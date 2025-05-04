@@ -4,6 +4,7 @@ import org.basaltmc.io.NativeThread
 import org.basaltmc.io.TcpListener
 import org.basaltmc.protocol.status.ServerStatusPayload
 import org.basaltmc.text.Component
+import org.basaltmc.text.TextColor
 
 /**
  * A thread-per-connection server, per `basalt-io`'s current scope (no event loop yet).
@@ -26,8 +27,9 @@ public class BasaltServer(
 
     private fun currentStatus(): ServerStatusPayload =
         ServerStatusPayload(
-            description = Component.text("A Basalt Server"),
+            description = Component.text("A Basalt Server", TextColor.GRAY),
             players = ServerStatusPayload.Players(max = 20, online = 0),
             version = ServerStatusPayload.Version(BuildInfo.MINECRAFT_VERSION, BuildInfo.PROTOCOL_VERSION),
+            favicon = Favicon.bytes,
         )
 }

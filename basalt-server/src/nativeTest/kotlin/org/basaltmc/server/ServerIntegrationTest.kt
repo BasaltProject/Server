@@ -19,6 +19,7 @@ import org.basaltmc.protocol.status.ServerStatusPayload
 import org.basaltmc.protocol.status.StatusRequestPacket
 import org.basaltmc.protocol.status.StatusResponsePacket
 import org.basaltmc.protocol.writeVarInt
+import org.basaltmc.text.TextColor
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -111,6 +112,10 @@ class ServerIntegrationTest {
             ServerStatusPayload.Version(BuildInfo.MINECRAFT_VERSION, BuildInfo.PROTOCOL_VERSION),
             status.version,
         )
+        assertEquals(TextColor.GRAY, status.description.style.color)
+        assertEquals(Favicon.bytes.size, status.favicon?.size)
+        val pngSignature = byteArrayOf(0x89.toByte(), 'P'.code.toByte(), 'N'.code.toByte(), 'G'.code.toByte())
+        assertEquals(pngSignature.toList(), status.favicon?.take(4))
 
         sendUncompressed(connection, PingRequestPacket.ID) { PingRequestPacket(987654321L).write(it) }
         val pongBody = readFrame(connection, incoming, compressionEnabled = false)
