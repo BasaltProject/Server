@@ -63,6 +63,7 @@ ticking a world, and waiting. None of that needs a virtual machine.
 | Area | What it means |
 |---|---|
 | **Vanilla parity** | Bit-exact RNG, identical tick ordering, seed-identical world generation, vanilla datapack execution |
+| **World storage** | Linear region format by default (smaller, fewer disk I/O ops than Anvil); existing Anvil (`.mca`) worlds are detected and converted automatically on load |
 | **PSMod plugins** | Lua API, `.psmod` package format, hot reload, sandboxed execution, dependency resolution |
 | **Tooling** | Official CLI, VS Code extension, IntelliJ IDEA plugin, generated API docs and type definitions |
 | **Legacy clients** | Multi-version support so older Java clients can connect, translated at the edge |
