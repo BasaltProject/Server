@@ -16,6 +16,11 @@ kotlin {
             api(project(":basalt-auth"))
             api(project(":basalt-psmod"))
         }
+        nativeTest.dependencies {
+            // Only to play the client side of the online-mode handshake in ServerIntegrationTest.
+            implementation(libs.cryptography.core)
+            implementation(libs.cryptography.provider.optimal)
+        }
     }
 
     targets.withType<KotlinNativeTarget>().configureEach {
