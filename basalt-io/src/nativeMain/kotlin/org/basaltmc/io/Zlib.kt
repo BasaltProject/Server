@@ -5,6 +5,7 @@ package org.basaltmc.io
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
+import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.usePinned
@@ -13,6 +14,7 @@ import platform.zlib.Z_BUF_ERROR
 import platform.zlib.Z_OK
 import platform.zlib.compress2
 import platform.zlib.compressBound
+import platform.zlib.uLongVar
 import platform.zlib.uncompress
 
 /** Thrown when zlib reports the destination buffer was too small; the caller can retry with more room. */
@@ -35,7 +37,7 @@ public object Zlib {
         level: Int = 6,
     ): ByteArray {
         if (data.isEmpty()) return ByteArray(0)
-        val bound = compressBound(data.size.toULong())
+        val bound = compressBound(data.size.convert())
         val dest = UByteArray(bound.toInt())
         val source = data.toUByteArray()
         return memScoped {
@@ -47,7 +49,7 @@ public object Zlib {
                             destPinned.addressOf(0),
                             destLen.ptr,
                             srcPinned.addressOf(0),
-                            data.size.toULong(),
+                            data.size.convert(),
                             level,
                         )
                     }
@@ -67,11 +69,12 @@ public object Zlib {
         val dest = UByteArray(uncompressedSize)
         val source = data.toUByteArray()
         return memScoped {
-            val destLen = alloc(uncompressedSize.toULong())
+            val destLen = alloc<uLongVar>()
+            destLen.value = uncompressedSize.convert()
             val result =
                 source.usePinned { srcPinned ->
                     dest.usePinned { destPinned ->
-                        uncompress(destPinned.addressOf(0), destLen.ptr, srcPinned.addressOf(0), data.size.toULong())
+                        uncompress(destPinned.addressOf(0), destLen.ptr, srcPinned.addressOf(0), data.size.convert())
                     }
                 }
             when (result) {
