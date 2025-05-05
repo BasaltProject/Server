@@ -41,6 +41,19 @@ public fun ByteBuffer.readProtocolString(maxLength: Int = 32767): String {
     return result
 }
 
+public fun ByteBuffer.writeByteArray(bytes: ByteArray) {
+    writeVarInt(bytes.size)
+    writeBytes(bytes)
+}
+
+/** [maxSize] mirrors `FriendlyByteBuf.readByteArray`, which bounds against the buffer's own readable bytes by default. */
+public fun ByteBuffer.readByteArray(maxSize: Int = readableBytes): ByteArray {
+    val length = readVarInt()
+    if (length < 0) throw ProtocolException("Negative byte array length: $length")
+    if (length > maxSize) throw ProtocolException("Byte array length $length exceeds maximum allowed $maxSize")
+    return readBytes(length)
+}
+
 public fun ByteBuffer.writeBoolean(value: Boolean): Unit = writeByte(if (value) 1 else 0)
 
 public fun ByteBuffer.readBoolean(): Boolean = readByte() != 0.toByte()
