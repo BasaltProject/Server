@@ -40,6 +40,17 @@ public class SocketException(
 ) : Exception(message)
 
 /**
+ * Sets `sin_family` (and, on BSD-family systems, `sin_len`) for a fresh [sockaddr_in]. Split out
+ * as `expect`/`actual` because the struct genuinely differs at the ABI level, not just in the
+ * bundled Kotlin binding: BSD/Darwin's `sockaddr_in` has a `u_char sin_len` field before an
+ * `u_char sin_family` (4.4BSD's variable-length-record convention), while Linux's has no length
+ * field at all and `sin_family` alone is a 16-bit `sa_family_t`. `nativeMain` code has to call
+ * through this rather than assign the fields directly, or it only compiles for whichever family
+ * was used to write it.
+ */
+internal expect fun sockaddr_in.setAddressFamily()
+
+/**
  * Blocking IPv4 TCP sockets over `platform.posix`, which Kotlin/Native bundles for every POSIX
  * target (no custom cinterop needed). This is a thread-per-connection building block, not an
  * event loop: `epoll`/`kqueue`/IOCP-based async I/O is deliberately out of scope for this pass
@@ -76,8 +87,7 @@ public class TcpListener private constructor(
                 setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, reuse.ptr, sizeOf<IntVar>().convert())
 
                 val address = alloc<sockaddr_in>()
-                address.sin_len = sizeOf<sockaddr_in>().toUByte()
-                address.sin_family = AF_INET.toUByte()
+                address.setAddressFamily()
                 address.sin_port = hostToNetworkShort(port)
                 address.sin_addr.s_addr = INADDR_ANY
 
@@ -142,8 +152,7 @@ public class TcpConnection internal constructor(
 
             memScoped {
                 val address = alloc<sockaddr_in>()
-                address.sin_len = sizeOf<sockaddr_in>().toUByte()
-                address.sin_family = AF_INET.toUByte()
+                address.setAddressFamily()
                 address.sin_port = hostToNetworkShort(port)
                 address.sin_addr.s_addr = parseIpv4NetworkOrder(host)
 
