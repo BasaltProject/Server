@@ -25,6 +25,9 @@ public class ChunkSection {
     public val nonAirBlockCount: Int
         get() = blockStateIds.count { it != Blocks.AIR.stateId }
 
+    /** A copy of the raw state IDs, in `(y * 16 + z) * 16 + x` order: the layout `PalettedContainer` expects. */
+    public fun blockStateIds(): IntArray = blockStateIds.copyOf()
+
     private fun index(
         x: Int,
         y: Int,
