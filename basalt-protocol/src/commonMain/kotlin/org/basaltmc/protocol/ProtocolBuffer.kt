@@ -1,6 +1,8 @@
 package org.basaltmc.protocol
 
 import org.basaltmc.io.ByteBuffer
+import org.basaltmc.nbt.NbtIO
+import org.basaltmc.nbt.NbtTag
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -68,3 +70,14 @@ public fun ByteBuffer.writeUuid(uuid: Uuid) {
 
 @OptIn(ExperimentalUuidApi::class)
 public fun ByteBuffer.readUuid(): Uuid = Uuid.fromLongs(readLong(), readLong())
+
+/** "Network NBT": a root tag with no name field, used by chat, registry data, and disconnect reasons. */
+public fun ByteBuffer.writeAnonymousNbt(tag: NbtTag) {
+    writeBytes(NbtIO.writeAnonymous(tag))
+}
+
+public fun ByteBuffer.readAnonymousNbt(): NbtTag {
+    val result = NbtIO.readAnonymous(toByteArray())
+    skip(result.bytesConsumed)
+    return result.tag
+}
