@@ -6,6 +6,12 @@ public data class NamedTag(
     val tag: NbtTag,
 )
 
+/** Result of [NbtIO.readAnonymous]: the parsed tag and how many bytes of the input it consumed. */
+public data class AnonymousNbtResult(
+    val tag: NbtTag,
+    val bytesConsumed: Int,
+)
+
 /**
  * Binary NBT reader/writer. Deliberately has no notion of gzip/zlib: compression is a transport
  * concern, layered on top by callers that already have a compressor (`basalt-io`'s zlib
@@ -37,6 +43,22 @@ public object NbtIO {
         bytes: ByteArray,
         decompress: (ByteArray) -> ByteArray,
     ): NamedTag = read(decompress(bytes))
+
+    /** The root tag has no name field, unlike [write]/[read]: the shape modern network packets use. */
+    public fun writeAnonymous(root: NbtTag): ByteArray {
+        val writer = GrowableByteWriter()
+        writer.writeByte(root.type.id)
+        if (root.type != NbtType.END) writePayload(writer, root)
+        return writer.toByteArray()
+    }
+
+    /** Reads one anonymous root tag starting at the front of [bytes], reporting how many bytes it consumed. */
+    public fun readAnonymous(bytes: ByteArray): AnonymousNbtResult {
+        val reader = ArrayByteReader(bytes)
+        val type = NbtType.fromId(reader.readByte())
+        val tag = if (type == NbtType.END) NbtEnd else readPayload(reader, type)
+        return AnonymousNbtResult(tag, reader.position)
+    }
 
     private fun writeNamedTag(
         writer: ByteWriter,
