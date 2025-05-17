@@ -10,12 +10,8 @@ import org.basaltmc.auth.OnlineMode
 import org.basaltmc.auth.SessionKeyPair
 import org.basaltmc.auth.SessionProfile
 import org.basaltmc.auth.SessionService
-import org.basaltmc.common.logging.LogLevel
 import org.basaltmc.io.ByteBuffer
-import org.basaltmc.io.NativeThread
 import org.basaltmc.io.TcpConnection
-import org.basaltmc.io.Zlib
-import org.basaltmc.protocol.PacketFraming
 import org.basaltmc.protocol.handshake.ClientIntent
 import org.basaltmc.protocol.handshake.HandshakePacket
 import org.basaltmc.protocol.login.HelloPacket
@@ -30,8 +26,6 @@ import org.basaltmc.protocol.status.PongResponsePacket
 import org.basaltmc.protocol.status.ServerStatusPayload
 import org.basaltmc.protocol.status.StatusRequestPacket
 import org.basaltmc.protocol.status.StatusResponsePacket
-import org.basaltmc.protocol.writeVarInt
-import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.text.TextColor
 import kotlin.random.Random
 import kotlin.test.Test
@@ -50,138 +44,7 @@ class ServerIntegrationTest {
     private val port = 25566
 
     private fun startServer() {
-        startServerOn(port, onlineMode = null)
-    }
-
-    private fun startServerOn(
-        boundPort: Int,
-        onlineMode: OnlineMode?,
-    ) {
-        // A bind() failure on the spawned thread no longer crashes the process (see
-        // NativeThread's KDoc), so it is safe to retry the whole attempt: CI runners have shown
-        // occasional transient bind failures that a fresh attempt clears.
-        repeat(3) { attempt ->
-            val config =
-                BasaltConfig(
-                    port = boundPort,
-                    motd = "A Basalt Server",
-                    maxPlayers = 20,
-                    onlineMode = onlineMode != null,
-                    worldName = "world",
-                    logLevel = LogLevel.INFO,
-                )
-            NativeThread.start { BasaltServer(config, onlineMode).start() }
-            val deadline =
-                kotlin.time.TimeSource.Monotonic
-                    .markNow()
-            while (deadline.elapsedNow().inWholeMilliseconds < 500) {
-                try {
-                    TcpConnection.connect("127.0.0.1", boundPort).close()
-                    return
-                } catch (_: Exception) {
-                    // not up yet, keep trying
-                }
-            }
-            if (attempt < 2) {
-                val backoff =
-                    kotlin.time.TimeSource.Monotonic
-                        .markNow()
-                while (backoff.elapsedNow().inWholeMilliseconds < 200) {
-                    // brief pause before retrying the bind
-                }
-            }
-        }
-    }
-
-    private fun sendUncompressed(
-        connection: TcpConnection,
-        id: Int,
-        writeBody: (ByteBuffer) -> Unit = {},
-    ) {
-        val body = ByteBuffer()
-        body.writeVarInt(id)
-        writeBody(body)
-        val wire = ByteBuffer()
-        PacketFraming.writeUncompressed(wire, body.toByteArray())
-        connection.write(wire.toByteArray())
-    }
-
-    private fun sendCompressed(
-        connection: TcpConnection,
-        id: Int,
-        threshold: Int,
-        writeBody: (ByteBuffer) -> Unit,
-    ) {
-        val body = ByteBuffer()
-        body.writeVarInt(id)
-        writeBody(body)
-        val wire = ByteBuffer()
-        PacketFraming.writeCompressed(wire, body.toByteArray(), threshold, Zlib::compress)
-        connection.write(wire.toByteArray())
-    }
-
-    private fun readFrame(
-        connection: TcpConnection,
-        incoming: ByteBuffer,
-        compressionEnabled: Boolean,
-    ): ByteBuffer {
-        val chunk = ByteArray(4096)
-        while (true) {
-            PacketFraming.tryReadFrame(incoming, compressionEnabled, decompress = Zlib::decompress)?.let { frame ->
-                incoming.discardReadBytes()
-                return ByteBuffer(frame.size).also { it.writeBytes(frame) }
-            }
-            val n = connection.read(chunk)
-            check(n > 0) { "connection closed while waiting for a frame" }
-            incoming.writeBytes(chunk, length = n)
-        }
-    }
-
-    private fun sendUncompressedEncrypted(
-        connection: TcpConnection,
-        id: Int,
-        cipher: Cfb8Cipher,
-        writeBody: (ByteBuffer) -> Unit = {},
-    ) {
-        val body = ByteBuffer()
-        body.writeVarInt(id)
-        writeBody(body)
-        val wire = ByteBuffer()
-        PacketFraming.writeUncompressed(wire, body.toByteArray())
-        connection.write(cipher.update(wire.toByteArray(), encrypting = true))
-    }
-
-    private fun sendCompressedEncrypted(
-        connection: TcpConnection,
-        id: Int,
-        threshold: Int,
-        cipher: Cfb8Cipher,
-        writeBody: (ByteBuffer) -> Unit,
-    ) {
-        val body = ByteBuffer()
-        body.writeVarInt(id)
-        writeBody(body)
-        val wire = ByteBuffer()
-        PacketFraming.writeCompressed(wire, body.toByteArray(), threshold, Zlib::compress)
-        connection.write(cipher.update(wire.toByteArray(), encrypting = true))
-    }
-
-    private fun readFrameEncrypted(
-        connection: TcpConnection,
-        incoming: ByteBuffer,
-        compressionEnabled: Boolean,
-        cipher: Cfb8Cipher,
-    ): ByteBuffer {
-        val chunk = ByteArray(4096)
-        while (true) {
-            PacketFraming.tryReadFrame(incoming, compressionEnabled, decompress = Zlib::decompress)?.let { frame ->
-                incoming.discardReadBytes()
-                return ByteBuffer(frame.size).also { it.writeBytes(frame) }
-            }
-            val n = connection.read(chunk)
-            check(n > 0) { "connection closed while waiting for a frame" }
-            incoming.writeBytes(cipher.update(chunk, length = n, encrypting = false))
-        }
+        startTestServer(port)
     }
 
     @Test
@@ -262,7 +125,7 @@ class ServerIntegrationTest {
                 sawUsername = username
                 authenticatedProfile
             }
-        startServerOn(onlinePort, OnlineMode(serverKeyPair, sessionService))
+        startTestServer(onlinePort, OnlineMode(serverKeyPair, sessionService))
 
         val connection = TcpConnection.connect("127.0.0.1", onlinePort)
         val incoming = ByteBuffer()
