@@ -128,6 +128,65 @@ public data class RegistryDataPacket(
     }
 }
 
+/** One named tag within a [TagGroup]: [ids] are numeric registry state/entry IDs, not names. */
+public data class TagEntry(
+    val name: String,
+    val ids: List<Int>,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeProtocolString(name)
+        buffer.writeVarInt(ids.size)
+        for (id in ids) buffer.writeVarInt(id)
+    }
+
+    public companion object {
+        public fun read(buffer: ByteBuffer): TagEntry {
+            val name = buffer.readProtocolString()
+            val count = buffer.readVarInt()
+            return TagEntry(name, List(count) { buffer.readVarInt() })
+        }
+    }
+}
+
+/** Every tag defined for one registry (`registryId`, matching [RegistryDataPacket]'s id format). */
+public data class TagGroup(
+    val registryId: String,
+    val tags: List<TagEntry>,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeProtocolString(registryId)
+        buffer.writeVarInt(tags.size)
+        for (tag in tags) tag.write(buffer)
+    }
+
+    public companion object {
+        public fun read(buffer: ByteBuffer): TagGroup {
+            val registryId = buffer.readProtocolString()
+            val count = buffer.readVarInt()
+            return TagGroup(registryId, List(count) { TagEntry.read(buffer) })
+        }
+    }
+}
+
+/** Clientbound, id 0x0d: every tag Basalt defines, grouped by registry. Mirrors `ClientboundUpdateTagsPacket`. */
+public data class TagsPacket(
+    val groups: List<TagGroup>,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeVarInt(groups.size)
+        for (group in groups) group.write(buffer)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x0d
+
+        public fun read(buffer: ByteBuffer): TagsPacket {
+            val count = buffer.readVarInt()
+            return TagsPacket(List(count) { TagGroup.read(buffer) })
+        }
+    }
+}
+
 /** Both directions, id 0x03: ends Configuration. Empty body. Mirrors `(Clientbound|Serverbound)FinishConfigurationPacket`. */
 public object FinishConfigurationPacket {
     public const val ID: Int = 3
