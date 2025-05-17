@@ -12,6 +12,7 @@ import org.basaltmc.protocol.PacketFraming
 import org.basaltmc.protocol.ProtocolState
 import org.basaltmc.protocol.configuration.ClientInformationPacket
 import org.basaltmc.protocol.configuration.FinishConfigurationPacket
+import org.basaltmc.protocol.configuration.KnownPack
 import org.basaltmc.protocol.configuration.RegistryDataPacket
 import org.basaltmc.protocol.configuration.RegistryEntry
 import org.basaltmc.protocol.configuration.SelectKnownPacksPacket
@@ -246,7 +247,13 @@ public class ClientSession(
 
     private fun enterConfiguration() {
         state = ProtocolState.CONFIGURATION
-        sendCompressed(SelectKnownPacksPacket.CLIENTBOUND_ID) { SelectKnownPacksPacket(emptyList()).write(it) }
+        // Claims the client's own vanilla data pack rather than an empty list: the more correct
+        // default for a server with no datapacks of its own, though tested live against a real
+        // 26.2 client and confirmed this alone does not fill in registries Basalt never sends
+        // (cat_variant, wolf_variant, and the rest a real client still requires non-empty).
+        sendCompressed(SelectKnownPacksPacket.CLIENTBOUND_ID) {
+            SelectKnownPacksPacket(listOf(KnownPack("minecraft", "core", "26.2"))).write(it)
+        }
     }
 
     private fun handleConfiguration(
