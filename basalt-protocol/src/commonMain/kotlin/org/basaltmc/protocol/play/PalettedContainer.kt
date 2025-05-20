@@ -1,7 +1,6 @@
 package org.basaltmc.protocol.play
 
 import org.basaltmc.io.ByteBuffer
-import org.basaltmc.protocol.ProtocolException
 import org.basaltmc.protocol.readVarInt
 import org.basaltmc.protocol.writeVarInt
 
@@ -31,7 +30,9 @@ public object PalettedContainer {
         if (palette.size == 1) {
             buffer.writeByte(0.toByte())
             buffer.writeVarInt(palette.first())
-            buffer.writeVarInt(0)
+            // No data array follows: vanilla's zero-bit storage has zero longs, and (like the
+            // indirect/direct cases below) the length is never written on the wire, only computed
+            // from bitsPerEntry and the container size (`FriendlyByteBuf.writeFixedSizeLongArray`).
             return
         }
 
@@ -45,13 +46,11 @@ public object PalettedContainer {
             val indexOf = paletteList.withIndex().associate { (index, value) -> value to index }
             val storage = BitStorage(bitsPerEntry, values.size)
             for (i in values.indices) storage[i] = indexOf.getValue(values[i])
-            buffer.writeVarInt(storage.data.size)
             for (long in storage.data) buffer.writeLong(long)
         } else {
             buffer.writeByte(directBits.toByte())
             val storage = BitStorage(directBits, values.size)
             for (i in values.indices) storage[i] = values[i]
-            buffer.writeVarInt(storage.data.size)
             for (long in storage.data) buffer.writeLong(long)
         }
     }
@@ -64,8 +63,7 @@ public object PalettedContainer {
         val bitsPerEntry = buffer.readByte().toInt() and 0xFF
         if (bitsPerEntry == 0) {
             val value = buffer.readVarInt()
-            val emptyLength = buffer.readVarInt()
-            if (emptyLength != 0) throw ProtocolException("Single-valued paletted container had a non-empty data array")
+            // No data array to read: matches write's zero-bit case (see its comment).
             return IntArray(size) { value }
         }
 
@@ -75,7 +73,11 @@ public object PalettedContainer {
             } else {
                 null
             }
-        val longCount = buffer.readVarInt()
+        // The data array's length is never sent on the wire (vanilla's `readFixedSizeLongArray`):
+        // it's derived from bitsPerEntry and the container's own known size, same formula as
+        // BitStorage's own longCount.
+        val valuesPerLong = 64 / bitsPerEntry
+        val longCount = (size + valuesPerLong - 1) / valuesPerLong
         val data = LongArray(longCount) { buffer.readLong() }
         val storage = BitStorage(bitsPerEntry, size, data)
         return IntArray(size) { i -> palette?.get(storage[i]) ?: storage[i] }
