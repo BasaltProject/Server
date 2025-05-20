@@ -7,13 +7,13 @@ public data class BlockState(
 )
 
 /**
- * Hand-authored subset of the vanilla block registry: just enough for an in-memory flat world.
- * The full registry is [basalt-datagen]'s job once it exists.
- *
- * // parity: state IDs read from `minecraft-data`'s `26.1` data set (`blocks.json`), the closest
- * available reference to protocol 776; not yet cross-checked against the real 26.2 server jar.
- * These particular blocks (air, stone, dirt, bedrock, and grass_block's non-snowy default state)
- * have stayed at the same IDs across many past versions, but this is provisional until reconciled.
+ * Every block's default state, regenerated straight from the real 26.2 server jar's own data
+ * generator output (see [ALL_DEFAULT_BLOCK_STATES]'s KDoc): authoritative state IDs, not
+ * decompiled or guessed. Non-default states (block properties: facing, waterlogged, age...)
+ * aren't modeled yet, since nothing in `basalt-world`/`basalt-entity` needs them yet either; every
+ * block here is its default state only. A handful of commonly-referenced blocks get named
+ * constants for readability at call sites; every other block is still in [REGISTRY], just without
+ * its own named `val`.
  */
 public object Blocks {
     public val REGISTRY: Registry<BlockState> = Registry()
@@ -23,6 +23,12 @@ public object Blocks {
     public val GRASS_BLOCK: BlockState = register(9, "grass_block")
     public val DIRT: BlockState = register(10, "dirt")
     public val BEDROCK: BlockState = register(85, "bedrock")
+
+    init {
+        for ((stateId, path) in ALL_DEFAULT_BLOCK_STATES) {
+            if (REGISTRY.byId(stateId) == null) register(stateId, path)
+        }
+    }
 
     private fun register(
         stateId: Int,
