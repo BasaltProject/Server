@@ -1,6 +1,8 @@
 package org.basaltmc.server
 
+import org.basaltmc.assets.AssetCache
 import org.basaltmc.assets.EulaFile
+import org.basaltmc.assets.VersionManifest
 import org.basaltmc.auth.MojangSessionService
 import org.basaltmc.auth.OnlineMode
 import org.basaltmc.auth.SessionKeyPair
@@ -18,6 +20,13 @@ public fun main(args: Array<String>) {
     if (eulaResult is EulaFile.Result.Rejected) {
         exitProcess(EulaFile.REJECTED_EXIT_CODE)
     }
+
+    // Cached after the first run: `AssetCache.ensure` skips the download once the local copy's
+    // SHA-1 already matches, so this only touches the network again if the cache is missing or stale.
+    val assetsLogger = Logger("Assets")
+    val versionMetadata = VersionManifest().resolve(BuildInfo.MINECRAFT_VERSION)
+    val clientJarPath = AssetCache(logger = assetsLogger).ensure(versionMetadata, AssetCache.Artifact.CLIENT)
+    assetsLogger.info { "Client assets ready at $clientJarPath." }
 
     val config = BasaltConfig.load()
     val onlineMode = if (config.onlineMode) OnlineMode(SessionKeyPair.generate(), MojangSessionService()) else null
