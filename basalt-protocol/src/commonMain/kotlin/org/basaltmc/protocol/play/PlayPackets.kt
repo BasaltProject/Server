@@ -95,6 +95,7 @@ public data class LoginPlayPacket(
     val enableRespawnScreen: Boolean,
     val doLimitedCrafting: Boolean,
     val spawnInfo: SpawnInfo,
+    val onlineMode: Boolean,
     val enforcesSecureChat: Boolean,
 ) {
     public fun write(buffer: ByteBuffer) {
@@ -109,6 +110,7 @@ public data class LoginPlayPacket(
         buffer.writeBoolean(enableRespawnScreen)
         buffer.writeBoolean(doLimitedCrafting)
         spawnInfo.write(buffer)
+        buffer.writeBoolean(onlineMode)
         buffer.writeBoolean(enforcesSecureChat)
     }
 
@@ -127,6 +129,7 @@ public data class LoginPlayPacket(
             val enableRespawnScreen = buffer.readBoolean()
             val doLimitedCrafting = buffer.readBoolean()
             val spawnInfo = SpawnInfo.read(buffer)
+            val onlineMode = buffer.readBoolean()
             val enforcesSecureChat = buffer.readBoolean()
             return LoginPlayPacket(
                 entityId,
@@ -139,6 +142,7 @@ public data class LoginPlayPacket(
                 enableRespawnScreen,
                 doLimitedCrafting,
                 spawnInfo,
+                onlineMode,
                 enforcesSecureChat,
             )
         }
@@ -203,6 +207,37 @@ private fun ByteBuffer.readByteArrayList(): List<ByteArray> {
 }
 
 /**
+ * Clientbound, id 0x26: a miscellaneous world/game-state notification, one of a fixed set of
+ * numeric event types (see companion constants). Mirrors `ClientboundGameEventPacket`. Only
+ * [LEVEL_CHUNKS_LOAD_START] is used so far: real vanilla's join sequence sends it right before
+ * chunk data, and the client only starts tracking/waiting for chunks once it sees it (confirmed
+ * live: without it, the "loading terrain" screen never dismisses, even with correct chunks and a
+ * correct chunk-batch wrapper).
+ */
+public data class GameEventPacket(
+    val event: Int,
+    val param: Float,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeByte(event.toByte())
+        buffer.writeFloat(param)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x26
+        public const val LEVEL_CHUNKS_LOAD_START: Int = 13
+
+        public fun read(buffer: ByteBuffer): GameEventPacket =
+            GameEventPacket(buffer.readByte().toInt() and 0xFF, buffer.readFloat())
+    }
+}
+
+/** Serverbound, id 0x2c: the client confirming it has finished loading the world it spawned into. Empty body. Mirrors `ServerboundPlayerLoadedPacket`. */
+public object PlayerLoadedPacket {
+    public const val ID: Int = 0x2c
+}
+
+/**
  * Clientbound, id 0x2d: one chunk column's block/biome data. Mirrors `ClientboundLevelChunkPacket`.
  * `basalt-world` has no block entities yet, so that array is always empty here.
  */
@@ -264,6 +299,55 @@ public data class MapChunkPacket(
                 blockLight,
             )
         }
+    }
+}
+
+/** Clientbound, id 0x0c: marks the start of a batch of [MapChunkPacket] sends. Empty body. Mirrors `ClientboundChunkBatchStartPacket`. */
+public object ChunkBatchStartPacket {
+    public const val ID: Int = 0x0c
+}
+
+/**
+ * Clientbound, id 0x0b: marks the end of a chunk batch, with how many chunks it contained. Mirrors
+ * `ClientboundChunkBatchFinishedPacket`. Without wrapping chunk sends in a start/finish pair
+ * (confirmed live), a real client's "loading terrain" screen never dismisses: it tracks loading
+ * progress by chunk batch, not by individual [MapChunkPacket] arrivals.
+ */
+public data class ChunkBatchFinishedPacket(
+    val batchSize: Int,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeVarInt(batchSize)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x0b
+
+        public fun read(buffer: ByteBuffer): ChunkBatchFinishedPacket =
+            ChunkBatchFinishedPacket(
+                buffer.readVarInt(),
+            )
+    }
+}
+
+/**
+ * Serverbound, id 0x0b: the client's ack for a chunk batch, carrying its desired chunks-per-tick
+ * rate. Mirrors `ServerboundChunkBatchReceivedPacket`.
+ */
+public data class ChunkBatchReceivedPacket(
+    val desiredChunksPerTick: Float,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeFloat(desiredChunksPerTick)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x0b
+
+        public fun read(buffer: ByteBuffer): ChunkBatchReceivedPacket =
+            ChunkBatchReceivedPacket(
+                buffer.readFloat(),
+            )
     }
 }
 
@@ -398,6 +482,68 @@ public data class SpawnPositionPacket(
 
         public fun read(buffer: ByteBuffer): SpawnPositionPacket =
             SpawnPositionPacket(GlobalPos.read(buffer), buffer.readFloat(), buffer.readFloat())
+    }
+}
+
+/**
+ * Clientbound, id 0x5e: tells the client which chunk is the center of its loaded area. Mirrors
+ * `ClientboundSetChunkCacheCenterPacket`. Sent on join before any chunk data: without it (confirmed
+ * live) a real client's "loading terrain" screen never dismisses, since it never learns which
+ * chunks to expect.
+ */
+public data class SetChunkCacheCenterPacket(
+    val chunkX: Int,
+    val chunkZ: Int,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeVarInt(chunkX)
+        buffer.writeVarInt(chunkZ)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x5e
+
+        public fun read(buffer: ByteBuffer): SetChunkCacheCenterPacket =
+            SetChunkCacheCenterPacket(buffer.readVarInt(), buffer.readVarInt())
+    }
+}
+
+/**
+ * Clientbound, id 0x5f: how many chunks around the center the client should expect. Mirrors
+ * `ClientboundSetChunkCacheRadiusPacket`. Must match how many chunks the server actually sends
+ * (confirmed live: declaring a larger radius than sent, or none at all, leaves the client waiting
+ * for chunks that never arrive).
+ */
+public data class SetChunkCacheRadiusPacket(
+    val radius: Int,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeVarInt(radius)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x5f
+
+        public fun read(buffer: ByteBuffer): SetChunkCacheRadiusPacket =
+            SetChunkCacheRadiusPacket(
+                buffer.readVarInt(),
+            )
+    }
+}
+
+/** Clientbound, id 0x6f: the server's simulation distance. Mirrors `ClientboundSetSimulationDistancePacket`. */
+public data class SetSimulationDistancePacket(
+    val simulationDistance: Int,
+) {
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeVarInt(simulationDistance)
+    }
+
+    public companion object {
+        public const val ID: Int = 0x6f
+
+        public fun read(buffer: ByteBuffer): SetSimulationDistancePacket =
+            SetSimulationDistancePacket(buffer.readVarInt())
     }
 }
 
