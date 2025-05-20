@@ -8,6 +8,7 @@ kotlin {
             api(project(":basalt-common"))
             api(project(":basalt-nbt"))
             api(project(":basalt-io"))
+            api(project(":basalt-text"))
             implementation(libs.ktor.client.core)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.cryptography.core)
