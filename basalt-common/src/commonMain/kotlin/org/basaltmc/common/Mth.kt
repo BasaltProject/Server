@@ -86,6 +86,15 @@ public object Mth {
         toMax: Double,
     ): Double = clampedLerp(inverseLerp(value, fromMin, fromMax), toMin, toMax)
 
+    /** Unclamped linear remap of [value] from `[fromMin, fromMax]` to `[toMin, toMax]`. */
+    public fun map(
+        value: Double,
+        fromMin: Double,
+        fromMax: Double,
+        toMin: Double,
+        toMax: Double,
+    ): Double = lerp(inverseLerp(value, fromMin, fromMax), toMin, toMax)
+
     public fun lerp(
         alpha: Float,
         p0: Float,

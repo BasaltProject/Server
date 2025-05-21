@@ -11,6 +11,7 @@ import org.basaltmc.common.logging.Logger
 import org.basaltmc.random.XoroshiroRandom
 import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.server.world.RealNoiseParameters
+import org.basaltmc.server.world.RealSurfaceEnvironment
 import org.basaltmc.world.densityfunction.BlendedNoise
 import org.basaltmc.world.terrain.NoiseRouterData
 import kotlin.system.exitProcess
@@ -50,13 +51,14 @@ public fun main(args: Array<String>) {
     val realNoises = RealNoiseParameters(serverJar, noiseRandom)
     val base3d = BlendedNoise.createUnseeded(0.25, 0.125, 80.0, 160.0, 8.0)
     val overworldRouter = NoiseRouterData.overworld(realNoises::get, base3d)
+    val surfaceEnvironment = RealSurfaceEnvironment(serverJar, noiseRandom, overworldRouter)
 
     val configLogger = Logger("Config")
     val config = BasaltConfig.load(logger = configLogger)
     Logger.defaultMinLevel = config.logLevel
 
     val onlineMode = if (config.onlineMode) OnlineMode(SessionKeyPair.generate(), MojangSessionService()) else null
-    BasaltServer(config, onlineMode, overworldRouter).start(startedAt)
+    BasaltServer(config, onlineMode, overworldRouter, surfaceEnvironment).start(startedAt)
 }
 
 private const val WORLD_SEED = 0L
