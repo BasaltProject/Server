@@ -37,6 +37,22 @@ public object VanillaRegistryData {
             // IntProviders.codec's Either<Int, IntProvider>: a bare int is shorthand for a constant provider.
             putInt("monster_spawn_light_level", 0)
             putInt("monster_spawn_block_light_limit", 0)
+            // `attributes` is `EnvironmentAttributeMap`'s codec: absent entirely defaults to EMPTY, and
+            // every color attribute here (`EnvironmentAttributes.SKY_COLOR`, `CLOUD_COLOR`,
+            // `FOG_COLOR`, `AMBIENT_LIGHT_COLOR`) defaults to `0` (opaque black) when missing from the
+            // map, that was the real cause of the black sky/void-colored fog, not a light-level bug.
+            // Values verbatim from the real jar's `data/minecraft/dimension_type/overworld.json`.
+            // `default_clock`/`timelines` (day/night progression via the new `WorldClock`/`Timeline`
+            // registries) aren't modeled yet: both are optional and default to "no clock"/empty, and
+            // are a separate concern from these static backdrop colors.
+            this["attributes"] =
+                NbtCompound().apply {
+                    putString("minecraft:visual/sky_color", "#78a7ff")
+                    putString("minecraft:visual/fog_color", "#c0d8ff")
+                    putString("minecraft:visual/cloud_color", "#ccffffff")
+                    putFloat("minecraft:visual/cloud_height", 192.33f)
+                    putString("minecraft:visual/ambient_light_color", "#0a0a0a")
+                }
         }
 
     public fun plainsBiome(): NbtCompound =

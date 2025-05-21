@@ -8,10 +8,14 @@ import org.basaltmc.protocol.play.PalettedContainer
 /**
  * Turns a [Chunk] into the wire bytes `basalt-protocol`'s `MapChunkPacket.chunkData` and
  * `UpdateLightPacket` need. Biomes are always plains: `basalt-world` does not vary biomes yet.
- * Light is a uniform value per section, not real propagation: sections entirely above the flat
- * world's surface get full skylight, sections at or below get none. This is the basic lighting a
- * flat world needs, not a general light engine (that belongs to a later pass with real terrain to
- * propagate light across).
+ * Light is a uniform value per section, not real propagation: sections entirely below the
+ * chunk's own tallest column get no skylight, everything at or above it gets full skylight. This
+ * is the basic lighting a flat world needs, not a general light engine (that belongs to a later
+ * pass with real terrain to propagate light across); using the chunk's tallest column rather than
+ * a single fixed one (`heightmap()[0]`, correct only when every column in the chunk is the same
+ * height, as in a flat world) matters once terrain actually varies within a chunk: real hills
+ * were being marked skyless above ground, the sky rendering solid black even directly over lit
+ * terrain, confirmed live once `NoiseWorldGenerator` replaced the flat world.
  */
 public object ChunkDataCodec {
     private const val BLOCK_DIRECT_BITS = 8
@@ -79,7 +83,7 @@ public object ChunkDataCodec {
     )
 
     public fun encodeLight(chunk: Chunk): LightData {
-        val surfaceY = chunk.heightmap()[0]
+        val surfaceY = chunk.heightmap().max()
         var maskBits = 0L
         var emptyMaskBits = 0L
         val arrays = mutableListOf<ByteArray>()

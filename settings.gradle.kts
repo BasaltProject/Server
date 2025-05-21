@@ -30,6 +30,6 @@ include(
     ":basalt-translate",
     ":basalt-bedrock",
     ":basalt-lua",
-    ":basalt-psmod",
+    ":basalt-bsmod",
     ":basalt-datagen",
 )

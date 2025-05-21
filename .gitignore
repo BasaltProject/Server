@@ -35,3 +35,6 @@ gradle-app.setting
 eula.txt
 basalt.toml
 .basalt/
+/world/
+basalt_server_test_world/
+basalt_asset_cache_test/

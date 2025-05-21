@@ -40,6 +40,7 @@ import org.basaltmc.protocol.play.ChunkBatchStartPacket
 import org.basaltmc.protocol.play.ClientboundBlockChangedAckPacket
 import org.basaltmc.protocol.play.ClientboundBlockUpdatePacket
 import org.basaltmc.protocol.play.EntityTeleportPacket
+import org.basaltmc.protocol.play.ForgetLevelChunkPacket
 import org.basaltmc.protocol.play.GameEventPacket
 import org.basaltmc.protocol.play.Gamemode
 import org.basaltmc.protocol.play.GlobalPos
@@ -81,6 +82,7 @@ import org.basaltmc.text.Component
 import org.basaltmc.text.TextColor
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.ChunkDataCodec
+import org.basaltmc.world.ChunkTracker
 import kotlin.random.Random
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -96,9 +98,11 @@ import kotlin.uuid.Uuid
  *
  * Configuration sends an empty known-pack list (Basalt has no datapacks yet), then the
  * `dimension_type`/`worldgen/biome` registries [VanillaRegistryData] hand-authors, then
- * [FinishConfigurationPacket]. Play sends [world] (a fixed chunk set decided once at server
- * startup, not real view-distance-based loading yet) and wires movement/chat through
- * [playerRegistry] so other connected players see them. Breaking a block ([handlePlayerAction])
+ * [FinishConfigurationPacket]. Play sends the chunks around spawn first, then streams new ones in
+ * (generating them on demand through [world]) and forgets old ones as the player crosses chunk
+ * boundaries ([chunkTracker], the same square view area [SetChunkCacheRadiusPacket] already
+ * declares, just re-centered instead of fixed at the spawn position), and wires movement/chat
+ * through [playerRegistry] so other connected players see them. Breaking a block ([handlePlayerAction])
  * is instant-only (creative-style, no hardness/tool timing) and broadcasts to every connected
  * player through [WorldState]'s single lock; placing one is acknowledged but not yet acted on,
  * since it needs a held-item/inventory model that doesn't exist yet.
@@ -125,6 +129,11 @@ public class ClientSession(
 
     private var pendingProfile: GameProfile? = null
     private var playerSession: PlayerSession? = null
+
+    private val chunkTracker = ChunkTracker()
+    private var viewRadius = 0
+    private var centerChunkX = 0
+    private var centerChunkZ = 0
 
     public fun run() {
         val readChunk = ByteArray(4096)
@@ -446,8 +455,13 @@ public class ClientSession(
 
         // Without these, a real client's "loading terrain" screen never dismisses: it has no
         // center to count chunks around and no radius to know when it has enough (confirmed live).
-        val centerChunkX = spawnX.toInt() shr 4
-        val centerChunkZ = spawnZ.toInt() shr 4
+        centerChunkX = spawnX.toInt() shr 4
+        centerChunkZ = spawnZ.toInt() shr 4
+        viewRadius = chunkRadius
+        // Seeds the tracker with exactly the square `world.chunks` already is (the fixed area
+        // BasaltServer generated around spawn), so later crossings compute deltas relative to it
+        // instead of re-sending everything as "newly loaded" on the first move.
+        chunkTracker.update(centerChunkX, centerChunkZ, viewRadius)
         sendCompressed(SetChunkCacheCenterPacket.ID) { SetChunkCacheCenterPacket(centerChunkX, centerChunkZ).write(it) }
         sendCompressed(SetChunkCacheRadiusPacket.ID) { SetChunkCacheRadiusPacket(chunkRadius).write(it) }
         sendCompressed(SetSimulationDistancePacket.ID) { SetSimulationDistancePacket(chunkRadius).write(it) }
@@ -639,6 +653,7 @@ public class ClientSession(
         session.yaw = yaw
         session.pitch = pitch
         session.onGround = onGround
+        streamChunksAround(x, z)
         for (other in playerRegistry?.snapshot().orEmpty()) {
             if (other.uuid == session.uuid) continue
             other.connection.sendPlayPacket(EntityTeleportPacket.ID) {
@@ -652,6 +667,36 @@ public class ClientSession(
                     onGround,
                 ).write(it)
             }
+        }
+    }
+
+    /**
+     * Re-centers [chunkTracker] on the player's current chunk and applies the resulting delta: newly
+     * in-range chunks are generated on demand ([WorldState.getOrGenerateChunk]) and sent, chunks that
+     * fell out of range are forgotten client-side. A no-op when the player hasn't crossed into a new
+     * chunk, so this stays cheap on every movement packet, not just the ones that matter.
+     */
+    private fun streamChunksAround(
+        x: Double,
+        z: Double,
+    ) {
+        val chunkX = x.toInt() shr 4
+        val chunkZ = z.toInt() shr 4
+        if (chunkX == centerChunkX && chunkZ == centerChunkZ) return
+        centerChunkX = chunkX
+        centerChunkZ = chunkZ
+
+        val delta = chunkTracker.update(chunkX, chunkZ, viewRadius)
+        if (delta.toLoad.isEmpty() && delta.toUnload.isEmpty()) return
+
+        sendCompressed(SetChunkCacheCenterPacket.ID) { SetChunkCacheCenterPacket(chunkX, chunkZ).write(it) }
+        if (delta.toLoad.isNotEmpty()) {
+            sendCompressed(ChunkBatchStartPacket.ID) { }
+            for (pos in delta.toLoad) sendChunk(world.getOrGenerateChunk(pos.x, pos.z))
+            sendCompressed(ChunkBatchFinishedPacket.ID) { ChunkBatchFinishedPacket(delta.toLoad.size).write(it) }
+        }
+        for (pos in delta.toUnload) {
+            sendCompressed(ForgetLevelChunkPacket.ID) { ForgetLevelChunkPacket(pos.x, pos.z).write(it) }
         }
     }
 

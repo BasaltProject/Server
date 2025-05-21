@@ -87,6 +87,15 @@ class PlayPacketsTest {
     }
 
     @Test
+    fun forgetLevelChunkRoundTripsPositiveAndNegativeCoordinates() {
+        val buffer = ByteBuffer()
+        val packet = ForgetLevelChunkPacket(chunkX = -12345, chunkZ = 67890)
+        packet.write(buffer)
+        val result = ForgetLevelChunkPacket.read(buffer)
+        assertEquals(packet, result)
+    }
+
+    @Test
     fun updateLightRoundTrips() {
         val buffer = ByteBuffer()
         val packet =
