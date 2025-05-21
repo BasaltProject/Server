@@ -3,9 +3,9 @@ package org.basaltmc.world
 /**
  * Overworld vertical bounds.
  *
- * // parity: matches the 1.18+ Overworld dimension type (`min_y = -64`, `height = 384`), stable
- * across every real Minecraft release since; not yet confirmed against 26.2's actual dimension
- * type registry data, which needs `basalt-datagen` to extract.
+ * // parity: net.minecraft.world.level.levelgen.NoiseSettings.OVERWORLD_NOISE_SETTINGS
+ * (`create(-64, 384, 1, 2)`), confirmed directly against the real 26.2 jar, not just assumed
+ * stable from older versions.
  */
 public object WorldHeight {
     public const val MIN_Y: Int = -64
