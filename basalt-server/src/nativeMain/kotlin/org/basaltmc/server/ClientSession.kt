@@ -36,6 +36,8 @@ import org.basaltmc.protocol.play.ChatMessagePacket
 import org.basaltmc.protocol.play.ChunkBatchFinishedPacket
 import org.basaltmc.protocol.play.ChunkBatchReceivedPacket
 import org.basaltmc.protocol.play.ChunkBatchStartPacket
+import org.basaltmc.protocol.play.ClientboundBlockChangedAckPacket
+import org.basaltmc.protocol.play.ClientboundBlockUpdatePacket
 import org.basaltmc.protocol.play.EntityTeleportPacket
 import org.basaltmc.protocol.play.GameEventPacket
 import org.basaltmc.protocol.play.Gamemode
@@ -51,8 +53,10 @@ import org.basaltmc.protocol.play.PlayerInfoEntry
 import org.basaltmc.protocol.play.PlayerInfoRemovePacket
 import org.basaltmc.protocol.play.PlayerLoadedPacket
 import org.basaltmc.protocol.play.PlayerPositionPacket
+import org.basaltmc.protocol.play.ServerboundPlayerActionPacket
 import org.basaltmc.protocol.play.ServerboundPositionLookPacket
 import org.basaltmc.protocol.play.ServerboundPositionPacket
+import org.basaltmc.protocol.play.ServerboundUseItemOnPacket
 import org.basaltmc.protocol.play.SetChunkCacheCenterPacket
 import org.basaltmc.protocol.play.SetChunkCacheRadiusPacket
 import org.basaltmc.protocol.play.SetSimulationDistancePacket
@@ -66,10 +70,12 @@ import org.basaltmc.protocol.status.PongResponsePacket
 import org.basaltmc.protocol.status.StatusRequestPacket
 import org.basaltmc.protocol.status.StatusResponsePacket
 import org.basaltmc.protocol.writeVarInt
+import org.basaltmc.registry.Blocks
 import org.basaltmc.server.player.PlayerRegistry
 import org.basaltmc.server.player.PlayerSession
 import org.basaltmc.server.registry.VanillaRegistryData
 import org.basaltmc.server.registry.VanillaTagData
+import org.basaltmc.server.world.WorldState
 import org.basaltmc.text.Component
 import org.basaltmc.text.TextColor
 import org.basaltmc.world.Chunk
@@ -91,7 +97,10 @@ import kotlin.uuid.Uuid
  * `dimension_type`/`worldgen/biome` registries [VanillaRegistryData] hand-authors, then
  * [FinishConfigurationPacket]. Play sends [world] (a fixed chunk set decided once at server
  * startup, not real view-distance-based loading yet) and wires movement/chat through
- * [playerRegistry] so other connected players see them.
+ * [playerRegistry] so other connected players see them. Breaking a block ([handlePlayerAction])
+ * is instant-only (creative-style, no hardness/tool timing) and broadcasts to every connected
+ * player through [WorldState]'s single lock; placing one is acknowledged but not yet acted on,
+ * since it needs a held-item/inventory model that doesn't exist yet.
  */
 @OptIn(ExperimentalUuidApi::class)
 public class ClientSession(
@@ -100,7 +109,7 @@ public class ClientSession(
     private val compressionThreshold: Int = 256,
     private val onlineMode: OnlineMode? = null,
     private val playerRegistry: PlayerRegistry? = null,
-    private val world: List<Chunk> = emptyList(),
+    private val world: WorldState = WorldState(emptyList()),
     private val spawn: Triple<Double, Double, Double> = Triple(8.5, 4.0, 8.5),
 ) {
     private val incoming = ByteBuffer()
@@ -394,7 +403,8 @@ public class ClientSession(
 
         // How far world actually extends from spawn, not a guess: the client must never be told
         // to expect more chunks than get sent (see the packets right below).
-        val chunkRadius = world.maxOfOrNull { maxOf(kotlin.math.abs(it.chunkX), kotlin.math.abs(it.chunkZ)) } ?: 0
+        val chunkRadius =
+            world.chunks.maxOfOrNull { maxOf(kotlin.math.abs(it.chunkX), kotlin.math.abs(it.chunkZ)) } ?: 0
         val (spawnX, spawnY, spawnZ) = spawn
 
         val entityId = registry.allocateEntityId()
@@ -414,7 +424,12 @@ public class ClientSession(
                         dimension = 0,
                         dimensionName = "minecraft:overworld",
                         hashedSeed = 0L,
-                        gamemode = Gamemode.SURVIVAL,
+                        // Must match what block breaking actually does (instant, no hardness/tool
+                        // timing): reporting SURVIVAL while breaking like CREATIVE would desync the
+                        // client's own prediction, which times survival mining client-side before
+                        // sending STOP_DESTROY_BLOCK. Switch this back to SURVIVAL only once real
+                        // hardness-timed breaking exists.
+                        gamemode = Gamemode.CREATIVE,
                         previousGamemode = 255,
                         isDebug = false,
                         isFlat = true,
@@ -474,8 +489,8 @@ public class ClientSession(
             GameEventPacket(GameEventPacket.LEVEL_CHUNKS_LOAD_START, 0f).write(it)
         }
         sendCompressed(ChunkBatchStartPacket.ID) { }
-        for (chunk in world) sendChunk(chunk)
-        sendCompressed(ChunkBatchFinishedPacket.ID) { ChunkBatchFinishedPacket(world.size).write(it) }
+        for (chunk in world.chunks) sendChunk(chunk)
+        sendCompressed(ChunkBatchFinishedPacket.ID) { ChunkBatchFinishedPacket(world.chunks.size).write(it) }
 
         for (other in others) {
             other.connection.sendPlayPacket(PlayerInfoAddPacket.ID) {
@@ -556,11 +571,52 @@ public class ClientSession(
                 val chat = ChatMessagePacket.read(body)
                 broadcastChat(chat.message)
             }
+            ServerboundPlayerActionPacket.ID -> {
+                val action = ServerboundPlayerActionPacket.read(body)
+                handlePlayerAction(action)
+            }
+            ServerboundUseItemOnPacket.ID -> {
+                // Placing a block depends on which item the player is holding, and there's no
+                // inventory/held-item state to consult yet: acknowledged (so the client's own
+                // prediction doesn't get stuck waiting), not acted on. Documented gap.
+                val useItemOn = ServerboundUseItemOnPacket.read(body)
+                sendCompressed(ClientboundBlockChangedAckPacket.ID) {
+                    ClientboundBlockChangedAckPacket(useItemOn.sequence).write(it)
+                }
+            }
             AcceptTeleportationPacket.ID,
             PlayKeepAlivePacket.SERVERBOUND_ID,
             ChunkBatchReceivedPacket.ID,
             PlayerLoadedPacket.ID,
             -> Unit
+        }
+    }
+
+    /**
+     * Instant-break only, matching vanilla's creative-mode digging (`ServerPlayerGameMode.
+     * destroyBlock` on the first packet, no timing): [ServerboundPlayerActionPacket.Action
+     * .ABORT_DESTROY_BLOCK]/[ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK] are no-ops.
+     * Survival's hardness/tool-speed-timed breaking needs block hardness data and a real game mode
+     * model, neither of which exist yet: documented gap, not a silent shortcut.
+     */
+    private fun handlePlayerAction(action: ServerboundPlayerActionPacket) {
+        if (action.action != ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK) {
+            sendCompressed(ClientboundBlockChangedAckPacket.ID) {
+                ClientboundBlockChangedAckPacket(action.sequence).write(it)
+            }
+            return
+        }
+
+        val changed = world.setBlockState(action.pos.x, action.pos.y, action.pos.z, Blocks.AIR.stateId)
+        sendCompressed(ClientboundBlockChangedAckPacket.ID) {
+            ClientboundBlockChangedAckPacket(action.sequence).write(it)
+        }
+        if (!changed) return
+
+        for (player in playerRegistry?.snapshot().orEmpty()) {
+            player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                ClientboundBlockUpdatePacket(action.pos, Blocks.AIR.stateId).write(it)
+            }
         }
     }
 
