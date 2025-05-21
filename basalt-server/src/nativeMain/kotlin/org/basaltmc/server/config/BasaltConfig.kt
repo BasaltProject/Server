@@ -1,6 +1,7 @@
 package org.basaltmc.server.config
 
 import org.basaltmc.common.logging.LogLevel
+import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.FileIO
 
 private const val DEFAULT_TOML = """# Basalt server configuration, generated once with vanilla-parity defaults.
@@ -63,17 +64,20 @@ public data class BasaltConfig(
         public fun load(
             path: String = "basalt.toml",
             legacyPropertiesPath: String = "server.properties",
+            logger: Logger = Logger("Config"),
         ): BasaltConfig {
             if (!FileIO.exists(path)) {
                 val legacy = FileIO.readText(legacyPropertiesPath)
                 if (legacy != null) {
-                    println("Found $legacyPropertiesPath, importing recognized values into $path once.")
+                    logger.info { "Found $legacyPropertiesPath, importing recognized values into $path once." }
                     FileIO.writeText(path, mergeLegacyProperties(DEFAULT_TOML, parseJavaProperties(legacy)))
                 } else {
+                    logger.info { "$path not found, generating one with vanilla-parity defaults." }
                     FileIO.writeText(path, DEFAULT_TOML)
                 }
             }
             val text = FileIO.readText(path) ?: throw TomlFormatException("Failed to read $path after writing it")
+            logger.info { "Loaded configuration from $path." }
             return fromToml(Toml.parse(text))
         }
 
