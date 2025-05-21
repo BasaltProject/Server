@@ -1,8 +1,11 @@
 package org.basaltmc.world.terrain
 
+import org.basaltmc.random.WorldgenRandom
+import org.basaltmc.random.XoroshiroRandom
 import org.basaltmc.registry.Blocks
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.WorldHeight
+import org.basaltmc.world.terrain.decoration.PlainsDecoration
 import org.basaltmc.world.terrain.surface.SurfaceBuilder
 import org.basaltmc.world.terrain.surface.SurfaceRuleData
 import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
@@ -24,10 +27,19 @@ import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
  * than [DensityChunkSampler]'s own cell grid needs, an easy trap to fall back into after already
  * solving it once for the base terrain shape.
  *
+ * After surface rules, [PlainsDecoration] runs (short/tall grass, flowers, bushes: the real
+ * `vegetal_decoration` entries Plains actually has), seeded with the real
+ * `WorldgenRandom.setDecorationSeed([seed], chunkX * 16, chunkZ * 16)` formula, over the real
+ * `WorldgenRandom`-wrapping-`XoroshiroRandomSource` combination `ChunkGenerator
+ * .applyBiomeDecoration` itself uses (confirmed from its own decompiled body: the `seed` argument
+ * there is the plain world seed, not a separately derived per-region seed).
+ *
  * **Documented gaps, matching this project's own established scope for this pass:**
  * - No caves/aquifers/ore veins: [OverworldNoiseRouter.finalDensity] itself already omits them
  *   (see its own KDoc).
- * - No decoration (trees, ores, structures): separate, tracked work.
+ * - [PlainsDecoration] itself has its own documented gaps (trees, mushrooms, pumpkins, sugar cane,
+ *   glow lichen, firefly bushes: not ported yet).
+ * - No structures: separate, tracked work.
  */
 public object RealTerrainGenerator {
     private const val CELL_WIDTH = 4
@@ -38,6 +50,7 @@ public object RealTerrainGenerator {
         environment: SurfaceRuleEnvironment,
         chunkX: Int,
         chunkZ: Int,
+        seed: Long = 0L,
     ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         val sampler =
@@ -63,6 +76,9 @@ public object RealTerrainGenerator {
             ChunkScopedSurfaceEnvironment(environment, heightmap),
             SurfaceRuleData.overworld(),
         )
+        val decorationRandom = WorldgenRandom(XoroshiroRandom(seed))
+        decorationRandom.setDecorationSeed(seed, chunkX * 16, chunkZ * 16)
+        PlainsDecoration.decorate(chunk, decorationRandom)
         return chunk
     }
 }
