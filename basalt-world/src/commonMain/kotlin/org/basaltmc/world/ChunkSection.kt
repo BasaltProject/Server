@@ -28,6 +28,12 @@ public class ChunkSection {
     /** A copy of the raw state IDs, in `(y * 16 + z) * 16 + x` order: the layout `PalettedContainer` expects. */
     public fun blockStateIds(): IntArray = blockStateIds.copyOf()
 
+    /** Overwrites every state ID at once, in the same `(y * 16 + z) * 16 + x` order [blockStateIds] returns. */
+    public fun setBlockStateIds(ids: IntArray) {
+        require(ids.size == blockStateIds.size) { "expected ${blockStateIds.size} state ids, got ${ids.size}" }
+        ids.copyInto(blockStateIds)
+    }
+
     private fun index(
         x: Int,
         y: Int,
