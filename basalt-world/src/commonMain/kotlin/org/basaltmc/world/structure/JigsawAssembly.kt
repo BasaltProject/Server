@@ -32,6 +32,19 @@ public data class PlacedStructurePiece(
  * targetRigid` path (a plain Y delta, no heightmap query) is what actually runs in practice; the
  * `terrain_matching` path (calling [heightAt]) is wired for completeness but effectively untested
  * against real data.
+ *
+ * **A real bug found and fixed after real gameplay reproduced a CPU-pegged hang**: this class
+ * originally had no equivalent of real vanilla's own outer bound on the jigsaw "free space"
+ * (`JigsawPlacement.addPieces`'s own `AABB` capped to `maxDistanceFromCenter`, which the free
+ * region a candidate piece must fit *entirely* inside is intersected against before anything else
+ * runs). Without it, nothing stopped a chain of connections from sprawling outward indefinitely
+ * (bounded by [assemble]'s own `maxDepth`, but real pools branch widely enough that "bounded by
+ * depth" was still large: a stress test across a wide scattered chunk area reliably produced
+ * assemblies with piece counts far past what a real village ever has, and since collision
+ * checking is `O(n)` per candidate against every already-placed piece, an `O(n)`-piece runaway
+ * assembly is `O(n^2)` overall). [maxDistanceFromCenter] is now enforced exactly where real
+ * vanilla enforces it: a candidate is rejected unless its bounding box lies entirely within the
+ * square centered on the start piece, independent of (and checked before) the collision test.
  */
 public class JigsawAssembly(
     private val poolLookup: (String) -> StructureTemplatePool?,
@@ -44,6 +57,7 @@ public class JigsawAssembly(
         maxDepth: Int,
         random: WorldgenRandom,
         projectStartToHeightmap: Boolean,
+        maxDistanceFromCenter: Int,
     ): List<PlacedStructurePiece> {
         val startPool = poolLookup(startPoolName) ?: return emptyList()
         val centerRotation = StructureRotations.random(random)
@@ -62,12 +76,24 @@ public class JigsawAssembly(
         val pieces = mutableListOf(PlacedStructurePiece(centerElement, centerPosition, centerRotation, centerBox))
         if (maxDepth <= 0) return pieces
 
+        // parity: JigsawPlacement.addPieces's own bounding AABB, capped to maxDistanceFromCenter
+        // around the center piece; see this class's own KDoc for why this bound matters.
+        val allowedRegion =
+            StructureBoundingBox(
+                centerX - maxDistanceFromCenter,
+                Int.MIN_VALUE,
+                centerZ - maxDistanceFromCenter,
+                centerX + maxDistanceFromCenter,
+                Int.MAX_VALUE,
+                centerZ + maxDistanceFromCenter,
+            )
+
         val placedBoxes = mutableListOf(centerBox)
         val queue = ArrayDeque<Pair<PlacedStructurePiece, Int>>()
         queue.add(pieces[0] to 0)
         while (queue.isNotEmpty()) {
             val (sourcePiece, depth) = queue.removeFirst()
-            tryPlacingChildren(sourcePiece, depth, maxDepth, random, pieces, placedBoxes, queue)
+            tryPlacingChildren(sourcePiece, depth, maxDepth, random, pieces, placedBoxes, queue, allowedRegion)
         }
         return pieces
     }
@@ -80,6 +106,7 @@ public class JigsawAssembly(
         pieces: MutableList<PlacedStructurePiece>,
         placedBoxes: MutableList<StructureBoundingBox>,
         queue: ArrayDeque<Pair<PlacedStructurePiece, Int>>,
+        allowedRegion: StructureBoundingBox,
     ) {
         val sourceElement = sourcePiece.element
         val sourceRigid = sourceElement.projection == StructureProjection.RIGID
@@ -135,7 +162,7 @@ public class JigsawAssembly(
                         val targetBB = rawTargetBB.move(StructurePos(0, yOffset, 0))
                         val targetBoxPosition = rawTargetBoxPos + StructurePos(0, yOffset, 0)
 
-                        if (placedBoxes.none { it.intersects(targetBB) }) {
+                        if (allowedRegion.containsFully(targetBB) && placedBoxes.none { it.intersects(targetBB) }) {
                             placedBoxes.add(targetBB)
                             val targetPiece =
                                 PlacedStructurePiece(targetElement, targetBoxPosition, targetRotation, targetBB)

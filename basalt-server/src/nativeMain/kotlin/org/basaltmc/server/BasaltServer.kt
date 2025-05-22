@@ -4,6 +4,7 @@ import org.basaltmc.auth.OnlineMode
 import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.NativeThread
 import org.basaltmc.io.TcpListener
+import org.basaltmc.io.sleepMillis
 import org.basaltmc.protocol.status.ServerStatusPayload
 import org.basaltmc.server.command.ConsoleCommandRegistry
 import org.basaltmc.server.command.ConsoleReader
@@ -19,6 +20,7 @@ import org.basaltmc.world.terrain.OverworldNoiseRouter
 import org.basaltmc.world.terrain.RealTerrainGenerator
 import org.basaltmc.world.terrain.VillageStructureGenerator
 import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
+import kotlin.concurrent.AtomicInt
 import kotlin.system.exitProcess
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -83,19 +85,55 @@ public class BasaltServer(
     }
 
     private fun loadOrGenerateWorld(): WorldState {
-        val generated = mutableListOf<Chunk>()
-        val chunks =
+        val positions =
             (-SPAWN_RADIUS_CHUNKS..SPAWN_RADIUS_CHUNKS).flatMap { x ->
-                (-SPAWN_RADIUS_CHUNKS..SPAWN_RADIUS_CHUNKS).map { z ->
-                    WorldPersistence.loadChunk(config.worldName, DIMENSION, x, z)
-                        ?: generateChunk(x, z).also { generated += it }
-                }
+                (-SPAWN_RADIUS_CHUNKS..SPAWN_RADIUS_CHUNKS).map { z -> x to z }
             }
-        if (generated.isNotEmpty()) {
-            logger.info { "Generated ${generated.size} new chunk(s), saving them now." }
-            saveWorld(generated)
+        val fromDisk =
+            positions.associateWith { (x, z) ->
+                WorldPersistence.loadChunk(config.worldName, DIMENSION, x, z)
+            }
+        val toGenerate = fromDisk.filterValues { it == null }.keys.toList()
+        val freshlyGenerated = generateChunksInParallel(toGenerate)
+
+        val chunks = positions.map { pos -> fromDisk.getValue(pos) ?: freshlyGenerated.getValue(pos) }
+        if (freshlyGenerated.isNotEmpty()) {
+            logger.info { "Generated ${freshlyGenerated.size} new chunk(s), saving them now." }
+            saveWorld(freshlyGenerated.values.toList())
         }
         return WorldState(chunks, loadOrGenerate = ::generateChunk)
+    }
+
+    /**
+     * Splits [positions] round-robin across [STARTUP_GENERATION_WORKERS] worker threads: real
+     * terrain generation (density router, surface rules, decoration, village assembly) measured
+     * at tens of milliseconds to over a second per chunk, so generating the startup radius one
+     * chunk at a time on the main thread was most of this server's own startup time. Each worker
+     * writes only its own disjoint indices into [results] (no lock needed for the writes
+     * themselves), and the caller busy-waits on [remaining] rather than joining, since
+     * [NativeThread] is fire-and-forget by design (see its own KDoc). Safe to run before any
+     * player connects: nothing else touches the world yet, so this doesn't race against the
+     * concurrent-generation safety [WorldState]/`VillageStructureGenerator`/`VillageDataLoader`
+     * added for in-game chunk streaming, it just exercises it a little earlier.
+     */
+    private fun generateChunksInParallel(positions: List<Pair<Int, Int>>): Map<Pair<Int, Int>, Chunk> {
+        if (positions.isEmpty()) return emptyMap()
+        val workerCount = minOf(STARTUP_GENERATION_WORKERS, positions.size)
+        val results = arrayOfNulls<Chunk>(positions.size)
+        val remaining = AtomicInt(workerCount)
+        for (worker in 0 until workerCount) {
+            NativeThread.start {
+                var i = worker
+                while (i < positions.size) {
+                    val (x, z) = positions[i]
+                    results[i] = generateChunk(x, z)
+                    i += workerCount
+                }
+                remaining.decrementAndGet()
+            }
+        }
+        while (remaining.value > 0) sleepMillis(1L)
+        return positions.indices.associate { positions[it] to results[it]!! }
     }
 
     /** Where a player who has not been here before spawns: on top of the terrain at the world's own (8, 8) column, not a fixed Y that assumed a flat world. */
@@ -159,5 +197,11 @@ public class BasaltServer(
         // while staying in the range a real client behaves normally at.
         const val SPAWN_RADIUS_CHUNKS = 3
         const val DIMENSION = "overworld"
+
+        // A fixed worker count rather than a queried core count: this project has no portable
+        // "how many cores" call yet (would need its own per-platform cinterop), and 8 is a
+        // reasonable default that doesn't oversubscribe a small machine too badly while still
+        // giving a real speedup over one chunk at a time.
+        const val STARTUP_GENERATION_WORKERS = 8
     }
 }

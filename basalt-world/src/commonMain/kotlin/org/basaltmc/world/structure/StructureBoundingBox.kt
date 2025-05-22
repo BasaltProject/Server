@@ -21,6 +21,15 @@ public data class StructureBoundingBox(
             maxZ + offset.z,
         )
 
+    /** Whether [other] is entirely within this box on every axis (not merely overlapping). */
+    public fun containsFully(other: StructureBoundingBox): Boolean =
+        minX <= other.minX &&
+            other.maxX <= maxX &&
+            minY <= other.minY &&
+            other.maxY <= maxY &&
+            minZ <= other.minZ &&
+            other.maxZ <= maxZ
+
     public fun intersects(other: StructureBoundingBox): Boolean =
         minX <= other.maxX &&
             maxX >= other.minX &&
