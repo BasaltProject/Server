@@ -3,9 +3,10 @@ package org.basaltmc.world.terrain
 import org.basaltmc.random.WorldgenRandom
 import org.basaltmc.random.XoroshiroRandom
 import org.basaltmc.registry.Blocks
+import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.WorldHeight
-import org.basaltmc.world.terrain.decoration.PlainsDecoration
+import org.basaltmc.world.terrain.decoration.BiomeDecoration
 import org.basaltmc.world.terrain.surface.SurfaceBuilder
 import org.basaltmc.world.terrain.surface.SurfaceRuleData
 import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
@@ -32,9 +33,10 @@ import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
  * [villageGenerator] is given, [VillageStructureGenerator.generateInto] runs right after surface
  * rules and before decoration, matching that order.
  *
- * After structures, [PlainsDecoration] runs (short/tall grass, flowers, bushes: the real
- * `vegetal_decoration` entries Plains actually has), seeded with the real
- * `WorldgenRandom.setDecorationSeed([seed], chunkX * 16, chunkZ * 16)` formula, over the real
+ * After structures, [BiomeDecoration.forBiome] dispatches to whichever biome the chunk's own
+ * center column resolves to (real vanilla decorates per chunk-section biome too, see
+ * [BiomeDecoration]'s own KDoc for the simplification this project makes there), seeded with the
+ * real `WorldgenRandom.setDecorationSeed([seed], chunkX * 16, chunkZ * 16)` formula, over the real
  * `WorldgenRandom`-wrapping-`XoroshiroRandomSource` combination `ChunkGenerator
  * .applyBiomeDecoration` itself uses (confirmed from its own decompiled body: the `seed` argument
  * there is the plain world seed, not a separately derived per-region seed).
@@ -42,8 +44,9 @@ import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
  * **Documented gaps, matching this project's own established scope for this pass:**
  * - No caves/aquifers/ore veins: [OverworldNoiseRouter.finalDensity] itself already omits them
  *   (see its own KDoc).
- * - [PlainsDecoration] itself has its own documented gaps (trees, mushrooms, pumpkins, sugar cane,
- *   glow lichen, firefly bushes: not ported yet).
+ * - [BiomeDecoration] itself has its own documented per-biome gaps (see its own KDoc): only some
+ *   biomes have real decoration ported so far, the rest fall back to no vegetal decoration at all
+ *   (still strictly more correct than running another biome's decoration list on them).
  * - [villageGenerator] itself has its own documented gaps (see [VillageStructureGenerator]'s own
  *   KDoc): no terrain adaptation (buildings don't get their surrounding dirt "beard" carved to
  *   meet uneven ground), no block-state rotation on directional blocks, no entities.
@@ -87,7 +90,9 @@ public object RealTerrainGenerator {
         villageGenerator?.generateInto(chunk, chunkX, chunkZ, seed)
         val decorationRandom = WorldgenRandom(XoroshiroRandom(seed))
         decorationRandom.setDecorationSeed(seed, chunkX * 16, chunkZ * 16)
-        PlainsDecoration.decorate(chunk, decorationRandom)
+        val centerY = heightmap[8 + 8 * 16]
+        val biomeId = Identifier.parse(environment.biomeAt(chunkX * 16 + 8, centerY, chunkZ * 16 + 8))
+        BiomeDecoration.forBiome(biomeId)?.decorate(chunk, decorationRandom)
         return chunk
     }
 }
@@ -96,11 +101,38 @@ public object RealTerrainGenerator {
  * // parity: how net.minecraft.world.level.levelgen.SurfaceRules.Context.SteepMaterialCondition
  * clamps its neighbor lookup to the chunk under construction (`Math.max(chunkBlockZ - 1, 0)` etc,
  * never crossing into a neighboring chunk).
+ *
+ * [biomeAt] also memoizes here, by quart (4-block) position: real vanilla's own `isBiome` check
+ * re-samples the biome independently every time it is reached (there can be dozens in one
+ * [SurfaceRuleData.overworld] sequence, all for the same block position), and [delegate]'s own
+ * `biomeAt` is a real climate lookup (a brute-force scan over thousands of registered regions, see
+ * [OverworldBiomeSource]'s own KDoc), not a cheap field read. This cache is safe as a plain
+ * `MutableMap` specifically because one [ChunkScopedSurfaceEnvironment] is only ever used by the
+ * single thread generating this one chunk, then discarded: no cross-thread sharing, unlike
+ * [OverworldBiomeSource] itself (see its own KDoc for why a shared cache there was a real, measured
+ * regression: unbounded copy-on-write growth turned a ~1s startup into 45s).
  */
 private class ChunkScopedSurfaceEnvironment(
     private val delegate: SurfaceRuleEnvironment,
     private val heightmap: IntArray,
 ) : SurfaceRuleEnvironment by delegate {
+    private val biomeCache = HashMap<Long, String>()
+
+    override fun biomeAt(
+        x: Int,
+        y: Int,
+        z: Int,
+    ): String {
+        val key =
+            ((x shr 2).toLong() and 0x1FFFFFL) or
+                (((y shr 2).toLong() and 0xFFFFFL) shl 21) or
+                (((z shr 2).toLong() and 0x1FFFFFL) shl 41)
+        biomeCache[key]?.let { return it }
+        val biome = delegate.biomeAt(x, y, z)
+        biomeCache[key] = biome
+        return biome
+    }
+
     override fun estimatedSurfaceHeight(
         x: Int,
         z: Int,

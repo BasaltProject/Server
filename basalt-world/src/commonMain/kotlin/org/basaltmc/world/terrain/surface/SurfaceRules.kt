@@ -1,6 +1,7 @@
 package org.basaltmc.world.terrain.surface
 
 import org.basaltmc.common.Mth
+import org.basaltmc.world.terrain.BiomeTemperature
 
 /** // parity: net.minecraft.world.level.levelgen.SurfaceRules.Condition. */
 public fun interface Condition {
@@ -158,8 +159,13 @@ public object SurfaceRules {
             }
         }
 
-    /** // parity: SurfaceRules.temperature/Context.TemperatureHelperCondition. Needs real per-biome `coldEnoughToSnow`: not modeled, always false. Documented gap. */
-    public fun temperature(): ConditionSource = ConditionSource { Condition { false } }
+    /** // parity: SurfaceRules.temperature/Context.TemperatureHelperCondition, itself Biome.coldEnoughToSnow. */
+    public fun temperature(): ConditionSource =
+        ConditionSource { context ->
+            Condition {
+                BiomeTemperature.coldEnoughToSnow(context.biome(), context.blockX, context.blockY, context.blockZ)
+            }
+        }
 
     public fun ifTrue(
         condition: ConditionSource,

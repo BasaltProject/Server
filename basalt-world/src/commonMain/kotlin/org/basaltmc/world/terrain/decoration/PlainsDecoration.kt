@@ -31,8 +31,8 @@ import org.basaltmc.world.noise.SimplexNoise
  * `WorldgenRandom` degenerates to a pure passthrough over a bit-based inner source, using
  * [LegacyRandom] directly for those is already bit-identical.
  */
-public object PlainsDecoration {
-    public fun decorate(
+public object PlainsDecoration : BiomeVegetalDecoration {
+    override fun decorate(
         chunk: Chunk,
         random: WorldgenRandom,
     ) {
