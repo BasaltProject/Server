@@ -84,6 +84,29 @@ class TreeFeatureTest {
         assertTrue(leaves > 0, "expected at least one dark oak leaves block")
     }
 
+    @Test
+    fun megaSprucePlacesA2x2TrunkAndACrownOfLeaves() {
+        val chunk = chunkWithFlatGround(0)
+        val random = WorldgenRandom(XoroshiroRandom(3L))
+        val placed = TreeFeature.place(chunk, random, 6, 1, 6, TreeConfigs.MEGA_SPRUCE)
+        assertTrue(placed, "expected the mega spruce tree to place successfully")
+
+        var logs = 0
+        var leaves = 0
+        for (x in 0 until 16) {
+            for (y in 1..30) {
+                for (z in 0 until 16) {
+                    val id = chunk.getBlockStateId(x, y, z)
+                    if (id == spruceLogState) logs++
+                    if (id == spruceLeavesState) leaves++
+                }
+            }
+        }
+        // baseHeight 13 minimum, 2x2 trunk for all but the topmost layer: at least 13*3+1 = 40 logs.
+        assertTrue(logs >= 40, "expected at least 40 spruce logs (2x2 giant trunk), got $logs")
+        assertTrue(leaves > 0, "expected at least one spruce leaves block")
+    }
+
     private companion object {
         val oakLogState =
             org.basaltmc.registry.Blocks.REGISTRY

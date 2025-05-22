@@ -99,4 +99,24 @@ public object TreeConfigs {
             DarkOakFoliagePlacer(IntProvider.of(0), IntProvider.of(0)),
             FeatureSizeThreeLayers(1, 1, 0, 1, 2),
         )
+
+    // parity: TreeFeatures.MEGA_SPRUCE registration (AlterGroundDecorator podzol swap not ported, documented gap).
+    public val MEGA_SPRUCE: TreeConfiguration =
+        TreeConfiguration(
+            SPRUCE_LOG,
+            GiantTrunkPlacer(13, 2, 14),
+            SPRUCE_LEAVES,
+            MegaPineFoliagePlacer(IntProvider.of(0), IntProvider.of(0), IntProvider.uniform(13, 17)),
+            FeatureSizeTwoLayers(1, 1, 2),
+        )
+
+    // parity: TreeFeatures.MEGA_PINE registration.
+    public val MEGA_PINE: TreeConfiguration =
+        TreeConfiguration(
+            SPRUCE_LOG,
+            GiantTrunkPlacer(13, 2, 14),
+            SPRUCE_LEAVES,
+            MegaPineFoliagePlacer(IntProvider.of(0), IntProvider.of(0), IntProvider.uniform(3, 7)),
+            FeatureSizeTwoLayers(1, 1, 2),
+        )
 }

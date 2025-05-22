@@ -41,38 +41,89 @@ public object BiomeDecoration {
             Identifier.vanilla("sunflower_plains") to combine(TreeDecoration.single(TreeConfigs.OAK, 0, 0.05f, 1), PlainsDecoration),
             // parity: OverworldBiomes.forest(birch=false)/addOtherBirchTrees: TREES_BIRCH_AND_OAK_LEAF_LITTER, oak default.
             Identifier.vanilla("forest") to TreeDecoration.single(TreeConfigs.OAK, 10, 0.1f, 1),
+            // parity: OverworldBiomes.forest(flower=true): trees_flower_forest (birch 20%, fallen_birch/fancy_oak
+            // dropped, oak default) + flower_flower_forest (real 11-flower NoiseProvider) + default grass.
+            // flower_forest_flowers (a second wildflower patch) not ported, see FlowerForestDecoration's own KDoc.
+            Identifier.vanilla("flower_forest") to FlowerForestDecoration,
             // parity: OverworldBiomes.forest(birch=true, tall=false)/addBirchTrees: TREES_BIRCH, birch default.
             Identifier.vanilla("birch_forest") to TreeDecoration.single(TreeConfigs.BIRCH, 10, 0.1f, 1),
             // parity: OverworldBiomes.forest(birch=true, tall=true)/addTallBirchTrees: BIRCH_TALL, super_birch default.
             Identifier.vanilla("old_growth_birch_forest") to TreeDecoration.single(TreeConfigs.SUPER_BIRCH, 10, 0.1f, 1),
-            // parity: OverworldBiomes.taiga/addTaigaTrees: TREES_TAIGA, 33.3% pine else spruce (fallen_spruce entry dropped).
-            Identifier.vanilla("taiga") to TreeDecoration.choice(TreeConfigs.PINE, 0.33333334f, TreeConfigs.SPRUCE, 10, 0.1f, 1),
-            // parity: OverworldBiomes.taiga(snowy=true)/addSnowyTrees: TREES_SNOWY, spruce default.
-            Identifier.vanilla("snowy_taiga") to TreeDecoration.single(TreeConfigs.SPRUCE, 0, 0.1f, 1),
-            // parity: OverworldBiomes.savanna/addSavannaTrees: TREES_SAVANNA, 80% acacia else oak (fallen_oak entry dropped).
-            Identifier.vanilla("savanna") to TreeDecoration.choice(TreeConfigs.ACACIA, 0.8f, TreeConfigs.OAK, 1, 0.1f, 1),
-            // parity: OverworldBiomes.savanna(plateau=true)/addSavannaTrees: same TREES_SAVANNA feature and species mix as plains savanna.
-            Identifier.vanilla("savanna_plateau") to TreeDecoration.choice(TreeConfigs.ACACIA, 0.8f, TreeConfigs.OAK, 1, 0.1f, 1),
-            // parity: OverworldBiomes.savanna(shattered=true)/addShatteredSavannaTrees: TREES_WINDSWEPT_SAVANNA, same species mix.
-            Identifier.vanilla("windswept_savanna") to TreeDecoration.choice(TreeConfigs.ACACIA, 0.8f, TreeConfigs.OAK, 2, 0.1f, 1),
-            // parity: OverworldBiomes.jungle/addJungleTrees: TREES_JUNGLE, jungle_tree default (fancy_oak/jungle_bush/mega entries dropped).
-            Identifier.vanilla("jungle") to TreeDecoration.single(TreeConfigs.JUNGLE_TREE, 50, 0.1f, 1),
-            // parity: OverworldBiomes.sparseJungle/addSparseJungleTrees: TREES_SPARSE_JUNGLE, jungle_tree default.
-            Identifier.vanilla("sparse_jungle") to TreeDecoration.single(TreeConfigs.JUNGLE_TREE, 2, 0.1f, 1),
-            // parity: OverworldBiomes.windsweptHills(moreTrees=false)/addMountainTrees: TREES_WINDSWEPT_HILLS, 66.6% spruce else oak.
-            Identifier.vanilla("windswept_hills") to TreeDecoration.choice(TreeConfigs.SPRUCE, 0.666f, TreeConfigs.OAK, 0, 0.1f, 1),
-            Identifier.vanilla("windswept_gravelly_hills") to TreeDecoration.choice(TreeConfigs.SPRUCE, 0.666f, TreeConfigs.OAK, 0, 0.1f, 1),
+            // parity: OverworldBiomes.taiga/addTaigaTrees+addDefaultFlowers: TREES_TAIGA (33.3% pine else spruce,
+            // fallen_spruce entry dropped) plus the real default flower patch (taiga uses addTaigaGrass, not
+            // addDefaultGrass, so no grass patch here, only flowers).
+            Identifier.vanilla("taiga") to
+                combine(TreeDecoration.choice(TreeConfigs.PINE, 0.33333334f, TreeConfigs.SPRUCE, 10, 0.1f, 1), DefaultVegetationDecoration.FLOWERS),
+            // parity: OverworldBiomes.taiga(snowy=true)/addSnowyTrees+addDefaultFlowers: TREES_SNOWY, spruce default.
+            Identifier.vanilla("snowy_taiga") to combine(TreeDecoration.single(TreeConfigs.SPRUCE, 0, 0.1f, 1), DefaultVegetationDecoration.FLOWERS),
+            // parity: OverworldBiomes.oldGrowthTaiga(spruce=true)/TREES_OLD_GROWTH_SPRUCE_TAIGA: 33.3% mega_spruce,
+            // 33.3% pine, fallen_spruce dropped (1.25%), spruce default. countExtra(10, 0.1, 1).
+            Identifier.vanilla("old_growth_spruce_taiga") to
+                combine(
+                    TreeDecoration.sequenceCountExtra(
+                        listOf(0.33333334f to TreeConfigs.MEGA_SPRUCE, 0.33333334f to TreeConfigs.PINE, 0.0125f to null),
+                        TreeConfigs.SPRUCE,
+                        10,
+                        0.1f,
+                        1,
+                    ),
+                    DefaultVegetationDecoration.FLOWERS,
+                ),
+            // parity: OverworldBiomes.oldGrowthTaiga(spruce=false)/TREES_OLD_GROWTH_PINE_TAIGA: 2.56% mega_spruce,
+            // 30.8% mega_pine, 33.3% pine, fallen_spruce dropped (1.25%), spruce default.
+            Identifier.vanilla("old_growth_pine_taiga") to
+                combine(
+                    TreeDecoration.sequenceCountExtra(
+                        listOf(0.025641026f to TreeConfigs.MEGA_SPRUCE, 0.30769232f to TreeConfigs.MEGA_PINE, 0.33333334f to TreeConfigs.PINE, 0.0125f to null),
+                        TreeConfigs.SPRUCE,
+                        10,
+                        0.1f,
+                        1,
+                    ),
+                    DefaultVegetationDecoration.FLOWERS,
+                ),
+            // parity: OverworldBiomes.plains(snowy=true, spikes=false/true)/addSnowyTrees: same TREES_SNOWY feature.
+            Identifier.vanilla("snowy_plains") to TreeDecoration.single(TreeConfigs.SPRUCE, 0, 0.1f, 1),
+            Identifier.vanilla("ice_spikes") to TreeDecoration.single(TreeConfigs.SPRUCE, 0, 0.1f, 1),
+            // parity: OverworldBiomes.savanna/addSavannaTrees+addWarmFlowers: TREES_SAVANNA (80% acacia else oak,
+            // fallen_oak entry dropped) plus flower_warm (real flowerDefault, rarity 1/16).
+            Identifier.vanilla("savanna") to
+                combine(TreeDecoration.choice(TreeConfigs.ACACIA, 0.8f, TreeConfigs.OAK, 1, 0.1f, 1), DefaultVegetationDecoration.WARM_FLOWERS),
+            // parity: OverworldBiomes.savanna(plateau=true)/addSavannaTrees+addWarmFlowers: same as plains savanna.
+            Identifier.vanilla("savanna_plateau") to
+                combine(TreeDecoration.choice(TreeConfigs.ACACIA, 0.8f, TreeConfigs.OAK, 1, 0.1f, 1), DefaultVegetationDecoration.WARM_FLOWERS),
+            // parity: OverworldBiomes.savanna(shattered=true)/addShatteredSavannaTrees+addDefaultFlowers (not
+            // addWarmFlowers: the shattered variant uses the real default rarity, not the warm one).
+            Identifier.vanilla("windswept_savanna") to
+                combine(TreeDecoration.choice(TreeConfigs.ACACIA, 0.8f, TreeConfigs.OAK, 2, 0.1f, 1), DefaultVegetationDecoration.FLOWERS),
+            // parity: OverworldBiomes.jungle/addJungleTrees+addWarmFlowers+addJungleGrass: TREES_JUNGLE (jungle_tree
+            // default, fancy_oak/jungle_bush/mega entries dropped) plus flower_warm and patch_grass_jungle.
+            Identifier.vanilla("jungle") to
+                combine(TreeDecoration.single(TreeConfigs.JUNGLE_TREE, 50, 0.1f, 1), DefaultVegetationDecoration.WARM_FLOWERS, JungleGrassDecoration),
+            // parity: OverworldBiomes.sparseJungle/addSparseJungleTrees+addWarmFlowers+addJungleGrass: TREES_SPARSE_JUNGLE, jungle_tree default.
+            Identifier.vanilla("sparse_jungle") to
+                combine(TreeDecoration.single(TreeConfigs.JUNGLE_TREE, 2, 0.1f, 1), DefaultVegetationDecoration.WARM_FLOWERS, JungleGrassDecoration),
+            // parity: OverworldBiomes.windsweptHills(moreTrees=false)/addMountainTrees+addDefaultFlowers+addDefaultGrass:
+            // TREES_WINDSWEPT_HILLS (66.6% spruce else oak) plus the real default grass and flower patches.
+            Identifier.vanilla("windswept_hills") to
+                combine(TreeDecoration.choice(TreeConfigs.SPRUCE, 0.666f, TreeConfigs.OAK, 0, 0.1f, 1), DefaultVegetationDecoration),
+            Identifier.vanilla("windswept_gravelly_hills") to
+                combine(TreeDecoration.choice(TreeConfigs.SPRUCE, 0.666f, TreeConfigs.OAK, 0, 0.1f, 1), DefaultVegetationDecoration),
             // parity: OverworldBiomes.windsweptHills(moreTrees=true)/addMountainForestTrees: TREES_WINDSWEPT_FOREST, same species mix.
-            Identifier.vanilla("windswept_forest") to TreeDecoration.choice(TreeConfigs.SPRUCE, 0.666f, TreeConfigs.OAK, 3, 0.1f, 1),
+            Identifier.vanilla("windswept_forest") to
+                combine(TreeDecoration.choice(TreeConfigs.SPRUCE, 0.666f, TreeConfigs.OAK, 3, 0.1f, 1), DefaultVegetationDecoration),
             // parity: OverworldBiomes.grove/addGroveTrees: TREES_GROVE, 33.3% pine else spruce (real "on snow" placement filter dropped).
             Identifier.vanilla("grove") to TreeDecoration.choice(TreeConfigs.PINE, 0.33333334f, TreeConfigs.SPRUCE, 10, 0.1f, 1),
-            // parity: OverworldBiomes.badlands(wooded=true)/addBadlandsTrees: TREES_BADLANDS, oak default (oak_leaf_litter/fallen_oak simplified to plain oak).
-            Identifier.vanilla("wooded_badlands") to combine(TreeDecoration.single(TreeConfigs.OAK, 5, 0.1f, 1), BadlandsDecoration),
-            // parity: OverworldBiomes.badlands(wooded=false)/addBadlandGrass: patch_dead_bush_badlands (no trees for the plain/eroded variants).
-            Identifier.vanilla("badlands") to BadlandsDecoration,
-            Identifier.vanilla("eroded_badlands") to BadlandsDecoration,
-            // parity: OverworldBiomes.swamp/addSwampVegetation: TREES_SWAMP, swamp_oak (a single feature, not a random selector).
-            Identifier.vanilla("swamp") to TreeDecoration.single(TreeConfigs.SWAMP_OAK, 2, 0.1f, 1),
+            // parity: OverworldBiomes.badlands(wooded=true)/addBadlandsTrees+addBadlandGrass: TREES_BADLANDS (oak
+            // default, oak_leaf_litter/fallen_oak simplified to plain oak) plus patch_grass_badlands (the same
+            // real feature DefaultVegetationDecoration.GRASS already builds) and patch_dead_bush_badlands.
+            Identifier.vanilla("wooded_badlands") to combine(TreeDecoration.single(TreeConfigs.OAK, 5, 0.1f, 1), DefaultVegetationDecoration.GRASS, BadlandsDecoration),
+            // parity: OverworldBiomes.badlands(wooded=false)/addBadlandGrass: patch_grass_badlands, patch_dead_bush_badlands (dry grass variant not ported).
+            Identifier.vanilla("badlands") to combine(DefaultVegetationDecoration.GRASS, BadlandsDecoration),
+            Identifier.vanilla("eroded_badlands") to combine(DefaultVegetationDecoration.GRASS, BadlandsDecoration),
+            // parity: OverworldBiomes.swamp/addSwampVegetation: TREES_SWAMP (swamp_oak, a single feature, not a
+            // random selector) plus flower_swamp/patch_grass_normal/patch_dead_bush/patch_waterlily.
+            Identifier.vanilla("swamp") to combine(TreeDecoration.single(TreeConfigs.SWAMP_OAK, 2, 0.1f, 1), SwampDecoration),
             // parity: OverworldBiomes.desert/addDesertVegetation+addDesertExtraVegetation: patch_cactus_desert, patch_dead_bush_2.
             Identifier.vanilla("desert") to DesertDecoration,
             // parity: OverworldBiomes.darkForest(isPaleGarden=false)/DARK_FOREST_VEGETATION: real RANDOM_SELECTOR,
@@ -88,6 +139,21 @@ public object BiomeDecoration {
             // (same tree shape as the default, only the CreakingHeartDecorator differs, not ported), else pale_oak.
             // CountPlacement(16). Pale moss carpet/pale garden flowers not ported.
             Identifier.vanilla("pale_garden") to TreeDecoration.fixed(TreeConfigs.PALE_OAK, 16),
+            // parity: OverworldBiomes.meadowOrCherryGrove(cherryGrove=false)/addMeadowVegetation: patch_grass_meadow.
+            Identifier.vanilla("meadow") to MeadowDecoration,
+            // parity: OverworldBiomes.river/addDefaultFlowers+addDefaultGrass (both frozen and unfrozen call this
+            // unconditionally): same default patches (addWaterTrees/addBushes not ported: water-tree survival
+            // and bush placement not modeled here).
+            Identifier.vanilla("river") to DefaultVegetationDecoration,
+            Identifier.vanilla("frozen_river") to DefaultVegetationDecoration,
+            // parity: OverworldBiomes.beach(snowy=false, stony=false)/addDefaultFlowers+addDefaultGrass.
+            Identifier.vanilla("beach") to DefaultVegetationDecoration,
+            Identifier.vanilla("snowy_beach") to DefaultVegetationDecoration,
+            Identifier.vanilla("stony_shore") to DefaultVegetationDecoration,
+            // parity: OverworldBiomes.bambooJungle/baseJungle: addWarmFlowers+addJungleGrass (shared with
+            // jungle/sparse_jungle). addBambooVegetation itself (the bamboo stalks) is a distinct feature type
+            // this project doesn't model yet, so bamboo_jungle has no trees/bamboo, only its real ground cover.
+            Identifier.vanilla("bamboo_jungle") to combine(DefaultVegetationDecoration.WARM_FLOWERS, JungleGrassDecoration),
         )
 
     public fun forBiome(id: Identifier): BiomeVegetalDecoration? = byBiome[id]
