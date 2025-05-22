@@ -24,6 +24,9 @@ online-mode = true
 [world]
 # Name of the default world.
 name = "world"
+# Radius, in chunks, sent to a client around its own position (vanilla's own
+# server.properties default is 10).
+view-distance = 10
 
 [performance]
 # Reserved for future tick/performance tuning.
@@ -43,6 +46,7 @@ public data class BasaltConfig(
     public val maxPlayers: Int,
     public val onlineMode: Boolean,
     public val worldName: String,
+    public val viewDistance: Int,
     public val logLevel: LogLevel,
 ) {
     public companion object {
@@ -53,6 +57,7 @@ public data class BasaltConfig(
                 maxPlayers = 20,
                 onlineMode = true,
                 worldName = "world",
+                viewDistance = 10,
                 logLevel = LogLevel.INFO,
             )
 
@@ -91,6 +96,7 @@ public data class BasaltConfig(
                 maxPlayers = server?.intOrNull("max-players")?.toInt() ?: DEFAULT.maxPlayers,
                 onlineMode = server?.boolOrNull("online-mode") ?: DEFAULT.onlineMode,
                 worldName = world?.stringOrNull("name") ?: DEFAULT.worldName,
+                viewDistance = world?.intOrNull("view-distance")?.toInt() ?: DEFAULT.viewDistance,
                 logLevel = logging?.stringOrNull("level")?.let(::parseLogLevel) ?: DEFAULT.logLevel,
             )
         }
@@ -126,6 +132,9 @@ public data class BasaltConfig(
             }
             legacy["online-mode"]?.toBooleanStrictOrNull()?.let {
                 result = result.replace("online-mode = true", "online-mode = $it")
+            }
+            legacy["view-distance"]?.toIntOrNull()?.let {
+                result = result.replace("view-distance = 10", "view-distance = $it")
             }
             return result
         }

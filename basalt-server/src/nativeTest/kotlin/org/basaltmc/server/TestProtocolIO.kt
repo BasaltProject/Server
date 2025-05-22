@@ -36,6 +36,7 @@ internal fun startTestServer(
                 maxPlayers = 20,
                 onlineMode = onlineMode != null,
                 worldName = "basalt_server_test_world",
+                viewDistance = 3,
                 logLevel = LogLevel.INFO,
             )
         NativeThread.start { BasaltServer(config, onlineMode).start() }
