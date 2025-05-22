@@ -27,7 +27,12 @@ import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
  * than [DensityChunkSampler]'s own cell grid needs, an easy trap to fall back into after already
  * solving it once for the base terrain shape.
  *
- * After surface rules, [PlainsDecoration] runs (short/tall grass, flowers, bushes: the real
+ * Real vanilla places structures during their own generation step, before decoration features run
+ * (so decoration naturally skips whatever blocks a structure already placed): when
+ * [villageGenerator] is given, [VillageStructureGenerator.generateInto] runs right after surface
+ * rules and before decoration, matching that order.
+ *
+ * After structures, [PlainsDecoration] runs (short/tall grass, flowers, bushes: the real
  * `vegetal_decoration` entries Plains actually has), seeded with the real
  * `WorldgenRandom.setDecorationSeed([seed], chunkX * 16, chunkZ * 16)` formula, over the real
  * `WorldgenRandom`-wrapping-`XoroshiroRandomSource` combination `ChunkGenerator
@@ -39,7 +44,9 @@ import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
  *   (see its own KDoc).
  * - [PlainsDecoration] itself has its own documented gaps (trees, mushrooms, pumpkins, sugar cane,
  *   glow lichen, firefly bushes: not ported yet).
- * - No structures: separate, tracked work.
+ * - [villageGenerator] itself has its own documented gaps (see [VillageStructureGenerator]'s own
+ *   KDoc): no terrain adaptation (buildings don't get their surrounding dirt "beard" carved to
+ *   meet uneven ground), no block-state rotation on directional blocks, no entities.
  */
 public object RealTerrainGenerator {
     private const val CELL_WIDTH = 4
@@ -51,6 +58,7 @@ public object RealTerrainGenerator {
         chunkX: Int,
         chunkZ: Int,
         seed: Long = 0L,
+        villageGenerator: VillageStructureGenerator? = null,
     ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         val sampler =
@@ -76,6 +84,7 @@ public object RealTerrainGenerator {
             ChunkScopedSurfaceEnvironment(environment, heightmap),
             SurfaceRuleData.overworld(),
         )
+        villageGenerator?.generateInto(chunk, chunkX, chunkZ, seed)
         val decorationRandom = WorldgenRandom(XoroshiroRandom(seed))
         decorationRandom.setDecorationSeed(seed, chunkX * 16, chunkZ * 16)
         PlainsDecoration.decorate(chunk, decorationRandom)
