@@ -6,14 +6,15 @@ import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 
 /**
- * Desert ground cover before [ExtraVegetationDecoration.DESERT]: `patch_dead_bush_2`.
- * `patch_dry_grass_desert` remains unported.
+ * Desert ground cover before [ExtraVegetationDecoration.DESERT]: `patch_dry_grass_desert`, then
+ * `patch_dead_bush_2`.
  */
 public object DesertDecoration : BiomeVegetalDecoration {
     override fun decorate(
         chunk: Chunk,
         random: WorldgenRandom,
     ) {
+        DryGrassDecoration.DESERT.decorate(chunk, random)
         placeDeadBush(chunk, random)
     }
 

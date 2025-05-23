@@ -2,6 +2,7 @@ package org.basaltmc.world.terrain
 
 import org.basaltmc.random.XoroshiroRandom
 import org.basaltmc.registry.Blocks
+import org.basaltmc.registry.Identifier
 import org.basaltmc.world.WorldHeight
 import org.basaltmc.world.densityfunction.BlendedNoise
 import org.basaltmc.world.densityfunction.FunctionContext
@@ -12,6 +13,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class RealTerrainGeneratorTest {
+    private fun blockStateId(path: String): Int =
+        Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
+
     private fun syntheticNoise(name: String): NormalNoise {
         val seed = name.hashCode().toLong()
         return NormalNoise.create(XoroshiroRandom(seed), -5, doubleArrayOf(1.0, 1.0, 1.0, 1.0, 1.0))
@@ -132,16 +136,28 @@ class RealTerrainGeneratorTest {
     }
 
     @Test
-    fun theTopmostSolidBlockOfEachColumnHasTheCorrectPlainsSurface() {
+    fun theTopmostSolidBlockOfEachColumnHasTheCorrectPlainsSurfaceOrUnderwaterDisk() {
         val chunk = RealTerrainGenerator.generate(router, environment, 0, 0)
         val heightmap = chunk.heightmap(org.basaltmc.world.Chunk.HeightmapType.OCEAN_FLOOR)
+        val underwaterSurfaces =
+            setOf(
+                Blocks.DIRT.stateId,
+                blockStateId("sand"),
+                blockStateId("sandstone"),
+                blockStateId("clay"),
+                blockStateId("gravel"),
+            )
         for (x in 0 until 16) {
             for (z in 0 until 16) {
                 val topY = heightmap[x + z * 16] - 1
                 val submerged =
                     topY < WorldHeight.MAX_Y && chunk.getBlockStateId(x, topY + 1, z) == Blocks.WATER.stateId
-                val expected = if (submerged) Blocks.DIRT.stateId else Blocks.GRASS_BLOCK.stateId
-                assertEquals(expected, chunk.getBlockStateId(x, topY, z), "at ($x, $z), top=$topY")
+                val actual = chunk.getBlockStateId(x, topY, z)
+                if (submerged) {
+                    assertTrue(actual in underwaterSurfaces, "at ($x, $z), top=$topY, state=$actual")
+                } else {
+                    assertEquals(Blocks.GRASS_BLOCK.stateId, actual, "at ($x, $z), top=$topY")
+                }
             }
         }
     }

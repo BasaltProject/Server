@@ -29,6 +29,28 @@ private fun flatGrassChunk(
 
 class PlainsDecorationTest {
     @Test
+    fun sunflowerPatchPlacesBothPlantHalves() {
+        val seed =
+            (0L..10_000L).first { candidate ->
+                WorldgenRandom(XoroshiroRandom(candidate)).nextFloat() < 1.0f / 3.0f
+            }
+        val chunk = flatGrassChunk(0, 0)
+        PlainsDecoration.SUNFLOWER.decorate(chunk, WorldgenRandom(XoroshiroRandom(seed)))
+
+        val sunflower = blockId("sunflower")
+        var lower = 0
+        var upper = 0
+        for (x in 0 until 16) {
+            for (z in 0 until 16) {
+                if (chunk.getBlockStateId(x, 65, z) == sunflower) lower++
+                if (chunk.getBlockStateId(x, 66, z) == sunflower) upper++
+            }
+        }
+        assertTrue(lower > 0)
+        assertEquals(lower, upper)
+    }
+
+    @Test
     fun placesShortGrassSomewhereAcrossSeveralChunks() {
         val shortGrass = blockId("short_grass")
         var found = false
