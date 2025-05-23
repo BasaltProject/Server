@@ -56,16 +56,16 @@ public fun main(args: Array<String>) {
     val overworldRouter = NoiseRouterData.overworld(realNoises::get, base3d)
     val surfaceEnvironment = RealSurfaceEnvironment(serverJar, noiseRandom, overworldRouter)
 
-    // Real villages.json placement values (spacing 34, separation 8, salt 10387312) and
-    // village_plains.json's own start_pool/size: see VillageStructureGenerator's own KDoc for the
-    // documented gaps in what actually gets placed.
+    // Real villages.json placement values (spacing 34, separation 8, salt 10387312) and each
+    // variant's own start_pool/size (all five share size 6 and max_distance_from_center 80): see
+    // VillageStructureGenerator's own KDoc for the documented gaps in what actually gets placed.
     val villageLoader = VillageDataLoader(serverJar)
     val villageGrid = StructurePlacementGrid(spacing = 34, separation = 8, salt = 10387312)
     val villageGenerator =
         VillageStructureGenerator(
             overworldRouter,
             villageGrid,
-            startPoolName = "minecraft:village/plains/town_centers",
+            biomeAt = surfaceEnvironment::biomeAt,
             maxDepth = 6,
             maxDistanceFromCenter = 80,
             poolLookup = villageLoader.poolLookup,

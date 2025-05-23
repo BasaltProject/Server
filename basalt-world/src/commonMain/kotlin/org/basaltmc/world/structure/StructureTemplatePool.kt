@@ -190,6 +190,41 @@ public class ListPoolElement(
     }
 }
 
+/**
+ * // parity: net.minecraft.world.level.levelgen.structure.pools.FeaturePoolElement: a placed
+ * worldgen feature (a tree, a block pile, a small patch) as a village piece, used by the real
+ * desert/savanna/snowy/taiga `decor`/`trees` pools. Zero-sized like the real one
+ * (`getSize` returns `Vec3i.ZERO`), with no jigsaw blocks of its own.
+ */
+public class FeaturePoolElement(
+    public val feature: String,
+    projection: StructureProjection,
+) : StructurePoolElement(projection) {
+    override fun getBoundingBox(
+        loader: TemplateLoader,
+        position: StructurePos,
+        rotation: StructureRotation,
+    ): StructureBoundingBox = StructureBoundingBox(position.x, position.y, position.z, position.x, position.y, position.z)
+
+    override fun getShuffledJigsawBlocks(
+        loader: TemplateLoader,
+        position: StructurePos,
+        rotation: StructureRotation,
+        random: WorldgenRandom,
+    ): List<PlacedJigsaw> = emptyList()
+
+    override fun place(
+        loader: TemplateLoader,
+        chunk: Chunk,
+        position: StructurePos,
+        rotation: StructureRotation,
+        clipTo: StructureBoundingBox,
+        random: WorldgenRandom,
+    ) {
+        org.basaltmc.world.terrain.decoration.VillageFeatures.place(feature, chunk, position.x, position.y, position.z, random)
+    }
+}
+
 /** // parity: net.minecraft.world.level.levelgen.structure.pools.StructureTemplatePool. */
 public class StructureTemplatePool(
     public val fallback: String,

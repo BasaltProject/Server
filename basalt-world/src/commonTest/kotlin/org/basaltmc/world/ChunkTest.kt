@@ -44,4 +44,17 @@ class ChunkTest {
         assertEquals(11, heightmap[5 * 16 + 5])
         assertEquals(WorldHeight.MIN_Y, heightmap[0])
     }
+
+    @Test
+    fun heightmapTypesDistinguishTheOceanFloorFromWaterSurface() {
+        val chunk = Chunk(0, 0)
+        chunk.setBlockStateId(2, 10, 3, Blocks.STONE.stateId)
+        for (y in 11..20) chunk.setBlockStateId(2, y, 3, Blocks.WATER.stateId)
+        chunk.setBlockStateId(2, 20, 3, Blocks.KELP.stateId)
+
+        val index = 2 + 3 * 16
+        assertEquals(11, chunk.heightmap(Chunk.HeightmapType.OCEAN_FLOOR)[index])
+        assertEquals(21, chunk.heightmap(Chunk.HeightmapType.WORLD_SURFACE)[index])
+        assertEquals(21, chunk.heightmap(Chunk.HeightmapType.MOTION_BLOCKING)[index])
+    }
 }

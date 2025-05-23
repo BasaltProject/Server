@@ -1,7 +1,6 @@
 package org.basaltmc.world.terrain.surface
 
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.WorldHeight
 
@@ -27,7 +26,7 @@ public object SurfaceBuilder {
         val worldGenContext = WorldGenerationContext(WorldHeight.MIN_Y, WorldHeight.HEIGHT)
         val context = SurfaceRuleContext(environment, worldGenContext)
         val rule = ruleSource.apply(context)
-        val heightmap = chunk.heightmap()
+        val heightmap = chunk.heightmap(Chunk.HeightmapType.WORLD_SURFACE)
 
         val minBlockX = chunk.chunkX * 16
         val minBlockZ = chunk.chunkZ * 16
@@ -91,11 +90,9 @@ public object SurfaceBuilder {
 
     // Every fluid this project models is water for now (no lava placement yet): matches this
     // generator's own documented "no aquifers/lava" gap elsewhere.
-    private fun isFluid(stateId: Int): Boolean = stateId == WATER_STATE_ID
+    private fun isFluid(stateId: Int): Boolean = stateId == Blocks.WATER.stateId
 
     private fun isStone(stateId: Int): Boolean = stateId != Blocks.AIR.stateId && !isFluid(stateId)
-
-    private val WATER_STATE_ID = Blocks.REGISTRY.byIdentifier(Identifier.vanilla("water"))?.stateId ?: -1
 
     // A sentinel far enough below any real Y that `stoneBelowDepth` computed from it reads as
     // "solid all the way down, no ceiling found": matches vanilla's own `DimensionType.WAY_BELOW_MIN_Y`

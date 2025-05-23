@@ -99,7 +99,12 @@ public object BiomeDecoration {
             // parity: OverworldBiomes.jungle/addJungleTrees+addWarmFlowers+addJungleGrass: TREES_JUNGLE (jungle_tree
             // default, fancy_oak/jungle_bush/mega entries dropped) plus flower_warm and patch_grass_jungle.
             Identifier.vanilla("jungle") to
-                combine(TreeDecoration.single(TreeConfigs.JUNGLE_TREE, 50, 0.1f, 1), DefaultVegetationDecoration.WARM_FLOWERS, JungleGrassDecoration),
+                combine(
+                    BambooDecoration.LIGHT,
+                    TreeDecoration.single(TreeConfigs.JUNGLE_TREE, 50, 0.1f, 1),
+                    DefaultVegetationDecoration.WARM_FLOWERS,
+                    JungleGrassDecoration,
+                ),
             // parity: OverworldBiomes.sparseJungle/addSparseJungleTrees+addWarmFlowers+addJungleGrass: TREES_SPARSE_JUNGLE, jungle_tree default.
             Identifier.vanilla("sparse_jungle") to
                 combine(TreeDecoration.single(TreeConfigs.JUNGLE_TREE, 2, 0.1f, 1), DefaultVegetationDecoration.WARM_FLOWERS, JungleGrassDecoration),
@@ -146,18 +151,19 @@ public object BiomeDecoration {
             // cherry_bees_005 minus the unported BeehiveDecorator). See CherryGroveDecoration's own KDoc.
             Identifier.vanilla("cherry_grove") to CherryGroveDecoration,
             // parity: OverworldBiomes.river/addDefaultFlowers+addDefaultGrass (both frozen and unfrozen call this
-            // unconditionally): same default patches (addWaterTrees/addBushes not ported: water-tree survival
-            // and bush placement not modeled here).
-            Identifier.vanilla("river") to DefaultVegetationDecoration,
+            // unconditionally), followed by seagrass_river only when unfrozen. addWaterTrees/addBushes remain
+            // unported: water-tree survival and bush placement are not modeled here.
+            Identifier.vanilla("river") to combine(DefaultVegetationDecoration, AquaticDecoration.RIVER),
             Identifier.vanilla("frozen_river") to DefaultVegetationDecoration,
             // parity: OverworldBiomes.beach(snowy=false, stony=false)/addDefaultFlowers+addDefaultGrass.
             Identifier.vanilla("beach") to DefaultVegetationDecoration,
             Identifier.vanilla("snowy_beach") to DefaultVegetationDecoration,
             Identifier.vanilla("stony_shore") to DefaultVegetationDecoration,
             // parity: OverworldBiomes.bambooJungle/baseJungle: addWarmFlowers+addJungleGrass (shared with
-            // jungle/sparse_jungle). addBambooVegetation itself (the bamboo stalks) is a distinct feature type
-            // this project doesn't model yet, so bamboo_jungle has no trees/bamboo, only its real ground cover.
-            Identifier.vanilla("bamboo_jungle") to combine(DefaultVegetationDecoration.WARM_FLOWERS, JungleGrassDecoration),
+            // jungle/sparse_jungle), after the real dense bamboo patch. The separate
+            // bamboo_vegetation random-selector's mega jungle trees remain a documented gap.
+            Identifier.vanilla("bamboo_jungle") to
+                combine(BambooDecoration.DENSE, DefaultVegetationDecoration.WARM_FLOWERS, JungleGrassDecoration),
             // parity: OverworldBiomes.dripstoneCaves/deepDark: both call addPlainGrass+addPlainVegetation, the
             // exact same real features Plains itself uses (PlainsDecoration already builds them). Real vanilla
             // also runs addDripstone/addSculk here (cave-specific structures, not ported); this project has no
@@ -182,6 +188,20 @@ public object BiomeDecoration {
             // (huge red/brown 50/50, one attempt per chunk) + brown_mushroom_taiga (rarity 4) +
             // red_mushroom_taiga (rarity 256). addNearWaterVegetation not ported (needs water modeling).
             Identifier.vanilla("mushroom_fields") to MushroomFieldsDecoration,
+            // parity: OverworldBiomes.ocean/coldOcean/lukeWarmOcean. Each variant selects the
+            // matching real seagrass count/tall probability, then its cold or warm kelp density.
+            Identifier.vanilla("ocean") to AquaticDecoration.OCEAN,
+            Identifier.vanilla("deep_ocean") to AquaticDecoration.DEEP_OCEAN,
+            Identifier.vanilla("cold_ocean") to AquaticDecoration.COLD_OCEAN,
+            Identifier.vanilla("deep_cold_ocean") to AquaticDecoration.DEEP_COLD_OCEAN,
+            Identifier.vanilla("lukewarm_ocean") to AquaticDecoration.LUKEWARM_OCEAN,
+            Identifier.vanilla("deep_lukewarm_ocean") to AquaticDecoration.DEEP_LUKEWARM_OCEAN,
+            // parity: warm ocean adds coral first, then seagrass_warm and sea_pickle.
+            Identifier.vanilla("warm_ocean") to AquaticDecoration.WARM_OCEAN,
+            // parity: frozenOcean calls the same default flower/grass features as beaches, plus
+            // water trees and mushrooms not yet modeled by this decoration engine.
+            Identifier.vanilla("frozen_ocean") to DefaultVegetationDecoration,
+            Identifier.vanilla("deep_frozen_ocean") to DefaultVegetationDecoration,
         )
 
     public fun forBiome(id: Identifier): BiomeVegetalDecoration? = byBiome[id]

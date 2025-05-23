@@ -6,11 +6,12 @@ import org.basaltmc.registry.Identifier
 
 /**
  * // parity: net.minecraft.world.level.levelgen.structure.templatesystem.RuleTest, narrowed to
- * the two predicate kinds the real Plains village processor lists (`mossify_20_percent`,
- * `mossify_70_percent`, `mossify_10_percent`, `farm_plains`, `street_plains`) actually use:
- * `random_block_match` (a fixed block, accepted with [probability] chance) and `block_match` (a
- * fixed block, always accepted). `minecraft:always_true` is the null/no-op predicate: this project
- * represents it as `null` rather than a dedicated object.
+ * the predicate kinds the real village processor lists actually use: `random_block_match` (a fixed
+ * block, accepted with [probability] chance), `block_match`/`blockstate_match` (a fixed block,
+ * always accepted; the state variant matches on the block alone, properties unmodeled) and
+ * `tag_match` (any block of a named tag, e.g. zombie villages' `minecraft:doors` rule).
+ * `minecraft:always_true` is the null/no-op predicate: this project represents it as `null` rather
+ * than a dedicated object.
  */
 public sealed class StructureRuleTest {
     public abstract fun test(
@@ -35,6 +36,16 @@ public sealed class StructureRuleTest {
             stateId: Int,
             random: WorldgenRandom,
         ): Boolean = stateId == blockStateId && random.nextFloat() < probability
+    }
+
+    /** // parity: net.minecraft.world.level.levelgen.structure.templatesystem.TagMatchTest (zombie village pools' `minecraft:doors` rule). */
+    public class TagMatch(
+        public val stateIds: Set<Int>,
+    ) : StructureRuleTest() {
+        override fun test(
+            stateId: Int,
+            random: WorldgenRandom,
+        ): Boolean = stateId in stateIds
     }
 }
 

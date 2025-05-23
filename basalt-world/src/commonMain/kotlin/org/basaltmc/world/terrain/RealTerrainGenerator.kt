@@ -2,6 +2,7 @@ package org.basaltmc.world.terrain
 
 import org.basaltmc.random.WorldgenRandom
 import org.basaltmc.random.XoroshiroRandom
+import org.basaltmc.registry.Biomes
 import org.basaltmc.registry.Blocks
 import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
@@ -42,8 +43,8 @@ import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
  * there is the plain world seed, not a separately derived per-region seed).
  *
  * **Documented gaps, matching this project's own established scope for this pass:**
- * - No caves/aquifers/ore veins: [OverworldNoiseRouter.finalDensity] itself already omits them
- *   (see its own KDoc).
+ * - No caves/local aquifers/ore veins: [OverworldNoiseRouter.finalDensity] itself already omits
+ *   them (see its own KDoc). The global fluid picker's sea-level water is modeled.
  * - [BiomeDecoration] itself has its own documented per-biome gaps (see its own KDoc): only some
  *   biomes have real decoration ported so far, the rest fall back to no vegetal decoration at all
  *   (still strictly more correct than running another biome's decoration list on them).
@@ -54,6 +55,7 @@ import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
 public object RealTerrainGenerator {
     private const val CELL_WIDTH = 4
     private const val CELL_HEIGHT = 8
+    private const val SEA_LEVEL = 63
 
     public fun generate(
         router: OverworldNoiseRouter,
@@ -77,23 +79,58 @@ public object RealTerrainGenerator {
         for (x in 0 until 16) {
             for (z in 0 until 16) {
                 for (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
-                    if (sampler.sample(x, y, z) > 0.0) chunk.setBlockStateId(x, y, z, Blocks.STONE.stateId)
+                    if (sampler.sample(x, y, z) > 0.0) {
+                        chunk.setBlockStateId(x, y, z, Blocks.STONE.stateId)
+                    } else if (y < SEA_LEVEL) {
+                        // parity: NoiseGeneratorSettings' global Overworld FluidPicker. Full
+                        // aquifers are still absent, but outside caves their fallback is exactly
+                        // water below sea level and air at/above it.
+                        chunk.setBlockStateId(x, y, z, Blocks.WATER.stateId)
+                    }
                 }
             }
         }
-        val heightmap = chunk.heightmap()
+        val heightmap = chunk.heightmap(Chunk.HeightmapType.OCEAN_FLOOR)
+        val chunkEnvironment = ChunkScopedSurfaceEnvironment(environment, heightmap)
         SurfaceBuilder.buildSurface(
             chunk,
-            ChunkScopedSurfaceEnvironment(environment, heightmap),
+            chunkEnvironment,
             SurfaceRuleData.overworld(),
         )
         villageGenerator?.generateInto(chunk, chunkX, chunkZ, seed)
         val decorationRandom = WorldgenRandom(XoroshiroRandom(seed))
         decorationRandom.setDecorationSeed(seed, chunkX * 16, chunkZ * 16)
         val centerY = heightmap[8 + 8 * 16]
-        val biomeId = Identifier.parse(environment.biomeAt(chunkX * 16 + 8, centerY, chunkZ * 16 + 8))
+        val biomeId = Identifier.parse(chunkEnvironment.biomeAt(chunkX * 16 + 8, centerY, chunkZ * 16 + 8))
         BiomeDecoration.forBiome(biomeId)?.decorate(chunk, decorationRandom)
+        fillBiomes(chunk, chunkEnvironment)
         return chunk
+    }
+
+    /**
+     * Fills every quart cell of the chunk with its real biome network ID, so the wire palette
+     * ([org.basaltmc.world.ChunkDataCodec]) carries the actual biome layout the client needs for
+     * grass/water/fog colors. Sampled once per quart through [environment]'s own per-quart cache.
+     */
+    private fun fillBiomes(
+        chunk: Chunk,
+        environment: SurfaceRuleEnvironment,
+    ) {
+        for (quartY in 0 until WorldHeight.HEIGHT / 4) {
+            val blockY = WorldHeight.MIN_Y + quartY * 4
+            for (quartX in 0 until 4) {
+                for (quartZ in 0 until 4) {
+                    val biome =
+                        environment.biomeAt(
+                            chunk.chunkX * 16 + quartX * 4,
+                            blockY,
+                            chunk.chunkZ * 16 + quartZ * 4,
+                        )
+                    val id = Biomes.REGISTRY.idOf(Identifier.parse(biome)) ?: 0
+                    chunk.setBiomeId(quartX, quartY, quartZ, id)
+                }
+            }
+        }
     }
 }
 

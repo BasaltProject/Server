@@ -5,6 +5,9 @@ import org.basaltmc.io.Gzip
 import org.basaltmc.io.NativeMutex
 import org.basaltmc.nbt.NbtCompound
 import org.basaltmc.nbt.NbtIO
+import org.basaltmc.registry.Blocks
+import org.basaltmc.registry.Identifier
+import org.basaltmc.world.structure.BlockTagJson
 import org.basaltmc.world.structure.StructureTemplate
 import org.basaltmc.world.structure.StructureTemplatePool
 import org.basaltmc.world.structure.TemplateLoader
@@ -32,10 +35,14 @@ public class VillageDataLoader(
     private val templateCache = mutableMapOf<String, StructureTemplate?>()
     private val poolCache = mutableMapOf<String, StructureTemplatePool?>()
     private val processorTextCache = mutableMapOf<String, String?>()
+    private val tagCache = mutableMapOf<String, Set<Int>?>()
 
     public val templateLoader: TemplateLoader = { location -> loadTemplate(location) }
 
     public val poolLookup: (String) -> StructureTemplatePool? = { name -> loadPool(name) }
+
+    /** Resolves a block tag name to its member state ids, expanding nested `#tag` references. */
+    public val tagLookup: (String) -> Set<Int>? = { name -> loadBlockTag(name) }
 
     private fun loadTemplate(location: String): StructureTemplate? =
         cachedOrCompute(templateCache, location) {
@@ -50,8 +57,29 @@ public class VillageDataLoader(
         cachedOrCompute(poolCache, name) {
             val path = "data/minecraft/worldgen/template_pool/${stripNamespace(name)}.json"
             val json = serverJar.readEntry(path)?.decodeToString() ?: return@cachedOrCompute null
-            VillagePoolJson.parsePool(json, ::loadProcessorListText)
+            VillagePoolJson.parsePool(json, tagLookup, ::loadProcessorListText)
         }
+
+    private fun loadBlockTag(name: String): Set<Int>? =
+        cachedOrCompute(tagCache, name) { expandBlockTag(name, mutableSetOf()) }
+
+    private fun expandBlockTag(
+        name: String,
+        seen: MutableSet<String>,
+    ): Set<Int>? {
+        if (!seen.add(name)) return emptySet()
+        val path = "data/minecraft/tags/block/${stripNamespace(name)}.json"
+        val json = serverJar.readEntry(path)?.decodeToString() ?: return null
+        val result = mutableSetOf<Int>()
+        for (entry in BlockTagJson.parse(json)) {
+            if (entry.startsWith("#")) {
+                expandBlockTag(entry.substring(1), seen)?.let(result::addAll)
+            } else {
+                Blocks.REGISTRY.byIdentifier(Identifier.parse(entry))?.let { result.add(it.stateId) }
+            }
+        }
+        return result
+    }
 
     private fun loadProcessorListText(name: String): String? =
         cachedOrCompute(processorTextCache, name) {

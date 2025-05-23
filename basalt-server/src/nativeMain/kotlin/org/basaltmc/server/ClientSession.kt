@@ -75,6 +75,7 @@ import org.basaltmc.protocol.writeVarInt
 import org.basaltmc.registry.Blocks
 import org.basaltmc.server.player.PlayerRegistry
 import org.basaltmc.server.player.PlayerSession
+import org.basaltmc.server.registry.VanillaBiomes
 import org.basaltmc.server.registry.VanillaRegistryData
 import org.basaltmc.server.registry.VanillaTagData
 import org.basaltmc.server.world.WorldState
@@ -303,7 +304,14 @@ public class ClientSession(
 
     private fun sendRegistriesThenFinish() {
         sendRegistry("minecraft:dimension_type", "minecraft:overworld", VanillaRegistryData.overworldDimensionType())
-        sendRegistry("minecraft:worldgen/biome", "minecraft:plains", VanillaRegistryData.plainsBiome())
+        // The full 55-biome Overworld set in one packet, in Biomes.REGISTRY order: each entry's
+        // numeric id is its index here, which is what chunk biome palettes then reference.
+        sendCompressed(RegistryDataPacket.ID) {
+            RegistryDataPacket(
+                "minecraft:worldgen/biome",
+                VanillaBiomes.ALL.map { entry -> RegistryEntry("minecraft:${entry.path}", with(VanillaBiomes) { entry.toNbt() }) },
+            ).write(it)
+        }
         // These 13 are the only registries a real client hard-requires non-empty (see
         // VanillaRegistryData's KDoc); the rest of the full 29-registry set is a documented gap.
         // Entry names matter here, not just presence: spawn eggs for wolf/pig/cow/chicken/zombie
