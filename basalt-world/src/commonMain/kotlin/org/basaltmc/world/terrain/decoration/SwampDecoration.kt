@@ -16,14 +16,20 @@ import org.basaltmc.world.Chunk
  * "must be over water" check, see [SimpleBlockFeature]'s own KDoc).
  */
 public object SwampDecoration : BiomeVegetalDecoration {
+    /** `patch_grass_normal`+`patch_dead_bush`+`patch_waterlily`, without the blue-orchid flower: real `mangrove_swamp` shares exactly this ground cover, not the flower. */
+    public val GROUND_COVER: BiomeVegetalDecoration =
+        BiomeVegetalDecoration { chunk, random ->
+            placeGrass(chunk, random)
+            placeDeadBush(chunk, random)
+            placeWaterlily(chunk, random)
+        }
+
     override fun decorate(
         chunk: Chunk,
         random: WorldgenRandom,
     ) {
         placeFlower(chunk, random)
-        placeGrass(chunk, random)
-        placeDeadBush(chunk, random)
-        placeWaterlily(chunk, random)
+        GROUND_COVER.decorate(chunk, random)
     }
 
     // parity: placed_feature/flower_swamp.json.

@@ -107,6 +107,53 @@ class TreeFeatureTest {
         assertTrue(leaves > 0, "expected at least one spruce leaves block")
     }
 
+    @Test
+    fun cherryPlacesLogsAndLeaves() {
+        val chunk = chunkWithFlatGround(0)
+        val random = WorldgenRandom(XoroshiroRandom(99L))
+        val placed = TreeFeature.place(chunk, random, 8, 1, 8, TreeConfigs.CHERRY)
+        assertTrue(placed, "expected the cherry tree to place successfully")
+
+        var logs = 0
+        var leaves = 0
+        for (x in 0 until 16) {
+            for (y in 1..24) {
+                for (z in 0 until 16) {
+                    val id = chunk.getBlockStateId(x, y, z)
+                    if (id == cherryLogState) logs++
+                    if (id == cherryLeavesState) leaves++
+                }
+            }
+        }
+        // baseHeight 7 plus at least one side branch: well above a plain straight trunk's 7 logs.
+        assertTrue(logs >= 8, "expected at least 8 cherry logs (trunk plus a branch), got $logs")
+        assertTrue(leaves > 0, "expected at least one cherry leaves block")
+    }
+
+    @Test
+    fun mangrovePlacesLogsAndScatteredLeaves() {        val chunk = chunkWithFlatGround(0)
+        val random = WorldgenRandom(XoroshiroRandom(11L))
+        val placed = TreeFeature.place(chunk, random, 8, 1, 8, TreeConfigs.MANGROVE)
+        assertTrue(placed, "expected the mangrove tree to place successfully")
+
+        var logs = 0
+        var leaves = 0
+        var roots = 0
+        for (x in 0 until 16) {
+            for (y in 1..20) {
+                for (z in 0 until 16) {
+                    val id = chunk.getBlockStateId(x, y, z)
+                    if (id == mangroveLogState) logs++
+                    if (id == mangroveLeavesState) leaves++
+                    if (id == mangroveRootsState) roots++
+                }
+            }
+        }
+        assertTrue(logs > 0, "expected at least one mangrove log")
+        assertTrue(leaves > 0, "expected at least one mangrove leaves block")
+        assertTrue(roots > 0, "expected at least one mangrove roots block (the trunk starts elevated)")
+    }
+
     private companion object {
         val oakLogState =
             org.basaltmc.registry.Blocks.REGISTRY
@@ -131,6 +178,26 @@ class TreeFeatureTest {
         val darkOakLeavesState =
             org.basaltmc.registry.Blocks.REGISTRY
                 .byIdentifier(org.basaltmc.registry.Identifier.vanilla("dark_oak_leaves"))
+                ?.stateId ?: error("unknown block")
+        val mangroveLogState =
+            org.basaltmc.registry.Blocks.REGISTRY
+                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("mangrove_log"))
+                ?.stateId ?: error("unknown block")
+        val mangroveLeavesState =
+            org.basaltmc.registry.Blocks.REGISTRY
+                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("mangrove_leaves"))
+                ?.stateId ?: error("unknown block")
+        val cherryLogState =
+            org.basaltmc.registry.Blocks.REGISTRY
+                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("cherry_log"))
+                ?.stateId ?: error("unknown block")
+        val cherryLeavesState =
+            org.basaltmc.registry.Blocks.REGISTRY
+                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("cherry_leaves"))
+                ?.stateId ?: error("unknown block")
+        val mangroveRootsState =
+            org.basaltmc.registry.Blocks.REGISTRY
+                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("mangrove_roots"))
                 ?.stateId ?: error("unknown block")
     }
 }

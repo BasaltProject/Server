@@ -141,6 +141,10 @@ public object BiomeDecoration {
             Identifier.vanilla("pale_garden") to TreeDecoration.fixed(TreeConfigs.PALE_OAK, 16),
             // parity: OverworldBiomes.meadowOrCherryGrove(cherryGrove=false)/addMeadowVegetation: patch_grass_meadow.
             Identifier.vanilla("meadow") to MeadowDecoration,
+            // parity: OverworldBiomes.meadowOrCherryGrove(cherryGrove=true)/addCherryGroveVegetation:
+            // patch_grass_plain + flower_cherry (pink petals) + trees_cherry (countExtra(10, 0.1, 1),
+            // cherry_bees_005 minus the unported BeehiveDecorator). See CherryGroveDecoration's own KDoc.
+            Identifier.vanilla("cherry_grove") to CherryGroveDecoration,
             // parity: OverworldBiomes.river/addDefaultFlowers+addDefaultGrass (both frozen and unfrozen call this
             // unconditionally): same default patches (addWaterTrees/addBushes not ported: water-tree survival
             // and bush placement not modeled here).
@@ -154,6 +158,30 @@ public object BiomeDecoration {
             // jungle/sparse_jungle). addBambooVegetation itself (the bamboo stalks) is a distinct feature type
             // this project doesn't model yet, so bamboo_jungle has no trees/bamboo, only its real ground cover.
             Identifier.vanilla("bamboo_jungle") to combine(DefaultVegetationDecoration.WARM_FLOWERS, JungleGrassDecoration),
+            // parity: OverworldBiomes.dripstoneCaves/deepDark: both call addPlainGrass+addPlainVegetation, the
+            // exact same real features Plains itself uses (PlainsDecoration already builds them). Real vanilla
+            // also runs addDripstone/addSculk here (cave-specific structures, not ported); this project has no
+            // cave generation yet either, so these two biomes are effectively unreachable at the surface right
+            // now, but the real ground cover they'd get once caves exist is already correct.
+            Identifier.vanilla("dripstone_caves") to combine(TreeDecoration.single(TreeConfigs.OAK, 0, 0.05f, 1), PlainsDecoration),
+            Identifier.vanilla("deep_dark") to combine(TreeDecoration.single(TreeConfigs.OAK, 0, 0.05f, 1), PlainsDecoration),
+            // parity: OverworldBiomes.lushCaves/sulfurCaves: both call only addPlainGrass (real patch_tall_grass_2),
+            // not the rest of Plains' own decoration. addLushCavesVegetationFeatures/addSulfurCavesFeatures (cave
+            // ceiling vegetation, glow berries, azalea, sulfur spikes) are real cave-specific systems, not ported;
+            // like dripstone_caves/deep_dark, neither biome is reachable without cave generation yet either.
+            Identifier.vanilla("lush_caves") to PlainsDecoration.TALL_GRASS,
+            Identifier.vanilla("sulfur_caves") to PlainsDecoration.TALL_GRASS,
+            // parity: OverworldBiomes.mangroveSwamp/addMangroveSwampVegetation: TREES_MANGROVE (85% tall_mangrove
+            // else mangrove, CountPlacement(25) fixed) plus patch_grass_normal/patch_dead_bush/patch_waterlily
+            // (the same real features SwampDecoration.GROUND_COVER already builds, no flower_swamp here).
+            // Real MangroveRootPlacer ported: trunks start elevated on simulated roots.
+            // SurfaceWaterDepthFilter not ported (no fluid modeling, an established gap).
+            Identifier.vanilla("mangrove_swamp") to
+                combine(TreeDecoration.sequence(listOf(0.85f to TreeConfigs.TALL_MANGROVE), TreeConfigs.MANGROVE, 25), SwampDecoration.GROUND_COVER),
+            // parity: OverworldBiomes.mushroomFields/addMushroomFieldVegetation: mushroom_island_vegetation
+            // (huge red/brown 50/50, one attempt per chunk) + brown_mushroom_taiga (rarity 4) +
+            // red_mushroom_taiga (rarity 256). addNearWaterVegetation not ported (needs water modeling).
+            Identifier.vanilla("mushroom_fields") to MushroomFieldsDecoration,
         )
 
     public fun forBiome(id: Identifier): BiomeVegetalDecoration? = byBiome[id]
