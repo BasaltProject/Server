@@ -76,6 +76,9 @@ public class Chunk(
 
         /** // parity: Heightmap.Types.MOTION_BLOCKING, motion-blocking blocks plus fluids. */
         MOTION_BLOCKING,
+
+        /** // parity: MOTION_BLOCKING_NO_LEAVES, used by near-water firefly bushes. */
+        MOTION_BLOCKING_NO_LEAVES,
         ;
 
         internal fun matches(stateId: Int): Boolean =
@@ -88,6 +91,11 @@ public class Chunk(
                 MOTION_BLOCKING ->
                     Blocks.hasWaterFluid(stateId) ||
                         (stateId != Blocks.AIR.stateId && stateId !in NON_COLLIDING_STATE_IDS)
+                MOTION_BLOCKING_NO_LEAVES ->
+                    Blocks.hasWaterFluid(stateId) ||
+                        (stateId != Blocks.AIR.stateId &&
+                            stateId !in NON_COLLIDING_STATE_IDS &&
+                            stateId !in LEAF_STATE_IDS)
             }
 
         private companion object {
@@ -125,6 +133,21 @@ public class Chunk(
                     "bubble_coral_wall_fan",
                     "fire_coral_wall_fan",
                     "horn_coral_wall_fan",
+                ).mapNotNull { Blocks.REGISTRY.byIdentifier(Identifier.vanilla(it))?.stateId }.toSet()
+
+            val LEAF_STATE_IDS: Set<Int> =
+                listOf(
+                    "oak_leaves",
+                    "spruce_leaves",
+                    "birch_leaves",
+                    "jungle_leaves",
+                    "acacia_leaves",
+                    "cherry_leaves",
+                    "dark_oak_leaves",
+                    "pale_oak_leaves",
+                    "mangrove_leaves",
+                    "azalea_leaves",
+                    "flowering_azalea_leaves",
                 ).mapNotNull { Blocks.REGISTRY.byIdentifier(Identifier.vanilla(it))?.stateId }.toSet()
         }
     }

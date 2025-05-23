@@ -1,6 +1,7 @@
 package org.basaltmc.world
 
 import org.basaltmc.registry.Blocks
+import org.basaltmc.registry.Identifier
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -56,5 +57,17 @@ class ChunkTest {
         assertEquals(11, chunk.heightmap(Chunk.HeightmapType.OCEAN_FLOOR)[index])
         assertEquals(21, chunk.heightmap(Chunk.HeightmapType.WORLD_SURFACE)[index])
         assertEquals(21, chunk.heightmap(Chunk.HeightmapType.MOTION_BLOCKING)[index])
+    }
+
+    @Test
+    fun motionBlockingNoLeavesIgnoresLeafCanopies() {
+        val chunk = Chunk(0, 0)
+        val oakLeaves = Blocks.REGISTRY.byIdentifier(Identifier.vanilla("oak_leaves"))!!.stateId
+        chunk.setBlockStateId(4, 10, 7, Blocks.STONE.stateId)
+        chunk.setBlockStateId(4, 20, 7, oakLeaves)
+
+        val index = 4 + 7 * 16
+        assertEquals(21, chunk.heightmap(Chunk.HeightmapType.MOTION_BLOCKING)[index])
+        assertEquals(11, chunk.heightmap(Chunk.HeightmapType.MOTION_BLOCKING_NO_LEAVES)[index])
     }
 }

@@ -49,6 +49,8 @@ public object AquaticDecoration {
 
     public val RIVER: BiomeVegetalDecoration = seagrass(count = 48, tallProbability = 0.4)
 
+    public val SWAMP: BiomeVegetalDecoration = seagrass(count = 64, tallProbability = 0.6)
+
     public val WARM_OCEAN: BiomeVegetalDecoration =
         combine(CoralDecoration, seagrass(count = 80, tallProbability = 0.3), SEA_PICKLES)
 

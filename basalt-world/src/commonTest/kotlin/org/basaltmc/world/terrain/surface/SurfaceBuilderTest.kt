@@ -1,6 +1,9 @@
 package org.basaltmc.world.terrain.surface
 
+import org.basaltmc.random.BasaltRandom
+import org.basaltmc.random.LegacyRandom
 import org.basaltmc.registry.Blocks
+import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.WorldHeight
 import kotlin.test.Test
@@ -9,6 +12,9 @@ import kotlin.test.assertTrue
 
 private class FakeEnvironment(
     private val heights: IntArray,
+    private val biomeId: String = "minecraft:plains",
+    private val icebergNoise: Boolean = false,
+    private val badlandsNoise: Boolean = false,
 ) : SurfaceRuleEnvironment {
     override fun surfaceDepthNoise(
         x: Int,
@@ -33,12 +39,29 @@ private class FakeEnvironment(
         z: Int,
     ): Double = 0.0
 
+    override fun sample2dScaled(
+        noiseId: String,
+        x: Double,
+        z: Double,
+    ): Double =
+        when {
+            icebergNoise && noiseId != "iceberg_pillar_roof" -> 1.0
+            badlandsNoise && noiseId != "badlands_pillar_roof" -> 1.0
+            else -> 0.0
+        }
+
     override fun verticalGradientRandom(
         name: String,
         x: Int,
         y: Int,
         z: Int,
     ): Float = 1.0f
+
+    override fun positionalRandom(
+        x: Int,
+        y: Int,
+        z: Int,
+    ): BasaltRandom = LegacyRandom(x.toLong() * 31L + z)
 
     override fun estimatedSurfaceHeight(
         x: Int,
@@ -49,12 +72,18 @@ private class FakeEnvironment(
         x: Int,
         y: Int,
         z: Int,
-    ): String = "minecraft:plains"
+    ): String = biomeId
 
     override fun isSteep(
         x: Int,
         z: Int,
     ): Boolean = false
+
+    override fun clayBand(
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Int = Blocks.REGISTRY.byIdentifier(Identifier.vanilla("terracotta"))!!.stateId
 }
 
 private fun flatChunk(surfaceY: Int): Chunk {
@@ -68,6 +97,53 @@ private fun flatChunk(surfaceY: Int): Chunk {
 }
 
 class SurfaceBuilderTest {
+    @Test
+    fun erodedBadlandsExtensionRaisesStonePillarsBeforeApplyingSurfaceRules() {
+        val surfaceY = 60
+        val chunk = flatChunk(surfaceY)
+        val environment =
+            FakeEnvironment(
+                IntArray(256) { surfaceY + 1 },
+                biomeId = "minecraft:eroded_badlands",
+                badlandsNoise = true,
+            )
+
+        SurfaceBuilder.buildSurface(chunk, environment, SurfaceRuleData.overworld())
+
+        assertTrue(chunk.heightAt(8, 8, Chunk.HeightmapType.WORLD_SURFACE) > surfaceY + 1)
+        assertTrue(chunk.getBlockStateId(8, 80, 8) != Blocks.AIR.stateId)
+    }
+
+    @Test
+    fun frozenOceanExtensionBuildsPackedIceAboveAndBelowSeaLevel() {
+        val chunk = Chunk(0, 0)
+        for (x in 0 until 16) {
+            for (z in 0 until 16) {
+                for (y in WorldHeight.MIN_Y..40) chunk.setBlockStateId(x, y, z, Blocks.STONE.stateId)
+                for (y in 41..62) chunk.setBlockStateId(x, y, z, Blocks.WATER.stateId)
+            }
+        }
+        val environment =
+            FakeEnvironment(
+                IntArray(256) { 41 },
+                biomeId = "minecraft:frozen_ocean",
+                icebergNoise = true,
+            )
+
+        SurfaceBuilder.buildSurface(chunk, environment, SurfaceRuleData.overworld())
+
+        var aboveSea = 0
+        var belowSea = 0
+        for (x in 0 until 16) {
+            for (z in 0 until 16) {
+                for (y in 63..90) if (chunk.getBlockStateId(x, y, z) == Blocks.PACKED_ICE.stateId) aboveSea++
+                for (y in 41..62) if (chunk.getBlockStateId(x, y, z) == Blocks.PACKED_ICE.stateId) belowSea++
+            }
+        }
+        assertTrue(aboveSea > 0)
+        assertTrue(belowSea > 0)
+    }
+
     @Test
     fun grassOnTopDirtBelowForAPlainsColumn() {
         val surfaceY = 70

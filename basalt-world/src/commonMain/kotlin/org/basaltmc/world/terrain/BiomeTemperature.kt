@@ -30,6 +30,14 @@ public object BiomeTemperature {
         z: Int,
     ): Boolean = temperatureAt(biomeId, x, y, z) < 0.15f
 
+    /** // parity: `Biome.shouldMeltFrozenOceanIcebergSlightly`: temperature greater than `0.1`. */
+    public fun shouldMeltFrozenOceanIcebergSlightly(
+        biomeId: String,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Boolean = temperatureAt(biomeId, x, y, z) > 0.1f
+
     private fun temperatureAt(
         biomeId: String,
         x: Int,

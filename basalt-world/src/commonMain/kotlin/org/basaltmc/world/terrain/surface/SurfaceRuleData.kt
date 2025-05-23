@@ -27,8 +27,7 @@ import org.basaltmc.world.terrain.surface.SurfaceRules.yStartCheck
  * scope grows past Plains.
  *
  * Not ported: [SurfaceRules.temperature] always reports false (real per-biome snow logic isn't
- * modeled) and [SurfaceRules.bandlands] throws if actually reached (needs the clay-band generator,
- * only badlands uses it). Neither affects Plains.
+ * modeled). Badlands clay bands are supplied by the real surface environment.
  */
 public object SurfaceRuleData {
     private fun state(name: String): RuleSource {

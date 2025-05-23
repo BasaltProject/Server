@@ -33,6 +33,14 @@ public object Blocks {
     public val KELP_PLANT: BlockState = register(15088, "kelp_plant")
     public val SEA_PICKLE: BlockState = register(15267, "sea_pickle")
     public val BAMBOO: BlockState = register(15279, "bamboo")
+    public val SNOW: BlockState = register(6919, "snow")
+    public val ICE: BlockState = register(6927, "ice")
+    public val SNOW_BLOCK: BlockState = register(6928, "snow_block")
+    public val PACKED_ICE: BlockState = register(12914, "packed_ice")
+    public val BLUE_ICE: BlockState = register(15275, "blue_ice")
+    public val PUMPKIN: BlockState = register(8332, "pumpkin")
+    public val SUGAR_CANE: BlockState = register(6947, "sugar_cane")
+    public val FIREFLY_BUSH: BlockState = register(32365, "firefly_bush")
 
     init {
         for ((stateId, path) in ALL_DEFAULT_BLOCK_STATES) {
