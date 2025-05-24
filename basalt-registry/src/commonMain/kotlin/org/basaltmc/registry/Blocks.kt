@@ -49,7 +49,13 @@ public object Blocks {
     }
 
     /** Whether this default block state exposes a non-empty water fluid state. */
-    public fun hasWaterFluid(stateId: Int): Boolean = stateId in WATER_FLUID_STATE_IDS
+    public fun hasWaterFluid(stateId: Int): Boolean =
+        stateId in WATER_FLUID_STATE_IDS ||
+            isGlowLichenState(stateId) && ((stateId - GLOW_LICHEN_FIRST_STATE_ID) and GLOW_LICHEN_WATERLOGGED_FALSE_BIT) == 0
+
+    /** Whether [stateId] is one of glow lichen's 128 property combinations. */
+    public fun isGlowLichenState(stateId: Int): Boolean =
+        stateId in GLOW_LICHEN_FIRST_STATE_ID..GLOW_LICHEN_DEFAULT_STATE_ID
 
     private fun register(
         stateId: Int,
@@ -83,4 +89,9 @@ public object Blocks {
             "fire_coral_wall_fan",
             "horn_coral_wall_fan",
         ).mapNotNull { REGISTRY.byIdentifier(Identifier.vanilla(it))?.stateId }.toSet()
+
+    private val GLOW_LICHEN_DEFAULT_STATE_ID: Int =
+        REGISTRY.byIdentifier(Identifier.vanilla("glow_lichen"))?.stateId ?: error("unknown block 'glow_lichen'")
+    private val GLOW_LICHEN_FIRST_STATE_ID: Int = GLOW_LICHEN_DEFAULT_STATE_ID - 127
+    private const val GLOW_LICHEN_WATERLOGGED_FALSE_BIT: Int = 2
 }

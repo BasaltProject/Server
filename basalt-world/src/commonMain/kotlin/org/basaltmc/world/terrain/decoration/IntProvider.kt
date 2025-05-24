@@ -2,7 +2,7 @@ package org.basaltmc.world.terrain.decoration
 
 import org.basaltmc.random.WorldgenRandom
 
-/** // parity: net.minecraft.util.valueproviders.IntProvider, just the two variants real tree configs actually use. */
+/** // parity: net.minecraft.util.valueproviders.IntProvider variants used by ported worldgen. */
 public sealed interface IntProvider {
     public fun sample(random: WorldgenRandom): Int
 
@@ -18,6 +18,15 @@ public sealed interface IntProvider {
         val max: Int,
     ) : IntProvider {
         override fun sample(random: WorldgenRandom): Int = min + random.nextInt(max - min + 1)
+    }
+
+    /** // parity: ClampedInt clamps the sampled source value to an inclusive range. */
+    public data class Clamped(
+        val source: IntProvider,
+        val min: Int,
+        val max: Int,
+    ) : IntProvider {
+        override fun sample(random: WorldgenRandom): Int = source.sample(random).coerceIn(min, max)
     }
 
     /**

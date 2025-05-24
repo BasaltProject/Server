@@ -28,9 +28,8 @@ public fun combine(vararg steps: BiomeVegetalDecoration): BiomeVegetalDecoration
  * has no cross-chunk state), so per-column dispatch is not meaningfully different except at biome
  * borders, an accepted, documented approximation.
  *
- * Only biomes with real, jar-verified decoration ported so far are listed: every other biome
- * resolves to `null` (no vegetal decoration at all), strictly more correct than running a
- * different biome's own feature list over it.
+ * All 55 current Overworld biome identifiers are listed. Unknown biome identifiers resolve to
+ * `null` rather than borrowing another biome's feature list.
  */
 public object BiomeDecoration {
     private val noVegetalDecoration = BiomeVegetalDecoration { _, _ -> }
@@ -45,15 +44,14 @@ public object BiomeDecoration {
             Identifier.vanilla("forest") to TreeDecoration.single(TreeConfigs.OAK, 10, 0.1f, 1),
             // parity: OverworldBiomes.forest(flower=true): trees_flower_forest (birch 20%, fallen_birch/fancy_oak
             // dropped, oak default) + flower_flower_forest (real 11-flower NoiseProvider) + default grass.
-            // flower_forest_flowers (a second wildflower patch) not ported, see FlowerForestDecoration's own KDoc.
             Identifier.vanilla("flower_forest") to FlowerForestDecoration,
             // parity: OverworldBiomes.forest(birch=true, tall=false)/addBirchTrees: TREES_BIRCH, birch default.
             Identifier.vanilla("birch_forest") to TreeDecoration.single(TreeConfigs.BIRCH, 10, 0.1f, 1),
             // parity: OverworldBiomes.forest(birch=true, tall=true)/addTallBirchTrees: BIRCH_TALL, super_birch default.
             Identifier.vanilla("old_growth_birch_forest") to TreeDecoration.single(TreeConfigs.SUPER_BIRCH, 10, 0.1f, 1),
             // parity: OverworldBiomes.taiga/addTaigaTrees+addDefaultFlowers: TREES_TAIGA (33.3% pine else spruce,
-            // fallen_spruce entry dropped) plus the real default flower patch. The taiga mushroom tail is
-            // appended by forBiome; patch_grass_taiga_2 remains a separate gap.
+            // fallen_spruce entry dropped) plus the real default flower patch. Shared ground cover and the
+            // taiga mushroom tail are appended by forBiome.
             Identifier.vanilla("taiga") to
                 combine(TreeDecoration.choice(TreeConfigs.PINE, 0.33333334f, TreeConfigs.SPRUCE, 10, 0.1f, 1), DefaultVegetationDecoration.FLOWERS),
             // parity: OverworldBiomes.taiga(snowy=true)/addSnowyTrees+addDefaultFlowers: TREES_SNOWY, spruce default.
@@ -133,7 +131,7 @@ public object BiomeDecoration {
             // default, oak_leaf_litter/fallen_oak simplified to plain oak) plus patch_grass_badlands (the same
             // real feature DefaultVegetationDecoration.GRASS already builds) and patch_dead_bush_badlands.
             Identifier.vanilla("wooded_badlands") to combine(TreeDecoration.single(TreeConfigs.OAK, 5, 0.1f, 1), DefaultVegetationDecoration.GRASS, BadlandsDecoration),
-            // parity: OverworldBiomes.badlands(wooded=false)/addBadlandGrass: patch_grass_badlands, patch_dead_bush_badlands (dry grass variant not ported).
+            // parity: OverworldBiomes.badlands(wooded=false)/addBadlandGrass; specialized ground cover is appended by forBiome.
             Identifier.vanilla("badlands") to combine(DefaultVegetationDecoration.GRASS, BadlandsDecoration),
             Identifier.vanilla("eroded_badlands") to combine(DefaultVegetationDecoration.GRASS, BadlandsDecoration),
             // parity: OverworldBiomes.swamp/addSwampVegetation: TREES_SWAMP (swamp_oak, a single feature, not a
@@ -152,17 +150,17 @@ public object BiomeDecoration {
                 ),
             // parity: OverworldBiomes.darkForest(isPaleGarden=true)/PALE_GARDEN_VEGETATION: 10% pale_oak_creaking
             // (same tree shape as the default, only the CreakingHeartDecorator differs, not ported), else pale_oak.
-            // CountPlacement(16). Pale moss carpet/pale garden flowers not ported.
+            // CountPlacement(16). Pale moss and pale garden flowers are appended by forBiome.
             Identifier.vanilla("pale_garden") to TreeDecoration.fixed(TreeConfigs.PALE_OAK, 16),
-            // parity: OverworldBiomes.meadowOrCherryGrove(cherryGrove=false)/addMeadowVegetation: patch_grass_meadow.
+            // parity: meadow tall grass, grass, DualNoiseProvider flowers, and wildflowers.
+            // The rare trees_meadow selector remains documented in MeadowDecoration.
             Identifier.vanilla("meadow") to MeadowDecoration,
             // parity: OverworldBiomes.meadowOrCherryGrove(cherryGrove=true)/addCherryGroveVegetation:
             // patch_grass_plain + flower_cherry (pink petals) + trees_cherry (countExtra(10, 0.1, 1),
             // cherry_bees_005 minus the unported BeehiveDecorator). See CherryGroveDecoration's own KDoc.
             Identifier.vanilla("cherry_grove") to CherryGroveDecoration,
             // parity: OverworldBiomes.river/addDefaultFlowers+addDefaultGrass (both frozen and unfrozen call this
-            // unconditionally), followed by seagrass_river only when unfrozen. addWaterTrees/addBushes remain
-            // unported: water-tree survival and bush placement are not modeled here.
+            // unconditionally), followed by bushes and seagrass_river only when unfrozen. Water trees remain unported.
             Identifier.vanilla("river") to combine(DefaultVegetationDecoration, AquaticDecoration.RIVER),
             Identifier.vanilla("frozen_river") to DefaultVegetationDecoration,
             // parity: OverworldBiomes.beach(snowy=false, stony=false)/addDefaultFlowers+addDefaultGrass.
@@ -293,8 +291,20 @@ public object BiomeDecoration {
                     MushroomDecoration.NORMAL,
                     ExtraVegetationDecoration.DEFAULT,
                 )
-            "forest", "birch_forest", "old_growth_birch_forest" ->
+            "forest" ->
                 combine(
+                    ForestFlowerDecoration.NORMAL,
+                    requireBase(id),
+                    ForestGroundDecoration.BUSH,
+                    DefaultVegetationDecoration.FLOWERS,
+                    ForestGroundDecoration.GRASS,
+                    MushroomDecoration.NORMAL,
+                    ExtraVegetationDecoration.DEFAULT,
+                )
+            "birch_forest", "old_growth_birch_forest" ->
+                combine(
+                    ForestFlowerDecoration.NORMAL,
+                    ForestFloorDecoration.BIRCH_WILDFLOWERS,
                     requireBase(id),
                     ForestGroundDecoration.BUSH,
                     DefaultVegetationDecoration.FLOWERS,
@@ -305,13 +315,29 @@ public object BiomeDecoration {
             "dark_forest" ->
                 combine(
                     requireBase(id),
+                    ForestFlowerDecoration.NORMAL,
                     DefaultVegetationDecoration.FLOWERS,
                     ForestGroundDecoration.GRASS,
                     MushroomDecoration.NORMAL,
+                    ForestFloorDecoration.LEAF_LITTER,
                     ExtraVegetationDecoration.DEFAULT,
                 )
             "pale_garden" ->
-                combine(requireBase(id), ForestGroundDecoration.GRASS, ExtraVegetationDecoration.DEFAULT)
+                combine(
+                    requireBase(id),
+                    PaleMossDecoration,
+                    PaleGardenDecoration.FLOWER_PATCH,
+                    PaleGardenDecoration.RARE_FLOWER,
+                    ForestGroundDecoration.GRASS,
+                    ExtraVegetationDecoration.DEFAULT,
+                )
+            "flower_forest" ->
+                combine(
+                    ForestFlowerDecoration.FLOWER_FOREST,
+                    requireBase(id),
+                    MushroomDecoration.NORMAL,
+                    ExtraVegetationDecoration.DEFAULT,
+                )
             "windswept_hills", "windswept_gravelly_hills", "windswept_forest" ->
                 combine(
                     requireBase(id),
@@ -328,14 +354,25 @@ public object BiomeDecoration {
                     MushroomDecoration.OLD_GROWTH,
                     MushroomDecoration.NORMAL,
                     ExtraVegetationDecoration.DEFAULT,
+                    TaigaGroundDecoration.COMMON_BERRY,
                 )
-            in TAIGA_PATHS ->
+            "taiga" ->
                 combine(
                     TaigaGroundDecoration.LARGE_FERN,
                     requireBase(id),
                     TaigaGroundDecoration.NORMAL,
                     MushroomDecoration.TAIGA,
                     ExtraVegetationDecoration.DEFAULT,
+                    TaigaGroundDecoration.COMMON_BERRY,
+                )
+            "snowy_taiga" ->
+                combine(
+                    TaigaGroundDecoration.LARGE_FERN,
+                    requireBase(id),
+                    TaigaGroundDecoration.NORMAL,
+                    MushroomDecoration.TAIGA,
+                    ExtraVegetationDecoration.DEFAULT,
+                    TaigaGroundDecoration.RARE_BERRY,
                 )
             in DEFAULT_EXTRA_PATHS ->
                 if (path == "pale_garden") {
@@ -353,11 +390,11 @@ public object BiomeDecoration {
         }
         body ?: return null
         return when (path) {
-            "ice_spikes" -> combine(IceSpikesDecoration, SoftDiskDecoration.DEFAULT, body)
-            "frozen_ocean", "deep_frozen_ocean" -> combine(FrozenOceanDecoration, SoftDiskDecoration.DEFAULT, body)
-            "swamp" -> combine(SoftDiskDecoration.SWAMP, body)
-            "mangrove_swamp" -> combine(SoftDiskDecoration.MANGROVE, body)
-            else -> combine(SoftDiskDecoration.DEFAULT, body)
+            "ice_spikes" -> combine(IceSpikesDecoration, SoftDiskDecoration.DEFAULT, GlowLichenDecoration, body)
+            "frozen_ocean", "deep_frozen_ocean" -> combine(FrozenOceanDecoration, SoftDiskDecoration.DEFAULT, GlowLichenDecoration, body)
+            "swamp" -> combine(SoftDiskDecoration.SWAMP, GlowLichenDecoration, body)
+            "mangrove_swamp" -> combine(SoftDiskDecoration.MANGROVE, GlowLichenDecoration, body)
+            else -> combine(SoftDiskDecoration.DEFAULT, GlowLichenDecoration, body)
         }
     }
 
@@ -371,7 +408,6 @@ public object BiomeDecoration {
         setOf(
             "snowy_plains",
             "ice_spikes",
-            "flower_forest",
             "beach",
             "snowy_beach",
             "stony_shore",
@@ -382,6 +418,5 @@ public object BiomeDecoration {
     private val PUMPKIN_ONLY_PATHS: Set<String> =
         setOf("grove", "snowy_slopes", "dripstone_caves", "deep_dark")
 
-    private val TAIGA_PATHS: Set<String> = setOf("taiga", "snowy_taiga")
     private val OLD_GROWTH_TAIGA_PATHS: Set<String> = setOf("old_growth_pine_taiga", "old_growth_spruce_taiga")
 }
