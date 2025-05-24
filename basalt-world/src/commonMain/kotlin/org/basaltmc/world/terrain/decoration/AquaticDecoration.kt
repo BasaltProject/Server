@@ -6,10 +6,8 @@ import org.basaltmc.world.Chunk
 import org.basaltmc.world.WorldHeight
 
 /**
- * Real ocean-floor vegetation shared by the seven non-frozen ocean variants. Block properties
- * such as kelp age, sea-pickle count and double-plant half are collapsed to each block's default
- * state because the registry currently exposes only default states. Their random draws are still
- * consumed at the same points as vanilla so later placement stays on the same random stream.
+ * Real ocean-floor vegetation shared by the seven non-frozen ocean variants. Kelp age,
+ * sea-pickle count/waterlogging and both tall-seagrass halves preserve their exact block states.
  *
  * Warm-ocean coral lives in [CoralDecoration]. Seagrass, kelp and sea pickles below are complete
  * translations of their feature bodies and placed-feature pipelines.
@@ -101,7 +99,12 @@ public object AquaticDecoration {
         if (tall) {
             if (!chunk.isWater(x, y + 1, z)) return
             chunk.setLocalBlock(x, y, z, Blocks.TALL_SEAGRASS.stateId)
-            chunk.setLocalBlock(x, y + 1, z, Blocks.TALL_SEAGRASS.stateId)
+            chunk.setLocalBlock(
+                x,
+                y + 1,
+                z,
+                Blocks.upperDoublePlantStateId(Blocks.TALL_SEAGRASS.stateId) ?: error("missing tall seagrass upper half"),
+            )
         } else {
             chunk.setLocalBlock(x, y, z, Blocks.SEAGRASS.stateId)
         }
@@ -122,16 +125,14 @@ public object AquaticDecoration {
                 canKelpSurvive(chunk, origin.x, y, origin.z)
             ) {
                 if (h == height) {
-                    random.nextInt(4)
-                    chunk.setLocalBlock(origin.x, y, origin.z, Blocks.KELP.stateId)
+                    chunk.setLocalBlock(origin.x, y, origin.z, Blocks.KELP.stateId + 20 + random.nextInt(4))
                     return
                 }
                 chunk.setLocalBlock(origin.x, y, origin.z, Blocks.KELP_PLANT.stateId)
                 y++
             } else {
                 if (h > 0 && canKelpSurvive(chunk, origin.x, y - 1, origin.z)) {
-                    random.nextInt(4)
-                    chunk.setLocalBlock(origin.x, y - 1, origin.z, Blocks.KELP.stateId)
+                    chunk.setLocalBlock(origin.x, y - 1, origin.z, Blocks.KELP.stateId + 20 + random.nextInt(4))
                 }
                 return
             }
@@ -149,9 +150,9 @@ public object AquaticDecoration {
             val x = origin.x + random.nextInt(8) - random.nextInt(8)
             val z = origin.z + random.nextInt(8) - random.nextInt(8)
             val y = oceanFloor[(x and 15) + (z and 15) * 16]
-            random.nextInt(4)
+            val stateId = Blocks.SEA_PICKLE.stateId + random.nextInt(4) * 2
             if (chunk.isWater(x, y, z) && canAquaticPlantSurvive(chunk, x, y, z)) {
-                chunk.setLocalBlock(x, y, z, Blocks.SEA_PICKLE.stateId)
+                chunk.setLocalBlock(x, y, z, stateId)
             }
         }
     }
@@ -187,7 +188,7 @@ public object AquaticDecoration {
     ): Boolean {
         if (y <= WorldHeight.MIN_Y) return false
         val below = chunk.getLocalBlock(x, y - 1, z)
-        return below != Blocks.AIR.stateId && below != Blocks.WATER.stateId && below != Blocks.KELP.stateId
+        return below != Blocks.AIR.stateId && below != Blocks.WATER.stateId && !Blocks.isKelpState(below)
     }
 
     private fun Chunk.isWater(

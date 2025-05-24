@@ -23,10 +23,7 @@ public object ForestFloorDecoration {
                 AirTargetFilter(),
             ),
             SimpleBlockFeature({ random, _ ->
-                // The registry currently stores only default states. Consume the exact weighted
-                // provider choice among 4 facings x 4 flower amounts while placing that default.
-                random.nextInt(16)
-                wildflowersStateId
+                flowerBedStateId(wildflowersStateId, random.nextInt(16))
             }),
         )
 
@@ -57,9 +54,7 @@ public object ForestFloorDecoration {
                 BlockBelowFilter(Blocks.GRASS_BLOCK.stateId),
             ),
             SimpleBlockFeature({ random, _ ->
-                // Exact provider choice is 4 facings x 3 segment amounts.
-                random.nextInt(12)
-                leafLitterStateId
+                leafLitterStateId(random.nextInt(12), 3)
             }),
         )
 
@@ -76,8 +71,7 @@ public object ForestFloorDecoration {
 
     private fun wildflowerFeature(): SimpleBlockFeature =
         SimpleBlockFeature({ random, _ ->
-            random.nextInt(16)
-            wildflowersStateId
+            flowerBedStateId(wildflowersStateId, random.nextInt(16))
         })
 
     private class BlockBelowFilter(
@@ -92,4 +86,27 @@ public object ForestFloorDecoration {
 
     private fun stateId(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
+
+    private fun leafLitterStateId(
+        choice: Int,
+        maxSegmentAmount: Int,
+    ): Int {
+        val segmentOffset = choice / 4
+        val facingOffset = HORIZONTAL_FACING_STATE_OFFSETS[choice % 4]
+        check(segmentOffset < maxSegmentAmount)
+        return leafLitterStateId + facingOffset + segmentOffset
+    }
+
+    private fun flowerBedStateId(
+        defaultStateId: Int,
+        choice: Int,
+    ): Int {
+        val amountOffset = choice / 4
+        val facingOffset = HORIZONTAL_FACING_STATE_OFFSETS[choice % 4]
+        return defaultStateId + facingOffset + amountOffset
+    }
+
+    // Direction.Plane.HORIZONTAL provider order is NORTH, EAST, SOUTH, WEST, while block-state
+    // IDs group facings as NORTH, SOUTH, WEST, EAST.
+    private val HORIZONTAL_FACING_STATE_OFFSETS = intArrayOf(0, 12, 4, 8)
 }

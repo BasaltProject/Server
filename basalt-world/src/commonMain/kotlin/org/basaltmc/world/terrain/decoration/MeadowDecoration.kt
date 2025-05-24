@@ -23,7 +23,7 @@ public object MeadowDecoration : BiomeVegetalDecoration {
 
     /** // parity: `trees_meadow`, rarity 1/100 and a 50/50 fancy-oak/super-birch selector. */
     public val TREES: BiomeVegetalDecoration =
-        TreeDecoration.rarityChoice(TreeConfigs.FANCY_OAK, 0.5f, TreeConfigs.SUPER_BIRCH, 100)
+        TreeDecoration.rarityChoice(TreeConfigs.FANCY_OAK_BEES, 0.5f, TreeConfigs.SUPER_BIRCH_BEES, 100)
 
     public val GRASS: BiomeVegetalDecoration =
         BiomeVegetalDecoration { chunk, random ->

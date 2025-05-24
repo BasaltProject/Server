@@ -23,10 +23,10 @@ public object PaleMossDecoration : BiomeVegetalDecoration {
         ) {
             positions = positions.flatMap { modifier.getPositions(context, random, it) }
         }
-        positions.forEach { placePatch(chunk, random, it) }
+        positions.forEach { placePatchAt(chunk, random, it) }
     }
 
-    private fun placePatch(
+    internal fun placePatchAt(
         chunk: Chunk,
         random: WorldgenRandom,
         origin: DecorationPos,

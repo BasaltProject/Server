@@ -40,6 +40,17 @@ public object BiomeDecoration {
     private val spruceTree = TreeDecoration.tree(TreeConfigs.SPRUCE)
     private val pineTree = TreeDecoration.tree(TreeConfigs.PINE)
     private val fancyOakTree = TreeDecoration.tree(TreeConfigs.FANCY_OAK)
+    private val oakBees005Tree = TreeDecoration.tree(TreeConfigs.OAK_BEES_005)
+    private val fancyOakBees005Tree = TreeDecoration.tree(TreeConfigs.FANCY_OAK_BEES_005)
+    private val birchBees0002Tree = TreeDecoration.tree(TreeConfigs.BIRCH_BEES_0002)
+    private val superBirchBees0002Tree = TreeDecoration.tree(TreeConfigs.SUPER_BIRCH_BEES_0002)
+    private val oakLeafLitterTree = TreeDecoration.tree(TreeConfigs.OAK_LEAF_LITTER)
+    private val oakBees0002LeafLitterTree = TreeDecoration.tree(TreeConfigs.OAK_BEES_0002_LEAF_LITTER)
+    private val birchBees0002LeafLitterTree = TreeDecoration.tree(TreeConfigs.BIRCH_BEES_0002_LEAF_LITTER)
+    private val fancyOakBees0002LeafLitterTree = TreeDecoration.tree(TreeConfigs.FANCY_OAK_BEES_0002_LEAF_LITTER)
+    private val birchLeafLitterTree = TreeDecoration.tree(TreeConfigs.BIRCH_LEAF_LITTER)
+    private val fancyOakLeafLitterTree = TreeDecoration.tree(TreeConfigs.FANCY_OAK_LEAF_LITTER)
+    private val darkOakLeafLitterTree = TreeDecoration.tree(TreeConfigs.DARK_OAK_LEAF_LITTER)
     private val fallenOakTree = TreeDecoration.fallen(FallenTreeConfigs.OAK)
     private val fallenBirchTree = TreeDecoration.fallen(FallenTreeConfigs.BIRCH)
     private val fallenSuperBirchTree = TreeDecoration.fallen(FallenTreeConfigs.SUPER_BIRCH)
@@ -50,14 +61,31 @@ public object BiomeDecoration {
         mapOf(
             // parity: TREES_PLAINS, fancy oak 33.3%, fallen oak 1.25%, oak default.
             Identifier.vanilla("plains") to
-                TreeDecoration.candidateSequenceCountExtra(listOf(0.33333334f to fancyOakTree, 0.0125f to fallenOakTree), oakTree, 0, 0.05f, 1),
+                TreeDecoration.candidateSequenceCountExtra(
+                    listOf(0.33333334f to fancyOakBees005Tree, 0.0125f to fallenOakTree),
+                    oakBees005Tree,
+                    0,
+                    0.05f,
+                    1,
+                ),
             Identifier.vanilla("sunflower_plains") to
-                TreeDecoration.candidateSequenceCountExtra(listOf(0.33333334f to fancyOakTree, 0.0125f to fallenOakTree), oakTree, 0, 0.05f, 1),
-            // parity: TREES_BIRCH_AND_OAK_LEAF_LITTER; leaf-litter and beehive decorators remain shared gaps.
+                TreeDecoration.candidateSequenceCountExtra(
+                    listOf(0.33333334f to fancyOakBees005Tree, 0.0125f to fallenOakTree),
+                    oakBees005Tree,
+                    0,
+                    0.05f,
+                    1,
+                ),
+            // parity: TREES_BIRCH_AND_OAK_LEAF_LITTER.
             Identifier.vanilla("forest") to
                 TreeDecoration.candidateSequenceCountExtra(
-                    listOf(0.0025f to fallenBirchTree, 0.2f to birchTree, 0.1f to fancyOakTree, 0.0125f to fallenOakTree),
-                    oakTree,
+                    listOf(
+                        0.0025f to fallenBirchTree,
+                        0.2f to birchBees0002LeafLitterTree,
+                        0.1f to fancyOakBees0002LeafLitterTree,
+                        0.0125f to fallenOakTree,
+                    ),
+                    oakBees0002LeafLitterTree,
                     10,
                     0.1f,
                     1,
@@ -67,12 +95,12 @@ public object BiomeDecoration {
             Identifier.vanilla("flower_forest") to FlowerForestDecoration,
             // parity: OverworldBiomes.forest(birch=true, tall=false)/addBirchTrees: TREES_BIRCH, birch default.
             Identifier.vanilla("birch_forest") to
-                TreeDecoration.candidateSequenceCountExtra(listOf(0.0125f to fallenBirchTree), birchTree, 10, 0.1f, 1),
+                TreeDecoration.candidateSequenceCountExtra(listOf(0.0125f to fallenBirchTree), birchBees0002Tree, 10, 0.1f, 1),
             // parity: OverworldBiomes.forest(birch=true, tall=true)/addTallBirchTrees: BIRCH_TALL, super_birch default.
             Identifier.vanilla("old_growth_birch_forest") to
                 TreeDecoration.candidateSequenceCountExtra(
-                    listOf(0.00625f to fallenSuperBirchTree, 0.5f to superBirchTree, 0.0125f to fallenBirchTree),
-                    birchTree,
+                    listOf(0.00625f to fallenSuperBirchTree, 0.5f to superBirchBees0002Tree, 0.0125f to fallenBirchTree),
+                    birchBees0002Tree,
                     10,
                     0.1f,
                     1,
@@ -248,12 +276,12 @@ public object BiomeDecoration {
             Identifier.vanilla("frozen_peaks") to noVegetalDecoration,
             Identifier.vanilla("jagged_peaks") to noVegetalDecoration,
             Identifier.vanilla("stony_peaks") to noVegetalDecoration,
-            // parity: OverworldBiomes.badlands(wooded=true)/addBadlandsTrees+addBadlandGrass: TREES_BADLANDS (oak
-            // default, oak_leaf_litter/fallen_oak simplified to plain oak) plus patch_grass_badlands (the same
+            // parity: OverworldBiomes.badlands(wooded=true)/addBadlandsTrees+addBadlandGrass: TREES_BADLANDS
+            // (oak_leaf_litter default, fallen_oak candidate) plus patch_grass_badlands (the same
             // real feature DefaultVegetationDecoration.GRASS already builds) and patch_dead_bush_badlands.
             Identifier.vanilla("wooded_badlands") to
                 combine(
-                    TreeDecoration.candidateSequenceCountExtra(listOf(0.0125f to fallenOakTree), oakTree, 5, 0.1f, 1),
+                    TreeDecoration.candidateSequenceCountExtra(listOf(0.0125f to fallenOakTree), oakLeafLitterTree, 5, 0.1f, 1),
                     DefaultVegetationDecoration.GRASS,
                     BadlandsDecoration,
                 ),
@@ -273,24 +301,28 @@ public object BiomeDecoration {
                     listOf(
                         0.025f to TreeDecoration.hugeMushroom(HugeMushroomFeature.Kind.BROWN),
                         0.05f to TreeDecoration.hugeMushroom(HugeMushroomFeature.Kind.RED),
-                        0.6666667f to TreeDecoration.tree(TreeConfigs.DARK_OAK),
+                        0.6666667f to darkOakLeafLitterTree,
                         0.0025f to fallenBirchTree,
-                        0.2f to birchTree,
+                        0.2f to birchLeafLitterTree,
                         0.0125f to fallenOakTree,
-                        0.1f to fancyOakTree,
+                        0.1f to fancyOakLeafLitterTree,
                     ),
-                    oakTree,
+                    oakLeafLitterTree,
                     16,
                 ),
-            // parity: OverworldBiomes.darkForest(isPaleGarden=true)/PALE_GARDEN_VEGETATION: 10% pale_oak_creaking
-            // (same tree shape as the default, only the CreakingHeartDecorator differs, not ported), else pale_oak.
+            // parity: PALE_GARDEN_VEGETATION rolls creaking 10%, ordinary pale oak 90%, then ordinary fallback.
             // CountPlacement(16). Pale moss and pale garden flowers are appended by forBiome.
-            Identifier.vanilla("pale_garden") to TreeDecoration.fixed(TreeConfigs.PALE_OAK, 16),
+            Identifier.vanilla("pale_garden") to
+                TreeDecoration.sequence(
+                    listOf(0.1f to TreeConfigs.PALE_OAK_CREAKING, 0.9f to TreeConfigs.PALE_OAK),
+                    TreeConfigs.PALE_OAK,
+                    16,
+                ),
             // parity: meadow tall grass, grass, DualNoiseProvider flowers, rare trees, and wildflowers.
             Identifier.vanilla("meadow") to MeadowDecoration,
             // parity: OverworldBiomes.meadowOrCherryGrove(cherryGrove=true)/addCherryGroveVegetation:
             // patch_grass_plain + flower_cherry (pink petals) + trees_cherry (countExtra(10, 0.1, 1),
-            // cherry_bees_005 minus the unported BeehiveDecorator). See CherryGroveDecoration's own KDoc.
+            // cherry_bees_005). See CherryGroveDecoration's own KDoc.
             Identifier.vanilla("cherry_grove") to CherryGroveDecoration,
             // parity: river vegetation is composed in forBiome so water trees precede bushes and defaults.
             Identifier.vanilla("river") to combine(DefaultVegetationDecoration, AquaticDecoration.RIVER),

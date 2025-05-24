@@ -24,7 +24,7 @@ class TaigaGroundDecorationTest {
             for (z in 0 until 16) {
                 if (chunk.getBlockStateId(x, 63, z) == largeFernStateId) {
                     found = true
-                    assertEquals(largeFernStateId, chunk.getBlockStateId(x, 64, z))
+                    assertEquals(largeFernStateId - 1, chunk.getBlockStateId(x, 64, z))
                 }
             }
         }

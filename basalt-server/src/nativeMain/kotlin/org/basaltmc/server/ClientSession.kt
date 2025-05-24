@@ -37,6 +37,7 @@ import org.basaltmc.protocol.play.ChatMessagePacket
 import org.basaltmc.protocol.play.ChunkBatchFinishedPacket
 import org.basaltmc.protocol.play.ChunkBatchReceivedPacket
 import org.basaltmc.protocol.play.ChunkBatchStartPacket
+import org.basaltmc.protocol.play.ChunkBlockEntityInfo
 import org.basaltmc.protocol.play.ClientboundBlockChangedAckPacket
 import org.basaltmc.protocol.play.ClientboundBlockUpdatePacket
 import org.basaltmc.protocol.play.EntityTeleportPacket
@@ -558,6 +559,15 @@ public class ClientSession(
                 z = chunk.chunkZ,
                 heightmaps = listOf(Heightmap(HeightmapType.MOTION_BLOCKING, heightmap)),
                 chunkData = chunkData,
+                blockEntities =
+                    chunk.blockEntities().map { blockEntity ->
+                        ChunkBlockEntityInfo(
+                            packedXZ = (blockEntity.localX shl 4) or blockEntity.localZ,
+                            y = blockEntity.y,
+                            typeId = blockEntityTypeId(blockEntity.type.toString()),
+                            tag = blockEntity.data,
+                        )
+                    },
                 skyLightMask = light.skyLightMask,
                 blockLightMask = longArrayOf(0L),
                 emptySkyLightMask = light.emptySkyLightMask,
@@ -579,6 +589,12 @@ public class ClientSession(
             ).write(it)
         }
     }
+
+    private fun blockEntityTypeId(identifier: String): Int =
+        when (identifier) {
+            "minecraft:beehive" -> 33
+            else -> error("no protocol block entity type ID registered for $identifier")
+        }
 
     private fun handlePlay(
         packetId: Int,

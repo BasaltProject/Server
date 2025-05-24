@@ -24,7 +24,7 @@ class SavannaGroundDecorationTest {
             for (z in 0 until 16) {
                 if (chunk.getBlockStateId(x, 63, z) == tallGrassStateId) {
                     found = true
-                    assertEquals(tallGrassStateId, chunk.getBlockStateId(x, 64, z))
+                    assertEquals(tallGrassStateId - 1, chunk.getBlockStateId(x, 64, z))
                 }
             }
         }

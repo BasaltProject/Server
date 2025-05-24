@@ -14,8 +14,7 @@ import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
  * columns using `MOTION_BLOCKING`. Block light is zero during world generation, so its `< 10`
  * check is inherently satisfied here.
  *
- * The final `SnowyBlock.SNOWY=true` mutation is intentionally absent because this project still
- * represents only default block states and cannot encode block properties.
+ * Snow placement also updates the `snowy` property of grass block, podzol, and mycelium below it.
  */
 public object SurfaceFreezingDecoration {
     public fun decorate(
@@ -37,6 +36,10 @@ public object SurfaceFreezingDecoration {
 
                 if (shouldSnow(chunk, localX, topY, localZ, biomeId, worldX, worldZ)) {
                     chunk.setBlockStateId(localX, topY, localZ, Blocks.SNOW.stateId)
+                    val snowyBelowStateId = Blocks.withSnowy(chunk.getBlockStateId(localX, belowY, localZ), true)
+                    if (snowyBelowStateId != null) {
+                        chunk.setBlockStateId(localX, belowY, localZ, snowyBelowStateId)
+                    }
                 }
             }
         }

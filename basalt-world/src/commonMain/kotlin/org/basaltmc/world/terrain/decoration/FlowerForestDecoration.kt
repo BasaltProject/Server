@@ -34,10 +34,10 @@ public object FlowerForestDecoration : BiomeVegetalDecoration {
         TreeDecoration.candidateSequenceCountExtra(
             listOf(
                 0.0025f to TreeDecoration.fallen(FallenTreeConfigs.BIRCH),
-                0.2f to TreeDecoration.tree(TreeConfigs.BIRCH),
-                0.1f to TreeDecoration.tree(TreeConfigs.FANCY_OAK),
+                0.2f to TreeDecoration.tree(TreeConfigs.BIRCH_BEES_002),
+                0.1f to TreeDecoration.tree(TreeConfigs.FANCY_OAK_BEES_002),
             ),
-            TreeDecoration.tree(TreeConfigs.OAK),
+            TreeDecoration.tree(TreeConfigs.OAK_BEES_002),
             6,
             0.1f,
             1,
