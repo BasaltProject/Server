@@ -32,10 +32,11 @@ public class ChunkNbtException(
  * exact thresholds: blocks go single-value / 4-8 bit indirect (floored to 4) / direct beyond that,
  * biomes go single-value / 1-3 bit indirect / direct beyond that.
  *
- * Deliberately out of scope for now, since nothing in `basalt-world` produces or needs them yet:
- * block/light data (`BlockLight`/`SkyLight`), entities, block entities, ticks, heightmaps,
- * structures, and per-block properties (every block here is its bare default state). Biomes are
- * always a single-entry `minecraft:plains` palette, matching [Chunk]'s own single-biome model.
+ * Non-default states emitted by worldgen preserve their vanilla `Properties` compound in the
+ * palette and resolve it back to the same network state ID when loaded. Deliberately out of scope
+ * for now: block/light data (`BlockLight`/`SkyLight`), entities, block entities, ticks, heightmaps,
+ * and structures. Biomes are always a single-entry `minecraft:plains` palette, matching [Chunk]'s
+ * own single-biome model.
  */
 public object ChunkNbt {
     // world_version for Minecraft 26.2, per the project's own protocol constants.
@@ -43,7 +44,7 @@ public object ChunkNbt {
     private const val BLOCK_MIN_INDIRECT_BITS = 4
     private const val BLOCK_MAX_INDIRECT_BITS = 8
     private const val SECTION_BLOCK_COUNT = 16 * 16 * 16
-    private val blockDirectBits = bitsFor(Blocks.REGISTRY.size)
+    private val blockDirectBits = bitsFor(Blocks.stateCount)
 
     public fun write(chunk: Chunk): NbtCompound {
         val tag = NbtCompound()
@@ -89,9 +90,14 @@ public object ChunkNbt {
             directBits = blockDirectBits,
         ) { stateId ->
             val block =
-                Blocks.REGISTRY.byId(stateId) ?: throw ChunkNbtException("no block registered for state id $stateId")
+                Blocks.byStateId(stateId) ?: throw ChunkNbtException("no block registered for state id $stateId")
             val entry = NbtCompound()
             entry.putString("Name", block.block.toString())
+            if (block.properties.isNotEmpty()) {
+                val properties = NbtCompound()
+                for ((name, value) in block.properties) properties.putString(name, value)
+                entry["Properties"] = properties
+            }
             entry
         }
 
@@ -105,10 +111,16 @@ public object ChunkNbt {
         val paletteList = tag.getList("palette") ?: throw ChunkNbtException("missing block_states palette")
         val paletteIds =
             paletteList.map { entry ->
-                val name =
-                    (entry as? NbtCompound)?.getString("Name")
-                        ?: throw ChunkNbtException("invalid block palette entry: $entry")
-                Blocks.REGISTRY.idOf(Identifier.parse(name)) ?: throw ChunkNbtException("unknown block $name")
+                val entryTag = entry as? NbtCompound ?: throw ChunkNbtException("invalid block palette entry: $entry")
+                val name = entryTag.getString("Name").takeIf { it.isNotEmpty() }
+                    ?: throw ChunkNbtException("invalid block palette entry: $entry")
+                val propertiesTag = entryTag.getCompound("Properties")
+                val properties =
+                    propertiesTag.associate { (key, value) ->
+                        key to ((value as? NbtString)?.value ?: throw ChunkNbtException("invalid property $key for block $name"))
+                    }
+                Blocks.stateIdOf(Identifier.parse(name), properties)
+                    ?: throw ChunkNbtException("unknown block state $name$properties")
             }
         return decodePalette(
             paletteIds = paletteIds,

@@ -7,7 +7,7 @@ import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.noise.NormalNoise
 import org.basaltmc.world.terrain.decoration.tree.TreeConfigs
-import org.basaltmc.world.terrain.decoration.tree.TreeFeature
+import org.basaltmc.world.terrain.decoration.tree.FallenTreeConfigs
 import kotlin.math.max
 import kotlin.math.min
 
@@ -24,35 +24,24 @@ public object FlowerForestDecoration : BiomeVegetalDecoration {
         chunk: Chunk,
         random: WorldgenRandom,
     ) {
-        placeTrees(chunk, random)
+        TREES.decorate(chunk, random)
         placeFlowers(chunk, random)
         DefaultVegetationDecoration.GRASS.decorate(chunk, random)
     }
 
     // parity: VegetationFeatures.TREES_FLOWER_FOREST, VegetationPlacements.treePlacement(countExtra(6, 0.1, 1)).
-    private fun placeTrees(
-        chunk: Chunk,
-        random: WorldgenRandom,
-    ) {
-        val context = PlacementContext(chunk)
-        val origin = DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16)
-        var positions = CountExtraPlacement(6, 0.1f, 1).getPositions(context, random, origin)
-        positions = positions.flatMap { InSquarePlacement.getPositions(context, random, it) }
-        positions = positions.flatMap { HeightmapPlacement.getPositions(context, random, it) }
-        positions.forEach { pos ->
-            val config =
-                if (random.nextFloat() < 0.0025f) {
-                    null
-                } else if (random.nextFloat() < 0.2f) {
-                    TreeConfigs.BIRCH
-                } else if (random.nextFloat() < 0.1f) {
-                    null
-                } else {
-                    TreeConfigs.OAK
-                }
-            config?.let { TreeFeature.place(chunk, random, pos.x, pos.y, pos.z, it) }
-        }
-    }
+    private val TREES: BiomeVegetalDecoration =
+        TreeDecoration.candidateSequenceCountExtra(
+            listOf(
+                0.0025f to TreeDecoration.fallen(FallenTreeConfigs.BIRCH),
+                0.2f to TreeDecoration.tree(TreeConfigs.BIRCH),
+                0.1f to TreeDecoration.tree(TreeConfigs.FANCY_OAK),
+            ),
+            TreeDecoration.tree(TreeConfigs.OAK),
+            6,
+            0.1f,
+            1,
+        )
 
     // parity: placed_feature/flower_flower_forest.json + the real NoiseProvider algorithm.
     private fun placeFlowers(

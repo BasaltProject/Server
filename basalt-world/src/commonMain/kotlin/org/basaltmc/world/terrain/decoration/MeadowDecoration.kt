@@ -6,13 +6,9 @@ import org.basaltmc.registry.Blocks
 import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.noise.NormalNoise
+import org.basaltmc.world.terrain.decoration.tree.TreeConfigs
 
-/**
- * Real meadow grass and flower vegetation, including `flower_meadow`'s DualNoiseProvider.
- * **Not ported**: `trees_meadow` (rare, `RarityFilter(100)`, a `RANDOM_SELECTOR` between an
- * unported `fancy_oak_bees` and `super_birch_bees`, which this project's [TreeDecoration] can
- * express but wasn't prioritized given the real feature is already rare 1/100 per chunk).
- */
+/** Real meadow vegetation, including `flower_meadow`'s DualNoiseProvider and rare trees. */
 public object MeadowDecoration : BiomeVegetalDecoration {
     override fun decorate(
         chunk: Chunk,
@@ -21,8 +17,13 @@ public object MeadowDecoration : BiomeVegetalDecoration {
         PlainsDecoration.TALL_GRASS.decorate(chunk, random)
         GRASS.decorate(chunk, random)
         FLOWERS.decorate(chunk, random)
+        TREES.decorate(chunk, random)
         ForestFloorDecoration.MEADOW_WILDFLOWERS.decorate(chunk, random)
     }
+
+    /** // parity: `trees_meadow`, rarity 1/100 and a 50/50 fancy-oak/super-birch selector. */
+    public val TREES: BiomeVegetalDecoration =
+        TreeDecoration.rarityChoice(TreeConfigs.FANCY_OAK, 0.5f, TreeConfigs.SUPER_BIRCH, 100)
 
     public val GRASS: BiomeVegetalDecoration =
         BiomeVegetalDecoration { chunk, random ->

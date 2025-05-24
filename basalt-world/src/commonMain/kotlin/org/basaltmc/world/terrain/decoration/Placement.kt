@@ -137,6 +137,23 @@ public class SurfaceRelativeThresholdFilter(
     }
 }
 
+/** // parity: SurfaceWaterDepthFilter. */
+public class SurfaceWaterDepthFilter(
+    private val maxWaterDepth: Int,
+) : PlacementFilter {
+    override fun shouldPlace(
+        context: PlacementContext,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ): Boolean {
+        val x = origin.x and 15
+        val z = origin.z and 15
+        val oceanFloorY = context.height(x, z, Chunk.HeightmapType.OCEAN_FLOOR)
+        val worldSurfaceY = context.height(x, z, Chunk.HeightmapType.WORLD_SURFACE)
+        return worldSurfaceY - oceanFloorY <= maxWaterDepth
+    }
+}
+
 /** // parity: net.minecraft.world.level.levelgen.placement.HeightmapPlacement, this project's single heightmap standing in for every real heightmap type. */
 public object HeightmapPlacement : PlacementModifier {
     public operator fun invoke(type: Chunk.HeightmapType): PlacementModifier =

@@ -3,6 +3,7 @@ package org.basaltmc.world.terrain.decoration.tree
 import org.basaltmc.random.WorldgenRandom
 import org.basaltmc.random.XoroshiroRandom
 import org.basaltmc.world.Chunk
+import org.basaltmc.world.terrain.decoration.TreeDecoration
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -40,6 +41,59 @@ class TreeFeatureTest {
     }
 
     @Test
+    fun fancyOakPlacesBranchedLogsAndRoundedFoliageClusters() {
+        val chunk = chunkWithFlatGround(0)
+        val random = WorldgenRandom(XoroshiroRandom(42L))
+        val placed = TreeFeature.place(chunk, random, 8, 1, 8, TreeConfigs.FANCY_OAK)
+        assertTrue(placed, "expected the fancy oak tree to place successfully")
+
+        var logs = 0
+        var leaves = 0
+        for (x in 0 until 16) {
+            for (y in 1..24) {
+                for (z in 0 until 16) {
+                    val id = chunk.getBlockStateId(x, y, z)
+                    if (id in oakLogState - 1..oakLogState + 1) logs++
+                    if (id == oakLeavesState) leaves++
+                }
+            }
+        }
+        assertTrue(logs > 4, "expected a trunk and limbs, got $logs logs")
+        assertTrue(leaves > 0, "expected at least one rounded foliage cluster")
+    }
+
+    @Test
+    fun nullRandomSelectorEntryConsumesTheRollWithoutPlacingTheDefault() {
+        val chunk = chunkWithFlatGround(0)
+        TreeDecoration.sequence(listOf(1.0f to null), TreeConfigs.OAK, 1)
+            .decorate(chunk, WorldgenRandom(XoroshiroRandom(5L)))
+
+        for (x in 0 until 16) {
+            for (z in 0 until 16) {
+                for (y in 1..20) assertTrue(chunk.getBlockStateId(x, y, z) !in oakLogState - 1..oakLogState + 1)
+            }
+        }
+    }
+
+    @Test
+    fun waterTreeWeightedCountCanPlaceAnOak() {
+        val seed =
+            (0L..1_000L).first { candidate ->
+                WorldgenRandom(XoroshiroRandom(candidate)).nextInt(10) == 9
+            }
+        val chunk = chunkWithFlatGround(0)
+        TreeDecoration.WATER.decorate(chunk, WorldgenRandom(XoroshiroRandom(seed)))
+
+        var logs = 0
+        for (x in 0 until 16) {
+            for (z in 0 until 16) {
+                for (y in 1..24) if (chunk.getBlockStateId(x, y, z) in oakLogState - 1..oakLogState + 1) logs++
+            }
+        }
+        assertTrue(logs > 0, "expected the weighted 1/10 water-tree count to produce an oak")
+    }
+
+    @Test
     fun spruceWithPineFoliagePlacesLogsAndLeaves() {
         val chunk = chunkWithFlatGround(0)
         val random = WorldgenRandom(XoroshiroRandom(1234L))
@@ -59,6 +113,48 @@ class TreeFeatureTest {
         }
         assertTrue(logs > 0, "expected at least one spruce log")
         assertTrue(leaves > 0, "expected at least one spruce leaves block")
+    }
+
+    @Test
+    fun jungleBushPlacesOneLogWithOakLeafCanopy() {
+        val chunk = chunkWithFlatGround(0)
+        val placed = TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(17L)), 8, 1, 8, TreeConfigs.JUNGLE_BUSH)
+        assertTrue(placed)
+
+        var logs = 0
+        var leaves = 0
+        for (x in 0 until 16) {
+            for (z in 0 until 16) {
+                for (y in 1..8) {
+                    val state = chunk.getBlockStateId(x, y, z)
+                    if (state == jungleLogState) logs++
+                    if (state == oakLeavesState) leaves++
+                }
+            }
+        }
+        assertTrue(logs == 1, "expected the bush's single jungle log, got $logs")
+        assertTrue(leaves > 0)
+    }
+
+    @Test
+    fun megaJunglePlacesGiantTrunkBranchesAndLeaves() {
+        val chunk = chunkWithFlatGround(0)
+        val placed = TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(23L)), 7, 1, 7, TreeConfigs.MEGA_JUNGLE)
+        assertTrue(placed)
+
+        var logs = 0
+        var leaves = 0
+        for (x in 0 until 16) {
+            for (z in 0 until 16) {
+                for (y in 1..40) {
+                    val state = chunk.getBlockStateId(x, y, z)
+                    if (state == jungleLogState) logs++
+                    if (state == jungleLeavesState) leaves++
+                }
+            }
+        }
+        assertTrue(logs >= 31, "expected a giant trunk and branches, got $logs logs")
+        assertTrue(leaves > 0)
     }
 
     @Test
@@ -194,6 +290,14 @@ class TreeFeatureTest {
         val cherryLeavesState =
             org.basaltmc.registry.Blocks.REGISTRY
                 .byIdentifier(org.basaltmc.registry.Identifier.vanilla("cherry_leaves"))
+                ?.stateId ?: error("unknown block")
+        val jungleLogState =
+            org.basaltmc.registry.Blocks.REGISTRY
+                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("jungle_log"))
+                ?.stateId ?: error("unknown block")
+        val jungleLeavesState =
+            org.basaltmc.registry.Blocks.REGISTRY
+                .byIdentifier(org.basaltmc.registry.Identifier.vanilla("jungle_leaves"))
                 ?.stateId ?: error("unknown block")
         val mangroveRootsState =
             org.basaltmc.registry.Blocks.REGISTRY

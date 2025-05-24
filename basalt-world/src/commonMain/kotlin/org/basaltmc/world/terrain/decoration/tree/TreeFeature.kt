@@ -6,14 +6,19 @@ import org.basaltmc.world.Chunk
 import org.basaltmc.world.WorldHeight
 import org.basaltmc.world.terrain.decoration.IntProvider
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 /**
  * // parity: net.minecraft.world.level.levelgen.feature.TreeFeature plus the real trunk/foliage
  * placer and `FeatureSize` types it drives (`TrunkPlacer`/`StraightTrunkPlacer`/`ForkingTrunkPlacer`/
- * `DarkOakTrunkPlacer`/`GiantTrunkPlacer`/`UpwardsBranchingTrunkPlacer`/`CherryTrunkPlacer`,
- * `FoliagePlacer`/`BlobFoliagePlacer`/`AcaciaFoliagePlacer`/`SpruceFoliagePlacer`/`PineFoliagePlacer`/
+ * `FancyTrunkPlacer`/`DarkOakTrunkPlacer`/`GiantTrunkPlacer`/`MegaJungleTrunkPlacer`/
+ * `UpwardsBranchingTrunkPlacer`/`CherryTrunkPlacer`, `FoliagePlacer`/`BlobFoliagePlacer`/
+ * `BushFoliagePlacer`/`MegaJungleFoliagePlacer`/`FancyFoliagePlacer`/`AcaciaFoliagePlacer`/`SpruceFoliagePlacer`/`PineFoliagePlacer`/
  * `DarkOakFoliagePlacer`/`MegaPineFoliagePlacer`/`RandomSpreadFoliagePlacer`/`CherryFoliagePlacer`,
  * `TwoLayersFeatureSize`/`ThreeLayersFeatureSize`), all decompiled from the real jar. Coordinates are world block
  * coordinates throughout, matching [org.basaltmc.world.terrain.decoration.DecorationPos]'s own
@@ -168,6 +173,189 @@ public class StraightTrunkPlacer(
     }
 }
 
+/** // parity: FancyTrunkPlacer, including its limb collision probes and branch clusters. */
+public class FancyTrunkPlacer(
+    baseHeight: Int,
+    heightRandA: Int,
+    heightRandB: Int,
+) : TrunkPlacer(baseHeight, heightRandA, heightRandB) {
+    override fun placeTrunk(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        treeHeight: Int,
+        originX: Int,
+        originY: Int,
+        originZ: Int,
+        trunkStateId: Int,
+    ): List<FoliageAttachment> {
+        val height = treeHeight + 2
+        val trunkHeight = floor(height * TRUNK_HEIGHT_SCALE).toInt()
+        val clustersPerY = min(1, floor(CLUSTER_DENSITY_MAGIC + (height.toDouble() / 13.0) * (height.toDouble() / 13.0)).toInt())
+        val trunkTop = originY + trunkHeight
+        var relativeY = height - ASSUMED_FOLIAGE_HEIGHT
+        val foliageCoords = mutableListOf(FancyFoliageCoords(FoliageAttachment(originX, originY + relativeY, originZ, 0), trunkTop))
+
+        while (relativeY >= 0) {
+            val shape = treeShape(height, relativeY)
+            if (shape >= 0.0f) {
+                repeat(clustersPerY) {
+                    val radius = shape * (random.nextFloat() + BRANCH_LENGTH_MAGIC)
+                    val angle = random.nextFloat() * 2.0 * kotlin.math.PI
+                    val checkStartX = originX + floor(radius * sin(angle) + 0.5).toInt()
+                    val checkStartY = originY + relativeY - 1
+                    val checkStartZ = originZ + floor(radius * cos(angle) + 0.5).toInt()
+                    if (
+                        makeLimb(
+                            chunk,
+                            checkStartX,
+                            checkStartY,
+                            checkStartZ,
+                            checkStartX,
+                            checkStartY + ASSUMED_FOLIAGE_HEIGHT,
+                            checkStartZ,
+                            checkOnly = true,
+                            trunkStateId = trunkStateId,
+                        )
+                    ) {
+                        val dx = originX - checkStartX
+                        val dz = originZ - checkStartZ
+                        val branchHeight = checkStartY - sqrt((dx * dx + dz * dz).toDouble()) * BRANCH_SLOPE
+                        val branchTop = if (branchHeight > trunkTop) trunkTop else branchHeight.toInt()
+                        if (
+                            makeLimb(
+                                chunk,
+                                originX,
+                                branchTop,
+                                originZ,
+                                checkStartX,
+                                checkStartY,
+                                checkStartZ,
+                                checkOnly = true,
+                                trunkStateId = trunkStateId,
+                            )
+                        ) {
+                            foliageCoords += FancyFoliageCoords(FoliageAttachment(checkStartX, checkStartY, checkStartZ, 0), branchTop)
+                        }
+                    }
+                }
+            }
+            relativeY--
+        }
+
+        makeLimb(
+            chunk,
+            originX,
+            originY,
+            originZ,
+            originX,
+            originY + trunkHeight,
+            originZ,
+            checkOnly = false,
+            trunkStateId = trunkStateId,
+        )
+        for (coord in foliageCoords) {
+            if (coord.attachment.x == originX && coord.attachment.y == coord.branchBase && coord.attachment.z == originZ) continue
+            if (trimBranches(height, coord.branchBase - originY)) {
+                makeLimb(
+                    chunk,
+                    originX,
+                    coord.branchBase,
+                    originZ,
+                    coord.attachment.x,
+                    coord.attachment.y,
+                    coord.attachment.z,
+                    checkOnly = false,
+                    trunkStateId = trunkStateId,
+                )
+            }
+        }
+        return foliageCoords.filter { trimBranches(height, it.branchBase - originY) }.map { it.attachment }
+    }
+
+    private fun makeLimb(
+        chunk: Chunk,
+        startX: Int,
+        startY: Int,
+        startZ: Int,
+        endX: Int,
+        endY: Int,
+        endZ: Int,
+        checkOnly: Boolean,
+        trunkStateId: Int,
+    ): Boolean {
+        if (checkOnly && startX == endX && startY == endY && startZ == endZ) return true
+        val deltaX = endX - startX
+        val deltaY = endY - startY
+        val deltaZ = endZ - startZ
+        val steps = max(abs(deltaX), max(abs(deltaY), abs(deltaZ)))
+        if (steps == 0) {
+            if (!checkOnly) placeLog(chunk, startX, startY, startZ, trunkStateId)
+            return true
+        }
+        val dx = deltaX.toFloat() / steps
+        val dy = deltaY.toFloat() / steps
+        val dz = deltaZ.toFloat() / steps
+        for (step in 0..steps) {
+            val x = startX + floor(0.5f + step * dx).toInt()
+            val y = startY + floor(0.5f + step * dy).toInt()
+            val z = startZ + floor(0.5f + step * dz).toInt()
+            if (checkOnly) {
+                if (!isFree(chunk, x, y, z)) return false
+            } else {
+                placeLog(chunk, x, y, z, axisStateId(trunkStateId, startX, startZ, x, z))
+            }
+        }
+        return true
+    }
+
+    private fun axisStateId(
+        defaultStateId: Int,
+        startX: Int,
+        startZ: Int,
+        x: Int,
+        z: Int,
+    ): Int {
+        val xDifference = abs(x - startX)
+        val zDifference = abs(z - startZ)
+        val largest = max(xDifference, zDifference)
+        return when {
+            largest == 0 -> defaultStateId
+            xDifference == largest -> defaultStateId - 1
+            else -> defaultStateId + 1
+        }
+    }
+
+    private fun trimBranches(
+        height: Int,
+        localY: Int,
+    ): Boolean = localY.toDouble() >= height * 0.2
+
+    private fun treeShape(
+        height: Int,
+        y: Int,
+    ): Float {
+        if (y < height * 0.3f) return -1.0f
+        val radius = height / 2.0f
+        val adjacent = radius - y
+        if (abs(adjacent) >= radius) return if (adjacent == 0.0f) radius * 0.5f else 0.0f
+        val distance = if (adjacent == 0.0f) radius else sqrt(radius * radius - adjacent * adjacent)
+        return distance * 0.5f
+    }
+
+    private data class FancyFoliageCoords(
+        val attachment: FoliageAttachment,
+        val branchBase: Int,
+    )
+
+    private companion object {
+        const val ASSUMED_FOLIAGE_HEIGHT = 5
+        const val TRUNK_HEIGHT_SCALE = 0.618
+        const val CLUSTER_DENSITY_MAGIC = 1.382
+        const val BRANCH_SLOPE = 0.381
+        const val BRANCH_LENGTH_MAGIC = 0.328
+    }
+}
+
 /** // parity: ForkingTrunkPlacer (acacia). */
 public class ForkingTrunkPlacer(
     baseHeight: Int,
@@ -281,7 +469,7 @@ public class DarkOakTrunkPlacer(
 }
 
 /** // parity: GiantTrunkPlacer (mega spruce/pine): a solid 2x2 trunk, no lean/branches. No below-trunk-block placement (documented gap). */
-public class GiantTrunkPlacer(
+public open class GiantTrunkPlacer(
     baseHeight: Int,
     heightRandA: Int,
     heightRandB: Int,
@@ -304,6 +492,45 @@ public class GiantTrunkPlacer(
             }
         }
         return listOf(FoliageAttachment(originX, originY + treeHeight, originZ, 0, true))
+    }
+}
+
+/** // parity: MegaJungleTrunkPlacer, the giant 2x2 trunk plus high lateral branches. */
+public class MegaJungleTrunkPlacer(
+    baseHeight: Int,
+    heightRandA: Int,
+    heightRandB: Int,
+) : GiantTrunkPlacer(baseHeight, heightRandA, heightRandB) {
+    override fun placeTrunk(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        treeHeight: Int,
+        originX: Int,
+        originY: Int,
+        originZ: Int,
+        trunkStateId: Int,
+    ): List<FoliageAttachment> {
+        val attachments = super.placeTrunk(chunk, random, treeHeight, originX, originY, originZ, trunkStateId).toMutableList()
+        var branchHeight = treeHeight - 2 - random.nextInt(4)
+        while (branchHeight > treeHeight / 2) {
+            val angle = random.nextFloat() * (kotlin.math.PI * 2.0).toFloat()
+            var branchX = 0
+            var branchZ = 0
+            for (step in 0 until 5) {
+                branchX = (1.5f + cos(angle) * step).toInt()
+                branchZ = (1.5f + sin(angle) * step).toInt()
+                placeLog(
+                    chunk,
+                    originX + branchX,
+                    originY + branchHeight - 3 + step / 2,
+                    originZ + branchZ,
+                    trunkStateId,
+                )
+            }
+            attachments += FoliageAttachment(originX + branchX, originY + branchHeight, originZ + branchZ, -2)
+            branchHeight -= 2 + random.nextInt(4)
+        }
+        return attachments
     }
 }
 
@@ -815,6 +1042,116 @@ public class BlobFoliagePlacer(
         currentRadius: Int,
         doubleTrunk: Boolean,
     ): Boolean = dx == currentRadius && dz == currentRadius && (random.nextInt(2) == 0 || y == 0)
+}
+
+/** // parity: BushFoliagePlacer. */
+public class BushFoliagePlacer(
+    radius: IntProvider,
+    offset: IntProvider,
+    private val height: Int,
+) : FoliagePlacer(radius, offset) {
+    override fun foliageHeight(
+        random: WorldgenRandom,
+        treeHeight: Int,
+    ): Int = height
+
+    override fun createFoliage(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        foliageStateId: Int,
+        attachment: FoliageAttachment,
+        foliageHeight: Int,
+        leafRadius: Int,
+        offset: Int,
+    ) {
+        for (y in offset downTo offset - foliageHeight) {
+            val currentRadius = leafRadius + attachment.radiusOffset - 1 - y
+            placeLeavesRow(chunk, random, foliageStateId, attachment.x, attachment.y, attachment.z, currentRadius, y, attachment.doubleTrunk)
+        }
+    }
+
+    override fun shouldSkipLocation(
+        random: WorldgenRandom,
+        dx: Int,
+        y: Int,
+        dz: Int,
+        currentRadius: Int,
+        doubleTrunk: Boolean,
+    ): Boolean = dx == currentRadius && dz == currentRadius && random.nextInt(2) == 0
+}
+
+/** // parity: MegaJungleFoliagePlacer. */
+public class MegaJungleFoliagePlacer(
+    radius: IntProvider,
+    offset: IntProvider,
+    private val height: Int,
+) : FoliagePlacer(radius, offset) {
+    override fun foliageHeight(
+        random: WorldgenRandom,
+        treeHeight: Int,
+    ): Int = height
+
+    override fun createFoliage(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        foliageStateId: Int,
+        attachment: FoliageAttachment,
+        foliageHeight: Int,
+        leafRadius: Int,
+        offset: Int,
+    ) {
+        val leafHeight = if (attachment.doubleTrunk) foliageHeight else 1 + random.nextInt(2)
+        for (y in offset downTo offset - leafHeight) {
+            val currentRadius = leafRadius + attachment.radiusOffset + 1 - y
+            placeLeavesRow(chunk, random, foliageStateId, attachment.x, attachment.y, attachment.z, currentRadius, y, attachment.doubleTrunk)
+        }
+    }
+
+    override fun shouldSkipLocation(
+        random: WorldgenRandom,
+        dx: Int,
+        y: Int,
+        dz: Int,
+        currentRadius: Int,
+        doubleTrunk: Boolean,
+    ): Boolean = dx + dz >= 7 || dx * dx + dz * dz > currentRadius * currentRadius
+}
+
+/** // parity: FancyFoliagePlacer. */
+public class FancyFoliagePlacer(
+    radius: IntProvider,
+    offset: IntProvider,
+    private val height: Int,
+) : FoliagePlacer(radius, offset) {
+    override fun foliageHeight(
+        random: WorldgenRandom,
+        treeHeight: Int,
+    ): Int = height
+
+    override fun createFoliage(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        foliageStateId: Int,
+        attachment: FoliageAttachment,
+        foliageHeight: Int,
+        leafRadius: Int,
+        offset: Int,
+    ) {
+        for (y in offset downTo offset - foliageHeight) {
+            val currentRadius = leafRadius + if (y != offset && y != offset - foliageHeight) 1 else 0
+            placeLeavesRow(chunk, random, foliageStateId, attachment.x, attachment.y, attachment.z, currentRadius, y, attachment.doubleTrunk)
+        }
+    }
+
+    override fun shouldSkipLocation(
+        random: WorldgenRandom,
+        dx: Int,
+        y: Int,
+        dz: Int,
+        currentRadius: Int,
+        doubleTrunk: Boolean,
+    ): Boolean =
+        (dx + 0.5f) * (dx + 0.5f) + (dz + 0.5f) * (dz + 0.5f) > currentRadius * currentRadius
 }
 
 /** // parity: AcaciaFoliagePlacer. */

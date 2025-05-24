@@ -7,10 +7,10 @@ import org.basaltmc.world.terrain.decoration.IntProvider
 /**
  * Real per-tree [TreeConfiguration]s, ported verbatim from the real jar's own decompiled
  * `net.minecraft.data.worldgen.features.TreeFeatures` (`createOak`/`createBirch`/
- * `createSuperBirch`/`createJungleTree`/`cherry`, and the inline `SPRUCE`/`PINE`/`ACACIA` registrations).
+ * `createSuperBirch`/`createJungleTree`/`cherry`, and the inline `FANCY_OAK`/`SPRUCE`/`PINE`/`ACACIA` registrations).
  * Only the configs this project's currently-ported [org.basaltmc.world.terrain.decoration.tree.TrunkPlacer]/
  * [org.basaltmc.world.terrain.decoration.tree.FoliagePlacer] types can drive are included: no
- * fancy oak, mega jungle or azalea yet.
+ * azalea yet.
  */
 public object TreeConfigs {
     private fun state(name: String): Int = Blocks.REGISTRY.byIdentifier(Identifier.vanilla(name))?.stateId ?: error("unknown block '$name'")
@@ -50,9 +50,41 @@ public object TreeConfigs {
     public val SUPER_BIRCH: TreeConfiguration =
         TreeConfiguration(BIRCH_LOG, StraightTrunkPlacer(5, 2, 6), BIRCH_LEAVES, BlobFoliagePlacer(IntProvider.of(2), IntProvider.of(0), 3), FeatureSizeTwoLayers(1, 0, 1))
 
+    // parity: TreeFeatures.FANCY_OAK registration. FANCY_OAK_BEES uses this same shape plus a
+    // guaranteed BeehiveDecorator, which remains part of the shared tree-decorator gap.
+    public val FANCY_OAK: TreeConfiguration =
+        TreeConfiguration(
+            OAK_LOG,
+            FancyTrunkPlacer(3, 11, 0),
+            OAK_LEAVES,
+            FancyFoliagePlacer(IntProvider.of(2), IntProvider.of(4), 4),
+            FeatureSizeTwoLayers(0, 0, 0),
+        )
+
     // parity: TreeFeatures.createJungleTree/createStraightBlobTree(JUNGLE_LOG, JUNGLE_LEAVES, 4, 8, 0, 2).
     public val JUNGLE_TREE: TreeConfiguration =
         TreeConfiguration(JUNGLE_LOG, StraightTrunkPlacer(4, 8, 0), JUNGLE_LEAVES, BlobFoliagePlacer(IntProvider.of(2), IntProvider.of(0), 3), FeatureSizeTwoLayers(1, 0, 1))
+
+    // parity: TreeFeatures.JUNGLE_BUSH registration.
+    public val JUNGLE_BUSH: TreeConfiguration =
+        TreeConfiguration(
+            JUNGLE_LOG,
+            StraightTrunkPlacer(1, 0, 0),
+            OAK_LEAVES,
+            BushFoliagePlacer(IntProvider.of(2), IntProvider.of(1), 2),
+            FeatureSizeTwoLayers(0, 0, 0),
+        )
+
+    // parity: TreeFeatures.MEGA_JUNGLE_TREE registration. Trunk and leaf vines remain part of the
+    // shared tree-decorator gap.
+    public val MEGA_JUNGLE: TreeConfiguration =
+        TreeConfiguration(
+            JUNGLE_LOG,
+            MegaJungleTrunkPlacer(10, 2, 19),
+            JUNGLE_LEAVES,
+            MegaJungleFoliagePlacer(IntProvider.of(2), IntProvider.of(0), 2),
+            FeatureSizeTwoLayers(1, 1, 2),
+        )
 
     // parity: TreeFeatures.SPRUCE registration.
     public val SPRUCE: TreeConfiguration =
