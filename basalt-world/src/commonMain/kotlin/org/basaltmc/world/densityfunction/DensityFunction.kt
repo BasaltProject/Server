@@ -1,10 +1,15 @@
 package org.basaltmc.world.densityfunction
 
-/** // parity: net.minecraft.world.level.levelgen.DensityFunction.FunctionContext (the single-point variant). */
+/**
+ * // parity: net.minecraft.world.level.levelgen.DensityFunction.FunctionContext (the single-point
+ * variant). [cache] is what vanilla gets by rewriting the tree per chunk instead: see
+ * [DensityCache]. Null means "no chunk scope", and every [Marker] then evaluates straight through.
+ */
 public class FunctionContext(
     public val blockX: Int,
     public val blockY: Int,
     public val blockZ: Int,
+    public val cache: DensityCache? = null,
 )
 
 /**

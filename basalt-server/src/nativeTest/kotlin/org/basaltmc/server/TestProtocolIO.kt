@@ -38,6 +38,7 @@ internal fun startTestServer(
                 worldName = "basalt_server_test_world",
                 viewDistance = 3,
                 logLevel = LogLevel.INFO,
+                generationMetrics = false,
             )
         NativeThread.start { BasaltServer(config, onlineMode).start() }
         // Generous, not tight: BasaltServer now generates and saves real chunks before it starts

@@ -4,6 +4,7 @@ import org.basaltmc.registry.Biome
 import org.basaltmc.world.climate.OverworldBiomeBuilder
 import org.basaltmc.world.climate.ParameterList
 import org.basaltmc.world.climate.Sampler
+import org.basaltmc.world.densityfunction.DensityCache
 
 /**
  * // parity: net.minecraft.world.level.biome.MultiNoiseBiomeSource, specialized to the real
@@ -44,8 +45,9 @@ public class OverworldBiomeSource(
         x: Int,
         y: Int,
         z: Int,
+        cache: DensityCache? = null,
     ): Biome {
-        val target = sampler.sample(x shr 2, y shr 2, z shr 2)
+        val target = sampler.sample(x shr 2, y shr 2, z shr 2, cache)
         return parameters.findValue(target)
     }
 }

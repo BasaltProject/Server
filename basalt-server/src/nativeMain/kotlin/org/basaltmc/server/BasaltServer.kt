@@ -15,6 +15,7 @@ import org.basaltmc.server.world.WorldState
 import org.basaltmc.text.Component
 import org.basaltmc.text.TextColor
 import org.basaltmc.world.Chunk
+import org.basaltmc.world.GenerationMetrics
 import org.basaltmc.world.NoiseWorldGenerator
 import org.basaltmc.world.terrain.OverworldNoiseRouter
 import org.basaltmc.world.terrain.RealTerrainGenerator
@@ -59,6 +60,13 @@ public class BasaltServer(
 ) {
     private val logger = Logger("Server")
     private val playerRegistry = PlayerRegistry()
+
+    // Before `world`, which generates the startup chunks: declaration order is what makes the flag
+    // visible to that generation at all, and GenerationMetrics is only exact single-threaded.
+    init {
+        GenerationMetrics.enabled = config.generationMetrics
+    }
+
     private val world = loadOrGenerateWorld()
     private val spawn = computeSpawn()
     private val tickLoop = TickLoop(playerRegistry)
@@ -105,6 +113,10 @@ public class BasaltServer(
             logger.info { "Generated ${freshlyGenerated.size} new chunk(s), saving them now." }
             saveWorld(freshlyGenerated.values.toList())
         }
+        if (GenerationMetrics.enabled) {
+            Logger("GenerationMetrics").info { "\n" + GenerationMetrics.report() }
+            GenerationMetrics.reset()
+        }
         return WorldState(chunks, loadOrGenerate = ::generateChunk)
     }
 
@@ -122,7 +134,8 @@ public class BasaltServer(
      */
     private fun generateChunksInParallel(positions: List<Pair<Int, Int>>): Map<Pair<Int, Int>, Chunk> {
         if (positions.isEmpty()) return emptyMap()
-        val workerCount = minOf(STARTUP_GENERATION_WORKERS, positions.size)
+        val budget = if (GenerationMetrics.enabled) 1 else STARTUP_GENERATION_WORKERS
+        val workerCount = minOf(budget, positions.size)
         val results = arrayOfNulls<Chunk>(positions.size)
         val remaining = AtomicInt(workerCount)
         for (worker in 0 until workerCount) {

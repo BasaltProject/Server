@@ -1,5 +1,6 @@
 package org.basaltmc.world.climate
 
+import org.basaltmc.world.densityfunction.DensityCache
 import org.basaltmc.world.densityfunction.DensityFunction
 import org.basaltmc.world.densityfunction.FunctionContext
 
@@ -23,8 +24,9 @@ public class Sampler(
         quartX: Int,
         quartY: Int,
         quartZ: Int,
+        cache: DensityCache? = null,
     ): TargetPoint {
-        val context = FunctionContext(quartToBlock(quartX), quartToBlock(quartY), quartToBlock(quartZ))
+        val context = FunctionContext(quartToBlock(quartX), quartToBlock(quartY), quartToBlock(quartZ), cache)
         return target(
             temperature.compute(context).toFloat(),
             humidity.compute(context).toFloat(),

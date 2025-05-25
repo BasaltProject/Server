@@ -20,7 +20,7 @@ public class FindTopSurface(
 
         var blockY = topY
         while (blockY >= lowerBound) {
-            if (density.compute(FunctionContext(context.blockX, blockY, context.blockZ)) > 0.0) return blockY.toDouble()
+            if (density.compute(FunctionContext(context.blockX, blockY, context.blockZ, context.cache)) > 0.0) return blockY.toDouble()
             blockY -= cellHeight
         }
         return lowerBound.toDouble()
