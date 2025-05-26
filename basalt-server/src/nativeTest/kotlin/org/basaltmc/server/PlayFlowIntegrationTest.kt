@@ -47,7 +47,7 @@ import kotlin.uuid.Uuid
  */
 @OptIn(ExperimentalUuidApi::class)
 class PlayFlowIntegrationTest {
-    private val port = 25570
+    private val port = 39570
 
     // BasaltServer generates a fixed 7x7 chunk grid (radius 3) around spawn at startup.
     private val chunkCount = 49

@@ -41,7 +41,7 @@ import kotlin.uuid.Uuid
  */
 @OptIn(ExperimentalUuidApi::class)
 class ServerIntegrationTest {
-    private val port = 25566
+    private val port = 39566
 
     private fun startServer() {
         startTestServer(port)
@@ -116,7 +116,7 @@ class ServerIntegrationTest {
     @Test
     @OptIn(DelicateCryptographyApi::class)
     fun onlineLoginFlowOverRealSockets() {
-        val onlinePort = 25568
+        val onlinePort = 39568
         val serverKeyPair = SessionKeyPair.generate()
         val authenticatedProfile = SessionProfile(Uuid.parse("11111111-2222-3333-4444-555555555555"), "Notch")
         var sawUsername: String? = null

@@ -10,6 +10,7 @@ import org.basaltmc.io.Zlib
 import org.basaltmc.protocol.PacketFraming
 import org.basaltmc.protocol.writeVarInt
 import org.basaltmc.server.config.BasaltConfig
+import org.basaltmc.server.config.ColorMode
 import kotlin.time.TimeSource
 
 /**
@@ -17,6 +18,11 @@ import kotlin.time.TimeSource
  * Retries the whole attempt on a bind failure: CI runners have shown occasional transient ones,
  * and a bind failure on the spawned thread no longer crashes the process (see [NativeThread]'s
  * KDoc), so a retry is safe.
+ *
+ * Ports live well outside Minecraft's own 25565-range on purpose. Fixed ports in that range
+ * collide with any real server the developer happens to have running, and the failure is deeply
+ * confusing: the test reaches that server instead of its own and fails on a protocol assertion
+ * that has nothing to do with the change under test.
  *
  * [worldName] is a distinctly-scoped scratch name, not `"world"`: [BasaltServer] now really
  * generates and saves chunks (`NoiseWorldGenerator`/`WorldPersistence`), a real relative path a
@@ -38,6 +44,9 @@ internal fun startTestServer(
                 worldName = "basalt_server_test_world",
                 viewDistance = 3,
                 logLevel = LogLevel.INFO,
+                logToFile = false,
+                logKeepDays = 0,
+                logColor = ColorMode.NEVER,
                 generationMetrics = false,
             )
         NativeThread.start { BasaltServer(config, onlineMode).start() }

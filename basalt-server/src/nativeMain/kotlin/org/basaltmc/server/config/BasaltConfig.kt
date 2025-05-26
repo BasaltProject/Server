@@ -41,7 +41,22 @@ generation-metrics = false
 [logging]
 # One of: trace, debug, info, warn, error.
 level = "info"
+# Mirror everything the console shows into .basalt/logs/latest.log, archiving the
+# previous run as .basalt/logs/archive/<date>-<n>.log.gz on every start.
+file = true
+# How many days of archived logs to keep. 0 keeps them forever.
+keep-days = 14
+# Colour the console output. One of: auto, always, never. "auto" colours only when
+# writing to a terminal, so redirected output and log files stay clean.
+color = "auto"
 """
+
+/** When the console gets ANSI colour. [AUTO] means "only when stdout is a terminal". */
+public enum class ColorMode {
+    AUTO,
+    ALWAYS,
+    NEVER,
+}
 
 /** Parsed `basalt.toml`. Only the fields Basalt currently reads are exposed; everything else is a documented placeholder in the file itself. */
 public data class BasaltConfig(
@@ -52,6 +67,9 @@ public data class BasaltConfig(
     public val worldName: String,
     public val viewDistance: Int,
     public val logLevel: LogLevel,
+    public val logToFile: Boolean,
+    public val logKeepDays: Int,
+    public val logColor: ColorMode,
     public val generationMetrics: Boolean,
 ) {
     public companion object {
@@ -64,6 +82,9 @@ public data class BasaltConfig(
                 worldName = "world",
                 viewDistance = 10,
                 logLevel = LogLevel.INFO,
+                logToFile = true,
+                logKeepDays = 14,
+                logColor = ColorMode.AUTO,
                 generationMetrics = false,
             )
 
@@ -105,10 +126,16 @@ public data class BasaltConfig(
                 worldName = world?.stringOrNull("name") ?: DEFAULT.worldName,
                 viewDistance = world?.intOrNull("view-distance")?.toInt() ?: DEFAULT.viewDistance,
                 logLevel = logging?.stringOrNull("level")?.let(::parseLogLevel) ?: DEFAULT.logLevel,
+                logToFile = logging?.boolOrNull("file") ?: DEFAULT.logToFile,
+                logKeepDays = logging?.intOrNull("keep-days")?.toInt() ?: DEFAULT.logKeepDays,
+                logColor = logging?.stringOrNull("color")?.let(::parseColorMode) ?: DEFAULT.logColor,
                 generationMetrics =
                     performance?.boolOrNull("generation-metrics") ?: DEFAULT.generationMetrics,
             )
         }
+
+        private fun parseColorMode(name: String): ColorMode =
+            ColorMode.entries.find { it.name.equals(name, ignoreCase = true) } ?: DEFAULT.logColor
 
         private fun parseLogLevel(name: String): LogLevel =
             LogLevel.entries.find { it.name.equals(name, ignoreCase = true) } ?: DEFAULT.logLevel
