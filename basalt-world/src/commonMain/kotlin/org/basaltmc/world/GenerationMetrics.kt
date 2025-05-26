@@ -21,6 +21,7 @@ public object GenerationMetrics {
         SURFACE_RULES,
         STRUCTURES,
         DECORATION,
+        SURFACE_FREEZE,
         BIOME_FILL,
     }
 
@@ -32,6 +33,8 @@ public object GenerationMetrics {
     private var normalNoiseEvaluations = 0L
     private var biomeLookups = 0L
     private var biomeCandidatesScanned = 0L
+    private var heightmapScans = 0L
+    private var heightmapScanSteps = 0L
 
     public fun countChunk() {
         chunks++
@@ -39,6 +42,12 @@ public object GenerationMetrics {
 
     public fun countNormalNoise() {
         normalNoiseEvaluations++
+    }
+
+    /** One top-down column scan for a heightmap value, the unit of work Chunk.heightAt does. */
+    public fun countHeightmapScan(steps: Int) {
+        heightmapScans++
+        heightmapScanSteps += steps
     }
 
     public fun countBiomeLookup() {
@@ -81,6 +90,8 @@ public object GenerationMetrics {
         normalNoiseEvaluations = 0L
         biomeLookups = 0L
         biomeCandidatesScanned = 0L
+        heightmapScans = 0L
+        heightmapScanSteps = 0L
     }
 
     public fun report(): String {
@@ -93,6 +104,8 @@ public object GenerationMetrics {
         lines += "  NormalNoise evaluations  ${normalNoiseEvaluations / chunks}"
         lines += "  Biome lookups            ${biomeLookups / chunks}"
         lines += "  Climate comparisons      ${biomeCandidatesScanned / chunks}"
+        lines += "  Heightmap column scans   ${heightmapScans / chunks}"
+        lines += "  Heightmap scan steps     ${heightmapScanSteps / chunks}"
         lines += "  Cache markers reached (each one is a cache vanilla hits and this does not yet):"
         for (type in MarkerType.entries) {
             val hits = markerHits[type.ordinal]
