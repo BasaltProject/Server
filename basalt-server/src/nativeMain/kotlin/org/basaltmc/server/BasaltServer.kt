@@ -4,12 +4,12 @@ import org.basaltmc.auth.OnlineMode
 import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.NativeThread
 import org.basaltmc.io.TcpListener
-import org.basaltmc.io.sleepMillis
 import org.basaltmc.protocol.status.ServerStatusPayload
 import org.basaltmc.server.command.ConsoleCommandRegistry
 import org.basaltmc.server.command.ConsoleReader
 import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.server.player.PlayerRegistry
+import org.basaltmc.server.world.ChunkGenerationQueue
 import org.basaltmc.server.world.WorldPersistence
 import org.basaltmc.server.world.WorldState
 import org.basaltmc.text.Component
@@ -21,7 +21,6 @@ import org.basaltmc.world.terrain.OverworldNoiseRouter
 import org.basaltmc.world.terrain.RealTerrainGenerator
 import org.basaltmc.world.terrain.VillageStructureGenerator
 import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
-import kotlin.concurrent.AtomicInt
 import kotlin.system.exitProcess
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -30,15 +29,17 @@ import kotlin.time.Instant
 /**
  * A thread-per-connection server, per `basalt-io`'s current scope (no event loop yet).
  * Handshake, Status, Login, Configuration and Play are implemented for a single world.
- * [SPAWN_RADIUS_CHUNKS] chunks generate eagerly at startup (a small warm cache so the server is
- * ready to listen fast, see [generateChunksInParallel]'s own KDoc); each joining player then gets
- * [BasaltConfig.viewDistance]'s full real view distance around their own spawn (generating
- * whatever that startup batch didn't already cover), and further chunks stream in as they move
- * ([org.basaltmc.server.ClientSession.streamChunksAround]). Each chunk is loaded from
- * [DIMENSION]'s region files under [BasaltConfig.worldName] if already
- * saved there ([WorldPersistence]); chunks missing from disk are generated fresh and saved
- * immediately (not only on a clean `stop`, so a crash or a `kill` right after first boot does not
- * throw away a freshly generated world that was never written to disk).
+ * [SPAWN_RADIUS_CHUNKS] chunks generate eagerly at startup, a small warm cache so the server is
+ * ready to listen fast; each joining player then gets [BasaltConfig.viewDistance]'s full real view
+ * distance around their own spawn, and further chunks stream in as they move
+ * ([org.basaltmc.server.ClientSession.streamChunksAround]). All of it goes through one
+ * [ChunkGenerationQueue], the only thing in the server that generates terrain.
+ *
+ * Every chunk comes from [DIMENSION]'s region files under [BasaltConfig.worldName] if it was ever
+ * saved there ([WorldPersistence]), including chunks first seen while exploring, so revisiting old
+ * ground returns the same terrain with whatever was built on it rather than regenerating it.
+ * Freshly generated chunks are written back on [TickLoop]'s save interval, not only on a clean
+ * `stop`, so a crash costs at most that interval.
  *
  * [overworldRouter]/[surfaceEnvironment], when both given, generate new chunks with
  * [RealTerrainGenerator] (the real, jar-verified Overworld density-function router plus the real
@@ -67,13 +68,19 @@ public class BasaltServer(
         GenerationMetrics.enabled = config.generationMetrics
     }
 
-    private val world = loadOrGenerateWorld()
-    private val spawn = computeSpawn()
-    private val tickLoop = TickLoop(playerRegistry)
+    private val world = WorldState(emptyList(), loadOrGenerate = ::loadOrGenerateChunk)
+
+    // One worker while measuring: GenerationMetrics counts without atomics on purpose, so its
+    // numbers are only exact when a single thread is generating (see its own KDoc).
+    private val generationQueue =
+        ChunkGenerationQueue(world, DIMENSION, workerCount = if (config.generationMetrics) 1 else 8)
+    private val spawn = warmStartupChunksAndComputeSpawn()
+    private val tickLoop = TickLoop(playerRegistry, onSaveInterval = ::persistGeneratedChunks)
     private val consoleCommands =
         ConsoleCommandRegistry().apply {
             register("stop") {
                 logger.info { "Saving the world." }
+                generationQueue.stop()
                 saveWorld(world.chunks)
                 logger.info { "Stopping the server." }
                 exitProcess(0)
@@ -96,68 +103,45 @@ public class BasaltServer(
         }
     }
 
-    private fun loadOrGenerateWorld(): WorldState {
+    /** A chunk off disk if it has ever been saved, so exploring back over old ground keeps player edits. */
+    private fun loadOrGenerateChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk =
+        WorldPersistence.loadChunk(config.worldName, DIMENSION, chunkX, chunkZ)
+            ?: generateChunk(chunkX, chunkZ)
+
+    /**
+     * Generates the small warm cache around spawn, then reads the spawn height out of it: a player
+     * who has not been here before lands on top of the terrain at the world's own (8, 8) column,
+     * not a fixed Y that assumed a flat world.
+     */
+    private fun warmStartupChunksAndComputeSpawn(): Triple<Double, Double, Double> {
         val positions =
             (-SPAWN_RADIUS_CHUNKS..SPAWN_RADIUS_CHUNKS).flatMap { x ->
                 (-SPAWN_RADIUS_CHUNKS..SPAWN_RADIUS_CHUNKS).map { z -> x to z }
             }
-        val fromDisk =
-            positions.associateWith { (x, z) ->
-                WorldPersistence.loadChunk(config.worldName, DIMENSION, x, z)
-            }
-        val toGenerate = fromDisk.filterValues { it == null }.keys.toList()
-        val freshlyGenerated = generateChunksInParallel(toGenerate)
-
-        val chunks = positions.map { pos -> fromDisk.getValue(pos) ?: freshlyGenerated.getValue(pos) }
-        if (freshlyGenerated.isNotEmpty()) {
-            logger.info { "Generated ${freshlyGenerated.size} new chunk(s), saving them now." }
-            saveWorld(freshlyGenerated.values.toList())
-        }
+        generationQueue.awaitAll(positions)
+        persistGeneratedChunks()
         if (GenerationMetrics.enabled) {
             Logger("GenerationMetrics").info { "\n" + GenerationMetrics.report() }
             GenerationMetrics.reset()
         }
-        return WorldState(chunks, loadOrGenerate = ::generateChunk)
+        val spawnChunk = world.getOrGenerateChunk(0, 0)
+        return Triple(8.5, spawnChunk.heightmap()[8 + 8 * 16].toDouble(), 8.5)
     }
 
     /**
-     * Splits [positions] round-robin across [STARTUP_GENERATION_WORKERS] worker threads: real
-     * terrain generation (density router, surface rules, decoration, village assembly) measured
-     * at tens of milliseconds to over a second per chunk, so generating the startup radius one
-     * chunk at a time on the main thread was most of this server's own startup time. Each worker
-     * writes only its own disjoint indices into [results] (no lock needed for the writes
-     * themselves), and the caller busy-waits on [remaining] rather than joining, since
-     * [NativeThread] is fire-and-forget by design (see its own KDoc). Safe to run before any
-     * player connects: nothing else touches the world yet, so this doesn't race against the
-     * concurrent-generation safety [WorldState]/`VillageStructureGenerator`/`VillageDataLoader`
-     * added for in-game chunk streaming, it just exercises it a little earlier.
+     * Writes out whatever the queue has generated since the last call. Driven from [TickLoop] so a
+     * crash or a `kill` mid-exploration loses at most one flush interval, instead of every chunk
+     * generated since boot. Batched per call because [WorldPersistence.saveChunks] rewrites a whole
+     * region file at a time, so this is one recompress per touched region, not one per chunk.
      */
-    private fun generateChunksInParallel(positions: List<Pair<Int, Int>>): Map<Pair<Int, Int>, Chunk> {
-        if (positions.isEmpty()) return emptyMap()
-        val budget = if (GenerationMetrics.enabled) 1 else STARTUP_GENERATION_WORKERS
-        val workerCount = minOf(budget, positions.size)
-        val results = arrayOfNulls<Chunk>(positions.size)
-        val remaining = AtomicInt(workerCount)
-        for (worker in 0 until workerCount) {
-            NativeThread.start {
-                var i = worker
-                while (i < positions.size) {
-                    val (x, z) = positions[i]
-                    results[i] = generateChunk(x, z)
-                    i += workerCount
-                }
-                remaining.decrementAndGet()
-            }
-        }
-        while (remaining.value > 0) sleepMillis(1L)
-        return positions.indices.associate { positions[it] to results[it]!! }
-    }
-
-    /** Where a player who has not been here before spawns: on top of the terrain at the world's own (8, 8) column, not a fixed Y that assumed a flat world. */
-    private fun computeSpawn(): Triple<Double, Double, Double> {
-        val spawnChunk = world.chunks.first { it.chunkX == 0 && it.chunkZ == 0 }
-        val surfaceY = spawnChunk.heightmap()[8 + 8 * 16]
-        return Triple(8.5, surfaceY.toDouble(), 8.5)
+    private fun persistGeneratedChunks() {
+        val generated = generationQueue.drainDirty()
+        if (generated.isEmpty()) return
+        logger.info { "Saving ${generated.size} newly generated chunk(s)." }
+        saveWorld(generated)
     }
 
     @OptIn(ExperimentalTime::class)
@@ -194,6 +178,7 @@ public class BasaltServer(
                     world = world,
                     spawn = spawn,
                     configuredViewDistance = config.viewDistance,
+                    generationQueue = generationQueue,
                 ).run()
             }
         }
@@ -215,11 +200,5 @@ public class BasaltServer(
         // while staying in the range a real client behaves normally at.
         const val SPAWN_RADIUS_CHUNKS = 3
         const val DIMENSION = "overworld"
-
-        // A fixed worker count rather than a queried core count: this project has no portable
-        // "how many cores" call yet (would need its own per-platform cinterop), and 8 is a
-        // reasonable default that doesn't oversubscribe a small machine too badly while still
-        // giving a real speedup over one chunk at a time.
-        const val STARTUP_GENERATION_WORKERS = 8
     }
 }
