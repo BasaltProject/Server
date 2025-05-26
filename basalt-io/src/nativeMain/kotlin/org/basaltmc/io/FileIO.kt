@@ -33,12 +33,15 @@ public object FileIO {
         return true
     }
 
+    /** Removes [path], returning whether it was there to remove. */
+    public fun delete(path: String): Boolean = platform.posix.remove(path) == 0
+
     /** Byte length without reading the contents, or `null` if [path] does not exist. */
     public fun size(path: String): Long? {
         val handle = fopen(path, "rb") ?: return null
         try {
             fseek(handle, 0, SEEK_END)
-            return ftell(handle).toLong()
+            return ftell(handle)
         } finally {
             fclose(handle)
         }
