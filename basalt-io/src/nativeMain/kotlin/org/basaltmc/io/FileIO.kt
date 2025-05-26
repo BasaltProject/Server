@@ -33,6 +33,17 @@ public object FileIO {
         return true
     }
 
+    /** Byte length without reading the contents, or `null` if [path] does not exist. */
+    public fun size(path: String): Long? {
+        val handle = fopen(path, "rb") ?: return null
+        try {
+            fseek(handle, 0, SEEK_END)
+            return ftell(handle).toLong()
+        } finally {
+            fclose(handle)
+        }
+    }
+
     /** Returns `null` if [path] does not exist. */
     public fun readText(path: String): String? {
         val handle = fopen(path, "rb") ?: return null

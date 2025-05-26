@@ -1,5 +1,6 @@
 package org.basaltmc.server
 
+import io.ktor.client.HttpClient
 import org.basaltmc.assets.AssetCache
 import org.basaltmc.assets.EulaFile
 import org.basaltmc.assets.ServerJarAssets
@@ -36,13 +37,16 @@ public fun main(args: Array<String>) {
         exitProcess(EulaFile.REJECTED_EXIT_CODE)
     }
 
-    // Cached after the first run: `AssetCache.ensure` skips the download once the local copy's
-    // SHA-1 already matches, so this only touches the network again if the cache is missing or stale.
+    // Nothing here touches the network once the cache is warm: the version metadata is cached on
+    // disk alongside the jar, and the jar's SHA-1 was verified when it was downloaded rather than
+    // re-verified on every boot. Only `server.jar` is fetched; `client.jar` holds assets nothing
+    // reads yet (see `LangAssets`, still unused), and downloading it bought a log line.
     val assetsLogger = Logger("Assets")
-    val versionMetadata = VersionManifest().resolve(BuildInfo.MINECRAFT_VERSION)
-    val clientJarPath = AssetCache(logger = assetsLogger).ensure(versionMetadata, AssetCache.Artifact.CLIENT)
-    assetsLogger.info { "Client assets ready at $clientJarPath." }
-    val serverJarPath = AssetCache(logger = assetsLogger).ensure(versionMetadata, AssetCache.Artifact.SERVER)
+    val httpClient = HttpClient()
+    val versionMetadata = VersionManifest(httpClient).resolveCached(BuildInfo.MINECRAFT_VERSION)
+    val serverJarPath =
+        AssetCache(httpClient, logger = assetsLogger).ensure(versionMetadata, AssetCache.Artifact.SERVER)
+    httpClient.close()
     assetsLogger.info { "Server assets ready at $serverJarPath." }
 
     // Real Overworld density-function router (see NoiseRouterData/TerrainProvider), built once at
