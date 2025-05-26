@@ -8,6 +8,7 @@ import org.basaltmc.auth.SessionProfileProperty
 import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.ByteBuffer
 import org.basaltmc.io.NativeMutex
+import org.basaltmc.io.SocketException
 import org.basaltmc.io.TcpConnection
 import org.basaltmc.io.Zlib
 import org.basaltmc.nbt.NbtCompound
@@ -162,6 +163,11 @@ public class ClientSession(
                 }
                 drainFrames()
             }
+        } catch (e: SocketException) {
+            // A connection dropping is part of this class's normal lifecycle, not a failure worth
+            // surfacing: server-list pings in particular reset the socket the instant they have
+            // their answer. Letting it escape logged an uncaught-exception line on every ping.
+            logger.debug { "Connection closed: ${e.message}" }
         } finally {
             leavePlayIfPresent()
             connection.close()
