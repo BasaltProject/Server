@@ -25,7 +25,7 @@ import kotlin.time.TimeSource
  * that has nothing to do with the change under test.
  *
  * [worldName] is a distinctly-scoped scratch name, not `"world"`: [BasaltServer] now really
- * generates and saves chunks (`NoiseWorldGenerator`/`WorldPersistence`), a real relative path a
+ * generates and saves chunks (`NoiseWorldGenerator`/`RegionStore`), a real relative path a
  * production run could plausibly also use, so tests need their own name to never collide with (or
  * be mistaken for) an actual world directory. Not cleaned up automatically, same as
  * `AssetCacheTest`'s own scratch directory: harmless small files, left for local inspection.

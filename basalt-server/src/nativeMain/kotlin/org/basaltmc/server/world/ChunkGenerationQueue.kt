@@ -32,7 +32,6 @@ public class ChunkGenerationQueue(
     private val mutex = NativeMutex()
     private val queued = HashMap<Long, Int>()
     private val inProgress = HashSet<Long>()
-    private val dirty = ArrayList<Chunk>()
     private val running = AtomicInt(1)
 
     init {
@@ -78,25 +77,32 @@ public class ChunkGenerationQueue(
         return positions.map { world.getOrGenerateChunk(it.first, it.second) }
     }
 
-    /**
-     * Hands over every chunk generated since the last call, for the caller to persist. Chunks are
-     * accumulated rather than written as they are produced because [WorldPersistence.saveChunks]
-     * rewrites a whole region file per call, so saving one chunk at a time would recompress the
-     * entire region up to 1024 times over.
-     */
-    public fun drainDirty(): List<Chunk> =
-        mutex.withLock {
-            if (dirty.isEmpty()) {
-                emptyList()
-            } else {
-                val drained = dirty.toList()
-                dirty.clear()
-                drained
-            }
-        }
+    /** Whether this chunk is waiting to be generated or being generated right now, so it must not be evicted. */
+    public fun isPending(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Boolean {
+        val key = pack(chunkX, chunkZ)
+        return mutex.withLock { key in queued || key in inProgress }
+    }
 
+    /** Stops accepting work. Workers finish whatever chunk they are on, so pair this with [awaitIdle]. */
     public fun stop() {
         running.value = 0
+        mutex.withLock { queued.clear() }
+    }
+
+    /**
+     * Waits until nothing is being generated, up to [timeoutMillis]. Shutdown saves what is in
+     * memory, so it has to happen after the last chunk lands rather than racing it.
+     */
+    public fun awaitIdle(timeoutMillis: Long) {
+        var waited = 0L
+        while (waited < timeoutMillis) {
+            if (mutex.withLock { inProgress.isEmpty() }) return
+            sleepMillis(IDLE_POLL_MILLIS)
+            waited += IDLE_POLL_MILLIS
+        }
     }
 
     private fun takeNext(): Long? =
@@ -119,12 +125,10 @@ public class ChunkGenerationQueue(
         }
 
     private fun generate(key: Long) {
-        val chunkX = unpackX(key)
-        val chunkZ = unpackZ(key)
         try {
-            val alreadyLoaded = world.isLoaded(chunkX, chunkZ)
-            val chunk = world.getOrGenerateChunk(chunkX, chunkZ)
-            if (!alreadyLoaded) mutex.withLock { dirty.add(chunk) }
+            // A freshly generated chunk marks itself dirty as it is filled in, so persistence is
+            // driven from the chunks themselves rather than from a list kept here.
+            world.getOrGenerateChunk(unpackX(key), unpackZ(key))
         } finally {
             mutex.withLock { inProgress.remove(key) }
         }

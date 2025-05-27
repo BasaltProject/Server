@@ -47,37 +47,54 @@ public class LinearRegion(
         timestamps[i] = timestamp
     }
 
+    /**
+     * The inner stream is built into one exactly-sized array rather than a growing buffer, and
+     * compressed straight out of it.
+     *
+     * A region is up to 1024 chunks of NBT, so it is tens of megabytes even before compression, and
+     * this used to make five full copies of it: a buffer that doubled its way up, `toByteArray`,
+     * the compressor's input, then another buffer and another `toByteArray` for the framing. Saving
+     * a handful of regions in a row was enough to put gigabytes of short-lived arrays in flight,
+     * which is what made a busy save balloon rather than merely take a while.
+     */
     public fun write(compressionLevel: Int = 1): ByteArray {
-        val inner = ByteBuffer(INNER_HEADER_SIZE)
         var newestTimestamp = 0
         var chunkCount = 0
+        var payloadSize = 0
+        for (i in 0 until DIMENSION * DIMENSION) {
+            val data = chunks[i] ?: continue
+            payloadSize += data.size
+            if (timestamps[i] > newestTimestamp) newestTimestamp = timestamps[i]
+            chunkCount++
+        }
+
+        val inner = ByteArray(INNER_HEADER_SIZE + payloadSize)
+        var at = 0
         for (i in 0 until DIMENSION * DIMENSION) {
             val data = chunks[i]
-            if (data != null) {
-                inner.writeInt(data.size)
-                inner.writeInt(timestamps[i])
-                if (timestamps[i] > newestTimestamp) newestTimestamp = timestamps[i]
-                chunkCount++
-            } else {
-                inner.writeInt(0)
-                inner.writeInt(0)
-            }
+            inner.writeIntAt(at, data?.size ?: 0)
+            inner.writeIntAt(at + 4, if (data != null) timestamps[i] else 0)
+            at += 8
         }
-        for (data in chunks) if (data != null) inner.writeBytes(data)
+        for (data in chunks) {
+            if (data == null) continue
+            data.copyInto(inner, at)
+            at += data.size
+        }
 
-        val compressed = Zstd.compress(inner.toByteArray(), compressionLevel)
+        val compressed = Zstd.compress(inner, compressionLevel)
 
-        val out = ByteBuffer(HEADER_SIZE + compressed.size + FOOTER_SIZE)
-        out.writeLong(SIGNATURE)
-        out.writeByte(VERSION.toByte())
-        out.writeLong(newestTimestamp.toLong())
-        out.writeByte(compressionLevel.toByte())
-        out.writeShort(chunkCount.toShort())
-        out.writeInt(compressed.size)
-        out.writeLong(0L)
-        out.writeBytes(compressed)
-        out.writeLong(SIGNATURE)
-        return out.toByteArray()
+        val out = ByteArray(HEADER_SIZE + compressed.size + FOOTER_SIZE)
+        out.writeLongAt(0, SIGNATURE)
+        out[8] = VERSION.toByte()
+        out.writeLongAt(9, newestTimestamp.toLong())
+        out[17] = compressionLevel.toByte()
+        out.writeShortAt(18, chunkCount.toShort())
+        out.writeIntAt(20, compressed.size)
+        out.writeLongAt(24, 0L)
+        compressed.copyInto(out, HEADER_SIZE)
+        out.writeLongAt(HEADER_SIZE + compressed.size, SIGNATURE)
+        return out
     }
 
     private fun index(
@@ -157,4 +174,31 @@ public class LinearRegion(
             return LinearRegion(chunks, timestamps)
         }
     }
+}
+
+// Big-endian scalar writes straight into a pre-sized array, so building a region file never needs
+// an intermediate growing buffer. Matches ByteBuffer's own encoding, just without the copies.
+private fun ByteArray.writeShortAt(
+    offset: Int,
+    value: Short,
+) {
+    this[offset] = (value.toInt() ushr 8).toByte()
+    this[offset + 1] = value.toByte()
+}
+
+private fun ByteArray.writeIntAt(
+    offset: Int,
+    value: Int,
+) {
+    this[offset] = (value ushr 24).toByte()
+    this[offset + 1] = (value ushr 16).toByte()
+    this[offset + 2] = (value ushr 8).toByte()
+    this[offset + 3] = value.toByte()
+}
+
+private fun ByteArray.writeLongAt(
+    offset: Int,
+    value: Long,
+) {
+    for (i in 0 until 8) this[offset + i] = (value ushr (56 - i * 8)).toByte()
 }
