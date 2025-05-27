@@ -8,6 +8,8 @@ import org.basaltmc.auth.SessionProfileProperty
 import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.ByteBuffer
 import org.basaltmc.io.NativeMutex
+import org.basaltmc.io.NativeThread
+import org.basaltmc.io.sleepMillis
 import org.basaltmc.io.SocketException
 import org.basaltmc.io.TcpConnection
 import org.basaltmc.io.Zlib
@@ -89,8 +91,11 @@ import org.basaltmc.world.Chunk
 import org.basaltmc.world.ChunkDataCodec
 import org.basaltmc.world.ChunkTracker
 import org.basaltmc.world.ChunkPos
+import kotlin.concurrent.AtomicInt
 import kotlin.random.Random
 import kotlin.uuid.ExperimentalUuidApi
+import kotlin.time.ExperimentalTime
+import kotlin.time.TimeSource
 import kotlin.uuid.Uuid
 
 /**
@@ -149,6 +154,43 @@ public class ClientSession(
     private val chunkStreamMutex = NativeMutex()
     private val pendingChunks = mutableListOf<ChunkPos>()
 
+    @OptIn(ExperimentalTime::class)
+    private var lastKeepAlive: TimeSource.Monotonic.ValueTimeMark = TimeSource.Monotonic.markNow()
+    private val streaming = AtomicInt(0)
+
+    // Until the client has told us: enough to fill a view distance in a few seconds, far below the
+    // rate the server can produce at. Guessing high is what floods a client that then stops
+    // draining its socket at all.
+    private var desiredChunksPerTick: Float = INITIAL_CHUNKS_PER_TICK
+    private var sendBudget: Float = 0f
+
+    /**
+     * This connection's own outbound loop, and the only thing that writes to it unprompted.
+     *
+     * Sockets here block, so a client that stops draining parks whoever writes to it. That has to
+     * be a thread belonging to this one connection: doing it from the tick loop stalled saving,
+     * chunk unloading and every other player the instant one client fell behind. Doing it from the
+     * read loop instead would work only for as long as the client keeps talking, which is not
+     * something a server should have to rely on.
+     */
+    private fun startOutboundLoop() {
+        if (streaming.compareAndSet(0, 1)) {
+            NativeThread.start {
+                while (streaming.value == 1) {
+                    runCatching {
+                        // A tick's worth of allowance, capped so a client that has been idle
+                        // cannot then be handed an enormous burst all at once.
+                        sendBudget = minOf(sendBudget + desiredChunksPerTick, MAX_BURST_CHUNKS)
+                        val allowed = sendBudget.toInt()
+                        if (allowed > 0) sendBudget -= flushReadyChunks(allowed).toFloat()
+                        sendKeepAliveIfDue()
+                    }
+                    sleepMillis(OUTBOUND_INTERVAL_MILLIS)
+                }
+            }
+        }
+    }
+
     public fun run() {
         val readChunk = ByteArray(4096)
         try {
@@ -169,6 +211,7 @@ public class ClientSession(
             // their answer. Letting it escape logged an uncaught-exception line on every ping.
             logger.debug { "Connection closed: ${e.message}" }
         } finally {
+            streaming.value = 0
             leavePlayIfPresent()
             connection.close()
         }
@@ -182,9 +225,7 @@ public class ClientSession(
             incoming.discardReadBytes()
             handleFrame(ByteBuffer(frame.size).also { it.writeBytes(frame) })
         }
-        // A client in Play sends position packets continuously, so this runs many times a second
-        // and is what actually gets generated chunks onto the wire without any thread waiting.
-        if (state == ProtocolState.PLAY) flushReadyChunks()
+
     }
 
     private fun handleFrame(body: ByteBuffer) {
@@ -546,6 +587,9 @@ public class ClientSession(
         for (chunk in loginChunks) sendChunk(chunk)
         sendCompressed(ChunkBatchFinishedPacket.ID) { ChunkBatchFinishedPacket(loginChunks.size).write(it) }
 
+        // Everything after the initial view streams from this connection's own outbound loop.
+        startOutboundLoop()
+
         for (other in others) {
             other.connection.sendPlayPacket(PlayerInfoAddPacket.ID) {
                 PlayerInfoAddPacket(
@@ -653,9 +697,19 @@ public class ClientSession(
                     ClientboundBlockChangedAckPacket(useItemOn.sequence).write(it)
                 }
             }
+            ChunkBatchReceivedPacket.ID -> {
+                // The client's own answer to "how fast can you take chunks". Ignoring it meant
+                // sending at whatever rate the server could produce, which floods the client,
+                // backs its socket up, and buries the server in encoding work for chunks that are
+                // not going to be looked at. This is the protocol's flow control; it is not advice.
+                desiredChunksPerTick =
+                    ChunkBatchReceivedPacket
+                        .read(body)
+                        .desiredChunksPerTick
+                        .coerceIn(MIN_CHUNKS_PER_TICK, MAX_CHUNKS_PER_TICK)
+            }
             AcceptTeleportationPacket.ID,
             PlayKeepAlivePacket.SERVERBOUND_ID,
-            ChunkBatchReceivedPacket.ID,
             PlayerLoadedPacket.ID,
             -> Unit
         }
@@ -803,26 +857,34 @@ public class ClientSession(
      * Capped per call so one flush cannot monopolize the socket while the client is also waiting on
      * movement and entity updates.
      */
-    internal fun flushReadyChunks() {
-        if (state != ProtocolState.PLAY) return
+    internal fun flushReadyChunks(limit: Int = MAX_BURST_CHUNKS.toInt()): Int {
+        if (state != ProtocolState.PLAY) return 0
         val ready =
             chunkStreamMutex.withLock {
-                if (pendingChunks.isEmpty()) return
+                if (pendingChunks.isEmpty()) return 0
                 pendingChunks.sortBy { squaredDistanceToCenter(it.x, it.z) }
                 val found = mutableListOf<Chunk>()
                 val iterator = pendingChunks.iterator()
-                while (iterator.hasNext() && found.size < MAX_CHUNKS_PER_FLUSH) {
+                while (iterator.hasNext() && found.size < limit) {
                     val pos = iterator.next()
-                    val chunk = world.chunkIfLoaded(pos.x, pos.z) ?: continue
+                    val chunk = world.chunkIfLoaded(pos.x, pos.z)
+                    if (chunk == null) {
+                        // Requested, then unloaded again before it could be sent. Ask for it once
+                        // more rather than waiting forever on a chunk nothing is going to produce:
+                        // the tracker already believes the client has it, so nothing else would.
+                        generationQueue.request(pos.x, pos.z, squaredDistanceToCenter(pos.x, pos.z))
+                        continue
+                    }
                     found.add(chunk)
                     iterator.remove()
                 }
                 found
             }
-        if (ready.isEmpty()) return
+        if (ready.isEmpty()) return 0
         sendCompressed(ChunkBatchStartPacket.ID) { }
         for (chunk in ready) sendChunk(chunk)
         sendCompressed(ChunkBatchFinishedPacket.ID) { ChunkBatchFinishedPacket(ready.size).write(it) }
+        return ready.size
     }
 
     private fun squaredDistanceToCenter(
@@ -863,7 +925,15 @@ public class ClientSession(
         sendCompressed(id, writeBody)
     }
 
-    internal fun sendKeepAlive() {
+    /**
+     * Vanilla's own 15-second interval, driven from this connection's read loop rather than a
+     * shared timer, so a client that has stopped draining its socket delays nothing but itself.
+     */
+    @OptIn(ExperimentalTime::class)
+    private fun sendKeepAliveIfDue() {
+        val now = TimeSource.Monotonic.markNow()
+        if (lastKeepAlive.elapsedNow().inWholeSeconds < KEEP_ALIVE_INTERVAL_SECONDS) return
+        lastKeepAlive = now
         sendCompressed(PlayKeepAlivePacket.CLIENTBOUND_ID) { PlayKeepAlivePacket(Random.nextLong()).write(it) }
     }
 
@@ -919,7 +989,18 @@ public class ClientSession(
         // largest squared distance inside the view is radius^2 + radius^2, well under this.
         const val PREFETCH_PRIORITY_PENALTY = 1 shl 20
 
-        const val MAX_CHUNKS_PER_FLUSH = 16
+        // Vanilla's own bounds for the rate a client asks for, and a ceiling on how much unsent
+        // allowance can pile up while a client is quiet.
+        const val INITIAL_CHUNKS_PER_TICK = 2f
+        const val MIN_CHUNKS_PER_TICK = 0.01f
+        const val MAX_CHUNKS_PER_TICK = 64f
+        const val MAX_BURST_CHUNKS = 16f
+
+        // Vanilla's own interval.
+        const val KEEP_ALIVE_INTERVAL_SECONDS = 15L
+
+        // One server tick: fast enough that chunks appear promptly, slow enough to be idle-cheap.
+        const val OUTBOUND_INTERVAL_MILLIS = 50L
     }
 }
 

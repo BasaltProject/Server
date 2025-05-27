@@ -14,6 +14,7 @@ import org.basaltmc.protocol.login.LoginFinishedPacket
 import org.basaltmc.protocol.login.LoginStartPacket
 import org.basaltmc.protocol.play.ChatMessagePacket
 import org.basaltmc.protocol.play.ChunkBatchFinishedPacket
+import org.basaltmc.protocol.play.ChunkBatchReceivedPacket
 import org.basaltmc.protocol.play.ChunkBatchStartPacket
 import org.basaltmc.protocol.play.EntityTeleportPacket
 import org.basaltmc.protocol.play.ForgetLevelChunkPacket
@@ -261,6 +262,12 @@ class PlayFlowIntegrationTest {
                 inThisBatch++
             }
             assertEquals(inThisBatch, ChunkBatchFinishedPacket.read(batchSizeBody).batchSize)
+            // A real client answers every batch with the rate it can keep up with, and the server
+            // paces itself by it. A client that stayed silent would be throttled to a trickle, on
+            // purpose: that is the protocol's flow control doing its job.
+            sendCompressed(alice.connection, ChunkBatchReceivedPacket.ID, alice.threshold) {
+                it.writeFloat(16f)
+            }
             assertTrue(inThisBatch > 0, "the server announced a chunk batch and then sent no chunks")
             streamedChunksSeen += inThisBatch
         }

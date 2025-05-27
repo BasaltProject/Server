@@ -7,6 +7,7 @@ import org.basaltmc.nbt.NbtIO
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.region.ChunkNbt
 import org.basaltmc.world.region.LinearRegion
+import kotlin.time.TimeSource
 
 /**
  * Keeps a few decompressed regions in memory so a region file is read and unpacked once rather than
@@ -18,9 +19,9 @@ import org.basaltmc.world.region.LinearRegion
  * megabytes per chunk loaded and was by far the dominant source of memory pressure while exploring.
  * Holding the region instead turns a chunk load into a lookup.
  *
- * [CAPACITY] is deliberately small. Regions are large even decompressed, and generation walks
- * through space roughly in order, so a handful is enough to collapse the repeated work without the
- * cache itself becoming the memory problem.
+ * Reading and decompressing happens outside the lock. Holding it across a region's worth of zstd
+ * kept the store busy continuously while eight workers explored, and the save/unload sweep, which
+ * needs the same lock, never got a turn: the server quietly stopped saving and unloading at all.
  */
 public class RegionStore(
     private val worldName: String,
@@ -32,6 +33,15 @@ public class RegionStore(
     private val cached = LinkedHashMap<Long, LinearRegion>()
     private val dirtyRegions = HashSet<Long>()
 
+    /** What the last save spent where, so a slow one can be attributed instead of guessed at. */
+    public var encodeMillis: Long = 0
+        private set
+
+    public var writeMillis: Long = 0
+        private set
+
+    public val cachedRegionCount: Int get() = mutex.withLock { cached.size }
+
     public fun regionPath(
         regionX: Int,
         regionZ: Int,
@@ -42,10 +52,25 @@ public class RegionStore(
         chunkX: Int,
         chunkZ: Int,
     ): Chunk? {
-        val chunkBytes =
-            mutex.withLock {
-                region(chunkX shr 5, chunkZ shr 5)?.chunkAt(chunkX and 31, chunkZ and 31)
-            } ?: return null
+        val regionX = chunkX shr 5
+        val regionZ = chunkZ shr 5
+        val key = key(regionX, regionZ)
+
+        // Reading and decompressing a region happens outside the lock, on purpose. It is tens of
+        // megabytes of zstd, and holding the lock across it meant eight generation workers kept
+        // this store permanently busy, so the save/unload sweep could never get in: the server
+        // stopped saving and unloading entirely while exploring, and memory grew because of it.
+        val alreadyLoaded = mutex.withLock { touch(key) }
+        val region =
+            alreadyLoaded ?: run {
+                val bytes = FileIO.readBytes(regionPath(regionX, regionZ)) ?: return null
+                val decoded = LinearRegion.read(bytes)
+                // Another worker may have loaded the same region meanwhile; theirs wins, since it
+                // may already hold writes this one would not have.
+                mutex.withLock { touch(key) ?: decoded.also { store(key, it) } }
+            }
+
+        val chunkBytes = mutex.withLock { region.chunkAt(chunkX and 31, chunkZ and 31) } ?: return null
         // Decoding happens outside the lock: it is the expensive half, and it touches nothing shared.
         val tag = NbtIO.read(chunkBytes).tag as NbtCompound
         // Rebuilding a chunk goes through the same block setters generation uses, which mark it
@@ -64,17 +89,27 @@ public class RegionStore(
     ): Int {
         if (chunks.isEmpty()) return 0
         // Serializing outside the lock keeps the per-chunk NBT work off everyone else's path.
+        val encodeStart = TimeSource.Monotonic.markNow()
         val encoded = chunks.map { it to NbtIO.write(ChunkNbt.write(it)) }
+        encodeMillis = encodeStart.elapsedNow().inWholeMilliseconds
+
+        // Grouped by region first, so each region is fetched once however many of its chunks
+        // changed. Fetching per chunk could evict and reload the same region repeatedly, and every
+        // eviction writes, so one save could rewrite the same file many times over.
+        val byRegion = encoded.groupBy { (chunk, _) -> key(chunk.chunkX shr 5, chunk.chunkZ shr 5) }
+        val writeStart = TimeSource.Monotonic.markNow()
         val touched =
             mutex.withLock {
-                for ((chunk, bytes) in encoded) {
-                    val key = key(chunk.chunkX shr 5, chunk.chunkZ shr 5)
-                    val region = region(chunk.chunkX shr 5, chunk.chunkZ shr 5) ?: LinearRegion().also { store(key, it) }
-                    region.setChunk(chunk.chunkX and 31, chunk.chunkZ and 31, bytes, timestamp)
+                for ((key, entries) in byRegion) {
+                    val region = region(regionX(key), regionZ(key)) ?: LinearRegion().also { store(key, it) }
+                    for ((chunk, bytes) in entries) {
+                        region.setChunk(chunk.chunkX and 31, chunk.chunkZ and 31, bytes, timestamp)
+                    }
                     dirtyRegions.add(key)
                 }
                 flushLocked()
             }
+        writeMillis = writeStart.elapsedNow().inWholeMilliseconds
         for ((chunk, _) in encoded) chunk.markClean()
         return touched
     }
@@ -96,16 +131,17 @@ public class RegionStore(
         return written
     }
 
-    /** Caller must hold [mutex]. Returns `null` only when no file exists for this region yet. */
+    /** Caller must hold [mutex]. Moves an already-cached region to the back of the LRU and returns it. */
+    private fun touch(key: Long): LinearRegion? =
+        cached.remove(key)?.also { cached[key] = it }
+
+    /** Caller must hold [mutex]. Reads from disk if needed; only the save path, which is already under the lock. */
     private fun region(
         regionX: Int,
         regionZ: Int,
     ): LinearRegion? {
         val key = key(regionX, regionZ)
-        cached.remove(key)?.let { existing ->
-            cached[key] = existing
-            return existing
-        }
+        touch(key)?.let { return it }
         val bytes = FileIO.readBytes(regionPath(regionX, regionZ)) ?: return null
         return LinearRegion.read(bytes).also { store(key, it) }
     }
@@ -129,7 +165,9 @@ public class RegionStore(
     }
 
     private companion object {
-        const val CAPACITY = 4
+        // A player near a region corner works across four at once, and prefetch reaches past them,
+        // so four meant constant thrashing: every miss is a full region decompressed again.
+        const val CAPACITY = 12
 
         fun key(
             regionX: Int,

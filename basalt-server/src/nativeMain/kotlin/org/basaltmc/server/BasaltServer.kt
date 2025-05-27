@@ -21,6 +21,7 @@ import org.basaltmc.world.terrain.OverworldNoiseRouter
 import org.basaltmc.world.terrain.RealTerrainGenerator
 import org.basaltmc.world.terrain.VillageStructureGenerator
 import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
+import kotlin.concurrent.AtomicInt
 import kotlin.math.abs
 import kotlin.system.exitProcess
 import kotlin.time.Clock
@@ -63,6 +64,8 @@ public class BasaltServer(
 ) {
     private val logger = Logger("Server")
     private val playerRegistry = PlayerRegistry()
+    private val accepting = AtomicInt(1)
+    private var listener: TcpListener? = null
 
     // Before `world`, which generates the startup chunks: declaration order is what makes the flag
     // visible to that generation at all, and GenerationMetrics is only exact single-threaded.
@@ -78,7 +81,7 @@ public class BasaltServer(
     private val generationQueue =
         ChunkGenerationQueue(world, DIMENSION, workerCount = if (config.generationMetrics) 1 else 8)
     private val spawn = warmStartupChunksAndComputeSpawn()
-    private val tickLoop = TickLoop(playerRegistry, onSaveInterval = ::persistAndUnload)
+    private val tickLoop = TickLoop(onSaveInterval = ::persistAndUnload)
     private val consoleCommands =
         ConsoleCommandRegistry().apply {
             register("stop") { shutdown() }
@@ -138,6 +141,9 @@ public class BasaltServer(
 
     /** One tick-loop hook for both: unloading has to save what it drops, so they belong together. */
     private fun persistAndUnload() {
+        // Emitted before the work, not after: if this method ever stops completing, the last thing
+        // in the log is where it got to, instead of nothing at all.
+        logger.debug { "Sweep starting: ${world.loadedChunkCount} loaded, ${generationQueue.pendingCount()} pending." }
         persistChangedChunks()
         unloadUnreachableChunks()
     }
@@ -154,6 +160,12 @@ public class BasaltServer(
      * competing save), let the queue drain (no chunk half-generated), and only then write, once.
      */
     private fun shutdown() {
+        // First of all, so nothing new can arrive while the rest is winding down. Without this a
+        // client with auto-reconnect walks straight back in mid-save and starts requesting chunks
+        // again, which is exactly the work shutting down is trying to finish.
+        accepting.value = 0
+        runCatching { listener?.close() }
+
         val players = playerRegistry.snapshot()
         if (players.isNotEmpty()) {
             logger.info { "Disconnecting ${players.size} player(s)." }
@@ -191,20 +203,45 @@ public class BasaltServer(
         // The retain radius has to cover more than the view distance: sessions prefetch beyond it,
         // and a chunk already requested but not yet sent must still be there when it is.
         val retainRadius = config.viewDistance + RETAIN_MARGIN_CHUNKS
+        // Taken once, before the scan: asking the queue per chunk meant holding the world's lock
+        // while repeatedly waiting for the queue's, which the generation workers never let go of
+        // for long. That is what stopped this sweep running at all, and with it saving,
+        // unloading and every line this method logs.
+        val pending = generationQueue.pendingKeys()
         val candidates =
             world.evictionCandidates { chunkX, chunkZ ->
                 if (abs(chunkX) <= SPAWN_RADIUS_CHUNKS && abs(chunkZ) <= SPAWN_RADIUS_CHUNKS) return@evictionCandidates true
-                if (generationQueue.isPending(chunkX, chunkZ)) return@evictionCandidates true
+                if (ChunkGenerationQueue.pack(chunkX, chunkZ) in pending) return@evictionCandidates true
                 players.any { player ->
                     abs(chunkX - (player.x.toInt() shr 4)) <= retainRadius &&
                         abs(chunkZ - (player.z.toInt() shr 4)) <= retainRadius
                 }
             }
-        if (candidates.isEmpty()) return
+        // Requests for ground the player has already left are worth exactly as much as the chunks
+        // themselves: dropping them stops the queue doing work whose result is evicted on sight.
+        val dropped =
+            generationQueue.retainWhere { chunkX, chunkZ ->
+                players.any { player ->
+                    abs(chunkX - (player.x.toInt() shr 4)) <= retainRadius &&
+                        abs(chunkZ - (player.z.toInt() shr 4)) <= retainRadius
+                }
+            }
 
-        saveWorld(candidates.filter { it.isDirty })
-        val removed = world.evictClean(candidates)
-        if (removed > 0) logger.info { "Unloaded $removed chunk(s), ${world.loadedChunkCount} still loaded." }
+        val evictStart = TimeSource.Monotonic.markNow()
+        val removed = if (candidates.isEmpty()) 0 else {
+            saveWorld(candidates.filter { it.isDirty })
+            world.evictClean(candidates)
+        }
+        val evictMillis = evictStart.elapsedNow().inWholeMilliseconds
+
+        // Reported every sweep, not only when something happens: when this server misbehaves it is
+        // because one of these numbers climbs without settling, and knowing which one is the whole
+        // diagnosis.
+        logger.info {
+            "Chunks: ${world.loadedChunkCount} loaded, ${generationQueue.pendingCount()} pending, " +
+                "$removed unloaded in ${evictMillis}ms, $dropped request(s) dropped, " +
+                "${world.dirtyChunks().size} unsaved. " + heapReport()
+        }
     }
 
     /**
@@ -213,6 +250,20 @@ public class BasaltServer(
      * re-serializing and recompressing its whole region for nothing, which is what made `stop` sit
      * there for so long.
      */
+    /**
+     * What the last collection actually reclaimed. The chunk counts above only account for what the
+     * server means to hold; if memory climbs while they stay flat, the answer is here, in the gap
+     * between what is live and what has been allocated and not yet collected.
+     */
+    @OptIn(kotlin.native.runtime.NativeRuntimeApi::class, ExperimentalStdlibApi::class)
+    private fun heapReport(): String {
+        val info = kotlin.native.runtime.GC.lastGCInfo ?: return "No collection has run yet."
+        val before = info.memoryUsageBefore["heap"]?.totalObjectsSizeBytes ?: 0L
+        val after = info.memoryUsageAfter["heap"]?.totalObjectsSizeBytes ?: 0L
+        return "Heap: ${after / 1_048_576} MB live after the last collection " +
+            "(${before / 1_048_576} MB before it, ${info.epoch} collections so far)."
+    }
+
     @OptIn(ExperimentalTime::class)
     private fun saveWorld(chunks: List<Chunk>) {
         if (chunks.isEmpty()) return
@@ -228,13 +279,14 @@ public class BasaltServer(
         val elapsed = startedAt.elapsedNow().inWholeMilliseconds
         logger.info {
             "Saved ${chunks.size} chunk(s) across $written region(s) in ${elapsed}ms " +
-                "(${world.loadedChunkCount} loaded)."
+                "(${regions.encodeMillis}ms encoding, ${regions.writeMillis}ms writing, " +
+                "${regions.cachedRegionCount} regions cached, ${world.loadedChunkCount} loaded)."
         }
     }
 
     @OptIn(ExperimentalTime::class)
     public fun start(startedAt: Instant = Clock.System.now()) {
-        val listener = TcpListener.bind(config.port)
+        val listener = TcpListener.bind(config.port).also { this.listener = it }
         tickLoop.start()
         ConsoleReader.start(consoleCommands)
         val elapsedSeconds = (Clock.System.now() - startedAt).inWholeMilliseconds / 1000.0
@@ -242,8 +294,8 @@ public class BasaltServer(
             "Done (${elapsedSeconds}s)! Listening on port ${config.port} " +
                 "(${if (onlineMode != null) "online" else "offline"}-mode)."
         }
-        while (true) {
-            val connection = listener.accept()
+        while (accepting.value == 1) {
+            val connection = runCatching { listener.accept() }.getOrNull() ?: break
             NativeThread.start {
                 ClientSession(
                     connection,

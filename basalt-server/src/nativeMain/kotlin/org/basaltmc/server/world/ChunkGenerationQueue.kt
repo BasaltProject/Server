@@ -37,13 +37,24 @@ public class ChunkGenerationQueue(
     init {
         repeat(workerCount) {
             NativeThread.start {
+                var idleSpins = 0
                 while (running.value == 1) {
                     val next = takeNext()
                     if (next == null) {
-                        sleepMillis(IDLE_POLL_MILLIS)
+                        // Back off while there is nothing to do. Eight workers each grabbing the
+                        // lock every millisecond is thousands of acquisitions a second spent
+                        // discovering the queue is empty, and it is contention everything else
+                        // then has to win against.
+                        idleSpins++
+                        sleepMillis(if (idleSpins > IDLE_SPINS_BEFORE_BACKOFF) IDLE_BACKOFF_MILLIS else IDLE_POLL_MILLIS)
                         continue
                     }
+                    idleSpins = 0
                     generate(next)
+                    // A deliberate breath between chunks. These eight threads otherwise hold the
+                    // world's lock in a tight loop, and the single thread that saves, unloads and
+                    // sends keep-alives never wins against them.
+                    sleepMillis(BETWEEN_CHUNKS_MILLIS)
                 }
             }
         }
@@ -61,9 +72,37 @@ public class ChunkGenerationQueue(
             if (key in inProgress) return@withLock
             val existing = queued[key]
             // A closer player asking for the same chunk should move it up, never back.
-            if (existing == null || priority < existing) queued[key] = priority
+            if (existing != null) {
+                if (priority < existing) queued[key] = priority
+                return@withLock
+            }
+            if (queued.size >= CAPACITY) {
+                // Requests arrive faster than chunks can be generated whenever a player moves at
+                // any speed, so without a ceiling this grows without bound, and every extra entry
+                // makes picking the next one slower, which makes it grow faster still. Past the
+                // ceiling the farthest pending request is the one worth losing.
+                val worstKey = queued.maxByOrNull { it.value }?.key ?: return@withLock
+                if (queued.getValue(worstKey) <= priority) return@withLock
+                queued.remove(worstKey)
+            }
+            queued[key] = priority
         }
     }
+
+    /**
+     * Forgets pending requests [shouldKeep] rejects. A player who has moved on leaves behind
+     * requests for ground nobody will look at again; generating them costs the same as real work
+     * and their results are retained until the next unload sweep notices.
+     */
+    public fun retainWhere(shouldKeep: (chunkX: Int, chunkZ: Int) -> Boolean): Int =
+        mutex.withLock {
+            val stale = queued.keys.filter { !shouldKeep(unpackX(it), unpackZ(it)) }
+            for (key in stale) queued.remove(key)
+            stale.size
+        }
+
+    /** Pending and in-flight counts, for the diagnostics that report where the server's work is going. */
+    public fun pendingCount(): Int = mutex.withLock { queued.size + inProgress.size }
 
     /**
      * Generates every one of [positions] and returns them in the same order, blocking until they
@@ -73,18 +112,20 @@ public class ChunkGenerationQueue(
     public fun awaitAll(positions: List<Pair<Int, Int>>): List<Chunk> {
         if (positions.isEmpty()) return emptyList()
         for ((index, position) in positions.withIndex()) request(position.first, position.second, index)
-        while (positions.any { !world.isLoaded(it.first, it.second) }) sleepMillis(IDLE_POLL_MILLIS)
+        // One lock acquisition per poll, not one per position. Checking each of a view distance's
+        // worth of positions individually, every millisecond, was hundreds of thousands of lock
+        // acquisitions a second from a single thread, against which nothing else got a turn.
+        while (world.countMissing(positions) > 0) sleepMillis(AWAIT_POLL_MILLIS)
         return positions.map { world.getOrGenerateChunk(it.first, it.second) }
     }
 
-    /** Whether this chunk is waiting to be generated or being generated right now, so it must not be evicted. */
-    public fun isPending(
-        chunkX: Int,
-        chunkZ: Int,
-    ): Boolean {
-        val key = pack(chunkX, chunkZ)
-        return mutex.withLock { key in queued || key in inProgress }
-    }
+    /**
+     * Everything queued or in flight, as one snapshot. Callers ask once and then test against the
+     * result, rather than calling in per chunk: the unload sweep does that test while holding the
+     * world's own lock, and taking this one inside it, hundreds of times, starved the sweep out
+     * entirely against eight workers looping on both locks.
+     */
+    public fun pendingKeys(): Set<Long> = mutex.withLock { HashSet<Long>(queued.keys).also { it.addAll(inProgress) } }
 
     /** Stops accepting work. Workers finish whatever chunk they are on, so pair this with [awaitIdle]. */
     public fun stop() {
@@ -138,7 +179,15 @@ public class ChunkGenerationQueue(
         // Fixed rather than queried: there is still no portable core count in this project, and
         // oversubscribing a little is cheap now that these threads are created once, not per batch.
         public const val DEFAULT_WORKERS: Int = 8
+
+        // Comfortably more than one player's view plus prefetch, and small enough that scanning it
+        // to pick the next chunk stays cheap.
+        private const val CAPACITY = 4096
         private const val IDLE_POLL_MILLIS = 1L
+        private const val AWAIT_POLL_MILLIS = 10L
+        private const val IDLE_SPINS_BEFORE_BACKOFF = 20
+        private const val IDLE_BACKOFF_MILLIS = 20L
+        private const val BETWEEN_CHUNKS_MILLIS = 1L
 
         public fun pack(
             chunkX: Int,
