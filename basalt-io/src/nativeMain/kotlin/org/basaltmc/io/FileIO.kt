@@ -9,18 +9,18 @@ import kotlinx.cinterop.convert
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
+import platform.posix.FILE
 import platform.posix.SEEK_END
-import platform.posix.closedir
-import platform.posix.opendir
-import platform.posix.readdir
 import platform.posix.SEEK_SET
+import platform.posix.closedir
 import platform.posix.fclose
 import platform.posix.fopen
 import platform.posix.fread
 import platform.posix.fseek
 import platform.posix.ftell
-import platform.posix.FILE
 import platform.posix.fwrite
+import platform.posix.opendir
+import platform.posix.readdir
 
 /**
  * An open file being written sequentially, with the ability to go back and patch what was already

@@ -12,10 +12,11 @@ class SimpleBlockFeatureTest {
     fun stateProviderRunsBeforeFailedSurvivalCheck() {
         val actual = WorldgenRandom(XoroshiroRandom(91L))
         val expected = WorldgenRandom(XoroshiroRandom(91L))
-        val feature = SimpleBlockFeature({ random, _ ->
-            random.nextInt(16)
-            Blocks.GRASS_BLOCK.stateId
-        })
+        val feature =
+            SimpleBlockFeature({ random, _ ->
+                random.nextInt(16)
+                Blocks.GRASS_BLOCK.stateId
+            })
 
         feature.place(Chunk(0, 0), actual, DecorationPos(0, 63, 0))
         expected.nextInt(16)

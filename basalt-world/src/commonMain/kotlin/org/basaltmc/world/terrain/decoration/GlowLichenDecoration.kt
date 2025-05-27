@@ -14,13 +14,14 @@ public object GlowLichenDecoration : BiomeVegetalDecoration {
     ) {
         val context = PlacementContext(chunk)
         var positions: Sequence<DecorationPos> = sequenceOf(DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16))
-        for (modifier in
-            listOf(
-                CountPlacement(IntProvider.Uniform(104, 157)),
-                UniformHeightRangePlacement(WorldHeight.MIN_Y, 256),
-                InSquarePlacement,
-                SurfaceRelativeThresholdFilter(Chunk.HeightmapType.OCEAN_FLOOR, maxInclusive = -13),
-            )
+        for (
+        modifier in
+        listOf(
+            CountPlacement(IntProvider.Uniform(104, 157)),
+            UniformHeightRangePlacement(WorldHeight.MIN_Y, 256),
+            InSquarePlacement,
+            SurfaceRelativeThresholdFilter(Chunk.HeightmapType.OCEAN_FLOOR, maxInclusive = -13),
+        )
         ) {
             positions = positions.flatMap { modifier.getPositions(context, random, it) }
         }
@@ -197,9 +198,20 @@ public object GlowLichenDecoration : BiomeVegetalDecoration {
     private val defaultGlowLichenStateId = stateId("glow_lichen")
     private val firstGlowLichenStateId = defaultGlowLichenStateId - 127
     private val canBePlacedOnStateIds =
-        setOf("stone", "andesite", "diorite", "granite", "dripstone_block", "calcite", "tuff", "deepslate", "sulfur", "cinnabar")
-            .map(::stateId)
+        setOf(
+            "stone",
+            "andesite",
+            "diorite",
+            "granite",
+            "dripstone_block",
+            "calcite",
+            "tuff",
+            "deepslate",
+            "sulfur",
+            "cinnabar",
+        ).map(::stateId)
             .toSet()
-    private val VALID_DIRECTIONS = listOf(Direction.UP, Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST)
+    private val VALID_DIRECTIONS =
+        listOf(Direction.UP, Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST)
     private val ALL_DIRECTIONS = Direction.entries
 }

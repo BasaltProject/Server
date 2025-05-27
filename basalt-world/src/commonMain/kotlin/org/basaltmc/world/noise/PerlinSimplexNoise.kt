@@ -44,7 +44,14 @@ public class PerlinSimplexNoise(
         }
 
         if (highFreqOctaves > 0) {
-            val positiveOctaveSeed = (zeroOctave.getValue(zeroOctave.xo, zeroOctave.yo, zeroOctave.zo) * 9.223372E18).toLong()
+            val positiveOctaveSeed =
+                (
+                    zeroOctave.getValue(
+                        zeroOctave.xo,
+                        zeroOctave.yo,
+                        zeroOctave.zo,
+                    ) * 9.223372E18
+                ).toLong()
             val highFreqRandom = WorldgenRandom(LegacyRandom(positiveOctaveSeed))
             for (i in zeroOctaveIndex - 1 downTo 0) {
                 if (i < totalOctaves && sorted.contains(zeroOctaveIndex - i)) {

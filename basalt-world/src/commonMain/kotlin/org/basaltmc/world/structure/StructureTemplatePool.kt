@@ -204,7 +204,8 @@ public class FeaturePoolElement(
         loader: TemplateLoader,
         position: StructurePos,
         rotation: StructureRotation,
-    ): StructureBoundingBox = StructureBoundingBox(position.x, position.y, position.z, position.x, position.y, position.z)
+    ): StructureBoundingBox =
+        StructureBoundingBox(position.x, position.y, position.z, position.x, position.y, position.z)
 
     override fun getShuffledJigsawBlocks(
         loader: TemplateLoader,
@@ -221,7 +222,14 @@ public class FeaturePoolElement(
         clipTo: StructureBoundingBox,
         random: WorldgenRandom,
     ) {
-        org.basaltmc.world.terrain.decoration.VillageFeatures.place(feature, chunk, position.x, position.y, position.z, random)
+        org.basaltmc.world.terrain.decoration.VillageFeatures.place(
+            feature,
+            chunk,
+            position.x,
+            position.y,
+            position.z,
+            random,
+        )
     }
 }
 

@@ -44,7 +44,20 @@ class GlowLichenDecorationTest {
             for (z in 0 until 16) {
                 for (y in WorldHeight.MIN_Y..62) {
                     val hollowLayer = y <= 50 && (y and 1) != 0
-                    chunk.setBlockStateId(x, y, z, if (hollowLayer) if (water) Blocks.WATER.stateId else Blocks.AIR.stateId else Blocks.STONE.stateId)
+                    chunk.setBlockStateId(
+                        x,
+                        y,
+                        z,
+                        if (hollowLayer) {
+                            if (water) {
+                                Blocks.WATER.stateId
+                            } else {
+                                Blocks.AIR.stateId
+                            }
+                        } else {
+                            Blocks.STONE.stateId
+                        },
+                    )
                 }
             }
         }

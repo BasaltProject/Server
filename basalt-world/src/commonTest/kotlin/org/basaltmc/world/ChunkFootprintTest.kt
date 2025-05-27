@@ -25,7 +25,9 @@ class ChunkFootprintTest {
         }
 
         val flat = chunk.sectionCount * 4096 * 4
-        println("paletted: ${bytes / 1024} KB, flat IntArray: ${flat / 1024} KB, uniform sections: $uniform/${chunk.sectionCount}")
+        println(
+            "paletted: ${bytes / 1024} KB, flat IntArray: ${flat / 1024} KB, uniform sections: $uniform/${chunk.sectionCount}",
+        )
 
         assertTrue(uniform > 0, "a normal chunk has sections of nothing but air; those must cost no entry storage")
         assertTrue(bytes * 4 < flat, "expected the paletted form to be several times smaller, got $bytes vs $flat")

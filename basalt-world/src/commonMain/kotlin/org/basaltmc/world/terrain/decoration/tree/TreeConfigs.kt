@@ -13,7 +13,8 @@ import org.basaltmc.world.terrain.decoration.IntProvider
  * azalea yet.
  */
 public object TreeConfigs {
-    private fun state(name: String): Int = Blocks.REGISTRY.byIdentifier(Identifier.vanilla(name))?.stateId ?: error("unknown block '$name'")
+    private fun state(name: String): Int =
+        Blocks.REGISTRY.byIdentifier(Identifier.vanilla(name))?.stateId ?: error("unknown block '$name'")
 
     private val OAK_LOG = state("oak_log")
     private val OAK_LEAVES = state("oak_leaves")
@@ -36,7 +37,13 @@ public object TreeConfigs {
 
     // parity: TreeFeatures.createOak/createStraightBlobTree(OAK_LOG, OAK_LEAVES, 4, 2, 0, 2).
     public val OAK: TreeConfiguration =
-        TreeConfiguration(OAK_LOG, StraightTrunkPlacer(4, 2, 0), OAK_LEAVES, BlobFoliagePlacer(IntProvider.of(2), IntProvider.of(0), 3), FeatureSizeTwoLayers(1, 0, 1))
+        TreeConfiguration(
+            OAK_LOG,
+            StraightTrunkPlacer(4, 2, 0),
+            OAK_LEAVES,
+            BlobFoliagePlacer(IntProvider.of(2), IntProvider.of(0), 3),
+            FeatureSizeTwoLayers(1, 0, 1),
+        )
 
     // parity: TreeFeatures.createStraightBlobTree(OAK_LOG, OAK_LEAVES, 5, 3, 0, 3) (swamp_oak).
     public val SWAMP_OAK: TreeConfiguration =
@@ -51,11 +58,23 @@ public object TreeConfigs {
 
     // parity: TreeFeatures.createBirch/createStraightBlobTree(BIRCH_LOG, BIRCH_LEAVES, 5, 2, 0, 2).
     public val BIRCH: TreeConfiguration =
-        TreeConfiguration(BIRCH_LOG, StraightTrunkPlacer(5, 2, 0), BIRCH_LEAVES, BlobFoliagePlacer(IntProvider.of(2), IntProvider.of(0), 3), FeatureSizeTwoLayers(1, 0, 1))
+        TreeConfiguration(
+            BIRCH_LOG,
+            StraightTrunkPlacer(5, 2, 0),
+            BIRCH_LEAVES,
+            BlobFoliagePlacer(IntProvider.of(2), IntProvider.of(0), 3),
+            FeatureSizeTwoLayers(1, 0, 1),
+        )
 
     // parity: TreeFeatures.createSuperBirch/createStraightBlobTree(BIRCH_LOG, BIRCH_LEAVES, 5, 2, 6, 2).
     public val SUPER_BIRCH: TreeConfiguration =
-        TreeConfiguration(BIRCH_LOG, StraightTrunkPlacer(5, 2, 6), BIRCH_LEAVES, BlobFoliagePlacer(IntProvider.of(2), IntProvider.of(0), 3), FeatureSizeTwoLayers(1, 0, 1))
+        TreeConfiguration(
+            BIRCH_LOG,
+            StraightTrunkPlacer(5, 2, 6),
+            BIRCH_LEAVES,
+            BlobFoliagePlacer(IntProvider.of(2), IntProvider.of(0), 3),
+            FeatureSizeTwoLayers(1, 0, 1),
+        )
 
     // parity: TreeFeatures.FANCY_OAK registration.
     public val FANCY_OAK: TreeConfiguration =
@@ -246,7 +265,15 @@ public object TreeConfigs {
                 IntProvider.uniform(-1, 0),
             ),
             CHERRY_LEAVES,
-            CherryFoliagePlacer(IntProvider.of(4), IntProvider.of(0), IntProvider.of(5), 0.25f, 0.5f, 0.16666667f, 0.33333334f),
+            CherryFoliagePlacer(
+                IntProvider.of(4),
+                IntProvider.of(0),
+                IntProvider.of(5),
+                0.25f,
+                0.5f,
+                0.16666667f,
+                0.33333334f,
+            ),
             FeatureSizeTwoLayers(1, 0, 2),
         )
 
@@ -270,15 +297,23 @@ public object TreeConfigs {
         withDecorators(FANCY_OAK, listOf(TreeDecoratorConfiguration.Beehive(0.002f)) + LEAF_LITTER_DECORATORS)
 
     public val OAK_BEES_002: TreeConfiguration = withDecorators(OAK, listOf(TreeDecoratorConfiguration.Beehive(0.02f)))
-    public val BIRCH_BEES_002: TreeConfiguration = withDecorators(BIRCH, listOf(TreeDecoratorConfiguration.Beehive(0.02f)))
-    public val FANCY_OAK_BEES_002: TreeConfiguration = withDecorators(FANCY_OAK, listOf(TreeDecoratorConfiguration.Beehive(0.02f)))
+    public val BIRCH_BEES_002: TreeConfiguration =
+        withDecorators(BIRCH, listOf(TreeDecoratorConfiguration.Beehive(0.02f)))
+    public val FANCY_OAK_BEES_002: TreeConfiguration =
+        withDecorators(FANCY_OAK, listOf(TreeDecoratorConfiguration.Beehive(0.02f)))
     public val OAK_BEES_005: TreeConfiguration = withDecorators(OAK, listOf(TreeDecoratorConfiguration.Beehive(0.05f)))
-    public val FANCY_OAK_BEES_005: TreeConfiguration = withDecorators(FANCY_OAK, listOf(TreeDecoratorConfiguration.Beehive(0.05f)))
-    public val BIRCH_BEES_0002: TreeConfiguration = withDecorators(BIRCH, listOf(TreeDecoratorConfiguration.Beehive(0.002f)))
-    public val SUPER_BIRCH_BEES_0002: TreeConfiguration = withDecorators(SUPER_BIRCH, listOf(TreeDecoratorConfiguration.Beehive(0.002f)))
-    public val FANCY_OAK_BEES: TreeConfiguration = withDecorators(FANCY_OAK, listOf(TreeDecoratorConfiguration.Beehive(1.0f)))
-    public val SUPER_BIRCH_BEES: TreeConfiguration = withDecorators(SUPER_BIRCH, listOf(TreeDecoratorConfiguration.Beehive(1.0f)))
-    public val CHERRY_BEES_005: TreeConfiguration = withDecorators(CHERRY, listOf(TreeDecoratorConfiguration.Beehive(0.05f)))
+    public val FANCY_OAK_BEES_005: TreeConfiguration =
+        withDecorators(FANCY_OAK, listOf(TreeDecoratorConfiguration.Beehive(0.05f)))
+    public val BIRCH_BEES_0002: TreeConfiguration =
+        withDecorators(BIRCH, listOf(TreeDecoratorConfiguration.Beehive(0.002f)))
+    public val SUPER_BIRCH_BEES_0002: TreeConfiguration =
+        withDecorators(SUPER_BIRCH, listOf(TreeDecoratorConfiguration.Beehive(0.002f)))
+    public val FANCY_OAK_BEES: TreeConfiguration =
+        withDecorators(FANCY_OAK, listOf(TreeDecoratorConfiguration.Beehive(1.0f)))
+    public val SUPER_BIRCH_BEES: TreeConfiguration =
+        withDecorators(SUPER_BIRCH, listOf(TreeDecoratorConfiguration.Beehive(1.0f)))
+    public val CHERRY_BEES_005: TreeConfiguration =
+        withDecorators(CHERRY, listOf(TreeDecoratorConfiguration.Beehive(0.05f)))
 
     private fun withDecorators(
         base: TreeConfiguration,
@@ -293,5 +328,4 @@ public object TreeConfigs {
             base.rootPlacer,
             decorators,
         )
-
 }

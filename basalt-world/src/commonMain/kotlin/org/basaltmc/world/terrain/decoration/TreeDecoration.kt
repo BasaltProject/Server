@@ -4,8 +4,8 @@ import org.basaltmc.random.WorldgenRandom
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.terrain.decoration.tree.FallenTreeConfiguration
 import org.basaltmc.world.terrain.decoration.tree.FallenTreeFeature
-import org.basaltmc.world.terrain.decoration.tree.TreeConfiguration
 import org.basaltmc.world.terrain.decoration.tree.TreeConfigs
+import org.basaltmc.world.terrain.decoration.tree.TreeConfiguration
 import org.basaltmc.world.terrain.decoration.tree.TreeFeature
 
 /**
@@ -28,13 +28,31 @@ public object TreeDecoration {
     }
 
     public fun tree(config: TreeConfiguration): Candidate =
-        Candidate { chunk, random, position -> TreeFeature.place(chunk, random, position.x, position.y, position.z, config) }
+        Candidate {
+            chunk,
+            random,
+            position,
+            ->
+            TreeFeature.place(chunk, random, position.x, position.y, position.z, config)
+        }
 
     public fun fallen(config: FallenTreeConfiguration): Candidate =
-        Candidate { chunk, random, position -> FallenTreeFeature.place(chunk, random, position.x, position.y, position.z, config) }
+        Candidate {
+            chunk,
+            random,
+            position,
+            ->
+            FallenTreeFeature.place(chunk, random, position.x, position.y, position.z, config)
+        }
 
     public fun hugeMushroom(kind: HugeMushroomFeature.Kind): Candidate =
-        Candidate { chunk, random, position -> HugeMushroomFeature.place(chunk, random, position.x, position.y, position.z, kind) }
+        Candidate {
+            chunk,
+            random,
+            position,
+            ->
+            HugeMushroomFeature.place(chunk, random, position.x, position.y, position.z, kind)
+        }
 
     /** // parity: `trees_water`, weighted count 0x9/1x1 and fancy oak 10% before oak fallback. */
     public val WATER: BiomeVegetalDecoration =
@@ -69,13 +87,24 @@ public object TreeDecoration {
         chance: Float,
         extra: Int,
     ): BiomeVegetalDecoration =
-        BiomeVegetalDecoration { chunk, random -> place(chunk, random, CountExtraPlacement(count, chance, extra)) { tree(config) } }
+        BiomeVegetalDecoration {
+            chunk,
+            random,
+            ->
+            place(chunk, random, CountExtraPlacement(count, chance, extra)) { tree(config) }
+        }
 
     /** Matches a real plain `CountPlacement.of(count)` frequency (no weighted "extra" roll), e.g. `pale_garden_vegetation`. */
     public fun fixed(
         config: TreeConfiguration,
         count: Int,
-    ): BiomeVegetalDecoration = BiomeVegetalDecoration { chunk, random -> place(chunk, random, CountPlacement(count)) { tree(config) } }
+    ): BiomeVegetalDecoration =
+        BiomeVegetalDecoration {
+            chunk,
+            random,
+            ->
+            place(chunk, random, CountPlacement(count)) { tree(config) }
+        }
 
     /** [rareConfig] is picked with probability [rareChance] (a single `nextFloat()` draw), otherwise [defaultConfig]: matches a two-entry real `RANDOM_SELECTOR` with every other real entry dropped (see this file's own KDoc). */
     public fun choice(
@@ -89,7 +118,15 @@ public object TreeDecoration {
         BiomeVegetalDecoration { chunk, random ->
             val rare = tree(rareConfig)
             val default = tree(defaultConfig)
-            place(chunk, random, CountExtraPlacement(count, chance, extra)) { r -> if (r.nextFloat() < rareChance) rare else default }
+            place(chunk, random, CountExtraPlacement(count, chance, extra)) { r ->
+                if (r.nextFloat() <
+                    rareChance
+                ) {
+                    rare
+                } else {
+                    default
+                }
+            }
         }
 
     /** A two-entry real `RANDOM_SELECTOR` behind one `RarityFilter`, such as `trees_meadow`. */

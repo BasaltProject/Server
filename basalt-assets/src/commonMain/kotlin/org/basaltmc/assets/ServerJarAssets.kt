@@ -50,7 +50,7 @@ public class ServerJarAssets(
 
     /** Reads and UTF-8 decodes one entry, throwing if it's absent: for datapack JSON callers expect to always exist. */
     public fun readText(name: String): String =
-        readEntry(name)?.decodeToString() ?: throw AssetException("'$name' is missing from the ${dataRoot} data")
+        readEntry(name)?.decodeToString() ?: throw AssetException("'$name' is missing from the $dataRoot data")
 
     /**
      * Every entry name under [prefix]: for enumerating a whole datapack directory (e.g. every
@@ -63,7 +63,12 @@ public class ServerJarAssets(
     private fun pathFor(name: String): String = "$dataRoot/${name.removePrefix(VANILLA_PREFIX)}"
 
     private fun readIndex(): List<String> =
-        FileIO.readText("$dataRoot/.index")?.lineSequence()?.filter { it.isNotBlank() }?.toList().orEmpty()
+        FileIO
+            .readText("$dataRoot/.index")
+            ?.lineSequence()
+            ?.filter { it.isNotBlank() }
+            ?.toList()
+            .orEmpty()
 
     private fun unpack(
         archivePath: String,

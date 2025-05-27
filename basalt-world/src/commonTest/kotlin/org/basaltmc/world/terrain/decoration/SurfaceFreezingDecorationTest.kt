@@ -91,25 +91,59 @@ class SurfaceFreezingDecorationTest {
     private fun environment(biomeId: String): SurfaceRuleEnvironment = environment { biomeId }
 
     private fun stateId(path: String): Int =
-        Blocks.REGISTRY.byIdentifier(org.basaltmc.registry.Identifier.vanilla(path))?.stateId
+        Blocks.REGISTRY
+            .byIdentifier(
+                org.basaltmc.registry.Identifier
+                    .vanilla(path),
+            )?.stateId
             ?: error("unknown block '$path'")
 
     private fun environment(biomeForX: (Int) -> String): SurfaceRuleEnvironment =
         object : SurfaceRuleEnvironment {
-            override fun surfaceDepthNoise(x: Int, z: Int): Int = 0
+            override fun surfaceDepthNoise(
+                x: Int,
+                z: Int,
+            ): Int = 0
 
-            override fun surfaceSecondaryNoise(x: Int, z: Int): Double = 0.0
+            override fun surfaceSecondaryNoise(
+                x: Int,
+                z: Int,
+            ): Double = 0.0
 
-            override fun sample2d(noiseId: String, x: Int, z: Int): Double = 0.0
+            override fun sample2d(
+                noiseId: String,
+                x: Int,
+                z: Int,
+            ): Double = 0.0
 
-            override fun sample3d(noiseId: String, x: Int, y: Int, z: Int): Double = 0.0
+            override fun sample3d(
+                noiseId: String,
+                x: Int,
+                y: Int,
+                z: Int,
+            ): Double = 0.0
 
-            override fun verticalGradientRandom(name: String, x: Int, y: Int, z: Int): Float = 0.0f
+            override fun verticalGradientRandom(
+                name: String,
+                x: Int,
+                y: Int,
+                z: Int,
+            ): Float = 0.0f
 
-            override fun estimatedSurfaceHeight(x: Int, z: Int): Int = 63
+            override fun estimatedSurfaceHeight(
+                x: Int,
+                z: Int,
+            ): Int = 63
 
-            override fun biomeAt(x: Int, y: Int, z: Int): String = biomeForX(x)
+            override fun biomeAt(
+                x: Int,
+                y: Int,
+                z: Int,
+            ): String = biomeForX(x)
 
-            override fun isSteep(x: Int, z: Int): Boolean = false
+            override fun isSteep(
+                x: Int,
+                z: Int,
+            ): Boolean = false
         }
 }

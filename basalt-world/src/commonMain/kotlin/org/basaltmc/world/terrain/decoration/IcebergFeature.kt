@@ -32,8 +32,11 @@ internal object IcebergFeature {
             for (zOffset in -a until a) {
                 for (yOffset in 0 until aboveWaterHeight) {
                     val radius =
-                        if (ellipse) heightDependentRadiusEllipse(yOffset, aboveWaterHeight, width)
-                        else heightDependentRadiusRound(random, yOffset, aboveWaterHeight, width)
+                        if (ellipse) {
+                            heightDependentRadiusEllipse(yOffset, aboveWaterHeight, width)
+                        } else {
+                            heightDependentRadiusRound(random, yOffset, aboveWaterHeight, width)
+                        }
                     if (ellipse || xOffset < radius) {
                         generateBlock(
                             region,
@@ -308,7 +311,11 @@ internal object IcebergFeature {
         return ceil(scale / 2.0f).toInt()
     }
 
-    private fun heightDependentRadiusEllipse(yOffset: Int, height: Int, width: Int): Int {
+    private fun heightDependentRadiusEllipse(
+        yOffset: Int,
+        height: Int,
+        width: Int,
+    ): Int {
         val scale = (1.0f - yOffset.toFloat().pow(2) / height) * width
         return ceil(scale / 2.0f).toInt()
     }
@@ -324,8 +331,11 @@ internal object IcebergFeature {
         return ceil(scale / 2.0f).toInt()
     }
 
-    private fun getEllipseC(yOffset: Int, height: Int, ellipseC: Int): Int =
-        if (yOffset > 0 && height - yOffset <= 3) ellipseC - (4 - (height - yOffset)) else ellipseC
+    private fun getEllipseC(
+        yOffset: Int,
+        height: Int,
+        ellipseC: Int,
+    ): Int = if (yOffset > 0 && height - yOffset <= 3) ellipseC - (4 - (height - yOffset)) else ellipseC
 
     private fun isIcebergState(stateId: Int): Boolean =
         stateId == Blocks.PACKED_ICE.stateId ||

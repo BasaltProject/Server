@@ -1,6 +1,5 @@
 package org.basaltmc.world.terrain.decoration
 
-import org.basaltmc.random.WorldgenRandom
 import org.basaltmc.registry.Blocks
 import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
@@ -52,5 +51,4 @@ public object ForestGroundDecoration {
             for (modifier in modifiers) positions = positions.flatMap { modifier.getPositions(context, random, it) }
             positions.forEach { position -> feature.place(chunk, random, position) }
         }
-
 }

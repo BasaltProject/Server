@@ -16,11 +16,15 @@ public data class FallenTreeConfiguration(
 
 /** Vanilla fallen-tree configurations used by Overworld biome selectors. */
 public object FallenTreeConfigs {
-    public val OAK: FallenTreeConfiguration = FallenTreeConfiguration(state("oak_log"), IntProvider.Uniform(4, 7), stumpVines = true)
+    public val OAK: FallenTreeConfiguration =
+        FallenTreeConfiguration(state("oak_log"), IntProvider.Uniform(4, 7), stumpVines = true)
     public val BIRCH: FallenTreeConfiguration = FallenTreeConfiguration(state("birch_log"), IntProvider.Uniform(5, 8))
-    public val SUPER_BIRCH: FallenTreeConfiguration = FallenTreeConfiguration(state("birch_log"), IntProvider.Uniform(5, 15))
-    public val SPRUCE: FallenTreeConfiguration = FallenTreeConfiguration(state("spruce_log"), IntProvider.Uniform(6, 10))
-    public val JUNGLE: FallenTreeConfiguration = FallenTreeConfiguration(state("jungle_log"), IntProvider.Uniform(4, 11), stumpVines = true)
+    public val SUPER_BIRCH: FallenTreeConfiguration =
+        FallenTreeConfiguration(state("birch_log"), IntProvider.Uniform(5, 15))
+    public val SPRUCE: FallenTreeConfiguration =
+        FallenTreeConfiguration(state("spruce_log"), IntProvider.Uniform(6, 10))
+    public val JUNGLE: FallenTreeConfiguration =
+        FallenTreeConfiguration(state("jungle_log"), IntProvider.Uniform(4, 11), stumpVines = true)
 
     private fun state(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
@@ -133,21 +137,25 @@ public object FallenTreeFeature {
         x: Int,
         y: Int,
         z: Int,
-    ): Boolean = y > WorldHeight.MIN_Y && Chunk.HeightmapType.OCEAN_FLOOR.matches(chunk.getBlockStateId(x and 15, y - 1, z and 15))
+    ): Boolean =
+        y > WorldHeight.MIN_Y &&
+            Chunk.HeightmapType.OCEAN_FLOOR.matches(chunk.getBlockStateId(x and 15, y - 1, z and 15))
 
     private fun isValidTreePos(
         chunk: Chunk,
         x: Int,
         y: Int,
         z: Int,
-    ): Boolean = y in WorldHeight.MIN_Y..WorldHeight.MAX_Y && chunk.getBlockStateId(x and 15, y, z and 15) == Blocks.AIR.stateId
+    ): Boolean =
+        y in WorldHeight.MIN_Y..WorldHeight.MAX_Y && chunk.getBlockStateId(x and 15, y, z and 15) == Blocks.AIR.stateId
 
     private fun isAir(
         chunk: Chunk,
         x: Int,
         y: Int,
         z: Int,
-    ): Boolean = y in WorldHeight.MIN_Y..WorldHeight.MAX_Y && chunk.getBlockStateId(x and 15, y, z and 15) == Blocks.AIR.stateId
+    ): Boolean =
+        y in WorldHeight.MIN_Y..WorldHeight.MAX_Y && chunk.getBlockStateId(x and 15, y, z and 15) == Blocks.AIR.stateId
 
     private fun set(
         chunk: Chunk,

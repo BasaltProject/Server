@@ -20,7 +20,10 @@ public class PlacementContext(
     private val worldSurfaceHeightmap: IntArray = chunk.heightmap(Chunk.HeightmapType.WORLD_SURFACE)
     private val oceanFloorHeightmap: IntArray = chunk.heightmap(Chunk.HeightmapType.OCEAN_FLOOR)
     private val motionBlockingHeightmap: IntArray = chunk.heightmap(Chunk.HeightmapType.MOTION_BLOCKING)
-    private val motionBlockingNoLeavesHeightmap: IntArray = chunk.heightmap(Chunk.HeightmapType.MOTION_BLOCKING_NO_LEAVES)
+    private val motionBlockingNoLeavesHeightmap: IntArray =
+        chunk.heightmap(
+            Chunk.HeightmapType.MOTION_BLOCKING_NO_LEAVES,
+        )
 
     public fun height(
         localX: Int,

@@ -107,8 +107,7 @@ public class BasaltServer(
     private fun loadOrGenerateChunk(
         chunkX: Int,
         chunkZ: Int,
-    ): Chunk =
-        regions.loadChunk(chunkX, chunkZ) ?: generateChunk(chunkX, chunkZ)
+    ): Chunk = regions.loadChunk(chunkX, chunkZ) ?: generateChunk(chunkX, chunkZ)
 
     /**
      * Generates the small warm cache around spawn, then reads the spawn height out of it: a player
@@ -210,7 +209,11 @@ public class BasaltServer(
         val pending = generationQueue.pendingKeys()
         val candidates =
             world.evictionCandidates { chunkX, chunkZ ->
-                if (abs(chunkX) <= SPAWN_RADIUS_CHUNKS && abs(chunkZ) <= SPAWN_RADIUS_CHUNKS) return@evictionCandidates true
+                if (abs(chunkX) <= SPAWN_RADIUS_CHUNKS &&
+                    abs(chunkZ) <= SPAWN_RADIUS_CHUNKS
+                ) {
+                    return@evictionCandidates true
+                }
                 if (ChunkGenerationQueue.pack(chunkX, chunkZ) in pending) return@evictionCandidates true
                 players.any { player ->
                     abs(chunkX - (player.x.toInt() shr 4)) <= retainRadius &&
@@ -228,10 +231,13 @@ public class BasaltServer(
             }
 
         val evictStart = TimeSource.Monotonic.markNow()
-        val removed = if (candidates.isEmpty()) 0 else {
-            saveWorld(candidates.filter { it.isDirty })
-            world.evictClean(candidates)
-        }
+        val removed =
+            if (candidates.isEmpty()) {
+                0
+            } else {
+                saveWorld(candidates.filter { it.isDirty })
+                world.evictClean(candidates)
+            }
         val evictMillis = evictStart.elapsedNow().inWholeMilliseconds
 
         // Reported every sweep, not only when something happens: when this server misbehaves it is
@@ -244,12 +250,6 @@ public class BasaltServer(
         }
     }
 
-    /**
-     * Saves [chunks] and reports what it cost. Only ever called with chunks that actually changed:
-     * rewriting a chunk identical to the one already on disk means reading, decompressing,
-     * re-serializing and recompressing its whole region for nothing, which is what made `stop` sit
-     * there for so long.
-     */
     /**
      * What the last collection actually reclaimed. The chunk counts above only account for what the
      * server means to hold; if memory climbs while they stay flat, the answer is here, in the gap
@@ -264,6 +264,12 @@ public class BasaltServer(
             "(${before / 1_048_576} MB before it, ${info.epoch} collections so far)."
     }
 
+    /**
+     * Saves [chunks] and reports what it cost. Only ever called with chunks that actually changed:
+     * rewriting a chunk identical to the one already on disk means reading, decompressing,
+     * re-serializing and recompressing its whole region for nothing, which is what made `stop` sit
+     * there for so long.
+     */
     @OptIn(ExperimentalTime::class)
     private fun saveWorld(chunks: List<Chunk>) {
         if (chunks.isEmpty()) return

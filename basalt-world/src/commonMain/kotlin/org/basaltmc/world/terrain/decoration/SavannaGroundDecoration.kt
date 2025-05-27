@@ -43,8 +43,7 @@ public object SavannaGroundDecoration {
     private fun placed(
         modifiers: List<PlacementModifier>,
         feature: SimpleBlockFeature,
-    ): BiomeVegetalDecoration =
-        BiomeVegetalDecoration { chunk, random -> place(chunk, random, modifiers, feature) }
+    ): BiomeVegetalDecoration = BiomeVegetalDecoration { chunk, random -> place(chunk, random, modifiers, feature) }
 
     private fun place(
         chunk: Chunk,

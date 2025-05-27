@@ -97,7 +97,11 @@ class ServerJarAssetsTest {
         withFixture()
 
         var asked = false
-        val reopened = ServerJarAssets("1.0", dataRoot, silentLogger()) { asked = true; path }
+        val reopened =
+            ServerJarAssets("1.0", dataRoot, silentLogger()) {
+                asked = true
+                path
+            }
 
         assertEquals(false, asked, "a warm install must not resolve or download anything")
         assertEquals(

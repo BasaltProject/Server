@@ -155,7 +155,13 @@ public object VillagePoolJson {
                 StructureRuleTest.BlockMatch(
                     Blocks.REGISTRY
                         .byIdentifier(
-                            Identifier.parse(json["state"]?.jsonObject?.get("Name")?.jsonPrimitive?.content ?: "minecraft:air"),
+                            Identifier.parse(
+                                json["state"]
+                                    ?.jsonObject
+                                    ?.get("Name")
+                                    ?.jsonPrimitive
+                                    ?.content ?: "minecraft:air",
+                            ),
                         )?.stateId ?: Blocks.AIR.stateId,
                 )
             "minecraft:tag_match" -> {

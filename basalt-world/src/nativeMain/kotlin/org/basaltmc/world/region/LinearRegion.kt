@@ -49,26 +49,6 @@ public class LinearRegion(
     }
 
     /**
-     * The inner stream is built into one exactly-sized array rather than a growing buffer, and
-     * compressed straight out of it.
-     *
-     * A region is up to 1024 chunks of NBT, so it is tens of megabytes even before compression, and
-     * this used to make five full copies of it: a buffer that doubled its way up, `toByteArray`,
-     * the compressor's input, then another buffer and another `toByteArray` for the framing. Saving
-     * a handful of regions in a row was enough to put gigabytes of short-lived arrays in flight,
-     * which is what made a busy save balloon rather than merely take a while.
-     */
-    /**
-     * Serializes into [scratch], a buffer the caller owns and reuses, and returns how many bytes of
-     * it are the finished file. Nothing here allocates per call.
-     *
-     * A region is tens of megabytes uncompressed, and building one used to allocate that much fresh
-     * every time, plus the compressed copy, plus the framed copy. Kotlin/Native's allocator serves
-     * blocks that size straight from `mmap` and does not hand the pages back, so every save left
-     * hundreds of megabytes mapped for good: a profile attributed four gigabytes of a one-minute
-     * session to this one method. Reusing a buffer keeps the peak flat instead.
-     */
-    /**
      * Writes this region straight to [path], compressing as it goes.
      *
      * Peak memory is a fixed 64 KB output block plus an 8 KB chunk table, whatever the region's

@@ -24,7 +24,9 @@ public object CactusFeature {
         val localX = origin.x and 15
         val localZ = origin.z and 15
         if (chunk.getBlockStateId(localX, origin.y, localZ) != Blocks.AIR.stateId) return false
-        if (origin.y - 1 < WorldHeight.MIN_Y || chunk.getBlockStateId(localX, origin.y - 1, localZ) == Blocks.AIR.stateId) {
+        if (origin.y - 1 < WorldHeight.MIN_Y ||
+            chunk.getBlockStateId(localX, origin.y - 1, localZ) == Blocks.AIR.stateId
+        ) {
             return false
         }
         // parity: BiasedToBottomInt.sample: min + nextInt(nextInt(max - min + 1) + 1); the flower
@@ -64,8 +66,17 @@ public object CactusFeature {
     }
 
     private val cactusStateId =
-        Blocks.REGISTRY.byIdentifier(org.basaltmc.registry.Identifier.vanilla("cactus"))?.stateId ?: error("unknown block 'cactus'")
+        Blocks.REGISTRY
+            .byIdentifier(
+                org.basaltmc.registry.Identifier
+                    .vanilla("cactus"),
+            )?.stateId
+            ?: error("unknown block 'cactus'")
     private val cactusFlowerStateId =
-        Blocks.REGISTRY.byIdentifier(org.basaltmc.registry.Identifier.vanilla("cactus_flower"))?.stateId
+        Blocks.REGISTRY
+            .byIdentifier(
+                org.basaltmc.registry.Identifier
+                    .vanilla("cactus_flower"),
+            )?.stateId
             ?: error("unknown block 'cactus_flower'")
 }

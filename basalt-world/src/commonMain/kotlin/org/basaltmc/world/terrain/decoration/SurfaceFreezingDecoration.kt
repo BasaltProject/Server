@@ -30,7 +30,9 @@ public object SurfaceFreezingDecoration {
 
                 val biomeId = environment.biomeAt(worldX, topY, worldZ)
                 val belowY = topY - 1
-                if (belowY >= WorldHeight.MIN_Y && shouldFreeze(chunk, localX, belowY, localZ, biomeId, worldX, worldZ)) {
+                if (belowY >= WorldHeight.MIN_Y &&
+                    shouldFreeze(chunk, localX, belowY, localZ, biomeId, worldX, worldZ)
+                ) {
                     chunk.setBlockStateId(localX, belowY, localZ, Blocks.ICE.stateId)
                 }
 

@@ -1,6 +1,5 @@
 package org.basaltmc.world.terrain.decoration
 
-import org.basaltmc.random.WorldgenRandom
 import org.basaltmc.registry.Blocks
 import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
@@ -15,14 +14,15 @@ public object JungleMelonDecoration {
         BiomeVegetalDecoration { chunk, random ->
             val context = PlacementContext(chunk)
             var positions: Sequence<DecorationPos> = sequenceOf(DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16))
-            for (modifier in
-                listOf(
-                    RarityFilter(rarity),
-                    InSquarePlacement,
-                    HeightmapPlacement,
-                    CountPlacement(64),
-                    RandomOffsetPlacement(xzSpread = 7, ySpread = 3),
-                )
+            for (
+            modifier in
+            listOf(
+                RarityFilter(rarity),
+                InSquarePlacement,
+                HeightmapPlacement,
+                CountPlacement(64),
+                RandomOffsetPlacement(xzSpread = 7, ySpread = 3),
+            )
             ) {
                 positions = positions.flatMap { modifier.getPositions(context, random, it) }
             }

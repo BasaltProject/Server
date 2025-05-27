@@ -124,7 +124,8 @@ public object BambooDecoration {
             )
 
     private fun states(vararg names: String): Set<Int> =
-        names.map { name ->
-            Blocks.REGISTRY.byIdentifier(Identifier.vanilla(name))?.stateId ?: error("unknown block '$name'")
-        }.toSet()
+        names
+            .map { name ->
+                Blocks.REGISTRY.byIdentifier(Identifier.vanilla(name))?.stateId ?: error("unknown block '$name'")
+            }.toSet()
 }

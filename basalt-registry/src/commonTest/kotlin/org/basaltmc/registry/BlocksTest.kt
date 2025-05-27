@@ -118,6 +118,7 @@ class BlocksTest {
 
     private fun stateId(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
+
     @Test
     fun stateCountIsStableAcrossReads() {
         assertEquals(Blocks.stateCount, Blocks.stateCount)
@@ -130,5 +131,4 @@ class BlocksTest {
         for (stateId in 0 until count) Blocks.byStateId(stateId)
         assertNull(Blocks.byStateId(count), "state ids are expected to stop below stateCount")
     }
-
 }

@@ -34,14 +34,18 @@ class HugeMushroomFeatureTest {
         assertTrue(stems.size >= 4, "expected at least 4 mushroom stem blocks, got ${stems.size}")
         assertTrue(caps.size >= 32, "expected the brown cap layer (7x7 minus corners), got ${caps.size}")
         assertTrue(stems.all(::isExactStemState))
-        assertTrue(caps.all { stateId ->
-            val properties = Blocks.byStateId(stateId)?.properties ?: return@all false
-            properties["down"] == "false" && properties["up"] == "true"
-        })
-        assertTrue(caps.any { stateId ->
-            val properties = Blocks.byStateId(stateId)?.properties ?: return@any false
-            listOf("east", "north", "south", "west").all { properties[it] == "false" }
-        })
+        assertTrue(
+            caps.all { stateId ->
+                val properties = Blocks.byStateId(stateId)?.properties ?: return@all false
+                properties["down"] == "false" && properties["up"] == "true"
+            },
+        )
+        assertTrue(
+            caps.any { stateId ->
+                val properties = Blocks.byStateId(stateId)?.properties ?: return@any false
+                listOf("east", "north", "south", "west").all { properties[it] == "false" }
+            },
+        )
     }
 
     @Test
