@@ -124,7 +124,7 @@ public class RegionStore(
             val region = cached[key] ?: continue
             val path = regionPath(regionX(key), regionZ(key))
             FileIO.createDirectories(path.substringBeforeLast('/'))
-            FileIO.writeBytes(path, region.write())
+            region.writeTo(path)
             written++
         }
         dirtyRegions.clear()
@@ -158,7 +158,7 @@ public class RegionStore(
             if (dirtyRegions.remove(oldest)) {
                 val path = regionPath(regionX(oldest), regionZ(oldest))
                 FileIO.createDirectories(path.substringBeforeLast('/'))
-                cached[oldest]?.let { FileIO.writeBytes(path, it.write()) }
+                cached[oldest]?.writeTo(path)
             }
             cached.remove(oldest)
         }

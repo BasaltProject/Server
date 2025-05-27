@@ -43,6 +43,7 @@ internal fun startTestServer(
                 onlineMode = onlineMode != null,
                 worldName = "basalt_server_test_world",
                 viewDistance = 3,
+                saveIntervalSeconds = 30,
                 logLevel = LogLevel.INFO,
                 logToFile = false,
                 logKeepDays = 0,

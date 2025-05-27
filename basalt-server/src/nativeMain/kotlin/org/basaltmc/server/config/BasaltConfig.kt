@@ -27,6 +27,9 @@ name = "world"
 # Radius, in chunks, sent to a client around its own position (vanilla's own
 # server.properties default is 10).
 view-distance = 10
+# How often changes are written to the region files: a crash costs at most this
+# much. 0 disables it, leaving chunks to save when they unload or on stop.
+save-interval-seconds = 30
 
 [performance]
 # Count noise evaluations, biome lookups and per-phase timings while generating
@@ -66,6 +69,7 @@ public data class BasaltConfig(
     public val onlineMode: Boolean,
     public val worldName: String,
     public val viewDistance: Int,
+    public val saveIntervalSeconds: Int,
     public val logLevel: LogLevel,
     public val logToFile: Boolean,
     public val logKeepDays: Int,
@@ -81,6 +85,7 @@ public data class BasaltConfig(
                 onlineMode = true,
                 worldName = "world",
                 viewDistance = 10,
+                saveIntervalSeconds = 30,
                 logLevel = LogLevel.INFO,
                 logToFile = true,
                 logKeepDays = 14,
@@ -125,6 +130,9 @@ public data class BasaltConfig(
                 onlineMode = server?.boolOrNull("online-mode") ?: DEFAULT.onlineMode,
                 worldName = world?.stringOrNull("name") ?: DEFAULT.worldName,
                 viewDistance = world?.intOrNull("view-distance")?.toInt() ?: DEFAULT.viewDistance,
+                saveIntervalSeconds =
+                    world?.intOrNull("save-interval-seconds")?.toInt()?.coerceAtLeast(0)
+                        ?: DEFAULT.saveIntervalSeconds,
                 logLevel = logging?.stringOrNull("level")?.let(::parseLogLevel) ?: DEFAULT.logLevel,
                 logToFile = logging?.boolOrNull("file") ?: DEFAULT.logToFile,
                 logKeepDays = logging?.intOrNull("keep-days")?.toInt() ?: DEFAULT.logKeepDays,

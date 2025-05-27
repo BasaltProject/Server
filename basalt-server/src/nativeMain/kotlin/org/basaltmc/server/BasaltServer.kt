@@ -81,7 +81,7 @@ public class BasaltServer(
     private val generationQueue =
         ChunkGenerationQueue(world, DIMENSION, workerCount = if (config.generationMetrics) 1 else 8)
     private val spawn = warmStartupChunksAndComputeSpawn()
-    private val tickLoop = TickLoop(onSaveInterval = ::persistAndUnload)
+    private val tickLoop = TickLoop(config.saveIntervalSeconds, onSaveInterval = ::persistAndUnload)
     private val consoleCommands =
         ConsoleCommandRegistry().apply {
             register("stop") { shutdown() }
