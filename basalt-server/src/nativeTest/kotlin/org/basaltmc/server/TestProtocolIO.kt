@@ -9,6 +9,8 @@ import org.basaltmc.io.TcpConnection
 import org.basaltmc.io.Zlib
 import org.basaltmc.io.sleepMillis
 import org.basaltmc.protocol.PacketFraming
+import org.basaltmc.protocol.play.PlayKeepAlivePacket
+import org.basaltmc.protocol.readVarInt
 import org.basaltmc.protocol.writeVarInt
 import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.server.config.ColorMode
@@ -108,6 +110,13 @@ internal fun sendCompressed(
     connection.write(wire.toByteArray())
 }
 
+/**
+ * The next frame that carries something the caller asked about, skipping keep-alives.
+ *
+ * The server sends those on its own timer, from each connection's own outbound thread, so they land
+ * between any two other packets and a real client simply handles them whenever they arrive. A test
+ * that asserted a strict global order therefore passed or failed on how fast the machine was.
+ */
 internal fun readFrame(
     connection: TcpConnection,
     incoming: ByteBuffer,
@@ -117,7 +126,7 @@ internal fun readFrame(
     while (true) {
         PacketFraming.tryReadFrame(incoming, compressionEnabled, decompress = Zlib::decompress)?.let { frame ->
             incoming.discardReadBytes()
-            return ByteBuffer(frame.size).also { it.writeBytes(frame) }
+            if (!isKeepAlive(frame)) return ByteBuffer(frame.size).also { it.writeBytes(frame) }
         }
         val n = connection.read(chunk)
         check(n > 0) { "connection closed while waiting for a frame" }
@@ -171,3 +180,6 @@ internal fun readFrameEncrypted(
         incoming.writeBytes(cipher.update(chunk, length = n, encrypting = false))
     }
 }
+
+private fun isKeepAlive(frame: ByteArray): Boolean =
+    ByteBuffer(frame.size).also { it.writeBytes(frame) }.readVarInt() == PlayKeepAlivePacket.CLIENTBOUND_ID
