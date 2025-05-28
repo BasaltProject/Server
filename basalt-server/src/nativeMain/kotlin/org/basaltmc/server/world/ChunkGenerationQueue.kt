@@ -123,7 +123,15 @@ public class ChunkGenerationQueue(
         // One lock acquisition per poll, not one per position. Checking each of a view distance's
         // worth of positions individually, every millisecond, was hundreds of thousands of lock
         // acquisitions a second from a single thread, against which nothing else got a turn.
-        while (world.countMissing(positions) > 0) sleepMillis(AWAIT_POLL_MILLIS)
+        //
+        // Bounded, because waiting forever turns any lost worker into a server that never finishes
+        // starting and never says why. Past the deadline the remaining chunks are generated here,
+        // on this thread, which is slower but always finishes.
+        var waited = 0L
+        while (world.countMissing(positions) > 0 && waited < AWAIT_TIMEOUT_MILLIS) {
+            sleepMillis(AWAIT_POLL_MILLIS)
+            waited += AWAIT_POLL_MILLIS
+        }
         return positions.map { world.getOrGenerateChunk(it.first, it.second) }
     }
 
@@ -193,6 +201,7 @@ public class ChunkGenerationQueue(
         private const val CAPACITY = 4096
         private const val IDLE_POLL_MILLIS = 1L
         private const val AWAIT_POLL_MILLIS = 10L
+        private const val AWAIT_TIMEOUT_MILLIS = 60_000L
         private const val IDLE_SPINS_BEFORE_BACKOFF = 20
         private const val IDLE_BACKOFF_MILLIS = 20L
         private const val BETWEEN_CHUNKS_MILLIS = 1L

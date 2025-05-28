@@ -41,7 +41,11 @@ internal fun startTestServer(
                 motd = "A Basalt Server",
                 maxPlayers = 20,
                 onlineMode = onlineMode != null,
-                worldName = "basalt_server_test_world",
+                // One world per port. Every server here owns its own RegionStore, and two of them
+                // reading and writing the same region files at once is a genuine race: a worker
+                // that reads a half-written region dies, and the startup that was waiting on its
+                // chunks never finishes binding.
+                worldName = "basalt_server_test_world_$port",
                 viewDistance = 3,
                 saveIntervalSeconds = 30,
                 logLevel = LogLevel.INFO,
