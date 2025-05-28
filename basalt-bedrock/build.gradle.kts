@@ -7,7 +7,7 @@ kotlin {
         commonMain.dependencies {
             api(project(":basalt-common"))
             api(project(":basalt-protocol"))
-            api(project(":basalt-translate"))
+            api(project(":basalt-multiversion"))
         }
     }
 }

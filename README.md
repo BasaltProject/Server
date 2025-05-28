@@ -2,8 +2,10 @@
   <img src="docs/assets/basalt-logo.png" alt="Basalt" width="360">
 </p>
 
+<h2 align="center">Basalt Server</h2>
+
 <p align="center">
-  <strong>A Minecraft: Java Edition server rewritten from scratch in Kotlin/Native. No JVM.</strong>
+  <strong>A Minecraft server rewritten from scratch in Kotlin/Native. No JVM.</strong>
 </p>
 
 <p align="center">
@@ -16,19 +18,26 @@
   <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-green">
 </p>
 
-> ⚠️ **Early development.** Basalt is not usable yet and is not ready for any
-> server, public or private. The roadmap below is the honest state of the project.
+> ⚠️ **Early development.** Basalt Server is not ready for any server, public or
+> private. The status table below is the honest state of the project.
 
 ## Overview
 
-Basalt is a complete reimplementation of the Minecraft: Java Edition server,
-written entirely in **Kotlin/Native** and shipped as a native binary for each
-platform. There is no JVM anywhere in the runtime: no bundled JRE, no embedded VM,
-no hidden Java process.
+Basalt Server is a complete reimplementation of the Minecraft server, written
+entirely in **Kotlin/Native** and shipped as a native binary for each platform.
+There is no JVM anywhere in the runtime: no bundled JRE, no embedded VM, no hidden
+Java process.
+
+It is the server component of the **Basalt** project.
+
+**Which clients can connect.** The server speaks Java Edition's protocol and uses
+its world format, so that is the client it serves today. Older Java clients and
+Bedrock clients are both planned, translated at the edge, and neither is
+implemented yet. Nothing below claims otherwise.
 
 Two goals drive every decision:
 
-- **Vanilla parity.** A Basalt server with no plugins must behave exactly like
+- **Vanilla parity.** A Basalt Server with no plugins must behave exactly like
   the official one. Same seed, same world. Same drops, same damage, same redstone,
   same mobs, bugs included. Parity is the acceptance criterion for every system,
   not a long-term aspiration.
@@ -102,13 +111,12 @@ hunt through.
 motd = "A Basalt Server"
 max-players = 20
 
-[network]
+[server]
 port = 25565
-compression-threshold = 256
 
-[world.overworld]
-seed = 0
+[world]
 view-distance = 10
+save-interval-seconds = 30
 ```
 
 Anything that makes the server behave differently from vanilla is opt-in and
@@ -117,24 +125,27 @@ first start, its values are imported once.
 
 ## Game assets and the EULA
 
-Basalt does **not** contain or distribute any proprietary Minecraft content.
+Basalt Server does **not** contain or distribute any proprietary Minecraft content.
 No structures, no loot tables, no datapacks, no textures, no client or server jars.
 
 Once you accept the [Minecraft EULA](https://www.minecraft.net/en-us/eula), the
-server downloads the official client jar directly from Mojang, verifies its
-checksum, and extracts what it needs into a local cache:
+server downloads the official server download directly from Mojang, verifies its
+SHA-1, unpacks only the data it needs into a local cache, and deletes the archive:
 
 1. `https://piston-meta.mojang.com/mc/game/version_manifest_v2.json`
 2. `https://piston-meta.mojang.com/v1/packages/{sha1}/{version}.json`
-3. `https://piston-data.mojang.com/v1/objects/{sha1}/client.jar`
+3. `https://piston-data.mojang.com/v1/objects/{sha1}/server.jar`
 
-Assets come from the official source, never from this repository.
+That happens once per version. Later starts read the unpacked files and touch
+neither the network nor the archive. Assets come from the official source, never
+from this repository.
 
 ### Accepting the EULA
 
 Same mechanism as the official server, and **the server never prompts you**. On
-first start it writes `eula.txt` with `eula=false` and stops. Set it to `eula=true`
-and start again.
+first start it writes `eula.toml` with `eula = false` and stops. Set it to
+`eula = true` and start again. An accepted `eula.txt` from an existing server is
+read once and migrated, so hosting panels and migrated worlds keep working.
 
 For non-interactive environments such as Docker or `systemd`, pass the flag
 instead:
@@ -149,12 +160,15 @@ Passing it is a deliberate act and counts as accepting the EULA.
 
 Gradle orchestrates the build; it is not part of the runtime.
 
+Kotlin/Native tasks carry the target in their name; replace `MacosArm64` with the
+one you are building for.
+
 ```bash
 # Native binary for the current host
-./gradlew :basalt-server:linkReleaseExecutableNative
+./gradlew :basalt-server:linkReleaseExecutableMacosArm64
 
 # Debug build and run
-./gradlew :basalt-server:runDebugExecutableNative
+./gradlew :basalt-server:runDebugExecutableMacosArm64
 ```
 
 Supported targets: `macosArm64`, `macosX64`, `linuxX64`, `linuxArm64`, `mingwX64`.
@@ -162,11 +176,11 @@ Supported targets: `macosArm64`, `macosX64`, `linuxX64`, `linuxArm64`, `mingwX64
 ## Testing
 
 ```bash
-# Every suite available on the current host
-./gradlew allTests
+# Everything CI runs: compile, style and every suite on this host
+./gradlew build
 
 # A single module
-./gradlew :basalt-protocol:nativeTest
+./gradlew :basalt-protocol:macosArm64Test
 ```
 
 Native tests only run on their matching host. Beyond unit tests, parity is checked
@@ -187,16 +201,28 @@ Use the included wrapper rather than a system Gradle installation.
 
 | Area | Status |
 |---|---|
-| Build and project layout | In progress |
-| Core platform (sockets, buffers, compression, crypto) | Not started |
-| NBT and component model | Not started |
-| Vanilla RNG parity | Not started |
-| Protocol and login | Not started |
-| World, entities and gameplay parity | Not started |
-| Asset downloader and datapack engine | Not started |
-| BSMod and Lua integration | Not started |
+| Build, module layout and cross-platform CI | Working |
+| Core platform (sockets, buffers, zlib/zstd/gzip, crypto) | Working |
+| NBT, SNBT and the component model | Working |
+| Vanilla RNG parity (LCG, xoroshiro, gaussian, positional) | Working |
+| Protocol, handshake, login, configuration and play | Working |
+| Online mode: encryption, Mojang session, profiles | Working |
+| Official asset download and the EULA flow | Working |
+| World storage: Linear regions, with Anvil worlds read on load | Working |
+| World generation: density router, surface rules, biomes, decoration | In progress |
+| Structures | Plains villages only |
+| Entities | Skeleton only: an ECS store and a movement system |
+| Gameplay parity (redstone, mobs, combat, inventories) | Not started |
+| Datapack execution (loot tables, recipes, advancements) | Not started |
+| BSMod and the Lua runtime | Not started |
 | Tooling (CLI, VS Code, IntelliJ) | Not started |
-| Legacy client and Bedrock support | Not started |
+| Older Java clients (`basalt-multiversion`) | Not started |
+| Bedrock clients (`basalt-bedrock`) | Not started |
+| Bukkit compatibility | Out of scope until BSMod is stable |
+
+What that adds up to today: a real client connects, authenticates, spawns in a
+generated world, flies around while chunks stream in, breaks blocks, chats, and
+sees other players do the same. Everything below that line is still missing.
 
 ## Roadmap
 
@@ -215,7 +241,7 @@ Use the included wrapper rather than a system Gradle installation.
 
 ## License
 
-Basalt is distributed under the [GNU General Public License v3.0](LICENSE).
+Basalt Server is distributed under the [GNU General Public License v3.0](LICENSE).
 
 Basalt is not affiliated with Mojang Studios or Microsoft. Minecraft is a
 trademark of Mojang Studios.
