@@ -588,9 +588,6 @@ public class ClientSession(
         for (chunk in loginChunks) sendChunk(chunk)
         sendCompressed(ChunkBatchFinishedPacket.ID) { ChunkBatchFinishedPacket(loginChunks.size).write(it) }
 
-        // Everything after the initial view streams from this connection's own outbound loop.
-        startOutboundLoop()
-
         for (other in others) {
             other.connection.sendPlayPacket(PlayerInfoAddPacket.ID) {
                 PlayerInfoAddPacket(
@@ -612,6 +609,12 @@ public class ClientSession(
                 ).write(it)
             }
         }
+
+        // Last, once the whole join sequence is on the wire. Started any earlier and this thread
+        // interleaves chunk batches with the packets still being sent to finish joining, which a
+        // client reads as a protocol desync; it only shows up when the machine is slow enough for
+        // the two to overlap.
+        startOutboundLoop()
     }
 
     private fun sendChunk(chunk: Chunk) {
