@@ -17,6 +17,14 @@ max-players = 20
 # Verify players against Mojang's session server. Disabling this accepts any
 # claimed username with no verification (vanilla's "cracked" mode).
 online-mode = true
+# Game mode new players join in: survival, creative, adventure or spectator.
+gamemode = "survival"
+# Player names with operator rights. Vanilla keeps these in ops.json; Basalt keeps
+# every setting in this one file. `op <name>` at the console adds a name here,
+# `deop <name>` removes it.
+operators = []
+# Permission level operators get, on vanilla's own 1-4 scale: 4 is full access.
+op-permission-level = 4
 
 [network]
 # Reserved for future network tuning (compression threshold, rate limits).
@@ -24,6 +32,9 @@ online-mode = true
 [world]
 # Name of the default world.
 name = "world"
+# peaceful, easy, normal or hard. Decides whether hunger can starve you and how
+# far down it can take you.
+difficulty = "easy"
 # Radius, in chunks, sent to a client around its own position (vanilla's own
 # server.properties default is 10).
 view-distance = 10
@@ -67,7 +78,11 @@ public data class BasaltConfig(
     public val motd: String,
     public val maxPlayers: Int,
     public val onlineMode: Boolean,
+    public val gamemode: String,
+    public val operators: List<String>,
+    public val opPermissionLevel: Int,
     public val worldName: String,
+    public val difficulty: String,
     public val viewDistance: Int,
     public val saveIntervalSeconds: Int,
     public val logLevel: LogLevel,
@@ -83,7 +98,11 @@ public data class BasaltConfig(
                 motd = "A Basalt Server",
                 maxPlayers = 20,
                 onlineMode = true,
+                gamemode = "survival",
+                operators = emptyList(),
+                opPermissionLevel = 4,
                 worldName = "world",
+                difficulty = "easy",
                 viewDistance = 10,
                 saveIntervalSeconds = 30,
                 logLevel = LogLevel.INFO,
@@ -128,7 +147,12 @@ public data class BasaltConfig(
                 motd = server?.stringOrNull("motd") ?: DEFAULT.motd,
                 maxPlayers = server?.intOrNull("max-players")?.toInt() ?: DEFAULT.maxPlayers,
                 onlineMode = server?.boolOrNull("online-mode") ?: DEFAULT.onlineMode,
+                gamemode = server?.stringOrNull("gamemode") ?: DEFAULT.gamemode,
+                operators = server?.stringListOrNull("operators") ?: DEFAULT.operators,
+                opPermissionLevel =
+                    server?.intOrNull("op-permission-level")?.toInt()?.coerceIn(0, 4) ?: DEFAULT.opPermissionLevel,
                 worldName = world?.stringOrNull("name") ?: DEFAULT.worldName,
+                difficulty = world?.stringOrNull("difficulty") ?: DEFAULT.difficulty,
                 viewDistance = world?.intOrNull("view-distance")?.toInt() ?: DEFAULT.viewDistance,
                 saveIntervalSeconds =
                     world?.intOrNull("save-interval-seconds")?.toInt()?.coerceAtLeast(0)

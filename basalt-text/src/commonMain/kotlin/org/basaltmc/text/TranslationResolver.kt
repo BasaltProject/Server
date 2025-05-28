@@ -9,14 +9,35 @@ public class TranslationFormatException(
 private val FORMAT_PATTERN = Regex("""%(?:(\d+)\$)?([A-Za-z%]|$)""")
 
 /**
- * Resolves a [Component.Translatable] into plain text using [table], mirroring vanilla's
- * `TranslatableContents.decompose`/`decomposeTemplate`. Vanilla's format string is a small, strict
- * subset of `String.format`: `%s`, `%N$s`, and `%%` for a literal percent, everything else
- * (`%d`, a bare trailing `%`...) is unsupported and throws exactly like the real client would fail
- * to render it, rather than silently producing something plausible-looking but wrong. Component
- * args are flattened to plain text first, recursively.
+ * Flattens any component to plain text, resolving every translation in it (arguments and children
+ * included) through [table]. What [PlainTextSerializer] does, except that a translatable renders as
+ * the sentence a player would read rather than as its key.
+ *
+ * This is how the server console prints the same messages it sends to clients: the client resolves
+ * keys itself against its own language, so the console has to resolve them here or print keys.
  */
-public fun Component.Translatable.resolvePlainText(table: LangTable): String {
+public fun Component.resolvePlainText(table: LangTable): String {
+    val sb = StringBuilder()
+    when (val component = this) {
+        is Component.Text -> sb.append(component.content)
+        is Component.Translatable -> sb.append(component.resolveTemplate(table))
+        is Component.Keybind -> sb.append(component.key)
+        is Component.Score -> sb.append(component.name)
+        is Component.Selector -> sb.append(component.pattern)
+    }
+    for (child in children) sb.append(child.resolvePlainText(table))
+    return sb.toString()
+}
+
+/**
+ * Resolves a [Component.Translatable]'s own template (not its children) into plain text using
+ * [table], mirroring vanilla's `TranslatableContents.decompose`/`decomposeTemplate`. Vanilla's
+ * format string is a small, strict subset of `String.format`: `%s`, `%N$s`, and `%%` for a literal
+ * percent, everything else (`%d`, a bare trailing `%`...) is unsupported and throws exactly like
+ * the real client would fail to render it, rather than silently producing something
+ * plausible-looking but wrong. Arguments are resolved recursively.
+ */
+public fun Component.Translatable.resolveTemplate(table: LangTable): String {
     val format = table.getOrDefault(key, fallback ?: key)
     val result = StringBuilder()
     var replacementIndex = 0
@@ -35,7 +56,7 @@ public fun Component.Translatable.resolvePlainText(table: LangTable): String {
             val index = if (positionalIndex.isNotEmpty()) positionalIndex.toInt() - 1 else replacementIndex++
             val arg =
                 args.getOrNull(index) ?: throw TranslationFormatException("Invalid index $index requested for '$key'")
-            result.append(PlainTextSerializer.serialize(arg))
+            result.append(arg.resolvePlainText(table))
         }
         current = match.range.last + 1
     }

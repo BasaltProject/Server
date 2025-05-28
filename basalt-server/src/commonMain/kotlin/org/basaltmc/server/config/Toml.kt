@@ -47,6 +47,10 @@ public sealed interface TomlValue {
 
         public fun boolOrNull(key: String): Boolean? = (entries[key] as? Bool)?.value
 
+        /** An array of strings, skipping any entry that is not one, so one bad element is not one bad file. */
+        public fun stringListOrNull(key: String): List<String>? =
+            (entries[key] as? Arr)?.values?.mapNotNull { (it as? Str)?.value }
+
         public fun keys(): Set<String> = entries.keys
     }
 }

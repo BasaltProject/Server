@@ -30,6 +30,29 @@ class LangAssetsTest {
     }
 
     @Test
+    fun theCachedLoaderExtractsFromTheJarOnceAndReadsTheExtractedFileAfterwards() {
+        val versionDir = "./basalt_lang_assets_test_version"
+        FileIO.createDirectories(versionDir)
+        FileIO.writeBytes("$versionDir/client.jar", fixtureBytes)
+
+        assertEquals("Stick", LangAssets.loadCachedOrEmpty(versionDir).getOrDefault("item.minecraft.stick", "?"))
+
+        // The jar is now irrelevant: the extracted copy is what gets read.
+        platform.posix.remove("$versionDir/client.jar")
+        assertEquals("Stick", LangAssets.loadCachedOrEmpty(versionDir).getOrDefault("item.minecraft.stick", "?"))
+
+        platform.posix.remove("$versionDir/lang/en_us.json")
+        platform.posix.rmdir("$versionDir/lang")
+        platform.posix.rmdir(versionDir)
+    }
+
+    @Test
+    fun theCachedLoaderFallsBackToAnEmptyTableWithNothingCached() {
+        val table = LangAssets.loadCachedOrEmpty("./basalt_lang_assets_test_missing")
+        assertEquals("fallback", table.getOrDefault("item.minecraft.stick", "fallback"))
+    }
+
+    @Test
     fun missingLocaleEntryThrows() {
         FileIO.writeBytes(fakeClientJarPath, fixtureBytes)
         assertFailsWith<AssetException> { LangAssets.load(fakeClientJarPath, locale = "xx_xx") }
