@@ -224,21 +224,6 @@ What that adds up to today: a real client connects, authenticates, spawns in a
 generated world, flies around while chunks stream in, breaks blocks, chats, and
 sees other players do the same. Everything below that line is still missing.
 
-## Roadmap
-
-1. Build system, module layout and cross-platform CI.
-2. Base platform: networking, buffers, compression, encryption, NBT, components,
-   and bit-exact vanilla RNG.
-3. Protocol, handshake and login.
-4. First playable slice: join a world, move, chat.
-5. Official assets, EULA flow and vanilla datapack execution.
-6. World generation and entities, with seed-identical output.
-7. Gameplay parity, system by system.
-8. Performance and scheduler design.
-9. BSMod, the plugin platform.
-10. Legacy client and Bedrock support.
-11. Tooling and ecosystem.
-
 ## License
 
 Basalt Server is distributed under the [GNU General Public License v3.0](LICENSE).
