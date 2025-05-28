@@ -117,7 +117,10 @@ public object FileIO {
         val handle = fopen(path, "rb") ?: return null
         try {
             fseek(handle, 0, SEEK_END)
-            return ftell(handle)
+            // `convert`, not a plain return: `ftell` gives a 64-bit `Long` on POSIX and a 32-bit
+            // `Int` on mingw, where `long` is half the width. Removing this "redundant" conversion
+            // compiles fine everywhere except Windows.
+            return ftell(handle).convert()
         } finally {
             fclose(handle)
         }

@@ -7,6 +7,7 @@ import org.basaltmc.io.ByteBuffer
 import org.basaltmc.io.NativeThread
 import org.basaltmc.io.TcpConnection
 import org.basaltmc.io.Zlib
+import org.basaltmc.io.sleepMillis
 import org.basaltmc.protocol.PacketFraming
 import org.basaltmc.protocol.writeVarInt
 import org.basaltmc.server.config.BasaltConfig
@@ -64,7 +65,10 @@ internal fun startTestServer(
                 TcpConnection.connect("127.0.0.1", port).close()
                 return
             } catch (_: Exception) {
-                // not up yet, keep trying
+                // Not up yet. Waiting between attempts rather than spinning: this used to hammer
+                // connect() as fast as one core allowed, which on a two-core CI runner starved the
+                // very server it was waiting for and made the wait a self-fulfilling failure.
+                sleepMillis(50)
             }
         }
         if (attempt < 2) {
