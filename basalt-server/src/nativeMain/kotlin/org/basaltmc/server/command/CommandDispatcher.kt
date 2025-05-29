@@ -3,26 +3,72 @@ package org.basaltmc.server.command
 import org.basaltmc.protocol.play.ArgumentParser
 import org.basaltmc.protocol.play.CommandNodeData
 import org.basaltmc.protocol.play.CommandsPacket
+import org.basaltmc.server.player.PlayerSession
 import org.basaltmc.text.Component
 import org.basaltmc.text.TextColor
 
 /**
- * One parsed command's arguments, keyed by the names its tree declared.
+ * Everything one running command can see: who ran it, its parsed arguments, and the server around it.
  *
- * Values are stored already parsed, so a command body reads `context.player("targets")` rather than
- * re-parsing text. Asking for a name the tree never declared is a bug in the command, not in user
- * input, so it throws rather than returning null.
+ * Values are stored already parsed, so a command body reads `context.get<List<PlayerSession>>
+ * ("targets")` rather than re-parsing text. Asking for a name the tree never declared is a bug in
+ * the command, not in user input, so it throws rather than returning null.
+ *
+ * This is the whole surface a command is written against, which is why reporting and the two
+ * "there has to be a player here" checks live on it rather than being passed around: a [Command]
+ * implementation needs nothing else, including the ones BSMod will eventually contribute.
  */
 public class CommandContext(
     public val source: CommandSource,
-    public val environment: CommandEnvironment,
+    public val dispatcher: CommandDispatcher,
     public val input: String,
     private val arguments: Map<String, Any>,
 ) {
+    public val environment: CommandEnvironment get() = dispatcher.environment
+
     public fun has(name: String): Boolean = name in arguments
 
     @Suppress("UNCHECKED_CAST")
     public fun <T> get(name: String): T = (arguments[name] ?: error("no argument named '$name' in /$input")) as T
+
+    /**
+     * Reports success, and with [broadcastToAdmins] set also tells every other operator and the
+     * log. Mirrors `CommandSourceStack.sendSuccess`, whose boolean means the same thing.
+     */
+    public fun success(
+        message: Component,
+        broadcastToAdmins: Boolean = false,
+    ) {
+        dispatcher.feedback.success(source, message, broadcastToAdmins)
+    }
+
+    /** parity: `CommandSourceStack.getPlayerOrException`, for forms that act on "you" as a player. */
+    public fun requirePlayer(): PlayerSession =
+        source.player ?: throw CommandSyntaxException(Component.translatable("permissions.requires.player"))
+
+    /** parity: `CommandSourceStack.getEntityOrException`, for forms that act on "you" as an entity. */
+    public fun requireEntity(): PlayerSession =
+        source.player ?: throw CommandSyntaxException(Component.translatable("permissions.requires.entity"))
+}
+
+/**
+ * One command, as a class: its name, the permission it needs, its aliases, and the tree it builds.
+ *
+ * Vanilla gives every command its own class under `net.minecraft.server.commands` and this follows
+ * that split, one file each, for the same reason: a command is a self-contained unit of behaviour
+ * and reads better next to nothing else. It is also the shape BSMod needs later, since a plugin
+ * contributing a command should have exactly this to fill in and nothing more.
+ *
+ * [aliases] are registered as brigadier redirects onto this command's own node, not as copies, so
+ * `/tp` really is `/teleport` rather than a second tree that can drift from it.
+ */
+public abstract class Command(
+    public val name: String,
+    public val permissionLevel: Int = PermissionLevel.ALL,
+    public val aliases: List<String> = emptyList(),
+) {
+    /** Builds this command's arguments and sub-commands onto its own (already named) root node. */
+    public abstract fun build(root: CommandNodeBuilder)
 }
 
 /** A command body. Returns vanilla's "result" integer, which is what `/execute store` reads. */
@@ -116,8 +162,21 @@ public class CommandDispatcher(
     public val environment: CommandEnvironment,
 ) {
     private val root = RootNode()
-    private val feedback = CommandFeedback(environment)
+    internal val feedback: CommandFeedback = CommandFeedback(environment)
 
+    /** Registers [command] and every alias it declares. The shape all real commands use. */
+    public fun register(command: Command): LiteralNode {
+        val node = LiteralNode(command.name)
+        // Before build(), so children inherit it: a sub-command is never easier to reach than the
+        // command it belongs to.
+        node.requiredLevel = command.permissionLevel
+        command.build(CommandNodeBuilder(node))
+        root.children.add(node)
+        for (alias in command.aliases) registerAlias(alias, node)
+        return node
+    }
+
+    /** The lower-level form, for a tree built inline rather than by a [Command]. */
     public fun register(
         name: String,
         build: CommandNodeBuilder.() -> Unit,
@@ -155,7 +214,7 @@ public class CommandDispatcher(
             val executor =
                 parsed.executor
                     ?: throw reader.syntaxError(UNKNOWN_COMMAND)
-            executor.run(CommandContext(source, environment, input, parsed.arguments))
+            executor.run(CommandContext(source, this, input, parsed.arguments))
         } catch (e: CommandSyntaxException) {
             reportSyntaxError(source, e)
             0
