@@ -23,6 +23,7 @@ include(
     ":basalt-protocol",
     ":basalt-registry",
     ":basalt-world",
+    ":basalt-storage",
     ":basalt-entity",
     ":basalt-server",
     ":basalt-assets",

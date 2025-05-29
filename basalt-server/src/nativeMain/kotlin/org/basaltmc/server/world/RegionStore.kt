@@ -24,9 +24,20 @@ import kotlin.time.TimeSource
  * needs the same lock, never got a turn: the server quietly stopped saving and unloading at all.
  */
 public class RegionStore(
-    private val worldName: String,
+    worldName: String,
     private val dimension: String,
+    worldsRoot: String = WORLDS_ROOT,
 ) {
+    /**
+     * Where this world's files live: `worlds/<name>/`, and nothing outside it belongs to this world.
+     *
+     * Player state deliberately does not live here (it is in `players.db`, beside `worlds/`, not
+     * inside any of them). That is the whole point of the layout: vanilla writes
+     * `playerdata/<uuid>.dat` into the world directory, which is why a world cannot be deleted,
+     * copied or reset there without taking everyone's inventory with it. Here, deleting this
+     * directory deletes exactly one world.
+     */
+    private val worldRoot: String = "$worldsRoot/$worldName"
     private val mutex = NativeMutex()
 
     /** Insertion-ordered, used as an LRU: re-inserting on access moves an entry to the back. */
@@ -45,7 +56,7 @@ public class RegionStore(
     public fun regionPath(
         regionX: Int,
         regionZ: Int,
-    ): String = "$worldName/dimensions/minecraft/$dimension/region/r.$regionX.$regionZ.linear"
+    ): String = "$worldRoot/dimensions/minecraft/$dimension/region/r.$regionX.$regionZ.linear"
 
     /** Returns `null` if this chunk has never been saved, meaning it still needs to be generated. */
     public fun loadChunk(
@@ -178,3 +189,6 @@ public class RegionStore(
         fun regionZ(key: Long): Int = (key shr 32).toInt()
     }
 }
+
+/** Every world lives under this directory, and nothing else does. */
+public const val WORLDS_ROOT: String = "worlds"

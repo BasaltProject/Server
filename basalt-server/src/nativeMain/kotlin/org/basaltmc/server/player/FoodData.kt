@@ -53,6 +53,18 @@ public class FoodData {
         saturationLevel = saturation
     }
 
+    /** Puts back exactly what was persisted, exhaustion included: a rejoin should not reset the hunger clock. */
+    public fun restore(
+        food: Int,
+        saturation: Float,
+        exhaustion: Float,
+    ) {
+        foodLevel = food
+        saturationLevel = saturation
+        exhaustionLevel = exhaustion
+        tickTimer = 0
+    }
+
     public fun reset() {
         foodLevel = MAX_FOOD
         saturationLevel = DEFAULT_SATURATION

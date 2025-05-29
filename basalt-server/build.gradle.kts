@@ -9,6 +9,7 @@ kotlin {
         commonMain.dependencies {
             api(project(":basalt-common"))
             api(project(":basalt-world"))
+            api(project(":basalt-storage"))
             api(project(":basalt-entity"))
             api(project(":basalt-registry"))
             api(project(":basalt-protocol"))

@@ -1,10 +1,19 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.dsl.ExplicitApiMode
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import java.io.File
 
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
     id("org.jlleitschuh.gradle.ktlint")
+}
+
+// Generated sources are not ours to format: SQLDelight writes its own style and reformatting it
+// would be undone on the next build anyway.
+ktlint {
+    filter {
+        exclude { it.file.absolutePath.replace(File.separatorChar, '/').contains("/build/generated/") }
+    }
 }
 
 kotlin {

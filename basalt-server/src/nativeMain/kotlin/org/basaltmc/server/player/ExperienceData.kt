@@ -69,6 +69,17 @@ public class ExperienceData {
         progress = (value / needed).coerceIn(0f, (needed - 1f) / needed)
     }
 
+    /** Puts back exactly what was persisted. Unlike [setLevels] this also restores the running total. */
+    public fun restore(
+        level: Int,
+        progress: Float,
+        total: Int,
+    ) {
+        this.level = level
+        this.progress = progress
+        this.total = total
+    }
+
     public fun reset() {
         level = 0
         progress = 0f

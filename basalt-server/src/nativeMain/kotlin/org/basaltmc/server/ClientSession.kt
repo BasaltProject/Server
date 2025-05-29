@@ -93,6 +93,7 @@ import org.basaltmc.server.command.CommandDispatcher
 import org.basaltmc.server.command.PlayerCommandSource
 import org.basaltmc.server.player.Difficulty
 import org.basaltmc.server.player.FoodData
+import org.basaltmc.server.player.PlayerPersistence
 import org.basaltmc.server.player.PlayerRegistry
 import org.basaltmc.server.player.PlayerSession
 import org.basaltmc.server.registry.VanillaBiomes
@@ -100,6 +101,8 @@ import org.basaltmc.server.registry.VanillaRegistryData
 import org.basaltmc.server.registry.VanillaTagData
 import org.basaltmc.server.world.ChunkGenerationQueue
 import org.basaltmc.server.world.WorldState
+import org.basaltmc.storage.PlayerStore
+import org.basaltmc.storage.StoredPlayer
 import org.basaltmc.text.Component
 import org.basaltmc.text.LangTable
 import org.basaltmc.text.TextColor
@@ -153,6 +156,8 @@ public class ClientSession(
     private val commands: CommandDispatcher? = null,
     private val defaultGamemode: Gamemode = Gamemode.SURVIVAL,
     private val difficulty: Difficulty = Difficulty.EASY,
+    private val playerStore: PlayerStore? = null,
+    private val worldName: String = "world",
 ) {
     private val logger = Logger("Session")
 
@@ -163,6 +168,11 @@ public class ClientSession(
     private val incoming = ByteBuffer()
     private var state = ProtocolState.HANDSHAKE
     private var lastPacketId = -1
+
+    // Persisted counters, carried across sessions. Play time is counted by the same 20 Hz loop that
+    // ticks hunger, so it is ticks played rather than wall-clock time connected.
+    private var firstSeenEpochSeconds = 0L
+    private var playTimeTicks = 0L
     private var compressionEnabled = false
 
     private var pendingUsername: String? = null
@@ -538,6 +548,15 @@ public class ClientSession(
         session.y = spawnY
         session.z = spawnZ
         session.flying = defaultGamemode == Gamemode.SPECTATOR
+        // Before a single packet goes out: the login packet carries the game mode and the position,
+        // so restoring afterwards would mean announcing one state and then correcting it.
+        val stored = playerStore?.players?.load(session.uuid.toString())
+        if (stored != null) {
+            PlayerPersistence.restore(session, stored)
+            firstSeenEpochSeconds = stored.firstSeenEpochSeconds
+            playTimeTicks = stored.playTimeTicks
+            logger.info { "Loaded ${session.name} from players.db (last seen ${stored.lastSeenEpochSeconds})." }
+        }
         playerSession = session
 
         sendCompressed(LoginPlayPacket.ID) {
@@ -565,8 +584,8 @@ public class ClientSession(
 
         // Without these, a real client's "loading terrain" screen never dismisses: it has no
         // center to count chunks around and no radius to know when it has enough (confirmed live).
-        centerChunkX = spawnX.toInt() shr 4
-        centerChunkZ = spawnZ.toInt() shr 4
+        centerChunkX = session.x.toInt() shr 4
+        centerChunkZ = session.z.toInt() shr 4
         viewRadius = chunkRadius
         // Seeds the tracker with exactly the square about to be sent below, so later crossings
         // compute deltas relative to it instead of re-sending everything as "newly loaded" on the
@@ -589,7 +608,18 @@ public class ClientSession(
             ).write(it)
         }
         sendCompressed(PlayerPositionPacket.ID) {
-            PlayerPositionPacket(0, spawnX, spawnY, spawnZ, 0.0, 0.0, 0.0, 0f, 0f, relativeFlags = 0).write(it)
+            PlayerPositionPacket(
+                0,
+                session.x,
+                session.y,
+                session.z,
+                0.0,
+                0.0,
+                0.0,
+                session.yaw,
+                session.pitch,
+                relativeFlags = 0,
+            ).write(it)
         }
 
         val others = registry.snapshot()
@@ -1054,6 +1084,7 @@ public class ClientSession(
      */
     private fun tickPlayer() {
         val session = playerSession ?: return
+        playTimeTicks++
         if (session.dead) return
         if (session.gamemode == Gamemode.CREATIVE || session.gamemode == Gamemode.SPECTATOR) return
 
@@ -1137,7 +1168,18 @@ public class ClientSession(
 
         sendCompressed(RespawnPacket.ID) { RespawnPacket(spawnInfo(session.gamemode), dataToKeep = 0).write(it) }
         sendCompressed(PlayerPositionPacket.ID) {
-            PlayerPositionPacket(0, spawnX, spawnY, spawnZ, 0.0, 0.0, 0.0, 0f, 0f, relativeFlags = 0).write(it)
+            PlayerPositionPacket(
+                0,
+                session.x,
+                session.y,
+                session.z,
+                0.0,
+                0.0,
+                0.0,
+                session.yaw,
+                session.pitch,
+                relativeFlags = 0,
+            ).write(it)
         }
         sendCompressed(SpawnPositionPacket.ID) {
             SpawnPositionPacket(
@@ -1257,6 +1299,9 @@ public class ClientSession(
     private fun leavePlayIfPresent() {
         val session = playerSession ?: return
         val registry = playerRegistry ?: return
+        // Before removing them from the registry, so a save triggered elsewhere cannot race this
+        // one into writing a player who is already half gone.
+        savePlayerState()
         registry.remove(session.uuid)
         logger.info { "${session.name} left the game" }
         for (other in registry.snapshot()) {
@@ -1264,6 +1309,28 @@ public class ClientSession(
                 PlayerInfoRemovePacket.ID,
             ) { PlayerInfoRemovePacket(listOf(session.uuid)).write(it) }
         }
+    }
+
+    /**
+     * Writes this player's row. Called on logout and from the periodic flush.
+     *
+     * Failures are logged and swallowed: a database that cannot be written is a serious problem,
+     * but taking the connection down over it loses the session as well as the save.
+     */
+    internal fun savePlayerState() {
+        val session = playerSession ?: return
+        val store = playerStore ?: return
+        runCatching {
+            store.players.save(
+                PlayerPersistence.toStored(session, worldName, firstSeenEpochSeconds, playTimeTicks),
+            )
+        }.onFailure { logger.error(it) { "Failed to save ${session.name}" } }
+    }
+
+    /** This player's row as it stands right now, for the batched periodic flush. */
+    internal fun storedSnapshot(): StoredPlayer? {
+        val session = playerSession ?: return null
+        return PlayerPersistence.toStored(session, worldName, firstSeenEpochSeconds, playTimeTicks)
     }
 
     /**
