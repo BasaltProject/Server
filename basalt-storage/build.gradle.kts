@@ -26,10 +26,8 @@ kotlin {
         }
         nativeMain.dependencies {
             implementation(libs.sqldelight.native.driver)
-        }
-        nativeTest.dependencies {
-            // Only the tests need it: gzip is the transport vanilla's player files come wrapped in,
-            // and this module deliberately takes the decompressor as a parameter instead of linking one.
+            // For file paths only. Gzip, the transport vanilla's player files come wrapped in,
+            // stays a parameter: this module does not choose a compressor for its callers.
             implementation(project(":basalt-io"))
         }
     }

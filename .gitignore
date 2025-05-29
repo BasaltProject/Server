@@ -31,11 +31,18 @@ gradle-app.setting
 # macOS
 .DS_Store
 
-# Local server data (never committed, generated at runtime)
+# Local server data, generated at runtime and never committed. These are patterns rather than
+# exact paths on purpose: the earlier list named `basalt_server_test_world/` and `/world/`, which
+# matched neither `basalt-server/basalt_server_test_world_39566/` nor the current `worlds/` layout,
+# so test worlds and player databases were committed for several releases without anyone noticing.
+# Tests now write under build/ instead, and these are the net that catches the next mistake.
 eula.txt
 basalt.toml
 .basalt/
-/world/
-/logs/
-basalt_server_test_world/
-basalt_asset_cache_test/
+logs/
+worlds/
+world/
+*.linear
+*.db
+*.db-shm
+*.db-wal

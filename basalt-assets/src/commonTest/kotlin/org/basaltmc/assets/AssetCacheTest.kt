@@ -14,7 +14,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class AssetCacheTest {
-    private val cacheRoot = "./basalt_asset_cache_test"
+    private val cacheRoot = "build/test-data/asset_cache"
 
     // sha1("hello world jar bytes") = e275da018ffa54b2b0082d257e7da2e359e36a93
     private val validBytes = "hello world jar bytes".encodeToByteArray()

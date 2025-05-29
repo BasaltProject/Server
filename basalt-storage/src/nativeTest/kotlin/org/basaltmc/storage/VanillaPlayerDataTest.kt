@@ -107,7 +107,7 @@ class VanillaPlayerDataTest {
 
     @Test
     fun anImportedPlayerCanBeSavedAndReadBack() {
-        val path = "./basalt_import_test.db"
+        val path = "build/test-data/import_test.db"
         PlayerStore.open(path).use { it.players.save(imported) }
         val loaded = PlayerStore.open(path).use { it.players.load(imported.uuid) }
         assertEquals(imported, loaded)

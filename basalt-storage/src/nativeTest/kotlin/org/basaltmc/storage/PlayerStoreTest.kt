@@ -113,7 +113,7 @@ class InventoryNbtTest {
 }
 
 class PlayerStoreTest {
-    private val path = "./basalt_players_test.db"
+    private val path = "build/test-data/players_test.db"
     private val artefacts = listOf(path, "$path-wal", "$path-shm")
 
     @AfterTest
