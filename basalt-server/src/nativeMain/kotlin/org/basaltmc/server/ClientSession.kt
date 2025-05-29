@@ -61,9 +61,9 @@ import org.basaltmc.protocol.play.PlayDisconnectPacket
 import org.basaltmc.protocol.play.PlayKeepAlivePacket
 import org.basaltmc.protocol.play.PlayerCombatKillPacket
 import org.basaltmc.protocol.play.PlayerCommandPacket
-import org.basaltmc.protocol.play.PlayerInfoAddPacket
 import org.basaltmc.protocol.play.PlayerInfoEntry
 import org.basaltmc.protocol.play.PlayerInfoRemovePacket
+import org.basaltmc.protocol.play.PlayerInfoUpdatePacket
 import org.basaltmc.protocol.play.PlayerLoadedPacket
 import org.basaltmc.protocol.play.PlayerPositionPacket
 import org.basaltmc.protocol.play.RespawnPacket
@@ -162,6 +162,7 @@ public class ClientSession(
     private val sendMutex = NativeMutex()
     private val incoming = ByteBuffer()
     private var state = ProtocolState.HANDSHAKE
+    private var lastPacketId = -1
     private var compressionEnabled = false
 
     private var pendingUsername: String? = null
@@ -239,6 +240,17 @@ public class ClientSession(
             // surfacing: server-list pings in particular reset the socket the instant they have
             // their answer. Letting it escape logged an uncaught-exception line on every ping.
             logger.debug { "Connection closed: ${e.message}" }
+        } catch (e: Exception) {
+            // One malformed (or misunderstood) packet must cost one connection, not the thread that
+            // was reading it. Before this, a decoder that read past the end of a frame escaped as
+            // an uncaught exception on a native thread, which killed the read loop and disconnected
+            // the player with nothing in the log but a stack-trace line. It is logged loudly on
+            // purpose: reaching here is always a bug in a decoder or a hostile client, never
+            // routine, and the id in the message is what identifies which.
+            logger.error(e) {
+                "Dropping ${playerSession?.name ?: "connection"}: " +
+                    "failed to handle packet 0x${lastPacketId.toString(16)} in $state"
+            }
         } finally {
             streaming.value = 0
             leavePlayIfPresent()
@@ -258,6 +270,9 @@ public class ClientSession(
 
     private fun handleFrame(body: ByteBuffer) {
         val packetId = body.readVarInt()
+        // Remembered, not passed around: the only reader is the failure path in [run], and knowing
+        // which packet a decoder died on is the difference between a one-line fix and a hunt.
+        lastPacketId = packetId
         when (state) {
             ProtocolState.HANDSHAKE -> handleHandshake(packetId, body)
             ProtocolState.STATUS -> handleStatus(packetId, body)
@@ -582,11 +597,12 @@ public class ClientSession(
         logger.info { "${session.name} logged in with entity id $entityId at ($spawnX, $spawnY, $spawnZ)" }
         logger.info { "${session.name} joined the game" }
 
-        sendCompressed(PlayerInfoAddPacket.ID) {
-            PlayerInfoAddPacket(
-                others.map { PlayerInfoEntry(it.uuid, it.name, listed = true, latencyMillis = 0) } +
-                    PlayerInfoEntry(session.uuid, session.name, listed = true, latencyMillis = 0),
-            ).write(it)
+        sendCompressed(PlayerInfoUpdatePacket.ID) {
+            PlayerInfoUpdatePacket
+                .initializing(
+                    others.map { PlayerInfoEntry(it.uuid, it.name, listed = true, gamemode = it.gamemode) } +
+                        PlayerInfoEntry(session.uuid, session.name, listed = true, gamemode = session.gamemode),
+                ).write(it)
         }
 
         // The HUD draws no hearts and no experience bar until it has been told what to draw.
@@ -616,10 +632,11 @@ public class ClientSession(
         sendCompressed(ChunkBatchFinishedPacket.ID) { ChunkBatchFinishedPacket(loginChunks.size).write(it) }
 
         for (other in others) {
-            other.connection.sendPlayPacket(PlayerInfoAddPacket.ID) {
-                PlayerInfoAddPacket(
-                    listOf(PlayerInfoEntry(session.uuid, session.name, listed = true, latencyMillis = 0)),
-                ).write(it)
+            other.connection.sendPlayPacket(PlayerInfoUpdatePacket.ID) {
+                PlayerInfoUpdatePacket
+                    .initializing(
+                        listOf(PlayerInfoEntry(session.uuid, session.name, listed = true, gamemode = session.gamemode)),
+                    ).write(it)
             }
             other.connection.sendPlayPacket(EntityTeleportPacket.ID) {
                 EntityTeleportPacket(session.entityId, session.x, session.y, session.z, 0, 0, onGround = true).write(it)
@@ -783,6 +800,12 @@ public class ClientSession(
             AcceptTeleportationPacket.ID,
             PlayKeepAlivePacket.SERVERBOUND_ID,
             PlayerLoadedPacket.ID,
+            // `player_input`: the movement keys currently held, sent on every change. Sneaking
+            // lives here now (it left `player_command`), so this is where crouch exhaustion would
+            // come from if crouching cost anything in 26.2, which it does not. Named rather than
+            // left to fall off the end of this `when` because it is constant traffic, not an
+            // oddity: it arrives many times a second from every client.
+            SERVERBOUND_PLAYER_INPUT_ID,
             -> Unit
         }
     }
@@ -1160,6 +1183,15 @@ public class ClientSession(
             GameEventPacket(GameEventPacket.CHANGE_GAME_MODE, mode.ordinal.toFloat()).write(it)
         }
         sendAbilities()
+        // Broadcast to everyone, this player included, because the game event above only moves the
+        // HUD: a client reads its *own* tab-list entry to decide whether it is a spectator, and
+        // that is what turns off collision and hides it from other players. Sending one without the
+        // other is what left spectator mode looking right and behaving like survival.
+        for (player in playerRegistry?.snapshot().orEmpty()) {
+            player.connection.sendPlayPacket(PlayerInfoUpdatePacket.ID) {
+                PlayerInfoUpdatePacket.gameMode(session.uuid, mode).write(it)
+            }
+        }
     }
 
     internal fun teleportTo(
@@ -1234,11 +1266,26 @@ public class ClientSession(
         }
     }
 
+    /**
+     * Sends to *this* connection from somewhere else: another player's thread broadcasting chat or
+     * movement, a command, the tick loop.
+     *
+     * A write failure here is swallowed on purpose, and only here. The caller is not this
+     * connection's owner and has nothing useful to do about its socket; the owning read loop is
+     * already going to notice the close and run [leavePlayIfPresent]. Letting it propagate meant a
+     * single player who had just disconnected aborted a broadcast partway through, so the players
+     * after them in the list silently never got the message and whoever sent it was told the
+     * command had failed.
+     */
     internal fun sendPlayPacket(
         id: Int,
         writeBody: (ByteBuffer) -> Unit,
     ) {
-        sendCompressed(id, writeBody)
+        try {
+            sendCompressed(id, writeBody)
+        } catch (e: SocketException) {
+            logger.debug { "Dropped a packet for a connection that is already gone: ${e.message}" }
+        }
     }
 
     /**
@@ -1325,6 +1372,9 @@ public class ClientSession(
 
 /** [org.basaltmc.protocol.configuration.ConfigurationKeepAlivePacket]'s id, matched here just to no-op it explicitly. */
 private const val CONFIGURATION_KEEP_ALIVE_ID = 4
+
+/** `ServerboundPlayerInputPacket`'s id, matched here just to no-op it explicitly. */
+private const val SERVERBOUND_PLAYER_INPUT_ID = 0x2b
 
 /**
  * The 10 registries in `RegistryDataLoader.SYNCHRONIZED_REGISTRIES` that nothing sent elsewhere in

@@ -154,9 +154,19 @@ class PlayPacketsTest {
     fun playerInfoAddRoundTrips() {
         val buffer = ByteBuffer()
         val packet =
-            PlayerInfoAddPacket(listOf(PlayerInfoEntry(Uuid.random(), "Steve", listed = true, latencyMillis = 42)))
+            PlayerInfoUpdatePacket.initializing(
+                listOf(
+                    PlayerInfoEntry(
+                        Uuid.random(),
+                        "Steve",
+                        listed = true,
+                        latencyMillis = 42,
+                        gamemode = Gamemode.ADVENTURE,
+                    ),
+                ),
+            )
         packet.write(buffer)
-        assertEquals(packet, PlayerInfoAddPacket.read(buffer))
+        assertEquals(packet, PlayerInfoUpdatePacket.read(buffer))
     }
 
     @OptIn(ExperimentalUuidApi::class)
@@ -361,4 +371,17 @@ private fun writeChatMessage(
     buffer.writeVarInt(packet.offset)
     buffer.writeBytes(packet.acknowledged)
     buffer.writeByte(packet.checksum)
+
+    @Test
+    fun aGameModeOnlyPlayerInfoUpdateCarriesJustThatField() {
+        val buffer = ByteBuffer()
+        val uuid = Uuid.random()
+        val packet = PlayerInfoUpdatePacket.gameMode(uuid, Gamemode.SPECTATOR)
+        packet.write(buffer)
+
+        // One action bit (update_game_mode is ordinal 2), one entry: uuid then the mode, nothing else.
+        assertEquals(packet, PlayerInfoUpdatePacket.read(ByteBuffer().also { it.writeBytes(buffer.toByteArray()) }))
+        assertEquals(setOf(PlayerInfoUpdatePacket.Action.UPDATE_GAME_MODE), packet.actions)
+        assertEquals(0b100, buffer.readByte().toInt())
+    }
 }

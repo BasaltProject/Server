@@ -24,8 +24,8 @@ public class CommandEnvironment(
     public val stopServer: () -> Unit = {},
     /**
      * What the console reads messages with. Clients resolve translation keys themselves against
-     * their own language, so this only exists so the log shows sentences instead of keys; an empty
-     * table degrades to printing the keys, which is what happens when no `client.jar` is cached.
+     * their own language, so this exists only so the log shows sentences instead of keys; an empty
+     * table degrades to printing the keys rather than failing.
      */
     public val lang: LangTable = LangTable.EMPTY,
 ) {

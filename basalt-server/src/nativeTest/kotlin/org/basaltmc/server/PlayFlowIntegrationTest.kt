@@ -24,8 +24,9 @@ import org.basaltmc.protocol.play.ForgetLevelChunkPacket
 import org.basaltmc.protocol.play.GameEventPacket
 import org.basaltmc.protocol.play.LoginPlayPacket
 import org.basaltmc.protocol.play.MapChunkPacket
-import org.basaltmc.protocol.play.PlayerInfoAddPacket
+import org.basaltmc.protocol.play.PlayerInfoUpdatePacket
 import org.basaltmc.protocol.play.PlayerPositionPacket
+import org.basaltmc.protocol.play.ServerboundPlayerActionPacket
 import org.basaltmc.protocol.play.ServerboundPositionPacket
 import org.basaltmc.protocol.play.SetChunkCacheCenterPacket
 import org.basaltmc.protocol.play.SetChunkCacheRadiusPacket
@@ -158,8 +159,8 @@ class PlayFlowIntegrationTest {
         assertEquals(PlayerPositionPacket.ID, playerPositionBody.readVarInt())
 
         val playerInfoBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(PlayerInfoAddPacket.ID, playerInfoBody.readVarInt())
-        val playerInfo = PlayerInfoAddPacket.read(playerInfoBody)
+        assertEquals(PlayerInfoUpdatePacket.ID, playerInfoBody.readVarInt())
+        val playerInfo = PlayerInfoUpdatePacket.read(playerInfoBody)
         assertTrue(playerInfo.entries.any { it.name == name })
 
         val healthBody = readFrame(connection, incoming, compressionEnabled = true)
@@ -213,10 +214,10 @@ class PlayFlowIntegrationTest {
 
         // Alice sees Bob join: a player_info add, then a teleport placing him at spawn.
         val aliceSeesBobInfoBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
-        assertEquals(PlayerInfoAddPacket.ID, aliceSeesBobInfoBody.readVarInt())
+        assertEquals(PlayerInfoUpdatePacket.ID, aliceSeesBobInfoBody.readVarInt())
         assertEquals(
             "Bob",
-            PlayerInfoAddPacket
+            PlayerInfoUpdatePacket
                 .read(aliceSeesBobInfoBody)
                 .entries
                 .single()
@@ -304,6 +305,13 @@ class PlayFlowIntegrationTest {
         assertEquals(20.0, aliceMoved.x)
         assertEquals(20.0, aliceMoved.z)
 
+        // A real client sends `player_input` (0x2b) many times a second, and its body is a single
+        // byte. Decoding it as something longer read past the end of the frame, which escaped the
+        // read loop as an uncaught exception and disconnected the player: the session has to
+        // survive traffic it does not act on, whether it understands it or not.
+        sendCompressed(alice.connection, SERVERBOUND_PLAYER_INPUT_ID, alice.threshold) {
+            it.writeByte(0x01)
+        }
         // "chatea": Alice's chat reaches both herself and Bob.
         sendCompressed(alice.connection, ChatMessagePacket.ID, alice.threshold) {
             it.writeProtocolString("hello world", 256)
@@ -364,7 +372,41 @@ class PlayFlowIntegrationTest {
                 .contains("Unknown command"),
         )
 
+        // A syntax failure is two messages, not one: the error, then the grey line marking where
+        // the parser stopped. Vanilla sends both, so both have to be on the wire.
+        val contextBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
+        assertEquals(SystemChatPacket.ID, contextBody.readVarInt())
+        assertTrue(
+            SystemChatPacket
+                .read(contextBody)
+                .content
+                .toString()
+                .contains("command.context.here"),
+        )
+
+        // A deliberately truncated frame from Bob: a decoder that runs off the end of one costs
+        // that one connection and nothing else. Alice, on her own thread, keeps playing.
+        sendCompressed(bob.connection, ServerboundPlayerActionPacket.ID, bob.threshold) {
+            it.writeVarInt(0)
+        }
+
+        sendCompressed(alice.connection, ChatCommandPacket.ID, alice.threshold) {
+            it.writeProtocolString("me is still here", 256)
+        }
+        val survivorBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
+        assertEquals(SystemChatPacket.ID, survivorBody.readVarInt())
+        assertTrue(
+            SystemChatPacket
+                .read(survivorBody)
+                .content
+                .toString()
+                .contains("is still here"),
+        )
+
         alice.connection.close()
         bob.connection.close()
     }
 }
+
+/** `ServerboundPlayerInputPacket`'s id, which this server no-ops but every real client sends constantly. */
+private const val SERVERBOUND_PLAYER_INPUT_ID = 0x2b

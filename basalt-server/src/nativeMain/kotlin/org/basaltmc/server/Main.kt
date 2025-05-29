@@ -106,9 +106,8 @@ public fun main(args: Array<String>) {
         )
 
     val onlineMode = if (config.onlineMode) OnlineMode(SessionKeyPair.generate(), MojangSessionService()) else null
-    // Console-only: clients translate for themselves. Never downloaded on our account (see
-    // LangAssets), so without a cached client.jar the console prints translation keys instead of
-    // sentences, which is a cosmetic gap and not a failure.
+    // Console-only: clients translate for themselves, a log file cannot. Unpacked from the same
+    // server.jar as everything else, so this costs no extra download.
     val lang = LangAssets.loadCachedOrEmpty(dataRoot)
     BasaltServer(config, onlineMode, overworldRouter, surfaceEnvironment, villageGenerator, WORLD_SEED, lang)
         .start(startedAt)

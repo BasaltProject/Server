@@ -613,54 +613,119 @@ public data class SetSimulationDistancePacket(
     }
 }
 
-/**
- * Clientbound, id 0x46: adds/updates entries in the tab list. Mirrors `ClientboundPlayerInfoUpdatePacket`.
- * Only the `add_player`, `update_listed`, and `update_latency` actions are implemented: the
- * bundle a real vanilla server sends for a freshly joined player. The others (`initialize_chat`,
- * `update_game_mode`, `update_display_name`, `update_hat`, `update_list_order`) are a documented gap.
- */
+/** One tab-list entry. Which of these fields actually travel is decided by the packet's action set. */
 public data class PlayerInfoEntry(
     val uuid: Uuid,
-    val name: String,
-    val listed: Boolean,
-    val latencyMillis: Int,
+    val name: String = "",
+    val listed: Boolean = false,
+    val latencyMillis: Int = 0,
+    val gamemode: Gamemode = Gamemode.SURVIVAL,
 )
 
+/**
+ * Clientbound, id 0x46: adds or updates entries in the tab list. Mirrors
+ * `ClientboundPlayerInfoUpdatePacket`.
+ *
+ * The packet carries a set of [Action]s and, per entry, exactly the fields those actions call for,
+ * written in the enum's own order. The set itself is a fixed-size bitset over that enum, so the
+ * ordinals below are protocol, not bookkeeping.
+ *
+ * [Action.UPDATE_GAME_MODE] is not cosmetic, which is the trap here: a client decides whether *it*
+ * is a spectator by reading its own tab-list entry, not from the `game_event` that changes the game
+ * mode. Send the event alone and the HUD switches to spectator while the player still collides with
+ * the world, because as far as the client is concerned only the HUD changed.
+ *
+ * Not every action is implemented: [Action.INITIALIZE_CHAT], [Action.UPDATE_DISPLAY_NAME],
+ * [Action.UPDATE_LIST_ORDER] and [Action.UPDATE_HAT] are declared here because their positions
+ * define the bitset, but writing one throws rather than guessing a value. Skins and capes
+ * (`add_player`'s profile properties) are the same documented gap they were.
+ */
 @OptIn(ExperimentalUuidApi::class)
-public data class PlayerInfoAddPacket(
+public data class PlayerInfoUpdatePacket(
+    val actions: Set<Action>,
     val entries: List<PlayerInfoEntry>,
 ) {
+    public enum class Action {
+        ADD_PLAYER,
+        INITIALIZE_CHAT,
+        UPDATE_GAME_MODE,
+        UPDATE_LISTED,
+        UPDATE_LATENCY,
+        UPDATE_DISPLAY_NAME,
+        UPDATE_LIST_ORDER,
+        UPDATE_HAT,
+    }
+
     public fun write(buffer: ByteBuffer) {
-        buffer.writeByte(ACTIONS.toByte())
+        buffer.writeByte(actions.fold(0) { bits, action -> bits or (1 shl action.ordinal) }.toByte())
         buffer.writeVarInt(entries.size)
         for (entry in entries) {
             buffer.writeUuid(entry.uuid)
-            buffer.writeProtocolString(entry.name, 16)
-            buffer.writeVarInt(0) // properties (skin, cape): none yet
-            buffer.writeBoolean(entry.listed)
-            buffer.writeVarInt(entry.latencyMillis)
+            for (action in Action.entries) {
+                if (action !in actions) continue
+                when (action) {
+                    Action.ADD_PLAYER -> {
+                        buffer.writeProtocolString(entry.name, 16)
+                        buffer.writeVarInt(0) // profile properties (skin, cape): none yet
+                    }
+                    Action.UPDATE_GAME_MODE -> buffer.writeVarInt(entry.gamemode.ordinal)
+                    Action.UPDATE_LISTED -> buffer.writeBoolean(entry.listed)
+                    Action.UPDATE_LATENCY -> buffer.writeVarInt(entry.latencyMillis)
+                    else -> error("player_info action $action is not implemented")
+                }
+            }
         }
     }
 
     public companion object {
         public const val ID: Int = 0x46
-        private const val ACTIONS = 0b00011001 // add_player | update_listed | update_latency
 
-        public fun read(buffer: ByteBuffer): PlayerInfoAddPacket {
-            val actions = buffer.readByte().toInt() and 0xFF
-            require(actions == ACTIONS) { "Unsupported player_info action set: $actions" }
-            val count = buffer.readVarInt()
+        /**
+         * What vanilla's `createPlayerInitializing` sends for a player who just joined, minus the
+         * actions above that are not implemented. The game mode belongs in here: a player who joins
+         * in creative is a spectator-or-not to everyone else from this packet alone.
+         */
+        public val INITIALIZING: Set<Action> =
+            setOf(Action.ADD_PLAYER, Action.UPDATE_GAME_MODE, Action.UPDATE_LISTED, Action.UPDATE_LATENCY)
+
+        public fun initializing(entries: List<PlayerInfoEntry>): PlayerInfoUpdatePacket =
+            PlayerInfoUpdatePacket(INITIALIZING, entries)
+
+        /** The single-action update vanilla broadcasts to everyone when a player's game mode changes. */
+        public fun gameMode(
+            uuid: Uuid,
+            gamemode: Gamemode,
+        ): PlayerInfoUpdatePacket =
+            PlayerInfoUpdatePacket(
+                setOf(Action.UPDATE_GAME_MODE),
+                listOf(PlayerInfoEntry(uuid, gamemode = gamemode)),
+            )
+
+        public fun read(buffer: ByteBuffer): PlayerInfoUpdatePacket {
+            val bits = buffer.readByte().toInt() and 0xFF
+            val actions = Action.entries.filterTo(mutableSetOf()) { bits and (1 shl it.ordinal) != 0 }
             val entries =
-                List(count) {
-                    val uuid = buffer.readUuid()
-                    val name = buffer.readProtocolString(16)
-                    val propertyCount = buffer.readVarInt()
-                    repeat(propertyCount) { error("player properties are not supported yet") }
-                    val listed = buffer.readBoolean()
-                    val latency = buffer.readVarInt()
-                    PlayerInfoEntry(uuid, name, listed, latency)
+                List(buffer.readVarInt()) {
+                    var entry = PlayerInfoEntry(buffer.readUuid())
+                    for (action in Action.entries) {
+                        if (action !in actions) continue
+                        entry =
+                            when (action) {
+                                Action.ADD_PLAYER -> {
+                                    val name = buffer.readProtocolString(16)
+                                    val propertyCount = buffer.readVarInt()
+                                    repeat(propertyCount) { error("player properties are not supported yet") }
+                                    entry.copy(name = name)
+                                }
+                                Action.UPDATE_GAME_MODE -> entry.copy(gamemode = Gamemode.entries[buffer.readVarInt()])
+                                Action.UPDATE_LISTED -> entry.copy(listed = buffer.readBoolean())
+                                Action.UPDATE_LATENCY -> entry.copy(latencyMillis = buffer.readVarInt())
+                                else -> error("player_info action $action is not implemented")
+                            }
+                    }
+                    entry
                 }
-            return PlayerInfoAddPacket(entries)
+            return PlayerInfoUpdatePacket(actions, entries)
         }
     }
 }

@@ -267,8 +267,9 @@ public class BasaltServer(
 
         // Reported every sweep, not only when something happens: when this server misbehaves it is
         // because one of these numbers climbs without settling, and knowing which one is the whole
-        // diagnosis.
-        logger.info {
+        // diagnosis. At debug level for exactly that reason: it is a diagnostic, and a line every
+        // sweep forever is noise in an operator's console, which is where `info` belongs.
+        logger.debug {
             "Chunks: ${world.loadedChunkCount} loaded, ${generationQueue.pendingCount()} pending, " +
                 "$removed unloaded in ${evictMillis}ms, $dropped request(s) dropped, " +
                 "${world.dirtyChunks().size} unsaved. " + heapReport()
@@ -308,7 +309,9 @@ public class BasaltServer(
                     .toInt(),
             )
         val elapsed = startedAt.elapsedNow().inWholeMilliseconds
-        logger.info {
+        // Debug, like the sweep report it usually sits next to: an autosave every save interval is
+        // routine, and its timing breakdown is for diagnosing a slow save, not for an operator.
+        logger.debug {
             "Saved ${chunks.size} chunk(s) across $written region(s) in ${elapsed}ms " +
                 "(${regions.encodeMillis}ms encoding, ${regions.writeMillis}ms writing, " +
                 "${regions.cachedRegionCount} regions cached, ${world.loadedChunkCount} loaded)."
