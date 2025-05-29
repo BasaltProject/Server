@@ -12,10 +12,13 @@ import org.basaltmc.protocol.login.LoginAcknowledgedPacket
 import org.basaltmc.protocol.login.LoginCompressionPacket
 import org.basaltmc.protocol.login.LoginFinishedPacket
 import org.basaltmc.protocol.login.LoginStartPacket
+import org.basaltmc.protocol.play.ChatCommandPacket
 import org.basaltmc.protocol.play.ChatMessagePacket
 import org.basaltmc.protocol.play.ChunkBatchFinishedPacket
 import org.basaltmc.protocol.play.ChunkBatchReceivedPacket
 import org.basaltmc.protocol.play.ChunkBatchStartPacket
+import org.basaltmc.protocol.play.ClientboundPlayerAbilitiesPacket
+import org.basaltmc.protocol.play.CommandsPacket
 import org.basaltmc.protocol.play.EntityTeleportPacket
 import org.basaltmc.protocol.play.ForgetLevelChunkPacket
 import org.basaltmc.protocol.play.GameEventPacket
@@ -26,6 +29,8 @@ import org.basaltmc.protocol.play.PlayerPositionPacket
 import org.basaltmc.protocol.play.ServerboundPositionPacket
 import org.basaltmc.protocol.play.SetChunkCacheCenterPacket
 import org.basaltmc.protocol.play.SetChunkCacheRadiusPacket
+import org.basaltmc.protocol.play.SetExperiencePacket
+import org.basaltmc.protocol.play.SetHealthPacket
 import org.basaltmc.protocol.play.SetSimulationDistancePacket
 import org.basaltmc.protocol.play.SpawnPositionPacket
 import org.basaltmc.protocol.play.SystemChatPacket
@@ -123,6 +128,17 @@ class PlayFlowIntegrationTest {
         assertEquals(LoginPlayPacket.ID, loginPlayBody.readVarInt())
         val loginPlay = LoginPlayPacket.read(loginPlayBody)
 
+        val abilitiesBody = readFrame(connection, incoming, compressionEnabled = true)
+        assertEquals(ClientboundPlayerAbilitiesPacket.ID, abilitiesBody.readVarInt())
+        ClientboundPlayerAbilitiesPacket.read(abilitiesBody)
+
+        val commandsBody = readFrame(connection, incoming, compressionEnabled = true)
+        assertEquals(CommandsPacket.ID, commandsBody.readVarInt())
+        val commandTree = CommandsPacket.read(commandsBody)
+        // Everyone gets at least the commands that need no permission at all.
+        assertTrue(commandTree.nodes.any { it.name == "help" })
+        assertTrue(commandTree.nodes.any { it.name == "me" })
+
         val chunkCacheCenterBody = readFrame(connection, incoming, compressionEnabled = true)
         assertEquals(SetChunkCacheCenterPacket.ID, chunkCacheCenterBody.readVarInt())
         SetChunkCacheCenterPacket.read(chunkCacheCenterBody)
@@ -145,6 +161,14 @@ class PlayFlowIntegrationTest {
         assertEquals(PlayerInfoAddPacket.ID, playerInfoBody.readVarInt())
         val playerInfo = PlayerInfoAddPacket.read(playerInfoBody)
         assertTrue(playerInfo.entries.any { it.name == name })
+
+        val healthBody = readFrame(connection, incoming, compressionEnabled = true)
+        assertEquals(SetHealthPacket.ID, healthBody.readVarInt())
+        assertEquals(20f, SetHealthPacket.read(healthBody).health)
+
+        val experienceBody = readFrame(connection, incoming, compressionEnabled = true)
+        assertEquals(SetExperiencePacket.ID, experienceBody.readVarInt())
+        SetExperiencePacket.read(experienceBody)
 
         val gameEventBody = readFrame(connection, incoming, compressionEnabled = true)
         assertEquals(GameEventPacket.ID, gameEventBody.readVarInt())
@@ -300,6 +324,45 @@ class PlayFlowIntegrationTest {
         assertEquals(SystemChatPacket.ID, bobSeesChatBody.readVarInt())
         val bobChat = SystemChatPacket.read(bobSeesChatBody)
         assertTrue(bobChat.content.toString().contains("hello world"))
+
+        // "ejecuta un comando": /me needs no permission, so a plain player can run it, and its
+        // output reaches everyone. This is the whole path the client exercises when it types a
+        // slash command: chat_command in, dispatcher, broadcast out.
+        sendCompressed(alice.connection, ChatCommandPacket.ID, alice.threshold) {
+            it.writeProtocolString("me waves", 256)
+        }
+
+        val aliceSeesEmoteBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
+        assertEquals(SystemChatPacket.ID, aliceSeesEmoteBody.readVarInt())
+        val emote = SystemChatPacket.read(aliceSeesEmoteBody).content
+        assertTrue(emote.toString().contains("chat.type.emote"))
+        assertTrue(emote.toString().contains("waves"))
+
+        val bobSeesEmoteBody = readFrame(bob.connection, bob.incoming, compressionEnabled = true)
+        assertEquals(SystemChatPacket.ID, bobSeesEmoteBody.readVarInt())
+        assertTrue(
+            SystemChatPacket
+                .read(bobSeesEmoteBody)
+                .content
+                .toString()
+                .contains("waves"),
+        )
+
+        // A command this player may not run comes back as brigadier's own "Unknown command",
+        // exactly as vanilla hides commands above your permission level rather than refusing them.
+        sendCompressed(alice.connection, ChatCommandPacket.ID, alice.threshold) {
+            it.writeProtocolString("stop", 256)
+        }
+
+        val refusalBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
+        assertEquals(SystemChatPacket.ID, refusalBody.readVarInt())
+        assertTrue(
+            SystemChatPacket
+                .read(refusalBody)
+                .content
+                .toString()
+                .contains("Unknown command"),
+        )
 
         alice.connection.close()
         bob.connection.close()

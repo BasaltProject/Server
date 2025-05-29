@@ -1,16 +1,28 @@
 package org.basaltmc.server.player
 
+import org.basaltmc.protocol.play.Gamemode
+import org.basaltmc.protocol.play.SystemChatPacket
 import org.basaltmc.server.ClientSession
+import org.basaltmc.text.Component
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-/** Server-side bookkeeping for one logged-in player: identity, live position, and how to reach their connection. */
+/**
+ * Server-side state for one logged-in player: identity, live position, and the survival state the
+ * client draws in its HUD.
+ *
+ * Health, hunger and experience live here rather than on the connection because they outlive any
+ * single packet exchange and are what a respawn resets; the connection ([connection]) is only how
+ * they reach the client. Nothing here is persisted yet: a rejoin starts from these defaults, which
+ * is a documented gap, not the intended end state.
+ */
 @OptIn(ExperimentalUuidApi::class)
 public class PlayerSession(
     public val uuid: Uuid,
     public val name: String,
     public val entityId: Int,
     internal val connection: ClientSession,
+    gamemode: Gamemode = Gamemode.SURVIVAL,
 ) {
     public var x: Double = 0.0
     public var y: Double = 0.0
@@ -18,4 +30,44 @@ public class PlayerSession(
     public var yaw: Float = 0f
     public var pitch: Float = 0f
     public var onGround: Boolean = false
+
+    public var gamemode: Gamemode = gamemode
+    public var sprinting: Boolean = false
+
+    public var health: Float = MAX_HEALTH
+    public val food: FoodData = FoodData()
+    public val experience: ExperienceData = ExperienceData()
+
+    /** Set the moment health hits zero, cleared on respawn. A dead player stops being ticked. */
+    public var dead: Boolean = false
+
+    /** Client-driven, and only meaningful when the game mode allows it. */
+    public var flying: Boolean = false
+
+    public val mayFly: Boolean
+        get() = gamemode == Gamemode.CREATIVE || gamemode == Gamemode.SPECTATOR
+
+    public val invulnerable: Boolean
+        get() = gamemode == Gamemode.CREATIVE || gamemode == Gamemode.SPECTATOR
+
+    public val instabuild: Boolean
+        get() = gamemode == Gamemode.CREATIVE
+
+    public fun sendSystemMessage(message: Component) {
+        connection.sendPlayPacket(SystemChatPacket.ID) { SystemChatPacket(message, isActionBar = false).write(it) }
+    }
+
+    /** Back to a freshly spawned player: full health, full food, no experience kept. */
+    public fun resetForRespawn() {
+        health = MAX_HEALTH
+        food.reset()
+        experience.reset()
+        dead = false
+        flying = gamemode == Gamemode.SPECTATOR
+        sprinting = false
+    }
+
+    public companion object {
+        public const val MAX_HEALTH: Float = 20f
+    }
 }

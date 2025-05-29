@@ -3,6 +3,7 @@ package org.basaltmc.server
 import io.ktor.client.HttpClient
 import org.basaltmc.assets.AssetCache
 import org.basaltmc.assets.EulaFile
+import org.basaltmc.assets.LangAssets
 import org.basaltmc.assets.ServerJarAssets
 import org.basaltmc.assets.VersionManifest
 import org.basaltmc.auth.MojangSessionService
@@ -105,7 +106,12 @@ public fun main(args: Array<String>) {
         )
 
     val onlineMode = if (config.onlineMode) OnlineMode(SessionKeyPair.generate(), MojangSessionService()) else null
-    BasaltServer(config, onlineMode, overworldRouter, surfaceEnvironment, villageGenerator).start(startedAt)
+    // Console-only: clients translate for themselves. Never downloaded on our account (see
+    // LangAssets), so without a cached client.jar the console prints translation keys instead of
+    // sentences, which is a cosmetic gap and not a failure.
+    val lang = LangAssets.loadCachedOrEmpty(dataRoot)
+    BasaltServer(config, onlineMode, overworldRouter, surfaceEnvironment, villageGenerator, WORLD_SEED, lang)
+        .start(startedAt)
 }
 
 private fun versionLine(): String = "Basalt Server ${BuildInfo.VERSION} (protocol ${BuildInfo.PROTOCOL_VERSION})"
