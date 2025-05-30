@@ -47,7 +47,7 @@ public class UiConfigs(
  */
 @OptIn(ExperimentalUuidApi::class)
 public class PlayerUi(
-    private val configs: UiConfigs,
+    private val configs: () -> UiConfigs,
     private val placeholders: PlaceholderRegistry,
     private val send: (packetId: Int, write: (org.basaltmc.io.ByteBuffer) -> Unit) -> Unit,
     private val logger: Logger = Logger("Ui"),
@@ -73,9 +73,9 @@ public class PlayerUi(
         tick: Long,
         context: PlaceholderContext,
     ) {
-        if (due(tick, configs.tabList.enabled, configs.tabList.updateIntervalTicks)) updateTabList(context)
-        if (due(tick, configs.scoreboard.enabled, configs.scoreboard.updateIntervalTicks)) updateScoreboard(context)
-        if (due(tick, configs.bossBar.enabled, configs.bossBar.updateIntervalTicks)) updateBossBar(context)
+        if (due(tick, configs().tabList.enabled, configs().tabList.updateIntervalTicks)) updateTabList(context)
+        if (due(tick, configs().scoreboard.enabled, configs().scoreboard.updateIntervalTicks)) updateScoreboard(context)
+        if (due(tick, configs().bossBar.enabled, configs().bossBar.updateIntervalTicks)) updateBossBar(context)
     }
 
     /** Takes down anything this player was shown. Called when they leave or change worlds. */
@@ -113,15 +113,16 @@ public class PlayerUi(
 
     private fun updateTabList(context: PlaceholderContext) {
         val profile =
-            configs.tabList.profiles
+            configs()
+                .tabList.profiles
                 .selectProfile(
-                    configs.tabList.defaultProfile,
+                    configs().tabList.defaultProfile,
                     placeholders,
                     context,
                     logger,
                     reporter,
                     "tab list",
-                ).inheriting(configs.tabList.defaultProfile)
+                ).inheriting(configs().tabList.defaultProfile)
         val header = render(profile.headerLines.orEmpty(), context)
         val footer = render(profile.footerLines.orEmpty(), context)
         if (lastTabList == header.first to footer.first) return
@@ -131,15 +132,16 @@ public class PlayerUi(
 
     private fun updateScoreboard(context: PlaceholderContext) {
         val profile =
-            configs.scoreboard.profiles
+            configs()
+                .scoreboard.profiles
                 .selectProfile(
-                    configs.scoreboard.defaultProfile,
+                    configs().scoreboard.defaultProfile,
                     placeholders,
                     context,
                     logger,
                     reporter,
                     "scoreboard",
-                ).inheriting(configs.scoreboard.defaultProfile)
+                ).inheriting(configs().scoreboard.defaultProfile)
 
         val title = substitute(profile.title.orEmpty(), context)
         val lines =
@@ -192,15 +194,16 @@ public class PlayerUi(
 
     private fun updateBossBar(context: PlaceholderContext) {
         val profile =
-            configs.bossBar.profiles
+            configs()
+                .bossBar.profiles
                 .selectProfile(
-                    configs.bossBar.defaultProfile,
+                    configs().bossBar.defaultProfile,
                     placeholders,
                     context,
                     logger,
                     reporter,
                     "boss bar",
-                ).inheriting(configs.bossBar.defaultProfile)
+                ).inheriting(configs().bossBar.defaultProfile)
 
         val text = substitute(profile.text.orEmpty(), context)
         val progress = progressOf(profile.progress, context)

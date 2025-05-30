@@ -176,7 +176,7 @@ public class ClientSession(
     private val playerStore: PlayerStore? = null,
     /** Where this connection came from, or null when nothing should be remembered about it. */
     private val rememberAddress: String? = null,
-    private val ui: UiConfigs = UiConfigs(),
+    private val ui: () -> UiConfigs = { UiConfigs() },
     private val placeholders: PlaceholderRegistry = PlaceholderRegistry(),
 ) {
     private val logger = Logger("Session")
@@ -1246,7 +1246,7 @@ public class ClientSession(
 
     /** Redraws whatever is due. Failures are swallowed: decoration must never drop a connection. */
     private fun tickUi() {
-        if (!ui.anyEnabled) return
+        if (!ui().anyEnabled) return
         val session = playerSession ?: return
         val context = PlaceholderContext.EMPTY.with(PlaceholderSlots.PLAYER, session)
         runCatching { playerUi.tick(uiTick++, context) }

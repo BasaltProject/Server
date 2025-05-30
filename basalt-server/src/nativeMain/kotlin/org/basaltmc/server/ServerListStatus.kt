@@ -35,7 +35,7 @@ public data class ListedPlayer(
  * happens if the file asked a question that needs one.
  */
 public class ServerListStatus(
-    private val config: ServerListConfig,
+    private val config: () -> ServerListConfig,
     private val placeholders: PlaceholderRegistry,
     private val slots: Int,
     private val versionName: String,
@@ -55,10 +55,11 @@ public class ServerListStatus(
     ): ServerStatusPayload {
         val request =
             PingRequest(protocolVersion, host, address) {
-                if (config.rememberIp && address != null) lookupPlayerByAddress?.invoke(address) else null
+                if (config().rememberIp && address != null) lookupPlayerByAddress?.invoke(address) else null
             }
         val context = PlaceholderContext.EMPTY.with(PlaceholderSlots.PING, request)
-        val profile = config.select(placeholders, context, logger)
+        val current = config()
+        val profile = current.select(placeholders, context, logger)
         val players = onlinePlayers()
 
         val online = profile.onlinePlayers ?: players.size

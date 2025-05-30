@@ -74,7 +74,7 @@ class AnimationsConfigTest {
         registry.register("basalt_server") { params, _ ->
             if (params == "online") PlaceholderValue.of(4) else PlaceholderValue.Unknown
         }
-        val provider = AnimationPlaceholders(config) { registry }
+        val provider = AnimationPlaceholders({ config }) { registry }
         registry.register(AnimationPlaceholders.IDENTIFIER, provider)
 
         assertEquals("<4 online>", provider.resolve("live", PlaceholderContext.EMPTY).textOrNull)
@@ -85,7 +85,7 @@ class AnimationsConfigTest {
 
     @Test
     fun anAnimationNobodyDefinedSaysSoRatherThanBeingUnknown() {
-        val provider = AnimationPlaceholders(load("missing")) { PlaceholderRegistry() }
+        val provider = AnimationPlaceholders({ load("missing") }) { PlaceholderRegistry() }
         val value = provider.resolve("nope", PlaceholderContext.EMPTY)
 
         assertTrue(value is PlaceholderValue.Unavailable && "no animation named" in (value.reason ?: ""))

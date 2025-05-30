@@ -18,16 +18,30 @@ import org.basaltmc.io.NativeThread
  * busy-spinning.
  */
 public object ConsoleReader {
-    public fun start(
-        dispatcher: CommandDispatcher,
-        source: CommandSource = ConsoleCommandSource(lang = dispatcher.environment.lang),
-    ) {
+    /**
+     * Started once for the life of the process, not once per server.
+     *
+     * [current] is asked for the dispatcher on every line rather than given one, because `/restart`
+     * replaces the whole server inside this process: a reader holding the old dispatcher would keep
+     * running commands against a server that has already closed its database. And it cannot simply
+     * be started again for the new one, since this thread is parked inside a blocking read of stdin
+     * that nothing can interrupt: two readers would take alternate lines from the same terminal.
+     *
+     * A line typed while no server is up (during the restart itself) is answered rather than
+     * swallowed, so the operator is not left wondering whether it was heard.
+     */
+    public fun start(current: () -> CommandDispatcher?) {
         NativeThread.start {
             while (true) {
                 val line = readlnOrNull() ?: break
                 val command = line.trim().removePrefix("/")
                 if (command.isEmpty()) continue
-                dispatcher.execute(source, command)
+                val dispatcher = current()
+                if (dispatcher == null) {
+                    println("The server is restarting; try again in a moment.")
+                    continue
+                }
+                dispatcher.execute(ConsoleCommandSource(lang = dispatcher.environment.lang), command)
             }
         }
     }

@@ -23,7 +23,7 @@ import kotlin.math.roundToInt
  * drifts is always the one nobody runs.
  */
 public class PlayerPlaceholders(
-    private val groups: GroupsConfig,
+    private val groups: () -> GroupsConfig,
     /** Looks a world up by name, so `dimension` can answer without the session carrying a copy of it. */
     private val worlds: () -> Map<String, org.basaltmc.server.world.LoadedWorld> = { emptyMap() },
 ) : PlaceholderProvider,
@@ -56,8 +56,8 @@ public class PlayerPlaceholders(
             "direction" to { it -> PlaceholderValue.of(direction(it.yaw)) },
             "direction_xz" to { it -> PlaceholderValue.of(directionXZ(it.yaw)) },
             "gamemode" to { it -> PlaceholderValue.of(it.gamemode.name.lowercase()) },
-            "group" to { it -> PlaceholderValue.of(groups[it.group].name) },
-            "is_op" to { it -> PlaceholderValue.of(groups[it.group].isOperator) },
+            "group" to { it -> PlaceholderValue.of(groups()[it.group].name) },
+            "is_op" to { it -> PlaceholderValue.of(groups()[it.group].isOperator) },
             "health" to { it -> PlaceholderValue.of(it.health) },
             "health_rounded" to { it -> PlaceholderValue.of(it.health.roundToInt()) },
             "max_health" to { _ -> PlaceholderValue.of(PlayerSession.MAX_HEALTH) },
@@ -103,7 +103,7 @@ public class PlayerPlaceholders(
         }
         if (params.startsWith(PERMISSION_PREFIX) && params.length > PERMISSION_PREFIX.length) {
             val node = params.removePrefix(PERMISSION_PREFIX)
-            return session?.let { PlaceholderValue.of(groups.resolve(it.group, node)) } ?: needsPlayer(ping)
+            return session?.let { PlaceholderValue.of(groups().resolve(it.group, node)) } ?: needsPlayer(ping)
         }
         val answer = ofPlayer[params] ?: return PlaceholderValue.Unknown
         return session?.let(answer) ?: needsPlayer(ping)

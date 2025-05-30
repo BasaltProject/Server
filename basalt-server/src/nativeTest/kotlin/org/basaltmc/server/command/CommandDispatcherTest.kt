@@ -67,7 +67,7 @@ internal fun testGroups(
 private fun testEnvironment(): CommandEnvironment =
     CommandEnvironment(
         players = PlayerRegistry(),
-        groups = testGroups(),
+        groupsProvider = { testGroups() },
         worldSeed = 12345L,
         maxPlayers = 20,
     )

@@ -21,7 +21,11 @@ import org.basaltmc.text.resolvePlainText
  */
 public class CommandEnvironment(
     public val players: PlayerRegistry,
-    public val groups: GroupsConfig,
+    /**
+     * Read through a supplier, not stored: `/reload` swaps the groups under a running server and a
+     * captured copy would keep answering with the permissions the server started with.
+     */
+    private val groupsProvider: () -> GroupsConfig,
     public val worldSeed: Long,
     /** The world a freshly imported or freshly joined player belongs to. */
     public val defaultWorldName: String = "world",
@@ -44,9 +48,13 @@ public class CommandEnvironment(
     /** Every placeholder this server answers, so commands can resolve text the same way files do. */
     public val placeholders: PlaceholderRegistry = PlaceholderRegistry(),
     /** `commands.toml`: which permission each command asks for, which exist, and what they answer. */
-    public val commands: CommandsConfig = CommandsConfig(emptyMap(), emptyList(), emptyMap()),
+    private val commandsProvider: () -> CommandsConfig = { CommandsConfig(emptyMap(), emptyList(), emptyMap()) },
 ) {
     /** A message every connected player sees, plus the console, the way vanilla's `broadcastSystemMessage` does. */
+    public val groups: GroupsConfig get() = groupsProvider()
+
+    public val commands: CommandsConfig get() = commandsProvider()
+
     public fun broadcast(message: Component) {
         for (player in players.snapshot()) player.sendSystemMessage(message)
         logger.info { message.resolvePlainText(lang) }

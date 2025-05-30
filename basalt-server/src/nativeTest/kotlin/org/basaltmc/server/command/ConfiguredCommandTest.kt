@@ -50,11 +50,11 @@ private fun environmentWith(
 ): CommandEnvironment =
     CommandEnvironment(
         players = PlayerRegistry(),
-        groups = testGroups(operatorPermissions = listOf("*")),
+        groupsProvider = { testGroups(operatorPermissions = listOf("*")) },
         worldSeed = 1L,
         maxPlayers = 20,
         placeholders = placeholders,
-        commands = commands,
+        commandsProvider = { commands },
     )
 
 private fun configOf(

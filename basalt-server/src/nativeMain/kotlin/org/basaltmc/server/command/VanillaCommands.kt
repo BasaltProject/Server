@@ -30,9 +30,13 @@ import org.basaltmc.server.command.commands.WorldCommand
  * What is *not* here is most of vanilla's command set (the world, scoreboard, data and datapack
  * families) plus the selector filter syntax: both are declared gaps, not silent ones.
  *
- * `import-players`, `placeholder` and `world` are the three with no vanilla counterpart, because
- * they administer things vanilla does not have: a player database outside the world directories, a
- * placeholder registry, and more than one world to stand in.
+ * `import-players`, `placeholder`, `world` and `reload` are the ones with no vanilla counterpart,
+ * because they administer things vanilla does not have: a player database outside the world
+ * directories, a placeholder registry, more than one world to stand in, and configuration that is
+ * read on every use rather than once at startup.
+ *
+ * `reload` is not in this list because it needs the running server's own configuration holder to
+ * swap, so it is registered by [org.basaltmc.server.BasaltServer] instead of built from nothing.
  */
 public val VANILLA_COMMANDS: List<Command> =
     listOf(

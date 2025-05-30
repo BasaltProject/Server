@@ -47,6 +47,13 @@ private class Recorder {
     fun clear(): Unit = sent.clear()
 }
 
+/** The configs a UI reads, as the supplier it now takes: they can be swapped by `/reload`. */
+private fun uiOf(
+    tabList: org.basaltmc.server.config.TabListConfig = org.basaltmc.server.config.TabListConfig.DISABLED,
+    scoreboard: org.basaltmc.server.config.ScoreboardConfig = org.basaltmc.server.config.ScoreboardConfig.DISABLED,
+    bossBar: org.basaltmc.server.config.BossBarConfig = org.basaltmc.server.config.BossBarConfig.DISABLED,
+): () -> UiConfigs = { UiConfigs(tabList, scoreboard, bossBar) }
+
 class PlayerUiTest {
     private var online = 1
 
@@ -85,7 +92,7 @@ class PlayerUiTest {
     @Test
     fun theTabListIsSentOnceAndNotResentWhileItSaysTheSameThing() {
         val recorder = Recorder()
-        val ui = PlayerUi(UiConfigs(tabList = tabList(listOf("head"), listOf("foot"))), registry, recorder::send)
+        val ui = PlayerUi(uiOf(tabList = tabList(listOf("head"), listOf("foot"))), registry, recorder::send)
 
         repeat(3) { ui.tick(it.toLong(), PlaceholderContext.EMPTY) }
 
@@ -97,7 +104,7 @@ class PlayerUiTest {
     fun theTabListIsResentAsSoonAsItsTextChanges() {
         val recorder = Recorder()
         val config = tabList(listOf("head"), listOf("%basalt_server_online% online"))
-        val ui = PlayerUi(UiConfigs(tabList = config), registry, recorder::send)
+        val ui = PlayerUi(uiOf(tabList = config), registry, recorder::send)
 
         ui.tick(0, PlaceholderContext.EMPTY)
         online = 2
@@ -113,7 +120,7 @@ class PlayerUiTest {
     @Test
     fun theScoreboardIsCreatedPutInTheSidebarAndFilledIn() {
         val recorder = Recorder()
-        val ui = PlayerUi(UiConfigs(scoreboard = scoreboard(listOf("a", "b"))), registry, recorder::send)
+        val ui = PlayerUi(uiOf(scoreboard = scoreboard(listOf("a", "b"))), registry, recorder::send)
 
         ui.tick(0, PlaceholderContext.EMPTY)
 
@@ -130,7 +137,7 @@ class PlayerUiTest {
         val recorder = Recorder()
         val ui =
             PlayerUi(
-                UiConfigs(scoreboard = scoreboard(listOf("static", "%basalt_server_online% online"))),
+                uiOf(scoreboard = scoreboard(listOf("static", "%basalt_server_online% online"))),
                 registry,
                 recorder::send,
             )
@@ -149,7 +156,7 @@ class PlayerUiTest {
     fun aBoardThatGotShorterHasItsLeftoverLinesTakenAway() {
         val recorder = Recorder()
         val lines = mutableListOf("a", "b", "c")
-        val ui = PlayerUi(UiConfigs(scoreboard = scoreboard(lines)), registry, recorder::send)
+        val ui = PlayerUi(uiOf(scoreboard = scoreboard(lines)), registry, recorder::send)
 
         ui.tick(0, PlaceholderContext.EMPTY)
         lines.removeLast()
@@ -163,7 +170,7 @@ class PlayerUiTest {
     @Test
     fun theBossBarIsAddedOnceAndThenNudged() {
         val recorder = Recorder()
-        val ui = PlayerUi(UiConfigs(bossBar = bossBar("%basalt_server_online% online")), registry, recorder::send)
+        val ui = PlayerUi(uiOf(bossBar = bossBar("%basalt_server_online% online")), registry, recorder::send)
 
         ui.tick(0, PlaceholderContext.EMPTY)
         online = 9
@@ -180,7 +187,7 @@ class PlayerUiTest {
         val recorder = Recorder()
         val ui =
             PlayerUi(
-                UiConfigs(scoreboard = scoreboard(listOf("a")), bossBar = bossBar("x")),
+                uiOf(scoreboard = scoreboard(listOf("a")), bossBar = bossBar("x")),
                 registry,
                 recorder::send,
             )
@@ -200,7 +207,7 @@ class PlayerUiTest {
     @Test
     fun nothingIsSentForAPieceThatIsSwitchedOff() {
         val recorder = Recorder()
-        val ui = PlayerUi(UiConfigs(), registry, recorder::send)
+        val ui = PlayerUi({ UiConfigs() }, registry, recorder::send)
 
         ui.tick(0, PlaceholderContext.EMPTY)
 
@@ -211,7 +218,7 @@ class PlayerUiTest {
     fun anIntervalOfZeroSendsOnceAndThenNeverAgain() {
         val recorder = Recorder()
         val config = tabList(listOf("head"), listOf("%basalt_server_online%"), interval = 0)
-        val ui = PlayerUi(UiConfigs(tabList = config), registry, recorder::send)
+        val ui = PlayerUi(uiOf(tabList = config), registry, recorder::send)
 
         ui.tick(0, PlaceholderContext.EMPTY)
         online = 7
