@@ -15,7 +15,11 @@ import kotlin.test.assertTrue
 
 /** The profiles a test server advertises: enough to answer a ping, with no file behind it. */
 internal fun testServerList(): ServerListConfig {
-    val default = ServerListProfile(name = "default", isDefault = true, motd = listOf("A Basalt Server"))
+    val default =
+        ServerListProfile(
+            ProfileHeader("default", priority = 0, isDefault = true, isActive = false, conditions = emptyList()),
+            motd = listOf("A Basalt Server"),
+        )
     return ServerListConfig(listOf(default), default, rememberIp = false)
 }
 

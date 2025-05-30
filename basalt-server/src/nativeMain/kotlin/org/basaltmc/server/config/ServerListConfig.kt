@@ -1,11 +1,8 @@
 package org.basaltmc.server.config
 
 import org.basaltmc.common.logging.Logger
-import org.basaltmc.common.placeholder.ConditionResult
-import org.basaltmc.common.placeholder.PlaceholderCondition
 import org.basaltmc.common.placeholder.PlaceholderContext
 import org.basaltmc.common.placeholder.PlaceholderRegistry
-import kotlin.concurrent.AtomicReference
 
 internal const val SERVER_LIST_DEFAULT_TOML = """# How the server looks in the multiplayer list.
 #
@@ -140,11 +137,7 @@ public class PingRequest(
  * and the player count to avoid silently resetting them.
  */
 public data class ServerListProfile(
-    public val name: String,
-    public val priority: Int = 0,
-    public val isDefault: Boolean = false,
-    public val isActive: Boolean = false,
-    public val conditions: List<PlaceholderCondition> = emptyList(),
+    private val header: ProfileHeader,
     public val motd: List<String>? = null,
     public val versionName: String? = null,
     public val versionProtocol: Int? = null,
@@ -153,7 +146,7 @@ public data class ServerListProfile(
     public val onlinePlayers: Int? = null,
     public val hover: List<String>? = null,
     public val icon: String? = null,
-) {
+) : ConditionalProfile by header {
     /** This profile's own values, with [fallback]'s used wherever it declared nothing. */
     public fun inheriting(fallback: ServerListProfile): ServerListProfile =
         if (fallback === this) {
@@ -173,15 +166,11 @@ public data class ServerListProfile(
 
     internal companion object {
         fun from(
-            name: String,
+            header: ProfileHeader,
             table: TomlValue.Table,
         ): ServerListProfile =
             ServerListProfile(
-                name = name,
-                priority = table.intOrNull("priority")?.toInt() ?: 0,
-                isDefault = table.boolOrNull("default") ?: false,
-                isActive = table.boolOrNull("active") ?: false,
-                conditions = table.stringListOrNull("when").orEmpty().map(::PlaceholderCondition),
+                header = header,
                 motd = table.linesOrNull("motd"),
                 versionName = table.stringOrNull("version-name"),
                 versionProtocol = table.intOrNull("version-protocol")?.toInt(),
@@ -191,10 +180,6 @@ public data class ServerListProfile(
                 hover = table.stringListOrNull("hover"),
                 icon = table.stringOrNull("icon"),
             )
-
-        /** A list of lines, or a single string split on its newlines: both spell the same MOTD. */
-        private fun TomlValue.Table.linesOrNull(key: String): List<String>? =
-            stringListOrNull(key) ?: stringOrNull(key)?.split("\n")
     }
 }
 
@@ -214,68 +199,23 @@ public class ServerListConfig(
     public val defaultProfile: ServerListProfile,
     public val rememberIp: Boolean,
 ) {
-    // Conditions are evaluated per ping, so a broken one would otherwise complain per ping. Held as
-    // an immutable set swapped by compare-and-set because pings arrive on connection threads, and a
-    // plain HashSet mutated from several of them is a data race, not just a duplicated warning.
-    private val reported = AtomicReference<Set<String>>(emptySet())
+    private val reporter = OnceReporter()
 
     /**
-     * The profile this ping gets.
+     * The profile this ping gets, by the same rule every UI file uses (see [selectProfile]).
      *
-     * A profile applies when it is switched on or when every one of its conditions holds. A
-     * condition that cannot be decided at all is not a no: the profile is skipped, and the reason is
-     * logged once, because "your condition is nonsense here" and "your condition said no" are
+     * A condition that cannot be decided at all is not a no: the profile is skipped and the reason
+     * is logged once, because "your condition is nonsense here" and "your condition said no" are
      * different things and only one of them is the operator's mistake.
      */
     public fun select(
         registry: PlaceholderRegistry,
         context: PlaceholderContext = PlaceholderContext.EMPTY,
         logger: Logger = Logger("ServerList"),
-    ): ServerListProfile {
-        val winner =
-            profiles
-                .filter { it.isActive || applies(it, registry, context, logger) }
-                .maxByOrNull { it.priority }
-        return (winner ?: defaultProfile).inheriting(defaultProfile)
-    }
-
-    private fun applies(
-        profile: ServerListProfile,
-        registry: PlaceholderRegistry,
-        context: PlaceholderContext,
-        logger: Logger,
-    ): Boolean {
-        if (profile.conditions.isEmpty()) return false
-        for (condition in profile.conditions) {
-            when (val result = condition.evaluate(registry, context)) {
-                ConditionResult.True -> continue
-                ConditionResult.False -> return false
-                is ConditionResult.Unresolvable -> {
-                    reportOnce(logger) {
-                        "Condition '${condition.raw}' of server list profile '${profile.name}' " +
-                            "was skipped: ${result.reason}."
-                    }
-                    return false
-                }
-            }
-        }
-        return true
-    }
-
-    private fun reportOnce(
-        logger: Logger,
-        message: () -> String,
-    ) {
-        val text = message()
-        while (true) {
-            val current = reported.value
-            if (text in current) return
-            if (reported.compareAndSet(current, current + text)) {
-                logger.warn { text }
-                return
-            }
-        }
-    }
+    ): ServerListProfile =
+        profiles
+            .selectProfile(defaultProfile, registry, context, logger, reporter, "server list")
+            .inheriting(defaultProfile)
 
     public companion object {
         public const val FILE_NAME: String = "server_list.toml"
@@ -287,27 +227,18 @@ public class ServerListConfig(
         ): ServerListConfig {
             val root = directory.load(FILE_NAME, defaultContents(legacyMotd, logger))
             val path = directory.pathOf(FILE_NAME)
-            val declared =
-                root.tableOrNull("profiles")
-                    ?: throw TomlFormatException("$path declares no [profiles] table.")
-
-            val profiles =
-                declared.keys().mapNotNull { name ->
-                    declared.tableOrNull(name)?.let { ServerListProfile.from(name, it) }
-                }
-            if (profiles.isEmpty()) throw TomlFormatException("$path declares no profiles.")
-
-            val defaults = profiles.filter { it.isDefault }
-            if (defaults.size != 1) {
-                throw TomlFormatException("$path must mark exactly one profile as `default`, found ${defaults.size}.")
-            }
+            val (profiles, default) =
+                parseProfiles(
+                    root,
+                    path,
+                ) { header, table -> ServerListProfile.from(header, table) }
             val active = profiles.filter { it.isActive }.sortedByDescending { it.priority }
             if (active.isNotEmpty()) {
                 logger.info { "Server list profile '${active.first().name}' is switched on in $path." }
             }
             return ServerListConfig(
                 profiles = profiles,
-                defaultProfile = defaults.single(),
+                defaultProfile = default,
                 rememberIp = root.tableOrNull("greeting")?.boolOrNull("remember-ip") ?: false,
             )
         }

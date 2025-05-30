@@ -12,16 +12,19 @@ import org.basaltmc.server.command.CommandDispatcher
 import org.basaltmc.server.command.CommandEnvironment
 import org.basaltmc.server.command.ConsoleReader
 import org.basaltmc.server.command.registerVanillaCommands
+import org.basaltmc.server.config.AnimationsConfig
 import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.server.config.CommandsConfig
 import org.basaltmc.server.config.GroupsConfig
 import org.basaltmc.server.config.ServerListConfig
 import org.basaltmc.server.config.WorldsConfig
+import org.basaltmc.server.placeholder.AnimationPlaceholders
 import org.basaltmc.server.placeholder.PlayerPlaceholders
 import org.basaltmc.server.placeholder.ServerFacts
 import org.basaltmc.server.placeholder.ServerPlaceholders
 import org.basaltmc.server.player.Difficulty
 import org.basaltmc.server.player.PlayerRegistry
+import org.basaltmc.server.ui.UiConfigs
 import org.basaltmc.server.world.LoadedWorld
 import org.basaltmc.server.world.WORLDS_ROOT
 import org.basaltmc.server.world.WorldMetadata
@@ -78,6 +81,8 @@ public class BasaltServer(
     private val groupsConfig: GroupsConfig,
     private val serverListConfig: ServerListConfig,
     private val commandsConfig: CommandsConfig = CommandsConfig(emptyMap(), emptyList(), emptyMap()),
+    private val animationsConfig: AnimationsConfig = AnimationsConfig(emptyMap()),
+    private val uiConfigs: UiConfigs = UiConfigs(),
     private val lang: LangTable = LangTable.EMPTY,
     /**
      * The world's own metadata, already loaded. `Main` needs the seed before this class exists (it
@@ -90,6 +95,7 @@ public class BasaltServer(
 ) {
     private val logger = Logger("Server")
     private val playerRegistry = PlayerRegistry()
+    private val cpuMeter = CpuMeter()
     private val accepting = AtomicInt(1)
 
     /** Guards against running the shutdown twice: `/stop` and a signal can arrive together. */
@@ -100,6 +106,8 @@ public class BasaltServer(
     // visible to that generation at all, and GenerationMetrics is only exact single-threaded.
     init {
         GenerationMetrics.enabled = config.generationMetrics
+        // A percentage needs two readings; this is the first, so nobody asking later gets nothing.
+        cpuMeter.prime()
     }
 
     /**
@@ -174,7 +182,8 @@ public class BasaltServer(
      */
     public val placeholders: PlaceholderRegistry =
         PlaceholderRegistry().apply {
-            register("basalt_player", PlayerPlaceholders(groupsConfig))
+            register("basalt_player", PlayerPlaceholders(groupsConfig) { worlds })
+            register(AnimationPlaceholders.IDENTIFIER, AnimationPlaceholders(animationsConfig) { placeholders })
             register(
                 "basalt_server",
                 ServerPlaceholders(
@@ -189,6 +198,10 @@ public class BasaltServer(
                         uniqueJoins = { playerStore.players.count() },
                         loadedChunks = { worlds.values.sumOf { it.state.loadedChunkCount } },
                         liveHeapBytes = { liveHeapBytes() },
+                        tickRates = {
+                            tickLoop.tickRates.let { Triple(it.oneMinute, it.fiveMinutes, it.fifteenMinutes) }
+                        },
+                        cpuPercent = cpuMeter::percent,
                     ),
                 ),
             )
@@ -390,6 +403,8 @@ public class BasaltServer(
                     difficulty = difficulty,
                     playerStore = playerStore,
                     rememberAddress = if (serverListConfig.rememberIp) connection.remoteAddress else null,
+                    ui = uiConfigs,
+                    placeholders = placeholders,
                 ).run()
             }
         }

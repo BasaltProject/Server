@@ -23,6 +23,8 @@ import kotlin.math.roundToInt
  */
 public class PlayerPlaceholders(
     private val groups: GroupsConfig,
+    /** Looks a world up by name, so `dimension` can answer without the session carrying a copy of it. */
+    private val worlds: () -> Map<String, org.basaltmc.server.world.LoadedWorld> = { emptyMap() },
 ) : PlaceholderProvider,
     PlaceholderCatalog {
     /** Answerable from a pending connection as well as from a player: what a handshake already carries. */
@@ -42,6 +44,9 @@ public class PlayerPlaceholders(
             "uuid" to { it -> PlaceholderValue.of(it.uuid.toString()) },
             "online" to { _ -> PlaceholderValue.of(true) },
             "world" to { it -> PlaceholderValue.of(it.worldName) },
+            "dimension" to { it ->
+                PlaceholderValue.of(worlds()[it.worldName]?.declaration?.dimension)
+            },
             "x" to { it -> PlaceholderValue.of(it.x) },
             "y" to { it -> PlaceholderValue.of(it.y) },
             "z" to { it -> PlaceholderValue.of(it.z) },
