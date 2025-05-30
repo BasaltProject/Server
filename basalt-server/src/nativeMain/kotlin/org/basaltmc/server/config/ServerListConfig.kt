@@ -31,7 +31,10 @@ internal const val SERVER_LIST_DEFAULT_TOML = """# How the server looks in the m
 #   %basalt_server_max_players%  the slot count shown in the list
 #   %basalt_server_version%      the Minecraft version this server implements
 #   %basalt_player_name%         who is pinging, if this server knows them; see
-#                                [greeting] at the bottom, off by default.
+#                                [greeting] at the bottom, off by default. It is
+#                                empty for anyone who has never connected, so a
+#                                greeting by name belongs in its own profile:
+#                                  when = ["%basalt_player_known%"]
 #
 # `when` is a list of conditions over those same placeholders, all of which have
 # to hold. Operators: = != < <= > >= matches contains, and a condition on its own

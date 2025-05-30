@@ -24,6 +24,7 @@ import org.basaltmc.server.world.RealNoiseParameters
 import org.basaltmc.server.world.RealSurfaceEnvironment
 import org.basaltmc.server.world.VillageDataLoader
 import org.basaltmc.server.world.WorldMetadata
+import org.basaltmc.storage.PlayerDatabaseSchemaException
 import org.basaltmc.world.densityfunction.BlendedNoise
 import org.basaltmc.world.structure.StructurePlacementGrid
 import org.basaltmc.world.terrain.NoiseRouterData
@@ -43,6 +44,7 @@ import kotlin.time.ExperimentalTime
  */
 private const val CONFIG_EXIT_CODE = 2
 private const val BIND_EXIT_CODE = 3
+private const val DATABASE_EXIT_CODE = 4
 
 @OptIn(ExperimentalTime::class)
 public fun main(args: Array<String>) {
@@ -51,6 +53,9 @@ public fun main(args: Array<String>) {
     } catch (e: TomlFormatException) {
         Logger("Config").error { e.message ?: "Invalid configuration." }
         exitProcess(CONFIG_EXIT_CODE)
+    } catch (e: PlayerDatabaseSchemaException) {
+        Logger("Storage").error { e.message ?: "players.db does not match this build." }
+        exitProcess(DATABASE_EXIT_CODE)
     } catch (e: SocketException) {
         Logger("Server").error {
             "${e.message}. Another server is probably already running on that port; " +
