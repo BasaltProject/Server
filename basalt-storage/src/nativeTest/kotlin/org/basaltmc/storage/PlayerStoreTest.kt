@@ -1,5 +1,6 @@
 package org.basaltmc.storage
 
+import org.basaltmc.io.FileIO
 import org.basaltmc.nbt.NbtCompound
 import org.basaltmc.nbt.NbtList
 import org.basaltmc.nbt.NbtType
@@ -203,5 +204,35 @@ class PlayerStoreTest {
             store.players.saveAll((1..50).map { samplePlayer(uuid = "player-$it", name = "P$it") })
             assertEquals(50L, store.players.count())
         }
+    }
+}
+
+class WalCheckpointTest {
+    private val path = "build/test-data/wal_checkpoint_test.db"
+
+    @AfterTest
+    fun cleanup() {
+        for (suffix in listOf("", "-wal", "-shm")) platform.posix.remove("$path$suffix")
+    }
+
+    @Test
+    fun closingLeavesTheDataInTheDatabaseFileAndNotOnlyInTheLog() {
+        PlayerStore.open(path).use { store ->
+            store.players.saveAll((1..40).map { samplePlayer(uuid = "player-$it", name = "P$it") })
+        }
+
+        // The point of the checkpoint: `players.db` alone is a complete database, so copying it for
+        // a backup does not silently copy an empty one. Measured before the fix: 4 KB here and
+        // every row in the -wal beside it.
+        val databaseSize = FileIO.size(path) ?: 0L
+        val logSize = FileIO.size("$path-wal") ?: 0L
+        assertTrue(
+            databaseSize > logSize,
+            "expected the data in players.db, found $databaseSize B with a $logSize B log",
+        )
+
+        // And it is readable from the file alone.
+        for (suffix in listOf("-wal", "-shm")) platform.posix.remove("$path$suffix")
+        assertEquals(40L, PlayerStore.open(path).use { it.players.count() })
     }
 }

@@ -18,6 +18,12 @@ import kotlin.concurrent.AtomicInt
 public class TickLoop(
     saveIntervalSeconds: Int = DEFAULT_SAVE_INTERVAL_SECONDS,
     private val onSaveInterval: () -> Unit = {},
+    /**
+     * Runs every tick. Deliberately not a general extension point: it exists so something checks
+     * for a termination signal 20 times a second, which no other thread here can do (the accept
+     * loop is blocked in `accept()` and connection threads only run while their client talks).
+     */
+    private val onTick: () -> Unit = {},
 ) {
     /** 0 seconds means no periodic save at all; chunks still go out when they unload or on stop. */
     private val saveIntervalTicks: Long = saveIntervalSeconds.toLong() * TICKS_PER_SECOND
@@ -29,6 +35,7 @@ public class TickLoop(
             var tick = 0L
             while (running.value == 1) {
                 tick++
+                onTick()
                 if (saveIntervalTicks > 0 && tick % saveIntervalTicks == 0L) onSaveInterval()
                 sleepMillis(TICK_MILLIS)
             }

@@ -3,6 +3,7 @@ package org.basaltmc.server.command
 import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.NativeMutex
 import org.basaltmc.server.player.PlayerRegistry
+import org.basaltmc.storage.PlayerRepository
 import org.basaltmc.text.Component
 import org.basaltmc.text.LangTable
 import org.basaltmc.text.resolvePlainText
@@ -19,6 +20,8 @@ public class CommandEnvironment(
     public val players: PlayerRegistry,
     public val operators: OperatorList,
     public val worldSeed: Long,
+    /** The world a freshly imported or freshly joined player belongs to. */
+    public val defaultWorldName: String = "world",
     public val maxPlayers: Int,
     public val logger: Logger = Logger("Command"),
     public val stopServer: () -> Unit = {},
@@ -28,6 +31,11 @@ public class CommandEnvironment(
      * table degrades to printing the keys rather than failing.
      */
     public val lang: LangTable = LangTable.EMPTY,
+    /**
+     * Persisted players, as opposed to [players], which is who is online right now. Null where
+     * there is no database to administer, which is how the dispatcher's own tests run.
+     */
+    public val playerRepository: PlayerRepository? = null,
 ) {
     public fun permissionLevelOf(playerName: String): Int = operators.levelOf(playerName)
 
