@@ -147,7 +147,13 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalUuidApi::class)
 public class ClientSession(
     private val connection: TcpConnection,
-    private val statusProvider: () -> org.basaltmc.protocol.status.ServerStatusPayload,
+    /**
+     * Answers the server list ping. Takes the handshake so that a profile can be chosen from the
+     * client's version, the address it connected to and where it connected from: those three are
+     * everything that is known before login.
+     */
+    private val statusProvider: (protocolVersion: Int, host: String, address: String?) ->
+    org.basaltmc.protocol.status.ServerStatusPayload,
     private val compressionThreshold: Int = 256,
     private val onlineMode: OnlineMode? = null,
     private val playerRegistry: PlayerRegistry? = null,
@@ -158,6 +164,8 @@ public class ClientSession(
     private val defaultGamemode: Gamemode = Gamemode.SURVIVAL,
     private val difficulty: Difficulty = Difficulty.EASY,
     private val playerStore: PlayerStore? = null,
+    /** Where this connection came from, or null when nothing should be remembered about it. */
+    private val rememberAddress: String? = null,
 ) {
     private val logger = Logger("Session")
 
@@ -168,6 +176,12 @@ public class ClientSession(
     private val incoming = ByteBuffer()
     private var state = ProtocolState.HANDSHAKE
     private var lastPacketId = -1
+
+    /** Kept because the status response is built from it, several packets after it arrives. */
+    private var handshake: HandshakePacket? = null
+
+    // Written once per session rather than on every flush: it only changes when someone logs in.
+    private var addressRecorded = false
 
     // Persisted counters, carried across sessions. Play time is counted by the same 20 Hz loop that
     // ticks hunger, so it is ticks played rather than wall-clock time connected.
@@ -305,6 +319,7 @@ public class ClientSession(
     ) {
         if (packetId != HandshakePacket.ID) return
         val packet = HandshakePacket.read(body)
+        handshake = packet
         state =
             when (packet.intent) {
                 ClientIntent.STATUS -> ProtocolState.STATUS
@@ -318,10 +333,15 @@ public class ClientSession(
         body: ByteBuffer,
     ) {
         when (packetId) {
-            StatusRequestPacket.ID ->
-                sendUncompressed(
-                    StatusResponsePacket.ID,
-                ) { StatusResponsePacket(statusProvider()).write(it) }
+            StatusRequestPacket.ID -> {
+                val status =
+                    statusProvider(
+                        handshake?.protocolVersion ?: 0,
+                        handshake?.hostName.orEmpty(),
+                        connection.remoteAddress,
+                    )
+                sendUncompressed(StatusResponsePacket.ID) { StatusResponsePacket(status).write(it) }
+            }
             PingRequestPacket.ID -> {
                 val ping = PingRequestPacket.read(body)
                 sendUncompressed(PongResponsePacket.ID) { PongResponsePacket(ping.time).write(it) }
@@ -1456,6 +1476,11 @@ public class ClientSession(
             store.players.save(
                 PlayerPersistence.toStored(session, worldName, firstSeenEpochSeconds, playTimeTicks),
             )
+            // After the save, because there has to be a row to update.
+            if (!addressRecorded && rememberAddress != null) {
+                store.players.setLastIp(session.uuid.toString(), rememberAddress)
+                addressRecorded = true
+            }
         }.onFailure { logger.error(it) { "Failed to save ${session.name}" } }
     }
 

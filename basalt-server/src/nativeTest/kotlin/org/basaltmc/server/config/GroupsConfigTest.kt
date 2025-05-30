@@ -99,8 +99,6 @@ class GroupsConfigTest {
 
     @Test
     fun theOperatorGroupCoversPermissionsThatAreNotBasaltsOwn() {
-        // The reason it ships with `*` and not `basalt.*`: plugins will bring their own namespaces
-        // and an operator is supposed to be able to do everything.
         assertEquals(true, load("star").resolve("operator", "someplugin.admin.reload"))
     }
 

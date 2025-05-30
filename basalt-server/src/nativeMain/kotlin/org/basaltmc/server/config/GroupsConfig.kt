@@ -26,7 +26,6 @@ permissions = [
 
 [groups.operator]
 # What `op` assigns. Exactly one group must be marked as the operator group.
-# `*` is every permission there is, including the ones plugins add later.
 operator = true
 permissions = ["*"]
 

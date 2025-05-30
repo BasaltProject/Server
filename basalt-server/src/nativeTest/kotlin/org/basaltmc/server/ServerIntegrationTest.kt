@@ -26,7 +26,7 @@ import org.basaltmc.protocol.status.PongResponsePacket
 import org.basaltmc.protocol.status.ServerStatusPayload
 import org.basaltmc.protocol.status.StatusRequestPacket
 import org.basaltmc.protocol.status.StatusResponsePacket
-import org.basaltmc.text.TextColor
+import org.basaltmc.text.PlainTextSerializer
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -65,7 +65,10 @@ class ServerIntegrationTest {
             ServerStatusPayload.Version(BuildInfo.MINECRAFT_VERSION, BuildInfo.PROTOCOL_VERSION),
             status.version,
         )
-        assertEquals(TextColor.GRAY, status.description.style.color)
+        // Whatever the selected server_list.toml profile says, rendered: the description is no
+        // longer a fixed string with a fixed colour.
+        assertEquals("A Basalt Server", PlainTextSerializer.serialize(status.description))
+        assertEquals(0, status.players?.online)
         assertEquals(Favicon.bytes.size, status.favicon?.size)
         val pngSignature = byteArrayOf(0x89.toByte(), 'P'.code.toByte(), 'N'.code.toByte(), 'G'.code.toByte())
         assertEquals(pngSignature.toList(), status.favicon?.take(4))

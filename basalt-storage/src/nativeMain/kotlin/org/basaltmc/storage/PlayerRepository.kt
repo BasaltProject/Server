@@ -94,6 +94,23 @@ public class PlayerRepository(
         return true
     }
 
+    /**
+     * Remembers the address a player logged in from, for the server list greeting and nothing else.
+     *
+     * Separate from [save] so that turning the greeting off simply stops calling this, rather than
+     * writing nulls over addresses already recorded, and so that the write happens once per session
+     * instead of on every periodic flush.
+     */
+    public fun setLastIp(
+        uuid: String,
+        address: String?,
+    ) {
+        queries.setLastIp(address, uuid)
+    }
+
+    /** The player last seen at [address], or null if this server has never seen anyone there. */
+    public fun findNameByAddress(address: String): String? = queries.findNameByLastIp(address).executeAsOneOrNull()
+
     public fun findInGroup(group: String): List<PlayerSummary> =
         queries
             .findByGroup(group)

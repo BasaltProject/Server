@@ -30,6 +30,10 @@ CREATE TABLE player (
     -- Which permission group they are in. Null means whichever group is currently the default,
     -- resolved at read time so renaming that group does not mean rewriting every row.
     group_name TEXT,
+    -- The address they last logged in from, and only that: it is written when config/server_list.toml
+    -- turns the greeting on, so that the server list can say hello by name. Never read by anything
+    -- that decides what a player may do, because an address identifies a router, not a person.
+    last_ip TEXT,
     inventory BLOB,
     ender_chest BLOB,
     stats BLOB
@@ -39,6 +43,8 @@ CREATE TABLE player (
 CREATE INDEX player_name ON player(name);
 CREATE INDEX player_last_seen ON player(last_seen);
 CREATE INDEX player_world ON player(world);
+-- Looked up on every server list ping that greets by name, which is a request anyone can send.
+CREATE INDEX player_last_ip ON player(last_ip);
 
 selectByUuid:
 SELECT * FROM player WHERE uuid = ?;
@@ -100,6 +106,16 @@ UPDATE player SET group_name = ? WHERE uuid = ?;
 
 findByGroup:
 SELECT uuid, name, group_name FROM player WHERE group_name = ? ORDER BY name;
+
+-- Kept out of the whole-player upsert so that turning the greeting off stops new addresses being
+-- written without erasing the ones already there.
+setLastIp:
+UPDATE player SET last_ip = ? WHERE uuid = ?;
+
+-- Most recently seen wins: a household shares one address, and the last person to play on it is the
+-- best guess available. A guess is all this is ever used for.
+findNameByLastIp:
+SELECT name FROM player WHERE last_ip = ? ORDER BY last_seen DESC LIMIT 1;
 
 findByPlayTimeAtLeast:
 SELECT uuid, name, play_time_ticks FROM player WHERE play_time_ticks >= ? ORDER BY play_time_ticks DESC;

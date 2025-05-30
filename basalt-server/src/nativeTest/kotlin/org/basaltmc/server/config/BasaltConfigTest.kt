@@ -26,7 +26,6 @@ class BasaltConfigTest {
 
         assertTrue(FileIO.exists(path))
         assertEquals(25565, config.port)
-        assertEquals("A Basalt Server", config.motd)
         assertEquals(20, config.maxPlayers)
         assertTrue(config.onlineMode)
         assertEquals(LogLevel.INFO, config.logLevel)
@@ -43,7 +42,6 @@ class BasaltConfigTest {
             """
             [server]
             port = 30000
-            motd = "custom"
             max-players = 5
             online-mode = false
 
@@ -59,11 +57,21 @@ class BasaltConfigTest {
             )
 
         assertEquals(30000, config.port)
-        assertEquals("custom", config.motd)
         assertEquals(5, config.maxPlayers)
         assertFalse(config.onlineMode)
         assertEquals(LogLevel.DEBUG, config.logLevel)
         deleteIfExists(path)
+    }
+
+    @Test
+    fun readsTheMotdOutOfLegacyServerPropertiesForTheServerListFile() {
+        val legacyPath = "build/test-data/legacy_motd.properties"
+        FileIO.writeText(legacyPath, "motd=Imported MOTD\n")
+
+        // Not part of BasaltConfig any more: server.toml has no MOTD, so the import hands it to
+        // whoever generates server_list.toml instead of keeping a field for it.
+        assertEquals("Imported MOTD", BasaltConfig.legacyMotd(legacyPath))
+        deleteIfExists(legacyPath)
     }
 
     @Test
@@ -85,7 +93,6 @@ class BasaltConfigTest {
         val config = BasaltConfig.load(directory = directory, legacyPropertiesPath = legacyPath)
 
         assertEquals(30001, config.port)
-        assertEquals("Imported MOTD", config.motd)
         assertEquals(7, config.maxPlayers)
         assertFalse(config.onlineMode)
         deleteIfExists(configPath)
