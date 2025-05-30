@@ -5,6 +5,7 @@ import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.FileIO
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -13,10 +14,15 @@ class BasaltConfigTest {
 
     @Test
     fun generatesACommentedDefaultOnFirstRun() {
-        val path = "basalt_config_test_default.toml"
+        val directory = directoryFor("default")
+        val path = directory.pathOf(BasaltConfig.FILE_NAME)
         deleteIfExists(path)
 
-        val config = BasaltConfig.load(path = path, legacyPropertiesPath = "basalt_config_test_no_legacy.properties")
+        val config =
+            BasaltConfig.load(
+                directory = directory,
+                legacyPropertiesPath = "build/test-data/no_such_legacy.properties",
+            )
 
         assertTrue(FileIO.exists(path))
         assertEquals(25565, config.port)
@@ -30,7 +36,9 @@ class BasaltConfigTest {
 
     @Test
     fun reloadsAnExistingFileWithoutRegeneratingIt() {
-        val path = "basalt_config_test_existing.toml"
+        val directory = directoryFor("existing")
+        val path = directory.pathOf(BasaltConfig.FILE_NAME)
+        FileIO.createDirectories(directory.root)
         FileIO.writeText(
             path,
             """
@@ -48,7 +56,11 @@ class BasaltConfigTest {
             """.trimIndent(),
         )
 
-        val config = BasaltConfig.load(path = path, legacyPropertiesPath = "basalt_config_test_no_legacy.properties")
+        val config =
+            BasaltConfig.load(
+                directory = directory,
+                legacyPropertiesPath = "build/test-data/no_such_legacy.properties",
+            )
 
         assertEquals(30000, config.port)
         assertEquals("custom", config.motd)
@@ -61,8 +73,9 @@ class BasaltConfigTest {
 
     @Test
     fun importsRecognizedKeysFromLegacyServerPropertiesOnce() {
-        val configPath = "basalt_config_test_migrated.toml"
-        val legacyPath = "basalt_config_test_legacy.properties"
+        val directory = directoryFor("properties_import")
+        val configPath = directory.pathOf(BasaltConfig.FILE_NAME)
+        val legacyPath = "build/test-data/legacy.properties"
         deleteIfExists(configPath)
         FileIO.writeText(
             legacyPath,
@@ -74,7 +87,7 @@ class BasaltConfigTest {
             """.trimIndent(),
         )
 
-        val config = BasaltConfig.load(path = configPath, legacyPropertiesPath = legacyPath)
+        val config = BasaltConfig.load(directory = directory, legacyPropertiesPath = legacyPath)
 
         assertEquals(30001, config.port)
         assertEquals("Imported MOTD", config.motd)
@@ -86,23 +99,43 @@ class BasaltConfigTest {
 
     @Test
     fun readsTheSaveInterval() {
-        val path = "./basalt_save_interval_test.toml"
-        FileIO.writeText(path, "[world]\nsave-interval-seconds = 120\n")
+        val directory = directoryFor("save_interval")
+        FileIO.createDirectories(directory.root)
+        FileIO.writeText(directory.pathOf(BasaltConfig.FILE_NAME), "[world]\nsave-interval-seconds = 120\n")
         try {
-            assertEquals(120, BasaltConfig.load(path, logger = silentLogger()).saveIntervalSeconds)
+            assertEquals(120, BasaltConfig.load(directory, logger = silentLogger()).saveIntervalSeconds)
         } finally {
-            platform.posix.remove(path)
+            platform.posix.remove(directory.pathOf(BasaltConfig.FILE_NAME))
         }
     }
 
     @Test
     fun rejectsANegativeSaveInterval() {
-        val path = "./basalt_save_interval_negative_test.toml"
-        FileIO.writeText(path, "[world]\nsave-interval-seconds = -5\n")
+        val directory = directoryFor("negative_save_interval")
+        FileIO.createDirectories(directory.root)
+        FileIO.writeText(directory.pathOf(BasaltConfig.FILE_NAME), "[world]\nsave-interval-seconds = -5\n")
         try {
             // Clamped rather than obeyed: a negative interval has no meaning, and 0 already says
             // "never save periodically".
-            assertEquals(0, BasaltConfig.load(path, logger = silentLogger()).saveIntervalSeconds)
+            assertEquals(0, BasaltConfig.load(directory, logger = silentLogger()).saveIntervalSeconds)
+        } finally {
+            platform.posix.remove(directory.pathOf(BasaltConfig.FILE_NAME))
+        }
+    }
+}
+
+class ConfigDirectoryTest {
+    private val directory = directoryFor("directory")
+
+    @Test
+    fun aFileThatDoesNotParseStopsTheServerAndNamesItself() {
+        FileIO.createDirectories(directory.root)
+        val path = directory.pathOf("broken.toml")
+        FileIO.writeText(path, "[server\nport = 1")
+        try {
+            val failure = assertFailsWith<TomlFormatException> { directory.load("broken.toml", "") }
+            // The point: with several files, "the configuration is broken" is not useful on its own.
+            assertTrue(failure.message.orEmpty().contains("broken.toml"))
         } finally {
             platform.posix.remove(path)
         }
@@ -112,3 +145,6 @@ class BasaltConfigTest {
 private fun deleteIfExists(path: String) {
     platform.posix.remove(path)
 }
+
+/** Each test gets its own config directory, under build/ where every other test artefact lives. */
+private fun directoryFor(name: String) = ConfigDirectory("build/test-data/config_$name", Logger("ConfigTest"))

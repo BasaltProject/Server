@@ -4,7 +4,11 @@ import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.FileIO
 
 /**
- * Writes the operator list back into `basalt.toml`, so `op` and `deop` outlive a restart.
+ * Writes the operator list back into `config/server.toml`, so `op` and `deop` outlive a restart.
+ *
+ * This whole file is on the wrong side of the configuration/state line and is scheduled to go: the
+ * server writes it, not the operator, which is what makes rewriting a TOML line necessary at all.
+ * Once permission groups exist, membership moves to a column in `players.db` and this disappears.
  *
  * Only the `operators = [...]` line is touched; everything else in the file, comments included,
  * is left byte for byte as it was. That is why this rewrites a line instead of re-serializing the
@@ -17,7 +21,7 @@ import org.basaltmc.io.FileIO
  */
 public fun rewriteOperators(
     names: Set<String>,
-    path: String = "basalt.toml",
+    path: String = "${ConfigDirectory.DEFAULT_ROOT}/${BasaltConfig.FILE_NAME}",
     logger: Logger = Logger("Config"),
 ) {
     val text = FileIO.readText(path)

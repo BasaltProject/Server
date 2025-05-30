@@ -56,10 +56,10 @@ public sealed interface TomlValue {
 }
 
 /**
- * A hand-written parser for the subset of TOML `basalt.toml` actually uses: comments, `[table]`/
+ * A hand-written parser for the subset of TOML the files under `config/` actually use: comments, `[table]`/
  * `[table.sub]` headers, bare/quoted keys, and string/integer/float/bool/array values. No
  * multi-line strings, inline tables, array-of-tables, or dates: none of those appear in
- * `basalt.toml`, so they are not implemented rather than guessed at.
+ * any of them, so they are not implemented rather than guessed at.
  */
 public object Toml {
     public fun parse(text: String): TomlValue.Table {
