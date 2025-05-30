@@ -29,7 +29,6 @@ class BasaltConfigTest {
         assertEquals("A Basalt Server", config.motd)
         assertEquals(20, config.maxPlayers)
         assertTrue(config.onlineMode)
-        assertEquals("world", config.worldName)
         assertEquals(LogLevel.INFO, config.logLevel)
         deleteIfExists(path)
     }
@@ -48,9 +47,6 @@ class BasaltConfigTest {
             max-players = 5
             online-mode = false
 
-            [world]
-            name = "custom-world"
-
             [logging]
             level = "debug"
             """.trimIndent(),
@@ -66,7 +62,6 @@ class BasaltConfigTest {
         assertEquals("custom", config.motd)
         assertEquals(5, config.maxPlayers)
         assertFalse(config.onlineMode)
-        assertEquals("custom-world", config.worldName)
         assertEquals(LogLevel.DEBUG, config.logLevel)
         deleteIfExists(path)
     }
@@ -95,32 +90,6 @@ class BasaltConfigTest {
         assertFalse(config.onlineMode)
         deleteIfExists(configPath)
         deleteIfExists(legacyPath)
-    }
-
-    @Test
-    fun readsTheSaveInterval() {
-        val directory = directoryFor("save_interval")
-        FileIO.createDirectories(directory.root)
-        FileIO.writeText(directory.pathOf(BasaltConfig.FILE_NAME), "[world]\nsave-interval-seconds = 120\n")
-        try {
-            assertEquals(120, BasaltConfig.load(directory, logger = silentLogger()).saveIntervalSeconds)
-        } finally {
-            platform.posix.remove(directory.pathOf(BasaltConfig.FILE_NAME))
-        }
-    }
-
-    @Test
-    fun rejectsANegativeSaveInterval() {
-        val directory = directoryFor("negative_save_interval")
-        FileIO.createDirectories(directory.root)
-        FileIO.writeText(directory.pathOf(BasaltConfig.FILE_NAME), "[world]\nsave-interval-seconds = -5\n")
-        try {
-            // Clamped rather than obeyed: a negative interval has no meaning, and 0 already says
-            // "never save periodically".
-            assertEquals(0, BasaltConfig.load(directory, logger = silentLogger()).saveIntervalSeconds)
-        } finally {
-            platform.posix.remove(directory.pathOf(BasaltConfig.FILE_NAME))
-        }
     }
 }
 

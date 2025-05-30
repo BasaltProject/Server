@@ -14,6 +14,10 @@ import org.basaltmc.protocol.readVarInt
 import org.basaltmc.protocol.writeVarInt
 import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.server.config.ColorMode
+import org.basaltmc.server.config.WorldDeclaration
+import org.basaltmc.server.config.WorldSettings
+import org.basaltmc.server.config.WorldType
+import org.basaltmc.server.config.WorldsConfig
 import kotlin.time.TimeSource
 
 /**
@@ -47,14 +51,6 @@ internal fun startTestServer(
                 gamemode = "survival",
                 operators = emptyList(),
                 opPermissionLevel = 4,
-                // One world per port. Every server here owns its own RegionStore, and two of them
-                // reading and writing the same region files at once is a genuine race: a worker
-                // that reads a half-written region dies, and the startup that was waiting on its
-                // chunks never finishes binding.
-                worldName = "test_world_$port",
-                difficulty = "easy",
-                viewDistance = 3,
-                saveIntervalSeconds = 30,
                 logLevel = LogLevel.INFO,
                 logToFile = false,
                 logKeepDays = 0,
@@ -66,10 +62,30 @@ internal fun startTestServer(
         // committed to the repository once already.
         val playersDatabase = "$TEST_DATA_ROOT/players_$port.db"
         for (suffix in listOf("", "-wal", "-shm")) platform.posix.remove("$playersDatabase$suffix")
+        // One world per port. Every server here owns its own RegionStore, and two of them reading
+        // and writing the same region files at once is a genuine race: a worker that reads a
+        // half-written region dies, and the startup that was waiting on its chunks never finishes
+        // binding. A view distance of 3 keeps the chunk count each test has to read bounded.
+        val worldsConfig =
+            WorldsConfig(
+                worlds =
+                    listOf(
+                        WorldDeclaration(
+                            "test_world_$port",
+                            "overworld",
+                            WorldType.NORMAL,
+                            seed = 0L,
+                            isDefault = true,
+                        ),
+                    ),
+                defaults = WorldSettings(difficulty = "easy", viewDistance = 3, saveIntervalSeconds = 30),
+                worldsRoot = "$TEST_DATA_ROOT/worlds",
+            )
         NativeThread.start {
             BasaltServer(
                 config,
                 onlineMode,
+                worldsConfig = worldsConfig,
                 playersDatabasePath = playersDatabase,
                 worldsRoot = "$TEST_DATA_ROOT/worlds",
             ).start()

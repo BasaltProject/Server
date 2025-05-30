@@ -1,5 +1,6 @@
 package org.basaltmc.server
 
+import org.basaltmc.auth.OfflineUuid
 import org.basaltmc.io.ByteBuffer
 import org.basaltmc.io.TcpConnection
 import org.basaltmc.protocol.configuration.FinishConfigurationPacket
@@ -22,6 +23,7 @@ import org.basaltmc.protocol.play.CommandsPacket
 import org.basaltmc.protocol.play.EntityTeleportPacket
 import org.basaltmc.protocol.play.ForgetLevelChunkPacket
 import org.basaltmc.protocol.play.GameEventPacket
+import org.basaltmc.protocol.play.Gamemode
 import org.basaltmc.protocol.play.LoginPlayPacket
 import org.basaltmc.protocol.play.MapChunkPacket
 import org.basaltmc.protocol.play.PlayerInfoUpdatePacket
@@ -40,6 +42,9 @@ import org.basaltmc.protocol.readVarInt
 import org.basaltmc.protocol.writeBoolean
 import org.basaltmc.protocol.writeProtocolString
 import org.basaltmc.protocol.writeVarInt
+import org.basaltmc.storage.PlayerStore
+import org.basaltmc.storage.StoredGamemode
+import org.basaltmc.storage.StoredPlayer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -56,6 +61,9 @@ import kotlin.uuid.Uuid
 class PlayFlowIntegrationTest {
     private val port = 39570
 
+    /** Its own server, so seeding a player row here cannot disturb the other test. */
+    private val restorePort = 39574
+
     // BasaltServer generates a fixed 7x7 chunk grid (radius 3) around spawn at startup.
     private val chunkCount = 49
 
@@ -70,14 +78,18 @@ class PlayFlowIntegrationTest {
         val threshold: Int,
         val entityId: Int,
         val name: String,
+        val gamemode: Gamemode,
     )
 
-    private fun joinAsPlayer(name: String): PlayerHandle {
-        val connection = TcpConnection.connect("127.0.0.1", port)
+    private fun joinAsPlayer(
+        name: String,
+        onPort: Int = port,
+    ): PlayerHandle {
+        val connection = TcpConnection.connect("127.0.0.1", onPort)
         val incoming = ByteBuffer()
 
         sendUncompressed(connection, HandshakePacket.ID) {
-            HandshakePacket(776, "127.0.0.1", port, ClientIntent.LOGIN).write(it)
+            HandshakePacket(776, "127.0.0.1", onPort, ClientIntent.LOGIN).write(it)
         }
         sendUncompressed(connection, LoginStartPacket.ID) {
             LoginStartPacket(name, Uuid.fromLongs(0L, 0L)).write(it)
@@ -191,7 +203,7 @@ class PlayFlowIntegrationTest {
         assertEquals(ChunkBatchFinishedPacket.ID, chunkBatchFinishedBody.readVarInt())
         assertEquals(chunkCount, ChunkBatchFinishedPacket.read(chunkBatchFinishedBody).batchSize)
 
-        return PlayerHandle(connection, incoming, threshold, loginPlay.entityId, name)
+        return PlayerHandle(connection, incoming, threshold, loginPlay.entityId, name, loginPlay.spawnInfo.gamemode)
     }
 
     @Test
@@ -405,6 +417,47 @@ class PlayFlowIntegrationTest {
 
         alice.connection.close()
         bob.connection.close()
+    }
+
+    @Test
+    fun aReturningPlayerJoinsInTheGameModeTheyLeftIn() {
+        // Regression: the login packet was built from the *configured default* game mode rather
+        // than the restored one, so someone who logged out in creative came back to a survival HUD
+        // while their abilities and block breaking still followed creative. The mismatch is only
+        // visible in this packet, which is why it is asserted here and not on the session.
+        startTestServer(restorePort)
+
+        val name = "Zoe"
+        val uuid = OfflineUuid.forUsername(name)
+        PlayerStore.open("$TEST_DATA_ROOT/players_$restorePort.db").use { store ->
+            store.players.save(
+                StoredPlayer(
+                    uuid = uuid.toString(),
+                    name = name,
+                    lastSeenEpochSeconds = 1L,
+                    firstSeenEpochSeconds = 1L,
+                    playTimeTicks = 0L,
+                    world = "test_world_$restorePort",
+                    x = 8.5,
+                    y = 64.0,
+                    z = 8.5,
+                    yaw = 0f,
+                    pitch = 0f,
+                    health = 20f,
+                    food = 20,
+                    saturation = 5f,
+                    exhaustion = 0f,
+                    xpLevel = 0,
+                    xpProgress = 0f,
+                    xpTotal = 0,
+                    gamemode = StoredGamemode.CREATIVE,
+                ),
+            )
+        }
+
+        val zoe = joinAsPlayer(name, restorePort)
+        assertEquals(Gamemode.CREATIVE, zoe.gamemode)
+        zoe.connection.close()
     }
 }
 

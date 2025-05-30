@@ -31,6 +31,9 @@ public class PlayerSession(
     public var pitch: Float = 0f
     public var onGround: Boolean = false
 
+    /** Which world this player is in. Sweeps use it so one world's chunks are not held by another's players. */
+    public var worldName: String = ""
+
     public var gamemode: Gamemode = gamemode
     public var sprinting: Boolean = false
 

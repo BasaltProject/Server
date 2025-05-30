@@ -33,19 +33,6 @@ op-permission-level = 4
 [network]
 # Reserved for future network tuning (compression threshold, rate limits).
 
-[world]
-# Name of the default world.
-name = "world"
-# peaceful, easy, normal or hard. Decides whether hunger can starve you and how
-# far down it can take you.
-difficulty = "easy"
-# Radius, in chunks, sent to a client around its own position (vanilla's own
-# server.properties default is 10).
-view-distance = 10
-# How often changes are written to the region files: a crash costs at most this
-# much. 0 disables it, leaving chunks to save when they unload or on stop.
-save-interval-seconds = 30
-
 [performance]
 # Count noise evaluations, biome lookups and per-phase timings while generating
 # chunks, then log a report once the startup chunks are ready. Diagnostics only:
@@ -81,8 +68,8 @@ public enum class ColorMode {
  * is a documented placeholder in the file itself.
  *
  * Some of these are on their way out of this file as their own domain grows one: `motd` to
- * `server_list.toml`, `operators`/`opPermissionLevel` to `groups.toml` plus a column in
- * `players.db`, `worldName` to `worlds.toml`.
+ * `server_list.toml`, and `operators`/`opPermissionLevel` to `groups.toml` plus a column in
+ * `players.db`. Everything about worlds already left, to `worlds.toml`.
  */
 public data class BasaltConfig(
     public val port: Int,
@@ -92,10 +79,6 @@ public data class BasaltConfig(
     public val gamemode: String,
     public val operators: List<String>,
     public val opPermissionLevel: Int,
-    public val worldName: String,
-    public val difficulty: String,
-    public val viewDistance: Int,
-    public val saveIntervalSeconds: Int,
     public val logLevel: LogLevel,
     public val logToFile: Boolean,
     public val logKeepDays: Int,
@@ -112,10 +95,6 @@ public data class BasaltConfig(
                 gamemode = "survival",
                 operators = emptyList(),
                 opPermissionLevel = 4,
-                worldName = "world",
-                difficulty = "easy",
-                viewDistance = 10,
-                saveIntervalSeconds = 30,
                 logLevel = LogLevel.INFO,
                 logToFile = true,
                 logKeepDays = 14,
@@ -164,7 +143,6 @@ public data class BasaltConfig(
 
         private fun fromToml(root: TomlValue.Table): BasaltConfig {
             val server = root.tableOrNull("server")
-            val world = root.tableOrNull("world")
             val logging = root.tableOrNull("logging")
             val performance = root.tableOrNull("performance")
             return BasaltConfig(
@@ -176,12 +154,6 @@ public data class BasaltConfig(
                 operators = server?.stringListOrNull("operators") ?: DEFAULT.operators,
                 opPermissionLevel =
                     server?.intOrNull("op-permission-level")?.toInt()?.coerceIn(0, 4) ?: DEFAULT.opPermissionLevel,
-                worldName = world?.stringOrNull("name") ?: DEFAULT.worldName,
-                difficulty = world?.stringOrNull("difficulty") ?: DEFAULT.difficulty,
-                viewDistance = world?.intOrNull("view-distance")?.toInt() ?: DEFAULT.viewDistance,
-                saveIntervalSeconds =
-                    world?.intOrNull("save-interval-seconds")?.toInt()?.coerceAtLeast(0)
-                        ?: DEFAULT.saveIntervalSeconds,
                 logLevel = logging?.stringOrNull("level")?.let(::parseLogLevel) ?: DEFAULT.logLevel,
                 logToFile = logging?.boolOrNull("file") ?: DEFAULT.logToFile,
                 logKeepDays = logging?.intOrNull("keep-days")?.toInt() ?: DEFAULT.logKeepDays,

@@ -29,6 +29,14 @@ public class PlayerStore private constructor(
     public val players: PlayerRepository = PlayerRepository(database)
 
     /**
+     * False once [close] has run. Callers that may still be winding down on their own threads check
+     * it instead of finding out through the driver, which reports a use-after-close as a bare
+     * `IllegalStateException: Check failed` that says nothing about what happened.
+     */
+    public var isOpen: Boolean = true
+        private set
+
+    /**
      * Folds the write-ahead log back into the database file, then closes.
      *
      * The checkpoint is not optional, which is worth stating because the opposite looks true:
@@ -42,6 +50,7 @@ public class PlayerStore private constructor(
      * with a row, and the driver refuses to run a row-returning statement as a plain execute.
      */
     override fun close() {
+        isOpen = false
         runCatching {
             driver.executeQuery(null, "PRAGMA wal_checkpoint(TRUNCATE)", { QueryResult.Value(Unit) }, 0)
         }
