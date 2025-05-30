@@ -3,6 +3,7 @@ package org.basaltmc.server.command
 import org.basaltmc.protocol.play.ArgumentParser
 import org.basaltmc.protocol.play.CommandNodeData
 import org.basaltmc.protocol.play.CommandsPacket
+import org.basaltmc.server.command.commands.ConfiguredCommand
 import org.basaltmc.server.player.PlayerSession
 import org.basaltmc.text.Component
 import org.basaltmc.text.TextColor
@@ -180,16 +181,29 @@ public class CommandDispatcher(
     private val root = RootNode()
     internal val feedback: CommandFeedback = CommandFeedback(environment)
 
-    /** Registers [command] and every alias it declares. The shape all real commands use. */
-    public fun register(command: Command): LiteralNode {
+    init {
+        for (definition in environment.commands.custom) register(ConfiguredCommand(definition))
+    }
+
+    /**
+     * Registers [command] and every alias it declares, as `commands.toml` says to.
+     *
+     * Returns null for a command that file switched off. Off means gone: it is not registered, so it
+     * is not in the tree sent to clients either, and it fails as an unknown command rather than as a
+     * refusal. A command that answers "you may not do that" tells everyone it exists.
+     */
+    public fun register(command: Command): LiteralNode? {
+        val override = environment.commands[command.name]
+        if (!override.enabled) return null
+
         val node = LiteralNode(command.name)
         // Before build(), so children inherit them: a sub-command is never easier to reach than the
         // command it belongs to.
         node.requiredLevel = command.permissionLevel
-        node.permission = command.permission
+        node.permission = override.permission ?: command.permission
         command.build(CommandNodeBuilder(node))
         root.children.add(node)
-        for (alias in command.aliases) registerAlias(alias, node)
+        for (alias in command.aliases + override.aliases) registerAlias(alias, node)
         return node
     }
 

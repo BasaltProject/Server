@@ -16,6 +16,7 @@ import org.basaltmc.io.SocketException
 import org.basaltmc.random.XoroshiroRandom
 import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.server.config.ColorMode
+import org.basaltmc.server.config.CommandsConfig
 import org.basaltmc.server.config.GroupsConfig
 import org.basaltmc.server.config.ServerListConfig
 import org.basaltmc.server.config.TomlFormatException
@@ -124,6 +125,7 @@ private fun run(args: Array<String>) {
     // while generating the file for the first time.
     val serverListConfig =
         ServerListConfig.load(legacyMotd = BasaltConfig.legacyMotd(), logger = Logger("Config"))
+    val commandsConfig = CommandsConfig.load(logger = Logger("Config"))
     // The seed comes from the world itself, not from configuration: a world already on disk was
     // generated with one, and that is the one its terrain matches.
     val worldMetadata =
@@ -167,6 +169,7 @@ private fun run(args: Array<String>) {
         worldsConfig,
         groupsConfig,
         serverListConfig,
+        commandsConfig,
         lang,
         worldMetadata,
     ).start(startedAt)

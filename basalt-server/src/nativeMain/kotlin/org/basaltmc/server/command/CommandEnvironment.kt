@@ -2,6 +2,7 @@ package org.basaltmc.server.command
 
 import org.basaltmc.common.logging.Logger
 import org.basaltmc.common.placeholder.PlaceholderRegistry
+import org.basaltmc.server.config.CommandsConfig
 import org.basaltmc.server.config.GroupsConfig
 import org.basaltmc.server.player.PlayerRegistry
 import org.basaltmc.server.world.LoadedWorld
@@ -42,6 +43,8 @@ public class CommandEnvironment(
     public val worlds: Map<String, LoadedWorld> = emptyMap(),
     /** Every placeholder this server answers, so commands can resolve text the same way files do. */
     public val placeholders: PlaceholderRegistry = PlaceholderRegistry(),
+    /** `commands.toml`: which permission each command asks for, which exist, and what they answer. */
+    public val commands: CommandsConfig = CommandsConfig(emptyMap(), emptyList(), emptyMap()),
 ) {
     /** A message every connected player sees, plus the console, the way vanilla's `broadcastSystemMessage` does. */
     public fun broadcast(message: Component) {

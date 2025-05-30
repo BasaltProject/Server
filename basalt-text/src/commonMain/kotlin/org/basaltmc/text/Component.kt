@@ -48,6 +48,9 @@ public sealed class Component {
 
     public fun withStyle(newStyle: Style): Component = withStyleAndChildren(newStyle, children)
 
+    /** The same component with different children, for rewriting a tree without knowing its shape. */
+    public fun withChildren(newChildren: List<Component>): Component = withStyleAndChildren(style, newChildren)
+
     public fun append(child: Component): Component = withStyleAndChildren(style, children + child)
 
     public fun color(color: TextColor?): Component = withStyle(style.copy(color = color))
