@@ -21,9 +21,15 @@ enabled = true
 # %basalt_server_cpu% is a percentage of ONE core, the same as `top` shows, so it
 # goes over 100 when more than one thread is busy.
 #
-# How often each player's list is redrawn, in ticks (20 = one second). This is one
-# packet per player per refresh, so it is also the ceiling on how smooth any
-# animation in here can look. 0 sends it once on join and never again.
+# How often each player's list is redrawn, in ticks (20 = one second), and the
+# ceiling on how smooth any animation in here can look. 0 sends it once on join
+# and never again.
+#
+# Lowering it is fine and is what animation needs: a redraw only becomes a packet
+# when the text it produces actually changed, so static panels stay free however
+# often they are drawn. What costs is animated text, at one packet per player per
+# change. 1 is 20 a second per player; with a hundred players that is 2000 packets
+# a second for this panel alone, which is affordable but no longer nothing.
 update-interval-ticks = 20
 
 [profiles.default]

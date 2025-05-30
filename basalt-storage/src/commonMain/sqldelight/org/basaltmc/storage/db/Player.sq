@@ -49,8 +49,12 @@ CREATE INDEX player_last_ip ON player(last_ip);
 selectByUuid:
 SELECT * FROM player WHERE uuid = ?;
 
+-- A name is not unique and never was: the same person has one row per UUID they have joined with,
+-- and a server that has run in both online and offline mode has two for everybody. Most recently
+-- seen wins, so `op <name>` acts on whoever that name last belonged to instead of failing outright
+-- (which is what it did: "ResultSet returned more than 1 row").
 selectByName:
-SELECT * FROM player WHERE name = ? COLLATE NOCASE;
+SELECT * FROM player WHERE name = ? COLLATE NOCASE ORDER BY last_seen DESC LIMIT 1;
 
 exists:
 SELECT EXISTS(SELECT 1 FROM player WHERE uuid = ?);

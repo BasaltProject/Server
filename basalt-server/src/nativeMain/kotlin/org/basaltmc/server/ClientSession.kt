@@ -779,6 +779,12 @@ public class ClientSession(
             }
         }
 
+        // Drawn here rather than left to the loop below. That loop sends chunks before it redraws
+        // anything, so on a fresh join the scoreboard, tab list and boss bar waited behind the whole
+        // terrain stream: seconds of a player staring at a bare screen for packets that were ready
+        // immediately.
+        tickUi()
+
         // Last, once the whole join sequence is on the wire. Started any earlier and this thread
         // interleaves chunk batches with the packets still being sent to finish joining, which a
         // client reads as a protocol desync; it only shows up when the machine is slow enough for
