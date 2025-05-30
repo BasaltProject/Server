@@ -1,13 +1,19 @@
 package org.basaltmc.server
 
 import org.basaltmc.common.logging.Logger
+import org.basaltmc.common.placeholder.PlaceholderContext
+import org.basaltmc.common.placeholder.PlaceholderRegistry
+import org.basaltmc.common.placeholder.PlaceholderText
+import org.basaltmc.common.placeholder.PlaceholderValue
 import org.basaltmc.io.FileIO
 import org.basaltmc.protocol.status.ServerStatusPayload
 import org.basaltmc.server.config.PingRequest
 import org.basaltmc.server.config.ServerListConfig
 import org.basaltmc.server.config.ServerListProfile
+import org.basaltmc.server.placeholder.PlaceholderSlots
 import org.basaltmc.text.Component
 import org.basaltmc.text.MiniMessage
+import kotlin.concurrent.AtomicReference
 
 /** One player, as the list's hover text names them. */
 public data class ListedPlayer(
@@ -20,16 +26,17 @@ public data class ListedPlayer(
  * rendering it.
  *
  * Kept apart from [ServerListConfig] because they answer different questions: the config knows what
- * the operator wrote and which profile applies, and this knows what the server currently is (who is
- * online, which version it speaks, what icon is on disk). Only the second half needs a running
- * server, which is what makes profile selection testable without one.
+ * the operator wrote and which profile applies, and this knows how to draw it. Neither knows what a
+ * `%basalt_player_protocol%` is worth, which is the placeholder registry's job, and that is what
+ * lets the same text work here, in a chat format, or anywhere else text is written by an operator.
  *
  * Everything here runs on a connection thread, before login, for a request anyone on the internet
- * can send as fast as they like. So: icons are read once and cached, and the database is only asked
- * about an address when a profile actually mentions one.
+ * can send as fast as they like. So: icons are read once and cached, and a database lookup only
+ * happens if the file asked a question that needs one.
  */
 public class ServerListStatus(
     private val config: ServerListConfig,
+    private val placeholders: PlaceholderRegistry,
     private val slots: Int,
     private val versionName: String,
     private val protocolVersion: Int,
@@ -38,30 +45,27 @@ public class ServerListStatus(
     private val lookupPlayerByAddress: ((String) -> String?)? = null,
     private val logger: Logger = Logger("ServerList"),
 ) {
-    private val icons = HashMap<String, ByteArray?>()
+    private val icons = AtomicReference<Map<String, ByteArray?>>(emptyMap())
+    private val reported = AtomicReference<Set<String>>(emptySet())
 
     public fun statusFor(
         protocolVersion: Int,
         host: String,
         address: String?,
     ): ServerStatusPayload {
-        val known = if (config.usesPlayerLookup && address != null) lookupPlayerByAddress?.invoke(address) else null
-        val request = PingRequest(protocolVersion, host, address, known)
-        val profile = config.select(request)
+        val request =
+            PingRequest(protocolVersion, host, address) {
+                if (config.rememberIp && address != null) lookupPlayerByAddress?.invoke(address) else null
+            }
+        val context = PlaceholderContext.EMPTY.with(PlaceholderSlots.PING, request)
+        val profile = config.select(placeholders, context, logger)
         val players = onlinePlayers()
 
         val online = profile.onlinePlayers ?: players.size
         val max = profile.maxPlayers ?: slots
-        val values =
-            mapOf(
-                "<online>" to online.toString(),
-                "<max>" to max.toString(),
-                "<version>" to versionName,
-                ServerListConfig.PLAYER_PLACEHOLDER to (known ?: "player"),
-            )
 
         return ServerStatusPayload(
-            description = render(profile.motd.orEmpty(), values),
+            description = render(profile.motd.orEmpty(), context),
             players =
                 if (profile.hidePlayerCount == true) {
                     null
@@ -69,7 +73,7 @@ public class ServerListStatus(
                     ServerStatusPayload.Players(
                         max = max,
                         online = online,
-                        sample = sampleFor(profile, players, values),
+                        sample = sampleFor(profile, players, context),
                     )
                 },
             version =
@@ -91,11 +95,11 @@ public class ServerListStatus(
     private fun sampleFor(
         profile: ServerListProfile,
         players: List<ListedPlayer>,
-        values: Map<String, String>,
+        context: PlaceholderContext,
     ): List<ServerStatusPayload.SamplePlayer> {
         val hover = profile.hover
         if (hover != null) {
-            return hover.map { ServerStatusPayload.SamplePlayer(substitute(it, values), NIL_UUID) }
+            return hover.map { ServerStatusPayload.SamplePlayer(substitute(it, context), NIL_UUID) }
         }
         return players.take(SAMPLE_LIMIT).map { ServerStatusPayload.SamplePlayer(it.name, it.uuid) }
     }
@@ -108,9 +112,12 @@ public class ServerListStatus(
      */
     private fun iconFor(profile: ServerListProfile): ByteArray? {
         val name = profile.icon ?: return Favicon.bytes
-        return icons.getOrPut(name) {
-            val path = "$configRoot/$name"
-            val bytes = FileIO.readBytes(path)
+        icons.value[name]?.let { return it }
+        if (name in icons.value) return Favicon.bytes
+
+        val path = "$configRoot/$name"
+        val bytes = FileIO.readBytes(path)
+        val usable =
             when {
                 bytes == null -> {
                     logger.warn { "Server list icon $path not found; using the built-in one." }
@@ -122,31 +129,57 @@ public class ServerListStatus(
                 }
                 else -> bytes
             }
-        } ?: Favicon.bytes
+        while (true) {
+            val current = icons.value
+            if (icons.compareAndSet(current, current + (name to usable))) break
+        }
+        return usable ?: Favicon.bytes
     }
 
     private fun render(
         lines: List<String>,
-        values: Map<String, String>,
+        context: PlaceholderContext,
     ): Component {
         if (lines.isEmpty()) return Component.empty()
-        var result = MiniMessage.parse(substitute(lines.first(), values))
+        var result = MiniMessage.parse(substitute(lines.first(), context))
         for (line in lines.drop(1)) {
-            result = result.append(Component.text("\n")).append(MiniMessage.parse(substitute(line, values)))
+            result = result.append(Component.text("\n")).append(MiniMessage.parse(substitute(line, context)))
         }
         return result
     }
 
-    /** Substituted before MiniMessage parses, so a placeholder is never mistaken for a tag. */
+    /**
+     * Placeholders are filled in before MiniMessage parses, so `%...%` and `<...>` never have to
+     * agree about anything.
+     *
+     * A placeholder that cannot be answered is left visible in the text and reported once. Blanking
+     * it would leave the operator with a sentence missing a word and nothing to go on.
+     */
     private fun substitute(
         text: String,
-        values: Map<String, String>,
-    ): String {
-        var result = text
-        for ((placeholder, value) in values) {
-            if (placeholder in result) result = result.replace(placeholder, value)
+        context: PlaceholderContext,
+    ): String =
+        PlaceholderText.substitute(text, placeholders, context) { name, value ->
+            reportOnce(
+                when {
+                    value is PlaceholderValue.Unavailable && value.reason != null ->
+                        "The server list uses %$name%, which it cannot fill in here: ${value.reason}."
+                    value is PlaceholderValue.Unknown ->
+                        "The server list uses %$name%, which is not a placeholder this server knows."
+                    else -> "The server list uses %$name%, which cannot be filled in here."
+                },
+            )
         }
-        return result
+
+    private fun reportOnce(message: String) {
+        while (true) {
+            val current = reported.value
+            if (message in current) return
+            if (reported.compareAndSet(current, current + message)) {
+                logger.warn { message }
+                return
+            }
+        }
     }
 
     /** The PNG signature plus the width and height out of the IHDR chunk, which is always first. */

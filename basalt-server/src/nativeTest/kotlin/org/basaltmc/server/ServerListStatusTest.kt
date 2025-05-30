@@ -1,8 +1,9 @@
 package org.basaltmc.server
 
-import org.basaltmc.server.config.PingCondition
+import org.basaltmc.common.placeholder.PlaceholderCondition
 import org.basaltmc.server.config.ServerListConfig
 import org.basaltmc.server.config.ServerListProfile
+import org.basaltmc.server.config.testPlaceholders
 import org.basaltmc.text.PlainTextSerializer
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,6 +21,7 @@ class ServerListStatusTest {
         address: String? = "203.0.113.7",
     ) = ServerListStatus(
         config = ServerListConfig(profiles, profiles.first { it.isDefault }, rememberIp),
+        placeholders = testPlaceholders(),
         slots = 20,
         versionName = "26.2",
         protocolVersion = 776,
@@ -55,16 +57,20 @@ class ServerListStatusTest {
 
     @Test
     fun placeholdersAreFilledInBeforeTheTextIsParsed() {
-        val profile = plain.copy(motd = listOf("<online>/<max> on <version>"))
-        val status = statusOf(listOf(profile), online = listOf(ListedPlayer("Whiron", UUID)))
+        // Substituted first, so `%...%` and MiniMessage's `<...>` never have to agree about syntax.
+        val profile = plain.copy(motd = listOf("You speak %basalt_player_protocol% from %basalt_player_host%"))
+        val status = statusOf(listOf(profile), protocolVersion = 776, host = "mc.example.com")
 
-        assertEquals("1/20 on 26.2", PlainTextSerializer.serialize(status.description))
+        assertEquals("You speak 776 from mc.example.com", PlainTextSerializer.serialize(status.description))
     }
 
     @Test
     fun aPlayerRecognisedByAddressIsGreetedByName() {
         val greeter =
-            plain.copy(motd = listOf("Welcome back, <player>"), condition = PingCondition(knownPlayer = true))
+            plain.copy(
+                motd = listOf("Welcome back, %basalt_player_name%"),
+                conditions = listOf(PlaceholderCondition("%basalt_player_known%")),
+            )
         val profiles = listOf(plain, greeter.copy(name = "returning", isDefault = false, priority = 1))
 
         val known = statusOf(profiles, knownAt = mapOf("203.0.113.7" to "Whiron"))
@@ -81,6 +87,7 @@ class ServerListStatusTest {
         val status =
             ServerListStatus(
                 config = ServerListConfig(listOf(plain), plain, rememberIp = false),
+                placeholders = testPlaceholders(),
                 slots = 20,
                 versionName = "26.2",
                 protocolVersion = 776,
@@ -109,6 +116,14 @@ class ServerListStatusTest {
 
         assertEquals("Maintenance", status.version?.name)
         assertEquals(-1, status.version?.protocol)
+    }
+
+    @Test
+    fun aPlaceholderThisSituationCannotFillInIsLeftVisible() {
+        // Not blanked: a line that lost a word gives the operator nothing to search for.
+        val profile = plain.copy(motd = listOf("at %basalt_player_x%"))
+
+        assertEquals("at %basalt_player_x%", PlainTextSerializer.serialize(statusOf(listOf(profile)).description))
     }
 
     @Test

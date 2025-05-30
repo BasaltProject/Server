@@ -26,7 +26,7 @@ class BasaltConfigTest {
 
         assertTrue(FileIO.exists(path))
         assertEquals(25565, config.port)
-        assertEquals(20, config.maxPlayers)
+        assertEquals(80, config.maxPlayers)
         assertTrue(config.onlineMode)
         assertEquals(LogLevel.INFO, config.logLevel)
         deleteIfExists(path)

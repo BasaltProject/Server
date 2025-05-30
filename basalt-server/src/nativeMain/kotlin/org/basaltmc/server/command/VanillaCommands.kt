@@ -11,6 +11,7 @@ import org.basaltmc.server.command.commands.KickCommand
 import org.basaltmc.server.command.commands.KillCommand
 import org.basaltmc.server.command.commands.ListPlayersCommand
 import org.basaltmc.server.command.commands.OpCommand
+import org.basaltmc.server.command.commands.PlaceholderCommand
 import org.basaltmc.server.command.commands.SayCommand
 import org.basaltmc.server.command.commands.SeedCommand
 import org.basaltmc.server.command.commands.StopCommand
@@ -27,13 +28,15 @@ import org.basaltmc.server.command.commands.TeleportCommand
  * What is *not* here is most of vanilla's command set (the world, scoreboard, data and datapack
  * families) plus the selector filter syntax: both are declared gaps, not silent ones.
  *
- * `import-players` is the one command with no vanilla counterpart, because it administers something
- * vanilla does not have: a player database outside the world directories.
+ * `import-players` and `placeholder` are the two with no vanilla counterpart, because they
+ * administer things vanilla does not have: a player database outside the world directories, and a
+ * placeholder registry.
  */
 public val VANILLA_COMMANDS: List<Command> =
     listOf(
         HelpCommand(),
         ListPlayersCommand(),
+        PlaceholderCommand(),
         SeedCommand(),
         SayCommand(),
         EmoteCommand(),

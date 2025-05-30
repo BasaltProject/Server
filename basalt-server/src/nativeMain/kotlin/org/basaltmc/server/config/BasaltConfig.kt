@@ -14,10 +14,11 @@ private const val DEFAULT_TOML = """# Basalt server configuration, generated onc
 [server]
 # Port the server listens on.
 port = 25565
-# How many players can be connected at once. What the server list *shows* is a
-# separate thing, in server_list.toml, since a profile can advertise whatever it
-# likes without changing who actually gets in.
-max-players = 20
+# How many players can be connected at once. Vanilla ships 20; this ships 80,
+# because 20 is a number from 2010 and nothing in the server cares. What the list
+# *shows* is a separate thing, in server_list.toml, since a profile can advertise
+# whatever it likes without changing who actually gets in.
+max-players = 80
 # Verify players against Mojang's session server. Disabling this accepts any
 # claimed username with no verification (vanilla's "cracked" mode).
 online-mode = true
@@ -80,7 +81,7 @@ public data class BasaltConfig(
         private val DEFAULT =
             BasaltConfig(
                 port = 25565,
-                maxPlayers = 20,
+                maxPlayers = 80,
                 onlineMode = true,
                 gamemode = "survival",
                 logLevel = LogLevel.INFO,
@@ -177,7 +178,7 @@ public data class BasaltConfig(
                 result = result.replace("port = 25565", "port = $it")
             }
             legacy["max-players"]?.toIntOrNull()?.let {
-                result = result.replace("max-players = 20", "max-players = $it")
+                result = result.replace("max-players = 80", "max-players = $it")
             }
             legacy["online-mode"]?.toBooleanStrictOrNull()?.let {
                 result = result.replace("online-mode = true", "online-mode = $it")

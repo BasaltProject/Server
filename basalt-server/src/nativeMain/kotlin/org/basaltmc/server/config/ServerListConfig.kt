@@ -1,6 +1,11 @@
 package org.basaltmc.server.config
 
 import org.basaltmc.common.logging.Logger
+import org.basaltmc.common.placeholder.ConditionResult
+import org.basaltmc.common.placeholder.PlaceholderCondition
+import org.basaltmc.common.placeholder.PlaceholderContext
+import org.basaltmc.common.placeholder.PlaceholderRegistry
+import kotlin.concurrent.AtomicReference
 
 internal const val SERVER_LIST_DEFAULT_TOML = """# How the server looks in the multiplayer list.
 #
@@ -18,12 +23,21 @@ internal const val SERVER_LIST_DEFAULT_TOML = """# How the server looks in the m
 # Text is MiniMessage. Writing the MOTD as a list gives you the two lines the
 # client shows; a single string with \n does the same thing.
 #
-# Placeholders, replaced before the text is parsed:
-#   <online>   players connected right now
-#   <max>      the slot count shown in the list
-#   <version>  the Minecraft version this server implements
-#   <player>   the name of whoever is pinging, if this server knows them; see
-#              [greeting] at the bottom, which is off by default.
+# Anything %like_this% is a placeholder, filled in before the text is parsed and
+# usable in every file that takes text. A placeholder this server cannot fill in
+# is left visible and explained once in the log, so a wrong name shows up rather
+# than silently emptying the line. The four that matter here:
+#   %basalt_server_online%       players connected right now
+#   %basalt_server_max_players%  the slot count shown in the list
+#   %basalt_server_version%      the Minecraft version this server implements
+#   %basalt_player_name%         who is pinging, if this server knows them; see
+#                                [greeting] at the bottom, off by default.
+#
+# `when` is a list of conditions over those same placeholders, all of which have
+# to hold. Operators: = != < <= > >= matches contains, and a condition on its own
+# is true when it reads `true`. A condition this situation cannot answer, such as
+# a player's coordinates before anyone has logged in, is reported once in the log
+# and the profile is skipped: it never counts as a silent no.
 
 [profiles.default]
 default = true
@@ -41,9 +55,8 @@ motd = [
     "              <white>Welcome to your new server</white>",
 ]
 
-[profiles.legacy.when]
 # 735 is 1.16, the first version with RGB text.
-protocol-below = 735
+when = ["%basalt_player_protocol% < 735"]
 
 [profiles.maintenance]
 # Not conditional: switch it on, and it is what everyone sees until you switch
@@ -51,10 +64,10 @@ protocol-below = 735
 active = false
 priority = 100
 motd = [
-    "              <bold><gray>BASALT SERVER</gray></bold> <red>[maintenance]</red>",
-    "              <white>Back shortly</white>",
+    "              <bold><gray>BASALT SERVER</gray></bold> <dark_gray>[1.8-26.2]</dark_gray>",
+    "           <red>The server is under maintenance</red>",
 ]
-# Replaces the player count with ??? rather than showing 0 of 20.
+# Replaces the player count with ??? rather than showing 0 of 80.
 hide-player-count = true
 # Purely how the list draws it: the client shows a version it does not recognise
 # in red, and this stops nobody from joining. Rejecting people is a job for the
@@ -64,18 +77,17 @@ version-protocol = -1
 
 # Other keys a profile takes:
 #   priority = 0              higher wins between profiles that both apply
-#   max-players = 20          what the list shows, not how many can actually join
+#   max-players = 80          what the list shows, not how many can actually join
 #   online-players = 0        likewise, for the left-hand number
 #   hover = ["a", "b"]        the lines shown when hovering the player count
 #   icon = "server-icon.png"  64x64 PNG in config/, replacing the built-in one
 #
-# And the conditions a [when] takes, all of which have to match at once:
-#   host = "mc.example.com"   the address they connected to, `*` allowed
-#   ip = "192.168.*"          where they connected from
-#   protocol = 776            exactly this protocol version
-#   protocol-below = 735      older than this
-#   protocol-above = 776      newer than this
-#   known-player = true       this server has seen that address before
+# And what a `when` tends to look like:
+#   when = ["%basalt_player_host% matches beta.*"]      per domain
+#   when = ["%basalt_player_ip% matches 192.168.*"]     per network
+#   when = ["%basalt_player_protocol% = 776"]           one exact version
+#   when = ["%basalt_player_known%"]                    somebody seen before
+#   when = ["%basalt_server_online% >= 20", "%basalt_player_protocol% >= 735"]
 
 [greeting]
 # Remembering the address a player last connected from is what lets <player> and
@@ -92,60 +104,29 @@ version-protocol = -1
 remember-ip = false
 """
 
-/** What the server knows about whoever is pinging. All of it comes from the handshake or the socket. */
-public data class PingRequest(
+/**
+ * What the server knows about whoever is pinging. All of it comes from the handshake or the socket.
+ *
+ * [knownPlayer] is resolved lazily and only once, because working it out means a database read and
+ * a ping is a request anyone on the internet can send as fast as they like. A file that never asks
+ * who is pinging never pays for the answer, which is why nothing has to scan the profiles up front
+ * to decide whether the lookup is worth doing.
+ */
+public class PingRequest(
     public val protocolVersion: Int,
     /** The address the client was pointed at, which is the handshake's virtual host. */
     public val host: String,
     public val address: String?,
-    /** The name last seen at [address], or null when nobody is remembered or the greeting is off. */
-    public val knownPlayer: String? = null,
-)
-
-/**
- * When a profile applies. Every declared condition has to hold, and a condition nobody declared is
- * not a condition: an empty [PingCondition] never matches anything, since a profile that applies
- * unconditionally is what `default` and `active` are for.
- */
-public data class PingCondition(
-    public val host: String? = null,
-    public val ip: String? = null,
-    public val protocol: Int? = null,
-    public val protocolBelow: Int? = null,
-    public val protocolAbove: Int? = null,
-    public val knownPlayer: Boolean? = null,
+    lookupKnownPlayer: () -> String? = { null },
 ) {
-    public val isEmpty: Boolean
-        get() =
-            host == null &&
-                ip == null &&
-                protocol == null &&
-                protocolBelow == null &&
-                protocolAbove == null &&
-                knownPlayer == null
+    public val knownPlayer: String? by lazy(lookupKnownPlayer)
 
-    public fun matches(request: PingRequest): Boolean {
-        if (isEmpty) return false
-        if (host != null && !globMatches(host, request.host)) return false
-        if (ip != null && (request.address == null || !globMatches(ip, request.address))) return false
-        if (protocol != null && request.protocolVersion != protocol) return false
-        if (protocolBelow != null && request.protocolVersion >= protocolBelow) return false
-        if (protocolAbove != null && request.protocolVersion <= protocolAbove) return false
-        if (knownPlayer != null && (request.knownPlayer != null) != knownPlayer) return false
-        return true
-    }
-
-    public companion object {
-        public fun from(table: TomlValue.Table?): PingCondition =
-            PingCondition(
-                host = table?.stringOrNull("host"),
-                ip = table?.stringOrNull("ip"),
-                protocol = table?.intOrNull("protocol")?.toInt(),
-                protocolBelow = table?.intOrNull("protocol-below")?.toInt(),
-                protocolAbove = table?.intOrNull("protocol-above")?.toInt(),
-                knownPlayer = table?.boolOrNull("known-player"),
-            )
-    }
+    public constructor(
+        protocolVersion: Int,
+        host: String,
+        address: String?,
+        knownPlayer: String?,
+    ) : this(protocolVersion, host, address, { knownPlayer })
 }
 
 /**
@@ -160,7 +141,7 @@ public data class ServerListProfile(
     public val priority: Int = 0,
     public val isDefault: Boolean = false,
     public val isActive: Boolean = false,
-    public val condition: PingCondition = PingCondition(),
+    public val conditions: List<PlaceholderCondition> = emptyList(),
     public val motd: List<String>? = null,
     public val versionName: String? = null,
     public val versionProtocol: Int? = null,
@@ -197,7 +178,7 @@ public data class ServerListProfile(
                 priority = table.intOrNull("priority")?.toInt() ?: 0,
                 isDefault = table.boolOrNull("default") ?: false,
                 isActive = table.boolOrNull("active") ?: false,
-                condition = PingCondition.from(table.tableOrNull("when")),
+                conditions = table.stringListOrNull("when").orEmpty().map(::PlaceholderCondition),
                 motd = table.linesOrNull("motd"),
                 versionName = table.stringOrNull("version-name"),
                 versionProtocol = table.intOrNull("version-protocol")?.toInt(),
@@ -222,7 +203,7 @@ public data class ServerListProfile(
  * rule is highest priority wins, ties broken by declaration order, and a tie at the same priority
  * is a sign the file wanted a priority rather than a coin toss.
  *
- * A profile with no `[when]` and `active = false` is not a mistake and is not reported as one: it is
+ * A profile with no `when` and `active = false` is not a mistake and is not reported as one: it is
  * how a profile that the operator switches on by hand, such as the maintenance one, is written.
  */
 public class ServerListConfig(
@@ -230,29 +211,71 @@ public class ServerListConfig(
     public val defaultProfile: ServerListProfile,
     public val rememberIp: Boolean,
 ) {
-    /**
-     * Whether anything in this file actually looks a player up by address.
-     *
-     * Checked once here so that a server whose profiles never mention it does not pay a database
-     * query per ping, which is a request anyone on the internet can send as fast as they like.
-     */
-    public val usesPlayerLookup: Boolean =
-        rememberIp &&
-            profiles.any { profile ->
-                profile.condition.knownPlayer != null || profile.motd?.any { PLAYER_PLACEHOLDER in it } == true
-            }
+    // Conditions are evaluated per ping, so a broken one would otherwise complain per ping. Held as
+    // an immutable set swapped by compare-and-set because pings arrive on connection threads, and a
+    // plain HashSet mutated from several of them is a data race, not just a duplicated warning.
+    private val reported = AtomicReference<Set<String>>(emptySet())
 
-    public fun select(request: PingRequest): ServerListProfile {
+    /**
+     * The profile this ping gets.
+     *
+     * A profile applies when it is switched on or when every one of its conditions holds. A
+     * condition that cannot be decided at all is not a no: the profile is skipped, and the reason is
+     * logged once, because "your condition is nonsense here" and "your condition said no" are
+     * different things and only one of them is the operator's mistake.
+     */
+    public fun select(
+        registry: PlaceholderRegistry,
+        context: PlaceholderContext = PlaceholderContext.EMPTY,
+        logger: Logger = Logger("ServerList"),
+    ): ServerListProfile {
         val winner =
             profiles
-                .filter { it.isActive || it.condition.matches(request) }
+                .filter { it.isActive || applies(it, registry, context, logger) }
                 .maxByOrNull { it.priority }
         return (winner ?: defaultProfile).inheriting(defaultProfile)
     }
 
+    private fun applies(
+        profile: ServerListProfile,
+        registry: PlaceholderRegistry,
+        context: PlaceholderContext,
+        logger: Logger,
+    ): Boolean {
+        if (profile.conditions.isEmpty()) return false
+        for (condition in profile.conditions) {
+            when (val result = condition.evaluate(registry, context)) {
+                ConditionResult.True -> continue
+                ConditionResult.False -> return false
+                is ConditionResult.Unresolvable -> {
+                    reportOnce(logger) {
+                        "Condition '${condition.raw}' of server list profile '${profile.name}' " +
+                            "was skipped: ${result.reason}."
+                    }
+                    return false
+                }
+            }
+        }
+        return true
+    }
+
+    private fun reportOnce(
+        logger: Logger,
+        message: () -> String,
+    ) {
+        val text = message()
+        while (true) {
+            val current = reported.value
+            if (text in current) return
+            if (reported.compareAndSet(current, current + text)) {
+                logger.warn { text }
+                return
+            }
+        }
+    }
+
     public companion object {
         public const val FILE_NAME: String = "server_list.toml"
-        public const val PLAYER_PLACEHOLDER: String = "<player>"
 
         public fun load(
             directory: ConfigDirectory = ConfigDirectory(),
@@ -328,26 +351,3 @@ private const val LEGACY_MOTD_BLOCK = """motd = [
     "              <bold><gray>BASALT SERVER</gray></bold> <dark_gray>[1.8-26.2]</dark_gray>",
     "              <white>Welcome to your new server</white>",
 ]"""
-
-/** Case-insensitive glob with `*` standing for any run of characters, which is all these fields need. */
-internal fun globMatches(
-    pattern: String,
-    value: String,
-): Boolean {
-    val parts = pattern.lowercase().split("*")
-    val text = value.lowercase()
-    if (parts.size == 1) return text == parts[0]
-
-    if (!text.startsWith(parts.first())) return false
-    if (!text.endsWith(parts.last())) return false
-    var index = parts.first().length
-    for (part in parts.subList(1, parts.size - 1)) {
-        if (part.isEmpty()) continue
-        val found = text.indexOf(part, index)
-        if (found < 0) return false
-        index = found + part.length
-    }
-    // The trailing literal has to fit after everything already matched, or "a*bc" would accept "abc"
-    // twice over by counting the same characters as both.
-    return index <= text.length - parts.last().length
-}

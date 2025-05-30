@@ -24,6 +24,11 @@ public class PlayerSession(
     internal val connection: ClientSession,
     gamemode: Gamemode = Gamemode.SURVIVAL,
 ) {
+    /** What the client said in its handshake, and where it connected from: the same facts a ping carries. */
+    public val protocolVersion: Int get() = connection.handshakeProtocol
+    public val connectedHost: String get() = connection.handshakeHost
+    public val address: String? get() = connection.remoteAddress
+
     public var x: Double = 0.0
     public var y: Double = 0.0
     public var z: Double = 0.0

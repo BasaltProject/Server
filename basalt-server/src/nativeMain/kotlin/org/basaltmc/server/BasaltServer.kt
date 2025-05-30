@@ -2,6 +2,7 @@ package org.basaltmc.server
 
 import org.basaltmc.auth.OnlineMode
 import org.basaltmc.common.logging.Logger
+import org.basaltmc.common.placeholder.PlaceholderRegistry
 import org.basaltmc.io.NativeThread
 import org.basaltmc.io.ShutdownSignal
 import org.basaltmc.io.TcpListener
@@ -15,6 +16,9 @@ import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.server.config.GroupsConfig
 import org.basaltmc.server.config.ServerListConfig
 import org.basaltmc.server.config.WorldsConfig
+import org.basaltmc.server.placeholder.PlayerPlaceholders
+import org.basaltmc.server.placeholder.ServerFacts
+import org.basaltmc.server.placeholder.ServerPlaceholders
 import org.basaltmc.server.player.Difficulty
 import org.basaltmc.server.player.PlayerRegistry
 import org.basaltmc.server.world.LoadedWorld
@@ -160,6 +164,34 @@ public class BasaltServer(
             onTick = ::shutdownIfSignalled,
         )
 
+    /**
+     * Every placeholder this server answers, in one registry shared by everything that renders
+     * operator-written text. The server list is the first user; chat formats and the tab list will
+     * be the next, and a plugin registering its own identifier is the point of it being a registry
+     * rather than a `when` inside the server list.
+     */
+    public val placeholders: PlaceholderRegistry =
+        PlaceholderRegistry().apply {
+            register("basalt_player", PlayerPlaceholders(groupsConfig))
+            register(
+                "basalt_server",
+                ServerPlaceholders(
+                    ServerFacts(
+                        versionName = BuildInfo.MINECRAFT_VERSION,
+                        protocolVersion = BuildInfo.PROTOCOL_VERSION,
+                        startedAt = Clock.System.now(),
+                        maxPlayers = { config.maxPlayers },
+                        onlineByWorld = {
+                            playerRegistry.snapshot().groupingBy { it.worldName }.eachCount()
+                        },
+                        uniqueJoins = { playerStore.players.count() },
+                        loadedChunks = { worlds.values.sumOf { it.state.loadedChunkCount } },
+                        liveHeapBytes = { liveHeapBytes() },
+                    ),
+                ),
+            )
+        }
+
     private val commands =
         CommandDispatcher(
             CommandEnvironment(
@@ -172,6 +204,7 @@ public class BasaltServer(
                 defaultWorldName = defaultWorld.name,
                 playerRepository = playerStore.players,
                 worlds = worlds,
+                placeholders = placeholders,
             ),
         ).also(::registerVanillaCommands)
 
@@ -185,6 +218,7 @@ public class BasaltServer(
     private val serverList =
         ServerListStatus(
             config = serverListConfig,
+            placeholders = placeholders,
             slots = config.maxPlayers,
             versionName = BuildInfo.MINECRAFT_VERSION,
             protocolVersion = BuildInfo.PROTOCOL_VERSION,
@@ -202,10 +236,19 @@ public class BasaltServer(
             ?: Difficulty.EASY
 
     /**
-     * What the last collection actually reclaimed. The chunk counts above only account for what the
-     * server means to hold; if memory climbs while they stay flat, the answer is here, in the gap
-     * between what is live and what has been allocated and not yet collected.
+     * Live bytes after the last collection, or null if nothing has been collected yet.
+     *
+     * The chunk counts elsewhere only account for what the server means to hold; if memory climbs
+     * while they stay flat, the answer is here, in the gap between what is live and what has been
+     * allocated and not yet collected.
      */
+    @OptIn(kotlin.native.runtime.NativeRuntimeApi::class, ExperimentalStdlibApi::class)
+    private fun liveHeapBytes(): Long? =
+        kotlin.native.runtime.GC.lastGCInfo
+            ?.memoryUsageAfter
+            ?.get("heap")
+            ?.totalObjectsSizeBytes
+
     @OptIn(kotlin.native.runtime.NativeRuntimeApi::class, ExperimentalStdlibApi::class)
     private fun heapReport(): String {
         val info = kotlin.native.runtime.GC.lastGCInfo ?: return "No collection has run yet."
