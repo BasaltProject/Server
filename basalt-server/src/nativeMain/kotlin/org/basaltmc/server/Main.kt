@@ -16,6 +16,7 @@ import org.basaltmc.io.SocketException
 import org.basaltmc.random.XoroshiroRandom
 import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.server.config.ColorMode
+import org.basaltmc.server.config.GroupsConfig
 import org.basaltmc.server.config.TomlFormatException
 import org.basaltmc.server.config.WorldsConfig
 import org.basaltmc.server.world.RealNoiseParameters
@@ -112,6 +113,7 @@ private fun run(args: Array<String>) {
     // Real Overworld density-function router (see NoiseRouterData/TerrainProvider), built once at
     // startup and reused for every generated chunk.
     val worldsConfig = WorldsConfig.load(logger = Logger("Config"))
+    val groupsConfig = GroupsConfig.load(logger = Logger("Config"))
     // The seed comes from the world itself, not from configuration: a world already on disk was
     // generated with one, and that is the one its terrain matches.
     val worldMetadata =
@@ -153,6 +155,7 @@ private fun run(args: Array<String>) {
         surfaceEnvironment,
         villageGenerator,
         worldsConfig,
+        groupsConfig,
         lang,
         worldMetadata,
     ).start(startedAt)

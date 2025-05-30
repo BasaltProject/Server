@@ -59,7 +59,8 @@ public sealed interface TomlValue {
  * A hand-written parser for the subset of TOML the files under `config/` actually use: comments, `[table]`/
  * `[table.sub]` headers, bare/quoted keys, and string/integer/float/bool/array values. No
  * multi-line strings, inline tables, array-of-tables, or dates: none of those appear in
- * any of them, so they are not implemented rather than guessed at.
+ * any of them, so they are not implemented rather than guessed at. Arrays *do* span lines, because
+ * a hand-edited list of permissions or worlds is written one entry per line.
  */
 public object Toml {
     public fun parse(text: String): TomlValue.Table {
@@ -81,7 +82,18 @@ public object Toml {
 
             val eq = findKeyValueSeparator(line)
             val key = unquoteKey(line.substring(0, eq).trim())
-            val valueText = line.substring(eq + 1).trim()
+            var valueText = line.substring(eq + 1).trim()
+
+            // An array may span several lines, and in a hand-edited file it usually does: a list of
+            // permissions or worlds written one per line is the readable way to write it, and is
+            // what anyone adding an entry will produce. Keep taking lines until the brackets close.
+            if (valueText.startsWith("[")) {
+                while (bracketDepth(valueText) > 0) {
+                    if (i >= lines.size) throw TomlFormatException("Unterminated array for key '$key'")
+                    valueText += " " + stripComment(lines[i]).trim()
+                    i++
+                }
+            }
             current[key] = parseValue(valueText)
         }
         return root
@@ -97,6 +109,25 @@ public object Toml {
             table = table.tableOrNull(key) ?: TomlValue.Table().also { table[key] = it }
         }
         return table
+    }
+
+    /** How many brackets are still open, ignoring any inside strings. */
+    private fun bracketDepth(text: String): Int {
+        var depth = 0
+        var inQuotes = false
+        var quoteChar = ' '
+        for (char in text) {
+            when {
+                inQuotes -> if (char == quoteChar) inQuotes = false
+                char == '"' || char == '\'' -> {
+                    inQuotes = true
+                    quoteChar = char
+                }
+                char == '[' -> depth++
+                char == ']' -> depth--
+            }
+        }
+        return depth
     }
 
     private fun findKeyValueSeparator(line: String): Int {
@@ -171,7 +202,11 @@ public object Toml {
         if (!text.endsWith("]")) throw TomlFormatException("Unterminated array: $text")
         val inner = text.substring(1, text.length - 1).trim()
         if (inner.isEmpty()) return TomlValue.Arr(emptyList())
-        return TomlValue.Arr(splitArrayElements(inner).map { parseValue(it.trim()) })
+        // Blank elements are dropped rather than rejected: that is TOML's trailing comma, which is
+        // how a multi-line list is normally written so that adding an entry touches only one line.
+        return TomlValue.Arr(
+            splitArrayElements(inner).map { it.trim() }.filter { it.isNotEmpty() }.map(::parseValue),
+        )
     }
 
     private fun splitArrayElements(inner: String): List<String> {

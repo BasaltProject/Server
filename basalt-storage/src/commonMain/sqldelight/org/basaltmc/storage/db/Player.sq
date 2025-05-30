@@ -27,6 +27,9 @@ CREATE TABLE player (
     xp_progress REAL NOT NULL,
     xp_total INTEGER NOT NULL,
     gamemode INTEGER NOT NULL,
+    -- Which permission group they are in. Null means whichever group is currently the default,
+    -- resolved at read time so renaming that group does not mean rewriting every row.
+    group_name TEXT,
     inventory BLOB,
     ender_chest BLOB,
     stats BLOB
@@ -50,9 +53,9 @@ upsert:
 INSERT INTO player(
     uuid, name, last_seen, first_seen, play_time_ticks, world, x, y, z, yaw, pitch,
     health, food, saturation, exhaustion, xp_level, xp_progress, xp_total, gamemode,
-    inventory, ender_chest, stats
+    group_name, inventory, ender_chest, stats
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(uuid) DO UPDATE SET
     name = excluded.name,
     last_seen = excluded.last_seen,
@@ -68,6 +71,7 @@ ON CONFLICT(uuid) DO UPDATE SET
     xp_progress = excluded.xp_progress,
     xp_total = excluded.xp_total,
     gamemode = excluded.gamemode,
+    group_name = excluded.group_name,
     inventory = excluded.inventory,
     ender_chest = excluded.ender_chest,
     stats = excluded.stats;
@@ -88,6 +92,14 @@ SELECT uuid, name, last_seen FROM player WHERE last_seen < ? ORDER BY last_seen;
 
 findByWorld:
 SELECT uuid, name, world FROM player WHERE world = ? ORDER BY name;
+
+-- Group membership, kept separate from the whole-player upsert so that `op` on someone who is
+-- offline does not need to invent the rest of their row.
+setGroup:
+UPDATE player SET group_name = ? WHERE uuid = ?;
+
+findByGroup:
+SELECT uuid, name, group_name FROM player WHERE group_name = ? ORDER BY name;
 
 findByPlayTimeAtLeast:
 SELECT uuid, name, play_time_ticks FROM player WHERE play_time_ticks >= ? ORDER BY play_time_ticks DESC;

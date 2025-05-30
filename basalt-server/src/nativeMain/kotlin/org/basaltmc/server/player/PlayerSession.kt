@@ -31,6 +31,13 @@ public class PlayerSession(
     public var pitch: Float = 0f
     public var onGround: Boolean = false
 
+    /**
+     * Which permission group they belong to, loaded from `players.db` at join. Null means the
+     * group currently marked as the default, which is resolved when a permission is checked rather
+     * than written into the row.
+     */
+    public var group: String? = null
+
     /** Which world this player is in. Sweeps use it so one world's chunks are not held by another's players. */
     public var worldName: String = ""
 

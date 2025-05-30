@@ -20,7 +20,7 @@ internal fun smartUsage(
     val childOptional = node.executor != null
     val open = if (childOptional) "[" else "("
     val close = if (childOptional) "]" else ")"
-    val children = (node.redirect ?: node).sortedChildren.filter { source.hasPermission(it.requiredLevel) }
+    val children = (node.redirect ?: node).sortedChildren.filter { source.mayUse(it) }
 
     when {
         children.size == 1 -> return "$self ${smartUsage(children[0], source, childOptional, childOptional)}"

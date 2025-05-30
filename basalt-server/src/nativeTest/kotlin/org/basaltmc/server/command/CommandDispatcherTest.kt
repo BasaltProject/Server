@@ -2,6 +2,9 @@ package org.basaltmc.server.command
 
 import org.basaltmc.protocol.play.CommandNodeData
 import org.basaltmc.protocol.play.Gamemode
+import org.basaltmc.server.config.GroupsConfig
+import org.basaltmc.server.config.PermissionGroup
+import org.basaltmc.server.config.PermissionRule
 import org.basaltmc.server.player.PlayerRegistry
 import org.basaltmc.server.player.PlayerSession
 import org.basaltmc.text.Component
@@ -10,14 +13,22 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** A console-shaped source that keeps what it was told, so tests can assert on the feedback itself. */
+/**
+ * A console-shaped source that keeps what it was told, so tests can assert on the feedback, and
+ * holds a fixed permission set, so each test states exactly what it may do.
+ */
 private class RecordingSource(
-    override val permissionLevel: Int = PermissionLevel.OWNERS,
+    private val permissions: Set<String> = setOf("*"),
 ) : CommandSource {
     val messages = mutableListOf<String>()
+
+    override val permissionLevel: Int = PermissionLevel.OWNERS
+
+    override fun hasPermission(node: String?): Boolean =
+        node != null &&
+            permissions.any { it == "*" || it == node || (it.endsWith("*") && node.startsWith(it.dropLast(1))) }
 
     override val name: String = "Tester"
     override val displayName: Component = Component.text("Tester")
@@ -29,10 +40,34 @@ private class RecordingSource(
     }
 }
 
+/** Two groups, matching the shape the generated groups.toml ships with. */
+internal fun testGroups(
+    defaultPermissions: List<String> = listOf("basalt.command.help", "basalt.command.me"),
+    operatorPermissions: List<String> = listOf("*"),
+): GroupsConfig {
+    val default =
+        PermissionGroup(
+            "default",
+            defaultPermissions.map(PermissionRule::parse),
+            inherits = null,
+            isDefault = true,
+            isOperator = false,
+        )
+    val operator =
+        PermissionGroup(
+            "operator",
+            operatorPermissions.map(PermissionRule::parse),
+            inherits = null,
+            isDefault = false,
+            isOperator = true,
+        )
+    return GroupsConfig(mapOf("default" to default, "operator" to operator), default, operator)
+}
+
 private fun testEnvironment(): CommandEnvironment =
     CommandEnvironment(
         players = PlayerRegistry(),
-        operators = OperatorList(emptyList(), PermissionLevel.OWNERS),
+        groups = testGroups(),
         worldSeed = 12345L,
         maxPlayers = 20,
     )
@@ -112,10 +147,10 @@ class CommandDispatcherTest {
     fun aCommandAboveTheSourcesLevelIsNotJustRefusedButUnknown() {
         val dispatcher = CommandDispatcher(testEnvironment())
         dispatcher.register("stop") {
-            requires(PermissionLevel.OWNERS)
+            permission("basalt.command.stop")
             executes { 1 }
         }
-        val source = RecordingSource(permissionLevel = PermissionLevel.ALL)
+        val source = RecordingSource(permissions = emptySet())
 
         assertEquals(0, dispatcher.execute(source, "stop"))
 
@@ -125,14 +160,17 @@ class CommandDispatcherTest {
     @Test
     fun theTreeSentToAClientIsFilteredByPermission() {
         val dispatcher = CommandDispatcher(testEnvironment())
-        dispatcher.register("me") { executes { 1 } }
+        dispatcher.register("me") {
+            permission("basalt.command.me")
+            executes { 1 }
+        }
         dispatcher.register("stop") {
-            requires(PermissionLevel.OWNERS)
+            permission("basalt.command.stop")
             executes { 1 }
         }
 
-        val everyone = dispatcher.treeFor(RecordingSource(permissionLevel = PermissionLevel.ALL))
-        val operator = dispatcher.treeFor(RecordingSource(permissionLevel = PermissionLevel.OWNERS))
+        val everyone = dispatcher.treeFor(RecordingSource(permissions = setOf("basalt.command.me")))
+        val operator = dispatcher.treeFor(RecordingSource(permissions = setOf("*")))
 
         assertEquals(listOf("me"), everyone.nodes.mapNotNull { it.name }.filter { it.isNotEmpty() })
         assertTrue(operator.nodes.any { it.name == "stop" })
@@ -197,8 +235,8 @@ class CommandDispatcherTest {
         assertEquals(1, dispatcher.execute(RecordingSource(), "w 3"))
         assertEquals(2, ran)
 
-        // Sub-commands inherit the command's permission, so a player below it sees neither form.
-        val outsider = RecordingSource(permissionLevel = PermissionLevel.ALL)
+        // Sub-commands inherit the command's permission, so someone without it sees neither form.
+        val outsider = RecordingSource(permissions = setOf("basalt.command.other"))
         assertEquals(0, dispatcher.execute(outsider, "warp 3"))
         assertEquals("Unknown command", outsider.messages.first())
         assertTrue(dispatcher.treeFor(outsider).nodes.none { it.name == "warp" || it.name == "w" })
@@ -282,25 +320,5 @@ class ArgumentTypeTest {
         val reader = StringReader("hello there world")
         assertEquals("hello there world", MessageArgument.parse(reader, source, environment))
         assertTrue(!reader.canRead())
-    }
-}
-
-class OperatorListTest {
-    @Test
-    fun namesAreCaseInsensitiveAndChangesAreReported() {
-        var persisted: Set<String>? = null
-        val operators = OperatorList(listOf("Whiron"), PermissionLevel.OWNERS) { persisted = it }
-
-        assertEquals(PermissionLevel.OWNERS, operators.levelOf("whiron"))
-        assertEquals(PermissionLevel.ALL, operators.levelOf("someone"))
-        assertNull(persisted)
-
-        assertTrue(operators.add("Someone"))
-        assertEquals(PermissionLevel.OWNERS, operators.levelOf("SOMEONE"))
-        assertEquals(setOf("whiron", "someone"), persisted)
-
-        assertTrue(!operators.add("someone"))
-        assertTrue(operators.remove("Whiron"))
-        assertEquals(PermissionLevel.ALL, operators.levelOf("whiron"))
     }
 }

@@ -4,6 +4,7 @@ import org.basaltmc.server.command.commands.DeopCommand
 import org.basaltmc.server.command.commands.EmoteCommand
 import org.basaltmc.server.command.commands.ExperienceCommand
 import org.basaltmc.server.command.commands.GameModeCommand
+import org.basaltmc.server.command.commands.GroupCommand
 import org.basaltmc.server.command.commands.HelpCommand
 import org.basaltmc.server.command.commands.ImportPlayersCommand
 import org.basaltmc.server.command.commands.KickCommand
@@ -43,6 +44,7 @@ public val VANILLA_COMMANDS: List<Command> =
         ExperienceCommand(),
         OpCommand(),
         DeopCommand(),
+        GroupCommand(),
         StopCommand(),
         ImportPlayersCommand(),
     )

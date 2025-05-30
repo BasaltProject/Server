@@ -81,6 +81,8 @@ public data class StoredPlayer(
     val xpProgress: Float,
     val xpTotal: Int,
     val gamemode: StoredGamemode,
+    /** Which permission group they are in, or null for whichever group is currently the default. */
+    val group: String? = null,
     val inventory: StoredInventory = StoredInventory.empty(),
     val enderChest: StoredInventory = StoredInventory.empty(ENDER_CHEST_SLOTS),
 ) {
