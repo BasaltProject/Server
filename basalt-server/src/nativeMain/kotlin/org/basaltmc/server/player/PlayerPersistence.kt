@@ -45,6 +45,8 @@ public object PlayerPersistence {
             xpTotal = session.experience.total,
             gamemode = StoredGamemode.entries[session.gamemode.ordinal],
             group = session.group,
+            stats = session.stats.snapshot(playTimeTicks),
+            inventory = session.inventory.snapshot(),
         )
 
     /** Puts a stored row back onto a freshly created session, in place. */
@@ -63,5 +65,7 @@ public object PlayerPersistence {
         session.gamemode = Gamemode.entries[stored.gamemode.ordinal]
         session.group = stored.group
         session.flying = session.gamemode == Gamemode.SPECTATOR
+        session.stats.restore(stored.stats)
+        session.inventory.restore(stored.inventory)
     }
 }

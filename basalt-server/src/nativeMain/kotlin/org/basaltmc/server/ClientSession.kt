@@ -50,6 +50,8 @@ import org.basaltmc.protocol.play.ClientboundBlockChangedAckPacket
 import org.basaltmc.protocol.play.ClientboundBlockUpdatePacket
 import org.basaltmc.protocol.play.ClientboundPlayerAbilitiesPacket
 import org.basaltmc.protocol.play.CommandsPacket
+import org.basaltmc.protocol.play.ContainerSetContentPacket
+import org.basaltmc.protocol.play.ContainerSetSlotPacket
 import org.basaltmc.protocol.play.EntityTeleportPacket
 import org.basaltmc.protocol.play.ForgetLevelChunkPacket
 import org.basaltmc.protocol.play.GameEventPacket
@@ -74,11 +76,13 @@ import org.basaltmc.protocol.play.ServerboundPlayerAbilitiesPacket
 import org.basaltmc.protocol.play.ServerboundPlayerActionPacket
 import org.basaltmc.protocol.play.ServerboundPositionLookPacket
 import org.basaltmc.protocol.play.ServerboundPositionPacket
+import org.basaltmc.protocol.play.ServerboundSetCarriedItemPacket
 import org.basaltmc.protocol.play.ServerboundUseItemOnPacket
 import org.basaltmc.protocol.play.SetChunkCacheCenterPacket
 import org.basaltmc.protocol.play.SetChunkCacheRadiusPacket
 import org.basaltmc.protocol.play.SetExperiencePacket
 import org.basaltmc.protocol.play.SetHealthPacket
+import org.basaltmc.protocol.play.SetHeldSlotPacket
 import org.basaltmc.protocol.play.SetSimulationDistancePacket
 import org.basaltmc.protocol.play.SignedChatCommandPacket
 import org.basaltmc.protocol.play.SpawnInfo
@@ -110,6 +114,7 @@ import org.basaltmc.server.world.LoadedWorld
 import org.basaltmc.server.world.WorldState
 import org.basaltmc.storage.PlayerStore
 import org.basaltmc.storage.StoredPlayer
+import org.basaltmc.storage.StoredStats
 import org.basaltmc.text.Component
 import org.basaltmc.text.LangTable
 import org.basaltmc.text.TextColor
@@ -202,6 +207,10 @@ public class ClientSession(
      */
     private val playerUi = PlayerUi(ui, placeholders, ::sendPlayPacket)
     private var uiTick = 0L
+
+    // Vanilla's optimistic-locking counter for container changes: bumped on every window write so
+    // the client can tell a click made against the current contents from a stale one.
+    private var containerStateId = 0
 
     // Persisted counters, carried across sessions. Play time is counted by the same 20 Hz loop that
     // ticks hunger, so it is ticks played rather than wall-clock time connected.
@@ -721,6 +730,11 @@ public class ClientSession(
         // player tick send them), which arrives at the same place one tick later.
         syncHealth()
         syncExperience()
+        // parity: `PlayerList.placeNewPlayer` sends the inventory here, after the level info and the
+        // player list, not among the chunk-radius packets above. Order matters on join: an earlier
+        // version of this code put a packet in the middle of that sequence and left real clients
+        // stuck on "loading terrain".
+        sendInventory()
 
         // The client only starts tracking/waiting for level chunks once it sees this event: without
         // it (confirmed live) the loading screen never dismisses even after every chunk and a
@@ -890,6 +904,19 @@ public class ClientSession(
                 val action = ServerboundPlayerActionPacket.read(body)
                 handlePlayerAction(action)
             }
+            ServerboundSetCarriedItemPacket.ID -> {
+                val slot = ServerboundSetCarriedItemPacket.read(body).slot
+                if (slot in 0 until ServerboundSetCarriedItemPacket.HOTBAR_SIZE) {
+                    playerSession?.inventory?.heldSlot = slot
+                }
+            }
+            CONTAINER_CLICK_ID -> {
+                // No click handling yet, so the click is refused rather than half-applied: the
+                // window goes back out as it really is and the client drops its prediction. Read
+                // nothing out of the body on purpose, since its shape is exactly the part that is
+                // not implemented.
+                sendInventory()
+            }
             ServerboundUseItemOnPacket.ID -> {
                 // Placing a block depends on which item the player is holding, and there's no
                 // inventory/held-item state to consult yet: acknowledged (so the client's own
@@ -951,11 +978,15 @@ public class ClientSession(
             return
         }
 
+        val broken = world.getBlockState(action.pos.x, action.pos.y, action.pos.z)
         val changed = world.setBlockState(action.pos.x, action.pos.y, action.pos.z, Blocks.AIR.stateId)
         sendCompressed(ClientboundBlockChangedAckPacket.ID) {
             ClientboundBlockChangedAckPacket(action.sequence).write(it)
         }
         if (!changed) return
+        broken?.let { stateId ->
+            Blocks.byStateId(stateId)?.let { playerSession?.stats?.increment(StoredStats.mined(it.block.toString())) }
+        }
 
         for (player in playersInSameWorld()) {
             player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
@@ -982,6 +1013,13 @@ public class ClientSession(
         session.food.addExhaustion(
             FoodData.movementExhaustion(x - session.x, z - session.z, session.sprinting, onGround),
         )
+        // Horizontal only, and only on the ground, which is how vanilla tells walking apart from
+        // falling and from being moved by something else.
+        if (onGround) {
+            val dx = x - session.x
+            val dz = z - session.z
+            session.stats.addWalked(kotlin.math.sqrt(dx * dx + dz * dz))
+        }
         session.x = x
         session.y = y
         session.z = z
@@ -1162,6 +1200,44 @@ public class ClientSession(
 
     // --- Player state ---
 
+    /**
+     * The whole inventory, and which slot is in hand.
+     *
+     * Also the answer to a click: this build has no click handling, so a click is refused by
+     * re-sending the window with a fresh state id. The client drops whatever it was predicting and
+     * matches the server again, which is a read-only inventory rather than a desynchronised one.
+     */
+    private fun sendInventory() {
+        val session = playerSession ?: return
+        val state = ++containerStateId
+        sendCompressed(ContainerSetContentPacket.ID) {
+            ContainerSetContentPacket(
+                containerId = ContainerSetContentPacket.PLAYER_INVENTORY,
+                stateId = state,
+                items = session.inventory.toWire(),
+            ).write(it)
+        }
+        sendCompressed(SetHeldSlotPacket.ID) { SetHeldSlotPacket(session.inventory.heldSlot).write(it) }
+    }
+
+    /** Re-sends the whole window, for a change that could have touched any slot. */
+    internal fun sendInventoryAll() {
+        sendInventory()
+    }
+
+    /** One slot changed, for when re-sending forty of them would be silly. */
+    internal fun sendInventorySlot(slot: Int) {
+        val session = playerSession ?: return
+        sendPlayPacket(ContainerSetSlotPacket.ID) {
+            ContainerSetSlotPacket(
+                containerId = ContainerSetContentPacket.PLAYER_INVENTORY,
+                stateId = ++containerStateId,
+                slot = slot,
+                item = session.inventory.toWire(slot),
+            ).write(it)
+        }
+    }
+
     /** Redraws whatever is due. Failures are swallowed: decoration must never drop a connection. */
     private fun tickUi() {
         if (!ui.anyEnabled) return
@@ -1212,6 +1288,7 @@ public class ClientSession(
     ) {
         val session = playerSession ?: return
         if (session.dead || session.invulnerable) return
+        session.stats.addDamageTaken(amount)
         session.health = maxOf(session.health - amount, 0f)
         if (session.health <= 0f) die(deathMessageId) else syncHealth()
     }
@@ -1233,6 +1310,7 @@ public class ClientSession(
         val session = playerSession ?: return
         session.dead = true
         session.health = 0f
+        session.stats.increment(StoredStats.DEATHS)
         syncHealth()
         val message = Component.translatable("death.attack.$deathMessageId", Component.text(session.name))
         sendCompressed(PlayerCombatKillPacket.ID) { PlayerCombatKillPacket(session.entityId, message).write(it) }
@@ -1621,6 +1699,9 @@ public class ClientSession(
 
         // parity: `DamageTypes.STARVE`'s message id, which the client renders as "<name> starved to death".
         const val DEATH_STARVE = "starve"
+
+        /** `ServerboundContainerClickPacket`, deliberately not decoded: see where it is handled. */
+        const val CONTAINER_CLICK_ID = 0x12
     }
 }
 

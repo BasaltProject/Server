@@ -7,6 +7,7 @@ import org.basaltmc.common.placeholder.PlaceholderValue
 import org.basaltmc.server.config.GroupsConfig
 import org.basaltmc.server.config.PingRequest
 import org.basaltmc.server.player.PlayerSession
+import org.basaltmc.storage.StoredStats
 import kotlin.math.roundToInt
 
 /**
@@ -91,6 +92,12 @@ public class PlayerPlaceholders(
             return PlaceholderValue.Text(value.toString())
         }
         NOT_IMPLEMENTED[params]?.let { return notImplemented(it) }
+        if (params.startsWith(STAT_PREFIX) && params.length > STAT_PREFIX.length) {
+            val key = params.removePrefix(STAT_PREFIX)
+            // Written without the namespaces for readability: `stat_mined_stone` rather than the
+            // full `minecraft:mined/minecraft:stone` a file would otherwise have to spell out.
+            return session?.let { PlaceholderValue.of(it.stats[expandStatKey(key)]) } ?: needsPlayer(ping)
+        }
         if (params.startsWith(PERMISSION_PREFIX) && params.length > PERMISSION_PREFIX.length) {
             val node = params.removePrefix(PERMISSION_PREFIX)
             return session?.let { PlaceholderValue.of(groups.resolve(it.group, node)) } ?: needsPlayer(ping)
@@ -121,6 +128,25 @@ public class PlayerPlaceholders(
 
     private companion object {
         const val NO_SUBJECT = "this text is not about any player"
+        const val STAT_PREFIX = "stat_"
+
+        /**
+         * `mined_stone` to `minecraft:mined/minecraft:stone`, and `deaths` to
+         * `minecraft:custom/minecraft:deaths`.
+         *
+         * A key already carrying a namespace is left alone, so anything vanilla can name can still
+         * be named in full.
+         */
+        fun expandStatKey(key: String): String {
+            if (':' in key) return key
+            val category = StoredStats.MINED.substringAfter(':')
+            return if (key.startsWith("${category}_")) {
+                StoredStats.mined("minecraft:${key.removePrefix("${category}_")}")
+            } else {
+                StoredStats.custom(key)
+            }
+        }
+
         const val NOT_RECOGNISED =
             "nobody has connected from that address before, so there is no name to greet. " +
                 "Put the greeting in a profile with when = [\"%basalt_player_known%\"]"

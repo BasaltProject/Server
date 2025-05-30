@@ -20,6 +20,7 @@ import org.basaltmc.protocol.play.ChunkBatchReceivedPacket
 import org.basaltmc.protocol.play.ChunkBatchStartPacket
 import org.basaltmc.protocol.play.ClientboundPlayerAbilitiesPacket
 import org.basaltmc.protocol.play.CommandsPacket
+import org.basaltmc.protocol.play.ContainerSetContentPacket
 import org.basaltmc.protocol.play.EntityTeleportPacket
 import org.basaltmc.protocol.play.ForgetLevelChunkPacket
 import org.basaltmc.protocol.play.GameEventPacket
@@ -34,6 +35,7 @@ import org.basaltmc.protocol.play.SetChunkCacheCenterPacket
 import org.basaltmc.protocol.play.SetChunkCacheRadiusPacket
 import org.basaltmc.protocol.play.SetExperiencePacket
 import org.basaltmc.protocol.play.SetHealthPacket
+import org.basaltmc.protocol.play.SetHeldSlotPacket
 import org.basaltmc.protocol.play.SetSimulationDistancePacket
 import org.basaltmc.protocol.play.SpawnPositionPacket
 import org.basaltmc.protocol.play.SystemChatPacket
@@ -44,6 +46,7 @@ import org.basaltmc.protocol.writeProtocolString
 import org.basaltmc.protocol.writeVarInt
 import org.basaltmc.storage.PlayerStore
 import org.basaltmc.storage.StoredGamemode
+import org.basaltmc.storage.StoredInventory
 import org.basaltmc.storage.StoredPlayer
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -182,6 +185,19 @@ class PlayFlowIntegrationTest {
         val experienceBody = readFrame(connection, incoming, compressionEnabled = true)
         assertEquals(SetExperiencePacket.ID, experienceBody.readVarInt())
         SetExperiencePacket.read(experienceBody)
+
+        // parity: `PlayerList.placeNewPlayer` sends the inventory here, after the player list and
+        // the HUD state, not among the chunk-radius packets earlier. This sequence is the parity
+        // claim, so a new packet belongs in it at the position vanilla puts it.
+        val inventoryBody = readFrame(connection, incoming, compressionEnabled = true)
+        assertEquals(ContainerSetContentPacket.ID, inventoryBody.readVarInt())
+        val inventory = ContainerSetContentPacket.read(inventoryBody)
+        assertEquals(StoredInventory.PLAYER_SLOTS, inventory.items.size)
+        assertTrue(inventory.items.all { it == null })
+
+        val heldSlotBody = readFrame(connection, incoming, compressionEnabled = true)
+        assertEquals(SetHeldSlotPacket.ID, heldSlotBody.readVarInt())
+        assertEquals(0, SetHeldSlotPacket.read(heldSlotBody).slot)
 
         val gameEventBody = readFrame(connection, incoming, compressionEnabled = true)
         assertEquals(GameEventPacket.ID, gameEventBody.readVarInt())

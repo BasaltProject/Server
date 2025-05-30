@@ -4,6 +4,7 @@ import org.basaltmc.server.command.commands.DeopCommand
 import org.basaltmc.server.command.commands.EmoteCommand
 import org.basaltmc.server.command.commands.ExperienceCommand
 import org.basaltmc.server.command.commands.GameModeCommand
+import org.basaltmc.server.command.commands.GiveCommand
 import org.basaltmc.server.command.commands.GroupCommand
 import org.basaltmc.server.command.commands.HelpCommand
 import org.basaltmc.server.command.commands.ImportPlayersCommand
@@ -16,6 +17,7 @@ import org.basaltmc.server.command.commands.SayCommand
 import org.basaltmc.server.command.commands.SeedCommand
 import org.basaltmc.server.command.commands.StopCommand
 import org.basaltmc.server.command.commands.TeleportCommand
+import org.basaltmc.server.command.commands.WorldCommand
 
 /**
  * Every command Basalt currently understands, in the order they are registered.
@@ -28,9 +30,9 @@ import org.basaltmc.server.command.commands.TeleportCommand
  * What is *not* here is most of vanilla's command set (the world, scoreboard, data and datapack
  * families) plus the selector filter syntax: both are declared gaps, not silent ones.
  *
- * `import-players` and `placeholder` are the two with no vanilla counterpart, because they
- * administer things vanilla does not have: a player database outside the world directories, and a
- * placeholder registry.
+ * `import-players`, `placeholder` and `world` are the three with no vanilla counterpart, because
+ * they administer things vanilla does not have: a player database outside the world directories, a
+ * placeholder registry, and more than one world to stand in.
  */
 public val VANILLA_COMMANDS: List<Command> =
     listOf(
@@ -41,7 +43,9 @@ public val VANILLA_COMMANDS: List<Command> =
         SayCommand(),
         EmoteCommand(),
         GameModeCommand(),
+        GiveCommand(),
         TeleportCommand(),
+        WorldCommand(),
         KillCommand(),
         KickCommand(),
         ExperienceCommand(),
