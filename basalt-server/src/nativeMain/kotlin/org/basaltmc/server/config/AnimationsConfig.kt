@@ -16,28 +16,34 @@ internal const val ANIMATIONS_DEFAULT_TOML = """# Animations: text that changes 
 # wrap live data. It cannot contain another animation: that is the one thing that
 # would loop forever.
 #
-# Nothing animates faster than the thing drawing it refreshes. The tab list
-# refreshes every `update-interval-ticks` (20 ticks = 1 second by default), so a
-# 100ms animation there still only changes once a second. Lower that interval if
-# you want it smoother, and remember it is a packet per player per refresh.
+# Nothing animates faster than the thing drawing it refreshes, and nothing
+# redraws faster than one tick (50ms). Asking for less than that is not wrong, it
+# just means frames are skipped. Lower `update-interval-ticks` to see more of
+# them, and remember every redraw that changes anything is a packet per player.
 
 [animations.website]
 # The classic scrolling shine, one frame per position of the highlight.
-change-interval-ms = 200
+change-interval-ms = 100
 frames = [
-    "<white>basaltmc.org</white>",
-    "<gray>b</gray><white>asaltmc.org</white>",
-    "<gray>ba</gray><white>saltmc.org</white>",
-    "<gray>bas</gray><white>altmc.org</white>",
-    "<gray>basa</gray><white>ltmc.org</white>",
-    "<gray>basal</gray><white>tmc.org</white>",
-    "<gray>basalt</gray><white>mc.org</white>",
-    "<gray>basaltm</gray><white>c.org</white>",
-    "<gray>basaltmc</gray><white>.org</white>",
-    "<gray>basaltmc.</gray><white>org</white>",
-    "<gray>basaltmc.o</gray><white>rg</white>",
-    "<gray>basaltmc.or</gray><white>g</white>",
-    "<gray>basaltmc.org</gray>",
+    "<gray>b</gray><dark_gray>asaltmc.org</dark_gray>",
+    "<white>b</white><gray>a</gray><dark_gray>saltmc.org</dark_gray>",
+    "<white>ba</white><gray>s</gray><dark_gray>altmc.org</dark_gray>",
+    "<white>bas</white><gray>a</gray><dark_gray>ltmc.org</dark_gray>",
+    "<gray>b</gray><white>asa</white><gray>l</gray><dark_gray>tmc.org</dark_gray>",
+    "<dark_gray>b</dark_gray><gray>a</gray><white>sal</white><gray>t</gray><dark_gray>mc.org</dark_gray>",
+    "<dark_gray>ba</dark_gray><gray>s</gray><white>alt</white><gray>m</gray><dark_gray>c.org</dark_gray>",
+    "<dark_gray>bas</dark_gray><gray>a</gray><white>ltm</white><gray>c</gray><dark_gray>.org</dark_gray>",
+    "<dark_gray>basa</dark_gray><gray>l</gray><white>tmc</white><gray>.</gray><dark_gray>org</dark_gray>",
+    "<dark_gray>basal</dark_gray><gray>t</gray><white>mc.</white><gray>o</gray><dark_gray>rg</dark_gray>",
+    "<dark_gray>basalt</dark_gray><gray>m</gray><white>c.o</white><gray>r</gray><dark_gray>g</dark_gray>",
+    "<dark_gray>basaltm</dark_gray><gray>c</gray><white>.or</white><gray>g</gray>",
+    "<dark_gray>basaltmc</dark_gray><gray>.</gray><white>org</white>",
+    "<dark_gray>basaltmc.</dark_gray><gray>o</gray><white>rg</white>",
+    "<dark_gray>basaltmc.o</dark_gray><gray>r</gray><white>g</white>",
+    "<dark_gray>basaltmc.or</dark_gray><gray>g</gray>",
+    "<dark_gray>basaltmc.org</dark_gray>",
+    "<dark_gray>basaltmc.org</dark_gray>",
+    "<dark_gray>basaltmc.org</dark_gray>",
 ]
 
 [animations.dots]
@@ -76,8 +82,14 @@ public class AnimationsConfig(
     public companion object {
         public const val FILE_NAME: String = "animations.toml"
 
-        /** Below this an animation would just burn packets: nothing redraws that fast. */
-        private const val MINIMUM_INTERVAL_MILLIS = 50L
+        /**
+         * A floor low enough not to silently rewrite what the file asks for.
+         *
+         * It used to be 50 (one tick, the fastest anything can redraw), which quietly turned a
+         * `change-interval-ms = 20` into 50: the file said one thing and the server did another.
+         * Asking for less than a tick is a legitimate choice, it just skips frames.
+         */
+        private const val MINIMUM_INTERVAL_MILLIS = 1L
 
         public fun load(
             directory: ConfigDirectory = ConfigDirectory(),
