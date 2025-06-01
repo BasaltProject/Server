@@ -8,6 +8,8 @@ import org.basaltmc.auth.SessionProfileProperty
 import org.basaltmc.common.logging.Logger
 import org.basaltmc.common.placeholder.PlaceholderContext
 import org.basaltmc.common.placeholder.PlaceholderRegistry
+import org.basaltmc.common.timings.Timings
+import org.basaltmc.common.timings.time
 import org.basaltmc.io.ByteBuffer
 import org.basaltmc.io.NativeMutex
 import org.basaltmc.io.NativeThread
@@ -178,6 +180,8 @@ public class ClientSession(
     private val rememberAddress: String? = null,
     private val ui: () -> UiConfigs = { UiConfigs() },
     private val placeholders: PlaceholderRegistry = PlaceholderRegistry(),
+    /** Where this connection's share of the server's time is recorded. Off unless `/timings` is on. */
+    private val timings: Timings = Timings(),
 ) {
     private val logger = Logger("Session")
 
@@ -271,9 +275,11 @@ public class ClientSession(
                         // cannot then be handed an enormous burst all at once.
                         sendBudget = minOf(sendBudget + desiredChunksPerTick, MAX_BURST_CHUNKS)
                         val allowed = sendBudget.toInt()
-                        if (allowed > 0) sendBudget -= flushReadyChunks(allowed).toFloat()
-                        tickPlayer()
-                        tickUi()
+                        if (allowed > 0) {
+                            timings.of("player.chunks").time { sendBudget -= flushReadyChunks(allowed).toFloat() }
+                        }
+                        timings.of("player.tick").time { tickPlayer() }
+                        timings.of("player.ui").time { tickUi() }
                         sendKeepAliveIfDue()
                     }
                     sleepMillis(OUTBOUND_INTERVAL_MILLIS)
@@ -334,6 +340,13 @@ public class ClientSession(
         // Remembered, not passed around: the only reader is the failure path in [run], and knowing
         // which packet a decoder died on is the difference between a one-line fix and a hunt.
         lastPacketId = packetId
+        timings.of("network.packet").time { handleFrameBody(packetId, body) }
+    }
+
+    private fun handleFrameBody(
+        packetId: Int,
+        body: ByteBuffer,
+    ) {
         when (state) {
             ProtocolState.HANDSHAKE -> handleHandshake(packetId, body)
             ProtocolState.STATUS -> handleStatus(packetId, body)

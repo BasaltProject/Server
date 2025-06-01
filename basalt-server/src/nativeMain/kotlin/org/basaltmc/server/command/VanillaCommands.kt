@@ -35,8 +35,9 @@ import org.basaltmc.server.command.commands.WorldCommand
  * directories, a placeholder registry, more than one world to stand in, and configuration that is
  * read on every use rather than once at startup.
  *
- * `reload` is not in this list because it needs the running server's own configuration holder to
- * swap, so it is registered by [org.basaltmc.server.BasaltServer] instead of built from nothing.
+ * `reload`, `restart` and `timings` are not in this list because each needs something the running
+ * server owns (its configuration holder, its own lifecycle, its counters), so they are registered by
+ * [org.basaltmc.server.BasaltServer] instead of built from nothing.
  */
 public val VANILLA_COMMANDS: List<Command> =
     listOf(

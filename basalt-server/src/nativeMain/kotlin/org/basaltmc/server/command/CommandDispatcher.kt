@@ -1,5 +1,6 @@
 package org.basaltmc.server.command
 
+import org.basaltmc.common.timings.time
 import org.basaltmc.protocol.play.ArgumentParser
 import org.basaltmc.protocol.play.CommandNodeData
 import org.basaltmc.protocol.play.CommandsPacket
@@ -273,7 +274,19 @@ public class CommandDispatcher(
         input: String,
     ): Int {
         val reader = StringReader(input)
-        return try {
+        // Named after the command, so a report shows which one is slow rather than that "commands"
+        // are. The name comes from the input rather than the parse, since a command that fails to
+        // parse still cost whatever it cost.
+        val timing = environment.timings.of("command." + input.substringBefore(' ').lowercase())
+        return timing.time { run(reader, source, input) }
+    }
+
+    private fun run(
+        reader: StringReader,
+        source: CommandSource,
+        input: String,
+    ): Int =
+        try {
             val parsed = parse(reader, root, source, emptyMap())
             val executor =
                 parsed.executor
@@ -287,7 +300,6 @@ public class CommandDispatcher(
             feedback.failure(source, Component.translatable("command.failed"))
             0
         }
-    }
 
     private class ParseResult(
         val executor: CommandExecutor?,
