@@ -24,8 +24,9 @@ public object VoidWorldGenerator {
         spawnY: Int = 64,
         spawnZ: Int = 8,
         platformRadius: Int = DEFAULT_PLATFORM_RADIUS,
+        verticalBounds: ChunkHeight = ChunkHeight.OVERWORLD,
     ): Chunk {
-        val chunk = Chunk(chunkX, chunkZ)
+        val chunk = Chunk(chunkX, chunkZ, verticalBounds)
         if (platformRadius <= 0) return chunk
         // Only the chunks the platform actually reaches do any work; everything else stays air.
         for (x in 0 until 16) {

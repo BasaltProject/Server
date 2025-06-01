@@ -13,14 +13,25 @@ import org.basaltmc.world.GenerationMetrics
 public class NormalNoise private constructor(
     random: BasaltRandom,
     public val parameters: NoiseParameters,
+    useNewInitialization: Boolean,
 ) {
     public class NoiseParameters(
         public val firstOctave: Int,
         public val amplitudes: DoubleArray,
     )
 
-    private val first: PerlinNoise = PerlinNoise.create(random, parameters.firstOctave, parameters.amplitudes)
-    private val second: PerlinNoise = PerlinNoise.create(random, parameters.firstOctave, parameters.amplitudes)
+    private val first: PerlinNoise =
+        if (useNewInitialization) {
+            PerlinNoise.create(random, parameters.firstOctave, parameters.amplitudes)
+        } else {
+            PerlinNoise.createLegacyForLegacyNetherBiome(random, parameters.firstOctave, parameters.amplitudes)
+        }
+    private val second: PerlinNoise =
+        if (useNewInitialization) {
+            PerlinNoise.create(random, parameters.firstOctave, parameters.amplitudes)
+        } else {
+            PerlinNoise.createLegacyForLegacyNetherBiome(random, parameters.firstOctave, parameters.amplitudes)
+        }
     private val valueFactor: Double
     public val maxValue: Double
 
@@ -59,7 +70,14 @@ public class NormalNoise private constructor(
             random: BasaltRandom,
             firstOctave: Int,
             amplitudes: DoubleArray,
-        ): NormalNoise = NormalNoise(random, NoiseParameters(firstOctave, amplitudes))
+        ): NormalNoise = NormalNoise(random, NoiseParameters(firstOctave, amplitudes), useNewInitialization = true)
+
+        /** // parity: `NormalNoise.createLegacyNetherBiome`. */
+        public fun createLegacyNetherBiome(
+            random: BasaltRandom,
+            firstOctave: Int,
+            amplitudes: DoubleArray,
+        ): NormalNoise = NormalNoise(random, NoiseParameters(firstOctave, amplitudes), useNewInitialization = false)
 
         private fun expectedDeviation(octaveSpan: Int): Double = 0.1 * (1.0 + 1.0 / (octaveSpan + 1))
     }

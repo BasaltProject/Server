@@ -12,7 +12,7 @@ class BiomesTest {
     }
 
     @Test
-    fun everyOverworldBiomeFromTheRealBootstrapOrderIsRegistered() {
+    fun everyVanillaBiomeIsRegistered() {
         val expected =
             listOf(
                 "plains",
@@ -70,6 +70,17 @@ class BiomesTest {
                 "lush_caves",
                 "deep_dark",
                 "sulfur_caves",
+                "the_void",
+                "nether_wastes",
+                "warped_forest",
+                "crimson_forest",
+                "soul_sand_valley",
+                "basalt_deltas",
+                "the_end",
+                "end_highlands",
+                "end_midlands",
+                "small_end_islands",
+                "end_barrens",
             )
         expected.forEachIndexed { id, path ->
             val biome = Biomes.REGISTRY.byId(id)

@@ -14,7 +14,6 @@ import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.LogFile
 import org.basaltmc.io.ShutdownSignal
 import org.basaltmc.io.SocketException
-import org.basaltmc.random.XoroshiroRandom
 import org.basaltmc.server.command.ConsoleReader
 import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.server.config.ColorMode
@@ -22,15 +21,8 @@ import org.basaltmc.server.config.LiveConfigs
 import org.basaltmc.server.config.ServerListConfig
 import org.basaltmc.server.config.TomlFormatException
 import org.basaltmc.server.config.WorldsConfig
-import org.basaltmc.server.world.RealNoiseParameters
-import org.basaltmc.server.world.RealSurfaceEnvironment
-import org.basaltmc.server.world.VillageDataLoader
-import org.basaltmc.server.world.WorldMetadata
+import org.basaltmc.server.world.VanillaWorldGeneratorFactory
 import org.basaltmc.storage.PlayerDatabaseSchemaException
-import org.basaltmc.world.densityfunction.BlendedNoise
-import org.basaltmc.world.structure.StructurePlacementGrid
-import org.basaltmc.world.terrain.NoiseRouterData
-import org.basaltmc.world.terrain.VillageStructureGenerator
 import platform.posix.STDOUT_FILENO
 import platform.posix.isatty
 import kotlin.system.exitProcess
@@ -152,8 +144,6 @@ private fun buildServer(attachedToTerminal: Boolean): BasaltServer {
         }
     assetsLogger.info { "${BuildInfo.MINECRAFT_VERSION} data ready at $dataRoot." }
 
-    // Real Overworld density-function router (see NoiseRouterData/TerrainProvider), built once at
-    // startup and reused for every generated chunk.
     val worldsConfig = WorldsConfig.load(logger = Logger("Config"))
     // The MOTD is the one thing the server list takes from a vanilla server.properties, and only
     // while generating the file for the first time.
@@ -161,50 +151,17 @@ private fun buildServer(attachedToTerminal: Boolean): BasaltServer {
     // server.properties happens exactly once, here.
     ServerListConfig.load(legacyMotd = BasaltConfig.legacyMotd(), logger = Logger("Config"))
     val live = LiveConfigs(LiveConfigs.read(logger = Logger("Config")))
-    // The seed comes from the world itself, not from configuration: a world already on disk was
-    // generated with one, and that is the one its terrain matches.
-    val worldMetadata =
-        WorldMetadata.loadOrCreate(
-            worldRoot = "worlds/${worldsConfig.default.name}",
-            declaredSeed = worldsConfig.default.seed,
-            defaultSpawn = WorldMetadata.DEFAULT_SPAWN,
-        )
-    val noiseRandom = XoroshiroRandom(worldMetadata.seed).forkPositional()
-    val realNoises = RealNoiseParameters(serverJar, noiseRandom)
-    val base3d = BlendedNoise.createUnseeded(0.25, 0.125, 80.0, 160.0, 8.0)
-    val overworldRouter = NoiseRouterData.overworld(realNoises::get, base3d)
-    val surfaceEnvironment = RealSurfaceEnvironment(serverJar, noiseRandom, overworldRouter)
-
-    // Real villages.json placement values (spacing 34, separation 8, salt 10387312) and each
-    // variant's own start_pool/size (all five share size 6 and max_distance_from_center 80): see
-    // VillageStructureGenerator's own KDoc for the documented gaps in what actually gets placed.
-    val villageLoader = VillageDataLoader(serverJar)
-    val villageGrid = StructurePlacementGrid(spacing = 34, separation = 8, salt = 10387312)
-    val villageGenerator =
-        VillageStructureGenerator(
-            overworldRouter,
-            villageGrid,
-            biomeAt = surfaceEnvironment::biomeAt,
-            maxDepth = 6,
-            maxDistanceFromCenter = 80,
-            poolLookup = villageLoader.poolLookup,
-            templateLoader = villageLoader.templateLoader,
-        )
-
     val onlineMode = if (config.onlineMode) OnlineMode(SessionKeyPair.generate(), MojangSessionService()) else null
     // Console-only: clients translate for themselves, a log file cannot. Unpacked from the same
     // server.jar as everything else, so this costs no extra download.
     val lang = LangAssets.loadCachedOrEmpty(dataRoot)
     return BasaltServer(
-        config,
-        onlineMode,
-        overworldRouter,
-        surfaceEnvironment,
-        villageGenerator,
-        worldsConfig,
-        live,
-        lang,
-        worldMetadata,
+        config = config,
+        onlineMode = onlineMode,
+        worldGeneratorFactory = VanillaWorldGeneratorFactory(serverJar),
+        worldsConfig = worldsConfig,
+        live = live,
+        lang = lang,
     )
 }
 

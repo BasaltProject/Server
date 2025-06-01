@@ -27,8 +27,8 @@ public class ChunkSection {
         if (!blockStateIds.set(at, stateId)) return false
         if (previous != Blocks.AIR.stateId) trackedNonAirBlockCount--
         if (stateId != Blocks.AIR.stateId) trackedNonAirBlockCount++
-        if (Blocks.hasWaterFluid(previous)) trackedNonEmptyFluidCount--
-        if (Blocks.hasWaterFluid(stateId)) trackedNonEmptyFluidCount++
+        if (Blocks.hasFluid(previous)) trackedNonEmptyFluidCount--
+        if (Blocks.hasFluid(stateId)) trackedNonEmptyFluidCount++
         return true
     }
 
@@ -45,6 +45,11 @@ public class ChunkSection {
         biomeId: Int,
     ) {
         biomeIds[biomeIndex(quartX, quartY, quartZ)] = biomeId
+    }
+
+    /** Overwrites all 64 quart-resolution biome IDs in wire order. */
+    public fun setBiomeIds(ids: IntArray) {
+        biomeIds.setAll(ids)
     }
 
     /** A copy of the raw biome IDs, in `(y * 4 + z) * 4 + x` order: the layout the biome `PalettedContainer` expects. */
@@ -70,7 +75,7 @@ public class ChunkSection {
     public fun setBlockStateIds(ids: IntArray) {
         blockStateIds.setAll(ids)
         trackedNonAirBlockCount = ids.count { it != Blocks.AIR.stateId }
-        trackedNonEmptyFluidCount = ids.count(Blocks::hasWaterFluid)
+        trackedNonEmptyFluidCount = ids.count(Blocks::hasFluid)
     }
 
     private fun index(

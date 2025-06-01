@@ -6,12 +6,13 @@ import org.basaltmc.nbt.NbtString
 import org.basaltmc.nbt.NbtTag
 import org.basaltmc.nbt.NbtType
 import org.basaltmc.protocol.play.BitStorage
+import org.basaltmc.registry.Biomes
 import org.basaltmc.registry.Blocks
 import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.ChunkBlockEntity
+import org.basaltmc.world.ChunkHeight
 import org.basaltmc.world.ChunkSection
-import org.basaltmc.world.WorldHeight
 
 /** Thrown for chunk NBT that doesn't parse: an unknown block, a missing palette, a corrupt section. */
 public class ChunkNbtException(
@@ -36,24 +37,27 @@ public class ChunkNbtException(
  * Non-default states emitted by worldgen preserve their vanilla `Properties` compound in the
  * palette and resolve it back to the same network state ID when loaded. Deliberately out of scope
  * for now: block/light data (`BlockLight`/`SkyLight`), entities, ticks, heightmaps, and structures.
- * Block entities preserve full custom NBT plus vanilla id/x/y/z metadata. Biomes are always a
- * single-entry `minecraft:plains` palette, matching [Chunk]'s
- * own single-biome model.
+ * Block entities preserve full custom NBT plus vanilla id/x/y/z metadata. Section biome palettes
+ * preserve the actual quart-resolution IDs generated for every dimension.
  */
 public object ChunkNbt {
     // world_version for Minecraft 26.2, per the project's own protocol constants.
     private const val DATA_VERSION = 4903
     private const val BLOCK_MIN_INDIRECT_BITS = 4
     private const val BLOCK_MAX_INDIRECT_BITS = 8
+    private const val BIOME_MIN_INDIRECT_BITS = 1
+    private const val BIOME_MAX_INDIRECT_BITS = 3
     private const val SECTION_BLOCK_COUNT = 16 * 16 * 16
+    private const val SECTION_BIOME_COUNT = 4 * 4 * 4
     private val blockDirectBits = bitsFor(Blocks.stateCount)
+    private val biomeDirectBits = bitsFor(Biomes.REGISTRY.size)
     private val BLOCK_ENTITY_METADATA_KEYS = setOf("id", "x", "y", "z", "keepPacked")
 
     public fun write(chunk: Chunk): NbtCompound {
         val tag = NbtCompound()
         tag.putInt("DataVersion", DATA_VERSION)
         tag.putInt("xPos", chunk.chunkX)
-        tag.putInt("yPos", WorldHeight.MIN_SECTION)
+        tag.putInt("yPos", chunk.verticalBounds.minSection)
         tag.putInt("zPos", chunk.chunkZ)
         tag.putLong("LastUpdate", 0L)
         tag.putLong("InhabitedTime", 0L)
@@ -62,9 +66,9 @@ public object ChunkNbt {
         val sections = mutableListOf<NbtTag>()
         for (i in 0 until chunk.sectionCount) {
             val sectionTag = NbtCompound()
-            sectionTag.putByte("Y", (WorldHeight.MIN_SECTION + i).toByte())
+            sectionTag.putByte("Y", (chunk.verticalBounds.minSection + i).toByte())
             sectionTag["block_states"] = encodeBlockStates(chunk.section(i))
-            sectionTag["biomes"] = encodeBiomes()
+            sectionTag["biomes"] = encodeBiomes(chunk.section(i))
             sections += sectionTag
         }
         tag["sections"] = NbtList(NbtType.COMPOUND, sections)
@@ -72,16 +76,21 @@ public object ChunkNbt {
         return tag
     }
 
-    public fun read(tag: NbtCompound): Chunk {
-        val chunk = Chunk(tag.getInt("xPos"), tag.getInt("zPos"))
+    public fun read(
+        tag: NbtCompound,
+        verticalBounds: ChunkHeight = ChunkHeight.OVERWORLD,
+    ): Chunk {
+        val chunk = Chunk(tag.getInt("xPos"), tag.getInt("zPos"), verticalBounds)
         val sections = tag.getList("sections") ?: throw ChunkNbtException("missing sections list")
         for (sectionEntry in sections) {
             val sectionTag = sectionEntry as? NbtCompound ?: throw ChunkNbtException("section entry is not a compound")
             val y = sectionTag.getByte("Y").toInt()
-            val index = y - WorldHeight.MIN_SECTION
+            val index = y - verticalBounds.minSection
             if (index !in 0 until chunk.sectionCount) continue
             val blockStates = sectionTag.getCompound("block_states")
             chunk.section(index).setBlockStateIds(decodeBlockStates(blockStates))
+            val biomes = sectionTag.getCompound("biomes")
+            chunk.section(index).setBiomeIds(decodeBiomes(biomes))
         }
         val blockEntities = tag.getList("block_entities")
         if (blockEntities != null) {
@@ -114,7 +123,7 @@ public object ChunkNbt {
         val worldZ = tag.getInt("z")
         val localX = worldX - chunk.chunkX * 16
         val localZ = worldZ - chunk.chunkZ * 16
-        if (localX !in 0..15 || localZ !in 0..15 || y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
+        if (localX !in 0..15 || localZ !in 0..15 || y !in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) {
             throw ChunkNbtException(
                 "block entity $id at ($worldX,$y,$worldZ) is outside chunk (${chunk.chunkX},${chunk.chunkZ})",
             )
@@ -132,6 +141,7 @@ public object ChunkNbt {
             minIndirectBits = BLOCK_MIN_INDIRECT_BITS,
             maxIndirectBits = BLOCK_MAX_INDIRECT_BITS,
             directBits = blockDirectBits,
+            elementType = NbtType.COMPOUND,
         ) { stateId ->
             val block =
                 Blocks.byStateId(stateId) ?: throw ChunkNbtException("no block registered for state id $stateId")
@@ -145,11 +155,19 @@ public object ChunkNbt {
             entry
         }
 
-    private fun encodeBiomes(): NbtCompound {
-        val tag = NbtCompound()
-        tag["palette"] = NbtList(NbtType.STRING, listOf(NbtString(PLAINS_BIOME)))
-        return tag
-    }
+    private fun encodeBiomes(section: ChunkSection): NbtCompound =
+        encodePalette(
+            values = section.biomeIds(),
+            minIndirectBits = BIOME_MIN_INDIRECT_BITS,
+            maxIndirectBits = BIOME_MAX_INDIRECT_BITS,
+            directBits = biomeDirectBits,
+            elementType = NbtType.STRING,
+        ) { biomeId ->
+            val identifier =
+                Biomes.REGISTRY.identifierOf(biomeId)
+                    ?: throw ChunkNbtException("no biome registered for id $biomeId")
+            NbtString(identifier.toString())
+        }
 
     private fun decodeBlockStates(tag: NbtCompound): IntArray {
         val paletteList = tag.getList("palette") ?: throw ChunkNbtException("missing block_states palette")
@@ -181,18 +199,39 @@ public object ChunkNbt {
         )
     }
 
+    private fun decodeBiomes(tag: NbtCompound): IntArray {
+        val paletteList = tag.getList("palette") ?: throw ChunkNbtException("missing biomes palette")
+        val paletteIds =
+            paletteList.map { entry ->
+                val identifier =
+                    (entry as? NbtString)?.value?.let(Identifier::parse)
+                        ?: throw ChunkNbtException("invalid biome palette entry: $entry")
+                Biomes.REGISTRY.idOf(identifier)
+                    ?: throw ChunkNbtException("unknown biome $identifier")
+            }
+        return decodePalette(
+            paletteIds = paletteIds,
+            data = tag.getLongArray("data"),
+            entryCount = SECTION_BIOME_COUNT,
+            minIndirectBits = BIOME_MIN_INDIRECT_BITS,
+            maxIndirectBits = BIOME_MAX_INDIRECT_BITS,
+            directBits = biomeDirectBits,
+        )
+    }
+
     private inline fun encodePalette(
         values: IntArray,
         minIndirectBits: Int,
         maxIndirectBits: Int,
         directBits: Int,
+        elementType: NbtType,
         elementToNbt: (Int) -> NbtTag,
     ): NbtCompound {
         val palette = LinkedHashSet<Int>()
         for (value in values) palette.add(value)
 
         val tag = NbtCompound()
-        tag["palette"] = NbtList(NbtType.COMPOUND, palette.map(elementToNbt))
+        tag["palette"] = NbtList(elementType, palette.map(elementToNbt))
         if (palette.size == 1) return tag
 
         val neededBits = bitsFor(palette.size)
@@ -231,6 +270,4 @@ public object ChunkNbt {
         while ((1 shl bits) < distinctCount) bits++
         return bits
     }
-
-    private const val PLAINS_BIOME = "minecraft:plains"
 }

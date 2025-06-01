@@ -1,13 +1,12 @@
 package org.basaltmc.server.registry
 
 import org.basaltmc.nbt.NbtCompound
-import org.basaltmc.nbt.NbtList
+import org.basaltmc.nbt.NbtInt
 import org.basaltmc.nbt.NbtString
-import org.basaltmc.nbt.NbtType
+import org.basaltmc.nbt.NbtTag
 import org.basaltmc.text.Component
 import org.basaltmc.text.ComponentNbt
 import org.basaltmc.text.TextColor
-import org.basaltmc.world.WorldHeight
 
 /**
  * Hand-authored NBT for the 15 registries a real 26.2 client needs during Configuration to reach
@@ -20,43 +19,217 @@ import org.basaltmc.world.WorldHeight
  * properly later.
  */
 public object VanillaRegistryData {
-    public fun overworldDimensionType(): NbtCompound =
-        NbtCompound().apply {
-            putBoolean("has_skylight", true)
-            putBoolean("has_ceiling", false)
-            putBoolean("has_ender_dragon_fight", false)
-            putDouble("coordinate_scale", 1.0)
-            putInt("min_y", WorldHeight.MIN_Y)
-            putInt("height", WorldHeight.HEIGHT)
-            putInt("logical_height", WorldHeight.HEIGHT)
-            // A literal block id, not a "#tag" reference: tags need a `tags` packet (not sent yet) to
-            // resolve against, but static registries like Block are never network-synced, so a plain
-            // id resolves against the client's own built-in registry regardless of known-packs state.
-            this["infiniburn"] = NbtList(NbtType.STRING, listOf(NbtString("minecraft:magma_block")))
-            putFloat("ambient_light", 0.0f)
-            // IntProviders.codec's Either<Int, IntProvider>: a bare int is shorthand for a constant provider.
-            putInt("monster_spawn_light_level", 0)
-            putInt("monster_spawn_block_light_limit", 0)
-            // `attributes` is `EnvironmentAttributeMap`'s codec: absent entirely defaults to EMPTY, and
-            // every color attribute here (`EnvironmentAttributes.SKY_COLOR`, `CLOUD_COLOR`,
-            // `FOG_COLOR`, `AMBIENT_LIGHT_COLOR`) defaults to `0` (opaque black) when missing from the
-            // map, that was the real cause of the black sky/void-colored fog, not a light-level bug.
-            // Values verbatim from the real jar's `data/minecraft/dimension_type/overworld.json`.
-            // `default_clock`/`timelines` (day/night progression via the new `WorldClock`/`Timeline`
-            // registries) aren't modeled yet: both are optional and default to "no clock"/empty, and
-            // are a separate concern from these static backdrop colors.
-            this["attributes"] =
+    /** // parity: `WorldClocks.bootstrap`; both clocks use the empty default clock codec. */
+    public val worldClocks: List<Pair<String, NbtCompound>> =
+        listOf(
+            "overworld" to NbtCompound(),
+            "the_end" to NbtCompound(),
+        )
+
+    /** // parity: `DimensionTypes.bootstrap`, in its exact registry order. */
+    public val dimensionTypes: List<Pair<String, NbtCompound>> =
+        listOf(
+            "overworld" to overworldDimensionType(hasCeiling = false),
+            "the_nether" to netherDimensionType(),
+            "the_end" to endDimensionType(),
+            "overworld_caves" to overworldDimensionType(hasCeiling = true),
+        )
+
+    public fun overworldDimensionType(): NbtCompound = overworldDimensionType(hasCeiling = false)
+
+    private fun overworldDimensionType(hasCeiling: Boolean): NbtCompound =
+        dimensionType(
+            hasFixedTime = false,
+            hasSkylight = true,
+            hasCeiling = hasCeiling,
+            hasEnderDragonFight = false,
+            coordinateScale = 1.0,
+            minY = -64,
+            height = 384,
+            logicalHeight = 384,
+            infiniburn = "#minecraft:infiniburn_overworld",
+            ambientLight = 0.0f,
+            monsterSpawnLightLevel = uniformInt(0, 7),
+            monsterSpawnBlockLightLimit = 0,
+            attributes = overworldAttributes(),
+        ).apply {
+            putString("default_clock", "minecraft:overworld")
+            putString("timelines", "#minecraft:in_overworld")
+        }
+
+    private fun netherDimensionType(): NbtCompound =
+        dimensionType(
+            hasFixedTime = true,
+            hasSkylight = false,
+            hasCeiling = true,
+            hasEnderDragonFight = false,
+            coordinateScale = 8.0,
+            minY = 0,
+            height = 256,
+            logicalHeight = 128,
+            infiniburn = "#minecraft:infiniburn_nether",
+            ambientLight = 0.1f,
+            monsterSpawnLightLevel = NbtInt(7),
+            monsterSpawnBlockLightLimit = 15,
+            attributes =
                 NbtCompound().apply {
-                    putString("minecraft:visual/sky_color", "#78a7ff")
-                    putString("minecraft:visual/fog_color", "#c0d8ff")
-                    putString("minecraft:visual/cloud_color", "#ccffffff")
-                    putFloat("minecraft:visual/cloud_height", 192.33f)
-                    putString("minecraft:visual/ambient_light_color", "#0a0a0a")
+                    this["minecraft:gameplay/bed_rule"] = bedRule("never", "never", explodes = true)
+                    putBoolean("minecraft:gameplay/can_start_raid", false)
+                    putBoolean("minecraft:gameplay/fast_lava", true)
+                    putBoolean("minecraft:gameplay/piglins_zombify", false)
+                    putBoolean("minecraft:gameplay/respawn_anchor_works", true)
+                    putFloat("minecraft:gameplay/sky_light_level", 4.0f)
+                    putBoolean("minecraft:gameplay/snow_golem_melts", true)
+                    putBoolean("minecraft:gameplay/water_evaporates", true)
+                    putString("minecraft:visual/ambient_light_color", "#302821")
+                    this["minecraft:visual/default_dripstone_particle"] =
+                        NbtCompound().apply { putString("type", "minecraft:dripping_dripstone_lava") }
+                    putFloat("minecraft:visual/fog_end_distance", 96.0f)
+                    putFloat("minecraft:visual/fog_start_distance", 10.0f)
+                    putString("minecraft:visual/sky_light_color", "#7a7aff")
+                    putFloat("minecraft:visual/sky_light_factor", 0.0f)
+                },
+        ).apply {
+            putString("cardinal_light", "nether")
+            putString("skybox", "none")
+            putString("timelines", "#minecraft:in_nether")
+        }
+
+    private fun endDimensionType(): NbtCompound =
+        dimensionType(
+            hasFixedTime = true,
+            hasSkylight = true,
+            hasCeiling = false,
+            hasEnderDragonFight = true,
+            coordinateScale = 1.0,
+            minY = 0,
+            height = 256,
+            logicalHeight = 256,
+            infiniburn = "#minecraft:infiniburn_end",
+            ambientLight = 0.25f,
+            monsterSpawnLightLevel = NbtInt(15),
+            monsterSpawnBlockLightLimit = 0,
+            attributes =
+                NbtCompound().apply {
+                    this["minecraft:audio/ambient_sounds"] = ambientCaveSounds()
+                    this["minecraft:audio/background_music"] =
+                        NbtCompound().apply {
+                            this["default"] = music("minecraft:music.end", 6000, 24000, replace = true)
+                        }
+                    this["minecraft:gameplay/bed_rule"] = bedRule("never", "never", explodes = true)
+                    putBoolean("minecraft:gameplay/respawn_anchor_works", false)
+                    putString("minecraft:visual/ambient_light_color", "#3f473f")
+                    putString("minecraft:visual/fog_color", "#181318")
+                    putString("minecraft:visual/sky_color", "#000000")
+                    putString("minecraft:visual/sky_light_color", "#ac60cd")
+                    putFloat("minecraft:visual/sky_light_factor", 0.0f)
+                },
+        ).apply {
+            putString("default_clock", "minecraft:the_end")
+            putString("skybox", "end")
+            putString("timelines", "#minecraft:in_end")
+        }
+
+    private fun dimensionType(
+        hasFixedTime: Boolean,
+        hasSkylight: Boolean,
+        hasCeiling: Boolean,
+        hasEnderDragonFight: Boolean,
+        coordinateScale: Double,
+        minY: Int,
+        height: Int,
+        logicalHeight: Int,
+        infiniburn: String,
+        ambientLight: Float,
+        monsterSpawnLightLevel: NbtTag,
+        monsterSpawnBlockLightLimit: Int,
+        attributes: NbtCompound,
+    ): NbtCompound =
+        NbtCompound().apply {
+            if (hasFixedTime) putBoolean("has_fixed_time", true)
+            putBoolean("has_skylight", hasSkylight)
+            putBoolean("has_ceiling", hasCeiling)
+            putBoolean("has_ender_dragon_fight", hasEnderDragonFight)
+            putDouble("coordinate_scale", coordinateScale)
+            putInt("min_y", minY)
+            putInt("height", height)
+            putInt("logical_height", logicalHeight)
+            this["infiniburn"] = NbtString(infiniburn)
+            putFloat("ambient_light", ambientLight)
+            this["monster_spawn_light_level"] = monsterSpawnLightLevel
+            putInt("monster_spawn_block_light_limit", monsterSpawnBlockLightLimit)
+            this["attributes"] = attributes
+        }
+
+    private fun overworldAttributes(): NbtCompound =
+        NbtCompound().apply {
+            this["minecraft:audio/ambient_sounds"] = ambientCaveSounds()
+            this["minecraft:audio/background_music"] =
+                NbtCompound().apply {
+                    this["creative"] = music("minecraft:music.creative", 12000, 24000)
+                    this["default"] = music("minecraft:music.game", 12000, 24000)
+                }
+            this["minecraft:gameplay/bed_rule"] =
+                bedRule("always", "when_dark", explodes = false).apply {
+                    this["error_message"] =
+                        NbtCompound().apply { putString("translate", "block.minecraft.bed.no_sleep") }
+                }
+            putBoolean("minecraft:gameplay/nether_portal_spawns_piglin", true)
+            putBoolean("minecraft:gameplay/respawn_anchor_works", false)
+            putString("minecraft:visual/ambient_light_color", "#0a0a0a")
+            putString("minecraft:visual/cloud_color", "#ccffffff")
+            putFloat("minecraft:visual/cloud_height", 192.33f)
+            putString("minecraft:visual/fog_color", "#c0d8ff")
+            putString("minecraft:visual/sky_color", "#78a7ff")
+        }
+
+    private fun ambientCaveSounds(): NbtCompound =
+        NbtCompound().apply {
+            this["mood"] =
+                NbtCompound().apply {
+                    putInt("block_search_extent", 8)
+                    putDouble("offset", 2.0)
+                    putString("sound", "minecraft:ambient.cave")
+                    putInt("tick_delay", 6000)
                 }
         }
 
-    // The biome registry (`minecraft:worldgen/biome`) is synced in full by [VanillaBiomes]: all 55
-    // real Overworld entries, not a single plains stand-in.
+    private fun music(
+        sound: String,
+        minDelay: Int,
+        maxDelay: Int,
+        replace: Boolean = false,
+    ): NbtCompound =
+        NbtCompound().apply {
+            putInt("max_delay", maxDelay)
+            putInt("min_delay", minDelay)
+            if (replace) putBoolean("replace_current_music", true)
+            putString("sound", sound)
+        }
+
+    private fun bedRule(
+        canSetSpawn: String,
+        canSleep: String,
+        explodes: Boolean,
+    ): NbtCompound =
+        NbtCompound().apply {
+            putString("can_set_spawn", canSetSpawn)
+            putString("can_sleep", canSleep)
+            if (explodes) putBoolean("explodes", true)
+        }
+
+    private fun uniformInt(
+        min: Int,
+        max: Int,
+    ): NbtCompound =
+        NbtCompound().apply {
+            putString("type", "minecraft:uniform")
+            putInt("max_inclusive", max)
+            putInt("min_inclusive", min)
+        }
+
+    // The biome registry (`minecraft:worldgen/biome`) is synced in full by [VanillaBiomes]: all 66
+    // vanilla entries, not a single plains stand-in.
 
     // The 13 registries below are the only ones a real 26.2 client hard-requires non-empty to
     // finish Configuration (confirmed live: RegistryDataLoader.SYNCHRONIZED_REGISTRIES marks

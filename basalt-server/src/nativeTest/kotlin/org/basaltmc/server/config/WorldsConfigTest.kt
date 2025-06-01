@@ -101,6 +101,35 @@ class WorldsConfigTest {
     }
 
     @Test
+    fun dimensionsResolveAliasesAndRejectUnknownNames() {
+        val directory = directory("dimensions")
+        write(
+            directory,
+            """
+            [worlds.overworld]
+            default = true
+            dimension = "minecraft:overworld"
+
+            [worlds.nether]
+            dimension = "the_nether"
+
+            [worlds.end]
+            dimension = "end"
+            """.trimIndent(),
+        )
+        val config = WorldsConfig.load(directory, "build/test-data/x", quiet())
+
+        assertEquals(
+            listOf(WorldDimension.OVERWORLD, WorldDimension.NETHER, WorldDimension.END),
+            config.worlds.map { it.dimension },
+        )
+
+        val invalid = directory("invalid_dimension")
+        write(invalid, "[worlds.world]\ndefault = true\ndimension = \"moon\"\n")
+        assertFailsWith<TomlFormatException> { WorldsConfig.load(invalid, "build/test-data/x", quiet()) }
+    }
+
+    @Test
     fun removingAWorldFromTheFileLeavesItsDataAlone() {
         // The lifecycle rule: this file declares what loads, it never deletes anything.
         val directory = directory("declaration")
@@ -183,8 +212,10 @@ class WorldLevelKeyTest {
     private fun world(
         name: String,
         isDefault: Boolean,
+        dimension: WorldDimension = WorldDimension.OVERWORLD,
     ) = LoadedWorld(
-        declaration = WorldDeclaration(name, "overworld", WorldType.VOID, seed = 0L, isDefault = isDefault),
+        declaration =
+            WorldDeclaration(name, dimension, WorldType.VOID, seed = 0L, isDefault = isDefault),
         settings = WorldSettings.VANILLA,
         metadata = WorldMetadata(0L, 8, 64, 8),
         worldsRoot = "build/test-data/level_keys",
@@ -196,6 +227,12 @@ class WorldLevelKeyTest {
     fun theDefaultWorldKeepsVanillasOwnLevelKey() {
         // So a single-world setup looks exactly as it did, the client's debug screen included.
         assertEquals("minecraft:overworld", world("world", isDefault = true).levelKey)
+    }
+
+    @Test
+    fun aDefaultNetherOrEndWorldUsesTheVanillaLevelKey() {
+        assertEquals("minecraft:the_nether", world("nether", true, WorldDimension.NETHER).levelKey)
+        assertEquals("minecraft:the_end", world("end", true, WorldDimension.END).levelKey)
     }
 
     @Test

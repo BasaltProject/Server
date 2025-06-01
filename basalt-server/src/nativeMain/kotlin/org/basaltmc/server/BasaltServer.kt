@@ -19,6 +19,7 @@ import org.basaltmc.server.command.commands.TimingsCommand
 import org.basaltmc.server.command.registerVanillaCommands
 import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.server.config.LiveConfigs
+import org.basaltmc.server.config.WorldType
 import org.basaltmc.server.config.WorldsConfig
 import org.basaltmc.server.placeholder.AnimationPlaceholders
 import org.basaltmc.server.placeholder.PlayerPlaceholders
@@ -29,6 +30,7 @@ import org.basaltmc.server.player.PlayerRegistry
 import org.basaltmc.server.timings.ReportSources
 import org.basaltmc.server.timings.TimingsReport
 import org.basaltmc.server.world.LoadedWorld
+import org.basaltmc.server.world.VanillaWorldGeneratorFactory
 import org.basaltmc.server.world.WORLDS_ROOT
 import org.basaltmc.server.world.WorldMetadata
 import org.basaltmc.storage.PlayerStore
@@ -38,7 +40,6 @@ import org.basaltmc.text.TextColor
 import org.basaltmc.world.GenerationMetrics
 import org.basaltmc.world.NoiseWorldGenerator
 import org.basaltmc.world.terrain.OverworldNoiseRouter
-import org.basaltmc.world.terrain.RealTerrainGenerator
 import org.basaltmc.world.terrain.VillageStructureGenerator
 import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
 import kotlin.concurrent.AtomicInt
@@ -56,19 +57,16 @@ import kotlin.time.TimeSource
  * ([org.basaltmc.server.ClientSession.streamChunksAround]). All of it goes through one
  * [ChunkGenerationQueue], the only thing in the server that generates terrain.
  *
- * Every chunk comes from [DIMENSION]'s region files under [BasaltConfig.worldName] if it was ever
- * saved there ([RegionStore]), including chunks first seen while exploring, so revisiting old
+ * Every chunk comes from its declared dimension's region files under that world's directory if it
+ * was ever saved there ([RegionStore]), including chunks first seen while exploring, so revisiting old
  * ground returns the same terrain with whatever was built on it rather than regenerating it.
  * Freshly generated chunks are written back on [TickLoop]'s save interval, not only on a clean
  * `stop`, so a crash costs at most that interval.
  *
- * [overworldRouter]/[surfaceEnvironment], when both given, generate new chunks with
- * [RealTerrainGenerator] (the real, jar-verified Overworld density-function router plus the real
- * `SurfaceRules` tree) instead of [NoiseWorldGenerator]'s stand-in approximation; [villageGenerator],
- * also optional, additionally places real Plains villages during that same generation call.
- * [Main.kt][org.basaltmc.server] always builds and passes real ones for actual gameplay; they stay
- * optional here (not required) so protocol/session-focused tests, whose concern is the network
- * layer, not terrain fidelity, can keep using the fast, network-free placeholder instead of
+ * [worldGeneratorFactory] builds a correctly seeded normal generator for each declared dimension
+ * and world. The older [overworldRouter]/[surfaceEnvironment] injection remains as a focused test
+ * seam. Both stay optional so protocol/session-focused tests, whose concern is the network layer,
+ * can keep using [NoiseWorldGenerator]'s fast, network-free placeholder instead of
  * downloading a real `server.jar` and paying real generation cost for something they never
  * inspect. Terrain fidelity itself has its own dedicated, real-jar-verified tests
  * (`RealTerrainGeneratorTest`/`SurfaceBuilderTest` and friends), not these.
@@ -79,6 +77,7 @@ public class BasaltServer(
     private val overworldRouter: OverworldNoiseRouter? = null,
     private val surfaceEnvironment: SurfaceRuleEnvironment? = null,
     private val villageGenerator: VillageStructureGenerator? = null,
+    private val worldGeneratorFactory: VanillaWorldGeneratorFactory? = null,
     private val worldsConfig: WorldsConfig,
     /**
      * Everything `/reload` can swap under a running server, read through this rather than copied:
@@ -164,6 +163,12 @@ public class BasaltServer(
                     overworldRouter = overworldRouter,
                     surfaceEnvironment = surfaceEnvironment,
                     villageGenerator = villageGenerator,
+                    normalGenerator =
+                        if (declaration.type == WorldType.NORMAL || declaration.type == WorldType.AMPLIFIED) {
+                            worldGeneratorFactory?.create(declaration, metadata)
+                        } else {
+                            null
+                        },
                 )
         }
 
@@ -517,7 +522,6 @@ public class BasaltServer(
         // (confirmed directly by reading the saved region files back). 3 keeps startup bounded
         // while staying in the range a real client behaves normally at.
         const val SPAWN_RADIUS_CHUNKS = 3
-        const val DIMENSION = "overworld"
 
         // Beside worlds/, never inside one.
         const val PLAYERS_DATABASE = "players.db"

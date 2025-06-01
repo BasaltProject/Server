@@ -45,6 +45,15 @@ class ChunkDataCodecTest {
     }
 
     @Test
+    fun dimensionsWithoutSkylightSendNoSkyMasksOrArrays() {
+        val chunk = Chunk(0, 0, ChunkHeight.NETHER)
+        val light = ChunkDataCodec.encodeLight(chunk, hasSkylight = false)
+        assertTrue(light.skyLightMask.isEmpty())
+        assertTrue(light.emptySkyLightMask.isEmpty())
+        assertTrue(light.skyLight.isEmpty())
+    }
+
+    @Test
     fun sectionsAboveTheFlatSurfaceHaveFullSkylight() {
         val chunk = FlatWorldGenerator.generate(0, 0)
         val light = ChunkDataCodec.encodeLight(chunk)

@@ -5,6 +5,7 @@ import org.basaltmc.io.NativeMutex
 import org.basaltmc.nbt.NbtCompound
 import org.basaltmc.nbt.NbtIO
 import org.basaltmc.world.Chunk
+import org.basaltmc.world.ChunkHeight
 import org.basaltmc.world.region.ChunkNbt
 import org.basaltmc.world.region.LinearRegion
 import kotlin.time.TimeSource
@@ -27,6 +28,7 @@ public class RegionStore(
     worldName: String,
     private val dimension: String,
     worldsRoot: String = WORLDS_ROOT,
+    private val verticalBounds: ChunkHeight = ChunkHeight.OVERWORLD,
 ) {
     /**
      * Where this world's files live: `worlds/<name>/`, and nothing outside it belongs to this world.
@@ -86,7 +88,7 @@ public class RegionStore(
         val tag = NbtIO.read(chunkBytes).tag as NbtCompound
         // Rebuilding a chunk goes through the same block setters generation uses, which mark it
         // dirty. Nothing here differs from what is already on disk, so saving it again is pure cost.
-        return ChunkNbt.read(tag).also { it.markClean() }
+        return ChunkNbt.read(tag, verticalBounds).also { it.markClean() }
     }
 
     /**

@@ -6,15 +6,11 @@ public data class Biome(
 )
 
 /**
- * The full Overworld biome set, registered in the same order as the real jar's own
- * `net.minecraft.data.worldgen.biome.BiomeData.bootstrap` (decompiled from `server-26.2.jar`),
- * filtered to the Overworld entries: `THE_VOID` and every Nether/End biome are skipped, out of
- * this project's current scope. Biome network IDs are a dynamic registry synced to each client at
- * login (`minecraft:worldgen/biome`), not a fixed wire constant like a block state ID: unlike
- * [Blocks], there is no vanilla numeric ID this registry must reproduce, only internal
- * self-consistency between the synced registry and the IDs used in a chunk's biome palette. The
- * real jar's own bootstrap order is used anyway, since it is the most natural and best-documented
- * choice available, not because the client requires it.
+ * Every vanilla 26.2 biome. The original 55 Overworld entries retain their existing IDs so saved
+ * chunks keep decoding after Nether, End and the void were added. The remaining entries preserve
+ * their relative `BiomeData.bootstrap` order. Biome network IDs are dynamic and synced to each
+ * client at login, so only internal consistency between this registry, the synced definitions and
+ * chunk palettes is observable on the wire.
  */
 public object Biomes {
     public val REGISTRY: Registry<Biome> = Registry()
@@ -74,6 +70,20 @@ public object Biomes {
     public val LUSH_CAVES: Biome = register(52, "lush_caves")
     public val DEEP_DARK: Biome = register(53, "deep_dark")
     public val SULFUR_CAVES: Biome = register(54, "sulfur_caves")
+
+    public val THE_VOID: Biome = register(55, "the_void")
+
+    public val NETHER_WASTES: Biome = register(56, "nether_wastes")
+    public val WARPED_FOREST: Biome = register(57, "warped_forest")
+    public val CRIMSON_FOREST: Biome = register(58, "crimson_forest")
+    public val SOUL_SAND_VALLEY: Biome = register(59, "soul_sand_valley")
+    public val BASALT_DELTAS: Biome = register(60, "basalt_deltas")
+
+    public val THE_END: Biome = register(61, "the_end")
+    public val END_HIGHLANDS: Biome = register(62, "end_highlands")
+    public val END_MIDLANDS: Biome = register(63, "end_midlands")
+    public val SMALL_END_ISLANDS: Biome = register(64, "small_end_islands")
+    public val END_BARRENS: Biome = register(65, "end_barrens")
 
     private fun register(
         id: Int,

@@ -3,10 +3,12 @@ package org.basaltmc.world.region
 import org.basaltmc.nbt.NbtCompound
 import org.basaltmc.nbt.NbtList
 import org.basaltmc.nbt.NbtType
+import org.basaltmc.registry.Biomes
 import org.basaltmc.registry.Blocks
 import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.ChunkBlockEntity
+import org.basaltmc.world.ChunkHeight
 import org.basaltmc.world.WorldHeight
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -72,6 +74,25 @@ class ChunkNbtTest {
         for (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y step 7) {
             assertEquals(Blocks.DIRT.stateId, read.getBlockStateId(5, y, 5))
         }
+    }
+
+    @Test
+    fun dimensionBoundsAndBiomePalettesRoundTrip() {
+        val chunk = Chunk(4, -7, ChunkHeight.NETHER)
+        chunk.setBlockStateId(2, 0, 3, Blocks.BEDROCK.stateId)
+        chunk.setBlockStateId(2, 255, 3, Blocks.NETHERRACK.stateId)
+        chunk.setBiomeId(0, 0, 0, Biomes.NETHER_WASTES.id())
+        chunk.setBiomeId(3, 63, 3, Biomes.BASALT_DELTAS.id())
+
+        val tag = ChunkNbt.write(chunk)
+        assertEquals(0, tag.getInt("yPos"))
+        assertEquals(16, tag.getList("sections")?.size)
+        val read = ChunkNbt.read(tag, ChunkHeight.NETHER)
+
+        assertEquals(Blocks.BEDROCK.stateId, read.getBlockStateId(2, 0, 3))
+        assertEquals(Blocks.NETHERRACK.stateId, read.getBlockStateId(2, 255, 3))
+        assertEquals(Biomes.NETHER_WASTES.id(), read.section(0).getBiomeId(0, 0, 0))
+        assertEquals(Biomes.BASALT_DELTAS.id(), read.section(15).getBiomeId(3, 3, 3))
     }
 
     @Test
@@ -183,4 +204,6 @@ class ChunkNbtTest {
 
     private fun stateId(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
+
+    private fun org.basaltmc.registry.Biome.id(): Int = Biomes.REGISTRY.idOf(id) ?: error("unregistered biome $id")
 }

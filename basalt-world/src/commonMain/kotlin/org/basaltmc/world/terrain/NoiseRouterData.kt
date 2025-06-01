@@ -2,6 +2,7 @@ package org.basaltmc.world.terrain
 
 import org.basaltmc.world.densityfunction.DensityFunction
 import org.basaltmc.world.densityfunction.DensityFunctions
+import org.basaltmc.world.densityfunction.EndIslandDensityFunction
 import org.basaltmc.world.densityfunction.FunctionContext
 import org.basaltmc.world.densityfunction.SplineCoordinate
 import org.basaltmc.world.noise.NormalNoise
@@ -39,6 +40,19 @@ public class OverworldNoiseRouter(
     public val erosion: DensityFunction,
     public val depth: DensityFunction,
     public val ridges: DensityFunction,
+    public val finalDensity: DensityFunction,
+)
+
+/** The three non-zero functions in vanilla's Nether router. */
+public class NetherNoiseRouter(
+    public val temperature: DensityFunction,
+    public val vegetation: DensityFunction,
+    public val finalDensity: DensityFunction,
+)
+
+/** The two non-zero functions in vanilla's End router. */
+public class EndNoiseRouter(
+    public val erosion: DensityFunction,
     public val finalDensity: DensityFunction,
 )
 
@@ -133,6 +147,35 @@ public object NoiseRouterData {
             ridges = ridge,
             finalDensity = fullNoise,
         )
+    }
+
+    /** // parity: `NoiseRouterData.nether`, using `noise_settings/nether.json`. */
+    public fun nether(
+        noise: (id: String) -> NormalNoise,
+        base3d: DensityFunction,
+    ): NetherNoiseRouter {
+        val zero = DensityFunctions.zero()
+        val temperature = DensityFunctions.shiftedNoise2d(zero, zero, 0.25, noise("nether/temperature"))
+        val vegetation =
+            DensityFunctions.shiftedNoise2d(
+                DensityFunctions.zero(),
+                DensityFunctions.zero(),
+                0.25,
+                noise("nether/vegetation"),
+            )
+        val finalDensity = postProcess(slide(base3d, 0, 128, 24, 0, 0.9375, -8, 24, 2.5))
+        return NetherNoiseRouter(temperature, vegetation, finalDensity)
+    }
+
+    /** // parity: `NoiseRouterData.end`, using `noise_settings/end.json`. */
+    public fun end(
+        base3d: DensityFunction,
+        seed: Long,
+    ): EndNoiseRouter {
+        val islands = EndIslandDensityFunction(seed)
+        val slopedCheese = DensityFunctions.add(islands, base3d)
+        val finalDensity = postProcess(slide(slopedCheese, 0, 128, 72, -184, -23.4375, 4, 32, -0.234375))
+        return EndNoiseRouter(DensityFunctions.cache2d(islands), finalDensity)
     }
 
     // parity: NoiseRouterData.peaksAndValleys(DensityFunction).

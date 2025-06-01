@@ -50,16 +50,16 @@ public object ChunkDataCodec {
         return buffer.toByteArray()
     }
 
-    // Vanilla's Heightmap packs 256 values (relative to WorldHeight.MIN_Y, not absolute Y) into a
+    // Vanilla's Heightmap packs 256 values (relative to the chunk minimum, not absolute Y) into a
     // SimpleBitStorage sized `ceillog2(worldHeight + 1)` bits per entry: sending one raw long per
     // column instead (256 unpacked longs) doesn't crash but is silently ignored client-side ("size
     // does not match; expected: 37, got: 256"), confirmed live, which leaves the client's own
     // heightmap unprimed and the "loading terrain" screen never dismisses.
     public fun encodeHeightmap(chunk: Chunk): LongArray {
-        val bitsPerEntry = ceilLog2(WorldHeight.HEIGHT + 1)
+        val bitsPerEntry = ceilLog2(chunk.verticalBounds.height + 1)
         val storage = BitStorage(bitsPerEntry, 256)
         val values = chunk.heightmap()
-        for (i in values.indices) storage[i] = values[i] - WorldHeight.MIN_Y
+        for (i in values.indices) storage[i] = values[i] - chunk.verticalBounds.minY
         return storage.data
     }
 
@@ -75,13 +75,17 @@ public object ChunkDataCodec {
         val skyLight: List<ByteArray>,
     )
 
-    public fun encodeLight(chunk: Chunk): LightData {
+    public fun encodeLight(
+        chunk: Chunk,
+        hasSkylight: Boolean = true,
+    ): LightData {
+        if (!hasSkylight) return LightData(longArrayOf(), longArrayOf(), emptyList())
         val surfaceY = chunk.heightmap().max()
         var maskBits = 0L
         var emptyMaskBits = 0L
         val arrays = mutableListOf<ByteArray>()
         for (i in 0 until chunk.sectionCount) {
-            val sectionMinY = WorldHeight.MIN_Y + i * 16
+            val sectionMinY = chunk.verticalBounds.minY + i * 16
             if (sectionMinY + 16 <= surfaceY) {
                 emptyMaskBits = emptyMaskBits or (1L shl i)
             } else {

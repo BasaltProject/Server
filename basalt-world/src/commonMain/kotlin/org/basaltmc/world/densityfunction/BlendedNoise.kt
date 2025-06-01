@@ -13,8 +13,8 @@ import org.basaltmc.world.noise.PerlinNoise
  * far `mainNoise` leans toward its own extremes. [createUnseeded] matches vanilla's own
  * `BlendedNoise.createUnseeded`: always seeded with [XoroshiroRandom] seed `0`, since the
  * overworld/nether/end noise router registers this once at bootstrap with a fixed placeholder
- * seed, not the world seed (the real per-world seed only reaches it later, via `withNewRandom`,
- * which this project has not needed yet since nothing assembles a full noise router).
+ * seed, not the world seed. Runtime router construction uses the public seeded constructor with
+ * the same random stream that vanilla's `RandomState.withNewRandom` supplies.
  */
 public class BlendedNoise private constructor(
     private val minLimitNoise: PerlinNoise,

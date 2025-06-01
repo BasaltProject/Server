@@ -3,6 +3,7 @@ package org.basaltmc.server.world
 import org.basaltmc.io.FileIO
 import org.basaltmc.registry.Blocks
 import org.basaltmc.world.Chunk
+import org.basaltmc.world.ChunkHeight
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -21,10 +22,12 @@ class RegionStoreTest {
     fun tearDown() = cleanUp()
 
     private fun cleanUp() {
-        val dir = "$worldName/dimensions/minecraft/$dimension/region"
-        for (name in FileIO.list(dir)) FileIO.delete("$dir/$name")
-        FileIO.delete(dir)
-        FileIO.delete("$worldName/dimensions/minecraft/$dimension")
+        for (path in listOf(dimension, "the_nether")) {
+            val dir = "$worldName/dimensions/minecraft/$path/region"
+            for (name in FileIO.list(dir)) FileIO.delete("$dir/$name")
+            FileIO.delete(dir)
+            FileIO.delete("$worldName/dimensions/minecraft/$path")
+        }
         FileIO.delete("$worldName/dimensions/minecraft")
         FileIO.delete("$worldName/dimensions")
         FileIO.delete(worldName)
@@ -46,6 +49,20 @@ class RegionStoreTest {
 
         assertNotNull(loaded)
         assertEquals(Blocks.STONE.stateId, loaded.getBlockStateId(1, 70, 1))
+    }
+
+    @Test
+    fun roundTripsDimensionSpecificBoundsAndPath() {
+        val store = RegionStore(worldName, "the_nether", verticalBounds = ChunkHeight.NETHER)
+        val chunk = Chunk(0, 0, ChunkHeight.NETHER)
+        chunk.setBlockStateId(1, 255, 1, Blocks.NETHERRACK.stateId)
+        store.saveChunks(listOf(chunk), timestamp = 1)
+
+        val loaded = RegionStore(worldName, "the_nether", verticalBounds = ChunkHeight.NETHER).loadChunk(0, 0)
+
+        assertNotNull(loaded)
+        assertEquals(ChunkHeight.NETHER, loaded.verticalBounds)
+        assertEquals(Blocks.NETHERRACK.stateId, loaded.getBlockStateId(1, 255, 1))
     }
 
     @Test

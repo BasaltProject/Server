@@ -3,12 +3,13 @@ package org.basaltmc.world
 import org.basaltmc.registry.Blocks
 import org.basaltmc.registry.Identifier
 
-/** A 16-wide, [WorldHeight.HEIGHT]-tall column of blocks at ([chunkX], [chunkZ]) in chunk coordinates. */
+/** A 16-wide column of blocks at ([chunkX], [chunkZ]) in chunk coordinates. */
 public class Chunk(
     public val chunkX: Int,
     public val chunkZ: Int,
+    public val verticalBounds: ChunkHeight = ChunkHeight.OVERWORLD,
 ) {
-    private val sections = Array(WorldHeight.SECTION_COUNT) { ChunkSection() }
+    private val sections = Array(verticalBounds.sectionCount) { ChunkSection() }
     private val blockEntitiesByPosition = LinkedHashMap<Int, ChunkBlockEntity>()
     private var blockWriteObserver: ((Int, Int, Int, Int, Int) -> Unit)? = null
 
@@ -60,6 +61,9 @@ public class Chunk(
     }
 
     public fun setBlockEntity(blockEntity: ChunkBlockEntity) {
+        require(blockEntity.y in verticalBounds.minY..verticalBounds.maxY) {
+            "block entity y=${blockEntity.y} outside chunk bounds"
+        }
         blockEntitiesByPosition[blockEntityKey(blockEntity.localX, blockEntity.y, blockEntity.localZ)] = blockEntity
         isDirty = true
     }
@@ -87,19 +91,19 @@ public class Chunk(
     }
 
     private fun sectionFor(y: Int): ChunkSection {
-        require(y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) { "y=$y out of world bounds" }
-        return sections[(y shr 4) - WorldHeight.MIN_SECTION]
+        require(y in verticalBounds.minY..verticalBounds.maxY) { "y=$y out of world bounds" }
+        return sections[(y shr 4) - verticalBounds.minSection]
     }
 
     private fun blockEntityKey(
         x: Int,
         y: Int,
         z: Int,
-    ): Int = ((y - WorldHeight.MIN_Y) shl 8) or ((z and 15) shl 4) or (x and 15)
+    ): Int = ((y - verticalBounds.minY) shl 8) or ((z and 15) shl 4) or (x and 15)
 
     /**
      * Sets the biome network ID at quart (4-block) resolution. [quartY] is the world quart
-     * (0 until [WorldHeight.HEIGHT] / 4), [quartX]/[quartZ] chunk-local (0..3).
+     * (0 until `verticalBounds.height / 4`), [quartX]/[quartZ] chunk-local (0..3).
      */
     public fun setBiomeId(
         quartX: Int,
@@ -107,7 +111,7 @@ public class Chunk(
         quartZ: Int,
         biomeId: Int,
     ) {
-        require(quartY in 0 until WorldHeight.HEIGHT / 4) { "quartY=$quartY out of world bounds" }
+        require(quartY in 0 until verticalBounds.height / 4) { "quartY=$quartY out of world bounds" }
         sections[quartY shr 2].setBiomeId(quartX, quartY and 3, quartZ, biomeId)
         isDirty = true
     }
@@ -126,9 +130,9 @@ public class Chunk(
         z: Int,
         type: HeightmapType = HeightmapType.MOTION_BLOCKING,
     ): Int {
-        var y = WorldHeight.MAX_Y
-        while (y >= WorldHeight.MIN_Y && !type.matches(getBlockStateId(x, y, z))) y--
-        if (GenerationMetrics.enabled) GenerationMetrics.countHeightmapScan(WorldHeight.MAX_Y - y)
+        var y = verticalBounds.maxY
+        while (y >= verticalBounds.minY && !type.matches(getBlockStateId(x, y, z))) y--
+        if (GenerationMetrics.enabled) GenerationMetrics.countHeightmapScan(verticalBounds.maxY - y)
         return y + 1
     }
 
@@ -167,12 +171,12 @@ public class Chunk(
                         stateId != Blocks.WATER.stateId &&
                         !isNonColliding(stateId)
                 MOTION_BLOCKING ->
-                    Blocks.hasWaterFluid(stateId) ||
+                    Blocks.hasFluid(stateId) ||
                         (stateId != Blocks.AIR.stateId && !isNonColliding(stateId))
                 MOTION_BLOCKING_NO_LEAVES ->
                     !Blocks.isLeavesState(stateId) &&
                         (
-                            Blocks.hasWaterFluid(stateId) ||
+                            Blocks.hasFluid(stateId) ||
                                 (stateId != Blocks.AIR.stateId && !isNonColliding(stateId))
                         )
             }

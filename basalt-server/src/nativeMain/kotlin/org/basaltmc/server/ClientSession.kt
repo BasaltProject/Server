@@ -487,8 +487,21 @@ public class ClientSession(
     }
 
     private fun sendRegistriesThenFinish() {
-        sendRegistry("minecraft:dimension_type", "minecraft:overworld", VanillaRegistryData.overworldDimensionType())
-        // The full 55-biome Overworld set in one packet, in Biomes.REGISTRY order: each entry's
+        sendCompressed(RegistryDataPacket.ID) {
+            RegistryDataPacket(
+                "minecraft:world_clock",
+                VanillaRegistryData.worldClocks.map { (path, value) -> RegistryEntry("minecraft:$path", value) },
+            ).write(it)
+        }
+        sendCompressed(RegistryDataPacket.ID) {
+            RegistryDataPacket(
+                "minecraft:dimension_type",
+                VanillaRegistryData.dimensionTypes.map { (path, value) ->
+                    RegistryEntry("minecraft:$path", value)
+                },
+            ).write(it)
+        }
+        // The full vanilla set in one packet, in Biomes.REGISTRY order: each entry's
         // numeric id is its index here, which is what chunk biome palettes then reference.
         sendCompressed(RegistryDataPacket.ID) {
             RegistryDataPacket(
@@ -816,23 +829,21 @@ public class ClientSession(
     /** The `CommonPlayerSpawnInfo` both joining and respawning need, which differ only in game mode. */
     private fun spawnInfo(gamemode: Gamemode): SpawnInfo =
         SpawnInfo(
-            // The dimension *type* is the same for every world so far (overworld); the level key
-            // is what distinguishes them, and what makes a world change a real dimension change.
-            dimension = 0,
+            dimension = currentWorld?.declaration?.dimension?.registryIndex ?: 0,
             dimensionName = currentWorld?.levelKey ?: "minecraft:overworld",
             hashedSeed = 0L,
             gamemode = gamemode,
             previousGamemode = 255,
             isDebug = false,
-            isFlat = true,
+            isFlat = currentWorld?.declaration?.type == org.basaltmc.server.config.WorldType.FLAT,
             death = null,
             portalCooldown = 0,
-            seaLevel = 63,
+            seaLevel = currentWorld?.declaration?.dimension?.seaLevel ?: 63,
         )
 
     private fun sendChunk(chunk: Chunk) {
         val chunkData = ChunkDataCodec.encodeSections(chunk)
-        val light = ChunkDataCodec.encodeLight(chunk)
+        val light = ChunkDataCodec.encodeLight(chunk, currentWorld?.declaration?.dimension?.hasSkylight ?: true)
         val heightmap = ChunkDataCodec.encodeHeightmap(chunk)
         sendCompressed(MapChunkPacket.ID) {
             MapChunkPacket(
@@ -1754,7 +1765,6 @@ private val EMPTY_SYNCHRONIZED_REGISTRIES =
         "minecraft:test_environment",
         "minecraft:test_instance",
         "minecraft:dialog",
-        "minecraft:world_clock",
         "minecraft:timeline",
     )
 
