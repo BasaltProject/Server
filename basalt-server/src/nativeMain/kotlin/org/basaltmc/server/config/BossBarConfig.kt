@@ -4,46 +4,6 @@ import org.basaltmc.common.logging.Logger
 import org.basaltmc.protocol.play.BossBarColor
 import org.basaltmc.protocol.play.BossBarOverlay
 
-internal const val BOSS_BAR_DEFAULT_TOML = """# The bar across the top of the screen.
-#
-# Off by default. It sits over the game and the client gives it to real bosses,
-# so a server that turns it on is spending attention it cannot get back; that is
-# the operator's call to make, not a default.
-#
-# Profiles work exactly as in server_list.toml: highest priority among those
-# switched on with `active` or whose every `when` holds, falling back to the one
-# marked `default`.
-#
-# `progress` is 0.0 to 1.0 and can be a placeholder, which is what makes the bar
-# a gauge rather than a label: anything that resolves to a number works, and a
-# value outside the range is clamped.
-#
-# color:   pink, blue, red, green, yellow, purple, white
-# overlay: progress (a solid bar), notched_6, notched_10, notched_12, notched_20
-
-enabled = false
-
-# One tick, so the animation below moves rather than stepping once a second.
-# Only matters once the bar above is switched on.
-update-interval-ticks = 1
-
-[profiles.default]
-default = true
-text = "<white>%basalt_animation_website%</white>   <gray>%basalt_server_online%/%basalt_server_max_players% online</gray>"
-color = "white"
-overlay = "notched_20"
-progress = "1.0"
-
-# Shown instead when the server is filling up: same bar, used as a gauge.
-# [profiles.busy]
-# priority = 10
-# when = ["%basalt_server_online% >= 40"]
-# text = "<yellow>Busy</yellow> <gray>%basalt_server_online%/%basalt_server_max_players%</gray>"
-# color = "yellow"
-# overlay = "progress"
-# progress = "%basalt_server_online%"
-"""
-
 /** One bar. Anything left out is taken from the default profile. */
 public data class BossBarProfile(
     private val header: ProfileHeader,

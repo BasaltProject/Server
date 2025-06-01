@@ -3,64 +3,6 @@ package org.basaltmc.server.config
 import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.FileIO
 
-internal const val WORLDS_DEFAULT_TOML = """# Which worlds this server loads, and how they behave.
-#
-# This file DECLARES what to load. It never deletes anything:
-#   - Add a table for a name that has no directory yet  -> the world is created.
-#   - Copy a world directory into worlds/ and add its table -> the world is imported.
-#   - Remove a table -> the world stops loading. Its files are left untouched, and
-#     putting the table back loads it again exactly as it was.
-# Deleting a world means deleting worlds/<name>/ yourself, which is deliberate.
-
-[worlds.world]
-# The world players join into. Exactly one world must be marked as the default.
-default = true
-# normal    terrain with biomes, caves and structures
-# flat      the vanilla superflat preset: bedrock, two dirt, grass
-# void      nothing but air, with a small stone platform under the spawn so a
-#           fresh world is standable. For lobbies and hubs.
-# amplified vanilla's amplified terrain. NOT IMPLEMENTED YET: it needs a second
-#           set of density functions that this build does not port, and pretending
-#           normal terrain is amplified would be a silent lie, so declaring it
-#           stops the server instead.
-type = "normal"
-# Leave the seed out to have one generated on first creation. Once a world exists,
-# the seed it was generated with wins over this value and a mismatch is logged:
-# changing it does not regenerate terrain that is already on disk.
-# seed = 12345
-# Only "overworld" is implemented so far.
-dimension = "overworld"
-
-# More worlds go here. Each one gets its own chunks, region files and settings,
-# and players travel between them with /tp.
-# [worlds.lobby]
-# type = "void"
-# [worlds.creative]
-# type = "flat"
-# seed = 42
-
-[defaults]
-# Inherited by every world, and overridable per world in worlds/<name>/settings.toml.
-# peaceful, easy, normal or hard. Decides whether hunger can starve you and how far
-# down it can take you.
-difficulty = "easy"
-# Radius, in chunks, sent to a client around its own position (vanilla's own
-# server.properties default is 10).
-view-distance = 10
-# How often changes are written to the region files: a crash costs at most this
-# much. 0 disables it, leaving chunks to save when they unload or on stop.
-save-interval-seconds = 30
-"""
-
-private const val WORLD_SETTINGS_TOML = """# Settings for this world only. Anything left out is inherited from
-# config/worlds.toml's [defaults]. This file lives inside the world directory on
-# purpose: it is copied, moved and deleted along with the world it describes.
-
-# difficulty = "easy"
-# view-distance = 10
-# save-interval-seconds = 30
-"""
-
 /** The settings that apply to one world, after inheritance has been resolved. */
 public data class WorldSettings(
     public val difficulty: String,
@@ -146,7 +88,7 @@ public class WorldsConfig(
         val path = "$worldsRoot/${world.name}/settings.toml"
         val text = FileIO.readText(path)
         if (text == null) {
-            if (FileIO.exists("$worldsRoot/${world.name}")) FileIO.writeText(path, WORLD_SETTINGS_TOML)
+            if (FileIO.exists("$worldsRoot/${world.name}")) FileIO.writeText(path, WORLD_SETTINGS_DEFAULT_TOML)
             return defaults
         }
         return WorldSettings.from(Toml.parse(text), defaults)

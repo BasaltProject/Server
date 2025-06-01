@@ -2,68 +2,6 @@ package org.basaltmc.server.config
 
 import org.basaltmc.common.logging.Logger
 
-internal const val COMMANDS_DEFAULT_TOML = """# Commands: which permission each one asks for, whether it exists at all, what it
-# answers, and any command of your own.
-#
-# This file NAMES the permission a command requires. It does not decide who has
-# it: that is groups.toml. The two read in one direction and only one:
-#
-#   commands.toml  ->  "/gamemode requires basalt.command.gamemode"
-#   groups.toml    ->  "the operator group has basalt.command.gamemode"
-#
-# So to open /teleport to your moderators, either give them the permission it
-# already asks for, or point it at one they already have. Both work; putting the
-# list of who may run it here would mean permissions living in two files.
-#
-# Every command already asks for `basalt.command.<name>` without being listed
-# here. This file is only for changing that.
-
-[commands]
-# One table per command you want to change. Every key is optional.
-#
-# [commands.teleport]
-# # The permission it asks for, instead of basalt.command.teleport.
-# permission = "basalt.command.moderator"
-# # false removes it: it stops existing, and stops being sent to clients, rather
-# # than existing and refusing. Aliases go with it.
-# enabled = true
-# # Extra names for the same command, on top of the ones it ships with.
-# aliases = ["tpa"]
-
-[custom]
-# Commands of your own: a name, a permission, and what they answer. Enough for
-# the /discord and /rules that would otherwise need a plugin, and no more than
-# that: anything with logic in it is a BSMod plugin, not a config entry.
-#
-# `message` is MiniMessage, one entry per line, and takes the same %placeholders%
-# as everywhere else. `permission` defaults to basalt.command.<name>, so remember
-# to grant it in groups.toml or nobody will be able to run it. To let everyone
-# use one, add its permission to the default group.
-#
-# [custom.discord]
-# message = ["<blue>Chat with us: https://discord.gg/example</blue>"]
-# aliases = ["dc"]
-#
-# [custom.online]
-# permission = "basalt.command.help"
-# message = ["<gray>%basalt_server_online% of %basalt_server_max_players% playing.</gray>"]
-
-[messages]
-# Replaces what a command answers, by the translation key it normally sends.
-#
-# Worth knowing before you use it: by default the server sends the *key* and each
-# client translates it into its own language. Override one and it becomes literal
-# text, the same for everyone, in whatever language you wrote it. That is the
-# trade, and it is why there are no per-language tables here: a server is
-# normally aimed at one community rather than being multilingual.
-#
-# %1%, %2% and so on are the values the message was going to be filled with, in
-# order, as plain text. Placeholders work too.
-#
-# "commands.gamemode.success.self" = "<green>You are now in %1% mode.</green>"
-# "commands.seed.success" = "<gray>Seed: %1%</gray>"
-"""
-
 /** One command's overrides. Everything is null when the file left it alone. */
 public data class CommandOverride(
     public val permission: String? = null,

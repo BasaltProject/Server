@@ -1,0 +1,7 @@
+# Settings for this world only. Anything left out is inherited from
+# config/worlds.toml's [defaults]. This file lives inside the world directory on
+# purpose: it is copied, moved and deleted along with the world it describes.
+
+# difficulty = "easy"
+# view-distance = 10
+# save-interval-seconds = 30
