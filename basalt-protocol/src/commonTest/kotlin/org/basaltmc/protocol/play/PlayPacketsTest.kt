@@ -181,7 +181,7 @@ class PlayPacketsTest {
     @Test
     fun entityTeleportRoundTrips() {
         val buffer = ByteBuffer()
-        val packet = EntityTeleportPacket(5, 1.0, 2.0, 3.0, (-64).toByte(), 32, true)
+        val packet = EntityTeleportPacket(5, 1.0, 2.0, 3.0, -64f, 32f, true)
         packet.write(buffer)
         assertEquals(packet, EntityTeleportPacket.read(buffer))
     }
