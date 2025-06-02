@@ -101,6 +101,13 @@ public object Mth {
         toMax: Double,
     ): Double = clampedLerp(inverseLerp(value, fromMin, fromMax), toMin, toMax)
 
+    /** // parity: Mth.fastInvSqrt(double), including its single Newton iteration. */
+    public fun fastInvSqrt(value: Double): Double {
+        val half = 0.5 * value
+        val estimate = Double.fromBits(6910469410427058090L - (value.toRawBits() shr 1))
+        return estimate * (1.5 - half * estimate * estimate)
+    }
+
     /** Unclamped linear remap of [value] from `[fromMin, fromMax]` to `[toMin, toMax]`. */
     public fun map(
         value: Double,

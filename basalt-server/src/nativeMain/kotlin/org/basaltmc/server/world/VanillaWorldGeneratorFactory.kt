@@ -12,6 +12,7 @@ import org.basaltmc.world.noise.NormalNoise
 import org.basaltmc.world.structure.StructurePlacementGrid
 import org.basaltmc.world.terrain.DimensionTerrainGenerator
 import org.basaltmc.world.terrain.NetherBiomeSource
+import org.basaltmc.world.terrain.NetherStructureGenerator
 import org.basaltmc.world.terrain.NoiseRouterData
 import org.basaltmc.world.terrain.RealTerrainGenerator
 import org.basaltmc.world.terrain.TheEndBiomeSource
@@ -64,6 +65,14 @@ public class VanillaWorldGeneratorFactory(
             )
         val biomes = NetherBiomeSource(router.temperature, router.vegetation)
         val surface = NetherSurfaceEnvironment(serverJar, LegacyRandom(seed).forkPositional(), router, biomes)
+        val structureLoader = VillageDataLoader(serverJar)
+        val structures =
+            NetherStructureGenerator(
+                router,
+                biomes,
+                structureLoader.templateLoader,
+                structureLoader.poolLookup,
+            )
         return { chunkX, chunkZ ->
             DimensionTerrainGenerator.nether(
                 router,
@@ -72,6 +81,7 @@ public class VanillaWorldGeneratorFactory(
                 chunkZ,
                 surfaceEnvironment = surface,
                 seed = seed,
+                structureGenerator = structures,
             )
         }
     }
@@ -81,7 +91,7 @@ public class VanillaWorldGeneratorFactory(
         val base3d = BlendedNoise(LegacyRandom(seed), 0.25, 0.25, 80.0, 160.0, 4.0)
         val router = NoiseRouterData.end(base3d, seed)
         val biomes = TheEndBiomeSource(router.erosion)
-        return { chunkX, chunkZ -> DimensionTerrainGenerator.end(router, biomes, chunkX, chunkZ) }
+        return { chunkX, chunkZ -> DimensionTerrainGenerator.end(router, biomes, chunkX, chunkZ, seed) }
     }
 
     private fun legacyNetherNoise(

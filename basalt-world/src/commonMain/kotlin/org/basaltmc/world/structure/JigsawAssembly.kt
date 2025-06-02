@@ -12,21 +12,15 @@ public data class PlacedStructurePiece(
 
 /**
  * // parity: net.minecraft.world.level.levelgen.structure.pools.JigsawPlacement, the BFS jigsaw
- * assembly algorithm read in full from the decompiled `Placer.tryPlacingChildren`. Two documented
- * simplifications, both because the supporting real-vanilla infrastructure doesn't exist in this
- * project yet:
+ * assembly algorithm read in full from the decompiled `Placer.tryPlacingChildren`.
  *
- * - **Collision uses plain integer bounding-box intersection**, not real vanilla's exact
- *   `VoxelShape` boolean-region tracking (`Shapes.join`/`joinIsNotEmpty` over the accumulated
- *   "free space"). For convex pieces (every real Plains village piece is a simple box) this gives
- *   the same accept/reject outcome; it can diverge in concave free-space gaps between several
- *   already-placed pieces, which real Plains village layouts essentially never produce.
- * - **`JointType`/top-facing is not checked**: this project only extracts a jigsaw block's front
- *   direction from its `orientation` property (see [StructureTemplate]'s own KDoc for why), not
- *   its top direction, so `canAttach` always behaves as if every joint were `rollable` (real
- *   vanilla's own behavior for vertical connections; only some horizontal ones are normally
- *   `aligned`). `placementPriority`/`selectionPriority` are read but not used for ordering either,
- *   since every sampled real Plains village jigsaw block leaves both at their default of 0.
+ * Collision tracks the same nested free-space contexts as vanilla. JigsawPlacement only creates
+ * and subtracts axis-aligned piece AABBs, then asks whether a deflated candidate AABB remains in
+ * that space. Inclusive integer boxes plus a list of subtracted boxes are equivalent for that
+ * query, including concave gaps and connectors which attach inside their source piece. Jigsaw
+ * front/top orientation, aligned-vs-rollable joints, selection-priority sorting and the
+ * placement-priority queue are also modeled. The expansion hack used by some village pools is
+ * still outside this class; Bastion explicitly disables that path.
  *
  * Every real Plains village pool element uses `projection: rigid`, so the `sourceRigid &&
  * targetRigid` path (a plain Y delta, no heightmap query) is what actually runs in practice; the
@@ -58,6 +52,7 @@ public class JigsawAssembly(
         random: WorldgenRandom,
         projectStartToHeightmap: Boolean,
         maxDistanceFromCenter: Int,
+        maxVerticalDistanceFromCenter: Int = Int.MAX_VALUE,
     ): List<PlacedStructurePiece> {
         val startPool = poolLookup(startPoolName) ?: return emptyList()
         val centerRotation = StructureRotations.random(random)
@@ -81,19 +76,43 @@ public class JigsawAssembly(
         val allowedRegion =
             StructureBoundingBox(
                 centerX - maxDistanceFromCenter,
-                Int.MIN_VALUE,
+                if (maxVerticalDistanceFromCenter ==
+                    Int.MAX_VALUE
+                ) {
+                    Int.MIN_VALUE
+                } else {
+                    bottomY - maxVerticalDistanceFromCenter
+                },
                 centerZ - maxDistanceFromCenter,
                 centerX + maxDistanceFromCenter,
-                Int.MAX_VALUE,
+                if (maxVerticalDistanceFromCenter ==
+                    Int.MAX_VALUE
+                ) {
+                    Int.MAX_VALUE
+                } else {
+                    bottomY + maxVerticalDistanceFromCenter
+                },
                 centerZ + maxDistanceFromCenter,
             )
 
-        val placedBoxes = mutableListOf(centerBox)
-        val queue = ArrayDeque<Pair<PlacedStructurePiece, Int>>()
-        queue.add(pieces[0] to 0)
+        val globalFree = CollisionSpace(allowedRegion, mutableListOf(centerBox))
+        val queue = mutableListOf(QueuedPiece(pieces[0], globalFree, 0, Int.MAX_VALUE, 0))
+        var insertionOrder = 1
         while (queue.isNotEmpty()) {
-            val (sourcePiece, depth) = queue.removeFirst()
-            tryPlacingChildren(sourcePiece, depth, maxDepth, random, pieces, placedBoxes, queue, allowedRegion)
+            val nextIndex =
+                queue.indices.maxWithOrNull(compareBy<Int> { queue[it].priority }.thenBy { -queue[it].order }) ?: 0
+            val (sourcePiece, sourceFree, depth) = queue.removeAt(nextIndex)
+            insertionOrder =
+                tryPlacingChildren(
+                    sourcePiece,
+                    depth,
+                    maxDepth,
+                    random,
+                    pieces,
+                    sourceFree,
+                    queue,
+                    insertionOrder,
+                )
         }
         return pieces
     }
@@ -104,10 +123,11 @@ public class JigsawAssembly(
         maxDepth: Int,
         random: WorldgenRandom,
         pieces: MutableList<PlacedStructurePiece>,
-        placedBoxes: MutableList<StructureBoundingBox>,
-        queue: ArrayDeque<Pair<PlacedStructurePiece, Int>>,
-        allowedRegion: StructureBoundingBox,
-    ) {
+        contextFree: CollisionSpace,
+        queue: MutableList<QueuedPiece>,
+        insertionOrder: Int,
+    ): Int {
+        var nextInsertionOrder = insertionOrder
         val sourceElement = sourcePiece.element
         val sourceRigid = sourceElement.projection == StructureProjection.RIGID
         val sourceBB = sourcePiece.boundingBox
@@ -118,10 +138,17 @@ public class JigsawAssembly(
                 sourcePiece.rotation,
                 random,
             )
+        var insideSourceFree: CollisionSpace? = null
 
         for (sourceJigsaw in sourceJigsaws) {
             val targetJigsawPos = sourceJigsaw.front.offset(sourceJigsaw.pos)
             val sourceJigsawLocalY = sourceJigsaw.pos.y - sourceBB.minY
+            val childrenFree =
+                if (sourceBB.isInside(targetJigsawPos)) {
+                    insideSourceFree ?: CollisionSpace(sourceBB, mutableListOf()).also { insideSourceFree = it }
+                } else {
+                    contextFree
+                }
 
             val targetPool = poolLookup(sourceJigsaw.pool)
             if (targetPool == null || targetPool.size() == 0) continue
@@ -162,12 +189,21 @@ public class JigsawAssembly(
                         val targetBB = rawTargetBB.move(StructurePos(0, yOffset, 0))
                         val targetBoxPosition = rawTargetBoxPos + StructurePos(0, yOffset, 0)
 
-                        if (allowedRegion.containsFully(targetBB) && placedBoxes.none { it.intersects(targetBB) }) {
-                            placedBoxes.add(targetBB)
+                        if (childrenFree.canFit(targetBB)) {
+                            childrenFree.occupy(targetBB)
                             val targetPiece =
                                 PlacedStructurePiece(targetElement, targetBoxPosition, targetRotation, targetBB)
                             pieces.add(targetPiece)
-                            if (depth + 1 <= maxDepth) queue.add(targetPiece to depth + 1)
+                            if (depth + 1 <= maxDepth) {
+                                queue +=
+                                    QueuedPiece(
+                                        targetPiece,
+                                        childrenFree,
+                                        depth + 1,
+                                        sourceJigsaw.placementPriority,
+                                        nextInsertionOrder++,
+                                    )
+                            }
                             placed = true
                             break@outer
                         }
@@ -176,11 +212,35 @@ public class JigsawAssembly(
             }
             if (!placed) continue
         }
+        return nextInsertionOrder
     }
 
-    /** // parity: JigsawBlock.canAttach, minus the top-facing/JointType check (see this class's own KDoc). */
+    /** // parity: JigsawBlock.canAttach. */
     private fun canAttach(
         source: PlacedJigsaw,
         target: PlacedJigsaw,
-    ): Boolean = source.front == target.front.opposite() && source.target == target.name
+    ): Boolean =
+        source.front == target.front.opposite() &&
+            (source.rollable || source.top == target.top) &&
+            source.target == target.name
+
+    private data class QueuedPiece(
+        val piece: PlacedStructurePiece,
+        val free: CollisionSpace,
+        val depth: Int,
+        val priority: Int,
+        val order: Int,
+    )
+
+    private class CollisionSpace(
+        private val bounds: StructureBoundingBox,
+        private val occupied: MutableList<StructureBoundingBox>,
+    ) {
+        fun canFit(candidate: StructureBoundingBox): Boolean =
+            bounds.containsFully(candidate) && occupied.none { it.intersects(candidate) }
+
+        fun occupy(box: StructureBoundingBox) {
+            occupied += box
+        }
+    }
 }

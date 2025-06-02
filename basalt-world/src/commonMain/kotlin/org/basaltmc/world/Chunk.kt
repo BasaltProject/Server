@@ -11,6 +11,8 @@ public class Chunk(
 ) {
     private val sections = Array(verticalBounds.sectionCount) { ChunkSection() }
     private val blockEntitiesByPosition = LinkedHashMap<Int, ChunkBlockEntity>()
+    private val scheduledBlockTicksBacking = mutableListOf<ChunkScheduledTick>()
+    private val scheduledFluidTicksBacking = mutableListOf<ChunkScheduledTick>()
     private var blockWriteObserver: ((Int, Int, Int, Int, Int) -> Unit)? = null
 
     public val sectionCount: Int get() = sections.size
@@ -75,6 +77,35 @@ public class Chunk(
     ): ChunkBlockEntity? = blockEntitiesByPosition[blockEntityKey(localX, y, localZ)]
 
     public fun blockEntities(): Collection<ChunkBlockEntity> = blockEntitiesByPosition.values
+
+    public fun scheduleBlockTick(tick: ChunkScheduledTick) {
+        scheduleTick(scheduledBlockTicksBacking, tick)
+    }
+
+    public fun scheduleFluidTick(tick: ChunkScheduledTick) {
+        scheduleTick(scheduledFluidTicksBacking, tick)
+    }
+
+    public fun scheduledBlockTicks(): List<ChunkScheduledTick> = scheduledBlockTicksBacking.toList()
+
+    public fun scheduledFluidTicks(): List<ChunkScheduledTick> = scheduledFluidTicksBacking.toList()
+
+    private fun scheduleTick(
+        ticks: MutableList<ChunkScheduledTick>,
+        tick: ChunkScheduledTick,
+    ) {
+        require(tick.y in verticalBounds.minY..verticalBounds.maxY) {
+            "scheduled tick y=${tick.y} outside chunk bounds"
+        }
+        val duplicate =
+            ticks.any {
+                it.type == tick.type && it.localX == tick.localX && it.y == tick.y && it.localZ == tick.localZ
+            }
+        if (!duplicate) {
+            ticks += tick
+            isDirty = true
+        }
+    }
 
     /** Synchronously records changed block writes without allocating on the normal write path. */
     internal fun <T> observeBlockWrites(

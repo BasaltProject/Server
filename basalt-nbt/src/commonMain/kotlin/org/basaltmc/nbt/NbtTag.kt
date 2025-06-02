@@ -268,3 +268,17 @@ public class NbtLongArray(
 
     override fun toString(): String = "NbtLongArray(size=${value.size})"
 }
+
+/** Returns an independent tree, matching vanilla NBT's copy semantics for mutable containers and arrays. */
+public fun NbtTag.deepCopy(): NbtTag =
+    when (this) {
+        is NbtCompound -> deepCopy()
+        is NbtList -> NbtList(elementType, map(NbtTag::deepCopy))
+        is NbtByteArray -> NbtByteArray(value.copyOf())
+        is NbtIntArray -> NbtIntArray(value.copyOf())
+        is NbtLongArray -> NbtLongArray(value.copyOf())
+        else -> this
+    }
+
+/** Type-preserving overload for the most common mutable NBT root. */
+public fun NbtCompound.deepCopy(): NbtCompound = NbtCompound(associate { (name, value) -> name to value.deepCopy() })

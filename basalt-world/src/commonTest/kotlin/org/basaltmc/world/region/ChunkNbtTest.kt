@@ -9,6 +9,7 @@ import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.ChunkBlockEntity
 import org.basaltmc.world.ChunkHeight
+import org.basaltmc.world.ChunkScheduledTick
 import org.basaltmc.world.WorldHeight
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -200,6 +201,28 @@ class ChunkNbtTest {
         assertEquals(customData, blockEntity.data)
         assertEquals(false, "id" in blockEntity.data)
         assertEquals(false, "x" in blockEntity.data)
+    }
+
+    @Test
+    fun scheduledTicksRoundTripTheVanillaSavedTickShape() {
+        val chunk = Chunk(-2, 3)
+        val blockTick = ChunkScheduledTick(Identifier.vanilla("stone"), 15, -12, 4, delay = 7, priority = -1)
+        val fluidTick = ChunkScheduledTick(Identifier.vanilla("lava"), 0, 63, 15, delay = 0)
+        chunk.scheduleBlockTick(blockTick)
+        chunk.scheduleFluidTick(fluidTick)
+
+        val tag = ChunkNbt.write(chunk)
+        val writtenBlock = tag.getList("block_ticks")!![0] as NbtCompound
+        assertEquals("minecraft:stone", writtenBlock.getString("i"))
+        assertEquals(-17, writtenBlock.getInt("x"))
+        assertEquals(-12, writtenBlock.getInt("y"))
+        assertEquals(52, writtenBlock.getInt("z"))
+        assertEquals(7, writtenBlock.getInt("t"))
+        assertEquals(-1, writtenBlock.getInt("p"))
+
+        val read = ChunkNbt.read(tag)
+        assertEquals(listOf(blockTick), read.scheduledBlockTicks())
+        assertEquals(listOf(fluidTick), read.scheduledFluidTicks())
     }
 
     private fun stateId(path: String): Int =

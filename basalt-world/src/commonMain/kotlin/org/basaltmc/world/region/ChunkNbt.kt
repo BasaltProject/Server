@@ -12,6 +12,7 @@ import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.ChunkBlockEntity
 import org.basaltmc.world.ChunkHeight
+import org.basaltmc.world.ChunkScheduledTick
 import org.basaltmc.world.ChunkSection
 
 /** Thrown for chunk NBT that doesn't parse: an unknown block, a missing palette, a corrupt section. */
@@ -35,10 +36,12 @@ public class ChunkNbtException(
  * biomes go single-value / 1-3 bit indirect / direct beyond that.
  *
  * Non-default states emitted by worldgen preserve their vanilla `Properties` compound in the
- * palette and resolve it back to the same network state ID when loaded. Deliberately out of scope
- * for now: block/light data (`BlockLight`/`SkyLight`), entities, ticks, heightmaps, and structures.
- * Block entities preserve full custom NBT plus vanilla id/x/y/z metadata. Section biome palettes
- * preserve the actual quart-resolution IDs generated for every dimension.
+ * palette and resolve it back to the same network state ID when loaded. Block and fluid ticks use
+ * the vanilla SavedTick shape and preserve insertion order; executing due ticks remains a runtime
+ * concern outside this codec. Deliberately out of scope for now: block/light data
+ * (`BlockLight`/`SkyLight`), entities, heightmaps, and structures. Block entities preserve full
+ * custom NBT plus vanilla id/x/y/z metadata. Section biome palettes preserve the actual
+ * quart-resolution IDs generated for every dimension.
  */
 public object ChunkNbt {
     // world_version for Minecraft 26.2, per the project's own protocol constants.
@@ -72,7 +75,10 @@ public object ChunkNbt {
             sections += sectionTag
         }
         tag["sections"] = NbtList(NbtType.COMPOUND, sections)
-        tag["block_entities"] = NbtList(NbtType.COMPOUND, chunk.blockEntities().map { encodeBlockEntity(chunk, it) })
+        val blockEntities = chunk.blockEntities().map { encodeBlockEntity(chunk, it) }
+        tag["block_entities"] = NbtList(if (blockEntities.isEmpty()) NbtType.END else NbtType.COMPOUND, blockEntities)
+        tag["block_ticks"] = encodeTicks(chunk, chunk.scheduledBlockTicks())
+        tag["fluid_ticks"] = encodeTicks(chunk, chunk.scheduledFluidTicks())
         return tag
     }
 
@@ -96,8 +102,54 @@ public object ChunkNbt {
         if (blockEntities != null) {
             for (entry in blockEntities) chunk.setBlockEntity(decodeBlockEntity(chunk, entry))
         }
+        decodeTicks(chunk, tag.getList("block_ticks")).forEach(chunk::scheduleBlockTick)
+        decodeTicks(chunk, tag.getList("fluid_ticks")).forEach(chunk::scheduleFluidTick)
         return chunk
     }
+
+    private fun encodeTicks(
+        chunk: Chunk,
+        ticks: List<ChunkScheduledTick>,
+    ): NbtList =
+        NbtList(
+            if (ticks.isEmpty()) NbtType.END else NbtType.COMPOUND,
+            ticks.map { tick ->
+                NbtCompound().apply {
+                    putString("i", tick.type.toString())
+                    putInt("x", chunk.chunkX * 16 + tick.localX)
+                    putInt("y", tick.y)
+                    putInt("z", chunk.chunkZ * 16 + tick.localZ)
+                    putInt("t", tick.delay)
+                    putInt("p", tick.priority)
+                }
+            },
+        )
+
+    private fun decodeTicks(
+        chunk: Chunk,
+        entries: NbtList?,
+    ): List<ChunkScheduledTick> =
+        entries?.map { entry ->
+            val tag = entry as? NbtCompound ?: throw ChunkNbtException("scheduled tick entry is not a compound")
+            val type =
+                tag.getString("i").takeIf(String::isNotEmpty) ?: throw ChunkNbtException("scheduled tick has no id")
+            val worldX = tag.getInt("x")
+            val y = tag.getInt("y")
+            val worldZ = tag.getInt("z")
+            val localX = worldX - chunk.chunkX * 16
+            val localZ = worldZ - chunk.chunkZ * 16
+            if (localX !in 0..15 || localZ !in 0..15 || y !in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) {
+                throw ChunkNbtException("scheduled tick $type at ($worldX,$y,$worldZ) is outside the chunk")
+            }
+            ChunkScheduledTick(
+                Identifier.parse(type),
+                localX,
+                y,
+                localZ,
+                tag.getInt("t"),
+                tag.getInt("p").coerceIn(-3, 3),
+            )
+        } ?: emptyList()
 
     private fun encodeBlockEntity(
         chunk: Chunk,

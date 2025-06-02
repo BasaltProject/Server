@@ -6,6 +6,8 @@ import org.basaltmc.registry.Blocks
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.ChunkHeight
 import org.basaltmc.world.densityfunction.BlendedNoise
+import org.basaltmc.world.densityfunction.DensityFunction
+import org.basaltmc.world.densityfunction.FunctionContext
 import org.basaltmc.world.noise.NormalNoise
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -50,6 +52,42 @@ class DimensionTerrainGeneratorTest {
         }
     }
 
+    @Test
+    fun smallEndIslandsMatchOfficialPlacedFeatureVector() {
+        val router = EndNoiseRouter(ConstantDensity(-1.0), ConstantDensity(-1.0))
+        val biomeSource = TheEndBiomeSource(router.erosion)
+
+        val chunk = DimensionTerrainGenerator.end(router, biomeSource, 65, 0, seed = 27L)
+
+        var count = 0
+        var checksum = 0L
+        for (y in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) {
+            for (z in 0 until 16) {
+                for (x in 0 until 16) {
+                    val stateId = chunk.getBlockStateId(x, y, z)
+                    if (stateId != Blocks.END_STONE.stateId) continue
+                    count++
+                    checksum =
+                        checksum * 31 +
+                        (chunk.chunkX * 16 + x) * 73428767L +
+                        y * 912931L +
+                        (chunk.chunkZ * 16 + z) * 438289L +
+                        stateId
+                }
+            }
+        }
+        assertEquals(461, count)
+        assertEquals(1924761240665797445L, checksum)
+    }
+
+    @Test
+    fun endIslandsRespectTheSmallEndIslandsBiomeFilter() {
+        val router = EndNoiseRouter(ConstantDensity(1.0), ConstantDensity(-1.0))
+        val chunk = DimensionTerrainGenerator.end(router, TheEndBiomeSource(router.erosion), 65, 0, seed = 27L)
+
+        assertEquals(0, count(chunk, Blocks.END_STONE.stateId, 0, 127))
+    }
+
     private fun syntheticNoise(name: String): NormalNoise =
         NormalNoise.create(
             XoroshiroRandom(name.hashCode().toLong()),
@@ -72,5 +110,15 @@ class DimensionTerrainGeneratorTest {
             }
         }
         return count
+    }
+
+    private class ConstantDensity(
+        private val value: Double,
+    ) : DensityFunction {
+        override fun compute(context: FunctionContext): Double = value
+
+        override fun minValue(): Double = value
+
+        override fun maxValue(): Double = value
     }
 }

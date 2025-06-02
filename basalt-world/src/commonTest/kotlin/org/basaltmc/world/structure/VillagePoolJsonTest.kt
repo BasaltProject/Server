@@ -6,7 +6,9 @@ import org.basaltmc.registry.Blocks
 import org.basaltmc.registry.Identifier
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 /**
  * Synthetic JSON matching the real `template_pool`/`processor_list` schema shape (verified against
@@ -45,6 +47,31 @@ class VillagePoolJsonTest {
         val pool = VillagePoolJson.parsePool(json) { null }
         assertEquals(4, pool.size())
         assertEquals("test:sample_fallback", pool.fallback)
+    }
+
+    @Test
+    fun distinguishesLegacyAndModernSingleAirProcessors() {
+        fun parse(type: String): LegacySinglePoolElement {
+            val json =
+                """
+                {
+                  "elements": [{
+                    "element": {
+                      "element_type": "$type",
+                      "location": "test:piece",
+                      "processors": {"processors": []},
+                      "projection": "rigid"
+                    },
+                    "weight": 1
+                  }],
+                  "fallback": "minecraft:empty"
+                }
+                """.trimIndent()
+            return assertIs(VillagePoolJson.parsePool(json) { null }.getRandomTemplate(fakeRandom()))
+        }
+
+        assertTrue(parse("minecraft:legacy_single_pool_element").ignoreAir)
+        assertFalse(parse("minecraft:single_pool_element").ignoreAir)
     }
 
     @Test

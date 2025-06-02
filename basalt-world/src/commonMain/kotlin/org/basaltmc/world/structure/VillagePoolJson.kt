@@ -17,12 +17,9 @@ public class VillagePoolParseException(
 ) : Exception(message)
 
 /**
- * Parses the real `data/minecraft/worldgen/template_pool/village/plains` and
- * `data/minecraft/worldgen/processor_list` json formats, verbatim against the real values
- * captured from the decompiled 26.2 jar (`town_centers.json`, `mossify_{10,20,70}_percent.json`,
- * `farm_plains.json`, `street_plains.json`). Element kinds are narrowed to what real Plains
- * village pools use: `legacy_single_pool_element`, `list_pool_element`, `empty_pool_element`
- * (matching [StructurePoolElement]'s own documented scope).
+ * Parses the real 26.2 `worldgen/template_pool` and `worldgen/processor_list` JSON formats used by
+ * villages and Bastion. Supported elements are single, legacy single, list, feature and empty;
+ * processor lists currently retain rule processors, matching every Bastion degradation list.
  */
 public object VillagePoolJson {
     /** [resolveProcessors] resolves a named processor list reference (`"minecraft:mossify_20_percent"`) to its real JSON text; only called for string-form `processors` fields. [resolveTag] resolves a block tag name (`"minecraft:doors"`) to its member block state ids; only called for `tag_match` rule predicates. */
@@ -63,7 +60,12 @@ public object VillagePoolJson {
                     json["location"]?.jsonPrimitive?.content ?: throw VillagePoolParseException("Missing 'location'")
                 val projection = parseProjection(json)
                 val processors = parseProcessorsField(json["processors"], resolveProcessors, resolveTag)
-                LegacySinglePoolElement(location, processors, projection)
+                LegacySinglePoolElement(
+                    location,
+                    processors,
+                    projection,
+                    ignoreAir = type == "minecraft:legacy_single_pool_element",
+                )
             }
             "minecraft:list_pool_element" -> {
                 val elements = json["elements"]?.jsonArray ?: JsonArray(emptyList())

@@ -11,7 +11,39 @@ class BlocksTest {
     @Test
     fun lavaHasANonEmptyFluidState() {
         assertTrue(Blocks.hasFluid(Blocks.LAVA.stateId))
+        assertTrue(Blocks.hasFluid(Blocks.LAVA.stateId + 15))
         assertFalse(Blocks.hasWaterFluid(Blocks.LAVA.stateId))
+    }
+
+    @Test
+    fun ruinedPortalStatesResolveFromOfficialProperties() {
+        assertEquals(
+            22313,
+            Blocks.stateIdOf(
+                Identifier.vanilla("polished_blackstone_brick_stairs"),
+                linkedMapOf(
+                    "facing" to "east",
+                    "half" to "top",
+                    "shape" to "straight",
+                    "waterlogged" to "false",
+                ),
+            ),
+        )
+        assertEquals(
+            22251,
+            Blocks.stateIdOf(
+                Identifier.vanilla("polished_blackstone_brick_slab"),
+                linkedMapOf("type" to "double", "waterlogged" to "false"),
+            ),
+        )
+        assertEquals(
+            4006,
+            Blocks.stateIdOf(
+                Identifier.vanilla("chest"),
+                linkedMapOf("type" to "single", "facing" to "east", "waterlogged" to "false"),
+            ),
+        )
+        assertEquals(110, Blocks.stateIdOf(Identifier.vanilla("lava"), mapOf("level" to "8")))
     }
 
     @Test
