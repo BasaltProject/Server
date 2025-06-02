@@ -21,6 +21,7 @@ import org.basaltmc.protocol.play.ContainerSetContentPacket
 import org.basaltmc.protocol.play.ContainerSetSlotPacket
 import org.basaltmc.protocol.play.Direction
 import org.basaltmc.protocol.play.LoginPlayPacket
+import org.basaltmc.protocol.play.OpenScreenPacket
 import org.basaltmc.protocol.play.ServerboundPickItemFromBlockPacket
 import org.basaltmc.protocol.play.ServerboundPlayerActionPacket
 import org.basaltmc.protocol.play.ServerboundPositionLookPacket
@@ -43,6 +44,7 @@ import org.basaltmc.storage.StoredPlayer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -79,6 +81,7 @@ class BlockInteractionIntegrationTest {
         val uuid = OfflineUuid.forUsername(name)
         val heldSlot = PlayerInventory.HOTBAR_START
         val emptySlot = PlayerInventory.HOTBAR_START + 1
+        val tableSlot = PlayerInventory.HOTBAR_START + 2
         // Everything the client sees is addressed in container 0's own numbering, which is not
         // this server's storage order: see [PlayerInventory.MENU_SLOTS].
         val heldMenuSlot = PlayerInventory.menuSlotOf(heldSlot)
@@ -118,7 +121,11 @@ class BlockInteractionIntegrationTest {
                     inventory =
                         StoredInventory(
                             List(StoredInventory.PLAYER_SLOTS) { slot ->
-                                if (slot == heldSlot) StoredItemStack(dirtId, 64) else null
+                                when (slot) {
+                                    heldSlot -> StoredItemStack(dirtId, 64)
+                                    tableSlot -> StoredItemStack("minecraft:crafting_table", 1)
+                                    else -> null
+                                }
                             },
                         ),
                 ),
@@ -329,6 +336,67 @@ class BlockInteractionIntegrationTest {
             "the stack pick block selected should still be where it already was",
         )
         assertNull(pickedInventory.items[emptyMenuSlot], "pick block must not duplicate the stack into a second slot")
+
+        // --- Place a crafting table, then right-click it with an empty hand and expect its screen.
+        //
+        // The empty hand is the point. An earlier version checked for a placeable item *before* it
+        // looked at what was clicked, so the usual way of opening a table (empty hand) was rejected
+        // before the block was ever considered and the screen simply never appeared. ---
+        val tablePos = BlockPos(10, 300, 8)
+        sendCompressed(connection, ServerboundSetCarriedItemPacket.ID, threshold) {
+            ServerboundSetCarriedItemPacket(2).write(it)
+        }
+        sendCompressed(connection, ServerboundUseItemOnPacket.ID, threshold) {
+            ServerboundUseItemOnPacket(
+                hand = ServerboundUseItemOnPacket.Hand.MAIN_HAND,
+                blockHit =
+                    BlockHitResult(
+                        tablePos,
+                        Direction.UP,
+                        0.5f,
+                        0.5f,
+                        0.5f,
+                        inside = true,
+                        worldBorderHit = false,
+                    ),
+                sequence = 6,
+            ).write(it)
+        }
+        val tablePlaced =
+            ClientboundBlockUpdatePacket.read(drainUntil(connection, incoming, ClientboundBlockUpdatePacket.ID))
+        assertEquals(tablePos, tablePlaced.pos)
+        assertEquals(
+            Blocks.REGISTRY.idOf(Identifier.vanilla("crafting_table")),
+            tablePlaced.blockStateId,
+        )
+
+        // Hotbar slot 2 is empty now that the only table was placed, so this really is an empty hand.
+        sendCompressed(connection, ServerboundUseItemOnPacket.ID, threshold) {
+            ServerboundUseItemOnPacket(
+                hand = ServerboundUseItemOnPacket.Hand.MAIN_HAND,
+                blockHit =
+                    BlockHitResult(
+                        tablePos,
+                        Direction.UP,
+                        0.5f,
+                        0.5f,
+                        0.5f,
+                        inside = false,
+                        worldBorderHit = false,
+                    ),
+                sequence = 7,
+            ).write(it)
+        }
+
+        val opened = OpenScreenPacket.read(drainUntil(connection, incoming, OpenScreenPacket.ID))
+        assertEquals(OpenScreenPacket.CRAFTING_MENU, opened.menuType)
+        assertTrue(opened.containerId != 0, "a block's window must not reuse the player's own container id")
+
+        // The window that follows is the table's, and it is addressed by that same container id.
+        val tableWindow =
+            ContainerSetContentPacket.read(drainUntil(connection, incoming, ContainerSetContentPacket.ID))
+        assertEquals(opened.containerId, tableWindow.containerId)
+        assertEquals(46, tableWindow.items.size)
 
         connection.close()
     }

@@ -51,6 +51,12 @@ public class PlayerSession(
     public var sprinting: Boolean = false
 
     /**
+     * Whether they are crouching, from `player_input`'s own bitmask. Read because sneaking is what
+     * tells "place a block against this one" apart from "open this one's screen".
+     */
+    public var sneaking: Boolean = false
+
+    /**
      * The signed profile properties from the session server, carrying this player's skin and cape.
      * Empty in offline mode, where nothing signs them and every client draws the default skin.
      */
