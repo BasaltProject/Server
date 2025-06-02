@@ -10,7 +10,10 @@ import org.basaltmc.world.densityfunction.DensityCache
 import org.basaltmc.world.densityfunction.DensityFunction
 import org.basaltmc.world.densityfunction.Marker
 import org.basaltmc.world.terrain.carver.NetherCaveCarver
+import org.basaltmc.world.terrain.decoration.nether.NetherLocalDecoration
+import org.basaltmc.world.terrain.decoration.nether.NetherSurfaceStructuresDecoration
 import org.basaltmc.world.terrain.decoration.nether.NetherUndergroundDecoration
+import org.basaltmc.world.terrain.decoration.nether.NetherVegetalDecoration
 import org.basaltmc.world.terrain.surface.SurfaceBuilder
 import org.basaltmc.world.terrain.surface.SurfaceRuleData
 import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
@@ -51,7 +54,12 @@ public object DimensionTerrainGenerator {
                 }
             },
             carverPass = { chunk -> NetherCaveCarver.carve(chunk, seed) },
-            decorationPass = { chunk -> NetherUndergroundDecoration.decorate(chunk, seed, biomeSource) },
+            decorationPass = { chunk ->
+                NetherLocalDecoration.decorate(chunk, seed, biomeSource)
+                NetherSurfaceStructuresDecoration.decorate(chunk, seed, biomeSource)
+                NetherUndergroundDecoration.decorate(chunk, seed, biomeSource)
+                NetherVegetalDecoration.decorate(chunk, seed, biomeSource)
+            },
         ) { blockX, blockY, blockZ, cache -> biomeSource.biomeAt(blockX, blockY, blockZ, cache) }
 
     /** // parity: `noise_settings/end.json` base shape, block default and cell sizes. */
