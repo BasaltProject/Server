@@ -38,15 +38,24 @@ public object LootTableJson {
         )
 
     private fun parseEntry(entry: JsonObject): LootEntry {
-        val type = entry.type()
-        if (type != "minecraft:item") throw LootTableParseException("Unsupported loot pool entry type: $type")
-        return LootEntry(
-            item = Identifier.parse(entry.getValue("name").jsonPrimitive.content),
-            weight = (entry["weight"] as? JsonPrimitive)?.content?.toInt() ?: 1,
-            quality = (entry["quality"] as? JsonPrimitive)?.content?.toInt() ?: 0,
-            conditions = (entry["conditions"] as? JsonArray)?.map { parseCondition(it as JsonObject) } ?: emptyList(),
-            functions = (entry["functions"] as? JsonArray)?.map { parseFunction(it as JsonObject) } ?: emptyList(),
-        )
+        val conditions = (entry["conditions"] as? JsonArray)?.map { parseCondition(it as JsonObject) } ?: emptyList()
+        return when (val type = entry.type()) {
+            "minecraft:item" ->
+                LootEntry(
+                    item = Identifier.parse(entry.getValue("name").jsonPrimitive.content),
+                    weight = (entry["weight"] as? JsonPrimitive)?.content?.toInt() ?: 1,
+                    quality = (entry["quality"] as? JsonPrimitive)?.content?.toInt() ?: 0,
+                    conditions = conditions,
+                    functions =
+                        (entry["functions"] as? JsonArray)?.map { parseFunction(it as JsonObject) } ?: emptyList(),
+                )
+            "minecraft:alternatives" ->
+                LootEntry(
+                    conditions = conditions,
+                    alternatives = (entry.getValue("children") as JsonArray).map { parseEntry(it as JsonObject) },
+                )
+            else -> throw LootTableParseException("Unsupported loot pool entry type: $type")
+        }
     }
 
     // Conditions dispatch on "condition", not "type" (`LootItemCondition.TYPED_CODEC`'s explicit
@@ -56,6 +65,8 @@ public object LootTableJson {
         val type = condition.getValue("condition").jsonPrimitive.content
         return when (type) {
             "minecraft:random_chance" -> LootCondition.RandomChance(parseNumberProvider(condition.getValue("chance")))
+            "minecraft:survives_explosion" -> LootCondition.SurvivesExplosion
+            "minecraft:match_tool" -> LootCondition.MatchTool
             else -> throw LootTableParseException("Unsupported loot condition type: $type")
         }
     }

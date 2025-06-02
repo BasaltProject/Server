@@ -1,5 +1,6 @@
 package org.basaltmc.server
 
+import org.basaltmc.assets.ServerJarAssets
 import org.basaltmc.auth.OnlineMode
 import org.basaltmc.common.logging.Logger
 import org.basaltmc.common.placeholder.PlaceholderRegistry
@@ -30,6 +31,7 @@ import org.basaltmc.server.player.PlayerRegistry
 import org.basaltmc.server.timings.ReportSources
 import org.basaltmc.server.timings.TimingsReport
 import org.basaltmc.server.world.LoadedWorld
+import org.basaltmc.server.world.RealLootTables
 import org.basaltmc.server.world.VanillaWorldGeneratorFactory
 import org.basaltmc.server.world.WORLDS_ROOT
 import org.basaltmc.server.world.WorldMetadata
@@ -78,6 +80,8 @@ public class BasaltServer(
     private val surfaceEnvironment: SurfaceRuleEnvironment? = null,
     private val villageGenerator: VillageStructureGenerator? = null,
     private val worldGeneratorFactory: VanillaWorldGeneratorFactory? = null,
+    /** Where block-break drops are read from (see [RealLootTables]); `null` in tests that never break a block in survival. */
+    private val serverJar: ServerJarAssets? = null,
     private val worldsConfig: WorldsConfig,
     /**
      * Everything `/reload` can swap under a running server, read through this rather than copied:
@@ -97,6 +101,7 @@ public class BasaltServer(
     private val logger = Logger("Server")
     private val playerRegistry = PlayerRegistry()
     private val cpuMeter = CpuMeter()
+    private val lootTables = RealLootTables(serverJar)
 
     /**
      * What `/timings` measures. Off until asked for: a clock read per section per call is small but
@@ -487,6 +492,7 @@ public class BasaltServer(
                     ui = { live.current.ui },
                     placeholders = placeholders,
                     timings = timings,
+                    lootTables = lootTables,
                 ).run()
             }
         }

@@ -1,8 +1,11 @@
 package org.basaltmc.server.world
 
 import org.basaltmc.io.NativeMutex
+import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.NoiseWorldGenerator
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * Shared, mutable view over the currently loaded chunks, guarding both block mutations and the
@@ -31,6 +34,7 @@ import org.basaltmc.world.NoiseWorldGenerator
  * all, rather than being regenerated from the seed. [ChunkGenerationQueue] is what drives it, and
  * what collects the freshly generated chunks for persistence.
  */
+@OptIn(ExperimentalUuidApi::class)
 public class WorldState(
     initialChunks: List<Chunk>,
     private val loadOrGenerate: (chunkX: Int, chunkZ: Int) -> Chunk = NoiseWorldGenerator::generate,
@@ -134,5 +138,67 @@ public class WorldState(
             val chunk = chunksByPos[key(x shr 4, z shr 4)] ?: return@withLock false
             chunk.setBlockStateId(x and 15, y, z and 15, stateId)
             true
+        }
+
+    // Dropped items in this world. Behind the same lock as blocks: a break spawning one and a
+    // nearby player picking one up are exactly the same kind of race two players editing blocks
+    // are. There is no server-side physics tick for these (see [DroppedItem]'s own KDoc); a
+    // connection's own thread is the only thing that ever moves one, by picking it up.
+    private val droppedItems = mutableListOf<DroppedItem>()
+
+    /**
+     * One item sitting in the world. Deliberately static once spawned: this build computes a
+     * resting position up front (drop straight down to the first solid support) rather than ticking
+     * gravity and broadcasting movement every tick, which the shared [org.basaltmc.server.TickLoop]
+     * cannot do (it touches no sockets, see its own KDoc) and no per-connection thread owns on the
+     * world's behalf. A documented gap against real vanilla physics (no bounce, no merging with
+     * other stacks, no server-driven fall animation), not a broken one: the item is exactly where
+     * this position says it is, the whole time it exists.
+     */
+    public data class DroppedItem(
+        val entityId: Int,
+        val uuid: Uuid,
+        val item: Identifier,
+        val count: Int,
+        val x: Double,
+        val y: Double,
+        val z: Double,
+    )
+
+    /** Adds a newly spawned (or re-added, for a partial pickup) dropped item to this world. */
+    public fun spawnItem(dropped: DroppedItem): DroppedItem =
+        mutex.withLock {
+            droppedItems.add(dropped)
+            dropped
+        }
+
+    /** A snapshot of every dropped item within [radius] blocks of a point, nearest first. */
+    public fun nearbyItems(
+        x: Double,
+        y: Double,
+        z: Double,
+        radius: Double,
+    ): List<DroppedItem> =
+        mutex.withLock {
+            val radiusSquared = radius * radius
+            droppedItems
+                .filter {
+                    val dx = it.x - x
+                    val dy = it.y - y
+                    val dz = it.z - z
+                    dx * dx + dy * dy + dz * dz <= radiusSquared
+                }.sortedBy {
+                    val dx = it.x - x
+                    val dy = it.y - y
+                    val dz = it.z - z
+                    dx * dx + dy * dy + dz * dz
+                }
+        }
+
+    /** Removes and returns the dropped item with this entity id, or `null` if it is already gone (picked up, despawned). */
+    public fun removeItem(entityId: Int): DroppedItem? =
+        mutex.withLock {
+            val index = droppedItems.indexOfFirst { it.entityId == entityId }
+            if (index < 0) null else droppedItems.removeAt(index)
         }
 }

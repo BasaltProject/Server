@@ -9,3 +9,28 @@ public enum class Direction {
     WEST,
     EAST,
 }
+
+/** The unit step from a block towards its neighbour on this face. Mirrors `Direction.getUnitVec3i`. */
+public val Direction.normalX: Int
+    get() =
+        when (this) {
+            Direction.WEST -> -1
+            Direction.EAST -> 1
+            else -> 0
+        }
+
+public val Direction.normalY: Int
+    get() =
+        when (this) {
+            Direction.DOWN -> -1
+            Direction.UP -> 1
+            else -> 0
+        }
+
+public val Direction.normalZ: Int
+    get() =
+        when (this) {
+            Direction.NORTH -> -1
+            Direction.SOUTH -> 1
+            else -> 0
+        }

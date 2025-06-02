@@ -51,6 +51,7 @@ import org.basaltmc.protocol.play.ClientCommandPacket
 import org.basaltmc.protocol.play.ClientboundBlockChangedAckPacket
 import org.basaltmc.protocol.play.ClientboundBlockUpdatePacket
 import org.basaltmc.protocol.play.ClientboundPlayerAbilitiesPacket
+import org.basaltmc.protocol.play.ClientboundTakeItemEntityPacket
 import org.basaltmc.protocol.play.CommandsPacket
 import org.basaltmc.protocol.play.ContainerSetContentPacket
 import org.basaltmc.protocol.play.ContainerSetSlotPacket
@@ -74,35 +75,44 @@ import org.basaltmc.protocol.play.PlayerLoadedPacket
 import org.basaltmc.protocol.play.PlayerPositionPacket
 import org.basaltmc.protocol.play.RemoveEntitiesPacket
 import org.basaltmc.protocol.play.RespawnPacket
+import org.basaltmc.protocol.play.ServerboundPickItemFromBlockPacket
 import org.basaltmc.protocol.play.ServerboundPlayerAbilitiesPacket
 import org.basaltmc.protocol.play.ServerboundPlayerActionPacket
 import org.basaltmc.protocol.play.ServerboundPositionLookPacket
 import org.basaltmc.protocol.play.ServerboundPositionPacket
 import org.basaltmc.protocol.play.ServerboundSetCarriedItemPacket
+import org.basaltmc.protocol.play.ServerboundSetCreativeModeSlotPacket
 import org.basaltmc.protocol.play.ServerboundUseItemOnPacket
 import org.basaltmc.protocol.play.SetChunkCacheCenterPacket
 import org.basaltmc.protocol.play.SetChunkCacheRadiusPacket
+import org.basaltmc.protocol.play.SetEntityDataPacket
 import org.basaltmc.protocol.play.SetExperiencePacket
 import org.basaltmc.protocol.play.SetHealthPacket
 import org.basaltmc.protocol.play.SetHeldSlotPacket
 import org.basaltmc.protocol.play.SetSimulationDistancePacket
 import org.basaltmc.protocol.play.SignedChatCommandPacket
+import org.basaltmc.protocol.play.SpawnEntityPacket
 import org.basaltmc.protocol.play.SpawnInfo
 import org.basaltmc.protocol.play.SpawnPositionPacket
 import org.basaltmc.protocol.play.SystemChatPacket
 import org.basaltmc.protocol.play.UpdateLightPacket
+import org.basaltmc.protocol.play.WireItemStack
 import org.basaltmc.protocol.readVarInt
 import org.basaltmc.protocol.status.PingRequestPacket
 import org.basaltmc.protocol.status.PongResponsePacket
 import org.basaltmc.protocol.status.StatusRequestPacket
 import org.basaltmc.protocol.status.StatusResponsePacket
 import org.basaltmc.protocol.writeVarInt
+import org.basaltmc.random.LegacyRandom
 import org.basaltmc.registry.Blocks
+import org.basaltmc.registry.Identifier
+import org.basaltmc.registry.Items
 import org.basaltmc.server.command.CommandDispatcher
 import org.basaltmc.server.command.PlayerCommandSource
 import org.basaltmc.server.placeholder.PlaceholderSlots
 import org.basaltmc.server.player.Difficulty
 import org.basaltmc.server.player.FoodData
+import org.basaltmc.server.player.PlayerInventory
 import org.basaltmc.server.player.PlayerPersistence
 import org.basaltmc.server.player.PlayerRegistry
 import org.basaltmc.server.player.PlayerSession
@@ -113,8 +123,10 @@ import org.basaltmc.server.ui.PlayerUi
 import org.basaltmc.server.ui.UiConfigs
 import org.basaltmc.server.world.ChunkGenerationQueue
 import org.basaltmc.server.world.LoadedWorld
+import org.basaltmc.server.world.RealLootTables
 import org.basaltmc.server.world.WorldState
 import org.basaltmc.storage.PlayerStore
+import org.basaltmc.storage.StoredItemStack
 import org.basaltmc.storage.StoredPlayer
 import org.basaltmc.storage.StoredStats
 import org.basaltmc.text.Component
@@ -148,9 +160,10 @@ import kotlin.uuid.Uuid
  * boundaries ([chunkTracker], the same square view area [SetChunkCacheRadiusPacket] already
  * declares, just re-centered instead of fixed at the spawn position), and wires movement/chat
  * through [playerRegistry] so other connected players see them. Breaking a block
- * ([handlePlayerAction]) follows the player's game mode and broadcasts through [WorldState]'s
- * single lock; placing one is acknowledged but not yet acted on, since it needs a held-item
- * inventory model that doesn't exist yet.
+ * ([handlePlayerAction]) and placing one ([handleUseItemOn]) both follow the player's game mode and
+ * broadcast through [WorldState]'s single lock; a survival break also rolls [lootTables] and spawns
+ * whatever it drops, which [tryPickupNearbyItems] (driven from this connection's own outbound loop,
+ * like [tickPlayer]) later picks back up.
  *
  * Play also owns this player's survival state: [tickPlayer] runs hunger and regeneration on this
  * connection's own thread, slash commands go through [commands], and death and respawn are handled
@@ -182,6 +195,8 @@ public class ClientSession(
     private val placeholders: PlaceholderRegistry = PlaceholderRegistry(),
     /** Where this connection's share of the server's time is recorded. Off unless `/timings` is on. */
     private val timings: Timings = Timings(),
+    /** Where a survival block break resolves its drops from. `null` means blocks never drop anything. */
+    private val lootTables: RealLootTables? = null,
 ) {
     private val logger = Logger("Session")
 
@@ -948,6 +963,8 @@ public class ClientSession(
                     playerSession?.inventory?.heldSlot = slot
                 }
             }
+            ServerboundSetCreativeModeSlotPacket.ID ->
+                handleSetCreativeModeSlot(ServerboundSetCreativeModeSlotPacket.read(body))
             CONTAINER_CLICK_ID -> {
                 // No click handling yet, so the click is refused rather than half-applied: the
                 // window goes back out as it really is and the client drops its prediction. Read
@@ -955,15 +972,11 @@ public class ClientSession(
                 // not implemented.
                 sendInventory()
             }
-            ServerboundUseItemOnPacket.ID -> {
-                // Placing a block depends on which item the player is holding, and there's no
-                // inventory/held-item state to consult yet: acknowledged (so the client's own
-                // prediction doesn't get stuck waiting), not acted on. Documented gap.
-                val useItemOn = ServerboundUseItemOnPacket.read(body)
-                sendCompressed(ClientboundBlockChangedAckPacket.ID) {
-                    ClientboundBlockChangedAckPacket(useItemOn.sequence).write(it)
-                }
-            }
+            ServerboundUseItemOnPacket.ID -> handleUseItemOn(ServerboundUseItemOnPacket.read(body))
+            ServerboundPickItemFromBlockPacket.ID ->
+                handlePickItemFromBlock(
+                    ServerboundPickItemFromBlockPacket.read(body),
+                )
             ChunkBatchReceivedPacket.ID -> {
                 // The client's own answer to "how fast can you take chunks". Ignoring it meant
                 // sending at whatever rate the server could produce, which floods the client,
@@ -1002,6 +1015,12 @@ public class ClientSession(
      * spectator cannot break anything, which they already could not in vanilla.
      */
     private fun handlePlayerAction(action: ServerboundPlayerActionPacket) {
+        when (action.action) {
+            ServerboundPlayerActionPacket.Action.DROP_ITEM -> dropHeldItem(all = false)
+            ServerboundPlayerActionPacket.Action.DROP_ALL_ITEMS -> dropHeldItem(all = true)
+            else -> Unit
+        }
+
         val gamemode = playerSession?.gamemode ?: defaultGamemode
         val breaksOn =
             when (gamemode) {
@@ -1022,15 +1041,268 @@ public class ClientSession(
             ClientboundBlockChangedAckPacket(action.sequence).write(it)
         }
         if (!changed) return
-        broken?.let { stateId ->
-            Blocks.byStateId(stateId)?.let { playerSession?.stats?.increment(StoredStats.mined(it.block.toString())) }
-        }
+        val brokenBlock = broken?.let(Blocks::byStateId)
+        brokenBlock?.let { playerSession?.stats?.increment(StoredStats.mined(it.block.toString())) }
 
         for (player in playersInSameWorld()) {
             player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
                 ClientboundBlockUpdatePacket(action.pos, Blocks.AIR.stateId).write(it)
             }
         }
+
+        if (gamemode == Gamemode.SURVIVAL && brokenBlock != null) dropLootFor(brokenBlock.block, action.pos)
+    }
+
+    /**
+     * `Q`/ctrl+`Q`: tosses the held stack (or all of it) into the world. parity:
+     * `ServerPlayerGameMode` reads this off the same `DROP_ITEM`/`DROP_ALL_ITEMS`
+     * [ServerboundPlayerActionPacket] this build does. Real vanilla arcs the toss forward from eye
+     * height; this build drops it straight down at the player's own feet, a documented
+     * simplification (see [WorldState.DroppedItem]'s own KDoc: nothing here ticks item physics).
+     */
+    private fun dropHeldItem(all: Boolean) {
+        val session = playerSession ?: return
+        if (session.gamemode == Gamemode.SPECTATOR) return
+        val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
+        val held = session.inventory[heldSlot] ?: return
+        val dropCount = if (all) held.count else 1
+        val remaining = held.count - dropCount
+        session.inventory[heldSlot] = if (remaining <= 0) null else held.copy(count = remaining)
+        sendInventorySlot(heldSlot)
+        spawnDroppedItem(Identifier.parse(held.id), dropCount, session.x, session.y, session.z)
+    }
+
+    /**
+     * Rolls [block]'s loot table (see [RealLootTables]) and drops each resulting stack, snapped to
+     * the ground below [pos] rather than left floating in the hole the break just made.
+     *
+     * The roll itself is not RNG-parity with vanilla: a real block break consumes the world's own
+     * `RandomSequences` entry (`minecraft:blocks/<path>`, `LootTable.getDefaultParamSet`'s own
+     * `RandomSource`), so the exact same seed and break order would not currently reproduce
+     * vanilla's drops. A documented gap, not a silent one: see [LegacyRandom]'s use below.
+     */
+    private fun dropLootFor(
+        block: Identifier,
+        pos: BlockPos,
+    ) {
+        val table = lootTables?.forBlock(block) ?: return
+        val drops = table.generate(LegacyRandom(Random.nextLong()))
+        if (drops.isEmpty()) return
+        val restY = restingSurfaceY(pos.x, pos.y, pos.z)
+        for (stack in drops) {
+            spawnDroppedItem(stack.item, stack.count, pos.x + 0.5, restY.toDouble(), pos.z + 0.5)
+        }
+    }
+
+    /** The first empty space at or below [startY] with solid support beneath it, where a dropped item comes to rest. */
+    private fun restingSurfaceY(
+        x: Int,
+        startY: Int,
+        z: Int,
+    ): Int {
+        var y = startY
+        repeat(MAX_ITEM_FALL_BLOCKS) {
+            val below = world.getBlockState(x, y - 1, z) ?: return y
+            if (!isAirLike(below)) return y
+            y--
+        }
+        return y
+    }
+
+    private fun isAirLike(stateId: Int): Boolean =
+        stateId == Blocks.AIR.stateId || stateId == Blocks.CAVE_AIR.stateId || stateId == Blocks.VOID_AIR.stateId
+
+    /** Puts a new item entity into the world and tells everyone who can currently see it. */
+    private fun spawnDroppedItem(
+        item: Identifier,
+        count: Int,
+        x: Double,
+        y: Double,
+        z: Double,
+    ) {
+        if (count <= 0) return
+        val protocolId = Items.REGISTRY.byIdentifier(item)?.protocolId ?: return
+        val entityId = playerRegistry?.allocateEntityId() ?: return
+        val uuid = Uuid.random()
+        world.spawnItem(WorldState.DroppedItem(entityId, uuid, item, count, x, y, z))
+        for (player in playersInSameWorld()) {
+            player.connection.sendPlayPacket(SpawnEntityPacket.ID) {
+                SpawnEntityPacket(entityId, uuid, SpawnEntityPacket.ITEM_ENTITY_TYPE, x, y, z).write(it)
+            }
+            player.connection.sendPlayPacket(SetEntityDataPacket.ID) {
+                SetEntityDataPacket(entityId, WireItemStack(protocolId, count)).write(it)
+            }
+        }
+    }
+
+    /**
+     * Whatever [WorldState.DroppedItem]s are close enough to this player right now, added to their
+     * inventory and removed from the world. Driven from this connection's own outbound loop
+     * ([tickPlayer], see [startOutboundLoop]'s own KDoc for why): the shared tick loop touches no
+     * sockets, and picking something up always ends in one (an inventory update, at least).
+     */
+    private fun tryPickupNearbyItems() {
+        val session = playerSession ?: return
+        if (session.gamemode == Gamemode.SPECTATOR) return
+        for (candidate in world.nearbyItems(session.x, session.y, session.z, PICKUP_RADIUS)) {
+            val removed = world.removeItem(candidate.entityId) ?: continue
+            val leftover = session.inventory.add(StoredItemStack(removed.item.toString(), removed.count))
+            val picked = removed.count - leftover
+            if (picked <= 0) {
+                // Nowhere for it to go: put it back exactly as it was, nothing happened.
+                world.spawnItem(removed)
+                continue
+            }
+            sendInventoryAll()
+            if (leftover > 0) {
+                // Only some of it fit: same entity, fewer items, still sitting where it was.
+                world.spawnItem(removed.copy(count = leftover))
+                val protocolId = Items.REGISTRY.byIdentifier(removed.item)?.protocolId
+                if (protocolId != null) {
+                    for (player in playersInSameWorld()) {
+                        player.connection.sendPlayPacket(SetEntityDataPacket.ID) {
+                            SetEntityDataPacket(removed.entityId, WireItemStack(protocolId, leftover)).write(it)
+                        }
+                    }
+                }
+            } else {
+                for (player in playersInSameWorld()) {
+                    player.connection.sendPlayPacket(RemoveEntitiesPacket.ID) {
+                        RemoveEntitiesPacket(listOf(removed.entityId)).write(it)
+                    }
+                }
+            }
+            for (player in playersInSameWorld()) {
+                player.connection.sendPlayPacket(ClientboundTakeItemEntityPacket.ID) {
+                    ClientboundTakeItemEntityPacket(removed.entityId, session.entityId, picked).write(it)
+                }
+            }
+        }
+    }
+
+    /**
+     * Placing a block: resolves the held item to a block state by matching identifiers (so only
+     * plain blocks whose item shares the block's own name place correctly), then places it in the
+     * empty space [ServerboundUseItemOnPacket.blockHit] points at.
+     *
+     * parity: `ServerPlayerGameMode.useItemOn`. Oriented placement (stairs, logs, slabs facing the
+     * player), off-hand placing, and interacting with a block instead of placing on it (opening a
+     * container, flipping a lever) are all documented gaps: every block places in its default
+     * state, only the main hand is read, and this build has no block-entity/container-interaction
+     * model yet.
+     */
+    private fun handleUseItemOn(useItemOn: ServerboundUseItemOnPacket) {
+        fun ack() {
+            sendCompressed(ClientboundBlockChangedAckPacket.ID) {
+                ClientboundBlockChangedAckPacket(useItemOn.sequence).write(it)
+            }
+        }
+
+        val session = playerSession
+        if (session == null || useItemOn.hand != ServerboundUseItemOnPacket.Hand.MAIN_HAND) return ack()
+        if (session.gamemode == Gamemode.SPECTATOR || session.gamemode == Gamemode.ADVENTURE) return ack()
+
+        val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
+        val held = session.inventory[heldSlot]
+        val blockStateId = held?.let { Blocks.REGISTRY.idOf(Identifier.parse(it.id)) }
+        if (held == null || blockStateId == null) return ack()
+
+        val hit = useItemOn.blockHit
+        val placeAt = if (hit.inside) hit.pos else hit.pos.offset(hit.direction)
+        val existing = world.getBlockState(placeAt.x, placeAt.y, placeAt.z)
+        if (existing == null || !isAirLike(existing)) return ack()
+
+        val changed = world.setBlockState(placeAt.x, placeAt.y, placeAt.z, blockStateId)
+        ack()
+        if (!changed) return
+
+        if (session.gamemode == Gamemode.SURVIVAL) {
+            val remaining = held.count - 1
+            session.inventory[heldSlot] = if (remaining <= 0) null else held.copy(count = remaining)
+            sendInventorySlot(heldSlot)
+        }
+
+        for (player in playersInSameWorld()) {
+            player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                ClientboundBlockUpdatePacket(placeAt, blockStateId).write(it)
+            }
+        }
+    }
+
+    /**
+     * Serverbound, id 0x38: creative-mode inventory editing. This is the *only* path a creative
+     * client's dragged item takes: dragging from the creative menu into a slot, dragging a slot
+     * into another slot, or dragging a slot out of the window entirely to discard it (which arrives
+     * as [ServerboundSetCreativeModeSlotPacket.slot] `-1`) all go through this one packet, never
+     * through [CONTAINER_CLICK_ID]'s window-click. Without a handler here, a creative player's
+     * inventory as the client renders it and as this server tracks it never agree: the client shows
+     * whatever was dragged, the server still has whatever was there before, and every action that
+     * reads the held item (placing, dropping) acts on the stale one.
+     *
+     * Ignored outside creative, matching vanilla (`ServerPlayerGameMode.handleCreativeModeItemAdd`
+     * refuses it there too, since the packet exists purely for the creative menu). A stack the
+     * client sends with non-empty data components (an enchanted or named item, for instance) fails
+     * [WireItemStack.read] and costs the connection, the same documented boundary as everywhere
+     * else this build reads a stack off the wire.
+     */
+    private fun handleSetCreativeModeSlot(packet: ServerboundSetCreativeModeSlotPacket) {
+        val session = playerSession ?: return
+        if (session.gamemode != Gamemode.CREATIVE) return
+        // The client numbers this in container 0's own slots, not this server's storage order, and
+        // the two are neither the same size nor the same layout: taking it at face value wrote a
+        // hotbar edit into the armour slots, so the item was accepted and then never in hand.
+        // Slot -1 (dragged out of the window to discard) and the crafting slots resolve to null.
+        val slot = PlayerInventory.storageSlotOf(packet.slot) ?: return
+        val stack =
+            packet.item?.let { wire ->
+                val id = Items.REGISTRY.identifierOf(wire.itemId) ?: return@let null
+                StoredItemStack(id.toString(), wire.count)
+            }
+        session.inventory[slot] = stack
+        sendInventorySlot(slot)
+    }
+
+    /**
+     * Middle-click "pick block". In creative, always fills the current hotbar slot with a full
+     * stack of the targeted block's item; in survival, only swaps it in from wherever this player
+     * already carries it, matching vanilla: survival pick-block cannot conjure an item from
+     * nothing. [ServerboundPickItemFromBlockPacket.includeData] (copying a sign's text, a
+     * container's contents onto the picked stack) is a documented gap: no block entities yet.
+     */
+    private fun handlePickItemFromBlock(packet: ServerboundPickItemFromBlockPacket) {
+        val session = playerSession ?: return
+        val stateId = world.getBlockState(packet.pos.x, packet.pos.y, packet.pos.z) ?: return
+        if (isAirLike(stateId)) return
+        val block = Blocks.byStateId(stateId) ?: return
+        val item = Items.REGISTRY.byIdentifier(block.block) ?: return
+        val inventory = session.inventory
+        val id = item.id.toString()
+
+        val existing = inventory.indexOf(id)
+        when {
+            // Already in the hotbar: vanilla only moves the selection, it does not touch a slot.
+            existing != null && existing >= PlayerInventory.HOTBAR_START -> {
+                inventory.heldSlot = existing - PlayerInventory.HOTBAR_START
+            }
+            // Elsewhere in the inventory: swapped into a suitable hotbar slot, not duplicated.
+            existing != null -> {
+                inventory.heldSlot = inventory.suitableHotbarSlot()
+                inventory.swap(PlayerInventory.HOTBAR_START + inventory.heldSlot, existing)
+            }
+            // Not carried at all: only creative may conjure one, and only ever a single item.
+            session.gamemode == Gamemode.CREATIVE -> {
+                inventory.heldSlot = inventory.suitableHotbarSlot()
+                val target = PlayerInventory.HOTBAR_START + inventory.heldSlot
+                // Every hotbar slot was full, so whatever is in the way moves to a free slot
+                // rather than being destroyed; if nothing is free, vanilla overwrites it too.
+                inventory[target]?.let { displaced -> inventory.firstFreeSlot()?.let { inventory[it] = displaced } }
+                inventory[target] = StoredItemStack(id, 1)
+            }
+            else -> return
+        }
+
+        sendCompressed(SetHeldSlotPacket.ID) { SetHeldSlotPacket(inventory.heldSlot).write(it) }
+        sendInventoryAll()
     }
 
     /** Everyone who can actually see this player: the tab list is server-wide, entities are not. */
@@ -1263,14 +1535,18 @@ public class ClientSession(
         sendInventory()
     }
 
-    /** One slot changed, for when re-sending forty of them would be silly. */
+    /**
+     * One slot changed, for when re-sending forty of them would be silly. [slot] is this server's
+     * own storage index; it goes out translated to container 0's own numbering (see
+     * [PlayerInventory.menuSlotOf]), because the client addresses its window, not our array.
+     */
     internal fun sendInventorySlot(slot: Int) {
         val session = playerSession ?: return
         sendPlayPacket(ContainerSetSlotPacket.ID) {
             ContainerSetSlotPacket(
                 containerId = ContainerSetContentPacket.PLAYER_INVENTORY,
                 stateId = ++containerStateId,
-                slot = slot,
+                slot = PlayerInventory.menuSlotOf(slot),
                 item = session.inventory.toWire(slot),
             ).write(it)
         }
@@ -1297,6 +1573,7 @@ public class ClientSession(
         val session = playerSession ?: return
         playTimeTicks++
         if (session.dead) return
+        tryPickupNearbyItems()
         if (session.gamemode == Gamemode.CREATIVE || session.gamemode == Gamemode.SPECTATOR) return
 
         val healthBefore = session.health
@@ -1740,6 +2017,12 @@ public class ClientSession(
 
         /** `ServerboundContainerClickPacket`, deliberately not decoded: see where it is handled. */
         const val CONTAINER_CLICK_ID = 0x12
+
+        /** How close (blocks) a player has to be to a dropped item to vacuum it up. Vanilla's own AABB-based range is close to this. */
+        const val PICKUP_RADIUS = 1.5
+
+        /** How far a dropped item is allowed to snap downward looking for solid ground before it just stays where it broke. */
+        const val MAX_ITEM_FALL_BLOCKS = 32
     }
 }
 
