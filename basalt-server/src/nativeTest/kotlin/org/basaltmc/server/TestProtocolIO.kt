@@ -26,18 +26,24 @@ import org.basaltmc.server.config.WorldType
 import org.basaltmc.server.config.WorldsConfig
 import org.basaltmc.server.config.testServerList
 import org.basaltmc.server.ui.UiConfigs
+import kotlin.concurrent.AtomicInt
 import kotlin.time.TimeSource
 
 /**
- * Starts a real [BasaltServer] on its own [NativeThread] and waits for it to accept connections.
- * Retries the whole attempt on a bind failure: CI runners have shown occasional transient ones,
- * and a bind failure on the spawned thread no longer crashes the process (see [NativeThread]'s
- * KDoc), so a retry is safe.
+ * Starts a real [BasaltServer] on its own [NativeThread], waits for it to accept connections, and
+ * returns the port it ended up on: callers must use that one, not the one they asked for. Each
+ * retry moves to the next candidate port, because a bind failure is usually about the port itself
+ * (see [candidatePorts]) and retrying the same one just fails again. A bind failure on the spawned
+ * thread no longer crashes the process (see [NativeThread]'s KDoc), so a retry is safe.
  *
  * Ports live well outside Minecraft's own 25565-range on purpose. Fixed ports in that range
  * collide with any real server the developer happens to have running, and the failure is deeply
  * confusing: the test reaches that server instead of its own and fails on a protocol assertion
  * that has nothing to do with the change under test.
+ *
+ * They also stay below 32768, under Linux's ephemeral range: a `connect` to a loopback port inside
+ * it can pick that very port as its own source and succeed against itself, which made the readiness
+ * probe below return before the server was listening.
  *
  * [worldName] is a distinctly-scoped scratch name, not `"world"`: [BasaltServer] now really
  * generates and saves chunks (`NoiseWorldGenerator`/`RegionStore`), a real relative path a
@@ -46,10 +52,10 @@ import kotlin.time.TimeSource
  * `AssetCacheTest`'s own scratch directory: harmless small files, left for local inspection.
  */
 internal fun startTestServer(
-    port: Int,
+    preferredPort: Int,
     onlineMode: OnlineMode? = null,
-) {
-    repeat(3) { attempt ->
+): Int {
+    for (port in candidatePorts(preferredPort)) {
         val config =
             BasaltConfig(
                 port = port,
@@ -86,33 +92,40 @@ internal fun startTestServer(
                 defaults = WorldSettings(difficulty = "easy", viewDistance = 3, saveIntervalSeconds = 30),
                 worldsRoot = "$TEST_DATA_ROOT/worlds",
             )
+        val startupFailed = AtomicInt(0)
         NativeThread.start {
-            BasaltServer(
-                config,
-                onlineMode,
-                worldsConfig = worldsConfig,
-                live =
-                    LiveConfigs(
-                        ConfigSnapshot(
-                            groups = testGroups(),
-                            serverList = testServerList(),
-                            commands = CommandsConfig(emptyMap(), emptyList(), emptyMap()),
-                            animations = AnimationsConfig(emptyMap()),
-                            ui = UiConfigs(),
+            try {
+                BasaltServer(
+                    config,
+                    onlineMode,
+                    worldsConfig = worldsConfig,
+                    live =
+                        LiveConfigs(
+                            ConfigSnapshot(
+                                groups = testGroups(),
+                                serverList = testServerList(),
+                                commands = CommandsConfig(emptyMap(), emptyList(), emptyMap()),
+                                animations = AnimationsConfig(emptyMap()),
+                                ui = UiConfigs(),
+                            ),
                         ),
-                    ),
-                playersDatabasePath = playersDatabase,
-                worldsRoot = "$TEST_DATA_ROOT/worlds",
-            ).start()
+                    playersDatabasePath = playersDatabase,
+                    worldsRoot = "$TEST_DATA_ROOT/worlds",
+                ).start()
+            } catch (_: Exception) {
+                // A bind that cannot succeed, so waiting out the deadline would only stall the run.
+                startupFailed.value = 1
+            }
         }
-        // Generous, not tight: BasaltServer now generates and saves real chunks before it starts
-        // listening, several real seconds on a cold asset cache, not the near-instant startup this
-        // deadline was tuned for back when world generation was a fixed in-memory flat world.
+        // Long, because generating and saving a world before the first bind takes upwards of half a
+        // minute on a two-core Windows runner. Waiting is free; giving up early is not, since every
+        // retry generates another world and steals the cores the first one still needs.
         val deadline = TimeSource.Monotonic.markNow()
-        while (deadline.elapsedNow().inWholeMilliseconds < 20000) {
+        while (deadline.elapsedNow().inWholeSeconds < 180) {
+            if (startupFailed.value != 0) break
             try {
                 TcpConnection.connect("127.0.0.1", port).close()
-                return
+                return port
             } catch (_: Exception) {
                 // Not up yet. Waiting between attempts rather than spinning: this used to hammer
                 // connect() as fast as one core allowed, which on a two-core CI runner starved the
@@ -120,14 +133,14 @@ internal fun startTestServer(
                 sleepMillis(50)
             }
         }
-        if (attempt < 2) {
-            val backoff = TimeSource.Monotonic.markNow()
-            while (backoff.elapsedNow().inWholeMilliseconds < 200) {
-                // brief pause before retrying the bind
-            }
-        }
     }
+    // Loudly, rather than leaving the test to fail later on a connect() nobody expects to be the
+    // startup timing out.
+    error("no test server came up on any of ${candidatePorts(preferredPort)}")
 }
+
+/** The asked-for port and two fallbacks, for a host that refuses to bind the first one at all. */
+private fun candidatePorts(preferred: Int): List<Int> = listOf(preferred, preferred + 1000, preferred + 2000)
 
 /** Plain packet I/O helpers shared by the integration tests that drive [BasaltServer] over a real socket. */
 internal fun sendUncompressed(

@@ -117,7 +117,7 @@ public class WorldsConfig(
         val path = "$worldsRoot/${world.name}/settings.toml"
         val text = FileIO.readText(path)
         if (text == null) {
-            if (FileIO.exists("$worldsRoot/${world.name}")) FileIO.writeText(path, WORLD_SETTINGS_DEFAULT_TOML)
+            if (FileIO.directoryExists("$worldsRoot/${world.name}")) FileIO.writeText(path, WORLD_SETTINGS_DEFAULT_TOML)
             return defaults
         }
         return WorldSettings.from(Toml.parse(text), defaults)

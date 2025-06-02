@@ -8,6 +8,13 @@ import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import platform.posix.WSADATA
+import platform.posix.WSAECONNABORTED
+import platform.posix.WSAECONNRESET
+import platform.posix.WSAEINTR
+import platform.posix.WSAENOTCONN
+import platform.posix.WSAESHUTDOWN
+import platform.posix.WSAETIMEDOUT
+import platform.posix.WSAGetLastError
 import platform.posix.WSAStartup
 import platform.posix.closesocket
 
@@ -45,3 +52,15 @@ internal actual fun closeSocket(fd: Long) {
 internal actual fun enableAddressReuse(fd: Long) {
     // intentionally a no-op on Windows; see the expect declaration's KDoc
 }
+
+internal actual fun lastSocketError(): Int = WSAGetLastError()
+
+internal actual fun socketErrorIsInterrupt(error: Int): Boolean = error == WSAEINTR
+
+/** Windows has no SIGPIPE: a write to a departed peer arrives as one of these, EPIPE's equivalent. */
+internal actual fun socketErrorIsPeerGone(error: Int): Boolean =
+    error == WSAECONNRESET ||
+        error == WSAECONNABORTED ||
+        error == WSAENOTCONN ||
+        error == WSAESHUTDOWN ||
+        error == WSAETIMEDOUT

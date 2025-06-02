@@ -3,8 +3,8 @@
 package org.basaltmc.io
 
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.convert
 import kotlinx.cinterop.alloc
+import kotlinx.cinterop.convert
 import kotlinx.cinterop.nativeHeap
 import kotlinx.cinterop.ptr
 import platform.posix.ECHO

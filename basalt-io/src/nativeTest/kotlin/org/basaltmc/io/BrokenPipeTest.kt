@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 class BrokenPipeTest {
     @Test
     fun writingToAConnectionWhosePeerHasGoneRaisesInsteadOfKillingTheProcess() {
-        val port = 39_611
+        val port = 18_611
         val listener = TcpListener.bind(port)
         val client = TcpConnection.connect("127.0.0.1", port)
         val server = listener.accept()

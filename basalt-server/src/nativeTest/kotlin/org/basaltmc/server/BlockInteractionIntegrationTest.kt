@@ -73,7 +73,8 @@ import kotlin.uuid.Uuid
  */
 @OptIn(ExperimentalUuidApi::class)
 class BlockInteractionIntegrationTest {
-    private val port = 39580
+    /** Assigned by [startTestServer]: the server may land on a fallback port, and everything must follow it. */
+    private var port = 0
 
     @Test
     fun placingBreakingDroppingAndPickingUpAllRoundTripCorrectly() {
@@ -94,7 +95,7 @@ class BlockInteractionIntegrationTest {
 
         // startTestServer wipes players_$port.db before the server opens it, so the seed below has
         // to happen after: seeding first would just get deleted, and Casey would join as brand new.
-        startTestServer(port)
+        port = startTestServer(18580)
 
         PlayerStore.open("$TEST_DATA_ROOT/players_$port.db").use { store ->
             store.players.save(

@@ -69,6 +69,16 @@ public object FileIO {
         return true
     }
 
+    /**
+     * Whether [path] is a directory. [exists] cannot answer this: its `fopen` opens a directory on
+     * POSIX and refuses one on Windows, so it reports the opposite answer per platform.
+     */
+    public fun directoryExists(path: String): Boolean {
+        val dir = opendir(path) ?: return false
+        closedir(dir)
+        return true
+    }
+
     /** Opens [path] for writing, truncating it. The caller closes it, ideally in a `finally`. */
     public fun openWrite(path: String): FileWriter {
         val handle = fopen(path, "wb") ?: throw FileIOException("failed to open '$path' for writing")

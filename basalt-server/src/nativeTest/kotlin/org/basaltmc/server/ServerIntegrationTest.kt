@@ -41,10 +41,11 @@ import kotlin.uuid.Uuid
  */
 @OptIn(ExperimentalUuidApi::class)
 class ServerIntegrationTest {
-    private val port = 39566
+    /** Assigned by [startServer]: the server may land on a fallback port, and everything must follow it. */
+    private var port = 0
 
     private fun startServer() {
-        startTestServer(port)
+        port = startTestServer(18566)
     }
 
     @Test
@@ -119,7 +120,6 @@ class ServerIntegrationTest {
     @Test
     @OptIn(DelicateCryptographyApi::class)
     fun onlineLoginFlowOverRealSockets() {
-        val onlinePort = 39568
         val serverKeyPair = SessionKeyPair.generate()
         val authenticatedProfile = SessionProfile(Uuid.parse("11111111-2222-3333-4444-555555555555"), "Notch")
         var sawUsername: String? = null
@@ -128,7 +128,7 @@ class ServerIntegrationTest {
                 sawUsername = username
                 authenticatedProfile
             }
-        startTestServer(onlinePort, OnlineMode(serverKeyPair, sessionService))
+        val onlinePort = startTestServer(18568, OnlineMode(serverKeyPair, sessionService))
 
         val connection = TcpConnection.connect("127.0.0.1", onlinePort)
         val incoming = ByteBuffer()
