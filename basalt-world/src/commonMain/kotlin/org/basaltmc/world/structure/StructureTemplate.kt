@@ -1,37 +1,44 @@
 package org.basaltmc.world.structure
 
 import org.basaltmc.nbt.NbtCompound
+import org.basaltmc.nbt.NbtDouble
+import org.basaltmc.nbt.NbtFloat
 import org.basaltmc.nbt.NbtInt
+import org.basaltmc.nbt.NbtList
 import org.basaltmc.nbt.NbtString
+import org.basaltmc.nbt.NbtType
 import org.basaltmc.nbt.deepCopy
 import org.basaltmc.random.WorldgenRandom
 import org.basaltmc.registry.Blocks
 import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.ChunkBlockEntity
+import org.basaltmc.world.ChunkGeneratedEntity
 import org.basaltmc.world.WorldHeight
 
 /**
  * // parity: net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate,
- * scoped to what this project can currently represent. Real vanilla block states carry
- * properties (facing, waterlogged, axis...) that this project's [Blocks] registry only models for
- * the states worldgen currently writes. The NBT `Properties` compound is retained and resolved
- * whenever that exact derived state is registered; horizontal facings are also mirrored/rotated
- * at placement. Unregistered properties still fall back to the block's default state. Multiple
- * alternative palettes (real vanilla's `palettes` list, used
- * by a handful of non-village structures for random variation) are not modeled. Block entity NBT
- * is preserved for blocks Basalt can store, including vanilla loot seeds for random containers.
+ * scoped to what this project can currently represent. The NBT `Properties` compound is retained
+ * and resolved through [Blocks]; facing, axis, cardinal connections, numeric rotations and rail
+ * shapes are mirrored/rotated at placement. Multiple alternative palettes (real vanilla's
+ * `palettes` list, used by a handful of non-village structures for random variation) are not
+ * modeled. Block entity NBT is preserved for blocks Basalt can store, including vanilla loot seeds
+ * for random containers, and template entities are emitted as persistent generated descriptors.
  */
 public class StructureTemplate {
     public var size: StructurePos = StructurePos(0, 0, 0)
         private set
 
     private val blocksBacking: MutableList<StructureBlockInfo> = mutableListOf()
+    private val entitiesBacking: MutableList<StructureEntityInfo> = mutableListOf()
 
     public val blocks: List<StructureBlockInfo> get() = blocksBacking
 
+    public val entities: List<StructureEntityInfo> get() = entitiesBacking
+
     public fun load(nbt: NbtCompound) {
         blocksBacking.clear()
+        entitiesBacking.clear()
         val sizeList = nbt.getList("size")
         size =
             StructurePos(
@@ -99,6 +106,28 @@ public class StructureTemplate {
                 ),
             )
         }
+        val entityList = nbt.getList("entities")
+        if (entityList != null) {
+            for (entry in entityList) {
+                val entityTag = entry as? NbtCompound ?: continue
+                val pos = entityTag.getList("pos") ?: continue
+                val blockPos = entityTag.getList("blockPos") ?: continue
+                if (pos.size < 3 || blockPos.size < 3) continue
+                val data = entityTag["nbt"] as? NbtCompound ?: continue
+                entitiesBacking +=
+                    StructureEntityInfo(
+                        (pos[0] as? NbtDouble)?.value ?: continue,
+                        (pos[1] as? NbtDouble)?.value ?: continue,
+                        (pos[2] as? NbtDouble)?.value ?: continue,
+                        StructurePos(
+                            (blockPos[0] as? NbtInt)?.value ?: continue,
+                            (blockPos[1] as? NbtInt)?.value ?: continue,
+                            (blockPos[2] as? NbtInt)?.value ?: continue,
+                        ),
+                        data,
+                    )
+            }
+        }
     }
 
     /** // parity: StructureTemplate.getJigsaws, world-space and rotated/mirrored. */
@@ -159,8 +188,8 @@ public class StructureTemplate {
     }
 
     /**
-     * // parity: StructureTemplate.placeInWorld, narrowed to blocks and block entities (no fluid
-     * spread or entities: documented gaps above). [clipTo] mirrors real
+     * // parity: StructureTemplate.placeInWorld, narrowed only by the missing fluid spread.
+     * [clipTo] mirrors real
      * vanilla's own per-chunk `chunkBb` clipping (`StructureTemplate.processBlockInfos`): a piece
      * spanning several chunks is placed once per intersecting chunk, each time keeping only the
      * blocks that land inside that one chunk.
@@ -176,19 +205,47 @@ public class StructureTemplate {
         random: WorldgenRandom? = null,
         ignoreStructureBlocks: Boolean = false,
         ignoreAir: Boolean = false,
+        gravityOffset: Int? = null,
     ) {
-        for (blockInfo in blocksBacking) {
-            if (
-                (ignoreAir && Blocks.isAir(blockInfo.stateId)) ||
-                (ignoreStructureBlocks && Blocks.byStateId(blockInfo.stateId)?.block?.path == "structure_block")
-            ) {
-                continue
+        val processedBlocks =
+            blocksBacking.mapNotNull { blockInfo ->
+                if (
+                    (ignoreAir && Blocks.isAir(blockInfo.stateId)) ||
+                    (ignoreStructureBlocks && Blocks.byStateId(blockInfo.stateId)?.block?.path == "structure_block")
+                ) {
+                    return@mapNotNull null
+                }
+                val originalWorldPos = StructureTransform.transform(blockInfo.pos, mirror, rotation, pivot) + position
+                // parity: processBlockInfos first rejects blocks outside chunkBb, before any processor
+                // (including GravityProcessor) gets to move them.
+                if (!clipTo.isInside(originalWorldPos)) return@mapNotNull null
+                val localX = originalWorldPos.x and 15
+                val localZ = originalWorldPos.z and 15
+                val worldPos =
+                    if (gravityOffset != null) {
+                        // parity: Projection.TERRAIN_MATCHING appends
+                        // GravityProcessor(WORLD_SURFACE_WG, -1). It uses the unrotated template Y,
+                        // not the piece origin or transformed Y.
+                        originalWorldPos.copy(
+                            y =
+                                chunk.heightAt(localX, localZ, Chunk.HeightmapType.WORLD_SURFACE) +
+                                    gravityOffset + blockInfo.pos.y,
+                        )
+                    } else {
+                        originalWorldPos
+                    }
+                if (!clipTo.isInside(worldPos) || worldPos.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
+                    return@mapNotNull null
+                }
+                ProcessedBlock(blockInfo, originalWorldPos, worldPos)
             }
-            val worldPos = StructureTransform.transform(blockInfo.pos, mirror, rotation, pivot) + position
-            if (!clipTo.isInside(worldPos)) continue
-            val localX = worldPos.x and 15
-            val localZ = worldPos.z and 15
-            if (worldPos.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) continue
+
+        // `processBlockInfos` completes the whole list before `placeInWorld` writes the first block.
+        // In particular, one projected block cannot raise the height sampled by another block in
+        // the same template.
+        for ((blockInfo, processorPos, worldPos) in processedBlocks) {
+            val processorLocalX = processorPos.x and 15
+            val processorLocalZ = processorPos.z and 15
             // parity: JigsawReplacementProcessor, applied to every jigsaw block unconditionally.
             val stateId =
                 if (blockInfo.frontFacing != null) {
@@ -197,8 +254,8 @@ public class StructureTemplate {
                     if (Identifier.parse(finalStateName.substringBefore('[')).path == "structure_void") continue
                     parsedAndTransformedStateId(finalStateName, mirror, rotation)
                 } else if (processors.rules.isNotEmpty()) {
-                    val worldStateId = chunk.getBlockStateId(localX, worldPos.y, localZ)
-                    val processedStateId = processors.processAt(blockInfo.stateId, worldStateId, worldPos)
+                    val worldStateId = chunk.getBlockStateId(processorLocalX, processorPos.y, processorLocalZ)
+                    val processedStateId = processors.processAt(blockInfo.stateId, worldStateId, processorPos)
                     val properties =
                         if (processedStateId == blockInfo.stateId) {
                             blockInfo.properties
@@ -209,9 +266,112 @@ public class StructureTemplate {
                 } else {
                     transformedStateId(blockInfo.stateId, blockInfo.properties, mirror, rotation)
                 }
+            val localX = worldPos.x and 15
+            val localZ = worldPos.z and 15
             chunk.setBlockStateId(localX, worldPos.y, localZ, stateId)
             placeBlockEntity(chunk, blockInfo, stateId, worldPos, random)
         }
+        for (entityInfo in entitiesBacking) {
+            val ownerPos = StructureTransform.transform(entityInfo.blockPos, mirror, rotation, pivot) + position
+            if (!clipTo.isInside(ownerPos)) continue
+            val transformed = transformEntityPosition(entityInfo.x, entityInfo.y, entityInfo.z, mirror, rotation, pivot)
+            val worldX = transformed.first + position.x
+            val worldY = transformed.second + position.y
+            val worldZ = transformed.third + position.z
+            val data = entityInfo.data.deepCopy()
+            data.remove("UUID")
+            data["Pos"] =
+                NbtList(
+                    NbtType.DOUBLE,
+                    listOf(NbtDouble(worldX), NbtDouble(worldY), NbtDouble(worldZ)),
+                )
+            val sourceRotation = data.getList("Rotation")
+            val sourceYaw =
+                if (sourceRotation != null &&
+                    sourceRotation.size > 0
+                ) {
+                    (sourceRotation[0] as? NbtFloat)?.value ?: 0f
+                } else {
+                    0f
+                }
+            val pitch =
+                if (sourceRotation != null &&
+                    sourceRotation.size > 1
+                ) {
+                    (sourceRotation[1] as? NbtFloat)?.value ?: 0f
+                } else {
+                    0f
+                }
+            val yaw = transformEntityYaw(sourceYaw, mirror, rotation)
+            data["Rotation"] = NbtList(NbtType.FLOAT, listOf(NbtFloat(yaw), NbtFloat(pitch)))
+            val typeName = data.getString("id")
+            if (typeName.isEmpty()) continue
+            chunk.addGeneratedEntity(
+                ChunkGeneratedEntity(
+                    Identifier.parse(typeName),
+                    worldX,
+                    worldY,
+                    worldZ,
+                    yaw,
+                    pitch,
+                    data,
+                ),
+            )
+        }
+    }
+
+    private data class ProcessedBlock(
+        val block: StructureBlockInfo,
+        val processorPos: StructurePos,
+        val placedPos: StructurePos,
+    )
+
+    private fun transformEntityPosition(
+        sourceX: Double,
+        sourceY: Double,
+        sourceZ: Double,
+        mirror: StructureMirror,
+        rotation: StructureRotation,
+        pivot: StructurePos,
+    ): Triple<Double, Double, Double> {
+        var x = sourceX
+        var z = sourceZ
+        when (mirror) {
+            StructureMirror.LEFT_RIGHT -> z = 1.0 - z
+            StructureMirror.FRONT_BACK -> x = 1.0 - x
+            StructureMirror.NONE -> Unit
+        }
+        return when (rotation) {
+            StructureRotation.COUNTERCLOCKWISE_90 ->
+                Triple(pivot.x - pivot.z + z, sourceY, pivot.x + pivot.z + 1.0 - x)
+            StructureRotation.CLOCKWISE_90 ->
+                Triple(pivot.x + pivot.z + 1.0 - z, sourceY, pivot.z - pivot.x + x)
+            StructureRotation.CLOCKWISE_180 ->
+                Triple(pivot.x + pivot.x + 1.0 - x, sourceY, pivot.z + pivot.z + 1.0 - z)
+            StructureRotation.NONE -> Triple(x, sourceY, z)
+        }
+    }
+
+    private fun transformEntityYaw(
+        sourceYaw: Float,
+        mirror: StructureMirror,
+        rotation: StructureRotation,
+    ): Float {
+        val mirrored =
+            when (mirror) {
+                StructureMirror.FRONT_BACK -> -sourceYaw
+                StructureMirror.LEFT_RIGHT -> 180f - sourceYaw
+                StructureMirror.NONE -> sourceYaw
+            }
+        val mirrorOffset = mirrored - sourceYaw
+        val rotationOffset =
+            when (rotation) {
+                StructureRotation.NONE -> 0f
+                StructureRotation.CLOCKWISE_90 -> 90f
+                StructureRotation.CLOCKWISE_180 -> 180f
+                StructureRotation.COUNTERCLOCKWISE_90 -> 270f
+            }
+        return sourceYaw + rotationOffset + mirrorOffset
     }
 
     private fun parsedAndTransformedStateId(
@@ -258,8 +418,90 @@ public class StructureTemplate {
         if ((axis == "x" || axis == "z") && rotation in ROTATIONS_SWAPPING_HORIZONTAL_AXES) {
             transformed = transformed + ("axis" to if (axis == "x") "z" else "x")
         }
+        val directionalConnections = HORIZONTAL_DIRECTIONS.filter { it in properties }
+        if (directionalConnections.isNotEmpty()) {
+            val remapped = transformed.toMutableMap()
+            directionalConnections.forEach(remapped::remove)
+            for (directionName in directionalConnections) {
+                val targetName =
+                    StructureDirection
+                        .fromName(directionName)!!
+                        .mirror(mirror)
+                        .rotate(rotation)
+                        .name
+                        .lowercase()
+                remapped[targetName] = properties.getValue(directionName)
+            }
+            transformed = remapped
+        }
+        properties["rotation"]?.toIntOrNull()?.let { originalRotation ->
+            val mirrored =
+                when (mirror) {
+                    StructureMirror.LEFT_RIGHT -> (8 - signedRotation(originalRotation) + 16) % 16
+                    StructureMirror.FRONT_BACK -> (16 - signedRotation(originalRotation)) % 16
+                    StructureMirror.NONE -> originalRotation
+                }
+            val rotated =
+                when (rotation) {
+                    StructureRotation.NONE -> mirrored
+                    StructureRotation.CLOCKWISE_90 -> (mirrored + 4) % 16
+                    StructureRotation.CLOCKWISE_180 -> (mirrored + 8) % 16
+                    StructureRotation.COUNTERCLOCKWISE_90 -> (mirrored + 12) % 16
+                }
+            transformed = transformed + ("rotation" to rotated.toString())
+        }
+        properties["shape"]?.let { shape ->
+            rotateRailShape(shape, mirror, rotation)?.let { transformedShape ->
+                transformed = transformed + ("shape" to transformedShape)
+            }
+        }
         return Blocks.stateIdOf(block, transformed) ?: stateId
     }
+
+    private fun signedRotation(rotation: Int): Int = if (rotation > 8) rotation - 16 else rotation
+
+    private fun rotateRailShape(
+        shape: String,
+        mirror: StructureMirror,
+        rotation: StructureRotation,
+    ): String? {
+        if (shape.startsWith("ascending_")) {
+            val direction = transformHorizontal(shape.substringAfter("ascending_"), mirror, rotation) ?: return null
+            return "ascending_$direction"
+        }
+        val directions =
+            when (shape) {
+                "north_south" -> listOf("north", "south")
+                "east_west" -> listOf("east", "west")
+                "south_east" -> listOf("south", "east")
+                "south_west" -> listOf("south", "west")
+                "north_west" -> listOf("north", "west")
+                "north_east" -> listOf("north", "east")
+                else -> return null // stair shapes do not rotate independently of facing
+            }.mapNotNull { transformHorizontal(it, mirror, rotation) }
+                .toSet()
+        return when (directions) {
+            setOf("north", "south") -> "north_south"
+            setOf("east", "west") -> "east_west"
+            setOf("south", "east") -> "south_east"
+            setOf("south", "west") -> "south_west"
+            setOf("north", "west") -> "north_west"
+            setOf("north", "east") -> "north_east"
+            else -> null
+        }
+    }
+
+    private fun transformHorizontal(
+        direction: String,
+        mirror: StructureMirror,
+        rotation: StructureRotation,
+    ): String? =
+        StructureDirection
+            .fromName(direction)
+            ?.mirror(mirror)
+            ?.rotate(rotation)
+            ?.name
+            ?.lowercase()
 
     private fun placeBlockEntity(
         chunk: Chunk,
@@ -290,6 +532,7 @@ public class StructureTemplate {
     }
 
     private companion object {
+        val HORIZONTAL_DIRECTIONS = listOf("north", "east", "south", "west")
         val ROTATIONS_SWAPPING_HORIZONTAL_AXES =
             setOf(StructureRotation.CLOCKWISE_90, StructureRotation.COUNTERCLOCKWISE_90)
         val DYE_COLORS =
@@ -341,7 +584,29 @@ public class StructureTemplate {
                     "chiseled_bookshelf",
                     "trial_spawner",
                     "vault",
-                )
+                    "bell",
+                ).plus(DYE_COLORS.flatMap { color -> listOf("${color}_banner", "${color}_wall_banner") })
+                    .plus(
+                        listOf(
+                            "oak",
+                            "spruce",
+                            "birch",
+                            "jungle",
+                            "acacia",
+                            "cherry",
+                            "dark_oak",
+                            "pale_oak",
+                            "mangrove",
+                            "bamboo",
+                        ).flatMap { wood ->
+                            listOf(
+                                "${wood}_sign",
+                                "${wood}_wall_sign",
+                                "${wood}_hanging_sign",
+                                "${wood}_wall_hanging_sign",
+                            )
+                        },
+                    )
     }
 }
 
@@ -352,6 +617,15 @@ public data class StructureBlockInfo(
     val frontFacing: StructureDirection?,
     val topFacing: StructureDirection?,
     val properties: Map<String, String> = emptyMap(),
+)
+
+/** // parity: StructureTemplate.StructureEntityInfo, before piece transform and chunk clipping. */
+public data class StructureEntityInfo(
+    val x: Double,
+    val y: Double,
+    val z: Double,
+    val blockPos: StructurePos,
+    val data: NbtCompound,
 )
 
 /** // parity: StructureTemplate.JigsawBlockInfo, world-space. [finalStateName] is what real vanilla's `JigsawReplacementProcessor` swaps the jigsaw block itself for once placement is done. */

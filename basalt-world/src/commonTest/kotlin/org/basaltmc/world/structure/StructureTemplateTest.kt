@@ -1,7 +1,10 @@
 package org.basaltmc.world.structure
 
 import org.basaltmc.nbt.NbtCompound
+import org.basaltmc.nbt.NbtDouble
+import org.basaltmc.nbt.NbtFloat
 import org.basaltmc.nbt.NbtInt
+import org.basaltmc.nbt.NbtIntArray
 import org.basaltmc.nbt.NbtList
 import org.basaltmc.nbt.NbtType
 import org.basaltmc.random.WorldgenRandom
@@ -38,6 +41,93 @@ private fun syntheticTemplateNbt(): NbtCompound {
 }
 
 class StructureTemplateTest {
+    @Test
+    fun transformsClipsAndPreservesTemplateEntities() {
+        val root = NbtCompound()
+        root["size"] = NbtList(NbtType.INT, listOf(NbtInt(3), NbtInt(1), NbtInt(3)))
+        root["palette"] = NbtList(NbtType.END)
+        root["blocks"] = NbtList(NbtType.END)
+        root["entities"] =
+            NbtList(
+                NbtType.COMPOUND,
+                listOf(
+                    NbtCompound().apply {
+                        this["pos"] =
+                            NbtList(
+                                NbtType.DOUBLE,
+                                listOf(NbtDouble(1.25), NbtDouble(0.0), NbtDouble(2.5)),
+                            )
+                        this["blockPos"] = NbtList(NbtType.INT, listOf(NbtInt(1), NbtInt(0), NbtInt(2)))
+                        this["nbt"] =
+                            NbtCompound().apply {
+                                putString("id", "minecraft:villager")
+                                this["Rotation"] = NbtList(NbtType.FLOAT, listOf(NbtFloat(30f), NbtFloat(10f)))
+                                this["UUID"] = NbtIntArray(intArrayOf(1, 2, 3, 4))
+                                putString("test", "preserved")
+                            }
+                    },
+                ),
+            )
+        val template = StructureTemplate().apply { load(root) }
+        val chunk = Chunk(0, 1)
+
+        template.placeInto(
+            chunk,
+            StructurePos(10, 64, 20),
+            StructureRotation.CLOCKWISE_90,
+            StructureMirror.NONE,
+            StructurePos(0, 0, 0),
+            StructureBoundingBox(0, 0, 16, 15, 100, 31),
+        )
+
+        val entity = chunk.generatedEntities().single()
+        assertEquals(8.5, entity.x)
+        assertEquals(64.0, entity.y)
+        assertEquals(21.25, entity.z)
+        assertEquals(120f, entity.yaw)
+        assertEquals(10f, entity.pitch)
+        assertEquals("preserved", entity.data.getString("test"))
+        assertEquals(false, "UUID" in entity.data)
+    }
+
+    @Test
+    fun rotatesVillagePaneConnectionProperties() {
+        val root = NbtCompound()
+        root["size"] = NbtList(NbtType.INT, listOf(NbtInt(1), NbtInt(1), NbtInt(1)))
+        root["palette"] =
+            NbtList(
+                NbtType.COMPOUND,
+                listOf(
+                    NbtCompound().apply {
+                        putString("Name", "minecraft:glass_pane")
+                        this["Properties"] =
+                            NbtCompound().apply {
+                                putString("east", "false")
+                                putString("north", "true")
+                                putString("south", "true")
+                                putString("waterlogged", "false")
+                                putString("west", "false")
+                            }
+                    },
+                ),
+            )
+        root["blocks"] = NbtList(NbtType.COMPOUND, listOf(blockEntry(0, 0)))
+        val template = StructureTemplate().apply { load(root) }
+        val chunk = Chunk(0, 0)
+
+        assertEquals(8319, template.blocks.single().stateId)
+        template.placeInto(
+            chunk,
+            StructurePos(4, 64, 4),
+            StructureRotation.CLOCKWISE_90,
+            StructureMirror.NONE,
+            StructurePos(0, 0, 0),
+            StructureBoundingBox(4, 64, 4, 4, 64, 4),
+        )
+
+        assertEquals(8314, chunk.getBlockStateId(4, 64, 4))
+    }
+
     @Test
     fun retainsExactPalettePropertiesAndRotatesRegisteredFacings() {
         val root = NbtCompound()
@@ -203,6 +293,47 @@ class StructureTemplateTest {
         assertEquals(stone, legacyChunk.getBlockStateId(1, 64, 0))
         assertEquals(Blocks.AIR.stateId, modernChunk.getBlockStateId(0, 64, 0))
         assertEquals(stone, modernChunk.getBlockStateId(1, 64, 0))
+    }
+
+    @Test
+    fun terrainMatchingProjectsEveryBlockFromThePrePlacementWorldSurface() {
+        val root = NbtCompound()
+        root["size"] = NbtList(NbtType.INT, listOf(NbtInt(1), NbtInt(11), NbtInt(1)))
+        root["palette"] =
+            NbtList(
+                NbtType.COMPOUND,
+                listOf(NbtCompound().apply { putString("Name", "minecraft:stone") }),
+            )
+
+        fun blockAt(y: Int): NbtCompound =
+            NbtCompound().apply {
+                this["pos"] = NbtList(NbtType.INT, listOf(NbtInt(0), NbtInt(y), NbtInt(0)))
+                putInt("state", 0)
+            }
+        // The high block comes first deliberately. A sequential height lookup would let it raise
+        // the column before projecting the low block, unlike StructureTemplate.processBlockInfos.
+        root["blocks"] = NbtList(NbtType.COMPOUND, listOf(blockAt(10), blockAt(0)))
+        val template = StructureTemplate().apply { load(root) }
+        val chunk = Chunk(0, 0).apply { setBlockStateId(4, 10, 4, Blocks.DIRT.stateId) }
+        val element =
+            LegacySinglePoolElement(
+                "test:terrain_matching",
+                StructureProcessorList.EMPTY,
+                StructureProjection.TERRAIN_MATCHING,
+                ignoreAir = true,
+            )
+
+        element.place(
+            loader = { template },
+            chunk = chunk,
+            position = StructurePos(4, 64, 4),
+            rotation = StructureRotation.NONE,
+            clipTo = StructureBoundingBox(0, -64, 0, 15, 319, 15),
+            random = WorldgenRandom(XoroshiroRandom(1L)),
+        )
+
+        assertEquals(Blocks.STONE.stateId, chunk.getBlockStateId(4, 10, 4))
+        assertEquals(Blocks.STONE.stateId, chunk.getBlockStateId(4, 20, 4))
     }
 
     @Test

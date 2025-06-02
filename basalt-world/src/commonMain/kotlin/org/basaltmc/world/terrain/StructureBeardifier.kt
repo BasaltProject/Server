@@ -10,6 +10,7 @@ import kotlin.math.pow
 /** // parity: Beardifier's BEARD_THIN rigid-piece contribution, used by Nether fossils. */
 internal class StructureBeardifier(
     private val pieces: List<Rigid>,
+    private val junctions: List<Junction> = emptyList(),
 ) : DensityFunction {
     override fun compute(context: FunctionContext): Double {
         var density = 0.0
@@ -19,6 +20,12 @@ internal class StructureBeardifier(
             val dz = maxOf(0, maxOf(box.minZ - context.blockZ, context.blockZ - box.maxZ))
             val dyToGround = context.blockY - (box.minY + rigid.groundLevelDelta)
             density += beardContribution(dx, dyToGround, dz, dyToGround) * 0.8
+        }
+        for (junction in junctions) {
+            val dx = context.blockX - junction.x
+            val dy = context.blockY - junction.groundY
+            val dz = context.blockZ - junction.z
+            density += beardContribution(dx, dy, dz, dy) * 0.4
         }
         return density
     }
@@ -30,6 +37,12 @@ internal class StructureBeardifier(
     internal data class Rigid(
         val box: StructureBoundingBox,
         val groundLevelDelta: Int = 0,
+    )
+
+    internal data class Junction(
+        val x: Int,
+        val groundY: Int,
+        val z: Int,
     )
 
     private companion object {

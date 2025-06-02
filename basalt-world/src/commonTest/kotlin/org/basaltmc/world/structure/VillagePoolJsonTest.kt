@@ -179,6 +179,7 @@ class VillagePoolJsonTest {
         val stoneId = Blocks.REGISTRY.byIdentifier(Identifier.vanilla("stone"))!!.stateId
 
         assertEquals(planksId, processors.process(dirtPathId, waterId, fakeRandom()))
+        assertEquals(planksId, processors.process(dirtPathId, waterId + 1, fakeRandom()))
         assertEquals(
             dirtPathId,
             processors.process(dirtPathId, stoneId, fakeRandom()),

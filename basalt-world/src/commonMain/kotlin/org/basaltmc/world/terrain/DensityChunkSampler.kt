@@ -1,16 +1,15 @@
 package org.basaltmc.world.terrain
 
-import org.basaltmc.common.Mth
 import org.basaltmc.world.densityfunction.DensityCache
 import org.basaltmc.world.densityfunction.DensityFunction
 import org.basaltmc.world.densityfunction.FunctionContext
+import org.basaltmc.world.densityfunction.Marker
 
 /**
- * // parity: net.minecraft.world.level.levelgen.NoiseChunk, its cell-interpolation scheme without
- * the incremental slope tracking, which is the same numbers faster. Vanilla never evaluates a
- * density tree per block: it samples [density] at the corners of a [cellWidth] by [cellHeight]
- * grid and trilinearly interpolates the rest, so that grid *is* the terrain and this output is
- * exact, not an approximation.
+ * // parity: net.minecraft.world.level.levelgen.NoiseChunk. Explicit `INTERPOLATED` markers sample
+ * their own wrapped subtrees at [cellWidth] by [cellHeight] corners through [DensityCache]; nodes
+ * outside those markers are evaluated at the real block. This distinction matters for nonlinear
+ * post-processing such as `squeeze` and for cave `min`/`max` composition.
  *
  * One instance covers one chunk column, [minY] up to [minY] + [height] - 1. [cellWidth] must
  * divide 16 and [cellHeight] must divide [height], as the Overworld settings do (4, 8, 384).
@@ -23,11 +22,17 @@ public class DensityChunkSampler(
     private val height: Int,
     private val cellWidth: Int,
     private val cellHeight: Int,
-    private val cache: DensityCache? = null,
+    cache: DensityCache? = null,
 ) {
     init {
         require(16 % cellWidth == 0) { "cellWidth must evenly divide 16, got $cellWidth" }
         require(height % cellHeight == 0) { "cellHeight must evenly divide height ($height), got $cellHeight" }
+    }
+
+    private val evaluationCache = cache ?: DensityCache(chunkX, chunkZ, Marker.slotCount)
+
+    init {
+        evaluationCache.configureInterpolation(cellWidth, cellHeight)
     }
 
     private val cellsPerAxis = 16 / cellWidth
@@ -44,20 +49,19 @@ public class DensityChunkSampler(
             val worldX = chunkX * 16 + gx * cellWidth
             val worldY = minY + gy * cellHeight
             val worldZ = chunkZ * 16 + gz * cellWidth
-            density.compute(FunctionContext(worldX, worldY, worldZ, cache))
+            density.compute(FunctionContext(worldX, worldY, worldZ, evaluationCache))
         }
     }
 
-    /** Forces the corner grid now, so callers can time grid construction apart from interpolation. */
+    /** Prewarms final-density corners and the interpolation-marker corners reached from them. */
     public fun prepare() {
         grid
     }
 
     /**
-     * Whether every one of a cell's eight corners is non-positive, in which case no block inside it
-     * can be solid: trilinear interpolation of eight values that are all `<= 0` is itself `<= 0`.
-     * Lets a caller skip whole 4x8x4 cells of empty sky instead of interpolating each block only to
-     * write nothing. Coordinates are cell indices, not blocks.
+     * Whether every final-density corner of a cell is non-positive. This is diagnostic only: nodes
+     * outside interpolation markers may make an interior value positive, so generation must not
+     * use this result to skip the cell.
      */
     public fun cellIsAllNonPositive(
         cellX: Int,
@@ -96,25 +100,8 @@ public class DensityChunkSampler(
         require(localZ in 0..15) { "localZ must be within a chunk: $localZ" }
         require(relativeY in 0 until height) { "y must be within [$minY, ${minY + height}): $y" }
 
-        val cellX = localX / cellWidth
-        val cellY = relativeY / cellHeight
-        val cellZ = localZ / cellWidth
-        val fracX = (localX % cellWidth).toDouble() / cellWidth
-        val fracY = (relativeY % cellHeight).toDouble() / cellHeight
-        val fracZ = (localZ % cellWidth).toDouble() / cellWidth
-
-        return Mth.lerp3(
-            fracX,
-            fracY,
-            fracZ,
-            cornerValue(cellX, cellY, cellZ),
-            cornerValue(cellX + 1, cellY, cellZ),
-            cornerValue(cellX, cellY + 1, cellZ),
-            cornerValue(cellX + 1, cellY + 1, cellZ),
-            cornerValue(cellX, cellY, cellZ + 1),
-            cornerValue(cellX + 1, cellY, cellZ + 1),
-            cornerValue(cellX, cellY + 1, cellZ + 1),
-            cornerValue(cellX + 1, cellY + 1, cellZ + 1),
-        )
+        val worldX = chunkX * 16 + localX
+        val worldZ = chunkZ * 16 + localZ
+        return density.compute(FunctionContext(worldX, y, worldZ, evaluationCache))
     }
 }

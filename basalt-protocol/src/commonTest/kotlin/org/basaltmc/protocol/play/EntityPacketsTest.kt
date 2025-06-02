@@ -62,6 +62,49 @@ class EntityPacketsTest {
     }
 
     @Test
+    fun villageEntityMetadataSerializersRoundTrip() {
+        val buffer = ByteBuffer()
+        val packet =
+            SetEntityDataPacket(
+                entityId = 42,
+                entries =
+                    listOf(
+                        SetEntityDataPacket.Entry.Ints(19, 261),
+                        SetEntityDataPacket.Entry.Floats(9, 24f),
+                        SetEntityDataPacket.Entry.Booleans(16, true),
+                        SetEntityDataPacket.Entry.Rotations(17, 3.978817f, 1.5454245f, 0f),
+                        SetEntityDataPacket.Entry.VillagerData(20, typeId = 0, professionId = 11, level = 1),
+                        SetEntityDataPacket.Entry.RegistryId(20, 1),
+                    ),
+            )
+
+        packet.write(buffer)
+
+        assertEquals(packet, SetEntityDataPacket.read(buffer))
+    }
+
+    @Test
+    fun equipmentRoundTripsContinuationAndEmptySlots() {
+        val buffer = ByteBuffer()
+        val packet =
+            SetEquipmentPacket(
+                entityId = 17,
+                slots =
+                    listOf(
+                        SetEquipmentPacket.Slot(SetEquipmentPacket.Type.MAINHAND, null),
+                        SetEquipmentPacket.Slot(
+                            SetEquipmentPacket.Type.HEAD,
+                            WireItemStack(itemId = 994, count = 1),
+                        ),
+                    ),
+            )
+
+        packet.write(buffer)
+
+        assertEquals(packet, SetEquipmentPacket.read(buffer))
+    }
+
+    @Test
     fun itemFrameUsesItsHierarchySpecificStackIndex() {
         val buffer = ByteBuffer()
         val packet = SetEntityDataPacket.itemFrame(entityId = 9, stack = WireItemStack(itemId = 890, count = 1))

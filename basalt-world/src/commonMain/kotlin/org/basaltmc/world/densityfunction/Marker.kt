@@ -3,15 +3,15 @@ package org.basaltmc.world.densityfunction
 import org.basaltmc.world.GenerationMetrics
 
 /**
- * // parity: net.minecraft.world.level.levelgen.DensityFunctions.Marker.Type. [FLAT_CACHE] and
- * [CACHE_2D] are honored against the [DensityCache] in [FunctionContext.cache]; the rest evaluate
- * straight through.
+ * // parity: net.minecraft.world.level.levelgen.DensityFunctions.Marker.Type. [FLAT_CACHE],
+ * [CACHE_2D] and [INTERPOLATED] are honored against the [DensityCache] in
+ * [FunctionContext.cache]; the rest evaluate straight through.
  *
  * [FLAT_CACHE] is not just an optimization: vanilla quantizes the query to the quart grid and
  * samples at `y = 0`, so honoring it changes values toward vanilla. [CACHE_2D] is exact
- * memoization. [INTERPOLATED], [CACHE_ONCE] and [CACHE_ALL_IN_CELL] are defined against
- * `NoiseChunk`'s own counters, and interpolation happens one level up in [DensityChunkSampler].
- * [BLEND_DENSITY] only marks where Anvil blending would apply.
+ * memoization. [CACHE_ONCE] and [CACHE_ALL_IN_CELL] are defined against `NoiseChunk`'s own
+ * iteration counters and remain performance-only here. [BLEND_DENSITY] only marks where Anvil
+ * blending would apply.
  */
 public enum class MarkerType {
     INTERPOLATED,
@@ -41,6 +41,7 @@ public class Marker(
         if (GenerationMetrics.enabled) GenerationMetrics.countMarker(type)
         val cache = context.cache ?: return wrapped.compute(context)
         return when (type) {
+            MarkerType.INTERPOLATED -> cache.interpolated(slot, context, wrapped)
             MarkerType.FLAT_CACHE -> cache.flatCache(slot, context, wrapped)
             MarkerType.CACHE_2D -> cache.cache2d(slot, context, wrapped)
             else -> wrapped.compute(context)

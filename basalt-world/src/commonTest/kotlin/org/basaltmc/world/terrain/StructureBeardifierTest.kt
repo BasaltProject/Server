@@ -31,6 +31,33 @@ class StructureBeardifierTest {
         }
     }
 
+    @Test
+    fun jigsawJunctionMatchesOfficial26_2Vectors() {
+        val beardifier =
+            StructureBeardifier(
+                emptyList(),
+                listOf(StructureBeardifier.Junction(10, 40, 20)),
+            )
+        val vectors =
+            listOf(
+                Vector(10, 40, 20, -0.27838788265039),
+                Vector(10, 39, 20, 0.27838788265039),
+                Vector(11, 40, 20, -0.11678446074621757),
+                Vector(0, 40, 20, -2.683215213066065E-5),
+                Vector(10, 51, 20, -7.267461183648832E-5),
+                Vector(10, 52, 20, 0.0),
+            )
+
+        for (vector in vectors) {
+            assertEquals(
+                vector.density,
+                beardifier.compute(FunctionContext(vector.x, vector.y, vector.z)),
+                1.0E-16,
+                vector.toString(),
+            )
+        }
+    }
+
     private data class Vector(
         val x: Int,
         val y: Int,

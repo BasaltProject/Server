@@ -967,6 +967,40 @@ public object Blocks {
                     seaPickleStateId++
                 }
             }
+
+            // parity: village templates need arbitrary palette properties and rotate them after
+            // loading. These compact generated state-definition specs expand in the registry's
+            // exact Cartesian-product order, covering every rotation result, not only states that
+            // happened to appear unrotated in one NBT template.
+            for (encoded in VILLAGE_BLOCK_STATE_SPECS) {
+                val fields = encoded.split('|', limit = 3)
+                var stateId = fields[0].toInt()
+                val block = Identifier.vanilla(fields[1])
+                val propertySpecs =
+                    fields[2]
+                        .split(';')
+                        .filter(String::isNotEmpty)
+                        .map { property ->
+                            val separator = property.indexOf('=')
+                            property.substring(0, separator) to property.substring(separator + 1).split(',')
+                        }
+                val properties = linkedMapOf<String, String>()
+
+                fun addStates(propertyIndex: Int) {
+                    if (propertyIndex == propertySpecs.size) {
+                        put(stateId, BlockState(block, stateId, properties.toMap()))
+                        stateId++
+                        return
+                    }
+                    val (name, values) = propertySpecs[propertyIndex]
+                    for (value in values) {
+                        properties[name] = value
+                        addStates(propertyIndex + 1)
+                    }
+                    properties.remove(name)
+                }
+                addStates(0)
+            }
         }
     }
 

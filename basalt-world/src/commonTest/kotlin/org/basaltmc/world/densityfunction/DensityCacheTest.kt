@@ -144,14 +144,17 @@ class DensityCacheTest {
     }
 
     @Test
-    fun `markers this project does not model yet stay pass-through`() {
+    fun `interpolated marker samples and reuses its eight noise cell corners`() {
         val cache = DensityCache(chunkX = 0, chunkZ = 0, slotCount = Marker.slotCount + 4)
+        cache.configureInterpolation(cellWidth = 4, cellHeight = 8)
         val echo = PositionEcho()
         val marker = Marker(MarkerType.INTERPOLATED, echo)
 
-        marker.compute(FunctionContext(5, 70, 6, cache))
-        marker.compute(FunctionContext(5, 70, 6, cache))
+        val first = marker.compute(FunctionContext(1, 2, 3, cache))
+        val second = marker.compute(FunctionContext(1, 2, 3, cache))
 
-        assertEquals(2, echo.calls)
+        assertEquals(1 * 1_000_000.0 + 2 * 1_000.0 + 3, first)
+        assertEquals(first, second)
+        assertEquals(8, echo.calls)
     }
 }

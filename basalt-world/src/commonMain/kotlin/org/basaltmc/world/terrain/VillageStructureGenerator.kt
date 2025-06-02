@@ -2,13 +2,17 @@ package org.basaltmc.world.terrain
 
 import org.basaltmc.random.LegacyRandom
 import org.basaltmc.random.WorldgenRandom
+import org.basaltmc.random.XoroshiroRandom
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.WorldHeight
+import org.basaltmc.world.densityfunction.DensityFunction
+import org.basaltmc.world.densityfunction.DensityFunctions
 import org.basaltmc.world.structure.JigsawAssembly
 import org.basaltmc.world.structure.PlacedStructurePiece
 import org.basaltmc.world.structure.StructureBoundingBox
 import org.basaltmc.world.structure.StructurePlacementGrid
 import org.basaltmc.world.structure.StructurePos
+import org.basaltmc.world.structure.StructureProjection
 import org.basaltmc.world.structure.StructureTemplatePool
 import org.basaltmc.world.structure.TemplateLoader
 import kotlin.concurrent.AtomicReference
@@ -16,14 +20,15 @@ import kotlin.math.abs
 
 /**
  * Places villages during chunk generation, choosing the variant from the biome at each candidate
- * position like vanilla's shared `villages` structure set (see [selectVariantStartPool]).
+ * position like vanilla's shared `villages` structure set (see [selectVariant]).
  *
  * // parity, narrowed: vanilla caches the assembled pieces in the placement chunk's saved data.
  * Chunks here are stateless, so [generateInto] recomputes the [JigsawAssembly] per nearby candidate
  * and keeps what lands in this one; [assemblyCache] makes that affordable, one measuring ~735ms.
  *
- * The randomness has two gaps: the assembly reseeds with `setLargeFeatureWithSalt` rather than
- * vanilla's per-structure seed, and placement reseeds per piece.
+ * Starts are rebuilt with the same independent Legacy structure seed as vanilla. During step four
+ * placement, each village variant owns its dynamic-registry index and every referenced start and
+ * piece consumes one shared xoroshiro decoration stream.
  */
 public class VillageStructureGenerator(
     private val router: OverworldNoiseRouter,
@@ -35,7 +40,7 @@ public class VillageStructureGenerator(
     private val templateLoader: TemplateLoader,
 ) {
     private val assembly = JigsawAssembly(poolLookup, templateLoader, heightAt = { x, z -> surfaceHeightAt(x, z) })
-    private val assemblyCache = AtomicReference<Map<Pair<Int, Int>, List<PlacedStructurePiece>>>(emptyMap())
+    private val assemblyCache = AtomicReference<Map<CandidateKey, VillageStart?>>(emptyMap())
     private val samplerCache = AtomicReference<Map<Pair<Int, Int>, DensityChunkSampler>>(emptyMap())
 
     public fun generateInto(
@@ -44,8 +49,6 @@ public class VillageStructureGenerator(
         chunkZ: Int,
         seed: Long,
     ) {
-        val cellX = chunkX.floorDiv(grid.spacing)
-        val cellZ = chunkZ.floorDiv(grid.spacing)
         val clip =
             StructureBoundingBox(
                 chunkX * 16,
@@ -56,31 +59,102 @@ public class VillageStructureGenerator(
                 chunkZ * 16 + 15,
             )
 
+        val starts = referencedStarts(chunkX, chunkZ, seed, clip)
+        val decorationRandom = WorldgenRandom(XoroshiroRandom(seed))
+        val decorationSeed = decorationRandom.setDecorationSeed(seed, chunkX * 16, chunkZ * 16)
+        for (variant in PLACEMENT_VARIANTS) {
+            decorationRandom.setFeatureSeed(decorationSeed, variant.structureIndex, SURFACE_STRUCTURES_STEP)
+            for (start in starts) {
+                if (start.variant !== variant) continue
+                for (piece in start.pieces) {
+                    if (!piece.boundingBox.intersects(clip)) continue
+                    piece.element.place(templateLoader, chunk, piece.position, piece.rotation, clip, decorationRandom)
+                }
+            }
+        }
+    }
+
+    /** // parity: NoiseChunk adds Beardifier.forStructuresInChunk to router.finalDensity. */
+    public fun finalDensityForChunk(
+        chunkX: Int,
+        chunkZ: Int,
+        seed: Long,
+    ): DensityFunction {
+        val chunkMinX = chunkX * 16
+        val chunkMinZ = chunkZ * 16
+        val referenceClip =
+            StructureBoundingBox(
+                chunkMinX,
+                WorldHeight.MIN_Y,
+                chunkMinZ,
+                chunkMinX + 15,
+                WorldHeight.MAX_Y,
+                chunkMinZ + 15,
+            )
+        val nearClip =
+            StructureBoundingBox(
+                chunkMinX - BEARD_RADIUS,
+                WorldHeight.MIN_Y,
+                chunkMinZ - BEARD_RADIUS,
+                chunkMinX + 15 + BEARD_RADIUS,
+                WorldHeight.MAX_Y,
+                chunkMinZ + 15 + BEARD_RADIUS,
+            )
+        val rigids = mutableListOf<StructureBeardifier.Rigid>()
+        val junctions = mutableListOf<StructureBeardifier.Junction>()
+        for (start in referencedStarts(chunkX, chunkZ, seed, referenceClip)) {
+            for (piece in start.pieces) {
+                if (!piece.boundingBox.intersects(nearClip)) continue
+                if (piece.element.projection == StructureProjection.RIGID) {
+                    rigids += StructureBeardifier.Rigid(piece.boundingBox, piece.groundLevelDelta)
+                }
+                for (junction in piece.junctions) {
+                    if (junction.sourceX > chunkMinX - BEARD_RADIUS &&
+                        junction.sourceX < chunkMinX + 15 + BEARD_RADIUS &&
+                        junction.sourceZ > chunkMinZ - BEARD_RADIUS &&
+                        junction.sourceZ < chunkMinZ + 15 + BEARD_RADIUS
+                    ) {
+                        junctions +=
+                            StructureBeardifier.Junction(
+                                junction.sourceX,
+                                junction.sourceGroundY,
+                                junction.sourceZ,
+                            )
+                    }
+                }
+            }
+        }
+        return if (rigids.isEmpty() && junctions.isEmpty()) {
+            router.finalDensity
+        } else {
+            DensityFunctions.add(router.finalDensity, StructureBeardifier(rigids, junctions))
+        }
+    }
+
+    private fun referencedStarts(
+        chunkX: Int,
+        chunkZ: Int,
+        seed: Long,
+        clip: StructureBoundingBox,
+    ): List<VillageStart> {
+        val cellX = chunkX.floorDiv(grid.spacing)
+        val cellZ = chunkZ.floorDiv(grid.spacing)
+        val starts = mutableListOf<VillageStart>()
         for (dx in -1..1) {
             for (dz in -1..1) {
                 val (candidateChunkX, candidateChunkZ) =
                     grid.candidateChunk(seed, (cellX + dx) * grid.spacing, (cellZ + dz) * grid.spacing)
-                val reachChunks = (maxDistanceFromCenter / 16) + 1
+                val reachChunks = (maxDistanceFromCenter + BEARD_RADIUS) / 16 + 1
                 if (abs(candidateChunkX - chunkX) > reachChunks ||
                     abs(candidateChunkZ - chunkZ) > reachChunks
                 ) {
                     continue
                 }
-
-                val pieces = assembledPieces(candidateChunkX, candidateChunkZ, seed)
-                pieces.forEachIndexed { index, piece ->
-                    if (!piece.boundingBox.intersects(clip)) return@forEachIndexed
-                    val placeRandom = WorldgenRandom(LegacyRandom(0L))
-                    placeRandom.setLargeFeatureWithSalt(
-                        seed,
-                        candidateChunkX * 31 + index,
-                        candidateChunkZ,
-                        VILLAGE_ASSEMBLY_SALT + 1,
-                    )
-                    piece.element.place(templateLoader, chunk, piece.position, piece.rotation, clip, placeRandom)
-                }
+                val start = assembledStart(candidateChunkX, candidateChunkZ, seed) ?: continue
+                if (start.pieces.any { it.boundingBox.intersects(clip) }) starts += start
             }
         }
+        return starts
     }
 
     /**
@@ -93,31 +167,37 @@ public class VillageStructureGenerator(
      * simply discarded in favor of whichever finished first (retried against the winner's map, not
      * overwriting it), the same tradeoff [org.basaltmc.server.world.WorldState] makes.
      */
-    private fun assembledPieces(
+    private fun assembledStart(
         candidateChunkX: Int,
         candidateChunkZ: Int,
         seed: Long,
-    ): List<PlacedStructurePiece> {
-        val key = candidateChunkX to candidateChunkZ
-        assemblyCache.value[key]?.let { return it }
+    ): VillageStart? {
+        val key = CandidateKey(seed, candidateChunkX, candidateChunkZ)
+        if (assemblyCache.value.containsKey(key)) return assemblyCache.value[key]
 
         val startPosition = StructurePos(candidateChunkX * 16, 0, candidateChunkZ * 16)
         val random = WorldgenRandom(LegacyRandom(0L))
-        random.setLargeFeatureWithSalt(seed, candidateChunkX, candidateChunkZ, VILLAGE_ASSEMBLY_SALT)
-        val startPoolName = selectVariantStartPool(candidateChunkX, candidateChunkZ, seed) ?: return emptyList()
+        random.setLargeFeatureSeed(seed, candidateChunkX, candidateChunkZ)
+        val variant = selectVariant(candidateChunkX, candidateChunkZ, seed)
         val assembled =
-            assembly.assemble(
-                startPoolName,
-                startPosition,
-                maxDepth,
-                random,
-                projectStartToHeightmap = true,
-                maxDistanceFromCenter = maxDistanceFromCenter,
-            )
+            variant?.let {
+                VillageStart(
+                    it,
+                    assembly.assemble(
+                        it.startPool,
+                        startPosition,
+                        maxDepth,
+                        random,
+                        projectStartToHeightmap = true,
+                        maxDistanceFromCenter = maxDistanceFromCenter,
+                        useExpansionHack = true,
+                    ),
+                )
+            }
 
         while (true) {
             val current = assemblyCache.value
-            current[key]?.let { return it }
+            if (current.containsKey(key)) return current[key]
             if (assemblyCache.compareAndSet(current, current + (key to assembled))) return assembled
         }
     }
@@ -130,11 +210,11 @@ public class VillageStructureGenerator(
      * (sampled at the density-derived surface height, the same spot the real heightmap-projected
      * start uses). No match anywhere means no village at that candidate at all, real behavior too.
      */
-    private fun selectVariantStartPool(
+    private fun selectVariant(
         candidateChunkX: Int,
         candidateChunkZ: Int,
         seed: Long,
-    ): String? {
+    ): Variant? {
         val random = WorldgenRandom(LegacyRandom(0L))
         random.setLargeFeatureSeed(seed, candidateChunkX, candidateChunkZ)
         val centerX = candidateChunkX * 16 + 8
@@ -151,7 +231,7 @@ public class VillageStructureGenerator(
                 index++
             }
             val variant = options[index]
-            if (biome in variant.biomes) return variant.startPool
+            if (biome in variant.biomes) return variant
             options.removeAt(index)
             total -= 1
         }
@@ -180,7 +260,10 @@ public class VillageStructureGenerator(
         val localZ = z and 15
         var y = WorldHeight.MAX_Y
         while (y >= WorldHeight.MIN_Y && sampler.sample(localX, y, localZ) <= 0.0) y--
-        return y + 1
+        // parity: NoiseBasedChunkGenerator.getFirstFreeHeight samples the generated base column,
+        // not density alone. The Overworld's global aquifer fills open columns through y=62, so
+        // WORLD_SURFACE_WG is at least sea level even when the solid ocean floor is lower.
+        return (y + 1).coerceAtLeast(SEA_LEVEL)
     }
 
     private fun createSampler(
@@ -206,24 +289,40 @@ public class VillageStructureGenerator(
     }
 
     private companion object {
-        const val VILLAGE_ASSEMBLY_SALT = 0
         const val CELL_WIDTH = 4
         const val CELL_HEIGHT = 8
+        const val SEA_LEVEL = 63
+        const val BEARD_RADIUS = 12
+        const val SURFACE_STRUCTURES_STEP = 4
 
         data class Variant(
             val startPool: String,
             val biomes: Set<String>,
+            val structureIndex: Int,
+        )
+
+        data class CandidateKey(
+            val seed: Long,
+            val chunkX: Int,
+            val chunkZ: Int,
+        )
+
+        data class VillageStart(
+            val variant: Variant,
+            val pieces: List<PlacedStructurePiece>,
         )
 
         // parity: villages.json's five entries in file order (all weight 1) with each structure's
         // own real `has_structure/village_*` biome tag contents.
         val VARIANTS =
             listOf(
-                Variant("minecraft:village/plains/town_centers", setOf("plains", "meadow")),
-                Variant("minecraft:village/desert/town_centers", setOf("desert")),
-                Variant("minecraft:village/savanna/town_centers", setOf("savanna")),
-                Variant("minecraft:village/snowy/town_centers", setOf("snowy_plains")),
-                Variant("minecraft:village/taiga/town_centers", setOf("taiga")),
+                Variant("minecraft:village/plains/town_centers", setOf("plains", "meadow"), 22),
+                Variant("minecraft:village/desert/town_centers", setOf("desert"), 21),
+                Variant("minecraft:village/savanna/town_centers", setOf("savanna"), 23),
+                Variant("minecraft:village/snowy/town_centers", setOf("snowy_plains"), 24),
+                Variant("minecraft:village/taiga/town_centers", setOf("taiga"), 25),
             )
+
+        val PLACEMENT_VARIANTS = VARIANTS.sortedBy(Variant::structureIndex)
     }
 }

@@ -2,8 +2,10 @@ package org.basaltmc.protocol.play
 
 import org.basaltmc.io.ByteBuffer
 import org.basaltmc.protocol.ProtocolException
+import org.basaltmc.protocol.readBoolean
 import org.basaltmc.protocol.readUuid
 import org.basaltmc.protocol.readVarInt
+import org.basaltmc.protocol.writeBoolean
 import org.basaltmc.protocol.writeUuid
 import org.basaltmc.protocol.writeVarInt
 import kotlin.math.abs
@@ -88,9 +90,9 @@ private fun unpackDegrees(value: Byte): Float = value * 360f / 256f
 /**
  * Clientbound, id 0x01: spawns an entity.
  * Mirrors `ClientboundAddEntityPacket`. [entityType] is the numeric protocol id of the entity's
- * type (verified against the real 26.2 registries; `minecraft:item` is 71, the only one this build
- * sends). [objectData] carries type-specific extra data (a thrown potion's item id, a falling
- * block's block state...); unused for items, always 0 here.
+ * type (verified against the real 26.2 registries; `minecraft:item` is 71). [objectData] carries
+ * type-specific extra data such as an item-frame direction; it is zero for types that do not need
+ * it.
  */
 @OptIn(ExperimentalUuidApi::class)
 public data class SpawnEntityPacket(
@@ -156,11 +158,10 @@ public data class SpawnEntityPacket(
  * Clientbound, id 0x63: entity metadata. Mirrors `ClientboundSetEntityDataPacket`: a stream of
  * entries, each an index byte, a serializer id and the value, terminated by [END_OF_METADATA].
  *
- * Only the two value types this build actually sends are modelled ([Entry.Bytes] and
- * [Entry.Item]). Indices are positions in the entity's own `defineId` order, counted down the real
- * class hierarchy, which is why they are named rather than written as literals at call sites: in
- * 26.2 a new `Avatar` class sits between `LivingEntity` and `Player`, so the player indices are not
- * where an older version would put them.
+ * Indices are positions in the entity's own `defineId` order, counted down the real class
+ * hierarchy, which is why shared indices are named rather than written as literals at call sites:
+ * in 26.2 a new `Avatar` class sits between `LivingEntity` and `Player`, so the player indices are
+ * not where an older version would put them.
  */
 public data class SetEntityDataPacket(
     val entityId: Int,
@@ -175,10 +176,50 @@ public data class SetEntityDataPacket(
             val value: Byte,
         ) : Entry
 
+        /** A VarInt, `EntityDataSerializers.INT` (serializer 1). */
+        public data class Ints(
+            override val index: Int,
+            val value: Int,
+        ) : Entry
+
+        /** A float, `EntityDataSerializers.FLOAT` (serializer 3). */
+        public data class Floats(
+            override val index: Int,
+            val value: Float,
+        ) : Entry
+
         /** An item stack, `EntityDataSerializers.ITEM_STACK` (serializer 7). */
         public data class Item(
             override val index: Int,
             val stack: WireItemStack?,
+        ) : Entry
+
+        /** A boolean, `EntityDataSerializers.BOOLEAN` (serializer 8). */
+        public data class Booleans(
+            override val index: Int,
+            val value: Boolean,
+        ) : Entry
+
+        /** Three Euler-angle floats, `EntityDataSerializers.ROTATIONS` (serializer 9). */
+        public data class Rotations(
+            override val index: Int,
+            val x: Float,
+            val y: Float,
+            val z: Float,
+        ) : Entry
+
+        /** Built-in villager type/profession ids and level, serializer 18. */
+        public data class VillagerData(
+            override val index: Int,
+            val typeId: Int,
+            val professionId: Int,
+            val level: Int,
+        ) : Entry
+
+        /** A holder in a synchronized dynamic registry, encoded as its VarInt id. */
+        public data class RegistryId(
+            override val index: Int,
+            val value: Int,
         ) : Entry
     }
 
@@ -191,9 +232,37 @@ public data class SetEntityDataPacket(
                     buffer.writeVarInt(BYTE_SERIALIZER)
                     buffer.writeByte(entry.value)
                 }
+                is Entry.Ints -> {
+                    buffer.writeVarInt(INT_SERIALIZER)
+                    buffer.writeVarInt(entry.value)
+                }
+                is Entry.Floats -> {
+                    buffer.writeVarInt(FLOAT_SERIALIZER)
+                    buffer.writeFloat(entry.value)
+                }
                 is Entry.Item -> {
                     buffer.writeVarInt(ITEM_STACK_SERIALIZER)
                     WireItemStack.write(buffer, entry.stack)
+                }
+                is Entry.Booleans -> {
+                    buffer.writeVarInt(BOOLEAN_SERIALIZER)
+                    buffer.writeBoolean(entry.value)
+                }
+                is Entry.Rotations -> {
+                    buffer.writeVarInt(ROTATIONS_SERIALIZER)
+                    buffer.writeFloat(entry.x)
+                    buffer.writeFloat(entry.y)
+                    buffer.writeFloat(entry.z)
+                }
+                is Entry.VillagerData -> {
+                    buffer.writeVarInt(VILLAGER_DATA_SERIALIZER)
+                    buffer.writeVarInt(entry.typeId)
+                    buffer.writeVarInt(entry.professionId)
+                    buffer.writeVarInt(entry.level)
+                }
+                is Entry.RegistryId -> {
+                    buffer.writeVarInt(CAT_VARIANT_SERIALIZER)
+                    buffer.writeVarInt(entry.value)
                 }
             }
         }
@@ -216,7 +285,13 @@ public data class SetEntityDataPacket(
         public const val PLAYER_SKIN_PARTS_INDEX: Int = 16
 
         private const val BYTE_SERIALIZER = 0
+        private const val INT_SERIALIZER = 1
+        private const val FLOAT_SERIALIZER = 3
         private const val ITEM_STACK_SERIALIZER = 7
+        private const val BOOLEAN_SERIALIZER = 8
+        private const val ROTATIONS_SERIALIZER = 9
+        private const val VILLAGER_DATA_SERIALIZER = 18
+        private const val CAT_VARIANT_SERIALIZER = 21
         private const val END_OF_METADATA = 0xFF
 
         /** The one entry a dropped item needs. */
@@ -246,13 +321,83 @@ public data class SetEntityDataPacket(
                 entries +=
                     when (val serializer = buffer.readVarInt()) {
                         BYTE_SERIALIZER -> Entry.Bytes(index, buffer.readByte())
+                        INT_SERIALIZER -> Entry.Ints(index, buffer.readVarInt())
+                        FLOAT_SERIALIZER -> Entry.Floats(index, buffer.readFloat())
                         ITEM_STACK_SERIALIZER -> Entry.Item(index, WireItemStack.read(buffer))
+                        BOOLEAN_SERIALIZER -> Entry.Booleans(index, buffer.readBoolean())
+                        ROTATIONS_SERIALIZER ->
+                            Entry.Rotations(index, buffer.readFloat(), buffer.readFloat(), buffer.readFloat())
+                        VILLAGER_DATA_SERIALIZER ->
+                            Entry.VillagerData(
+                                index,
+                                buffer.readVarInt(),
+                                buffer.readVarInt(),
+                                buffer.readVarInt(),
+                            )
+                        CAT_VARIANT_SERIALIZER -> Entry.RegistryId(index, buffer.readVarInt())
                         else -> throw ProtocolException(
                             "Unsupported entity metadata serializer $serializer at index $index",
                         )
                     }
             }
             return SetEntityDataPacket(entityId, entries)
+        }
+    }
+}
+
+/**
+ * Clientbound, id 0x66: equipment changes. The high bit on every slot except the last one is the
+ * continuation marker used by `ClientboundSetEquipmentPacket`.
+ */
+public data class SetEquipmentPacket(
+    val entityId: Int,
+    val slots: List<Slot>,
+) {
+    public data class Slot(
+        val type: Type,
+        val stack: WireItemStack?,
+    )
+
+    public enum class Type {
+        MAINHAND,
+        OFFHAND,
+        FEET,
+        LEGS,
+        CHEST,
+        HEAD,
+        BODY,
+        SADDLE,
+    }
+
+    init {
+        require(slots.isNotEmpty()) { "An equipment packet must contain at least one slot" }
+    }
+
+    public fun write(buffer: ByteBuffer) {
+        buffer.writeVarInt(entityId)
+        for ((index, slot) in slots.withIndex()) {
+            val continuation = if (index < slots.lastIndex) CONTINUE_MASK else 0
+            buffer.writeByte((slot.type.ordinal or continuation).toByte())
+            WireItemStack.write(buffer, slot.stack)
+        }
+    }
+
+    public companion object {
+        public const val ID: Int = 0x66
+
+        private const val CONTINUE_MASK = 0x80
+
+        public fun read(buffer: ByteBuffer): SetEquipmentPacket {
+            val entityId = buffer.readVarInt()
+            val slots = mutableListOf<Slot>()
+            do {
+                val encoded = buffer.readByte().toInt() and 0xFF
+                val type =
+                    Type.entries.getOrNull(encoded and 0x7F)
+                        ?: throw ProtocolException("Unknown equipment slot ${encoded and 0x7F}")
+                slots += Slot(type, WireItemStack.read(buffer))
+            } while ((encoded and CONTINUE_MASK) != 0)
+            return SetEquipmentPacket(entityId, slots)
         }
     }
 }

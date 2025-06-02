@@ -99,7 +99,191 @@ private fun singleJigsawNbt(
     return root
 }
 
+private fun twoJigsawNbt(
+    sizeX: Int,
+    firstX: Int,
+    firstOrientation: String,
+    firstPool: String,
+    firstName: String,
+    firstTarget: String,
+    secondX: Int,
+    secondOrientation: String,
+    secondPool: String,
+    secondName: String,
+    secondTarget: String,
+): NbtCompound {
+    val root = NbtCompound()
+    root["size"] = NbtList(NbtType.INT, listOf(NbtInt(sizeX), NbtInt(1), NbtInt(1)))
+    root["palette"] =
+        NbtList(
+            NbtType.COMPOUND,
+            listOf(firstOrientation, secondOrientation).map { orientation ->
+                NbtCompound().apply {
+                    putString("Name", "minecraft:jigsaw")
+                    set("Properties", NbtCompound().apply { putString("orientation", orientation) })
+                }
+            },
+        )
+
+    fun block(
+        x: Int,
+        state: Int,
+        pool: String,
+        name: String,
+        target: String,
+    ): NbtCompound =
+        NbtCompound().apply {
+            set("pos", NbtList(NbtType.INT, listOf(NbtInt(x), NbtInt(0), NbtInt(0))))
+            putInt("state", state)
+            set(
+                "nbt",
+                NbtCompound().apply {
+                    putString("name", name)
+                    putString("target", target)
+                    putString("pool", pool)
+                    putString("final_state", "minecraft:air")
+                },
+            )
+        }
+    root["blocks"] =
+        NbtList(
+            NbtType.COMPOUND,
+            listOf(
+                block(firstX, 0, firstPool, firstName, firstTarget),
+                block(secondX, 1, secondPool, secondName, secondTarget),
+            ),
+        )
+    return root
+}
+
 class JigsawAssemblyTest {
+    @Test
+    fun recordsVanillaGroundDeltasAndBidirectionalJunctions() {
+        val source =
+            StructureTemplate().apply {
+                load(singleJigsawNbt(2, 1, "east_up", "test:next", "minecraft:start", "minecraft:next"))
+            }
+        val target =
+            StructureTemplate().apply {
+                load(singleJigsawNbt(1, 0, "west_up", "minecraft:empty", "minecraft:next", "minecraft:none"))
+            }
+        val templates = mapOf("test:source" to source, "test:target" to target)
+        val pools =
+            mapOf(
+                "test:start" to
+                    StructureTemplatePool(
+                        "minecraft:empty",
+                        listOf(
+                            LegacySinglePoolElement(
+                                "test:source",
+                                StructureProcessorList.EMPTY,
+                                StructureProjection.RIGID,
+                            ) to 1,
+                        ),
+                    ),
+                "test:next" to
+                    StructureTemplatePool(
+                        "minecraft:empty",
+                        listOf(
+                            LegacySinglePoolElement(
+                                "test:target",
+                                StructureProcessorList.EMPTY,
+                                StructureProjection.RIGID,
+                            ) to 1,
+                        ),
+                    ),
+                "minecraft:empty" to StructureTemplatePool("minecraft:empty", emptyList()),
+            )
+        val pieces =
+            JigsawAssembly({ pools[it] }, { templates[it] }, heightAt = { _, _ -> 64 }).assemble(
+                "test:start",
+                StructurePos(0, 64, 0),
+                maxDepth = 1,
+                WorldgenRandom(XoroshiroRandom(2L)),
+                projectStartToHeightmap = false,
+                maxDistanceFromCenter = 80,
+            )
+
+        assertEquals(2, pieces.size)
+        assertEquals(1, pieces[0].groundLevelDelta)
+        assertEquals(1, pieces[1].groundLevelDelta)
+        val sourceJunction = pieces[0].junctions.single()
+        val targetJunction = pieces[1].junctions.single()
+        assertEquals(-sourceJunction.deltaY, targetJunction.deltaY)
+        assertEquals(StructureProjection.RIGID, sourceJunction.destinationProjection)
+        assertEquals(StructureProjection.RIGID, targetJunction.destinationProjection)
+        assertEquals(sourceJunction.sourceGroundY, targetJunction.sourceGroundY)
+        assertEquals(64, sourceJunction.sourceGroundY)
+    }
+
+    @Test
+    fun villageExpansionHackUsesTallestChildPoolHeight() {
+        val source =
+            StructureTemplate().apply {
+                load(singleJigsawNbt(2, 1, "east_up", "test:next", "minecraft:start", "minecraft:next"))
+            }
+        val candidate =
+            StructureTemplate().apply {
+                load(
+                    twoJigsawNbt(
+                        3,
+                        0,
+                        "west_up",
+                        "minecraft:empty",
+                        "minecraft:next",
+                        "minecraft:none",
+                        1,
+                        "east_up",
+                        "test:tall",
+                        "minecraft:child",
+                        "minecraft:tall",
+                    ),
+                )
+            }
+        val tall =
+            StructureTemplate().apply {
+                load(
+                    singleJigsawNbt(1, 0, "west_up", "minecraft:empty", "minecraft:tall", "minecraft:none").also {
+                        it["size"] =
+                            NbtList(NbtType.INT, listOf(NbtInt(1), NbtInt(20), NbtInt(1)))
+                    },
+                )
+            }
+        val templates = mapOf("test:source" to source, "test:candidate" to candidate, "test:tall" to tall)
+
+        fun pool(location: String) =
+            StructureTemplatePool(
+                "minecraft:empty",
+                listOf(
+                    LegacySinglePoolElement(location, StructureProcessorList.EMPTY, StructureProjection.RIGID) to 1,
+                ),
+            )
+        val pools =
+            mapOf(
+                "test:start" to pool("test:source"),
+                "test:next" to pool("test:candidate"),
+                "test:tall" to pool("test:tall"),
+                "minecraft:empty" to StructureTemplatePool("minecraft:empty", emptyList()),
+            )
+        val assembly = JigsawAssembly({ pools[it] }, { templates[it] }, heightAt = { _, _ -> 64 })
+
+        fun assemble(useHack: Boolean) =
+            assembly.assemble(
+                "test:start",
+                StructurePos(0, 64, 0),
+                maxDepth = 1,
+                WorldgenRandom(XoroshiroRandom(4L)),
+                projectStartToHeightmap = false,
+                maxDistanceFromCenter = 80,
+                useExpansionHack = useHack,
+            )
+
+        val ordinary = assemble(false)[1].boundingBox
+        val expanded = assemble(true)[1].boundingBox
+        assertEquals(1, ordinary.maxY - ordinary.minY + 1)
+        assertEquals(22, expanded.maxY - expanded.minY + 1)
+    }
+
     @Test
     fun inwardFacingJigsawCanPlaceAChildInsideItsSourcePiece() {
         val source =
