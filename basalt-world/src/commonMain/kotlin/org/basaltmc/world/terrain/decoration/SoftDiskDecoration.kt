@@ -114,7 +114,7 @@ public object SoftDiskDecoration {
 
     private val SAND =
         DiskConfig(2, 6, 2, setOf(Blocks.DIRT.stateId, Blocks.GRASS_BLOCK.stateId)) { chunk, x, y, z ->
-            if (get(chunk, x, y - 1, z) == Blocks.AIR.stateId) sandstoneStateId else sandStateId
+            if (Blocks.isAir(get(chunk, x, y - 1, z))) sandstoneStateId else sandStateId
         }
     private val CLAY =
         DiskConfig(2, 3, 1, setOf(Blocks.DIRT.stateId, clayStateId)) { _, _, _, _ -> clayStateId }

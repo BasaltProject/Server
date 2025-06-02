@@ -106,7 +106,7 @@ public object GlowLichenDecoration : BiomeVegetalDecoration {
             when {
                 Blocks.isGlowLichenState(oldState) -> oldState - firstGlowLichenStateId
                 oldState == Blocks.WATER.stateId -> ALL_FACE_FALSE_BITS
-                oldState == Blocks.AIR.stateId -> ALL_FACE_FALSE_BITS or WATERLOGGED_FALSE_BIT
+                Blocks.isAir(oldState) -> ALL_FACE_FALSE_BITS or WATERLOGGED_FALSE_BIT
                 else -> return null
             }
         if (bits and direction.falseBit == 0) return null
@@ -138,7 +138,7 @@ public object GlowLichenDecoration : BiomeVegetalDecoration {
     }
 
     private fun isAirWaterOrLichen(stateId: Int): Boolean =
-        stateId == Blocks.AIR.stateId || stateId == Blocks.WATER.stateId || Blocks.isGlowLichenState(stateId)
+        Blocks.isAir(stateId) || stateId == Blocks.WATER.stateId || Blocks.isGlowLichenState(stateId)
 
     private fun <T> List<T>.shuffled(random: WorldgenRandom): List<T> {
         val copy = toMutableList()

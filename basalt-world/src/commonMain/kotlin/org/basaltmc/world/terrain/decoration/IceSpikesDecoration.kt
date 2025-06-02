@@ -34,7 +34,7 @@ public object IceSpikesDecoration : BiomeVegetalDecoration {
         suppliedOrigin: DecorationPos,
     ) {
         var origin = suppliedOrigin
-        while (get(chunk, origin.x, origin.y, origin.z) == Blocks.AIR.stateId && origin.y > WorldHeight.MIN_Y + 2) {
+        while (Blocks.isAir(get(chunk, origin.x, origin.y, origin.z)) && origin.y > WorldHeight.MIN_Y + 2) {
             origin = origin.copy(y = origin.y - 1)
         }
         if (get(chunk, origin.x, origin.y, origin.z) != Blocks.SNOW_BLOCK.stateId) return
@@ -74,7 +74,7 @@ public object IceSpikesDecoration : BiomeVegetalDecoration {
                 var runLength = if (abs(xOffset) == 1 && abs(zOffset) == 1) random.nextInt(5) else 50
                 while (cursorY > 50) {
                     val stateId = get(chunk, origin.x + xOffset, cursorY, origin.z + zOffset)
-                    if (stateId != Blocks.AIR.stateId &&
+                    if (!Blocks.isAir(stateId) &&
                         stateId !in replaceableStateIds &&
                         stateId != Blocks.PACKED_ICE.stateId
                     ) {
@@ -99,7 +99,7 @@ public object IceSpikesDecoration : BiomeVegetalDecoration {
         z: Int,
     ) {
         val stateId = get(chunk, x, y, z)
-        if (stateId == Blocks.AIR.stateId || stateId in replaceableStateIds) {
+        if (Blocks.isAir(stateId) || stateId in replaceableStateIds) {
             set(chunk, x, y, z, Blocks.PACKED_ICE.stateId)
         }
     }

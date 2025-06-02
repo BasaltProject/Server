@@ -5,6 +5,7 @@ import org.basaltmc.random.LegacyRandom
 import org.basaltmc.registry.Blocks
 import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
+import org.basaltmc.world.ChunkHeight
 import org.basaltmc.world.WorldHeight
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -194,6 +195,30 @@ class SurfaceBuilderTest {
         SurfaceBuilder.buildSurface(chunk, environment, SurfaceRuleData.overworld())
 
         assertEquals(Blocks.BEDROCK.stateId, chunk.getBlockStateId(5, WorldHeight.MIN_Y, 5))
+    }
+
+    @Test
+    fun netherRulesUseTheDimensionFloorAndRoof() {
+        val chunk = Chunk(0, 0, ChunkHeight.NETHER)
+        for (x in 0 until 16) {
+            for (z in 0 until 16) {
+                for (y in 0..127) chunk.setBlockStateId(x, y, z, Blocks.NETHERRACK.stateId)
+            }
+        }
+        val environment = FakeEnvironment(IntArray(256) { 128 }, biomeId = "minecraft:nether_wastes")
+
+        SurfaceBuilder.buildSurface(
+            chunk,
+            environment,
+            SurfaceRuleData.nether(),
+            Blocks.NETHERRACK.stateId,
+            generationMinY = 0,
+            generationHeight = 128,
+        )
+
+        assertEquals(Blocks.BEDROCK.stateId, chunk.getBlockStateId(5, 0, 5))
+        assertEquals(Blocks.BEDROCK.stateId, chunk.getBlockStateId(5, 127, 5))
+        assertEquals(Blocks.NETHERRACK.stateId, chunk.getBlockStateId(5, 64, 5))
     }
 
     @Test

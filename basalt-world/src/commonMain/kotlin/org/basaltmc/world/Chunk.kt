@@ -165,19 +165,19 @@ public class Chunk(
 
         private fun matchesUncached(stateId: Int): Boolean =
             when (this) {
-                WORLD_SURFACE -> stateId != Blocks.AIR.stateId
+                WORLD_SURFACE -> !Blocks.isAir(stateId)
                 OCEAN_FLOOR ->
-                    stateId != Blocks.AIR.stateId &&
+                    !Blocks.isAir(stateId) &&
                         stateId != Blocks.WATER.stateId &&
                         !isNonColliding(stateId)
                 MOTION_BLOCKING ->
                     Blocks.hasFluid(stateId) ||
-                        (stateId != Blocks.AIR.stateId && !isNonColliding(stateId))
+                        (!Blocks.isAir(stateId) && !isNonColliding(stateId))
                 MOTION_BLOCKING_NO_LEAVES ->
                     !Blocks.isLeavesState(stateId) &&
                         (
                             Blocks.hasFluid(stateId) ||
-                                (stateId != Blocks.AIR.stateId && !isNonColliding(stateId))
+                                (!Blocks.isAir(stateId) && !isNonColliding(stateId))
                         )
             }
 

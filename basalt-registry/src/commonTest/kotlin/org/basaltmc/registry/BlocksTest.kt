@@ -15,6 +15,16 @@ class BlocksTest {
     }
 
     @Test
+    fun allThreeVanillaAirBlocksAreAir() {
+        assertTrue(Blocks.isAir(Blocks.AIR.stateId))
+        assertTrue(Blocks.isAir(Blocks.VOID_AIR.stateId))
+        assertTrue(Blocks.isAir(Blocks.CAVE_AIR.stateId))
+        assertFalse(Blocks.isAir(Blocks.STONE.stateId))
+        assertEquals(15292, Blocks.VOID_AIR.stateId)
+        assertEquals(15293, Blocks.CAVE_AIR.stateId)
+    }
+
+    @Test
     fun exposesTheExpectedStateIds() {
         assertEquals(0, Blocks.AIR.stateId)
         assertEquals(1, Blocks.STONE.stateId)

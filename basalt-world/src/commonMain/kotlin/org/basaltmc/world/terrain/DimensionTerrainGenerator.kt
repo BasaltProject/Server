@@ -9,6 +9,11 @@ import org.basaltmc.world.GenerationMetrics
 import org.basaltmc.world.densityfunction.DensityCache
 import org.basaltmc.world.densityfunction.DensityFunction
 import org.basaltmc.world.densityfunction.Marker
+import org.basaltmc.world.terrain.carver.NetherCaveCarver
+import org.basaltmc.world.terrain.decoration.nether.NetherUndergroundDecoration
+import org.basaltmc.world.terrain.surface.SurfaceBuilder
+import org.basaltmc.world.terrain.surface.SurfaceRuleData
+import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
 
 /** Base terrain and biome fill for vanilla's Nether and End noise settings. */
 public object DimensionTerrainGenerator {
@@ -18,6 +23,8 @@ public object DimensionTerrainGenerator {
         biomeSource: NetherBiomeSource,
         chunkX: Int,
         chunkZ: Int,
+        surfaceEnvironment: SurfaceRuleEnvironment? = null,
+        seed: Long = 0L,
     ): Chunk =
         generate(
             finalDensity = router.finalDensity,
@@ -31,6 +38,20 @@ public object DimensionTerrainGenerator {
             fluidLevel = 32,
             chunkX = chunkX,
             chunkZ = chunkZ,
+            surfacePass = { chunk ->
+                if (surfaceEnvironment != null) {
+                    SurfaceBuilder.buildSurface(
+                        chunk,
+                        surfaceEnvironment,
+                        SurfaceRuleData.nether(),
+                        Blocks.NETHERRACK.stateId,
+                        generationMinY = 0,
+                        generationHeight = 128,
+                    )
+                }
+            },
+            carverPass = { chunk -> NetherCaveCarver.carve(chunk, seed) },
+            decorationPass = { chunk -> NetherUndergroundDecoration.decorate(chunk, seed, biomeSource) },
         ) { blockX, blockY, blockZ, cache -> biomeSource.biomeAt(blockX, blockY, blockZ, cache) }
 
     /** // parity: `noise_settings/end.json` base shape, block default and cell sizes. */
@@ -66,6 +87,10 @@ public object DimensionTerrainGenerator {
         fluidLevel: Int,
         chunkX: Int,
         chunkZ: Int,
+        surfacePass: (Chunk) -> Unit = {},
+        carverPass: (Chunk) -> Unit = {},
+        structurePass: (Chunk) -> Unit = {},
+        decorationPass: (Chunk) -> Unit = {},
         biomeAt: (blockX: Int, blockY: Int, blockZ: Int, cache: DensityCache) -> Biome,
     ): Chunk {
         val chunk = Chunk(chunkX, chunkZ, verticalBounds)
@@ -103,7 +128,7 @@ public object DimensionTerrainGenerator {
                                             y < fluidLevel -> defaultFluid
                                             else -> Blocks.AIR.stateId
                                         }
-                                    if (stateId != Blocks.AIR.stateId) chunk.setBlockStateId(x, y, z, stateId)
+                                    if (!Blocks.isAir(stateId)) chunk.setBlockStateId(x, y, z, stateId)
                                 }
                             }
                         }
@@ -111,6 +136,10 @@ public object DimensionTerrainGenerator {
                 }
             }
         }
+        GenerationMetrics.measure(GenerationMetrics.Phase.SURFACE_RULES) { surfacePass(chunk) }
+        GenerationMetrics.measure(GenerationMetrics.Phase.CARVERS) { carverPass(chunk) }
+        GenerationMetrics.measure(GenerationMetrics.Phase.STRUCTURES) { structurePass(chunk) }
+        GenerationMetrics.measure(GenerationMetrics.Phase.DECORATION) { decorationPass(chunk) }
         GenerationMetrics.measure(GenerationMetrics.Phase.BIOME_FILL) {
             for (quartY in 0 until verticalBounds.height / 4) {
                 val blockY = verticalBounds.minY + quartY * 4

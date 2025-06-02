@@ -63,7 +63,7 @@ public object JungleGrassDecoration : BiomeVegetalDecoration {
             } else {
                 val x = position.x and 15
                 val z = position.z and 15
-                context.chunk.getBlockStateId(x, position.y, z) == Blocks.AIR.stateId &&
+                Blocks.isAir(context.chunk.getBlockStateId(x, position.y, z)) &&
                     context.chunk.getBlockStateId(x, position.y - 1, z) != podzolStateId
             }
         }

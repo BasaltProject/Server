@@ -19,6 +19,7 @@ public object GenerationMetrics {
         DENSITY_GRID,
         TERRAIN_FILL,
         SURFACE_RULES,
+        CARVERS,
         STRUCTURES,
         DECORATION,
         SURFACE_FREEZE,

@@ -2,10 +2,25 @@ package org.basaltmc.common
 
 // parity: net.minecraft.util.Mth, the subset noise generation needs.
 public object Mth {
+    // parity: Mth's 65536-entry float sine table. World carvers use these values rather than
+    // platform trigonometric calls, and a one-bit trajectory difference changes many blocks.
+    private val SIN: FloatArray =
+        FloatArray(65536) { index ->
+            kotlin.math.sin(index.toDouble() / SIN_SCALE).toFloat()
+        }
+
     // kotlin.math.floor is called qualified, not imported: an unqualified call inside a member
     // named `floor` resolves to itself first (member takes priority over a same-named top-level
     // import), which would make this infinitely recurse instead of calling the stdlib function.
     public fun floor(v: Double): Int = kotlin.math.floor(v).toInt()
+
+    public fun sin(value: Double): Float = SIN[(value * SIN_SCALE).toLong().toInt() and 65535]
+
+    public fun sin(value: Float): Float = sin(value.toDouble())
+
+    public fun cos(value: Double): Float = SIN[(value * SIN_SCALE + 16384.0).toLong().toInt() and 65535]
+
+    public fun cos(value: Float): Float = cos(value.toDouble())
 
     public fun lfloor(v: Double): Long = kotlin.math.floor(v).toLong()
 
@@ -121,4 +136,6 @@ public object Mth {
         }
         return lo
     }
+
+    private const val SIN_SCALE = 10430.378350470453
 }

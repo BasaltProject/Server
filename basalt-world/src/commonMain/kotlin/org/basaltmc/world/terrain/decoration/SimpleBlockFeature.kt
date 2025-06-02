@@ -28,7 +28,7 @@ public class SimpleBlockFeature(
         if (origin.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return false
         val localX = origin.x and 15
         val localZ = origin.z and 15
-        if (chunk.getBlockStateId(localX, origin.y, localZ) != Blocks.AIR.stateId) return false
+        if (!Blocks.isAir(chunk.getBlockStateId(localX, origin.y, localZ))) return false
         if (origin.y - 1 < WorldHeight.MIN_Y ||
             !Chunk.HeightmapType.OCEAN_FLOOR.matches(chunk.getBlockStateId(localX, origin.y - 1, localZ))
         ) {
@@ -36,7 +36,7 @@ public class SimpleBlockFeature(
         }
         if (isDoublePlant) {
             if (origin.y + 1 > WorldHeight.MAX_Y ||
-                chunk.getBlockStateId(localX, origin.y + 1, localZ) != Blocks.AIR.stateId
+                !Blocks.isAir(chunk.getBlockStateId(localX, origin.y + 1, localZ))
             ) {
                 return false
             }

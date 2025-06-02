@@ -19,6 +19,13 @@ class MthTest {
     }
 
     @Test
+    fun sineTableMatchesVanillaFloatBits() {
+        assertEquals(1062693212, Mth.sin(1.0).toBits())
+        assertEquals(1057641281, Mth.cos(1.0).toBits())
+        assertEquals(3210176860u, Mth.sin(-1.0).toBits().toUInt())
+    }
+
+    @Test
     fun lerp3IsTrilinearInterpolation() {
         val value = Mth.lerp3(0.5, 0.5, 0.5, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0)
         assertEquals(0.5, value, 1.0E-12)

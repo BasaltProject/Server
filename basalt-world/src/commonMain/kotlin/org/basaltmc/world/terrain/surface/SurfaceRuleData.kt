@@ -63,6 +63,16 @@ public object SurfaceRuleData {
     private val WATER = state("water")
     private val CINNABAR = state("cinnabar")
     private val SULFUR = state("sulfur")
+    private val LAVA = state(Blocks.LAVA.stateId)
+    private val NETHERRACK = state(Blocks.NETHERRACK.stateId)
+    private val SOUL_SAND = state("soul_sand")
+    private val SOUL_SOIL = state("soul_soil")
+    private val BASALT = state("basalt")
+    private val BLACKSTONE = state("blackstone")
+    private val WARPED_WART_BLOCK = state("warped_wart_block")
+    private val WARPED_NYLIUM = state("warped_nylium")
+    private val NETHER_WART_BLOCK = state("nether_wart_block")
+    private val CRIMSON_NYLIUM = state("crimson_nylium")
 
     /**
      * // parity: SurfaceRuleData.overworld(HolderGetter). Always the real `overworldLike(true,
@@ -76,6 +86,11 @@ public object SurfaceRuleData {
     }
 
     public fun overworld(): RuleSource = cachedOverworld
+
+    private val cachedNether: RuleSource by lazy { buildNether() }
+
+    /** // parity: `SurfaceRuleData.nether`. */
+    public fun nether(): RuleSource = cachedNether
 
     // parity: SurfaceRuleData.overworldLike.
     public fun overworldLike(
@@ -350,6 +365,108 @@ public object SurfaceRuleData {
                 DEEPSLATE,
             )
         return sequence(*rules.toTypedArray())
+    }
+
+    private fun buildNether(): RuleSource {
+        val aboveLavaLevel = yBlockCheck(VerticalAnchor.absolute(31), 0)
+        val aboveLavaSurface = yBlockCheck(VerticalAnchor.absolute(32), 0)
+        val aroundLavaBottom = yStartCheck(VerticalAnchor.absolute(30), 0)
+        val aroundLavaTop = not(yStartCheck(VerticalAnchor.absolute(35), 0))
+        val closeToCeiling = yBlockCheck(VerticalAnchor.belowTop(5), 0)
+        val soulSandLayer = noiseCondition2d("soul_sand_layer", -0.012)
+        val gravelLayer = noiseCondition2d("gravel_layer", -0.012)
+        val patch = noiseCondition2d("patch", -0.012)
+        val netherrack = noiseCondition2d("netherrack", 0.54)
+        val netherWart = noiseCondition2d("nether_wart", 1.17)
+        val stateSelector = noiseCondition2d("nether_state_selector", 0.0)
+        val gravelPatch = ifTrue(patch, ifTrue(aroundLavaBottom, ifTrue(aroundLavaTop, GRAVEL)))
+
+        return sequence(
+            ifTrue(
+                SurfaceRules.verticalGradient("bedrock_floor", VerticalAnchor.bottom(), VerticalAnchor.aboveBottom(5)),
+                BEDROCK,
+            ),
+            ifTrue(
+                not(SurfaceRules.verticalGradient("bedrock_roof", VerticalAnchor.belowTop(5), VerticalAnchor.top())),
+                BEDROCK,
+            ),
+            ifTrue(closeToCeiling, NETHERRACK),
+            ifTrue(
+                isBiome("minecraft:basalt_deltas"),
+                sequence(
+                    ifTrue(SurfaceRules.UNDER_CEILING, BASALT),
+                    ifTrue(SurfaceRules.UNDER_FLOOR, sequence(gravelPatch, ifTrue(stateSelector, BASALT), BLACKSTONE)),
+                ),
+            ),
+            ifTrue(
+                isBiome("minecraft:soul_sand_valley"),
+                sequence(
+                    ifTrue(
+                        SurfaceRules.UNDER_CEILING,
+                        sequence(ifTrue(stateSelector, SOUL_SAND), SOUL_SOIL),
+                    ),
+                    ifTrue(
+                        SurfaceRules.UNDER_FLOOR,
+                        sequence(gravelPatch, ifTrue(stateSelector, SOUL_SAND), SOUL_SOIL),
+                    ),
+                ),
+            ),
+            ifTrue(
+                SurfaceRules.ON_FLOOR,
+                sequence(
+                    ifTrue(not(aboveLavaSurface), ifTrue(hole(), LAVA)),
+                    ifTrue(
+                        isBiome("minecraft:warped_forest"),
+                        ifTrue(
+                            not(netherrack),
+                            ifTrue(
+                                aboveLavaLevel,
+                                sequence(ifTrue(netherWart, WARPED_WART_BLOCK), WARPED_NYLIUM),
+                            ),
+                        ),
+                    ),
+                    ifTrue(
+                        isBiome("minecraft:crimson_forest"),
+                        ifTrue(
+                            not(netherrack),
+                            ifTrue(
+                                aboveLavaLevel,
+                                sequence(ifTrue(netherWart, NETHER_WART_BLOCK), CRIMSON_NYLIUM),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            ifTrue(
+                isBiome("minecraft:nether_wastes"),
+                sequence(
+                    ifTrue(
+                        SurfaceRules.UNDER_FLOOR,
+                        ifTrue(
+                            soulSandLayer,
+                            sequence(
+                                ifTrue(not(hole()), ifTrue(aroundLavaBottom, ifTrue(aroundLavaTop, SOUL_SAND))),
+                                NETHERRACK,
+                            ),
+                        ),
+                    ),
+                    ifTrue(
+                        SurfaceRules.ON_FLOOR,
+                        ifTrue(
+                            aboveLavaLevel,
+                            ifTrue(
+                                aroundLavaTop,
+                                ifTrue(
+                                    gravelLayer,
+                                    sequence(ifTrue(aboveLavaSurface, GRAVEL), ifTrue(not(hole()), GRAVEL)),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            NETHERRACK,
+        )
     }
 
     private fun surfaceNoiseAbove(threshold: Double): ConditionSource =

@@ -128,10 +128,10 @@ public object VillageFeatures {
         stateProvider: (WorldgenRandom) -> Int,
     ) {
         if (y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return
-        if (chunk.getBlockStateId(x and 15, y, z and 15) != Blocks.AIR.stateId) return
+        if (!Blocks.isAir(chunk.getBlockStateId(x and 15, y, z and 15))) return
         if (y - 1 < WorldHeight.MIN_Y) return
         val below = chunk.getBlockStateId(x and 15, y - 1, z and 15)
-        val mayPlace = if (below == dirtPathId) random.nextBoolean() else below != Blocks.AIR.stateId
+        val mayPlace = if (below == dirtPathId) random.nextBoolean() else !Blocks.isAir(below)
         if (mayPlace) chunk.setBlockStateId(x and 15, y, z and 15, stateProvider(random))
     }
 

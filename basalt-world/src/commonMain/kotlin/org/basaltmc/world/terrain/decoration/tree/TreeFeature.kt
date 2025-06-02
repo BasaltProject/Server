@@ -156,7 +156,7 @@ public sealed class TrunkPlacer(
     ): Boolean {
         if (y < WorldHeight.MIN_Y || y > WorldHeight.MAX_Y) return false
         val stateId = chunk.getBlockStateId(x and 15, y, z and 15)
-        return stateId == Blocks.AIR.stateId || stateId in leafStateIds
+        return Blocks.isAir(stateId) || stateId in leafStateIds
     }
 
     private companion object {
@@ -958,7 +958,7 @@ public class MangroveRootPlacer(
     ): Boolean {
         if (y < WorldHeight.MIN_Y || y > WorldHeight.MAX_Y) return false
         val id = chunk.getBlockStateId(x and 15, y, z and 15)
-        return id == Blocks.AIR.stateId || id in canGrowThroughIds
+        return Blocks.isAir(id) || id in canGrowThroughIds
     }
 
     private fun placeRoot(
@@ -978,7 +978,7 @@ public class MangroveRootPlacer(
             chunk.setBlockStateId(x and 15, y, z and 15, mangroveRootsStateId)
             if (random.nextFloat() < ABOVE_ROOT_CHANCE &&
                 y + 1 <= WorldHeight.MAX_Y &&
-                chunk.getBlockStateId(x and 15, y + 1, z and 15) == Blocks.AIR.stateId
+                Blocks.isAir(chunk.getBlockStateId(x and 15, y + 1, z and 15))
             ) {
                 chunk.setBlockStateId(x and 15, y + 1, z and 15, mossCarpetStateId)
             }
@@ -2281,7 +2281,7 @@ public object TreeFeature {
                 return@repeat
             }
             val aboveStateId = chunk.getBlockStateId(x and 15, aboveY, z and 15)
-            if (aboveStateId != Blocks.AIR.stateId && !Blocks.isVineState(aboveStateId)) return@repeat
+            if (!Blocks.isAir(aboveStateId) && !Blocks.isVineState(aboveStateId)) return@repeat
             val supportStateId = chunk.getBlockStateId(x and 15, y, z and 15)
             if (!isSolidRender(supportStateId)) return@repeat
             if (chunk.heightAt(x and 15, z and 15, Chunk.HeightmapType.MOTION_BLOCKING_NO_LEAVES) >
@@ -2410,7 +2410,7 @@ public object TreeFeature {
                 chunk.setBlockStateId(x and 15, cursorY, z and 15, Blocks.PODZOL.stateId)
                 return
             }
-            if (stateId != Blocks.AIR.stateId && dy < 0) return
+            if (!Blocks.isAir(stateId) && dy < 0) return
         }
     }
 
@@ -2434,7 +2434,7 @@ public object TreeFeature {
         z: Int,
     ): Boolean =
         y in WorldHeight.MIN_Y..WorldHeight.MAX_Y &&
-            chunk.getBlockStateId(x and 15, y, z and 15) == Blocks.AIR.stateId
+            Blocks.isAir(chunk.getBlockStateId(x and 15, y, z and 15))
 
     private data class BlockPos(
         val x: Int,
@@ -2685,7 +2685,7 @@ private fun isValidTreePos(
     z: Int,
 ): Boolean {
     if (y < WorldHeight.MIN_Y || y > WorldHeight.MAX_Y) return false
-    return chunk.getBlockStateId(x and 15, y, z and 15) == Blocks.AIR.stateId
+    return Blocks.isAir(chunk.getBlockStateId(x and 15, y, z and 15))
 }
 
 private fun setBlock(
@@ -2707,7 +2707,7 @@ private fun tryPlaceLeaf(
     z: Int,
 ): Boolean {
     if (y < WorldHeight.MIN_Y || y > WorldHeight.MAX_Y) return false
-    if (chunk.getBlockStateId(x and 15, y, z and 15) == Blocks.AIR.stateId) {
+    if (Blocks.isAir(chunk.getBlockStateId(x and 15, y, z and 15))) {
         chunk.setBlockStateId(x and 15, y, z and 15, foliageStateId)
         return true
     }

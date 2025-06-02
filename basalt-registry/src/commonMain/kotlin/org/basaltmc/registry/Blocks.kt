@@ -42,6 +42,8 @@ public object Blocks {
     public val PUMPKIN: BlockState = register(8332, "pumpkin")
     public val SUGAR_CANE: BlockState = register(6947, "sugar_cane")
     public val FIREFLY_BUSH: BlockState = register(32365, "firefly_bush")
+    public val VOID_AIR: BlockState = register(15292, "void_air")
+    public val CAVE_AIR: BlockState = register(15293, "cave_air")
     public val NETHERRACK: BlockState = register(6997, "netherrack")
     public val END_STONE: BlockState = register(9477, "end_stone")
 
@@ -107,6 +109,10 @@ public object Blocks {
 
     /** Whether this state exposes any non-empty fluid state. */
     public fun hasFluid(stateId: Int): Boolean = stateId == LAVA.stateId || hasWaterFluid(stateId)
+
+    /** // parity: BlockState.isAir, including the two non-default air blocks used by worldgen. */
+    public fun isAir(stateId: Int): Boolean =
+        stateId == AIR.stateId || stateId == VOID_AIR.stateId || stateId == CAVE_AIR.stateId
 
     /** Whether [stateId] is one of the 28 distance, persistence, and water states of a leaves block. */
     public fun isLeavesState(stateId: Int): Boolean = stateId in LEAVES_FIRST_STATE_ID..LEAVES_LAST_STATE_ID

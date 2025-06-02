@@ -63,7 +63,17 @@ public class VanillaWorldGeneratorFactory(
                 base3d = base3d,
             )
         val biomes = NetherBiomeSource(router.temperature, router.vegetation)
-        return { chunkX, chunkZ -> DimensionTerrainGenerator.nether(router, biomes, chunkX, chunkZ) }
+        val surface = NetherSurfaceEnvironment(serverJar, LegacyRandom(seed).forkPositional(), router, biomes)
+        return { chunkX, chunkZ ->
+            DimensionTerrainGenerator.nether(
+                router,
+                biomes,
+                chunkX,
+                chunkZ,
+                surfaceEnvironment = surface,
+                seed = seed,
+            )
+        }
     }
 
     private fun end(seed: Long): (Int, Int) -> Chunk {

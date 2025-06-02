@@ -2,6 +2,7 @@ package org.basaltmc.world.terrain.decoration
 
 import org.basaltmc.random.LegacyRandom
 import org.basaltmc.random.WorldgenRandom
+import org.basaltmc.registry.Blocks
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.noise.SimplexNoise
 import kotlin.math.ceil
@@ -249,13 +250,23 @@ public class AirTargetFilter(
         random: WorldgenRandom,
         origin: DecorationPos,
     ): Boolean {
-        if (origin.y !in org.basaltmc.world.WorldHeight.MIN_Y..org.basaltmc.world.WorldHeight.MAX_Y) return false
-        val airStateId = org.basaltmc.registry.Blocks.AIR.stateId
-        if (context.chunk.getBlockStateId(origin.x and 15, origin.y, origin.z and 15) != airStateId) return false
+        val bounds = context.chunk.verticalBounds
+        if (origin.y !in bounds.minY..bounds.maxY) return false
+        if (!Blocks.isAir(
+                context.chunk.getBlockStateId(origin.x and 15, origin.y, origin.z and 15),
+            )
+        ) {
+            return false
+        }
         if (alsoCheckAbove) {
-            if (origin.y + 1 > org.basaltmc.world.WorldHeight.MAX_Y) return false
-            if (context.chunk.getBlockStateId(origin.x and 15, origin.y + 1, origin.z and 15) !=
-                airStateId
+            if (origin.y + 1 > bounds.maxY) return false
+            if (!Blocks.isAir(
+                    context.chunk.getBlockStateId(
+                        origin.x and 15,
+                        origin.y + 1,
+                        origin.z and 15,
+                    ),
+                )
             ) {
                 return false
             }

@@ -23,6 +23,14 @@ class ChunkSectionTest {
     }
 
     @Test
+    fun caveAndVoidAirDoNotCountAsNonAirBlocks() {
+        val section = ChunkSection()
+        section.setBlockStateId(1, 2, 3, Blocks.CAVE_AIR.stateId)
+        section.setBlockStateId(4, 5, 6, Blocks.VOID_AIR.stateId)
+        assertEquals(0, section.nonAirBlockCount)
+    }
+
+    @Test
     fun distinctCoordinatesDoNotAlias() {
         val section = ChunkSection()
         section.setBlockStateId(0, 0, 1, Blocks.STONE.stateId)

@@ -31,14 +31,14 @@ class HeightmapTypeTableTest {
     ): Boolean {
         val nonColliding = isNonColliding(stateId)
         return when (type) {
-            Chunk.HeightmapType.WORLD_SURFACE -> stateId != Blocks.AIR.stateId
+            Chunk.HeightmapType.WORLD_SURFACE -> !Blocks.isAir(stateId)
             Chunk.HeightmapType.OCEAN_FLOOR ->
-                stateId != Blocks.AIR.stateId && stateId != Blocks.WATER.stateId && !nonColliding
+                !Blocks.isAir(stateId) && stateId != Blocks.WATER.stateId && !nonColliding
             Chunk.HeightmapType.MOTION_BLOCKING ->
-                Blocks.hasFluid(stateId) || (stateId != Blocks.AIR.stateId && !nonColliding)
+                Blocks.hasFluid(stateId) || (!Blocks.isAir(stateId) && !nonColliding)
             Chunk.HeightmapType.MOTION_BLOCKING_NO_LEAVES ->
                 !Blocks.isLeavesState(stateId) &&
-                    (Blocks.hasFluid(stateId) || (stateId != Blocks.AIR.stateId && !nonColliding))
+                    (Blocks.hasFluid(stateId) || (!Blocks.isAir(stateId) && !nonColliding))
         }
     }
 

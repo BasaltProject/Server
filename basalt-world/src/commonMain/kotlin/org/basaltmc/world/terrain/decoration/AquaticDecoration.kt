@@ -178,7 +178,7 @@ public object AquaticDecoration {
     ): Boolean {
         if (y <= WorldHeight.MIN_Y) return false
         val below = chunk.getLocalBlock(x, y - 1, z)
-        return below != Blocks.AIR.stateId && below != Blocks.WATER.stateId
+        return !Blocks.isAir(below) && below != Blocks.WATER.stateId
     }
 
     private fun canKelpSurvive(
@@ -189,7 +189,7 @@ public object AquaticDecoration {
     ): Boolean {
         if (y <= WorldHeight.MIN_Y) return false
         val below = chunk.getLocalBlock(x, y - 1, z)
-        return below != Blocks.AIR.stateId && below != Blocks.WATER.stateId && !Blocks.isKelpState(below)
+        return !Blocks.isAir(below) && below != Blocks.WATER.stateId && !Blocks.isKelpState(below)
     }
 
     private fun Chunk.isWater(
