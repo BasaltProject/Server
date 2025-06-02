@@ -1,6 +1,11 @@
 package org.basaltmc.server.command
 
+import org.basaltmc.common.logging.LogOutput
 import org.basaltmc.io.NativeThread
+import org.basaltmc.io.enableTerminalRawMode
+import org.basaltmc.io.flushConsole
+import org.basaltmc.io.readTerminalByte
+import org.basaltmc.io.restoreTerminalMode
 import org.basaltmc.io.sleepMillis
 
 /**
@@ -37,16 +42,140 @@ public object ConsoleReader {
      */
     public fun start(current: () -> CommandDispatcher?) {
         NativeThread.start {
-            while (true) {
-                val line = readlnOrNull() ?: break
-                val command = line.trim().removePrefix("/")
-                if (command.isEmpty()) continue
-                val dispatcher = awaitDispatcher(current)
-                if (dispatcher == null) {
-                    println("No server is running, so '$command' was not run.")
-                    continue
+            // Raw mode is what makes an arrow key reach this program at all; without a terminal it
+            // is unavailable and unnecessary, and plain line reading is used instead.
+            val editing = enableTerminalRawMode()
+            if (editing) {
+                // Log lines and the prompt share one terminal. Wipe the prompt before a line is
+                // written and draw it again after, or every log line leaves a copy of it behind.
+                LogOutput.aroundConsoleLine = { write ->
+                    print("\r\u001B[K")
+                    write()
+                    redrawPrompt?.invoke()
+                    flushConsole()
                 }
-                dispatcher.execute(ConsoleCommandSource(lang = dispatcher.environment.lang), command)
+            }
+            try {
+                readLoop(current, editing)
+            } finally {
+                LogOutput.aroundConsoleLine = null
+                restoreTerminalMode()
+            }
+        }
+    }
+
+    /**
+     * How the log hook above puts the prompt back. Set while a line is being edited and cleared
+     * between lines, so a log line arriving with nothing half-typed prints on its own.
+     */
+    private var redrawPrompt: (() -> Unit)? = null
+
+    private fun readLoop(
+        current: () -> CommandDispatcher?,
+        editing: Boolean,
+    ) {
+        val history = mutableListOf<String>()
+        while (true) {
+            val line = (if (editing) readEditedLine(history) else readlnOrNull()) ?: break
+            val command = line.trim().removePrefix("/")
+            if (command.isEmpty()) continue
+            // Kept as typed, and never twice in a row: a history full of repeated `list` is a
+            // history you have to scroll past rather than one you can use.
+            if (history.lastOrNull() != command) history += command
+            if (history.size > MAX_HISTORY) history.removeAt(0)
+            val dispatcher = awaitDispatcher(current)
+            if (dispatcher == null) {
+                println("No server is running, so '$command' was not run.")
+                continue
+            }
+            dispatcher.execute(ConsoleCommandSource(lang = dispatcher.environment.lang), command)
+        }
+    }
+
+    /**
+     * One line, edited in place: printable characters, backspace, left/right, and up/down through
+     * [history]. Returns `null` at end of input, the same as [readlnOrNull].
+     *
+     * Deliberately small. This is not a readline implementation and does not try to be: no
+     * completion, no word motions, no search, no multi-line. It covers what an operator actually
+     * reaches for at a server console, which is recalling the last command and fixing a typo in it.
+     */
+    private fun readEditedLine(history: List<String>): String? {
+        val line = StringBuilder()
+        var cursor = 0
+        // Where up/down currently is in the history. Past the end means "the line being typed",
+        // which is what coming back down from the history has to restore.
+        var historyIndex = history.size
+        var draft = ""
+
+        fun redraw() {
+            // Carriage return, the prompt, the line, then clear whatever the old line left behind.
+            print("\r> $line\u001B[K")
+            if (cursor < line.length) print("\u001B[${line.length - cursor}D")
+            flushConsole()
+        }
+
+        redrawPrompt = { redraw() }
+        redraw()
+        while (true) {
+            when (val byte = readTerminalByte()) {
+                -1 -> {
+                    redrawPrompt = null
+                    return null
+                }
+                CARRIAGE_RETURN, NEWLINE -> {
+                    redrawPrompt = null
+                    print("\r\n")
+                    flushConsole()
+                    return line.toString()
+                }
+                BACKSPACE, DELETE -> {
+                    if (cursor > 0) {
+                        line.deleteAt(cursor - 1)
+                        cursor--
+                        redraw()
+                    }
+                }
+                ESCAPE -> {
+                    // An arrow is escape, then '[', then a letter. Anything else is left alone.
+                    if (readTerminalByte() != BRACKET) continue
+                    when (readTerminalByte()) {
+                        UP -> {
+                            if (historyIndex > 0) {
+                                if (historyIndex == history.size) draft = line.toString()
+                                historyIndex--
+                                line.clear().append(history[historyIndex])
+                                cursor = line.length
+                                redraw()
+                            }
+                        }
+                        DOWN -> {
+                            if (historyIndex < history.size) {
+                                historyIndex++
+                                line.clear()
+                                line.append(if (historyIndex == history.size) draft else history[historyIndex])
+                                cursor = line.length
+                                redraw()
+                            }
+                        }
+                        RIGHT ->
+                            if (cursor < line.length) {
+                                cursor++
+                                redraw()
+                            }
+                        LEFT ->
+                            if (cursor > 0) {
+                                cursor--
+                                redraw()
+                            }
+                    }
+                }
+                else -> {
+                    if (byte < FIRST_PRINTABLE) continue
+                    line.insert(cursor, byte.toChar())
+                    cursor++
+                    redraw()
+                }
             }
         }
     }
@@ -63,6 +192,23 @@ public object ConsoleReader {
     }
 
     private const val POLL_MILLIS = 25L
+
+    /** Enough to scroll back through a session's worth of commands without growing without bound. */
+    private const val MAX_HISTORY = 100
+
+    private const val CARRIAGE_RETURN = 13
+    private const val NEWLINE = 10
+    private const val BACKSPACE = 8
+    private const val DELETE = 127
+    private const val ESCAPE = 27
+    private const val BRACKET = 91
+    private const val UP = 65
+    private const val DOWN = 66
+    private const val RIGHT = 67
+    private const val LEFT = 68
+
+    /** Below this are control characters, which this editor does not act on. */
+    private const val FIRST_PRINTABLE = 32
 
     /** Long enough to cover a restart and a cold start; past it, something is wrong and saying so beats hanging. */
     private const val MAX_WAIT_MILLIS = 60_000L

@@ -14,6 +14,7 @@ import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.LogFile
 import org.basaltmc.io.ShutdownSignal
 import org.basaltmc.io.SocketException
+import org.basaltmc.io.restoreTerminalMode
 import org.basaltmc.server.command.ConsoleReader
 import org.basaltmc.server.config.BasaltConfig
 import org.basaltmc.server.config.ColorMode
@@ -118,6 +119,10 @@ private fun run(args: Array<String>) {
         if (!instance.shouldRestart) break
         server = null
     }
+    // The console thread is parked in a blocking read and never gets to run its own cleanup, so
+    // the terminal is put back from here. Skipping it leaves the operator's shell with no echo
+    // after the server stops, which looks like their terminal broke.
+    restoreTerminalMode()
     exitProcess(0)
 }
 
