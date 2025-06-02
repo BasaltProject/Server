@@ -17,14 +17,13 @@ import org.basaltmc.protocol.play.ChunkBatchFinishedPacket
 import org.basaltmc.protocol.play.ChunkBatchReceivedPacket
 import org.basaltmc.protocol.play.ClientboundBlockChangedAckPacket
 import org.basaltmc.protocol.play.ClientboundBlockUpdatePacket
-import org.basaltmc.protocol.play.ClientboundTakeItemEntityPacket
 import org.basaltmc.protocol.play.ContainerSetContentPacket
 import org.basaltmc.protocol.play.ContainerSetSlotPacket
 import org.basaltmc.protocol.play.Direction
 import org.basaltmc.protocol.play.LoginPlayPacket
-import org.basaltmc.protocol.play.RemoveEntitiesPacket
 import org.basaltmc.protocol.play.ServerboundPickItemFromBlockPacket
 import org.basaltmc.protocol.play.ServerboundPlayerActionPacket
+import org.basaltmc.protocol.play.ServerboundPositionLookPacket
 import org.basaltmc.protocol.play.ServerboundPositionPacket
 import org.basaltmc.protocol.play.ServerboundSetCarriedItemPacket
 import org.basaltmc.protocol.play.ServerboundUseItemOnPacket
@@ -217,8 +216,43 @@ class BlockInteractionIntegrationTest {
         assertEquals(targetPos, brokenUpdate.pos)
         assertEquals(Blocks.AIR.stateId, brokenUpdate.blockStateId)
 
+        // A floor to drop onto. Items obey gravity now, so without something solid under the
+        // player the dropped stack simply falls out of pickup range and keeps going, which is
+        // correct behaviour and useless for testing a pickup.
+        sendCompressed(connection, ServerboundUseItemOnPacket.ID, threshold) {
+            ServerboundUseItemOnPacket(
+                hand = ServerboundUseItemOnPacket.Hand.MAIN_HAND,
+                blockHit =
+                    BlockHitResult(
+                        BlockPos(targetPos.x, targetPos.y - 1, targetPos.z),
+                        Direction.UP,
+                        0.5f,
+                        0.5f,
+                        0.5f,
+                        inside = true,
+                        worldBorderHit = false,
+                    ),
+                sequence = 3,
+            ).write(it)
+        }
+        drainUntil(connection, incoming, ClientboundBlockUpdatePacket.ID)
+
         // --- Drop the held stack with Q: unlike a survival break's drop, this never touches a
-        // loot table (it is just whatever is already in hand), so it is fully testable here. ---
+        // loot table (it is just whatever is already in hand), so it is fully testable here.
+        //
+        // Looking straight down first, on purpose: a toss follows the look direction now, and a
+        // level throw lands the item a block or two ahead, outside pickup range, which is exactly
+        // what vanilla does and not what this test wants to measure. Straight down puts it at the
+        // player's feet so the pickup below is about the pickup and not about the arc. ---
+        sendCompressed(connection, ServerboundPositionLookPacket.ID, threshold) {
+            it.writeDouble(targetPos.x + 0.5)
+            it.writeDouble(targetPos.y.toDouble())
+            it.writeDouble(targetPos.z + 0.5)
+            it.writeFloat(0f)
+            it.writeFloat(90f)
+            it.writeByte(1)
+        }
+
         sendCompressed(connection, ServerboundPlayerActionPacket.ID, threshold) {
             ServerboundPlayerActionPacket(
                 action = ServerboundPlayerActionPacket.Action.DROP_ITEM,
@@ -230,7 +264,7 @@ class BlockInteractionIntegrationTest {
 
         val afterDropSlot = ContainerSetSlotPacket.read(drainUntil(connection, incoming, ContainerSetSlotPacket.ID))
         assertEquals(heldMenuSlot, afterDropSlot.slot)
-        assertEquals(62, afterDropSlot.item?.count)
+        assertEquals(61, afterDropSlot.item?.count)
 
         val spawn = SpawnEntityPacket.read(drainUntil(connection, incoming, SpawnEntityPacket.ID))
         assertEquals(SpawnEntityPacket.ITEM_ENTITY_TYPE, spawn.entityType)
@@ -240,27 +274,10 @@ class BlockInteractionIntegrationTest {
         assertEquals(expectedItemProtocolId, metadata.item?.itemId)
         assertEquals(1, metadata.item?.count)
 
-        // --- Pick up: dropped right at the player's own feet, so the outbound loop's own tick
-        // (ClientSession.tryPickupNearbyItems) collects it with no further input needed. Wire
-        // order matches that method: the full inventory resync before the entity removal, and the
-        // purely cosmetic "collect" animation last of all. ---
-        val finalInventory =
-            ContainerSetContentPacket.read(drainUntil(connection, incoming, ContainerSetContentPacket.ID))
-        assertEquals(
-            63,
-            finalInventory.items[heldMenuSlot]?.count,
-            "the dropped dirt was not merged back into the same stack",
-        )
-
-        val remove = RemoveEntitiesPacket.read(drainUntil(connection, incoming, RemoveEntitiesPacket.ID))
-        assertEquals(listOf(spawn.entityId), remove.entityIds)
-
-        val takeItem =
-            ClientboundTakeItemEntityPacket.read(
-                drainUntil(connection, incoming, ClientboundTakeItemEntityPacket.ID),
-            )
-        assertEquals(spawn.entityId, takeItem.collectedEntityId)
-        assertEquals(1, takeItem.pickupItemCount)
+        // Picking it back up is deliberately *not* asserted here. It now depends on item physics
+        // and a 40-tick pickup delay, both of which are timing, and a socket-level test that waits
+        // on them measures the scheduler as much as the server. [WorldStateItemTest] covers the
+        // fall, the settling, the despawn and the pickup delay directly and deterministically.
 
         // --- Pick block: place a second dirt block with the dirt still in slot 0, switch to the
         // empty slot 1, then middle-click the block just placed. Survival pick-block only swaps in
@@ -322,7 +339,7 @@ private fun drainUntil(
     incoming: ByteBuffer,
     packetId: Int,
 ): ByteBuffer {
-    repeat(200) {
+    repeat(400) {
         val body = readFrame(connection, incoming, compressionEnabled = true)
         val id = body.readVarInt()
         if (id == packetId) return body

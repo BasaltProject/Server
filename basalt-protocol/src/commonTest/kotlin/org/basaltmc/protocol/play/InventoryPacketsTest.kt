@@ -2,6 +2,7 @@ package org.basaltmc.protocol.play
 
 import org.basaltmc.io.ByteBuffer
 import org.basaltmc.protocol.ProtocolException
+import org.basaltmc.protocol.writeBoolean
 import org.basaltmc.protocol.writeVarInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -111,6 +112,40 @@ class InventoryPacketsTest {
         // Everything was consumed: a leftover byte here is a desynchronised stream, which is how a
         // misparse turns into the server holding an item the player never picked.
         assertEquals(0, buffer.readableBytes)
+    }
+
+    @Test
+    fun aContainerClickIsParsedPastItsHashedPredictionState() {
+        // The client's predicted result travels as component *hashes* (`HashedStack`), not as real
+        // stacks: an optional flag, item and count, then added components as a type id plus a
+        // fixed four-byte hash each, then removed component type ids. Getting that walk wrong
+        // desynchronises every packet after this one, so the whole body has to be consumed.
+        val buffer = ByteBuffer()
+        buffer.writeVarInt(0) // container 0
+        buffer.writeVarInt(7) // state id
+        buffer.writeShort(36) // slot
+        buffer.writeByte(0) // left button
+        buffer.writeVarInt(1) // QUICK_MOVE
+        buffer.writeVarInt(1) // one changed slot
+        buffer.writeShort(36)
+        buffer.writeBoolean(true) // that slot's predicted stack is present
+        buffer.writeVarInt(55)
+        buffer.writeVarInt(3)
+        buffer.writeVarInt(1) // one added component hash
+        buffer.writeVarInt(9)
+        buffer.writeInt(0x1234)
+        buffer.writeVarInt(1) // one removed component
+        buffer.writeVarInt(11)
+        buffer.writeBoolean(false) // empty cursor
+
+        val packet = ServerboundContainerClickPacket.read(buffer)
+
+        assertEquals(0, packet.containerId)
+        assertEquals(7, packet.stateId)
+        assertEquals(36, packet.slot)
+        assertEquals(ServerboundContainerClickPacket.Mode.QUICK_MOVE, packet.mode)
+        assertEquals(false, packet.clientHasCarriedItem)
+        assertEquals(0, buffer.readableBytes, "the hashed prediction state was not fully consumed")
     }
 
     @Test

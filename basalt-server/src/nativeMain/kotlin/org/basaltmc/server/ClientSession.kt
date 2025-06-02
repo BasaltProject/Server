@@ -75,6 +75,7 @@ import org.basaltmc.protocol.play.PlayerLoadedPacket
 import org.basaltmc.protocol.play.PlayerPositionPacket
 import org.basaltmc.protocol.play.RemoveEntitiesPacket
 import org.basaltmc.protocol.play.RespawnPacket
+import org.basaltmc.protocol.play.ServerboundContainerClickPacket
 import org.basaltmc.protocol.play.ServerboundPickItemFromBlockPacket
 import org.basaltmc.protocol.play.ServerboundPlayerAbilitiesPacket
 import org.basaltmc.protocol.play.ServerboundPlayerActionPacket
@@ -138,6 +139,9 @@ import org.basaltmc.world.ChunkDataCodec
 import org.basaltmc.world.ChunkPos
 import org.basaltmc.world.ChunkTracker
 import kotlin.concurrent.AtomicInt
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.random.Random
 import kotlin.time.ExperimentalTime
 import kotlin.time.TimeSource
@@ -252,6 +256,23 @@ public class ClientSession(
     private val generationQueue: ChunkGenerationQueue get() = requireNotNull(currentWorld).generationQueue
     private val worldName: String get() = currentWorld?.name ?: ""
 
+    /**
+     * What this player is holding on the cursor inside their open window, kept server-side rather
+     * than taken from the client's own claim: trusting theirs is how a stack gets duplicated.
+     */
+    private var carriedItem: StoredItemStack? = null
+
+    // The click-and-drag gesture in progress, if any. See [handleQuickCraft].
+    private var quickCraftActive = false
+    private var quickCraftType = 0
+    private val quickCraftSlots = LinkedHashSet<Int>()
+
+    /** Which dropped items this client has been told about. See [syncItemEntities]. */
+    private val trackedItems = HashSet<Int>()
+
+    /** Which of those have already had their final resting position sent. */
+    private val settledItems = HashSet<Int>()
+
     private val chunkTracker = ChunkTracker()
     private var viewRadius = 0
     private var centerChunkX = 0
@@ -294,6 +315,7 @@ public class ClientSession(
                             timings.of("player.chunks").time { sendBudget -= flushReadyChunks(allowed).toFloat() }
                         }
                         timings.of("player.tick").time { tickPlayer() }
+                        timings.of("player.items").time { syncItemEntities() }
                         timings.of("player.ui").time { tickUi() }
                         sendKeepAliveIfDue()
                     }
@@ -965,13 +987,7 @@ public class ClientSession(
             }
             ServerboundSetCreativeModeSlotPacket.ID ->
                 handleSetCreativeModeSlot(ServerboundSetCreativeModeSlotPacket.read(body))
-            CONTAINER_CLICK_ID -> {
-                // No click handling yet, so the click is refused rather than half-applied: the
-                // window goes back out as it really is and the client drops its prediction. Read
-                // nothing out of the body on purpose, since its shape is exactly the part that is
-                // not implemented.
-                sendInventory()
-            }
+            ServerboundContainerClickPacket.ID -> handleContainerClick(ServerboundContainerClickPacket.read(body))
             ServerboundUseItemOnPacket.ID -> handleUseItemOn(ServerboundUseItemOnPacket.read(body))
             ServerboundPickItemFromBlockPacket.ID ->
                 handlePickItemFromBlock(
@@ -1069,7 +1085,21 @@ public class ClientSession(
         val remaining = held.count - dropCount
         session.inventory[heldSlot] = if (remaining <= 0) null else held.copy(count = remaining)
         sendInventorySlot(heldSlot)
-        spawnDroppedItem(Identifier.parse(held.id), dropCount, session.x, session.y, session.z)
+
+        // parity: `Player.drop` throws it forward from eye height along the look direction, rather
+        // than dropping it on the player's own feet where they would instantly walk back into it.
+        val yaw = session.yaw * PI / 180.0
+        val pitch = session.pitch * PI / 180.0
+        spawnDroppedItem(
+            item = Identifier.parse(held.id),
+            count = dropCount,
+            x = session.x,
+            y = session.y + THROW_EYE_HEIGHT,
+            z = session.z,
+            velocityX = -sin(yaw) * cos(pitch) * THROW_SPEED,
+            velocityY = -sin(pitch) * THROW_SPEED + THROW_LIFT,
+            velocityZ = cos(yaw) * cos(pitch) * THROW_SPEED,
+        )
     }
 
     /**
@@ -1088,25 +1118,19 @@ public class ClientSession(
         val table = lootTables?.forBlock(block) ?: return
         val drops = table.generate(LegacyRandom(Random.nextLong()))
         if (drops.isEmpty()) return
-        val restY = restingSurfaceY(pos.x, pos.y, pos.z)
         for (stack in drops) {
-            spawnDroppedItem(stack.item, stack.count, pos.x + 0.5, restY.toDouble(), pos.z + 0.5)
+            // Falls under its own gravity now ([WorldState.tickItems]) instead of being snapped to
+            // the ground up front, so a block broken in mid-air drops as it should.
+            spawnDroppedItem(
+                item = stack.item,
+                count = stack.count,
+                x = pos.x + 0.5,
+                y = pos.y + 0.5,
+                z = pos.z + 0.5,
+                velocityY = BREAK_DROP_LIFT,
+                pickupDelay = BREAK_DROP_PICKUP_DELAY,
+            )
         }
-    }
-
-    /** The first empty space at or below [startY] with solid support beneath it, where a dropped item comes to rest. */
-    private fun restingSurfaceY(
-        x: Int,
-        startY: Int,
-        z: Int,
-    ): Int {
-        var y = startY
-        repeat(MAX_ITEM_FALL_BLOCKS) {
-            val below = world.getBlockState(x, y - 1, z) ?: return y
-            if (!isAirLike(below)) return y
-            y--
-        }
-        return y
     }
 
     private fun isAirLike(stateId: Int): Boolean =
@@ -1119,20 +1143,101 @@ public class ClientSession(
         x: Double,
         y: Double,
         z: Double,
+        velocityX: Double = 0.0,
+        velocityY: Double = 0.0,
+        velocityZ: Double = 0.0,
+        pickupDelay: Int = WorldState.DEFAULT_PICKUP_DELAY,
     ) {
         if (count <= 0) return
-        val protocolId = Items.REGISTRY.byIdentifier(item)?.protocolId ?: return
+        if (Items.REGISTRY.byIdentifier(item) == null) return
         val entityId = playerRegistry?.allocateEntityId() ?: return
-        val uuid = Uuid.random()
-        world.spawnItem(WorldState.DroppedItem(entityId, uuid, item, count, x, y, z))
-        for (player in playersInSameWorld()) {
-            player.connection.sendPlayPacket(SpawnEntityPacket.ID) {
-                SpawnEntityPacket(entityId, uuid, SpawnEntityPacket.ITEM_ENTITY_TYPE, x, y, z).write(it)
-            }
-            player.connection.sendPlayPacket(SetEntityDataPacket.ID) {
-                SetEntityDataPacket(entityId, WireItemStack(protocolId, count)).write(it)
+        // Only put into the world here. Telling anyone about it is [syncItemEntities]'s job, on
+        // each connection's own thread: broadcasting from here reached whoever happened to be
+        // online at the instant of the drop and nobody who walked up afterwards.
+        world.spawnItem(
+            WorldState.DroppedItem(
+                entityId = entityId,
+                uuid = Uuid.random(),
+                item = item,
+                count = count,
+                x = x,
+                y = y,
+                z = z,
+                velocityX = velocityX,
+                velocityY = velocityY,
+                velocityZ = velocityZ,
+                pickupDelay = pickupDelay,
+            ),
+        )
+    }
+
+    /**
+     * Brings this client's view of the world's dropped items up to date: spawns the ones that came
+     * into range, moves the ones still falling, and forgets the ones that were picked up, despawned
+     * or went out of range.
+     *
+     * Runs on this connection's own outbound loop, like everything else that writes to this socket.
+     * [WorldState.tickItems] does the physics once for the whole world on the tick thread; this only
+     * reports it, so an item moves at the same speed no matter how many players are watching.
+     *
+     * A settled item stops generating movement packets ([WorldState.DroppedItem.resting]), which is
+     * what keeps a floor covered in drops from costing anything to look at.
+     */
+    private fun syncItemEntities() {
+        val session = playerSession ?: return
+        val visible = HashSet<Int>()
+        for (item in world.items()) {
+            val dx = item.x - session.x
+            val dz = item.z - session.z
+            if (dx * dx + dz * dz > ITEM_VIEW_RADIUS_SQUARED) continue
+            val protocolId = Items.REGISTRY.byIdentifier(item.item)?.protocolId ?: continue
+            visible += item.entityId
+            if (trackedItems.add(item.entityId)) {
+                sendPlayPacket(SpawnEntityPacket.ID) {
+                    SpawnEntityPacket(
+                        entityId = item.entityId,
+                        uuid = item.uuid,
+                        entityType = SpawnEntityPacket.ITEM_ENTITY_TYPE,
+                        x = item.x,
+                        y = item.y,
+                        z = item.z,
+                        velocityX = item.velocityX,
+                        velocityY = item.velocityY,
+                        velocityZ = item.velocityZ,
+                    ).write(it)
+                }
+                sendPlayPacket(SetEntityDataPacket.ID) {
+                    SetEntityDataPacket(item.entityId, WireItemStack(protocolId, item.count)).write(it)
+                }
+            } else if (item.resting && settledItems.add(item.entityId)) {
+                // One correction when it stops, and nothing while it falls.
+                //
+                // A real client simulates a dropped item itself from the velocity the spawn packet
+                // carried, and it interpolates. Sending an absolute teleport every tick on top of
+                // that overrides its simulation twenty times a second with positions computed on a
+                // *different* 20 Hz loop than the one that produced them, so the two drift against
+                // each other and the item visibly stutters. Vanilla only syncs when something the
+                // client could not have predicted happens; this syncs the one thing that matters,
+                // where it came to rest.
+                sendPlayPacket(EntityTeleportPacket.ID) {
+                    EntityTeleportPacket(
+                        entityId = item.entityId,
+                        x = item.x,
+                        y = item.y,
+                        z = item.z,
+                        yaw = 0f,
+                        pitch = 0f,
+                        onGround = true,
+                    ).write(it)
+                }
             }
         }
+
+        val gone = trackedItems.filterNot { it in visible }
+        if (gone.isEmpty()) return
+        trackedItems.removeAll(gone.toSet())
+        settledItems.removeAll(gone.toSet())
+        sendPlayPacket(RemoveEntitiesPacket.ID) { RemoveEntitiesPacket(gone).write(it) }
     }
 
     /**
@@ -1145,6 +1250,8 @@ public class ClientSession(
         val session = playerSession ?: return
         if (session.gamemode == Gamemode.SPECTATOR) return
         for (candidate in world.nearbyItems(session.x, session.y, session.z, PICKUP_RADIUS)) {
+            // parity: a player's own toss cannot be picked straight back up (`ItemEntity.pickupDelay`).
+            if (!candidate.canBePickedUp) continue
             val removed = world.removeItem(candidate.entityId) ?: continue
             val leftover = session.inventory.add(StoredItemStack(removed.item.toString(), removed.count))
             val picked = removed.count - leftover
@@ -1155,8 +1262,9 @@ public class ClientSession(
             }
             sendInventoryAll()
             if (leftover > 0) {
-                // Only some of it fit: same entity, fewer items, still sitting where it was.
-                world.spawnItem(removed.copy(count = leftover))
+                // Only some of it fit: the same entity, fewer items, still sitting where it was.
+                removed.count = leftover
+                world.spawnItem(removed)
                 val protocolId = Items.REGISTRY.byIdentifier(removed.item)?.protocolId
                 if (protocolId != null) {
                     for (player in playersInSameWorld()) {
@@ -1165,13 +1273,9 @@ public class ClientSession(
                         }
                     }
                 }
-            } else {
-                for (player in playersInSameWorld()) {
-                    player.connection.sendPlayPacket(RemoveEntitiesPacket.ID) {
-                        RemoveEntitiesPacket(listOf(removed.entityId)).write(it)
-                    }
-                }
             }
+            // The pickup animation only: the entity itself is removed from every watcher's view by
+            // their own [syncItemEntities], since it is no longer in the world.
             for (player in playersInSameWorld()) {
                 player.connection.sendPlayPacket(ClientboundTakeItemEntityPacket.ID) {
                     ClientboundTakeItemEntityPacket(removed.entityId, session.entityId, picked).write(it)
@@ -1230,11 +1334,307 @@ public class ClientSession(
     }
 
     /**
+     * A click inside the player's own window: what actually lets someone rearrange their inventory.
+     *
+     * parity: `AbstractContainerMenu.doClick`, reduced to the modes that move items between slots.
+     * The server keeps its own cursor ([carriedItem]) rather than trusting the client's predicted
+     * one, so a desynchronised or hostile client cannot duplicate a stack by claiming to already
+     * hold it: the click is re-derived here and the result sent back as the authoritative window.
+     *
+     * Every mode `InventoryMenu` can produce is handled. What is **not** modelled is the 2x2
+     * crafting grid and its result slot: [PlayerInventory.storageSlotOf] answers `null` for those
+     * five, so a click on them changes nothing and the window goes straight back out. Nothing is
+     * lost that way, but nothing can be crafted either, and that stays true until recipes exist.
+     */
+    private fun handleContainerClick(packet: ServerboundContainerClickPacket) {
+        val session = playerSession ?: return
+        if (packet.containerId != ContainerSetContentPacket.PLAYER_INVENTORY) return sendInventory()
+
+        val inventory = session.inventory
+        when (packet.mode) {
+            ServerboundContainerClickPacket.Mode.PICKUP -> {
+                // Slot -999 is the click outside the window: whatever is on the cursor is thrown.
+                if (packet.slot == OUTSIDE_WINDOW_SLOT) {
+                    val carried = carriedItem ?: return sendInventory()
+                    val thrown = if (packet.button == RIGHT_BUTTON) 1 else carried.count
+                    dropStack(session, carried.copy(count = thrown))
+                    val left = carried.count - thrown
+                    carriedItem = if (left <= 0) null else carried.copy(count = left)
+                    return sendInventory()
+                }
+                val slot = PlayerInventory.storageSlotOf(packet.slot) ?: return sendInventory()
+                pickupClick(inventory, slot, half = packet.button == RIGHT_BUTTON)
+            }
+            ServerboundContainerClickPacket.Mode.SWAP -> {
+                // A number key: swap the clicked slot with that hotbar slot.
+                val slot = PlayerInventory.storageSlotOf(packet.slot) ?: return sendInventory()
+                if (packet.button !in 0 until PlayerInventory.HOTBAR_SIZE) return sendInventory()
+                inventory.swap(slot, PlayerInventory.HOTBAR_START + packet.button)
+            }
+            ServerboundContainerClickPacket.Mode.THROW -> {
+                val slot = PlayerInventory.storageSlotOf(packet.slot) ?: return sendInventory()
+                val stack = inventory[slot] ?: return sendInventory()
+                // Button 0 is `Q`, button 1 is ctrl+`Q`: one item or the whole stack.
+                val thrown = if (packet.button == 0) 1 else stack.count
+                dropStack(session, stack.copy(count = thrown))
+                val left = stack.count - thrown
+                inventory[slot] = if (left <= 0) null else stack.copy(count = left)
+            }
+            ServerboundContainerClickPacket.Mode.QUICK_MOVE -> {
+                val slot = PlayerInventory.storageSlotOf(packet.slot) ?: return sendInventory()
+                quickMove(inventory, slot)
+            }
+            ServerboundContainerClickPacket.Mode.QUICK_CRAFT -> {
+                // Mid-gesture stages answer with nothing: resending the window while the player is
+                // still dragging is what makes the drag snap back under their cursor.
+                if (!handleQuickCraft(session, inventory, packet)) return
+            }
+            ServerboundContainerClickPacket.Mode.CLONE -> {
+                // parity: creative's own middle-click, and only with an empty cursor.
+                if (session.gamemode != Gamemode.CREATIVE || carriedItem != null) return sendInventory()
+                val slot = PlayerInventory.storageSlotOf(packet.slot) ?: return sendInventory()
+                val stack = inventory[slot] ?: return sendInventory()
+                carriedItem = stack.copy(count = PlayerInventory.MAX_STACK)
+            }
+            ServerboundContainerClickPacket.Mode.PICKUP_ALL -> {
+                collectMatching(inventory, reversed = packet.button != 0)
+            }
+        }
+        sendInventory()
+    }
+
+    /**
+     * Double-click: sweeps matching stacks off the inventory and onto the cursor until it is full.
+     *
+     * parity: `AbstractContainerMenu.doClick`'s PICKUP_ALL branch, two passes and all. The first
+     * pass deliberately skips already-full stacks so the loose ones are consumed first, which is
+     * what makes double-clicking tidy an inventory up instead of just shuffling full stacks
+     * around; the second pass takes whatever is still needed.
+     */
+    private fun collectMatching(
+        inventory: PlayerInventory,
+        reversed: Boolean,
+    ) {
+        val carried = carriedItem ?: return
+        var total = carried.count
+        if (total >= PlayerInventory.MAX_STACK) return
+
+        val order = (0 until PlayerInventory.MAIN_SLOTS).let { if (reversed) it.reversed() else it.toList() }
+        for (pass in 0..1) {
+            for (slot in order) {
+                if (total >= PlayerInventory.MAX_STACK) break
+                val existing = inventory[slot] ?: continue
+                if (existing.id != carried.id || existing.components != carried.components) continue
+                if (pass == 0 && existing.count >= PlayerInventory.MAX_STACK) continue
+                val taken = minOf(PlayerInventory.MAX_STACK - total, existing.count)
+                total += taken
+                val left = existing.count - taken
+                inventory[slot] = if (left <= 0) null else existing.copy(count = left)
+            }
+        }
+        carriedItem = carried.copy(count = total)
+    }
+
+    /**
+     * The click-and-drag gesture, in its three stages. Returns whether the window should be sent
+     * back now: only the final stage changes anything, and answering the intermediate ones would
+     * fight the drag the player is still making.
+     *
+     * parity: `AbstractContainerMenu.doClick`'s QUICK_CRAFT branch, including its own bit layout
+     * (`getQuickcraftHeader` is `mask and 3`, `getQuickcraftType` is `mask shr 2 and 3`, which is
+     * the opposite way round from how it reads) and its `getQuickCraftPlaceCount` split: an even
+     * share per slot on a left drag, a single item on a right drag, a full stack on a middle one.
+     *
+     * This is the gesture the client actually sends for most "pick something up and put it
+     * somewhere" mouse movements, so ignoring it left the server holding a stack the player had
+     * already let go of, and every later click acted on that stale cursor.
+     */
+    private fun handleQuickCraft(
+        session: PlayerSession,
+        inventory: PlayerInventory,
+        packet: ServerboundContainerClickPacket,
+    ): Boolean {
+        val stage = packet.button and 3
+        val type = (packet.button shr 2) and 3
+        val carried = carriedItem
+
+        when {
+            stage == QUICK_CRAFT_START -> {
+                quickCraftType = type
+                quickCraftSlots.clear()
+                quickCraftActive = carried != null
+                return false
+            }
+            stage == QUICK_CRAFT_ADD && quickCraftActive -> {
+                val slot = PlayerInventory.storageSlotOf(packet.slot) ?: return false
+                val existing = inventory[slot]
+                val stackable =
+                    carried != null &&
+                        (existing == null || (existing.id == carried.id && existing.components == carried.components))
+                if (stackable) quickCraftSlots += slot
+                return false
+            }
+            stage == QUICK_CRAFT_END && quickCraftActive -> {
+                distributeQuickCraft(session, inventory)
+                quickCraftActive = false
+                quickCraftSlots.clear()
+                return true
+            }
+            else -> {
+                // Any other order is an interrupted gesture: forget it and resync.
+                quickCraftActive = false
+                quickCraftSlots.clear()
+                return true
+            }
+        }
+    }
+
+    /** Spreads the cursor stack over the slots the drag collected. See [handleQuickCraft]. */
+    private fun distributeQuickCraft(
+        session: PlayerSession,
+        inventory: PlayerInventory,
+    ) {
+        val carried = carriedItem ?: return
+        val targets = quickCraftSlots.toList()
+        if (targets.isEmpty()) return
+
+        // parity: a one-slot drag is just a click on that slot, cursor rules and all.
+        if (targets.size == 1) {
+            pickupClick(inventory, targets.single(), half = quickCraftType == QUICK_CRAFT_TYPE_RIGHT)
+            return
+        }
+
+        val perSlot =
+            when (quickCraftType) {
+                QUICK_CRAFT_TYPE_LEFT -> carried.count / targets.size
+                QUICK_CRAFT_TYPE_RIGHT -> 1
+                else -> PlayerInventory.MAX_STACK
+            }
+        if (perSlot <= 0) return
+
+        var remaining = carried.count
+        for (slot in targets) {
+            if (remaining <= 0) break
+            val existing = inventory[slot]
+            val already = existing?.count ?: 0
+            val give = minOf(perSlot, PlayerInventory.MAX_STACK - already, remaining)
+            if (give <= 0) continue
+            inventory[slot] = carried.copy(count = already + give)
+            remaining -= give
+        }
+        // A middle-button drag is creative's own "fill them all" and costs the player nothing.
+        carriedItem =
+            when {
+                quickCraftType == QUICK_CRAFT_TYPE_MIDDLE && session.gamemode == Gamemode.CREATIVE -> carried
+                remaining <= 0 -> null
+                else -> carried.copy(count = remaining)
+            }
+    }
+
+    /**
+     * Left/right click on a slot, against the cursor. parity: `AbstractContainerMenu.doClick`'s own
+     * PICKUP branch: an empty cursor takes the slot (half of it on a right click), a loaded cursor
+     * merges into a matching stack or swaps with a different one.
+     */
+    private fun pickupClick(
+        inventory: PlayerInventory,
+        slot: Int,
+        half: Boolean,
+    ) {
+        val inSlot = inventory[slot]
+        val carried = carriedItem
+        when {
+            carried == null -> {
+                if (inSlot == null) return
+                val taken = if (half) (inSlot.count + 1) / 2 else inSlot.count
+                carriedItem = inSlot.copy(count = taken)
+                val left = inSlot.count - taken
+                inventory[slot] = if (left <= 0) null else inSlot.copy(count = left)
+            }
+            inSlot == null -> {
+                val placed = if (half) 1 else carried.count
+                inventory[slot] = carried.copy(count = placed)
+                val left = carried.count - placed
+                carriedItem = if (left <= 0) null else carried.copy(count = left)
+            }
+            inSlot.id == carried.id && inSlot.components == carried.components -> {
+                val room = PlayerInventory.MAX_STACK - inSlot.count
+                if (room <= 0) return
+                val moved = if (half) minOf(1, room, carried.count) else minOf(room, carried.count)
+                inventory[slot] = inSlot.copy(count = inSlot.count + moved)
+                val left = carried.count - moved
+                carriedItem = if (left <= 0) null else carried.copy(count = left)
+            }
+            else -> {
+                // Two different items: they trade places, cursor for slot.
+                inventory[slot] = carried
+                carriedItem = inSlot
+            }
+        }
+    }
+
+    /**
+     * Shift-click. parity: `Inventory`'s own halves, so a stack in the hotbar goes up into the
+     * storage rows and one in the rows comes down to the hotbar, merging into matching stacks first.
+     */
+    private fun quickMove(
+        inventory: PlayerInventory,
+        slot: Int,
+    ) {
+        val stack = inventory[slot] ?: return
+        val toHotbar = slot < PlayerInventory.HOTBAR_START
+        val targets =
+            if (toHotbar) {
+                PlayerInventory.HOTBAR_START until PlayerInventory.MAIN_SLOTS
+            } else {
+                0 until PlayerInventory.HOTBAR_START
+            }
+
+        var remaining = stack.count
+        for (target in targets) {
+            if (remaining <= 0) break
+            val existing = inventory[target] ?: continue
+            if (existing.id != stack.id || existing.components != stack.components) continue
+            val room = PlayerInventory.MAX_STACK - existing.count
+            if (room <= 0) continue
+            val moved = minOf(room, remaining)
+            inventory[target] = existing.copy(count = existing.count + moved)
+            remaining -= moved
+        }
+        for (target in targets) {
+            if (remaining <= 0) break
+            if (inventory[target] != null) continue
+            inventory[target] = stack.copy(count = remaining)
+            remaining = 0
+        }
+        inventory[slot] = if (remaining <= 0) null else stack.copy(count = remaining)
+    }
+
+    /** Throws a stack into the world from this player, the same arc `Q` uses. */
+    private fun dropStack(
+        session: PlayerSession,
+        stack: StoredItemStack,
+    ) {
+        val yaw = session.yaw * PI / 180.0
+        val pitch = session.pitch * PI / 180.0
+        spawnDroppedItem(
+            item = Identifier.parse(stack.id),
+            count = stack.count,
+            x = session.x,
+            y = session.y + THROW_EYE_HEIGHT,
+            z = session.z,
+            velocityX = -sin(yaw) * cos(pitch) * THROW_SPEED,
+            velocityY = -sin(pitch) * THROW_SPEED + THROW_LIFT,
+            velocityZ = cos(yaw) * cos(pitch) * THROW_SPEED,
+        )
+    }
+
+    /**
      * Serverbound, id 0x38: creative-mode inventory editing. This is the *only* path a creative
      * client's dragged item takes: dragging from the creative menu into a slot, dragging a slot
      * into another slot, or dragging a slot out of the window entirely to discard it (which arrives
      * as [ServerboundSetCreativeModeSlotPacket.slot] `-1`) all go through this one packet, never
-     * through [CONTAINER_CLICK_ID]'s window-click. Without a handler here, a creative player's
+     * through the window-click packet. Without a handler here, a creative player's
      * inventory as the client renders it and as this server tracks it never agree: the client shows
      * whatever was dragged, the server still has whatever was there before, and every action that
      * reads the held item (placing, dropping) acts on the stale one.
@@ -1525,6 +1925,7 @@ public class ClientSession(
                 containerId = ContainerSetContentPacket.PLAYER_INVENTORY,
                 stateId = state,
                 items = session.inventory.toWire(),
+                carriedItem = carriedItem?.let(session.inventory::toWire),
             ).write(it)
         }
         sendCompressed(SetHeldSlotPacket.ID) { SetHeldSlotPacket(session.inventory.heldSlot).write(it) }
@@ -2015,14 +2416,32 @@ public class ClientSession(
         // parity: `DamageTypes.STARVE`'s message id, which the client renders as "<name> starved to death".
         const val DEATH_STARVE = "starve"
 
-        /** `ServerboundContainerClickPacket`, deliberately not decoded: see where it is handled. */
-        const val CONTAINER_CLICK_ID = 0x12
-
         /** How close (blocks) a player has to be to a dropped item to vacuum it up. Vanilla's own AABB-based range is close to this. */
         const val PICKUP_RADIUS = 1.5
 
-        /** How far a dropped item is allowed to snap downward looking for solid ground before it just stays where it broke. */
-        const val MAX_ITEM_FALL_BLOCKS = 32
+        /** The click target vanilla uses for "outside the window", which throws the cursor stack. */
+        const val OUTSIDE_WINDOW_SLOT = -999
+        const val RIGHT_BUTTON = 1
+
+        // parity: `AbstractContainerMenu`'s own quick-craft stages and drag types.
+        const val QUICK_CRAFT_START = 0
+        const val QUICK_CRAFT_ADD = 1
+        const val QUICK_CRAFT_END = 2
+        const val QUICK_CRAFT_TYPE_LEFT = 0
+        const val QUICK_CRAFT_TYPE_RIGHT = 1
+        const val QUICK_CRAFT_TYPE_MIDDLE = 2
+
+        // parity: `Player.drop`'s own throw, and the small pop a broken block's drop gets.
+        const val THROW_SPEED = 0.3
+        const val THROW_LIFT = 0.1
+        const val THROW_EYE_HEIGHT = 1.5
+        const val BREAK_DROP_LIFT = 0.2
+
+        /** A block's own drop is meant to be walked into immediately, unlike a deliberate toss. */
+        const val BREAK_DROP_PICKUP_DELAY = 10
+
+        /** How far a client is told about dropped items, squared. Well inside the view distance. */
+        const val ITEM_VIEW_RADIUS_SQUARED = 64.0 * 64.0
     }
 }
 
