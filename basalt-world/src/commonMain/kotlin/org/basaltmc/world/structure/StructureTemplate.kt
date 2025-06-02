@@ -128,6 +128,24 @@ public class StructureTemplate {
             )
         }
 
+    /** // parity: TemplateStructurePiece's transformed DATA-mode structure-block markers. */
+    public fun dataMarkers(
+        position: StructurePos,
+        rotation: StructureRotation,
+        mirror: StructureMirror,
+        pivot: StructurePos,
+    ): List<StructureDataMarker> =
+        blocksBacking.mapNotNull { blockInfo ->
+            val block = Blocks.byStateId(blockInfo.stateId)?.block ?: return@mapNotNull null
+            if (block.path != "structure_block") return@mapNotNull null
+            val nbt = blockInfo.blockEntityNbt ?: return@mapNotNull null
+            if (nbt.getString("mode").uppercase() != "DATA") return@mapNotNull null
+            StructureDataMarker(
+                StructureTransform.transform(blockInfo.pos, mirror, rotation, pivot) + position,
+                nbt.getString("metadata"),
+            )
+        }
+
     public fun getBoundingBox(
         position: StructurePos,
         rotation: StructureRotation,
@@ -348,4 +366,10 @@ public data class PlacedJigsaw(
     val finalStateName: String,
     val placementPriority: Int,
     val selectionPriority: Int,
+)
+
+/** A transformed structure-block DATA marker consumed by a template structure piece callback. */
+public data class StructureDataMarker(
+    val pos: StructurePos,
+    val metadata: String,
 )

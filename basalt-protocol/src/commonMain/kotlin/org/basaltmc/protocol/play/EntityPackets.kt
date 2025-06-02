@@ -86,7 +86,7 @@ private fun packDegrees(value: Float): Byte = floor(value * 256f / 360f).toInt()
 private fun unpackDegrees(value: Byte): Float = value * 360f / 256f
 
 /**
- * Clientbound, id 0x01: spawns a non-living entity (this build only ever spawns dropped items).
+ * Clientbound, id 0x01: spawns an entity.
  * Mirrors `ClientboundAddEntityPacket`. [entityType] is the numeric protocol id of the entity's
  * type (verified against the real 26.2 registries; `minecraft:item` is 71, the only one this build
  * sends). [objectData] carries type-specific extra data (a thrown potion's item id, a falling
@@ -206,6 +206,9 @@ public data class SetEntityDataPacket(
         /** `ItemEntity.DATA_ITEM`: `Entity` claims 0-7, so the item's own entry lands here. */
         public const val ITEM_STACK_INDEX: Int = 8
 
+        /** `ItemFrame.DATA_ITEM`: Entity 0-7, HangingEntity direction 8, then the frame item. */
+        public const val ITEM_FRAME_STACK_INDEX: Int = 9
+
         /**
          * `Avatar.DATA_PLAYER_MODE_CUSTOMISATION`, the bitmask of which skin layers to draw.
          * Entity 0-7, LivingEntity 8-14, Avatar 15-16.
@@ -221,6 +224,12 @@ public data class SetEntityDataPacket(
             entityId: Int,
             stack: WireItemStack?,
         ): SetEntityDataPacket = SetEntityDataPacket(entityId, listOf(Entry.Item(ITEM_STACK_INDEX, stack)))
+
+        /** The Elytra or other item displayed by an item frame. */
+        public fun itemFrame(
+            entityId: Int,
+            stack: WireItemStack?,
+        ): SetEntityDataPacket = SetEntityDataPacket(entityId, listOf(Entry.Item(ITEM_FRAME_STACK_INDEX, stack)))
 
         /** Which skin layers a player has switched on, straight from their own client settings. */
         public fun skinParts(

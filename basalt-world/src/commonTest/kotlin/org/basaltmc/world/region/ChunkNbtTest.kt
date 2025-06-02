@@ -8,6 +8,7 @@ import org.basaltmc.registry.Blocks
 import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.ChunkBlockEntity
+import org.basaltmc.world.ChunkGeneratedEntity
 import org.basaltmc.world.ChunkHeight
 import org.basaltmc.world.ChunkScheduledTick
 import org.basaltmc.world.WorldHeight
@@ -223,6 +224,32 @@ class ChunkNbtTest {
         val read = ChunkNbt.read(tag)
         assertEquals(listOf(blockTick), read.scheduledBlockTicks())
         assertEquals(listOf(fluidTick), read.scheduledFluidTicks())
+    }
+
+    @Test
+    fun generatedEntityDescriptorsRoundTripUntilRuntimeMaterialization() {
+        val chunk = Chunk(2, -3)
+        val data = NbtCompound().apply { putString("item", "minecraft:elytra") }
+        val frame =
+            ChunkGeneratedEntity(
+                Identifier.vanilla("item_frame"),
+                40.03125,
+                81.5,
+                -38.5,
+                270.0f,
+                0.0f,
+                data,
+            )
+        chunk.addGeneratedEntity(frame)
+
+        val tag = ChunkNbt.write(chunk)
+        val written = tag.getList("basalt_generated_entities")!!.single() as NbtCompound
+        assertEquals("minecraft:item_frame", written.getString("id"))
+        assertEquals(3, written.getList("Pos")!!.size)
+
+        val read = ChunkNbt.read(tag)
+        assertEquals(listOf(frame), read.generatedEntities())
+        assertEquals(data, read.generatedEntities().single().data)
     }
 
     private fun stateId(path: String): Int =

@@ -150,6 +150,7 @@ import org.basaltmc.world.crafting.CraftingInput
 import kotlin.concurrent.AtomicInt
 import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.sin
 import kotlin.random.Random
 import kotlin.time.ExperimentalTime
@@ -286,6 +287,9 @@ public class ClientSession(
     /** Which dropped items this client has been told about. See [syncItemEntities]. */
     private val trackedItems = HashSet<Int>()
 
+    /** Static entities emitted by world generation that this client has been told about. */
+    private val trackedGeneratedEntities = HashSet<Int>()
+
     /** Which of those have already had their final resting position sent. */
     private val settledItems = HashSet<Int>()
 
@@ -332,6 +336,7 @@ public class ClientSession(
                         }
                         timings.of("player.tick").time { tickPlayer() }
                         timings.of("player.items").time { syncItemEntities() }
+                        timings.of("player.generated_entities").time { syncGeneratedEntities() }
                         timings.of("player.ui").time { tickUi() }
                         sendKeepAliveIfDue()
                     }
@@ -1379,6 +1384,57 @@ public class ClientSession(
         settledItems.removeAll(gone.toSet())
         sendPlayPacket(RemoveEntitiesPacket.ID) { RemoveEntitiesPacket(gone).write(it) }
     }
+
+    /** Spawns immutable End crystals, shulkers and Elytra frames emitted by loaded generated chunks. */
+    private fun syncGeneratedEntities() {
+        val session = playerSession ?: return
+        val registry = playerRegistry ?: return
+        val visible = HashSet<Int>()
+        for (entity in world.generatedEntities(registry::allocateEntityId)) {
+            val descriptor = entity.descriptor
+            val dx = descriptor.x - session.x
+            val dz = descriptor.z - session.z
+            if (dx * dx + dz * dz > GENERATED_ENTITY_VIEW_RADIUS_SQUARED) continue
+            val typeId = GENERATED_ENTITY_TYPE_IDS[descriptor.type.path] ?: continue
+            visible += entity.entityId
+            if (!trackedGeneratedEntities.add(entity.entityId)) continue
+            val isFrame = descriptor.type.path == "item_frame"
+            sendPlayPacket(SpawnEntityPacket.ID) {
+                SpawnEntityPacket(
+                    entityId = entity.entityId,
+                    uuid = entity.uuid,
+                    entityType = typeId,
+                    x = if (isFrame) floor(descriptor.x) else descriptor.x,
+                    y = if (isFrame) floor(descriptor.y) else descriptor.y,
+                    z = if (isFrame) floor(descriptor.z) else descriptor.z,
+                    pitch = descriptor.pitch,
+                    yaw = descriptor.yaw,
+                    headYaw = descriptor.yaw,
+                    objectData = if (isFrame) frameDirectionData(descriptor.data.getString("facing")) else 0,
+                ).write(it)
+            }
+            if (isFrame && descriptor.data.getString("item") == "minecraft:elytra") {
+                val elytra = Items.REGISTRY.byIdentifier(Identifier.vanilla("elytra")) ?: continue
+                sendPlayPacket(SetEntityDataPacket.ID) {
+                    SetEntityDataPacket.itemFrame(entity.entityId, WireItemStack(elytra.protocolId, 1)).write(it)
+                }
+            }
+        }
+
+        val gone = trackedGeneratedEntities.filterNot { it in visible }
+        if (gone.isEmpty()) return
+        trackedGeneratedEntities.removeAll(gone.toSet())
+        sendPlayPacket(RemoveEntitiesPacket.ID) { RemoveEntitiesPacket(gone).write(it) }
+    }
+
+    private fun frameDirectionData(facing: String): Int =
+        when (facing) {
+            "north" -> 2
+            "south" -> 3
+            "west" -> 4
+            "east" -> 5
+            else -> 3
+        }
 
     /**
      * Whatever [WorldState.DroppedItem]s are close enough to this player right now, added to their
@@ -2792,6 +2848,16 @@ public class ClientSession(
 
         /** How far a client is told about dropped items, squared. Well inside the view distance. */
         const val ITEM_VIEW_RADIUS_SQUARED = 64.0 * 64.0
+
+        /** All generated End entity types use vanilla's 10-chunk client tracking range. */
+        const val GENERATED_ENTITY_VIEW_RADIUS_SQUARED = 160.0 * 160.0
+
+        val GENERATED_ENTITY_TYPE_IDS =
+            mapOf(
+                "end_crystal" to 45,
+                "item_frame" to 73,
+                "shulker" to 112,
+            )
     }
 }
 

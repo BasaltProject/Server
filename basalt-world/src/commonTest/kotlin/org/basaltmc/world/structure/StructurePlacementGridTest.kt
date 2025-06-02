@@ -12,6 +12,23 @@ import kotlin.test.assertTrue
  */
 class StructurePlacementGridTest {
     private val villages = StructurePlacementGrid(spacing = 34, separation = 8, salt = 10387312)
+
+    @Test
+    fun triangularEndCityGridMatchesOfficial26_2Vectors() {
+        val endCities =
+            StructurePlacementGrid(
+                spacing = 20,
+                separation = 11,
+                salt = 10387313,
+                spreadType = StructurePlacementGrid.SpreadType.TRIANGULAR,
+            )
+
+        assertEquals(3 to 4, endCities.candidateChunk(0L, 0, 0))
+        assertEquals(27 to 3, endCities.candidateChunk(0L, 20, 0))
+        assertEquals(-18 to -17, endCities.candidateChunk(0L, -1, -1))
+        assertEquals(-18 to 47, endCities.candidateChunk(42L, -20, 40))
+    }
+
     private val seed = 8392034097L
 
     @Test

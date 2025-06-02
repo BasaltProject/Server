@@ -11,6 +11,9 @@ import org.basaltmc.world.densityfunction.DensityFunction
 import org.basaltmc.world.densityfunction.Marker
 import org.basaltmc.world.terrain.carver.NetherCaveCarver
 import org.basaltmc.world.terrain.decoration.end.EndRawDecoration
+import org.basaltmc.world.terrain.decoration.end.EndSurfaceStructuresDecoration
+import org.basaltmc.world.terrain.decoration.end.EndTopLayerDecoration
+import org.basaltmc.world.terrain.decoration.end.EndVegetalDecoration
 import org.basaltmc.world.terrain.decoration.nether.NetherLocalDecoration
 import org.basaltmc.world.terrain.decoration.nether.NetherSurfaceStructuresDecoration
 import org.basaltmc.world.terrain.decoration.nether.NetherUndergroundDecoration
@@ -72,6 +75,7 @@ public object DimensionTerrainGenerator {
         chunkX: Int,
         chunkZ: Int,
         seed: Long = 0L,
+        structureGenerator: EndCityStructureGenerator? = null,
     ): Chunk =
         generate(
             finalDensity = router.finalDensity,
@@ -85,7 +89,13 @@ public object DimensionTerrainGenerator {
             fluidLevel = 0,
             chunkX = chunkX,
             chunkZ = chunkZ,
-            decorationPass = { chunk -> EndRawDecoration.decorate(chunk, seed, biomeSource) },
+            structurePass = { chunk -> structureGenerator?.generateInto(chunk, seed) },
+            decorationPass = { chunk ->
+                EndRawDecoration.decorate(chunk, seed, biomeSource)
+                EndSurfaceStructuresDecoration.decorate(chunk, seed, router, biomeSource)
+                EndVegetalDecoration.decorate(chunk, seed, router, biomeSource)
+                EndTopLayerDecoration.decorate(chunk, biomeSource)
+            },
         ) { blockX, blockY, blockZ, _ -> biomeSource.biomeAtQuart(blockX shr 2, blockY shr 2, blockZ shr 2) }
 
     private fun generate(
