@@ -13,17 +13,13 @@ import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
 import kotlin.concurrent.Volatile
 
 /**
- * The real [SurfaceRuleEnvironment]: real noise parameters from the downloaded [serverJar] (via
- * [RealNoiseParameters], already built for the density router), the real per-world [random], and
- * [router]'s own `finalDensity` for [estimatedSurfaceHeight] (see that method's own KDoc for why
- * scanning the real density function directly, not reading an already-filled chunk, is the right
- * substitute here). [biomeAt] resolves the real vanilla biome via [OverworldBiomeSource] (the real
- * climate transitioner, [org.basaltmc.world.climate.OverworldBiomeBuilder]), not a fixed biome.
+ * The real [SurfaceRuleEnvironment]: noise parameters from the downloaded [serverJar], the
+ * per-world [random], [router]'s `finalDensity` for [estimatedSurfaceHeight], and [biomeAt]
+ * through [OverworldBiomeSource] rather than a fixed biome.
  *
- * **Documented gap**: [isSteep] always reports `false` (real vanilla clamps its neighbor lookup to
- * the specific chunk under construction, which a single reusable environment object spanning every
- * chunk has no notion of); [RealTerrainGenerator][org.basaltmc.world.terrain.RealTerrainGenerator]
- * wraps this environment with a chunk-scoped one that does implement it correctly.
+ * [isSteep] always reports `false` here, since vanilla clamps its neighbour lookup to the chunk
+ * under construction and this object spans every chunk. `RealTerrainGenerator` wraps it in a
+ * chunk-scoped environment that implements it.
  */
 public class RealSurfaceEnvironment(
     serverJar: ServerJarAssets,
@@ -71,16 +67,12 @@ public class RealSurfaceEnvironment(
     ): Double = noises.get(noiseId).getValue(x.toDouble(), y.toDouble(), z.toDouble())
 
     /**
-     * The factory per name is built once, not per block.
+     * One factory per name, not per block: surface rules ask for nearly every block near the
+     * surface, and each call concatenated a string, MD5'd it and built two generators for something
+     * that depends only on [name]. A profile put a tenth of a session's allocation on this line.
      *
-     * Surface rules ask for this for essentially every block near the surface, and each call used
-     * to concatenate a string, MD5 it, and build two generators, all to arrive at something that
-     * depends only on [name] and on a handful of fixed names at that. A profile put a tenth of a
-     * whole session's allocation in this one line.
-     *
-     * Copy-on-write, because a single environment is shared by every generation worker: readers
-     * see a fully built immutable map or the previous one, and never a map mid-update. Two threads
-     * racing to add the same name both derive the same factory, so whichever lands is equivalent.
+     * Copy-on-write, since every generation worker shares one environment: a reader sees a fully
+     * built map or the previous one. Racing threads derive the same factory anyway.
      */
     override fun verticalGradientRandom(
         name: String,

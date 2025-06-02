@@ -6,17 +6,12 @@ import org.basaltmc.nbt.NbtList
 import org.basaltmc.nbt.NbtType
 
 /**
- * Turns an inventory into the blob that goes in the database, and back.
+ * Turns an inventory into the blob that goes in the database, and back. NBT rather than JSON for
+ * the reason vanilla uses it: item data is nested and typed, and JSON either loses every number's
+ * type or reinvents NBT. Uncompressed, so `sqlite3` can still show it when something goes wrong.
  *
- * NBT rather than JSON, for the same reason vanilla uses it: item data is arbitrarily nested and
- * typed, and JSON would mean either losing the type of every number or reinventing NBT inside JSON
- * without gaining any readability worth the size. Nothing here is compressed: the blob is small,
- * SQLite already stores it as one value, and a compressed blob cannot be inspected with `sqlite3`
- * when something goes wrong.
- *
- * [FORMAT_VERSION] is written into every blob. It exists so a future change to the item model can
- * be detected rather than misread: a blob from a version this build does not understand is
- * refused, which is preferable to loading someone's inventory as garbage.
+ * [FORMAT_VERSION] rides in every blob so a later change to the item model is detected rather than
+ * misread: an unknown version is refused instead of loading someone's inventory as garbage.
  */
 public object InventoryNbt {
     public const val FORMAT_VERSION: Int = 1

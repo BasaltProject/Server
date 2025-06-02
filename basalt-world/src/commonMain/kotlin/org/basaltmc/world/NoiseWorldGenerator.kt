@@ -7,43 +7,13 @@ import org.basaltmc.world.densityfunction.FunctionContext
 import org.basaltmc.world.noise.NormalNoise
 
 /**
- * A real, noise-driven terrain generator: **not vanilla parity yet**, an explicit, deliberate
- * stepping stone (requested directly, to get a player seeing shaped terrain and chunks actually
- * saved to disk before the real pipeline exists) rather than an accidental shortcut.
+ * A noise-driven stepping stone, deliberately **not vanilla parity**: solid where
+ * `base3dNoise + depthTerm` is positive, with vanilla's own [BlendedNoise] Overworld constants.
  *
- * Shape follows vanilla's own structure (`NoiseRouterData.overworld`, decompiled): a solid/air
- * decision from `density = base3dNoise + depthTerm`, positive meaning solid. [base3d] is
- * vanilla's own [BlendedNoise] with vanilla's own real Overworld constants
- * (`NoiseRouterData.BASE_3D_NOISE_OVERWORLD`'s `0.25, 0.125, 80.0, 160.0, 8.0`); `depthTerm` biases
- * toward solid below a 2D height field and air above it, the same shape as vanilla's own
- * `offsetToDepth`/`noiseGradientDensity`.
- *
- * **Explicit non-parity gaps, all deliberate, all pending the real pipeline:**
- * - [heightNoise] uses this project's own octave/amplitude choice for 2D height variation, not
- *   vanilla's real `continentalness`/`erosion`/`weirdness` parameters or `TerrainProvider`'s
- *   splines: those parameters are Mojang datapack content, not committed here (§7), and the
- *   splines themselves are not implemented yet either.
- * - No caves, no ore veins, no aquifers.
- * - No per-biome surface rules: the dirt/grass/stone layering is a fixed depth, not decided by
- *   biome, climate, or slope the way vanilla's `SurfaceSystem` does it.
- * - The seed is fixed, not read from `basalt.toml` or per-world state.
- * - [base3d] is only sampled every [CELL_HEIGHT] blocks and held constant across each cell,
- *   instead of vanilla's real interpolated-cell noise sampling (the `Interpolated` marker/
- *   `NoiseSettings.cellHeight` in real vanilla): sampling every single block was measured at
- *   several seconds per chunk (`BlendedNoise.compute` runs 24 octave evaluations per call), too
- *   slow for a player to actually connect to. [base3d]'s contribution is a small perturbation on
- *   top of the (smooth, cheap) `depthTerm`, so a coarser vertical resolution is not very visible.
- * - [base3d] is skipped entirely once `depthTerm` alone is decisive (further from the surface
- *   than [SKIP_THRESHOLD] divided by [DENSITY_SLOPE]): [base3d]'s real output stays well under
- *   that bound in practice, so this only skips columns of blocks that were always going to be
- *   solid stone or always air regardless, not a behavior change, just not paying for noise no
- *   sign flip could reach. Most of a 384-tall column is far from the surface, so this is the
- *   difference between a chunk being viable to send to a player and not.
- * - Trees ([placeTrees]) are a per-chunk hash of chunk coordinates, not vanilla's real per-chunk
- *   feature/decoration seed (`ChunkGenerator`'s own formula, not decompiled for this stepping
- *   stone) or its real tree population/placement logic (density, species, shape all vanilla's
- *   own, biome-dependent). A canopy that would cross into a neighboring chunk is just skipped
- *   rather than placed there, real vanilla generates decorations across chunk borders freely.
+ * Gaps: this project's own 2D height field rather than the real climate parameters and splines,
+ * no caves, ores or aquifers, fixed-depth surface layers, a fixed seed, and trees hashed per
+ * chunk. [base3d] is sampled per cell and skipped where `depthTerm` alone already decides the
+ * sign: per-block sampling measured several seconds per chunk.
  */
 public object NoiseWorldGenerator {
     private const val SEED = 0L

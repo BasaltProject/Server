@@ -14,17 +14,12 @@ import org.basaltmc.world.crafting.RecipeParseException
 import org.basaltmc.world.loot.ItemStack
 
 /**
- * Every crafting-table recipe the operator's own `server.jar` carries, read once at startup.
+ * Every crafting-table recipe the operator's own `server.jar` carries, read once at startup, like
+ * [RealLootTables] and [RealNoiseParameters]: datapack content is never committed here.
  *
- * Same arrangement as [RealLootTables] and [RealNoiseParameters], and for the same reason: recipes
- * are Mojang's datapack content, never committed here, so they are read from the download the
- * operator already has and has already had verified by SHA-1 (see [ServerJarAssets]).
- *
- * Item tags are loaded first because ingredients reference them (`#minecraft:planks`) and
- * [RecipeJson] flattens a tag into its members at parse time rather than looking it up on every
- * match. Recipes this build has no model for (smelting, stonecutting, smithing, and the special
- * hard-coded ones) are skipped rather than failing the load: they are a documented gap, and a
- * server that refused to start because it cannot craft a firework would be a worse answer.
+ * Item tags load first, because ingredients reference them and [RecipeJson] flattens a tag at
+ * parse time. Recipe types this build has no model for are skipped rather than failing the load:
+ * refusing to start over an uncraftable firework would be the worse answer.
  */
 public class RealRecipes(
     serverJar: ServerJarAssets?,

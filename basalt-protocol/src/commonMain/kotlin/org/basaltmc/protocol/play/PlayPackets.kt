@@ -631,21 +631,15 @@ public data class PlayerInfoEntry(
 )
 
 /**
- * Clientbound, id 0x46: adds or updates entries in the tab list. Mirrors
- * `ClientboundPlayerInfoUpdatePacket`.
+ * Clientbound, id 0x46: adds or updates tab list entries. Mirrors `ClientboundPlayerInfoUpdatePacket`.
+ * Carries a set of [Action]s and, per entry, the fields those actions call for, in the enum's
+ * order: the set is a bitset over that enum, so the ordinals below are protocol.
  *
- * The packet carries a set of [Action]s and, per entry, exactly the fields those actions call for,
- * written in the enum's own order. The set itself is a fixed-size bitset over that enum, so the
- * ordinals below are protocol, not bookkeeping.
+ * [Action.UPDATE_GAME_MODE] is not cosmetic: a client reads its own tab-list entry to decide it is
+ * a spectator, so the `game_event` alone switches the HUD while the player still collides.
  *
- * [Action.UPDATE_GAME_MODE] is not cosmetic, which is the trap here: a client decides whether *it*
- * is a spectator by reading its own tab-list entry, not from the `game_event` that changes the game
- * mode. Send the event alone and the HUD switches to spectator while the player still collides with
- * the world, because as far as the client is concerned only the HUD changed.
- *
- * Not every action is implemented: [Action.INITIALIZE_CHAT], [Action.UPDATE_DISPLAY_NAME],
- * [Action.UPDATE_LIST_ORDER] and [Action.UPDATE_HAT] are declared here because their positions
- * define the bitset, but writing one throws rather than guessing a value.
+ * [Action.INITIALIZE_CHAT], [Action.UPDATE_DISPLAY_NAME], [Action.UPDATE_LIST_ORDER] and
+ * [Action.UPDATE_HAT] exist to hold their bitset positions; writing one throws.
  */
 @OptIn(ExperimentalUuidApi::class)
 public data class PlayerInfoUpdatePacket(

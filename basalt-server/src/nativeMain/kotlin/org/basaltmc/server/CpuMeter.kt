@@ -6,20 +6,13 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.TimeSource
 
 /**
- * How much CPU this process is using, as a percentage of one core.
+ * CPU usage as a percentage of one core, `top`'s convention: eight busy workers read as roughly
+ * 800, which is the figure an operator can check against their own machine.
  *
- * Of one core, which is the same convention `top` uses and means the number goes above 100 whenever
- * more than one thread is busy: eight generation workers flat out read as roughly 800. That is the
- * figure an operator can check against their own machine, which is worth more than a tidier one
- * they would have to convert.
- *
- * A percentage only exists between two readings, so this keeps the last one and reports the average
- * over the gap. Read from every connection thread at once, hence the compare-and-set: two threads
- * sampling at the same moment must not both subtract from a half-updated baseline and report
- * nonsense.
- *
- * Nothing is resampled more often than [MINIMUM_WINDOW_MILLIS], both because a shorter window is
- * mostly noise and because the answer is asked for once per player per refresh.
+ * The percentage only exists between two readings, so the last one is kept and the average over
+ * the gap reported. Every connection thread reads this, hence the compare-and-set: two samples at
+ * once must not both subtract from a half-updated baseline. [MINIMUM_WINDOW_MILLIS] bounds how
+ * often it resamples, since a shorter window is mostly noise.
  */
 @OptIn(ExperimentalTime::class)
 public class CpuMeter {

@@ -6,22 +6,14 @@ import dev.whyoleg.cryptography.algorithms.AES
 import dev.whyoleg.cryptography.operations.Cipher
 
 /**
- * AES-128/CFB8, stateful across calls to [update] so it can encrypt or decrypt a socket's byte
- * stream as it arrives in arbitrary-sized chunks, exactly like the `CipherInputStream`/
- * `CipherOutputStream` vanilla wraps its channel in after the login key exchange.
+ * // parity: net.minecraft.util.Crypt.getCipher, `AES/CFB8/NoPadding` with the key reused as IV.
+ * Stateful across [update] calls, because the keystream is continuous for the whole connection in
+ * each direction, which `cryptography-kotlin`'s whole-message `AES.CFB8` cannot express.
  *
- * // parity: `net.minecraft.util.Crypt.getCipher`, `Cipher.getInstance("AES/CFB8/NoPadding")`
- * with the AES key's own bytes reused as the IV. `cryptography-kotlin`'s `AES.CFB8` only exposes
- * whole-message operations (a fresh random IV per call), which doesn't match this: CFB8 here is a
- * single continuous keystream for the entire connection lifetime, in each direction
- * independently. So this drives the block cipher itself, one call per byte, exactly as CFB8 is
- * defined (NIST SP 800-38A 6.3): encrypt the 16-byte shift register, XOR its first byte with the
- * input byte, then shift the *ciphertext* byte into the register, for both directions. This is
- * inherently one AES-128 block operation per byte; matching vanilla's own well-known CFB8 cost,
- * not a Basalt-specific inefficiency.
- *
- * Verified against real `javax.crypto.Cipher("AES/CFB8/NoPadding")` output, including chunked
- * calls with odd boundaries, to prove the streaming state is bit-exact (see [Cfb8CipherTest]).
+ * So this drives the block cipher directly, per NIST SP 800-38A 6.3: encrypt the shift register,
+ * XOR its first byte with the input, shift the ciphertext byte in. One AES block per byte is what
+ * CFB8 costs vanilla too. [Cfb8CipherTest] checks it against real `javax.crypto` output, chunked
+ * at odd boundaries.
  */
 @OptIn(DelicateCryptographyApi::class)
 public class Cfb8Cipher private constructor(

@@ -4,18 +4,12 @@ import org.basaltmc.random.LegacyRandom
 import org.basaltmc.random.WorldgenRandom
 
 /**
- * // parity: net.minecraft.world.level.levelgen.structure.placement.RandomSpreadStructurePlacement,
- * the `linear` [spreadType] case only (the only one the real `villages.json` uses; `triangular`,
- * used by strongholds and a couple of others, is not ported). Splits the world into a
- * [spacing]-wide grid of chunk cells; each cell has exactly one candidate chunk, chosen
- * pseudorandomly within a [separation]-margined inner square so candidates from adjacent cells
- * never land closer together than [separation] chunks.
+ * // parity: RandomSpreadStructurePlacement, the `linear` [spreadType] only, which is what
+ * `villages.json` uses; `triangular` is not ported. One candidate chunk per [spacing]-wide cell,
+ * drawn inside a [separation]-margined square so neighbouring candidates stay that far apart.
  *
- * The per-cell random is a fresh [WorldgenRandom] wrapping a [LegacyRandom] (real
- * `RandomSpreadStructurePlacement.getPotentialStructureChunk` constructs
- * `new WorldgenRandom(new LegacyRandomSource(0L))` every call, not a Xoroshiro source like
- * decoration: confirmed from the decompiled method body), reseeded with the real
- * `setLargeFeatureWithSalt` formula.
+ * The per-cell random is a fresh [WorldgenRandom] over [LegacyRandom], not the xoroshiro source
+ * decoration uses, reseeded with `setLargeFeatureWithSalt`.
  */
 public class StructurePlacementGrid(
     public val spacing: Int,

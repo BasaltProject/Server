@@ -19,18 +19,9 @@ import platform.posix.WSAStartup
 import platform.posix.closesocket
 
 /**
- * Winsock, unlike POSIX sockets, requires `WSAStartup` before any other socket call. Called
- * unconditionally on every [TcpListener.bind]/[TcpConnection.connect] rather than guarded behind
- * an initialize-once flag: `WSAStartup` is refcounted by the OS and safe to call repeatedly, and
- * there is nowhere in this codebase yet that runs at process shutdown to pair it with
- * `WSACleanup`.
- *
- * Requests Winsock version 2.2: `0x0202`, i.e. the raw value of the `MAKEWORD(2, 2)` macro (macros
- * aren't callable from Kotlin via cinterop, only real declarations are, so this is computed by
- * hand instead of referencing the macro).
- *
- * Confirmed on real Windows CI: `WSAStartup`/`WSADATA`/`closesocket` do live under `platform.posix`
- * on the mingw target, alongside the rest of the Winsock-flavored socket API.
+ * Winsock needs `WSAStartup` before any other socket call. Called on every bind and connect rather
+ * than guarded by a flag: the OS refcounts it, and nothing here runs at shutdown to pair it with
+ * `WSACleanup`. `0x0202` is `MAKEWORD(2, 2)` by hand, since cinterop does not expose macros.
  */
 internal actual fun ensureSocketsInitialized() {
     memScoped {

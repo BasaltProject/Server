@@ -17,44 +17,15 @@ import org.basaltmc.world.terrain.surface.SurfaceRuleData
 import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
 
 /**
- * Fills a [Chunk]'s solid/air shape from a real [OverworldNoiseRouter]'s `finalDensity`, sampled
- * through [DensityChunkSampler] (real vanilla's own cell-interpolation scheme, not per-block
- * evaluation, which earlier this project's own `BlendedNoise` work found to be too slow to be
- * viable), then runs the real [SurfaceRuleData.overworld] rule tree over it via [SurfaceBuilder]
- * (grass/dirt/gravel/deepslate/bedrock, real per-biome rules, not a fixed-depth stand-in). One
- * [OverworldNoiseRouter] should be built once per world (it is expensive to construct: dozens of
- * nested [org.basaltmc.world.densityfunction.DensityFunction] nodes) and reused across every chunk.
+ * Chunk shape from an [OverworldNoiseRouter]'s `finalDensity` through [DensityChunkSampler], then
+ * surface rules, structures and [BiomeDecoration], in that order.
+ * // parity: ChunkGenerator.applyBiomeDecoration, whose decoration seed is the plain world seed.
  *
- * [environment] is wrapped with the chunk's own just-computed heightmap for
- * [SurfaceRuleEnvironment.estimatedSurfaceHeight]/[SurfaceRuleEnvironment.isSteep]: both only need
- * this one already-generated chunk's own shape (real vanilla's own equivalents are chunk-scoped
- * too, not global), and a cheap array lookup here instead of [environment] re-scanning the density
- * function from scratch matters a lot: measured at roughly 80x more density evaluations per chunk
- * than [DensityChunkSampler]'s own cell grid needs, an easy trap to fall back into after already
- * solving it once for the base terrain shape.
+ * Build the router once per world: it is dozens of nested nodes. [environment] gets the chunk's
+ * heightmap so surface rules read an array instead of re-sampling density, 80x fewer evaluations.
  *
- * Real vanilla places structures during their own generation step, before decoration features run
- * (so decoration naturally skips whatever blocks a structure already placed): when
- * [villageGenerator] is given, [VillageStructureGenerator.generateInto] runs right after surface
- * rules and before decoration, matching that order.
- *
- * After structures, [BiomeDecoration.forBiome] dispatches to whichever biome the chunk's own
- * center column resolves to (real vanilla decorates per chunk-section biome too, see
- * [BiomeDecoration]'s own KDoc for the simplification this project makes there), seeded with the
- * real `WorldgenRandom.setDecorationSeed([seed], chunkX * 16, chunkZ * 16)` formula, over the real
- * `WorldgenRandom`-wrapping-`XoroshiroRandomSource` combination `ChunkGenerator
- * .applyBiomeDecoration` itself uses (confirmed from its own decompiled body: the `seed` argument
- * there is the plain world seed, not a separately derived per-region seed).
- *
- * **Documented gaps, matching this project's own established scope for this pass:**
- * - No caves/local aquifers/ore veins: [OverworldNoiseRouter.finalDensity] itself already omits
- *   them (see its own KDoc). The global fluid picker's sea-level water is modeled.
- * - [BiomeDecoration] itself has its own documented per-biome gaps (see its own KDoc): only some
- *   biomes have real decoration ported so far, the rest fall back to no vegetal decoration at all
- *   (still strictly more correct than running another biome's decoration list on them).
- * - [villageGenerator] itself has its own documented gaps (see [VillageStructureGenerator]'s own
- *   KDoc): no terrain adaptation (buildings don't get their surrounding dirt "beard" carved to
- *   meet uneven ground), no block-state rotation on directional blocks, no entities.
+ * Gaps: no caves, aquifers or ore veins; decoration only for the biomes ported so far; villages
+ * without terrain adaptation, block rotation or entities.
  */
 public object RealTerrainGenerator {
     private const val CELL_WIDTH = 4
@@ -171,19 +142,13 @@ public object RealTerrainGenerator {
 }
 
 /**
- * // parity: how net.minecraft.world.level.levelgen.SurfaceRules.Context.SteepMaterialCondition
- * clamps its neighbor lookup to the chunk under construction (`Math.max(chunkBlockZ - 1, 0)` etc,
- * never crossing into a neighboring chunk).
+ * // parity: SurfaceRules.Context.SteepMaterialCondition clamps its neighbour lookup to the chunk
+ * under construction rather than crossing into the next one.
  *
- * [biomeAt] also memoizes here, by quart (4-block) position: real vanilla's own `isBiome` check
- * re-samples the biome independently every time it is reached (there can be dozens in one
- * [SurfaceRuleData.overworld] sequence, all for the same block position), and [delegate]'s own
- * `biomeAt` is a real climate lookup (a brute-force scan over thousands of registered regions, see
- * [OverworldBiomeSource]'s own KDoc), not a cheap field read. This cache is safe as a plain
- * `MutableMap` specifically because one [ChunkScopedSurfaceEnvironment] is only ever used by the
- * single thread generating this one chunk, then discarded: no cross-thread sharing, unlike
- * [OverworldBiomeSource] itself (see its own KDoc for why a shared cache there was a real, measured
- * regression: unbounded copy-on-write growth turned a ~1s startup into 45s).
+ * [biomeAt] memoizes by quart position, because vanilla's `isBiome` re-samples for every check in
+ * a rule sequence and [delegate]'s lookup is a scan over thousands of climate regions. A plain
+ * `MutableMap` is safe here only because one instance serves one chunk on one thread and is then
+ * discarded, unlike the shared [OverworldBiomeSource].
  */
 private class ChunkScopedSurfaceEnvironment(
     private val delegate: SurfaceRuleEnvironment,

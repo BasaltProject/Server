@@ -4,29 +4,14 @@ import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.FileIO
 
 /**
- * The real `data/minecraft/...` datapack entries the official server ships, plus its language
- * files, unpacked into [dataRoot] once and read as plain files from then on.
+ * The official server's `data/minecraft/...` entries and its language files, unpacked into
+ * [dataRoot] once and read as plain files from then on. The archive is deleted right after:
+ * keeping it meant re-inflating a much larger download on every boot for a few megabytes.
+ * [source] is a lambda so a warm install never resolves it, let alone contacts the network.
  *
- * The download is unpacked exactly once, and the archive it came from is deleted immediately
- * afterwards: what Basalt needs is a few megabytes of JSON and NBT out of a download several times
- * that size, and keeping the archive around meant re-reading and re-inflating all of it on every
- * boot just to reach them. [source] is a lambda, not a path, so a warm install never even resolves
- * where the download would come from, let alone contacts the network.
- *
- * Files land directly under [dataRoot] with the vanilla `data/minecraft/` prefix stripped
- * (`worldgen/noise/continentalness.json`, not `data/data/minecraft/worldgen/...`), while callers
- * keep using the full vanilla entry names. Anything outside the `minecraft` namespace keeps its
- * full path, so a non-vanilla namespace could not collide with a vanilla one.
- *
- * The language files under `assets/minecraft/lang/` come out too, keeping their full path. They are
- * the only `assets/` entries taken, and they are taken because the server console has to resolve
- * the same translation keys it sends to clients (see [LangAssets]): a client translates
- * `commands.gamemode.success.self` for itself, a log file cannot.
- *
- * This class only ever reads entries already present in the official download: it has no embedded
- * values of its own, matching [org.basaltmc.registry.tags.TagFileJson]/`NoiseParametersJson`'s own
- * pattern for real datapack content elsewhere in this project. Unpacked files live in the same
- * gitignored cache and are never redistributed.
+ * Vanilla entries lose the `data/minecraft/` prefix while callers keep the full names; other
+ * namespaces keep their path and cannot collide. `assets/minecraft/lang/` comes out too, since the
+ * console resolves the same translation keys it sends clients (see [LangAssets]).
  */
 public class ServerJarAssets(
     versionId: String,

@@ -16,18 +16,12 @@ import org.basaltmc.world.terrain.surface.SurfaceRules.yBlockCheck
 import org.basaltmc.world.terrain.surface.SurfaceRules.yStartCheck
 
 /**
- * // parity: net.minecraft.data.worldgen.SurfaceRuleData (Java source in the real jar's own
- * `data.worldgen` package, the same category of algorithm-as-code this project already commits
- * for [org.basaltmc.world.terrain.TerrainProvider]). Ported the *entire* real `overworldLike`
- * tree, not a Plains-only shortcut: Plains itself is never named anywhere in it (confirmed against
- * the real jar), it just falls through every other biome's `isBiome(...)` checks to the shared
- * generic defaults (grass on floor, dirt under it, gravel/stone underwater, a deepslate blend near
- * Y 0-8, bedrock at the world's own floor/ceiling with its usual random-edged gradient). Every
- * branch other biomes need is still real, ported code, ready for when this project's own biome
- * scope grows past Plains.
+ * // parity: net.minecraft.data.worldgen.SurfaceRuleData, the whole `overworldLike` tree rather
+ * than a Plains-only shortcut. Plains is never named in it: it falls through every other biome's
+ * `isBiome` check to the generic defaults, so the other branches have to be there to reach them.
  *
- * Not ported: [SurfaceRules.temperature] always reports false (real per-biome snow logic isn't
- * modeled). Badlands clay bands are supplied by the real surface environment.
+ * Not ported: [SurfaceRules.temperature] always reports false, so per-biome snow is missing.
+ * Badlands clay bands come from the surface environment.
  */
 public object SurfaceRuleData {
     private fun state(name: String): RuleSource {

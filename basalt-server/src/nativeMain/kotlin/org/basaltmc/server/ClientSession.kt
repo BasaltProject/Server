@@ -161,27 +161,12 @@ import org.basaltmc.world.loot.ItemStack as LootItemStack
 /**
  * Drives one client connection through Handshake, (Status | Login), Configuration and Play.
  *
- * Login is offline-mode when [onlineMode] is `null` (no key exchange, [LoginFinishedPacket]
- * follows [LoginStartPacket] directly), and online-mode otherwise: [HelloPacket] and [KeyPacket]
- * negotiate an AES-128/CFB8 shared secret (verified against real `javax.crypto` output, see
- * `Cfb8CipherTest`), after which every packet in both directions, starting with
- * [LoginCompressionPacket] itself, flows through that cipher.
+ * Login is offline-mode when [onlineMode] is `null`; otherwise [HelloPacket]/[KeyPacket] negotiate
+ * an AES-128/CFB8 secret and everything from [LoginCompressionPacket] on is enciphered.
  *
- * Configuration sends an empty known-pack list (Basalt has no datapacks yet), then the
- * `dimension_type`/`worldgen/biome` registries [VanillaRegistryData] hand-authors, then
- * [FinishConfigurationPacket]. Play sends the chunks around spawn first, then streams new ones in
- * (generating them on demand through [world]) and forgets old ones as the player crosses chunk
- * boundaries ([chunkTracker], the same square view area [SetChunkCacheRadiusPacket] already
- * declares, just re-centered instead of fixed at the spawn position), and wires movement/chat
- * through [playerRegistry] so other connected players see them. Breaking a block
- * ([handlePlayerAction]) and placing one ([handleUseItemOn]) both follow the player's game mode and
- * broadcast through [WorldState]'s single lock; a survival break also rolls [lootTables] and spawns
- * whatever it drops, which [tryPickupNearbyItems] (driven from this connection's own outbound loop,
- * like [tickPlayer]) later picks back up.
- *
- * Play also owns this player's survival state: [tickPlayer] runs hunger and regeneration on this
- * connection's own thread, slash commands go through [commands], and death and respawn are handled
- * here because both are packet sequences, not world state.
+ * Play streams chunks through [chunkTracker] and wires movement, chat, breaking and placing
+ * through [playerRegistry] and [WorldState]'s lock. This connection's thread also runs
+ * [tickPlayer], [tryPickupNearbyItems], commands, death and respawn.
  */
 @OptIn(ExperimentalUuidApi::class)
 public class ClientSession(
@@ -656,19 +641,13 @@ public class ClientSession(
         for (emptyRegistryId in EMPTY_SYNCHRONIZED_REGISTRIES) {
             sendCompressed(RegistryDataPacket.ID) { RegistryDataPacket(emptyRegistryId, emptyList()).write(it) }
         }
-        // Item/entity/block bootstrap looks up many tags by key directly (fire resistance,
-        // repairable materials, horse armor, banner patterns...), independent of whether the tagged
-        // registry itself is loaded: confirmed live, a real client failed looking up
-        // minecraft:damage_type's is_fire tag with no `tags` packet sent at all. Sending every tag
-        // name the real 26.2 jar ships (see VanillaTagData), each with empty entries: the lookup
-        // only needs the key to exist, not be populated yet.
+        // Client bootstrap looks tags up by key whether or not the tagged registry is loaded: a
+        // real client failed on damage_type's is_fire with no `tags` packet sent at all. So every
+        // tag name the 26.2 jar ships goes out (see VanillaTagData), existing being enough there.
         //
-        // Members matter, and not only for correctness of anything server-side: a client evaluates
-        // its *own* tool rules against these. `Tool.getMiningSpeed` asks whether the block is in
-        // `minecraft:mineable/pickaxe`, and with the tag empty the answer is always no, no rule
-        // matches, and every tool mines at bare-hand speed. That is what made a stone pickaxe on
-        // stone take as long as a fist. Where real members are known they are sent; the rest keep
-        // the empty-but-present shape that unblocks the lookups above.
+        // Members matter separately: the client evaluates its own tool rules against them, and an
+        // empty `mineable/pickaxe` means no rule matches and every tool mines at bare-hand speed.
+        // Known members are sent, the rest keep the empty-but-present shape.
         sendCompressed(TagsPacket.ID) {
             TagsPacket(
                 VanillaTagData.tagsByRegistry.map { (registryId, tagNames) ->
@@ -1151,15 +1130,12 @@ public class ClientSession(
     /**
      * Breaking a block, on whichever packet the player's game mode breaks on.
      *
-     * parity: `ServerPlayerGameMode`. Creative destroys on `START_DESTROY_BLOCK` with no timing at
-     * all; survival times the dig client-side and only then sends `STOP_DESTROY_BLOCK`. Matching
-     * that split is what keeps the client's own prediction in step: a creative client expects the
-     * block gone immediately, a survival one expects it to survive until it finishes digging.
+     * // parity: ServerPlayerGameMode. Creative destroys on `START_DESTROY_BLOCK`, survival times
+     * the dig client-side and sends `STOP_DESTROY_BLOCK`; matching that split is what keeps the
+     * client's prediction in step. Adventure and spectator break nothing, as in vanilla.
      *
-     * The gap is that survival's timing is *trusted* rather than verified. Vanilla re-derives the
-     * dig time from block hardness and the held tool and rejects a client that finishes too early;
-     * that needs hardness data and an inventory, neither of which exists yet. Adventure and
-     * spectator cannot break anything, which they already could not in vanilla.
+     * Survival's timing is trusted rather than re-derived from hardness and tool, so a client that
+     * finishes early is believed.
      */
     private fun handlePlayerAction(action: ServerboundPlayerActionPacket) {
         when (action.action) {
@@ -1339,16 +1315,13 @@ public class ClientSession(
     }
 
     /**
-     * Brings this client's view of the world's dropped items up to date: spawns the ones that came
-     * into range, moves the ones still falling, and forgets the ones that were picked up, despawned
-     * or went out of range.
+     * Brings this client's view of the dropped items up to date: spawns what came into range, moves
+     * what is still falling, forgets what was picked up, despawned or left.
      *
-     * Runs on this connection's own outbound loop, like everything else that writes to this socket.
-     * [WorldState.tickItems] does the physics once for the whole world on the tick thread; this only
-     * reports it, so an item moves at the same speed no matter how many players are watching.
-     *
-     * A settled item stops generating movement packets ([WorldState.DroppedItem.resting]), which is
-     * what keeps a floor covered in drops from costing anything to look at.
+     * Physics happen once for the world in [WorldState.tickItems]; this only reports them, so an
+     * item falls at the same speed however many players watch. A settled item
+     * ([WorldState.DroppedItem.resting]) stops generating packets, which is what makes a floor
+     * covered in drops free to look at.
      */
     private fun syncItemEntities() {
         val session = playerSession ?: return
@@ -1650,17 +1623,14 @@ public class ClientSession(
     }
 
     /**
-     * A click inside the player's own window: what actually lets someone rearrange their inventory.
+     * A click inside the player's own window.
      *
-     * parity: `AbstractContainerMenu.doClick`, reduced to the modes that move items between slots.
-     * The server keeps its own cursor ([carriedItem]) rather than trusting the client's predicted
-     * one, so a desynchronised or hostile client cannot duplicate a stack by claiming to already
-     * hold it: the click is re-derived here and the result sent back as the authoritative window.
+     * // parity: AbstractContainerMenu.doClick, reduced to the modes that move items between slots.
+     * The cursor is the server's ([carriedItem]), not the client's predicted one, so claiming to
+     * hold a stack cannot duplicate it: the click is re-derived and the window sent back.
      *
-     * Every mode `InventoryMenu` can produce is handled. What is **not** modelled is the 2x2
-     * crafting grid and its result slot: [PlayerInventory.storageSlotOf] answers `null` for those
-     * five, so a click on them changes nothing and the window goes straight back out. Nothing is
-     * lost that way, but nothing can be crafted either, and that stays true until recipes exist.
+     * The 2x2 crafting grid and its result slot are not modelled: [PlayerInventory.storageSlotOf]
+     * answers `null` there, so those clicks change nothing.
      */
     private fun handleContainerClick(packet: ServerboundContainerClickPacket) {
         val session = playerSession ?: return
@@ -1775,18 +1745,14 @@ public class ClientSession(
     }
 
     /**
-     * The click-and-drag gesture, in its three stages. Returns whether the window should be sent
-     * back now: only the final stage changes anything, and answering the intermediate ones would
-     * fight the drag the player is still making.
+     * The click-and-drag gesture, in its three stages. Returns whether to send the window back:
+     * only the last stage changes anything, and answering the others fights the drag in progress.
      *
-     * parity: `AbstractContainerMenu.doClick`'s QUICK_CRAFT branch, including its own bit layout
-     * (`getQuickcraftHeader` is `mask and 3`, `getQuickcraftType` is `mask shr 2 and 3`, which is
-     * the opposite way round from how it reads) and its `getQuickCraftPlaceCount` split: an even
-     * share per slot on a left drag, a single item on a right drag, a full stack on a middle one.
-     *
-     * This is the gesture the client actually sends for most "pick something up and put it
-     * somewhere" mouse movements, so ignoring it left the server holding a stack the player had
-     * already let go of, and every later click acted on that stale cursor.
+     * // parity: AbstractContainerMenu.doClick's QUICK_CRAFT branch, bit layout included
+     * (`getQuickcraftHeader` is `mask and 3`, `getQuickcraftType` is `mask shr 2 and 3`, the
+     * opposite way round from how it reads), and its even share, single item or full stack split.
+     * The client sends this for most drag-and-drop, so ignoring it left every later click acting
+     * on a cursor the player had let go of.
      */
     private fun handleQuickCraft(
         session: PlayerSession,
@@ -1989,20 +1955,14 @@ public class ClientSession(
     }
 
     /**
-     * Serverbound, id 0x38: creative-mode inventory editing. This is the *only* path a creative
-     * client's dragged item takes: dragging from the creative menu into a slot, dragging a slot
-     * into another slot, or dragging a slot out of the window entirely to discard it (which arrives
-     * as [ServerboundSetCreativeModeSlotPacket.slot] `-1`) all go through this one packet, never
-     * through the window-click packet. Without a handler here, a creative player's
-     * inventory as the client renders it and as this server tracks it never agree: the client shows
-     * whatever was dragged, the server still has whatever was there before, and every action that
-     * reads the held item (placing, dropping) acts on the stale one.
+     * Serverbound, id 0x38: creative inventory editing, and the only path a creative client's
+     * dragged item takes, including discarding it as slot `-1`. Never the window-click packet, so
+     * without this the server keeps tracking the stack the player dragged away and every place or
+     * drop acts on it.
      *
-     * Ignored outside creative, matching vanilla (`ServerPlayerGameMode.handleCreativeModeItemAdd`
-     * refuses it there too, since the packet exists purely for the creative menu). A stack the
-     * client sends with non-empty data components (an enchanted or named item, for instance) fails
-     * [WireItemStack.read] and costs the connection, the same documented boundary as everywhere
-     * else this build reads a stack off the wire.
+     * Ignored outside creative, as `ServerPlayerGameMode.handleCreativeModeItemAdd` does. A stack
+     * carrying data components fails [WireItemStack.read] and costs the connection, the same
+     * boundary as anywhere else a stack is read off the wire.
      */
     private fun handleSetCreativeModeSlot(packet: ServerboundSetCreativeModeSlotPacket) {
         val session = playerSession ?: return
@@ -2203,17 +2163,13 @@ public class ClientSession(
     }
 
     /**
-     * Sends whichever requested chunks have finished generating, nearest first, and leaves the rest
-     * pending. Never blocks on generation.
+     * Sends whichever requested chunks have finished generating, nearest first, leaving the rest
+     * pending and never blocking on generation.
      *
-     * Driven from [TickLoop] rather than only from this connection's own read loop: a server that
-     * only pushed chunks when the client happened to send something would stall the moment a client
-     * went quiet, and "the client keeps sending position packets" is not a guarantee worth resting
-     * chunk delivery on. The read loop calls it too, so a client that is streaming input gets its
-     * chunks at input rate rather than waiting for the next tick.
-     *
-     * Capped per call so one flush cannot monopolize the socket while the client is also waiting on
-     * movement and entity updates.
+     * Driven from [TickLoop] as well as this connection's read loop: pushing only when the client
+     * sends something stalls the moment it goes quiet, and calling it from both means a client
+     * streaming input gets chunks at input rate. Capped per call so one flush cannot monopolize
+     * the socket.
      */
     internal fun flushReadyChunks(limit: Int = MAX_BURST_CHUNKS.toInt()): Int {
         if (state != ProtocolState.PLAY) return 0

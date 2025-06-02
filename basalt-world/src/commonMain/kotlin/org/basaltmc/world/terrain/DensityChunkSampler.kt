@@ -6,22 +6,14 @@ import org.basaltmc.world.densityfunction.DensityFunction
 import org.basaltmc.world.densityfunction.FunctionContext
 
 /**
- * // parity: net.minecraft.world.level.levelgen.NoiseChunk (the per-chunk cell-interpolation
- * scheme only, not its incremental slope-tracking optimization, which produces the exact same
- * numeric result faster; not needed for correctness, only for shaving further off this class's
- * own already-real speedup). Real vanilla never evaluates a density function tree per block: it
- * samples [density] only at the corners of a coarse 3D cell grid ([cellWidth] blocks apart
- * horizontally, [cellHeight] apart vertically, both confirmed from the real 26.2
- * `NoiseSettings.OVERWORLD_NOISE_SETTINGS`) and trilinearly interpolates every block inside a
- * cell from its 8 corners. This is not an approximation of some "true" per-block density: the
- * interpolated grid *is* what vanilla actually generates, so this class's output is exact, not a
- * performance shortcut with a fidelity cost, unlike the coarse sampling
- * [org.basaltmc.world.NoiseWorldGenerator] used before real parity work started on this.
+ * // parity: net.minecraft.world.level.levelgen.NoiseChunk, its cell-interpolation scheme without
+ * the incremental slope tracking, which is the same numbers faster. Vanilla never evaluates a
+ * density tree per block: it samples [density] at the corners of a [cellWidth] by [cellHeight]
+ * grid and trilinearly interpolates the rest, so that grid *is* the terrain and this output is
+ * exact, not an approximation.
  *
- * One instance samples exactly one chunk column range: [minY]..[minY] + [height] - 1, in world
- * coordinates `chunkX * 16 + localX` / `chunkZ * 16 + localZ`. [cellWidth] must evenly divide 16
- * and [cellHeight] must evenly divide [height]; both hold for the real Overworld settings
- * (`cellWidth = 4`, `cellHeight = 8`, `height = 384`).
+ * One instance covers one chunk column, [minY] up to [minY] + [height] - 1. [cellWidth] must
+ * divide 16 and [cellHeight] must divide [height], as the Overworld settings do (4, 8, 384).
  */
 public class DensityChunkSampler(
     private val density: DensityFunction,

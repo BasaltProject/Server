@@ -15,28 +15,15 @@ import kotlin.concurrent.AtomicReference
 import kotlin.math.abs
 
 /**
- * Places real village structures during chunk generation, picking the real variant (plains,
- * desert, savanna, snowy or taiga) per candidate position from the biome there, exactly like the
- * shared `villages` structure set does in real vanilla (see [selectVariantStartPool]).
- * // parity, narrowed:
- * `ChunkGenerator.createStructure`/`WorldGenRegion`'s own structure-starts-then-references
- * pipeline caches a structure's assembled pieces once (in the placement chunk's own saved data)
- * and has every overlapping chunk *reference* that cache when placing blocks. This project's
- * chunks generate statelessly with no such shared cache, so instead: [generateInto] recomputes
- * the deterministic [JigsawAssembly] for every nearby candidate placement chunk (same seed, same
- * grid cell, same result every time), then keeps only the pieces landing inside [chunkX]/[chunkZ].
- * [assemblyCache] avoids literally redoing that assembly for every one of the (typically dozens
- * of) nearby chunks a single village reaches: measured at ~735ms for one real Plains village's
- * ~45 pieces, an easy multi-minute blowup across a spawn-sized chunk sweep without it.
+ * Places villages during chunk generation, choosing the variant from the biome at each candidate
+ * position like vanilla's shared `villages` structure set (see [selectVariantStartPool]).
  *
- * The assembly's own random is **not** vanilla's real per-structure seed (that formula was not
- * decompiled for this pass): reseeded with the same `setLargeFeatureWithSalt` formula the
- * placement grid itself uses, over a fresh [LegacyRandom] source, a documented gap. Placement
- * (which still needs a random for processor rules like `mossify_20_percent`) uses its own
- * per-piece reseed rather than continuing the assembly random forward, since [assemblyCache]
- * means a cached assembly has no single "current" random state to continue from: real vanilla's
- * own placement draws are a continuation of the very same stream assembly used, so this is a
- * second, separate documented gap on top of the seed formula itself.
+ * // parity, narrowed: vanilla caches the assembled pieces in the placement chunk's saved data.
+ * Chunks here are stateless, so [generateInto] recomputes the [JigsawAssembly] per nearby candidate
+ * and keeps what lands in this one; [assemblyCache] makes that affordable, one measuring ~735ms.
+ *
+ * The randomness has two gaps: the assembly reseeds with `setLargeFeatureWithSalt` rather than
+ * vanilla's per-structure seed, and placement reseeds per piece.
  */
 public class VillageStructureGenerator(
     private val router: OverworldNoiseRouter,
@@ -172,28 +159,14 @@ public class VillageStructureGenerator(
     }
 
     /**
-     * **A real bug found and fixed after real gameplay reproduced a CPU-pegged hang**: this
-     * originally called [OverworldNoiseRouter.finalDensity]`.compute` directly in a raw per-`y`
-     * loop, exactly the "evaluate the whole density function tree per block" anti-pattern this
-     * project's own [DensityChunkSampler] KDoc already documents as too slow to be viable (the
-     * same mistake this project's surface-rule height estimation made once before and fixed by
-     * switching to the chunk's own already-computed heightmap; this function can't reuse a
-     * chunk's heightmap since the position it needs isn't always in the chunk currently
-     * generating). A stress test reproduced this taking so long (worse yet, run from several
-     * concurrent chunk-generation threads at once, per [org.basaltmc.server.world.WorldState]'s
-     * own KDoc) that it looked indistinguishable from a true hang. Fixed the same way real vanilla
-     * itself never evaluates density per-block: build a [DensityChunkSampler] for the column's own
-     * chunk (real vanilla's own cell-interpolated grid, not an approximation, see that class's own
-     * KDoc) and scan through it instead.
+     * Scans a [DensityChunkSampler] rather than calling `finalDensity.compute` per `y`, which is
+     * the per-block evaluation [DensityChunkSampler]'s own KDoc rules out, and which hung the
+     * generator here. The chunk's heightmap is not an option: the column is often outside the
+     * chunk being generated.
      *
-     * That alone still wasn't enough: real Plains village pools turn out to have 36 real
-     * `terrain_matching` entries (verified against every real `village/plains` pool json, not just
-     * `town_centers`, which happens to be all `rigid`), each one calling this function once per
-     * attempted connection during [JigsawAssembly.assemble]'s own search, not once per assembly.
-     * [samplerCache] reuses one [DensityChunkSampler] (and so its one already-built interpolation
-     * grid) across every call that lands in the same chunk, instead of rebuilding that grid from
-     * scratch on every single call: the actual fix that got the reproduction stress test from
-     * "never finishes" to completing cleanly.
+     * [samplerCache] keeps one sampler per chunk across calls: the Plains pools have 36
+     * `terrain_matching` entries, each asking once per attempted connection, not once per
+     * assembly, so rebuilding the interpolation grid every time is what made it never finish.
      */
     private fun surfaceHeightAt(
         x: Int,

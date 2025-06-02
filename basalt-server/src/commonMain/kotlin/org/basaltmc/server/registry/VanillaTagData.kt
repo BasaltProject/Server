@@ -1,20 +1,14 @@
 package org.basaltmc.server.registry
 
 /**
- * Every tag name vanilla 26.2 ships (every file under `data/minecraft/tags/` in the real server
- * jar), grouped by the registry it tags. Names only, no entries: a `getOrThrow(TagKey)` lookup during item/entity/
- * block bootstrap throws if the tag key itself is unknown to the client, regardless of whether it
- * has any members, so an empty-entries tag is enough to unblock Configuration. Populating real
- * members per tag is a documented gap for a later phase.
+ * Every tag name vanilla 26.2 ships, grouped by the registry it tags. Names only: the client's
+ * bootstrap lookup throws on an unknown tag key whether or not it has members, so empty tags
+ * unblock Configuration. Real members per tag are a documented gap.
  *
- * Only registries the client actually tracks are included: the ones `BuiltInRegistries` bakes in
- * client-side regardless of server data (`block`, `item`, `entity_type`, `fluid`, `game_event`,
- * `point_of_interest_type`, `potion`, `painting_variant`, `instrument`), plus every registry in
- * `RegistryDataLoader.SYNCHRONIZED_REGISTRIES` (`ClientSession` sends an entry, even if empty, for
- * all of those). Registries outside both sets (`villager_trade`, `worldgen/structure`,
- * `worldgen/configured_feature`, `worldgen/flat_level_generator_preset`, `worldgen/world_preset`)
- * don't exist in the client's `RegistryAccess` at all: confirmed live, sending tags for
- * `worldgen/world_preset` crashed with `Missing registry` before any tag lookup even ran.
+ * Only registries the client tracks are here, meaning the `BuiltInRegistries` ones plus
+ * `RegistryDataLoader.SYNCHRONIZED_REGISTRIES`. Anything else is absent from the client's
+ * `RegistryAccess`: sending tags for `worldgen/world_preset` crashed it with `Missing registry`
+ * before any tag lookup ran.
  */
 public object VanillaTagData {
     public val tagsByRegistry: Map<String, List<String>> =

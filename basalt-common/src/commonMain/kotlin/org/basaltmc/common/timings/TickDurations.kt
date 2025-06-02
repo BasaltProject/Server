@@ -17,16 +17,12 @@ public data class DurationSummary(
 }
 
 /**
- * How long each tick took, kept for the last few minutes.
+ * How long each tick took, for the last few minutes. TPS is a rate and hides this: a server pinned
+ * at 20 TPS with one tick in fifty taking 80ms stutters. Hence min/median/95th/max rather than an
+ * average, which the very outliers being looked for drag around.
  *
- * The number that matters, and the one a bare TPS reading hides: a server pinned at 20 TPS with one
- * tick in fifty taking 80ms is stuttering, and its TPS says everything is fine. Ticks per second is
- * a rate; this is the distribution, which is why the summary is min/median/95th/max rather than an
- * average. An average of tick durations is dragged around by exactly the outliers being looked for.
- *
- * Written only by the tick thread and read by whoever runs the command, on a fixed-size ring with no
- * lock: a reader that catches a sample mid-write gets one wrong figure out of thousands, and paying
- * for a lock on every tick to prevent that would be measuring the measurement.
+ * A fixed-size ring with no lock, written by the tick thread: a reader catching a sample mid-write
+ * gets one wrong figure in thousands, and locking every tick would be measuring the measurement.
  */
 public class TickDurations(
     private val capacity: Int = DEFAULT_CAPACITY,

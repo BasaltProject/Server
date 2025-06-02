@@ -11,34 +11,15 @@ public data class PlacedStructurePiece(
 )
 
 /**
- * // parity: net.minecraft.world.level.levelgen.structure.pools.JigsawPlacement, the BFS jigsaw
- * assembly algorithm read in full from the decompiled `Placer.tryPlacingChildren`.
+ * // parity: net.minecraft.world.level.levelgen.structure.pools.JigsawPlacement, BFS assembly as
+ * in `Placer.tryPlacingChildren`, including jigsaw orientation, joint types and both priorities.
  *
- * Collision tracks the same nested free-space contexts as vanilla. JigsawPlacement only creates
- * and subtracts axis-aligned piece AABBs, then asks whether a deflated candidate AABB remains in
- * that space. Inclusive integer boxes plus a list of subtracted boxes are equivalent for that
- * query, including concave gaps and connectors which attach inside their source piece. Jigsaw
- * front/top orientation, aligned-vs-rollable joints, selection-priority sorting and the
- * placement-priority queue are also modeled. The expansion hack used by some village pools is
- * still outside this class; Bastion explicitly disables that path.
+ * Free space is inclusive integer boxes minus the placed ones, equivalent to vanilla's AABB
+ * subtraction for the only query it makes. [maxDistanceFromCenter] is checked before collision, as
+ * vanilla does: without it an assembly sprawls to `maxDepth` and hangs the generator.
  *
- * Every real Plains village pool element uses `projection: rigid`, so the `sourceRigid &&
- * targetRigid` path (a plain Y delta, no heightmap query) is what actually runs in practice; the
- * `terrain_matching` path (calling [heightAt]) is wired for completeness but effectively untested
- * against real data.
- *
- * **A real bug found and fixed after real gameplay reproduced a CPU-pegged hang**: this class
- * originally had no equivalent of real vanilla's own outer bound on the jigsaw "free space"
- * (`JigsawPlacement.addPieces`'s own `AABB` capped to `maxDistanceFromCenter`, which the free
- * region a candidate piece must fit *entirely* inside is intersected against before anything else
- * runs). Without it, nothing stopped a chain of connections from sprawling outward indefinitely
- * (bounded by [assemble]'s own `maxDepth`, but real pools branch widely enough that "bounded by
- * depth" was still large: a stress test across a wide scattered chunk area reliably produced
- * assemblies with piece counts far past what a real village ever has, and since collision
- * checking is `O(n)` per candidate against every already-placed piece, an `O(n)`-piece runaway
- * assembly is `O(n^2)` overall). [maxDistanceFromCenter] is now enforced exactly where real
- * vanilla enforces it: a candidate is rejected unless its bounding box lies entirely within the
- * square centered on the start piece, independent of (and checked before) the collision test.
+ * The pool expansion hack is absent, and Bastion disables it anyway. Plains pools are all `rigid`,
+ * so the `terrain_matching` path through [heightAt] is untested against real data.
  */
 public class JigsawAssembly(
     private val poolLookup: (String) -> StructureTemplatePool?,

@@ -14,19 +14,12 @@ import org.basaltmc.world.structure.TemplateLoader
 import org.basaltmc.world.structure.VillagePoolJson
 
 /**
- * Resolves structure pool/piece names (`"minecraft:village/plains/town_centers"`,
- * `"minecraft:bastion/starts"`) the way vanilla's `StructureTemplateManager`/registry lookups do:
- * read the real
- * `data/minecraft/worldgen/template_pool/<path>.json` and gzipped
- * `data/minecraft/structure/<path>.nbt` entries straight from the operator's own downloaded
- * [serverJar] (never embedded in this repo, see [ServerJarAssets]'s own KDoc), the same source
- * [RealNoiseParameters] already reads real worldgen data from. Results are cached: a jigsaw
- * assembly run references the same pool many times over (once per attempted connection). Chunks
- * (and so village assemblies) now generate on more than one thread at once
- * ([WorldState][org.basaltmc.server.world.WorldState]'s own KDoc explains why), so every cache
- * here is guarded the same way: read the jar/parse outside the lock (that work can take real
- * time and must not block every other in-flight lookup), then insert under a brief lock,
- * discarding a duplicate if another thread already won the race for the same key.
+ * Resolves structure pool and piece names the way vanilla's `StructureTemplateManager` does, from
+ * the operator's own downloaded [serverJar] (never embedded here, see [ServerJarAssets]).
+ *
+ * Results are cached, since one jigsaw assembly asks for the same pool once per attempted
+ * connection. Assemblies run on several threads, so each cache parses outside the lock and inserts
+ * under a brief one, discarding a duplicate if another thread won the same key.
  */
 public class VillageDataLoader(
     private val serverJar: ServerJarAssets,

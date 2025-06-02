@@ -5,17 +5,13 @@ import org.basaltmc.nbt.NbtList
 import org.basaltmc.nbt.NbtType
 
 /**
- * Every real biome definition exactly as a vanilla 26.2 server syncs it in the
- * `minecraft:worldgen/biome` registry during Configuration, built from the real jar's own
- * `data/minecraft/worldgen/biome/` JSON files (only the fields the real `Biome.NETWORK_CODEC` carries:
- * climate settings, the environment attribute map and the special effects; spawners/features/
- * carvers are server-side only and never synced). Entry order matches [org.basaltmc.registry.Biomes]
- * (the real `BiomeData.bootstrap` order): the registry's numeric id of each entry is its index
- * here, which is what a chunk's biome palette then references.
+ * Every biome as a 26.2 server syncs it during Configuration: only what `Biome.NETWORK_CODEC`
+ * carries, since spawners, features and carvers stay server-side. Entry order matches
+ * [org.basaltmc.registry.Biomes], because each entry's index is the id a chunk's biome palette
+ * references.
  *
- * Color attributes and effect colors serialize as `#rrggbb` strings, the real
- * `ExtraCodecs.STRING_RGB_COLOR`'s own serialized form (it also decodes plain ints, which is why
- * the earlier int-encoded `plainsBiome` worked, but a vanilla server sends the string form).
+ * Colors serialize as `#rrggbb`, which is what `ExtraCodecs.STRING_RGB_COLOR` writes; it also
+ * decodes plain ints, which is why the earlier int-encoded form worked anyway.
  */
 public object VanillaBiomes {
     /** One environment attribute value, in the shapes the real biome data actually uses. */

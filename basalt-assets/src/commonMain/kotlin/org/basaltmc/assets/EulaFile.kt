@@ -6,25 +6,14 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 /**
- * The EULA acceptance mechanism: no prompts, no TTY detection, works identically interactive,
- * headless, or in a container. `--accept-eula` (see [check]'s `acceptFlag`) is a deliberate
- * operator act and counts as explicit acceptance without touching the file.
+ * // parity: net.minecraft.server.Eula, minus the prompt: no TTY detection, identical interactive,
+ * headless or in a container. `--accept-eula` is a deliberate operator act and counts as explicit
+ * acceptance without touching the file. The default file links minecraft.net rather than vanilla's
+ * `aka.ms` redirect, same document.
  *
- * [PATH] is TOML, matching `basalt.toml` rather than vanilla's `eula.txt`. The EULA requires
- * agreement from whoever runs a server; it does not dictate a file name, and vanilla's `eula.txt`
- * is that server's way of collecting agreement rather than a requirement placed on other software.
- * The content is unchanged either way: `#` starts a comment in TOML too, and `eula = true` is a
- * root-level boolean, so vanilla's own file body already parses as TOML.
- *
- * [LEGACY_PATH] is still honored, and that is not politeness: hosting panels write `eula.txt`
- * themselves, and an operator arriving from vanilla or Paper already has one saying `eula=true`.
- * Ignoring it would stop those servers dead with a message about a file they never had. An
- * acceptance found there is migrated to [PATH] once, matching how `server.properties` is imported
- * into `basalt.toml`.
- *
- * // parity: `net.minecraft.server.Eula`. Real vanilla's default file has a link to
- * `https://aka.ms/MinecraftEULA`; this project links the canonical `minecraft.net` URL instead,
- * same legal document, not a Mojang-owned redirect.
+ * [PATH] is TOML because the EULA asks for agreement, not for a file name, and vanilla's own body
+ * already parses as TOML. [LEGACY_PATH] is still honored and migrated once: hosting panels write
+ * `eula.txt` themselves, and refusing it would stop those servers over a file they never had.
  */
 public object EulaFile {
     public const val PATH: String = "eula.toml"

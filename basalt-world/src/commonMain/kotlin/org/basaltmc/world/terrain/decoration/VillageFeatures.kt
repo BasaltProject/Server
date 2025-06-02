@@ -9,16 +9,14 @@ import org.basaltmc.world.terrain.decoration.tree.TreeConfigs
 import org.basaltmc.world.terrain.decoration.tree.TreeFeature
 
 /**
- * The real placed features the desert/savanna/snowy/taiga village `decor`/`trees` pools reference
- * through their `feature_pool_element` entries, dispatched by name from
- * [org.basaltmc.world.structure.FeaturePoolElement.place]. Every pipeline below mirrors the real
- * `placed_feature/<name>.json` modifier list (count + trapezoid random offset, no in-square
- * spread: a village feature element scatters around its own piece position, not the chunk corner).
+ * The placed features the desert, savanna, snowy and taiga village pools reference through their
+ * `feature_pool_element` entries. Each mirrors its `placed_feature/<name>.json` modifier list:
+ * count plus trapezoid offset, no in-square spread, since a village element scatters around its
+ * own piece rather than the chunk corner.
  *
- * // parity: net.minecraft.world.level.levelgen.feature.BlockPileFeature for the five piles.
- * `mayPlaceOn`'s real `isFaceSturdy` test keeps this package's established "not air" stand-in for
- * a solid face (collision shapes unmodeled); `dirt_path`'s real coin flip is kept. Hay's
- * `rotated_block_provider` draws nothing (fixed Y axis, and axis properties aren't modeled).
+ * // parity: BlockPileFeature for the five piles. `mayPlaceOn`'s `isFaceSturdy` keeps this
+ * package's "not air" stand-in, and hay's `rotated_block_provider` draws nothing, axis properties
+ * being unmodelled.
  */
 public object VillageFeatures {
     public fun place(

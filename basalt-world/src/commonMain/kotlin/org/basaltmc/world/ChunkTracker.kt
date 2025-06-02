@@ -7,17 +7,12 @@ public data class ChunkPos(
 )
 
 /**
- * Tracks which chunks a single player should have loaded, recomputing the load/unload delta as
- * their view center (their own chunk position, matching what `SetChunkCacheCenterPacket` tells the
- * client) or view distance changes. This only decides *which* chunks belong in the set: it doesn't
- * send packets, generate/load chunk data, or order the results (real vanilla sends newly-visible
- * chunks nearest-first in a spiral from the center, which this doesn't replicate, only the
- * resulting set, since ordering only affects how quickly nearby terrain appears, not correctness).
+ * Which chunks one player should have loaded, as a load/unload delta whenever their view centre or
+ * distance changes. It decides the set only: no packets, no chunk data, and not vanilla's
+ * nearest-first spiral, which affects how fast terrain appears rather than correctness.
  *
- * The loaded set is a square (Chebyshev distance `<= radius`), matching `SetChunkCacheRadiusPacket`
- * elsewhere in this project (and how `BasaltServer`'s own fixed spawn area is already computed):
- * not vanilla's real circular-ish view area with its edge-of-render-distance ticket falloff, which
- * would need decompiling `ChunkMap`'s exact ticket/distance logic to replicate. Documented gap.
+ * The set is a square, Chebyshev distance `<= radius`, as `SetChunkCacheRadiusPacket` declares it.
+ * Vanilla's circular area with its ticket falloff is a documented gap.
  */
 public class ChunkTracker {
     private val loadedChunks = LinkedHashSet<ChunkPos>()

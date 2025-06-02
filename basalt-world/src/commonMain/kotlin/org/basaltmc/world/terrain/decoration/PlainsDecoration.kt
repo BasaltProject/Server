@@ -8,26 +8,14 @@ import org.basaltmc.world.Chunk
 import org.basaltmc.world.noise.SimplexNoise
 
 /**
- * Real Plains `vegetal_decoration` entries (the real jar's own `data/minecraft/worldgen/
- * placed_feature`/`configured_feature` values for `patch_grass_plain`/`patch_tall_grass_2`/
- * `flower_plains`/`patch_sunflower`, verbatim), ported the same way this project already treats other
- * single named real vanilla entries (`VanillaRegistryData`'s biome/damage-type/trim-material data):
- * literal values, not a generic runtime datapack loader, since this is specific known reference
- * data, not the seed-defining terrain-shape noise `NoiseParametersJson` is scoped to.
+ * The Plains `vegetal_decoration` entries, as literal values like the rest of the named vanilla
+ * reference data in `VanillaRegistryData`. [BiomeDecoration] appends the shared glow lichen,
+ * mushroom, pumpkin, sugar-cane and firefly-bush features; mushrooms use the surface survival
+ * approximation until the light engine exists.
  *
- * Shared glow lichen, mushrooms, pumpkin, sugar-cane, and firefly-bush features are appended by
- * [BiomeDecoration]. Mushroom placement uses the established surface survival approximation until
- * the light engine exists.
- *
- * The shared [random][WorldgenRandom] this whole pipeline draws from must be the real
- * `WorldgenRandom` wrapping `XoroshiroRandomSource` (confirmed from `ChunkGenerator
- * .applyBiomeDecoration`'s own decompiled body), not the legacy LCG: an earlier version of this
- * class used a plain [LegacyRandom] here, which is a real parity bug (wrong RNG family entirely,
- * not just a different formula), caught and fixed once `WorldgenRandom`'s bridging behavior was
- * understood. [FLOWER_NOISE]/`NoiseThresholdCountPlacement`'s own `BIOME_INFO_NOISE` are the one
- * legitimate exception: real vanilla wraps a fixed-seed [LegacyRandom] there too, and since
- * `WorldgenRandom` degenerates to a pure passthrough over a bit-based inner source, using
- * [LegacyRandom] directly for those is already bit-identical.
+ * The draws must come from [WorldgenRandom] over xoroshiro, not the legacy LCG: getting that wrong
+ * is a whole different RNG family, and it was wrong here once. [FLOWER_NOISE] is the exception,
+ * since vanilla wraps a fixed-seed [LegacyRandom] there too and the wrapper is a passthrough.
  */
 public object PlainsDecoration : BiomeVegetalDecoration {
     override fun decorate(

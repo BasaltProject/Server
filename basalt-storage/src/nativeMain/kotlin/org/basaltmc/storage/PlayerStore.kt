@@ -16,16 +16,13 @@ public class PlayerDatabaseSchemaException(
 ) : Exception(message)
 
 /**
- * The one player database, opened once for the whole server.
+ * The one player database, opened once for the whole server. One file rather than one per player:
+ * per-file cannot answer "who has not logged in for a month" without opening every file. WAL mode
+ * is what makes the single file safe to write concurrently, so a save on a connection thread
+ * stalls nobody.
  *
- * One file, not one per player: a per-file layout cannot answer "who has not logged in for a month"
- * without opening every file, and it multiplies the number of things a crash can leave half-written
- * by the number of players. WAL mode is what makes a single file safe to write concurrently:
- * readers never block the writer and the writer never blocks readers, so a save on a connection
- * thread does not stall anything else.
- *
- * The SQLite underneath is compiled into this binary (see `basalt.sqlite-native`), so opening a
- * database has no dependency on what the host machine happens to have installed.
+ * SQLite is compiled into the binary (see `basalt.sqlite-native`), so opening a database depends
+ * on nothing the host has installed.
  */
 public class PlayerStore private constructor(
     private val driver: SqlDriver,
@@ -44,15 +41,13 @@ public class PlayerStore private constructor(
     /**
      * Folds the write-ahead log back into the database file, then closes.
      *
-     * The checkpoint is not optional, which is worth stating because the opposite looks true:
-     * SQLite is documented to checkpoint when the last connection closes, but measured here it does
-     * not happen through this driver. Without this call a clean shutdown left `players.db` at 4 KB
-     * with every row sitting in a 24 KB `-wal` beside it. Nothing is lost (any SQLite reader
-     * replays the log) but the database is only complete as a *set* of files, so copying
-     * `players.db` on its own for a backup would silently copy an empty database.
+     * Not optional, though SQLite is documented to checkpoint when the last connection closes:
+     * through this driver it does not, and a clean shutdown left every row in the `-wal` beside a
+     * 4 KB `players.db`. Nothing is lost, but backing the file up alone would copy an empty
+     * database.
      *
-     * It goes through `executeQuery` rather than `execute` because `PRAGMA wal_checkpoint` answers
-     * with a row, and the driver refuses to run a row-returning statement as a plain execute.
+     * Through `executeQuery`, because `PRAGMA wal_checkpoint` answers with a row and the driver
+     * refuses those as a plain execute.
      */
     override fun close() {
         isOpen = false
@@ -108,16 +103,13 @@ public class PlayerStore private constructor(
         }
 
         /**
-         * Refuses to run against a database this build cannot actually use.
+         * Refuses to run against a database this build cannot use. There are no migrations on
+         * purpose, nobody running Basalt yet: a schema change deletes the old file. What must not
+         * happen again is the mismatch staying invisible until a query touched a new column and
+         * threw a native stack trace mid server-list ping.
          *
-         * There are no migrations on purpose: nobody is running Basalt yet, so a schema change is
-         * made cleanly and the old file is deleted. What must not happen is what did happen once,
-         * which is that the mismatch stayed invisible until the first query that touched a new
-         * column, and surfaced as a native stack trace in the middle of answering a server list
-         * ping. Wrong at startup, by name, beats wrong later, anywhere.
-         *
-         * The expected columns come from creating the schema in memory rather than from a list
-         * written out here, so this check cannot fall behind the `.sq` files it is checking.
+         * The expected columns come from creating the schema in memory, so this cannot fall behind
+         * the `.sq` files it checks.
          */
         private fun verifySchema(
             driver: SqlDriver,

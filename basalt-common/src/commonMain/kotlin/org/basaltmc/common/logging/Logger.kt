@@ -7,16 +7,12 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 /**
- * A minimal, dependency-free leveled logger. Writes to stdout via [println]; there is no
- * separate stderr sink or file appender yet, that lands when a system actually needs it.
+ * A minimal, dependency-free leveled logger, writing `[yyyy-MM-dd HH:mm:ss] [LEVEL] [name]:
+ * message` to stdout. Times are UTC: local time needs a `cinterop` call this project has not got
+ * yet, and UTC is unambiguous meanwhile.
  *
- * Every line has the same fixed shape, `[yyyy-MM-dd HH:mm:ss] [LEVEL] [name]: message`, in UTC
- * (matching [kotlin.time.Clock.System], not the host's local timezone: getting local time
- * cross-platform on Kotlin/Native needs a `cinterop` call this project doesn't have yet, and
- * UTC is unambiguous in the meantime).
- *
- * Message producers are `inline` so a filtered-out call (below [minLevel]) never builds the
- * string or allocates a closure.
+ * Message producers are `inline`, so a call filtered out by [minLevel] builds no string and
+ * allocates no closure.
  */
 public class Logger(
     @PublishedApi internal val name: String,

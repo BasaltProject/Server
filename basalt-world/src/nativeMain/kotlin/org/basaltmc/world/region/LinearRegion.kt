@@ -10,18 +10,14 @@ public class LinearFormatException(
 ) : Exception(message)
 
 /**
- * One 32x32-chunk Linear region (`.linear`), matching the real format's binary layout
- * (`LinearRegionFileFormatTools/linear.py`, the reference implementation, not guessed): a 32-byte
- * big-endian header (signature, version, newest timestamp, compression level, chunk count,
- * compressed length, 8 reserved bytes), a single zstd stream wrapping the *entire* region at once
- * (unlike Anvil's per-chunk zlib), and the signature repeated as an 8-byte footer. The zstd stream
- * decompresses to a fixed 1024-entry table of `(size, timestamp)` pairs (one per local chunk slot,
- * row-major, `size == 0` meaning no chunk there) followed by the chunk blobs themselves,
- * concatenated back to back with no padding, in the same slot order.
+ * One 32x32-chunk Linear region (`.linear`), laid out as `linear.py` has it: a 32-byte big-endian
+ * header (signature, version, newest timestamp, compression level, chunk count, compressed length,
+ * 8 reserved), one zstd stream over the whole region rather than Anvil's per-chunk zlib, and the
+ * signature repeated as a footer. The stream holds 1024 `(size, timestamp)` pairs, row-major with
+ * `size == 0` for an empty slot, then the chunk blobs back to back in the same order.
  *
- * This only handles the container: each chunk's bytes are opaque to it (real usage stores a
- * chunk's on-disk NBT there, but nothing here parses that). Coordinates are always local (0..31);
- * mapping a filename's region coordinates to absolute chunk coordinates is a caller concern.
+ * Only the container: the chunk bytes are opaque here. Coordinates are local (0..31), and mapping
+ * them to absolute chunk coordinates is the caller's job.
  */
 public class LinearRegion(
     private val chunks: Array<ByteArray?> = arrayOfNulls(DIMENSION * DIMENSION),
@@ -49,16 +45,13 @@ public class LinearRegion(
     }
 
     /**
-     * Writes this region straight to [path], compressing as it goes.
+     * Writes this region straight to [path], compressing as it goes: peak memory is a 64 KB output
+     * block plus an 8 KB table whatever the region holds. Building the whole region uncompressed,
+     * then compressed, then framed cost tens of megabytes each time, and Kotlin/Native serves
+     * allocations that size from `mmap` without giving the pages back.
      *
-     * Peak memory is a fixed 64 KB output block plus an 8 KB chunk table, whatever the region's
-     * size. The chunk blobs are already held individually, so nothing needs concatenating: the old
-     * approach built the whole region uncompressed, then the whole compressed copy, then the framed
-     * copy, tens of megabytes each. Kotlin/Native serves allocations that size from `mmap` and does
-     * not give the pages back, so a session spent exploring grew by gigabytes it could never reuse.
-     *
-     * The header carries the compressed length, which is only known at the end, so it goes out as a
-     * hole and is patched once the body is done.
+     * The compressed length is only known at the end, so the header goes out with a hole and is
+     * patched afterwards.
      */
     public fun writeTo(
         path: String,

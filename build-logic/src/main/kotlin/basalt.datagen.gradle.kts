@@ -146,16 +146,11 @@ val ITEMS_KDOC =
 
 
 /**
- * Block destroy times, which the vanilla data generator does not report.
+ * Block destroy times, which the vanilla data generator does not report: hardness lives in the
+ * block definitions, so a small harness bootstraps the registries, walks `BuiltInRegistries.BLOCK`
+ * and prints each block's `defaultDestroyTime` and whether drops need the right tool.
  *
- * Everything else here comes out of `--reports`, but hardness lives only in the block definitions
- * themselves, so it is read by running a small harness against the real classes: bootstrap the
- * registries, walk `BuiltInRegistries.BLOCK`, print each block's `defaultDestroyTime` and whether it
- * needs the correct tool for drops. Same technique this project already uses to capture noise
- * vectors from the real jar rather than trusting a transcription.
- *
- * Numbers, not content: what comes back is one float and one flag per block id, which is the same
- * kind of fact as the numeric ids in the tables above.
+ * One float and one flag per block id, the same kind of fact as the numeric ids above.
  */
 fun extractBlockHardness(
     jarFile: File,

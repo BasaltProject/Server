@@ -7,25 +7,14 @@ import org.basaltmc.world.climate.Sampler
 import org.basaltmc.world.densityfunction.DensityCache
 
 /**
- * // parity: net.minecraft.world.level.biome.MultiNoiseBiomeSource, specialized to the real
- * Overworld preset (`MultiNoiseBiomeSourceParameterLists.OVERWORLD`, itself just
- * `new OverworldBiomeBuilder().addBiomes(...)`, see [OverworldBiomeBuilder]'s own KDoc). Resolves a
- * block position to its real vanilla biome by sampling [router]'s six climate density functions at
- * that position's quart (4-block) resolution and finding the closest registered climate region.
+ * // parity: net.minecraft.world.level.biome.MultiNoiseBiomeSource, specialized to the Overworld
+ * preset. Samples [router]'s six climate functions at quart resolution and takes the closest
+ * registered climate region.
  *
- * Deliberately holds no cache of its own: a single [OverworldBiomeSource] is shared across every
- * worker thread generating chunks in parallel
- * ([org.basaltmc.server.BasaltServer.generateChunksInParallel]), and this method is called many
- * times per column (real vanilla's own [org.basaltmc.world.terrain.surface.SurfaceRules.isBiome]
- * re-samples the biome independently for every check in a sequence, not once per position). A
- * plain shared `MutableMap` corrupted its own backing array under concurrent writes the first time
- * this ran live, and the safe copy-on-write alternative
- * ([VillageStructureGenerator.samplerCache]'s own established pattern) copies its entire backing
- * map on every insert, which is fine for that cache's rare inserts but quadratic here given how
- * many distinct quart positions one chunk alone touches. The right place to memoize calls to this
- * method is therefore one level up, in a short-lived, single-thread, per-chunk cache (see
- * [org.basaltmc.world.terrain.RealTerrainGenerator]'s own `ChunkScopedSurfaceEnvironment`), not
- * inside this long-lived, cross-thread-shared object.
+ * Holds no cache on purpose: one instance is shared by every chunk worker, and a plain map
+ * corrupted itself under concurrent writes here. Copy-on-write is quadratic given how many quart
+ * positions a chunk touches, so memoization belongs one level up, in a per-chunk single-threaded
+ * cache like `RealTerrainGenerator`'s `ChunkScopedSurfaceEnvironment`.
  */
 public class OverworldBiomeSource(
     router: OverworldNoiseRouter,

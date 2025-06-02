@@ -4,16 +4,13 @@ import org.basaltmc.common.Mth
 import org.basaltmc.world.GenerationMetrics
 
 /**
- * // parity: net.minecraft.world.level.biome.Climate.RTree. A bounding-volume tree over the seven
- * quantized climate axes, so finding a target's closest [ParameterPoint] descends a handful of
- * nodes instead of comparing every registered region. Built once per [ParameterList] and read-only
- * afterwards, so the shared instance every generation worker uses needs no lock.
+ * // parity: net.minecraft.world.level.biome.Climate.RTree, a bounding-volume tree over the seven
+ * quantized climate axes, so the closest [ParameterPoint] is a descent rather than a full scan.
+ * Built once per [ParameterList] and read-only after, so the shared instance needs no lock.
  *
- * One deliberate deviation: vanilla seeds each search with the previous result held in a
- * `ThreadLocal`, which prunes a little more but makes its answer for *tied* targets depend on the
- * order chunks happened to be generated in. This seeds every search with the same first leaf
- * instead, so equal-distance targets resolve the same way on every run and on every thread.
- * Distances are unaffected, only which of several exactly-tied regions wins.
+ * One deviation: vanilla seeds each search from the previous result in a `ThreadLocal`, which
+ * prunes slightly better but lets generation order decide *tied* targets. Seeding from the same
+ * first leaf makes ties resolve identically on every run and thread; distances are unaffected.
  */
 internal class RTree<T> private constructor(
     private val root: Node<T>,

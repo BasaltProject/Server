@@ -11,18 +11,13 @@ import org.basaltmc.world.region.LinearRegion
 import kotlin.time.TimeSource
 
 /**
- * Keeps a few decompressed regions in memory so a region file is read and unpacked once rather than
- * once per chunk.
+ * Keeps a few decompressed regions in memory, so a region file is unpacked once rather than once
+ * per chunk. Linear compresses a whole region as one zstd stream, so reading any chunk unpacks all
+ * 1024: doing that per chunk from every worker was the dominant source of memory pressure while
+ * exploring.
  *
- * Linear compresses a whole region as a single zstd stream, which is what makes it compact but also
- * means there is no way to pull one chunk out of a file cheaply: reading a chunk means unpacking
- * all 1024 of them. Doing that per chunk, from every generation worker at once, allocated tens of
- * megabytes per chunk loaded and was by far the dominant source of memory pressure while exploring.
- * Holding the region instead turns a chunk load into a lookup.
- *
- * Reading and decompressing happens outside the lock. Holding it across a region's worth of zstd
- * kept the store busy continuously while eight workers explored, and the save/unload sweep, which
- * needs the same lock, never got a turn: the server quietly stopped saving and unloading at all.
+ * Decompression happens outside the lock. Holding it across a region of zstd starved the
+ * save/unload sweep, which needs the same lock, until the server quietly stopped saving at all.
  */
 public class RegionStore(
     worldName: String,

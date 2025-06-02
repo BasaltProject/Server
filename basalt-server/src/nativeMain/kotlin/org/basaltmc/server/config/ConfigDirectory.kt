@@ -4,22 +4,14 @@ import org.basaltmc.common.logging.Logger
 import org.basaltmc.io.FileIO
 
 /**
- * The `config/` directory: one file per domain, all TOML, all in one place.
+ * The `config/` directory: one file per domain, all TOML, all in one place. What makes Paper's
+ * configuration hard is not the number of files but that they are split without a rule, in two
+ * formats, with the same option in two places. A new file has to earn being its own domain rather
+ * than one more table in an existing one.
  *
- * This replaces the earlier rule of a single configuration file. That rule existed against the sprawl of
- * Paper (`server.properties` plus `bukkit.yml` plus `spigot.yml` plus two `paper-*.yml` plus a
- * folder), and the goal has not changed, only the diagnosis: what makes Paper's configuration hard
- * is that it is scattered *without a rule*, in two formats, half of it in the root, with the same
- * option in two places. One file stops working as soon as permission groups, world creation, list
- * profiles and per-command settings arrive, because it becomes thousands of lines nobody can find
- * anything in.
- *
- * So: one directory, one file per domain, and adding a file has to be justified by being a domain
- * of its own rather than one more table in an existing file.
- *
- * A file that does not exist is generated from its commented default. A file that exists but does
- * not parse **stops the server**, on purpose: silently falling back to defaults would mean a
- * `groups.toml` with a typo quietly granting nobody any permissions.
+ * A missing file is generated from its commented default. A file that does not parse **stops the
+ * server**: falling back to defaults would mean a typo in `groups.toml` quietly granting nobody
+ * any permissions.
  */
 public class ConfigDirectory(
     public val root: String = DEFAULT_ROOT,

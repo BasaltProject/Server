@@ -29,16 +29,12 @@ public class AssetCache(
     }
 
     /**
-     * Returns the local path to the cached, verified jar, downloading it first if needed.
+     * The local path to the cached, verified jar, downloading it first if needed.
      *
-     * Verification happens once, at download time, and is then recorded in a `.verified` sidecar
-     * holding the hash that was checked and the size it was checked at. Re-hashing tens of
-     * megabytes on every boot to re-learn something already established costs real startup time
-     * and proves nothing new. The size is re-checked because it is free (no read, just a seek) and
-     * catches the realistic corruption case, a truncated or half-written download; a jar edited in
-     * place to exactly the same length is not detected, which is the deliberate trade. A sidecar
-     * that is missing, malformed or no longer matching means a re-download, which is also what
-     * happens once for caches written before the sidecar existed.
+     * Hashing happens once, at download time, and lands in a `.verified` sidecar: re-hashing tens
+     * of megabytes every boot costs startup time and proves nothing new. The size is re-checked
+     * because a seek is free and catches the realistic corruption, a truncated download; an
+     * in-place edit of the same length is the trade. A missing or mismatched sidecar re-downloads.
      */
     public fun ensure(
         metadata: VersionMetadata,

@@ -8,28 +8,13 @@ import org.basaltmc.world.densityfunction.SplineCoordinate
 import org.basaltmc.world.noise.NormalNoise
 
 /**
- * // parity: net.minecraft.world.level.levelgen.NoiseRouterData (the `overworld` assembly only,
- * plus the handful of private helpers it needs). Builds the real Overworld density-function graph
- * by combining [DensityFunctions] factory calls exactly like the real jar does: this class lives
- * in the runtime package (`world.level.levelgen`), not a datapack (`data.worldgen`), and its own
- * bootstrap calls straight into it with resolved [NormalNoise.NoiseParameters] holders, so the
- * graph *shape* below is algorithm/code, matching this project's own precedent for
- * [org.basaltmc.world.densityfunction.BlendedNoise]/[TerrainProvider]. Only the named noise
- * parameters [overworld] takes in [noise] are real datapack content (json files under
- * `data/minecraft/worldgen/noise/`), loaded elsewhere at runtime, never embedded here.
+ * // parity: net.minecraft.world.level.levelgen.NoiseRouterData, the `overworld` assembly only.
+ * The graph shape is code, not datapack content: only the named noise parameters in [noise] come
+ * from `data/minecraft/worldgen/noise/`, loaded at runtime and never embedded here.
  *
- * **Deliberately narrowed scope, documented gaps:**
- * - Caves, aquifers and ore veins are not modeled: real vanilla's `fullNoise` is
- *   `min(postProcess(slideOverworld(caves)), NOODLE)` where `caves` itself folds in cave
- *   entrances/spaghetti/underground carving; this only builds the surface-relevant
- *   `slopedCheese` term (offset/factor/jaggedness/depth/base3d) and skips straight to
- *   `postProcess(slideOverworld(slopedCheese))`, the same "no caves" gap
- *   `org.basaltmc.world.NoiseWorldGenerator` already documents.
- * - Only the non-large-biomes, non-amplified variant is built (matches [TerrainProvider]'s own
- *   narrowed scope).
- * - `preliminarySurfaceLevel` (an approximate 2D surface-height estimate real vanilla's
- *   `SurfaceRules`/aquifer code queries for performance) is not built yet: nothing in this
- *   project needs it until real `SurfaceRules` do.
+ * Gaps: no caves, aquifers or ore veins (this stops at `postProcess(slideOverworld(slopedCheese))`
+ * instead of vanilla's `fullNoise`), only the non-large-biomes non-amplified variant, and no
+ * `preliminarySurfaceLevel` until real surface rules need it.
  */
 public class OverworldNoiseRouter(
     public val shiftX: DensityFunction,

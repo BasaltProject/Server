@@ -10,31 +10,15 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
- * Shared, mutable view over the currently loaded chunks, guarding both block mutations and the
- * chunk set itself with a single coarse-grained lock (matching
- * [org.basaltmc.server.player.PlayerRegistry]'s own pattern): every [org.basaltmc.server.ClientSession]
- * runs on its own thread, and two players breaking/placing blocks, or two players crossing into the
- * same never-before-seen chunk at once ([getOrGenerateChunk]), are both real data races without one.
- * Fine-grained (per-chunk/region) locking is future work once the scheduler ADR this project's own
- * roadmap tracks is settled; a single lock is the simplest correct starting point, matching that
- * ADR's own "global first" recommendation.
+ * Shared view over the loaded chunks, with one coarse lock over both block writes and the chunk
+ * set: sessions run a thread each. Per-region locking waits on the scheduler ADR.
  *
- * [getOrGenerateChunk] deliberately does **not** hold [mutex] while [loadOrGenerate] itself runs:
- * real terrain generation (density router, surface rules, decoration, village assembly) can take
- * anywhere from tens of milliseconds to over a second, and every other player's block reads/writes
- * and chunk loads share this same lock. Holding it for the whole generation call serializes the
- * entire world behind whichever single chunk is slowest to generate right now, which is exactly
- * what made the server appear to freeze while any player explored new terrain. Instead: check
- * under the lock (fast), generate outside it (slow, but no longer blocking anyone else), then
- * re-lock briefly to insert. Two threads racing to generate the very same never-before-seen chunk
- * both do the (deterministic, side-effect-free) generation work and the second one's result is
- * simply discarded in favor of whichever finished first: rare, and cheaper than making every
- * chunk load wait on every other one.
+ * [getOrGenerateChunk] releases [mutex] around [loadOrGenerate], which can take over a second and
+ * would freeze every other player behind the slowest chunk. Racing threads both generate and one
+ * result is discarded: generation is deterministic, so that beats serializing every load.
  *
- * [loadOrGenerate] is expected to consult the region files before generating anything: a chunk seen
- * once during exploration and saved must come back off disk on the next visit, player edits and
- * all, rather than being regenerated from the seed. [ChunkGenerationQueue] is what drives it, and
- * what collects the freshly generated chunks for persistence.
+ * [loadOrGenerate] must read the region files first, or a visited chunk comes back regenerated
+ * with the player's edits gone.
  */
 @OptIn(ExperimentalUuidApi::class)
 public class WorldState(

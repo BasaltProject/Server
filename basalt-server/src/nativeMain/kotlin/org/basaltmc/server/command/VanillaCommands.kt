@@ -20,24 +20,15 @@ import org.basaltmc.server.command.commands.TeleportCommand
 import org.basaltmc.server.command.commands.WorldCommand
 
 /**
- * Every command Basalt currently understands, in the order they are registered.
+ * Every command Basalt understands, in registration order, one class each under
+ * `command/commands/` as vanilla splits them. Each reimplements its counterpart's tree shape,
+ * permission level and translation keys: the client resolves the keys, so a different one is
+ * visible.
  *
- * One class per command under `command/commands/`, the same split vanilla makes under
- * `net.minecraft.server.commands`, and each one reimplements its counterpart's tree shape,
- * permission level and translation keys. The keys matter: the client resolves them itself, so a
- * different key is a visible divergence, not an internal detail.
- *
- * What is *not* here is most of vanilla's command set (the world, scoreboard, data and datapack
- * families) plus the selector filter syntax: both are declared gaps, not silent ones.
- *
- * `import-players`, `placeholder`, `world` and `reload` are the ones with no vanilla counterpart,
- * because they administer things vanilla does not have: a player database outside the world
- * directories, a placeholder registry, more than one world to stand in, and configuration that is
- * read on every use rather than once at startup.
- *
- * `reload`, `restart` and `timings` are not in this list because each needs something the running
- * server owns (its configuration holder, its own lifecycle, its counters), so they are registered by
- * [org.basaltmc.server.BasaltServer] instead of built from nothing.
+ * Gaps, declared rather than silent: the world, scoreboard, data and datapack families, and the
+ * selector filter syntax. `import-players`, `placeholder`, `world` and `reload` have no vanilla
+ * counterpart. `reload`, `restart` and `timings` are registered by [org.basaltmc.server.BasaltServer]
+ * instead, each needing something only the running server owns.
  */
 public val VANILLA_COMMANDS: List<Command> =
     listOf(

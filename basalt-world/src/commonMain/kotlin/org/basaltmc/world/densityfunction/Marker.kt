@@ -4,21 +4,14 @@ import org.basaltmc.world.GenerationMetrics
 
 /**
  * // parity: net.minecraft.world.level.levelgen.DensityFunctions.Marker.Type. [FLAT_CACHE] and
- * [CACHE_2D] are honored, against a [DensityCache] carried in [FunctionContext.cache]; the rest
- * evaluate straight through.
+ * [CACHE_2D] are honored against the [DensityCache] in [FunctionContext.cache]; the rest evaluate
+ * straight through.
  *
- * [FLAT_CACHE] is not merely an optimization: vanilla's `NoiseChunk.FlatCache` quantizes the query
- * to the quart grid and samples at `y = 0`, so honoring it changes computed values, toward vanilla.
- * [CACHE_2D] is exact memoization and changes nothing.
- *
- * [INTERPOLATED], [CACHE_ONCE] and [CACHE_ALL_IN_CELL] stay pass-through: all three are defined
- * against `NoiseChunk`'s own cell-interpolation counters (`CacheOnce` only caches when the context
- * *is* the `NoiseChunk`), and this project interpolates one level up in
- * [org.basaltmc.world.terrain.DensityChunkSampler] rather than per marked subtree. Wiring them up
- * means porting that interpolation scheme first, which is its own change.
- *
- * [BLEND_DENSITY] marks where Anvil-format terrain blending would apply (see [BlendAlpha]'s own
- * note on why that does not apply here), which changes its declared bounds but not its value.
+ * [FLAT_CACHE] is not just an optimization: vanilla quantizes the query to the quart grid and
+ * samples at `y = 0`, so honoring it changes values toward vanilla. [CACHE_2D] is exact
+ * memoization. [INTERPOLATED], [CACHE_ONCE] and [CACHE_ALL_IN_CELL] are defined against
+ * `NoiseChunk`'s own counters, and interpolation happens one level up in [DensityChunkSampler].
+ * [BLEND_DENSITY] only marks where Anvil blending would apply.
  */
 public enum class MarkerType {
     INTERPOLATED,

@@ -8,21 +8,14 @@ public class AnvilFormatException(
 ) : Exception(message)
 
 /**
- * Reads a real Anvil (`.mca`) region file into a [LinearRegion], for the automatic one-time import
- * an existing vanilla/Paper/Spigot world needs when Basalt opens it (see [LinearRegion]'s own KDoc
- * for the target container format). Layout confirmed against `linear.py`'s `open_region_anvil`, the
- * reference tool this whole Linear stack is verified against, not guessed: a 4096-byte header of
- * 1024 `(3-byte big-endian sector offset, 1-byte sector count)` entries, a second 4096-byte block of
- * 1024 big-endian timestamps, then the chunk data itself in 4096-byte sectors, each a 4-byte
- * big-endian length (covering the compression-type byte and everything after it), a 1-byte
- * compression type, then that many bytes of (usually compressed) chunk NBT.
+ * Reads an Anvil (`.mca`) region into a [LinearRegion], for the one-time import an existing
+ * vanilla, Paper or Spigot world needs. Layout taken from `linear.py`'s `open_region_anvil`: a
+ * 4096-byte header of 1024 `(3-byte sector offset, 1-byte count)` entries, 1024 timestamps, then
+ * chunks in 4096-byte sectors, each a big-endian length, a compression type byte and the NBT.
  *
- * This only transcodes the container: the chunk NBT bytes it hands to [LinearRegion.setChunk] are
- * exactly what Anvil had, decompressed but otherwise untouched, ready to be recompressed as part of
- * a whole region the next time [LinearRegion.write] runs. Only zlib (compression type 2, what every
- * modern save uses) and uncompressed (type 3) chunks are supported; gzip (type 1, pre-1.3-era
- * saves) and the external `.mcc` file indirection for oversized chunks (type 128+n) both throw
- * rather than silently skipping a chunk, since neither has come up in practice yet.
+ * Only the container is transcoded: the NBT reaches [LinearRegion.setChunk] decompressed but
+ * untouched. Gzip (type 1) and the `.mcc` indirection for oversized chunks throw instead of
+ * skipping a chunk silently, neither having come up in practice.
  */
 public object AnvilRegion {
     private const val SECTOR_SIZE = 4096

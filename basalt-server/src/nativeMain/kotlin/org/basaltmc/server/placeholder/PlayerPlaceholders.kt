@@ -11,16 +11,13 @@ import org.basaltmc.storage.StoredStats
 import kotlin.math.roundToInt
 
 /**
- * `%basalt_player_*%`, answered from whoever the context is about.
+ * `%basalt_player_*%`, answered from whoever the context is about. The same names serve both
+ * situations: `%basalt_player_name%` is the player talking in a chat format and whoever was
+ * recognised at that address in the server list. One that only one situation can answer says so
+ * rather than inventing a value.
  *
- * The same names serve both situations, which is the point: `%basalt_player_name%` in a chat format
- * means the player talking, and in the server list it means whoever this server recognised at that
- * address. A name that only one of the two can answer says so in the other rather than resolving to
- * something invented, and whoever used it gets told which one it was.
- *
- * Written as tables of functions rather than one long `when` so that listing the names and
- * answering them come from the same place. Two lists kept in step by hand drift, and the one that
- * drifts is always the one nobody runs.
+ * Tables of functions rather than one long `when`, so listing the names and answering them cannot
+ * drift apart.
  */
 public class PlayerPlaceholders(
     private val groups: () -> GroupsConfig,

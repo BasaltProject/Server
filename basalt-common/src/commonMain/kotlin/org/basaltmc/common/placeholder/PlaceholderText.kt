@@ -1,17 +1,13 @@
 package org.basaltmc.common.placeholder
 
 /**
- * Replacing `%name%` in operator-written text.
+ * Replacing `%name%` in operator-written text. A name may not contain whitespace, which keeps
+ * prose safe: "50% off, and 20% more" holds no placeholder. `%%` is a literal per cent sign.
  *
- * A name may not contain whitespace, which is what keeps ordinary prose safe: "50% off, and 20%
- * more" has no placeholder in it, because neither run between two per cent signs is a single word.
- * `%%` is a literal per cent sign for the cases that rule does not cover.
- *
- * A name nobody can answer is left exactly as written by default: text that still says
- * `%basalt_player_name%` tells the operator what went wrong, where text that silently lost a word
- * does not. A caller that knows better decides otherwise from [onUnresolved], because "leave the
- * debug text in" is the right answer for a config file being checked and the wrong one for a line
- * that strangers read.
+ * An unanswerable name is left as written by default, since text still saying
+ * `%basalt_player_name%` tells the operator what went wrong where a silently dropped word does
+ * not. [onUnresolved] lets a caller decide otherwise: that answer is right for a config being
+ * checked and wrong for a line strangers read.
  */
 public object PlaceholderText {
     public fun substitute(

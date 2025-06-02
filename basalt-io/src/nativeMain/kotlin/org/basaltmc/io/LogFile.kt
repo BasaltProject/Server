@@ -6,20 +6,13 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 /**
- * Mirrors everything the console shows into `<root>/latest.log`, and archives the previous run's
- * file on the way in.
+ * Mirrors the console into `<root>/latest.log`, archiving the previous run's file on the way in.
+ * `latest.log` stays alone at the top of [root], with the gzipped `yyyy-MM-dd-N.log.gz` archives
+ * one level down in [ARCHIVE_DIRECTORY], so the current log is not buried among hundreds of dated
+ * ones. `N` counts runs on the same date and is found by probing, which needs no directory read.
  *
- * `latest.log` sits alone at the top of [root] while archives go one level down, in
- * [ARCHIVE_DIRECTORY]: the file anyone actually wants to open is the current one, and burying it in
- * a list of hundreds of dated archives is the exact annoyance this layout avoids.
- *
- * Archives are gzipped and named `yyyy-MM-dd-N.log.gz`, where `N` counts runs on the same date, so
- * restarting several times a day never overwrites an earlier log. The next free `N` is found by
- * probing rather than listing, which needs no directory read and cannot race with itself.
- *
- * Nothing here is buffered: a line is appended as it is logged. Log volume is nowhere near an I/O
- * concern next to chunk generation, and a crash keeping every line written up to the moment it
- * happened is worth far more here than saved syscalls.
+ * Nothing is buffered: after a crash, every line logged up to it is worth more than the syscalls
+ * saved, and log volume is nothing next to chunk generation.
  */
 public class LogFile private constructor(
     private val path: String,

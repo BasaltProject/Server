@@ -6,17 +6,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * Vanilla's real `NoiseHolder` only resolves to an actual [NormalNoise] at world load (via a
- * registry lookup this project does not build yet); constructed directly, as a real Java harness
- * would have to, it always samples as zero, which makes the harness comparison this project
- * otherwise leans on uninformative for these nodes' `compute` path (see [DensityFunctionVectorsTest]
- * for a case where that comparison is informative). The `0.25`/`4.0` scale factors and the
- * per-node coordinate argument order below are still read directly from the decompiled
- * `net.minecraft.world.level.levelgen.DensityFunctions.ShiftNoise`/`Shift`/`ShiftA`/`ShiftB`
- * source, the same source of truth this project always uses; only the live cross-check step is
- * skipped here. [maxValue]/[minValue] bounds, which do not depend on holder resolution, were
- * cross-checked against the real jar (see the same harness's `shiftA.minValue`/`maxValue` output:
- * `-8.0`/`8.0` for a noise whose own `maxValue()` is `2.0`, matching `offsetNoise.maxValue * 4.0`).
+ * No jar cross-check of `compute` here: vanilla's `NoiseHolder` only resolves at world load, so a
+ * harness constructing one directly always samples zero. The scale factors and coordinate order
+ * still come from the decompiled `DensityFunctions.ShiftNoise`/`Shift`/`ShiftA`/`ShiftB`.
+ *
+ * The bounds do not depend on that resolution and were cross-checked: `-8.0`/`8.0` for a noise
+ * whose own `maxValue()` is `2.0`, matching `offsetNoise.maxValue * 4.0`.
  */
 class ShiftNoiseTest {
     private fun noise(): NormalNoise = NormalNoise.create(LegacyRandom(7L), -3, doubleArrayOf(1.0, 1.0, 1.0, 1.0))

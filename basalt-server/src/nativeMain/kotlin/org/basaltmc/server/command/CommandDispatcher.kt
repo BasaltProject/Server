@@ -194,16 +194,12 @@ public class CommandDispatcher(
     }
 
     /**
-     * Builds the tree again from the current `commands.toml`.
+     * Builds the tree again from the current `commands.toml`, whole rather than patched: permission,
+     * aliases and existence are all decided during registration, so diffing would mean writing
+     * registration a second way. A few dozen nodes cost nothing and cannot drift from what a fresh
+     * start produces.
      *
-     * The whole tree, not a patch of it: a command's permission, its aliases and whether it exists
-     * at all are decided while it is being registered, so working out the difference would mean
-     * reimplementing registration a second way. Rebuilding is cheap (it is a few dozen nodes) and
-     * cannot drift from what a fresh start would have produced, which for a reload is the property
-     * that matters.
-     *
-     * The caller is responsible for sending the new tree to every connected client: until it does,
-     * their client still autocompletes the old one.
+     * The caller sends the new tree to connected clients; until then they autocomplete the old one.
      */
     public fun rebuild() {
         root.children.clear()

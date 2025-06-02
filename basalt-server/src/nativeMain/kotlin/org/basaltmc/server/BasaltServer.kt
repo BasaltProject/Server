@@ -43,7 +43,6 @@ import org.basaltmc.text.Component
 import org.basaltmc.text.LangTable
 import org.basaltmc.text.TextColor
 import org.basaltmc.world.GenerationMetrics
-import org.basaltmc.world.NoiseWorldGenerator
 import org.basaltmc.world.terrain.OverworldNoiseRouter
 import org.basaltmc.world.terrain.VillageStructureGenerator
 import org.basaltmc.world.terrain.surface.SurfaceRuleEnvironment
@@ -54,27 +53,15 @@ import kotlin.time.Instant
 import kotlin.time.TimeSource
 
 /**
- * A thread-per-connection server, per `basalt-io`'s current scope (no event loop yet).
- * Handshake, Status, Login, Configuration and Play are implemented for a single world.
- * [SPAWN_RADIUS_CHUNKS] chunks generate eagerly at startup, a small warm cache so the server is
- * ready to listen fast; each joining player then gets [BasaltConfig.viewDistance]'s full real view
- * distance around their own spawn, and further chunks stream in as they move
- * ([org.basaltmc.server.ClientSession.streamChunksAround]). All of it goes through one
- * [ChunkGenerationQueue], the only thing in the server that generates terrain.
+ * A thread-per-connection server, per `basalt-io`'s current scope (no event loop yet), covering
+ * Handshake, Status, Login, Configuration and Play for a single world.
  *
- * Every chunk comes from its declared dimension's region files under that world's directory if it
- * was ever saved there ([RegionStore]), including chunks first seen while exploring, so revisiting old
- * ground returns the same terrain with whatever was built on it rather than regenerating it.
- * Freshly generated chunks are written back on [TickLoop]'s save interval, not only on a clean
- * `stop`, so a crash costs at most that interval.
+ * [SPAWN_RADIUS_CHUNKS] chunks generate eagerly so it starts listening fast and the rest stream as
+ * players move, through the one [ChunkGenerationQueue]. New chunks are written on [TickLoop]'s
+ * save interval, so a crash costs that interval rather than everything since boot.
  *
- * [worldGeneratorFactory] builds a correctly seeded normal generator for each declared dimension
- * and world. The older [overworldRouter]/[surfaceEnvironment] injection remains as a focused test
- * seam. Both stay optional so protocol/session-focused tests, whose concern is the network layer,
- * can keep using [NoiseWorldGenerator]'s fast, network-free placeholder instead of
- * downloading a real `server.jar` and paying real generation cost for something they never
- * inspect. Terrain fidelity itself has its own dedicated, real-jar-verified tests
- * (`RealTerrainGeneratorTest`/`SurfaceBuilderTest` and friends), not these.
+ * [worldGeneratorFactory] and the [overworldRouter]/[surfaceEnvironment] injection stay optional,
+ * so protocol tests need no `server.jar`.
  */
 public class BasaltServer(
     private val config: BasaltConfig,

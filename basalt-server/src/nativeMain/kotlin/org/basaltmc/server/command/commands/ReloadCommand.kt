@@ -10,18 +10,14 @@ import org.basaltmc.text.Component
 import org.basaltmc.text.TextColor
 
 /**
- * `/reload`: re-reads the configuration files that are read on every use.
+ * `/reload`: re-reads the configuration files that are read on every use. Bukkit's version is
+ * distrusted for good reason, but that comes from reloading *code* while the server holds
+ * references to what it threw away.
  *
- * Bukkit taught everyone to distrust this command, and for a good reason: there it re-runs every
- * plugin's enable and disable while the rest of the server keeps holding references to the objects
- * it just threw away, so the failure is silent, arbitrary and turns up an hour later. That is a
- * consequence of reloading *code*, not of the idea of reloading.
- *
- * Here the line is a property of the code rather than a judgement: a file whose values are read
- * every time they are used can be swapped under a running server, and a file whose values were read
- * once at startup and turned into a bound socket, a thread pool or a loaded world cannot. The first
- * group is reloaded, the second is refused **by name**, and nothing is left half-applied because
- * every file is read before any of them is applied.
+ * Here the line is a property of the file: values read on every use can be swapped under a running
+ * server, values already turned into a bound socket, a thread pool or a loaded world cannot. The
+ * second group is refused by name, and every file is read before any is applied, so nothing is
+ * left half-done.
  */
 public class ReloadCommand(
     private val live: LiveConfigs,

@@ -1,16 +1,13 @@
 package org.basaltmc.random
 
 /**
- * Mirrors vanilla's `net.minecraft.world.level.levelgen.WorldgenRandom`: wraps an inner
- * [BasaltRandom] (typically [XoroshiroRandom] for modern worldgen, occasionally [LegacyRandom])
- * and bridges it to the classic `java.util.Random`-style [BitRandom] algorithms for `nextInt`/
- * `nextFloat`/etc, regardless of which algorithm actually produces the raw bits. Real vanilla
- * does this so worldgen code written against `next(bits)` semantics behaves the same no matter
- * which [BasaltRandom] it is layered over: if the inner source is itself bit-based ([BitRandom],
- * e.g. [LegacyRandom]), `next(bits)` is a pure passthrough; otherwise (e.g. [XoroshiroRandom]) it
- * is synthesized from the inner source's own `nextLong()`, discarding its native bounded-int
- * algorithm entirely. `setSeed` reseeds the inner source directly, never this wrapper's own
- * (unused) `next(bits)` state.
+ * // parity: net.minecraft.world.level.levelgen.WorldgenRandom. Wraps an inner [BasaltRandom] and
+ * bridges it to the `java.util.Random`-style [BitRandom] algorithms, so worldgen written against
+ * `next(bits)` behaves the same over any source.
+ *
+ * Over a bit-based source like [LegacyRandom] that is a passthrough; over [XoroshiroRandom] the
+ * bits are synthesized from `nextLong()`, discarding its own bounded-int algorithm. `setSeed`
+ * reseeds the inner source, never this wrapper's unused state.
  */
 public class WorldgenRandom(
     private val inner: BasaltRandom,

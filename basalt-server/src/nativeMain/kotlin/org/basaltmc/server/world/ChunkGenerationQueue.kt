@@ -7,22 +7,14 @@ import org.basaltmc.world.Chunk
 import kotlin.concurrent.AtomicInt
 
 /**
- * The one place chunks get generated off the thread that asked for them: a fixed pool of workers,
- * started once, pulling from a queue ordered by how close each chunk is to a player.
+ * The one place chunks get generated off the thread that asked for them: a fixed pool of workers
+ * pulling from a queue ordered by distance to a player. The connection thread only enqueues and
+ * collects finished chunks later (see `ClientSession.flushReadyChunks`), instead of spawning eight
+ * threads per chunk boundary crossing and blocking on the slowest of them.
  *
- * This replaces spawning a fresh batch of OS threads per request. A player flying fast crosses a
- * chunk boundary several times a second, and each crossing used to mean creating (and detaching)
- * eight threads and then blocking that player's own connection thread until the slowest chunk in
- * the batch finished. Here the connection thread only ever enqueues; it picks up finished chunks
- * later, whenever it next has the socket in hand (see `ClientSession.flushReadyChunks`).
- *
- * [dimension] is carried on every request and the pool is per dimension, not global: it is the
- * seam a regional scheduler would shard on, so nothing here assumes one queue owns the world.
- *
- * Workers poll rather than wait on a condition variable, because `basalt-io` has no portable
- * condvar yet and adding one means three more `expect`/`actual` platform bindings. An idle worker
- * costs one map lookup per millisecond, which does not show up next to what generating a chunk
- * costs; the wait that actually mattered, the caller's, is gone entirely.
+ * The pool is per [dimension], not global: that is the seam a regional scheduler would shard on.
+ * Workers poll rather than wait on a condition variable, which `basalt-io` cannot express
+ * portably yet; an idle one costs a map lookup per millisecond.
  */
 public class ChunkGenerationQueue(
     private val world: WorldState,

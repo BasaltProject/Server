@@ -3,17 +3,12 @@ package org.basaltmc.world
 /**
  * // parity: net.minecraft.world.level.chunk.PalettedContainer, as storage only.
  *
- * Holds [size] values while paying for the number of *distinct* ones rather than the total. A
- * section of nothing but air keeps a one-entry palette and no data array at all; one with a handful
- * of blocks packs four bits per entry. Only when a section genuinely holds hundreds of distinct
- * states does this cost what a plain `IntArray` always did.
+ * Holds [size] values while paying for the distinct ones: all-air keeps a one-entry palette and no
+ * data array, and only hundreds of distinct states cost what a plain `IntArray` always did. That
+ * is what makes chunks affordable to keep in memory, where a flat `IntArray(4096)` per section put
+ * one chunk at roughly 390 KB.
  *
- * This is what makes chunks affordable to keep in memory. A flat `IntArray(4096)` per section is 16
- * KB whether the section holds terrain or nothing, which put a chunk at roughly 390 KB and made a
- * few hundred loaded chunks worth hundreds of megabytes.
- *
- * Not thread safe, and deliberately so: a section belongs to one chunk, and chunk access is already
- * serialized a level up.
+ * Not thread safe: a section belongs to one chunk, and chunk access is serialized a level up.
  */
 public class PalettedContainer(
     private val size: Int,
