@@ -53,6 +53,41 @@ public object Blocks {
         }
     }
 
+    /**
+     * How long a block takes to break and whether it drops anything without the right tool.
+     *
+     * A [destroyTime] of zero means it comes apart instantly, which matters more than it sounds: a
+     * client destroys those on the spot and only ever sends the *start* of the dig, never the end,
+     * so a server that waits for the end never breaks a flower. Below zero means unbreakable.
+     */
+    public data class BlockHardness(
+        public val destroyTime: Float,
+        public val requiresCorrectTool: Boolean,
+    ) {
+        public val isInstant: Boolean get() = destroyTime == 0f
+        public val isUnbreakable: Boolean get() = destroyTime < 0f
+    }
+
+    private val hardnessByBlock: Map<Identifier, BlockHardness> =
+        ALL_BLOCK_HARDNESS.associate { (path, destroyTime, requiresTool) ->
+            Identifier.vanilla(path) to BlockHardness(destroyTime, requiresTool)
+        }
+
+    /**
+     * Every block's id in the `minecraft:block` registry, which is **not** its block state id.
+     *
+     * Tags name blocks, so their members travel as these; chunk data and block updates carry state
+     * ids instead. The two are different numbers for every block past the first.
+     */
+    private val blockIdsByName: Map<Identifier, Int> =
+        ALL_BLOCK_IDS.associate { (id, path) -> Identifier.vanilla(path) to id }
+
+    /** This block's `minecraft:block` registry id, or `null` if it is not a known block. */
+    public fun blockIdOf(block: Identifier): Int? = blockIdsByName[block]
+
+    /** This block's destroy time and tool requirement, or `null` for one this build's table does not list. */
+    public fun hardnessOf(block: Identifier): BlockHardness? = hardnessByBlock[block]
+
     /** Resolves both registered default states and the non-default states emitted by worldgen. */
     public fun byStateId(stateId: Int): BlockState? = derivedStatesById[stateId] ?: REGISTRY.byId(stateId)
 
