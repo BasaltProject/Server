@@ -128,6 +128,13 @@ public data class SpawnEntityPacket(
         /** Protocol id of `minecraft:item` in the real 26.2 entity type registry. */
         public const val ITEM_ENTITY_TYPE: Int = 71
 
+        /**
+         * Protocol id of `minecraft:player` in the real 26.2 registry. Read off the jar's own
+         * `registries.json`, not a published table: `minecraft-data` still lists 155 for 26.1 and
+         * the entry moved, so a copied constant would spawn the wrong entity entirely.
+         */
+        public const val PLAYER_ENTITY_TYPE: Int = 156
+
         public fun read(buffer: ByteBuffer): SpawnEntityPacket {
             val entityId = buffer.readVarInt()
             val uuid = buffer.readUuid()
@@ -146,47 +153,97 @@ public data class SpawnEntityPacket(
 }
 
 /**
- * Clientbound, id 0x63: entity metadata. Mirrors `ClientboundSetEntityDataPacket`, but only ever
- * carries the one entry this build needs: a dropped item's stack, `ItemEntity.DATA_ITEM` (index 8,
- * the "item stack" serializer, id 7; `Entity` itself claims indices 0-7, verified against the real
- * 26.2 server jar's `EntityDataSerializers`/`ItemEntity`). A generic metadata entry list is not
- * implemented, since dropped items are the only metadata-bearing entity this build spawns; reading
- * anything else throws, the same boundary [WireItemStack] draws for item components.
+ * Clientbound, id 0x63: entity metadata. Mirrors `ClientboundSetEntityDataPacket`: a stream of
+ * entries, each an index byte, a serializer id and the value, terminated by [END_OF_METADATA].
+ *
+ * Only the two value types this build actually sends are modelled ([Entry.Bytes] and
+ * [Entry.Item]). Indices are positions in the entity's own `defineId` order, counted down the real
+ * class hierarchy, which is why they are named rather than written as literals at call sites: in
+ * 26.2 a new `Avatar` class sits between `LivingEntity` and `Player`, so the player indices are not
+ * where an older version would put them.
  */
 public data class SetEntityDataPacket(
     val entityId: Int,
-    val item: WireItemStack?,
+    val entries: List<Entry>,
 ) {
+    public sealed interface Entry {
+        public val index: Int
+
+        /** A single byte, `EntityDataSerializers.BYTE` (serializer 0). */
+        public data class Bytes(
+            override val index: Int,
+            val value: Byte,
+        ) : Entry
+
+        /** An item stack, `EntityDataSerializers.ITEM_STACK` (serializer 7). */
+        public data class Item(
+            override val index: Int,
+            val stack: WireItemStack?,
+        ) : Entry
+    }
+
     public fun write(buffer: ByteBuffer) {
         buffer.writeVarInt(entityId)
-        buffer.writeByte(ITEM_STACK_INDEX.toByte())
-        buffer.writeVarInt(ITEM_STACK_SERIALIZER_ID)
-        WireItemStack.write(buffer, item)
+        for (entry in entries) {
+            buffer.writeByte(entry.index.toByte())
+            when (entry) {
+                is Entry.Bytes -> {
+                    buffer.writeVarInt(BYTE_SERIALIZER)
+                    buffer.writeByte(entry.value)
+                }
+                is Entry.Item -> {
+                    buffer.writeVarInt(ITEM_STACK_SERIALIZER)
+                    WireItemStack.write(buffer, entry.stack)
+                }
+            }
+        }
         buffer.writeByte(END_OF_METADATA.toByte())
     }
 
     public companion object {
         public const val ID: Int = 0x63
-        private const val ITEM_STACK_INDEX = 8
-        private const val ITEM_STACK_SERIALIZER_ID = 7
+
+        /** `ItemEntity.DATA_ITEM`: `Entity` claims 0-7, so the item's own entry lands here. */
+        public const val ITEM_STACK_INDEX: Int = 8
+
+        /**
+         * `Avatar.DATA_PLAYER_MODE_CUSTOMISATION`, the bitmask of which skin layers to draw.
+         * Entity 0-7, LivingEntity 8-14, Avatar 15-16.
+         */
+        public const val PLAYER_SKIN_PARTS_INDEX: Int = 16
+
+        private const val BYTE_SERIALIZER = 0
+        private const val ITEM_STACK_SERIALIZER = 7
         private const val END_OF_METADATA = 0xFF
+
+        /** The one entry a dropped item needs. */
+        public fun item(
+            entityId: Int,
+            stack: WireItemStack?,
+        ): SetEntityDataPacket = SetEntityDataPacket(entityId, listOf(Entry.Item(ITEM_STACK_INDEX, stack)))
+
+        /** Which skin layers a player has switched on, straight from their own client settings. */
+        public fun skinParts(
+            entityId: Int,
+            skinParts: Byte,
+        ): SetEntityDataPacket = SetEntityDataPacket(entityId, listOf(Entry.Bytes(PLAYER_SKIN_PARTS_INDEX, skinParts)))
 
         public fun read(buffer: ByteBuffer): SetEntityDataPacket {
             val entityId = buffer.readVarInt()
-            val index = buffer.readByte().toInt() and 0xFF
-            if (index != ITEM_STACK_INDEX) {
-                throw ProtocolException("Only the item-stack metadata entry is supported, got index $index")
+            val entries = mutableListOf<Entry>()
+            while (true) {
+                val index = buffer.readByte().toInt() and 0xFF
+                if (index == END_OF_METADATA) break
+                entries +=
+                    when (val serializer = buffer.readVarInt()) {
+                        BYTE_SERIALIZER -> Entry.Bytes(index, buffer.readByte())
+                        ITEM_STACK_SERIALIZER -> Entry.Item(index, WireItemStack.read(buffer))
+                        else -> throw ProtocolException(
+                            "Unsupported entity metadata serializer $serializer at index $index",
+                        )
+                    }
             }
-            val serializerId = buffer.readVarInt()
-            if (serializerId != ITEM_STACK_SERIALIZER_ID) {
-                throw ProtocolException("Only the item-stack serializer is supported, got id $serializerId")
-            }
-            val item = WireItemStack.read(buffer)
-            val terminator = buffer.readByte().toInt() and 0xFF
-            if (terminator != END_OF_METADATA) {
-                throw ProtocolException("Expected a single metadata entry, found more after index $index")
-            }
-            return SetEntityDataPacket(entityId, item)
+            return SetEntityDataPacket(entityId, entries)
         }
     }
 }

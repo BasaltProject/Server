@@ -48,7 +48,7 @@ class EntityPacketsTest {
     @Test
     fun setEntityDataRoundTrips() {
         val buffer = ByteBuffer()
-        val packet = SetEntityDataPacket(entityId = 7, item = WireItemStack(itemId = 5, count = 3))
+        val packet = SetEntityDataPacket.item(entityId = 7, stack = WireItemStack(itemId = 5, count = 3))
         packet.write(buffer)
         assertEquals(packet, SetEntityDataPacket.read(buffer))
     }
@@ -56,7 +56,7 @@ class EntityPacketsTest {
     @Test
     fun setEntityDataRoundTripsEmptyStack() {
         val buffer = ByteBuffer()
-        val packet = SetEntityDataPacket(entityId = 7, item = null)
+        val packet = SetEntityDataPacket.item(entityId = 7, stack = null)
         packet.write(buffer)
         assertEquals(packet, SetEntityDataPacket.read(buffer))
     }
@@ -78,12 +78,27 @@ class EntityPacketsTest {
     }
 
     @Test
-    fun setEntityDataRejectsAnUnknownIndex() {
+    fun skinPartsMetadataRoundTrips() {
+        val buffer = ByteBuffer()
+        // Index 16 is `Avatar.DATA_PLAYER_MODE_CUSTOMISATION`, counted down the real 26.2 hierarchy
+        // (Entity 0-7, LivingEntity 8-14, Avatar 15-16), not where an older version would put it.
+        val packet = SetEntityDataPacket.skinParts(entityId = 3, skinParts = 0x7F)
+        packet.write(buffer)
+
+        val decoded = SetEntityDataPacket.read(buffer)
+        assertEquals(packet, decoded)
+        assertEquals(
+            SetEntityDataPacket.PLAYER_SKIN_PARTS_INDEX,
+            (decoded.entries.single() as SetEntityDataPacket.Entry.Bytes).index,
+        )
+    }
+
+    @Test
+    fun setEntityDataRejectsAnUnknownSerializer() {
         val buffer = ByteBuffer()
         buffer.writeVarInt(1)
-        buffer.writeByte(0)
-        buffer.writeVarInt(0)
-        buffer.writeByte(1)
+        buffer.writeByte(4)
+        buffer.writeVarInt(99) // a serializer this build has no reader for
         buffer.writeByte(0xFF.toByte())
         assertFailsWith<org.basaltmc.protocol.ProtocolException> { SetEntityDataPacket.read(buffer) }
     }

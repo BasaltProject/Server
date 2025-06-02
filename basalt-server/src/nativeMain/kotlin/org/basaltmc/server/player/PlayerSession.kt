@@ -1,5 +1,6 @@
 package org.basaltmc.server.player
 
+import org.basaltmc.protocol.login.GameProfileProperty
 import org.basaltmc.protocol.play.Gamemode
 import org.basaltmc.protocol.play.SystemChatPacket
 import org.basaltmc.server.ClientSession
@@ -49,6 +50,19 @@ public class PlayerSession(
     public var gamemode: Gamemode = gamemode
     public var sprinting: Boolean = false
 
+    /**
+     * The signed profile properties from the session server, carrying this player's skin and cape.
+     * Empty in offline mode, where nothing signs them and every client draws the default skin.
+     */
+    public var profileProperties: List<GameProfileProperty> = emptyList()
+
+    /**
+     * Which skin layers this player has switched on in their own video settings (hat, jacket,
+     * sleeves, trouser legs). The client owns this and reports it; the server only relays it to
+     * everyone else, or nobody would see the outer layer of anyone's skin.
+     */
+    public var skinParts: Byte = ALL_SKIN_PARTS
+
     public var health: Float = MAX_HEALTH
     public val food: FoodData = FoodData()
     public val experience: ExperienceData = ExperienceData()
@@ -90,5 +104,8 @@ public class PlayerSession(
 
     public companion object {
         public const val MAX_HEALTH: Float = 20f
+
+        /** Every layer on, which is what a client that has not told us otherwise almost certainly has. */
+        public const val ALL_SKIN_PARTS: Byte = 0x7F
     }
 }

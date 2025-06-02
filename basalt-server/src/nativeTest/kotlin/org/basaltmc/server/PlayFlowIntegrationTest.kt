@@ -33,10 +33,12 @@ import org.basaltmc.protocol.play.ServerboundPlayerActionPacket
 import org.basaltmc.protocol.play.ServerboundPositionPacket
 import org.basaltmc.protocol.play.SetChunkCacheCenterPacket
 import org.basaltmc.protocol.play.SetChunkCacheRadiusPacket
+import org.basaltmc.protocol.play.SetEntityDataPacket
 import org.basaltmc.protocol.play.SetExperiencePacket
 import org.basaltmc.protocol.play.SetHealthPacket
 import org.basaltmc.protocol.play.SetHeldSlotPacket
 import org.basaltmc.protocol.play.SetSimulationDistancePacket
+import org.basaltmc.protocol.play.SpawnEntityPacket
 import org.basaltmc.protocol.play.SpawnPositionPacket
 import org.basaltmc.protocol.play.SystemChatPacket
 import org.basaltmc.protocol.play.UpdateLightPacket
@@ -195,6 +197,19 @@ class PlayFlowIntegrationTest {
         val playerInfo = PlayerInfoUpdatePacket.read(playerInfoBody)
         assertTrue(playerInfo.entries.any { it.name == name })
 
+        // A client draws its *own* skin layers from the synced metadata too, so the player's own
+        // entity gets the layer mask before the HUD packets.
+        val ownSkinBody = readFrame(connection, incoming, compressionEnabled = true)
+        assertEquals(SetEntityDataPacket.ID, ownSkinBody.readVarInt())
+        assertEquals(
+            SetEntityDataPacket.PLAYER_SKIN_PARTS_INDEX,
+            SetEntityDataPacket
+                .read(ownSkinBody)
+                .entries
+                .single()
+                .index,
+        )
+
         val healthBody = readFrame(connection, incoming, compressionEnabled = true)
         assertEquals(SetHealthPacket.ID, healthBody.readVarInt())
         assertEquals(20f, SetHealthPacket.read(healthBody).health)
@@ -271,12 +286,40 @@ class PlayFlowIntegrationTest {
                 .name,
         )
 
+        // A tab-list entry alone leaves the other player invisible: they have to be created as a
+        // real entity, and told apart by the profile uuid the client matches against that entry to
+        // find the skin. Their chosen skin layers follow as metadata.
+        val aliceSeesBobSpawnBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
+        assertEquals(SpawnEntityPacket.ID, aliceSeesBobSpawnBody.readVarInt())
+        val bobSpawn = SpawnEntityPacket.read(aliceSeesBobSpawnBody)
+        assertEquals(bob.entityId, bobSpawn.entityId)
+        assertEquals(SpawnEntityPacket.PLAYER_ENTITY_TYPE, bobSpawn.entityType)
+
+        val aliceSeesBobSkinBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
+        assertEquals(SetEntityDataPacket.ID, aliceSeesBobSkinBody.readVarInt())
+        assertEquals(
+            SetEntityDataPacket.PLAYER_SKIN_PARTS_INDEX,
+            SetEntityDataPacket
+                .read(aliceSeesBobSkinBody)
+                .entries
+                .single()
+                .index,
+        )
+
         val aliceSeesBobTeleportBody = readFrame(alice.connection, alice.incoming, compressionEnabled = true)
         assertEquals(EntityTeleportPacket.ID, aliceSeesBobTeleportBody.readVarInt())
         val bobSpawnTeleport = EntityTeleportPacket.read(aliceSeesBobTeleportBody)
         assertEquals(bob.entityId, bobSpawnTeleport.entityId)
 
         // Bob, in turn, was told where Alice already is (her moved-to position from above).
+        val bobSeesAliceSpawnBody = readFrame(bob.connection, bob.incoming, compressionEnabled = true)
+        assertEquals(SpawnEntityPacket.ID, bobSeesAliceSpawnBody.readVarInt())
+        assertEquals(alice.entityId, SpawnEntityPacket.read(bobSeesAliceSpawnBody).entityId)
+
+        val bobSeesAliceSkinBody = readFrame(bob.connection, bob.incoming, compressionEnabled = true)
+        assertEquals(SetEntityDataPacket.ID, bobSeesAliceSkinBody.readVarInt())
+        SetEntityDataPacket.read(bobSeesAliceSkinBody)
+
         val bobSeesAliceBody = readFrame(bob.connection, bob.incoming, compressionEnabled = true)
         assertEquals(EntityTeleportPacket.ID, bobSeesAliceBody.readVarInt())
         val aliceTeleport = EntityTeleportPacket.read(bobSeesAliceBody)
