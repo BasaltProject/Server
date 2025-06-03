@@ -14,8 +14,8 @@ import kotlin.test.assertTrue
  * with real transcription risk live in [TerrainProvider], already verified bit-exact against the
  * jar, and the node types carry their own `// parity:` provenance.
  *
- * An end-to-end comparison needs the per-world-seed resolution `NoiseRouter.withNewRandom` applies,
- * which does not exist yet, so it waits rather than being faked with an ad hoc seeding scheme.
+ * End-to-end seeded cave and surface vectors live in [OfficialOverworldDensityVectorsTest]; these
+ * tests keep the fast synthetic structural coverage for every router variant.
  */
 class NoiseRouterDataTest {
     private fun syntheticNoise(name: String): NormalNoise {

@@ -56,9 +56,8 @@ import kotlin.uuid.Uuid
  * A survival break's loot drop needs a downloaded `server.jar` this test server has not got, so
  * [RealLootTablesTest] and `LootTableTest` cover those halves instead.
  *
- * The target y is 300: noise reaches higher than the documented height variation suggests, and
- * y=100 came back solid dirt for seed 0. [BlockHitResult.inside] places at the target rather than
- * offsetting from a neighbour, so no solid block has to be found.
+ * The target y is 300: y=100 came back solid dirt for seed 0, noise reaching higher than the
+ * documented variation suggests. [BlockHitResult.inside] places at the target, needing no neighbour.
  */
 @OptIn(ExperimentalUuidApi::class)
 class BlockInteractionIntegrationTest {
