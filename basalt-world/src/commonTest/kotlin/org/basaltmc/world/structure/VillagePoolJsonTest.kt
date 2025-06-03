@@ -1,9 +1,9 @@
 package org.basaltmc.world.structure
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.random.WorldgenRandom
 import org.basaltmc.random.XoroshiroRandom
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

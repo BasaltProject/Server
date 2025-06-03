@@ -1,7 +1,7 @@
 package org.basaltmc.server.player
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.protocol.play.WireItemStack
-import org.basaltmc.registry.Identifier
 import org.basaltmc.registry.Items
 import org.basaltmc.storage.StoredInventory
 import org.basaltmc.storage.StoredItemStack

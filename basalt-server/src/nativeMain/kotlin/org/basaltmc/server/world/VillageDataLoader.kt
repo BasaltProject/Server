@@ -1,12 +1,12 @@
 package org.basaltmc.server.world
 
 import org.basaltmc.assets.ServerJarAssets
+import org.basaltmc.common.Identifier
 import org.basaltmc.io.Gzip
 import org.basaltmc.io.NativeMutex
 import org.basaltmc.nbt.NbtCompound
 import org.basaltmc.nbt.NbtIO
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import org.basaltmc.world.structure.BlockTagJson
 import org.basaltmc.world.structure.StructureTemplate
 import org.basaltmc.world.structure.StructureTemplatePool

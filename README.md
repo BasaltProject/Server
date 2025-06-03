@@ -158,6 +158,16 @@ Passing it is a deliberate act and counts as accepting the EULA.
 
 ## Building
 
+The network layer lives in [Wire](https://github.com/BasaltProject/Wire), shared
+with the proxy and pulled in as a submodule, so clone with it:
+
+```bash
+git clone --recurse-submodules https://github.com/BasaltProject/Server.git
+```
+
+In an existing clone, `git submodule update --init` does the same thing. Without
+it the build fails immediately: half the modules are missing.
+
 Gradle orchestrates the build; it is not part of the runtime.
 
 Kotlin/Native tasks carry the target in their name; replace `MacosArm64` with the
@@ -223,6 +233,14 @@ Use the included wrapper rather than a system Gradle installation.
 What that adds up to today: a real client connects, authenticates, spawns in a
 generated world, flies around while chunks stream in, breaks blocks, chats, and
 sees other players do the same. Everything below that line is still missing.
+
+## Related repositories
+
+| Repository | What it is |
+|---|---|
+| [Wire](https://github.com/BasaltProject/Wire) | The network layer this repository builds on, shared with the proxy |
+| [Proxy](https://github.com/BasaltProject/Proxy) | The proxy component |
+| [Website](https://github.com/BasaltProject/Website) | The project site, at [basaltmc.org](https://basaltmc.org) |
 
 ## License
 

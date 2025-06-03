@@ -1,6 +1,6 @@
 package org.basaltmc.world.advancement
 
-import org.basaltmc.registry.Identifier
+import org.basaltmc.common.Identifier
 
 /** One named criterion within an advancement: which trigger grants it. Its condition JSON is kept unparsed. */
 public data class AdvancementCriterion(

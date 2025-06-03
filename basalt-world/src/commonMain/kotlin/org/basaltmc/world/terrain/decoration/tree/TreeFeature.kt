@@ -1,12 +1,12 @@
 package org.basaltmc.world.terrain.decoration.tree
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.nbt.NbtCompound
 import org.basaltmc.nbt.NbtList
 import org.basaltmc.nbt.NbtTag
 import org.basaltmc.nbt.NbtType
 import org.basaltmc.random.WorldgenRandom
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.ChunkBlockEntity
 import org.basaltmc.world.WorldHeight
@@ -177,7 +177,7 @@ public sealed class TrunkPlacer(
             ).mapNotNull {
                 Blocks.REGISTRY
                     .byIdentifier(
-                        org.basaltmc.registry.Identifier
+                        org.basaltmc.common.Identifier
                             .vanilla(it),
                     )?.stateId
             }.toSet()
@@ -986,7 +986,7 @@ public class MangroveRootPlacer(
         fun state(name: String): Int =
             Blocks.REGISTRY
                 .byIdentifier(
-                    org.basaltmc.registry.Identifier
+                    org.basaltmc.common.Identifier
                         .vanilla(name),
                 )?.stateId
                 ?: error("unknown block '$name'")
@@ -1002,7 +1002,7 @@ public class MangroveRootPlacer(
                 .mapNotNull {
                     Blocks.REGISTRY
                         .byIdentifier(
-                            org.basaltmc.registry.Identifier
+                            org.basaltmc.common.Identifier
                                 .vanilla(it),
                         )?.stateId
                 }.toSet()
@@ -2501,7 +2501,7 @@ public object TreeFeature {
         ).mapNotNull {
             Blocks.REGISTRY
                 .byIdentifier(
-                    org.basaltmc.registry.Identifier
+                    org.basaltmc.common.Identifier
                         .vanilla(it),
                 )?.stateId
         }.toSet()
@@ -2516,7 +2516,7 @@ public object TreeFeature {
     private val defaultVineStateId =
         Blocks.REGISTRY
             .byIdentifier(
-                org.basaltmc.registry.Identifier
+                org.basaltmc.common.Identifier
                     .vanilla("vine"),
             )?.stateId
             ?: error("unknown block 'vine'")
@@ -2530,14 +2530,14 @@ public object TreeFeature {
     private val defaultCocoaStateId =
         Blocks.REGISTRY
             .byIdentifier(
-                org.basaltmc.registry.Identifier
+                org.basaltmc.common.Identifier
                     .vanilla("cocoa"),
             )?.stateId
             ?: error("unknown block 'cocoa'")
     private val paleHangingMossTipTrueStateId =
         Blocks.REGISTRY
             .byIdentifier(
-                org.basaltmc.registry.Identifier
+                org.basaltmc.common.Identifier
                     .vanilla("pale_hanging_moss"),
             )?.stateId
             ?: error("unknown block 'pale_hanging_moss'")
@@ -2546,7 +2546,7 @@ public object TreeFeature {
         (
             Blocks.REGISTRY
                 .byIdentifier(
-                    org.basaltmc.registry.Identifier
+                    org.basaltmc.common.Identifier
                         .vanilla("creaking_heart"),
                 )?.stateId
                 ?: error("unknown block 'creaking_heart'")
@@ -2555,7 +2555,7 @@ public object TreeFeature {
         (
             Blocks.REGISTRY
                 .byIdentifier(
-                    org.basaltmc.registry.Identifier
+                    org.basaltmc.common.Identifier
                         .vanilla("mangrove_propagule"),
                 )?.stateId
                 ?: error("unknown block 'mangrove_propagule'")
@@ -2563,7 +2563,7 @@ public object TreeFeature {
     private val defaultLeafLitterStateId =
         Blocks.REGISTRY
             .byIdentifier(
-                org.basaltmc.registry.Identifier
+                org.basaltmc.common.Identifier
                     .vanilla("leaf_litter"),
             )?.stateId
             ?: error("unknown block 'leaf_litter'")
@@ -2571,7 +2571,7 @@ public object TreeFeature {
         (
             Blocks.REGISTRY
                 .byIdentifier(
-                    org.basaltmc.registry.Identifier
+                    org.basaltmc.common.Identifier
                         .vanilla("bee_nest"),
                 )?.stateId
                 ?: error("unknown block 'bee_nest'")

@@ -1,7 +1,7 @@
 package org.basaltmc.world.terrain.decoration.tree
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import org.basaltmc.world.terrain.decoration.IntProvider
 
 /**

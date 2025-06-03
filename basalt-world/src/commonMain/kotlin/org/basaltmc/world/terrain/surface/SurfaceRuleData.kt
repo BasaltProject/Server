@@ -1,7 +1,7 @@
 package org.basaltmc.world.terrain.surface
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import org.basaltmc.world.terrain.surface.SurfaceRules.hole
 import org.basaltmc.world.terrain.surface.SurfaceRules.ifTrue
 import org.basaltmc.world.terrain.surface.SurfaceRules.isBiome

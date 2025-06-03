@@ -73,6 +73,6 @@ public object BiomeClimateData {
             "sulfur_caves" to BiomeClimate(0.8f),
         )
 
-    /** [id] is a full `namespace:path` identifier string (see [org.basaltmc.registry.Identifier.toString]); unknown biomes fall back to `0.5`, vanilla's own `Biome` default. */
+    /** [id] is a full `namespace:path` identifier string (see [org.basaltmc.common.Identifier.toString]); unknown biomes fall back to `0.5`, vanilla's own `Biome` default. */
     public fun forBiomeId(id: String): BiomeClimate = byPath[id.substringAfter(':')] ?: BiomeClimate(0.5f)
 }

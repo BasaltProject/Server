@@ -1,7 +1,7 @@
 package org.basaltmc.world.terrain.decoration
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.random.WorldgenRandom
-import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.terrain.decoration.tree.FallenTreeConfigs
 import org.basaltmc.world.terrain.decoration.tree.TreeConfigs

@@ -1,6 +1,6 @@
 package org.basaltmc.server.command.commands
 
-import org.basaltmc.registry.Identifier
+import org.basaltmc.common.Identifier
 import org.basaltmc.registry.Items
 import org.basaltmc.server.command.Command
 import org.basaltmc.server.command.CommandNodeBuilder

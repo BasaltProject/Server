@@ -5,7 +5,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
-import org.basaltmc.registry.Identifier
+import org.basaltmc.common.Identifier
 
 /**
  * Parses the real vanilla advancement JSON schema into [Advancement]. Missing `requirements`

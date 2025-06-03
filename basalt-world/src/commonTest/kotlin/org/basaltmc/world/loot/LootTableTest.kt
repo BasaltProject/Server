@@ -1,7 +1,7 @@
 package org.basaltmc.world.loot
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.random.LegacyRandom
-import org.basaltmc.registry.Identifier
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

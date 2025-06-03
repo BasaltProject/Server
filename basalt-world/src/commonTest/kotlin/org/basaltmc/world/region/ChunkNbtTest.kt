@@ -1,11 +1,11 @@
 package org.basaltmc.world.region
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.nbt.NbtCompound
 import org.basaltmc.nbt.NbtList
 import org.basaltmc.nbt.NbtType
 import org.basaltmc.registry.Biomes
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.ChunkBlockEntity
 import org.basaltmc.world.ChunkGeneratedEntity

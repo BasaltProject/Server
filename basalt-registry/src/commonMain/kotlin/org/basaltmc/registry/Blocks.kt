@@ -1,5 +1,7 @@
 package org.basaltmc.registry
 
+import org.basaltmc.common.Identifier
+
 /** A single block state, identified by its vanilla network state ID. */
 public data class BlockState(
     public val block: Identifier,

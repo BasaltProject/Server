@@ -1,8 +1,8 @@
 package org.basaltmc.world
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.nbt.NbtCompound
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

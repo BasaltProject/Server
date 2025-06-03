@@ -1,9 +1,9 @@
 package org.basaltmc.world.terrain.surface
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.random.BasaltRandom
 import org.basaltmc.random.LegacyRandom
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.ChunkHeight
 import org.basaltmc.world.WorldHeight
@@ -179,7 +179,7 @@ class SurfaceBuilderTest {
         val deepslateStateId =
             Blocks.REGISTRY
                 .byIdentifier(
-                    org.basaltmc.registry.Identifier
+                    org.basaltmc.common.Identifier
                         .vanilla("deepslate"),
                 )!!
                 .stateId

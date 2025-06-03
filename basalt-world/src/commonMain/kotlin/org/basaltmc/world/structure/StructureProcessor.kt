@@ -1,10 +1,10 @@
 package org.basaltmc.world.structure
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.random.LegacyRandom
 import org.basaltmc.random.PositionalHashing
 import org.basaltmc.random.WorldgenRandom
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 
 /**
  * // parity: net.minecraft.world.level.levelgen.structure.templatesystem.RuleTest, narrowed to

@@ -68,14 +68,14 @@ public object CactusFeature {
     private val cactusStateId =
         Blocks.REGISTRY
             .byIdentifier(
-                org.basaltmc.registry.Identifier
+                org.basaltmc.common.Identifier
                     .vanilla("cactus"),
             )?.stateId
             ?: error("unknown block 'cactus'")
     private val cactusFlowerStateId =
         Blocks.REGISTRY
             .byIdentifier(
-                org.basaltmc.registry.Identifier
+                org.basaltmc.common.Identifier
                     .vanilla("cactus_flower"),
             )?.stateId
             ?: error("unknown block 'cactus_flower'")

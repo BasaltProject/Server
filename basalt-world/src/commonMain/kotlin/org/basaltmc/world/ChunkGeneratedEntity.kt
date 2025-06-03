@@ -1,7 +1,7 @@
 package org.basaltmc.world
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.nbt.NbtCompound
-import org.basaltmc.registry.Identifier
 
 /** Entity emitted by world generation and waiting for the runtime entity layer to materialize it. */
 public data class ChunkGeneratedEntity(

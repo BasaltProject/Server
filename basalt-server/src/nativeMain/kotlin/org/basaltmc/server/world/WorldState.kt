@@ -1,8 +1,8 @@
 package org.basaltmc.server.world
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.io.NativeMutex
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.ChunkGeneratedEntity
 import org.basaltmc.world.NoiseWorldGenerator

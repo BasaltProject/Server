@@ -1,6 +1,6 @@
 package org.basaltmc.registry.tags
 
-import org.basaltmc.registry.Identifier
+import org.basaltmc.common.Identifier
 
 /** Thrown when a tag graph can't be resolved: a required reference is missing, or a cycle exists. */
 public class TagResolutionException(

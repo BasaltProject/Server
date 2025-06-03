@@ -1,7 +1,7 @@
 package org.basaltmc.world.terrain.decoration
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.WorldHeight
 import org.basaltmc.world.terrain.BiomeClimateData

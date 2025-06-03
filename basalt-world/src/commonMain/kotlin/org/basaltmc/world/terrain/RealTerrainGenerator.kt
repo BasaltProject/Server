@@ -1,10 +1,10 @@
 package org.basaltmc.world.terrain
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.random.WorldgenRandom
 import org.basaltmc.random.XoroshiroRandom
 import org.basaltmc.registry.Biomes
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import org.basaltmc.world.GenerationMetrics
 import org.basaltmc.world.WorldHeight

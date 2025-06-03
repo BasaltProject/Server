@@ -6,7 +6,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
-import org.basaltmc.registry.Identifier
+import org.basaltmc.common.Identifier
 import org.basaltmc.world.loot.ItemStack
 
 /** Thrown for recipe JSON this parser doesn't (yet) understand: an unsupported type, not malformed JSON. */

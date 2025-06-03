@@ -1,7 +1,7 @@
 package org.basaltmc.server.world
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import org.basaltmc.world.Chunk
 import kotlin.test.Test
 import kotlin.test.assertEquals

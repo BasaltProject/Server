@@ -1,8 +1,8 @@
 package org.basaltmc.world.terrain.surface
 
+import org.basaltmc.common.Identifier
 import org.basaltmc.random.BasaltRandom
 import org.basaltmc.registry.Blocks
-import org.basaltmc.registry.Identifier
 import kotlin.math.floor
 
 /** // parity: `SurfaceSystem.generateBands`, the per-world 192-block badlands clay palette. */
