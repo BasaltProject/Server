@@ -57,7 +57,6 @@ public object RealTerrainGenerator {
             )
         val aquifer = OverworldAquifer(router, seed, chunkX, chunkZ, WorldHeight.MIN_Y, WorldHeight.HEIGHT, cache)
         val oreVeins = OverworldOreVeinifier(router, seed, cache)
-        GenerationMetrics.measure(GenerationMetrics.Phase.DENSITY_GRID) { sampler.prepare() }
         GenerationMetrics.measure(GenerationMetrics.Phase.TERRAIN_FILL) {
             // Cell by cell rather than column by column, so a cell of open sky (all eight corners
             // non-positive and entirely at or above sea level, which is most of a chunk's height)

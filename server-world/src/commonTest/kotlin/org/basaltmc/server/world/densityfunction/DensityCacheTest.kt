@@ -146,7 +146,7 @@ class DensityCacheTest {
     @Test
     fun `interpolated marker samples and reuses its eight noise cell corners`() {
         val cache = DensityCache(chunkX = 0, chunkZ = 0, slotCount = Marker.slotCount + 4)
-        cache.configureInterpolation(cellWidth = 4, cellHeight = 8)
+        cache.configureInterpolation(cellWidth = 4, cellHeight = 8, minY = -64, height = 384)
         val echo = PositionEcho()
         val marker = Marker(MarkerType.INTERPOLATED, echo)
 

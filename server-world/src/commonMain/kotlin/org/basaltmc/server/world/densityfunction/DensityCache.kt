@@ -24,19 +24,38 @@ public class DensityCache(
     private val lastSeen2d = BooleanArray(slotCount)
     private val lastPos2d = LongArray(slotCount)
     private val lastValue2d = DoubleArray(slotCount)
-    private val interpolatedValues = arrayOfNulls<MutableMap<Long, Double>>(slotCount)
+
+    // The cell corners of this chunk, one dense grid per marker. A map keyed by packed position
+    // boxed a Double on each of the eight corner lookups every block does, which is most of the
+    // work the interpolation exists to avoid.
+    private val interpolatedValues = arrayOfNulls<DoubleArray>(slotCount)
+    private val interpolatedPresent = arrayOfNulls<BooleanArray>(slotCount)
+    private val distantValues = arrayOfNulls<MutableMap<Long, Double>>(slotCount)
+    private val lastCellKey = LongArray(slotCount)
+    private val lastCellValid = BooleanArray(slotCount)
+    private val lastCorners = DoubleArray(slotCount * CORNERS_PER_CELL)
+    private val firstBlockX = chunkX * 16
+    private val firstBlockZ = chunkZ * 16
     private var interpolationCellWidth = 0
     private var interpolationCellHeight = 0
+    private var interpolationMinY = 0
+    private var interpolationGridX = 0
+    private var interpolationGridY = 0
 
-    /** Supplies the noise-cell dimensions used by vanilla's `NoiseChunk.Interpolator`. */
+    /** Supplies the noise-cell dimensions and Y range used by vanilla's `NoiseChunk.Interpolator`. */
     public fun configureInterpolation(
         cellWidth: Int,
         cellHeight: Int,
+        minY: Int,
+        height: Int,
     ) {
         require(cellWidth > 0 && cellHeight > 0) { "Interpolation cell dimensions must be positive" }
         if (interpolationCellWidth == 0) {
             interpolationCellWidth = cellWidth
             interpolationCellHeight = cellHeight
+            interpolationMinY = minY
+            interpolationGridX = 16 / cellWidth + 1
+            interpolationGridY = height / cellHeight + 1
         } else {
             require(interpolationCellWidth == cellWidth && interpolationCellHeight == cellHeight) {
                 "Density cache already uses ${interpolationCellWidth}x$interpolationCellHeight cells, " +
@@ -107,16 +126,23 @@ public class DensityCache(
         val minX = context.blockX.floorDiv(cellWidth) * cellWidth
         val minY = context.blockY.floorDiv(cellHeight) * cellHeight
         val minZ = context.blockZ.floorDiv(cellWidth) * cellWidth
-        val values = interpolatedValues[slot] ?: HashMap<Long, Double>().also { interpolatedValues[slot] = it }
 
-        fun corner(
-            x: Int,
-            y: Int,
-            z: Int,
-        ): Double =
-            values.getOrPut(packBlockPos(x, y, z)) {
-                function.compute(FunctionContext(x, y, z, this))
-            }
+        // The terrain fill walks a whole cell before moving to the next, so all but one of a
+        // cell's 128 blocks find the eight corners already in hand and only pay the lerp.
+        val key = packBlockPos(minX, minY, minZ)
+        val base = slot * CORNERS_PER_CELL
+        if (!lastCellValid[slot] || lastCellKey[slot] != key) {
+            lastCorners[base] = corner(slot, function, minX, minY, minZ)
+            lastCorners[base + 1] = corner(slot, function, minX + cellWidth, minY, minZ)
+            lastCorners[base + 2] = corner(slot, function, minX, minY + cellHeight, minZ)
+            lastCorners[base + 3] = corner(slot, function, minX + cellWidth, minY + cellHeight, minZ)
+            lastCorners[base + 4] = corner(slot, function, minX, minY, minZ + cellWidth)
+            lastCorners[base + 5] = corner(slot, function, minX + cellWidth, minY, minZ + cellWidth)
+            lastCorners[base + 6] = corner(slot, function, minX, minY + cellHeight, minZ + cellWidth)
+            lastCorners[base + 7] = corner(slot, function, minX + cellWidth, minY + cellHeight, minZ + cellWidth)
+            lastCellKey[slot] = key
+            lastCellValid[slot] = true
+        }
 
         val fractionX = (context.blockX - minX).toDouble() / cellWidth
         val fractionY = (context.blockY - minY).toDouble() / cellHeight
@@ -125,23 +151,66 @@ public class DensityCache(
             fractionX,
             fractionY,
             fractionZ,
-            corner(minX, minY, minZ),
-            corner(minX + cellWidth, minY, minZ),
-            corner(minX, minY + cellHeight, minZ),
-            corner(minX + cellWidth, minY + cellHeight, minZ),
-            corner(minX, minY, minZ + cellWidth),
-            corner(minX + cellWidth, minY, minZ + cellWidth),
-            corner(minX, minY + cellHeight, minZ + cellWidth),
-            corner(minX + cellWidth, minY + cellHeight, minZ + cellWidth),
+            lastCorners[base],
+            lastCorners[base + 1],
+            lastCorners[base + 2],
+            lastCorners[base + 3],
+            lastCorners[base + 4],
+            lastCorners[base + 5],
+            lastCorners[base + 6],
+            lastCorners[base + 7],
         )
+    }
+
+    /**
+     * One cell corner. Corners of this chunk come off a dense grid; the aquifer also asks for
+     * positions well outside it (and, following vanilla, for cell indices used as block
+     * coordinates), and those keep the map.
+     */
+    private fun corner(
+        slot: Int,
+        function: DensityFunction,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Double {
+        val gridX = (x - firstBlockX) / interpolationCellWidth
+        val gridY = (y - interpolationMinY) / interpolationCellHeight
+        val gridZ = (z - firstBlockZ) / interpolationCellWidth
+        if (gridX < 0 ||
+            gridX >= interpolationGridX ||
+            gridY < 0 ||
+            gridY >= interpolationGridY ||
+            gridZ < 0 ||
+            gridZ >= interpolationGridX
+        ) {
+            return distantCorner(slot, function, x, y, z)
+        }
+        val size = interpolationGridX * interpolationGridY * interpolationGridX
+        val values = interpolatedValues[slot] ?: DoubleArray(size).also { interpolatedValues[slot] = it }
+        val present = interpolatedPresent[slot] ?: BooleanArray(size).also { interpolatedPresent[slot] = it }
+        val index = (gridX * interpolationGridY + gridY) * interpolationGridX + gridZ
+        if (!present[index]) {
+            values[index] = function.compute(FunctionContext(x, y, z, this))
+            present[index] = true
+        }
+        return values[index]
+    }
+
+    private fun distantCorner(
+        slot: Int,
+        function: DensityFunction,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Double {
+        val values = distantValues[slot] ?: HashMap<Long, Double>().also { distantValues[slot] = it }
+        return values.getOrPut(packBlockPos(x, y, z)) { function.compute(FunctionContext(x, y, z, this)) }
     }
 
     private companion object {
         const val QUARTS_PER_CHUNK = 4
-
-        // parity: NoiseChunk's own `noiseSizeXZ + 1`, with the real Overworld cellWidth of 4 (which
-        // makes the noise grid and the quart grid the same thing).
-        const val GRID_SIZE = QUARTS_PER_CHUNK + 1
+        const val CORNERS_PER_CELL = 8
 
         // Same 26/12/26 bit layout as BlockPos. Every legal dimension Y fits in twelve bits.
         fun packBlockPos(
@@ -152,5 +221,9 @@ public class DensityCache(
             ((x.toLong() and 0x3FFFFFFL) shl 38) or
                 ((z.toLong() and 0x3FFFFFFL) shl 12) or
                 (y.toLong() and 0xFFFL)
+
+        // parity: NoiseChunk's own `noiseSizeXZ + 1`, with the real Overworld cellWidth of 4 (which
+        // makes the noise grid and the quart grid the same thing).
+        const val GRID_SIZE = QUARTS_PER_CHUNK + 1
     }
 }
