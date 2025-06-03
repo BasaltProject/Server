@@ -24,6 +24,10 @@ public class TickLoop(
     saveIntervalSeconds: Int = DEFAULT_SAVE_INTERVAL_SECONDS,
     /** Every tick's duration, for the distribution `/timings` reports. */
     public val durations: TickDurations = TickDurations(),
+    /**
+     * The periodic sweep, on its own thread. On the tick thread it outlasted [CATCH_UP_LIMIT], so
+     * its backlog was dropped rather than caught up and those ticks were simply lost.
+     */
     private val onSaveInterval: () -> Unit = {},
     /**
      * Runs every tick. Deliberately not a general extension point: it exists so something checks
@@ -37,11 +41,16 @@ public class TickLoop(
     private val running = AtomicInt(0)
     private val rates = AtomicReference(TickRates.IDLE)
 
+    // A flag, not a queue: a sweep that outlasts an interval owes one more sweep, not several.
+    private val sweepRequested = AtomicInt(0)
+    private val sweeping = AtomicInt(0)
+
     /** How many ticks a second the loop is actually managing, over one, five and fifteen minutes. */
     public val tickRates: TickRates get() = rates.value
 
     public fun start() {
         running.value = 1
+        if (saveIntervalTicks > 0) startSweeper()
         NativeThread.start {
             val meter = TickMeter()
             var tick = 0L
@@ -51,7 +60,7 @@ public class TickLoop(
                 val started = TimeSource.Monotonic.markNow()
                 tick++
                 onTick()
-                if (saveIntervalTicks > 0 && tick % saveIntervalTicks == 0L) onSaveInterval()
+                if (saveIntervalTicks > 0 && tick % saveIntervalTicks == 0L) sweepRequested.value = 1
 
                 // Recorded before the sleep, so it is the work that is measured and not the wait.
                 durations.record(clock.elapsedNow().inWholeNanoseconds, started.elapsedNow().inWholeNanoseconds)
@@ -75,8 +84,31 @@ public class TickLoop(
         }
     }
 
+    /** Stops ticking and waits for a sweep in flight: the caller's next move is to save once itself. */
     public fun stop() {
         running.value = 0
+        var waited = 0L
+        while (sweeping.value == 1 && waited < STOP_DRAIN_MILLIS) {
+            sleepMillis(SWEEP_POLL_MILLIS)
+            waited += SWEEP_POLL_MILLIS
+        }
+    }
+
+    private fun startSweeper() {
+        NativeThread.start {
+            while (running.value == 1) {
+                if (!sweepRequested.compareAndSet(1, 0)) {
+                    sleepMillis(SWEEP_POLL_MILLIS)
+                    continue
+                }
+                sweeping.value = 1
+                try {
+                    onSaveInterval()
+                } finally {
+                    sweeping.value = 0
+                }
+            }
+        }
     }
 
     /** Ticks per second over the three windows, the way every server reports them. */
@@ -136,6 +168,10 @@ public class TickLoop(
 
         /** How many ticks behind the loop tolerates before it stops trying to catch up. */
         private const val CATCH_UP_LIMIT = 20
+
+        private const val SWEEP_POLL_MILLIS = 5L
+
+        private const val STOP_DRAIN_MILLIS = 30_000L
 
         /** Fifteen minutes, the longest window reported. */
         private const val WINDOW_SECONDS = 900

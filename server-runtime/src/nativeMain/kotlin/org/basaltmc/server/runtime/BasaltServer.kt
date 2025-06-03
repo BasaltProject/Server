@@ -19,6 +19,7 @@ import org.basaltmc.server.runtime.player.Difficulty
 import org.basaltmc.server.runtime.player.PlayerRegistry
 import org.basaltmc.server.runtime.timings.ReportSources
 import org.basaltmc.server.runtime.timings.TimingsReport
+import org.basaltmc.server.runtime.world.ChunkGenerationQueue
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.RealBlockTags
 import org.basaltmc.server.runtime.world.RealItemTags
@@ -157,7 +158,7 @@ public class BasaltServer(
                     timings = timings,
                     // One worker while measuring: GenerationMetrics counts without atomics on
                     // purpose, so its numbers are only exact when a single thread is generating.
-                    generationWorkers = if (config.generationMetrics) 1 else 8,
+                    generationWorkers = if (config.generationMetrics) 1 else ChunkGenerationQueue.DEFAULT_WORKERS,
                     overworldRouter = overworldRouter,
                     surfaceEnvironment = surfaceEnvironment,
                     villageGenerator = villageGenerator,
