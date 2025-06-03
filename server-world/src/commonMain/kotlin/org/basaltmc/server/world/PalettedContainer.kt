@@ -1,5 +1,7 @@
 package org.basaltmc.server.world
 
+import kotlin.concurrent.Volatile
+
 /**
  * // parity: net.minecraft.world.level.chunk.PalettedContainer, as storage only.
  *
@@ -8,34 +10,33 @@ package org.basaltmc.server.world
  * is what makes chunks affordable to keep in memory, where a flat `IntArray(4096)` per section put
  * one chunk at roughly 390 KB.
  *
- * Not thread safe: a section belongs to one chunk, and chunk access is serialized a level up.
+ * One writer, any number of readers. Connection threads read a chunk to send it while the world is
+ * still being written to, so the width, the palette and the data array are swapped as one
+ * [Storage]: read separately, a widening write handed a reader the new width with the old array and
+ * it indexed off the end.
  */
 public class PalettedContainer(
     private val size: Int,
     initialValue: Int = 0,
 ) {
-    private var palette = IntArray(INITIAL_PALETTE_CAPACITY).also { it[0] = initialValue }
-    private var paletteSize = 1
+    /** 0 bits means every entry is [palette]`[0]`, in which case [words] stays null and costs nothing. */
+    private class Storage(
+        val bits: Int,
+        val palette: IntArray,
+        val paletteSize: Int,
+        val words: LongArray?,
+    )
 
-    /** 0 means every entry is [palette]`[0]`, in which case [data] stays null and costs nothing. */
-    private var bitsPerEntry = 0
-    private var data: LongArray? = null
+    @Volatile
+    private var storage =
+        Storage(0, IntArray(INITIAL_PALETTE_CAPACITY).also { it[0] = initialValue }, 1, null)
 
     public operator fun get(index: Int): Int {
-        val storage = data ?: return palette[0]
-        val bitIndex = index * bitsPerEntry
-        val wordIndex = bitIndex ushr 6
-        val bitOffset = bitIndex and 63
-        val mask = (1L shl bitsPerEntry) - 1L
-        val available = 64 - bitOffset
-        val raw =
-            if (available >= bitsPerEntry) {
-                (storage[wordIndex] ushr bitOffset) and mask
-            } else {
-                // An entry straddling two words: the low bits finish in the next one.
-                ((storage[wordIndex] ushr bitOffset) or (storage[wordIndex + 1] shl available)) and mask
-            }
-        return palette[raw.toInt()]
+        val current = storage
+        val words = current.words ?: return current.palette[0]
+        val raw = readRaw(words, current.bits, index)
+        // A reader can catch an entry written after its own snapshot was taken.
+        return if (raw < current.paletteSize) current.palette[raw] else current.palette[0]
     }
 
     /** Returns whether the stored value actually changed, so callers can track modifications without re-reading. */
@@ -43,7 +44,8 @@ public class PalettedContainer(
         index: Int,
         value: Int,
     ): Boolean {
-        if (data == null && palette[0] == value) return false
+        val current = storage
+        if (current.words == null && current.palette[0] == value) return false
         if (get(index) == value) return false
         write(index, indexOfOrAdd(value))
         return true
@@ -55,83 +57,59 @@ public class PalettedContainer(
     /** Replaces the whole contents, re-deriving the palette from [values]. */
     public fun setAll(values: IntArray) {
         require(values.size == size) { "expected $size values, got ${values.size}" }
-        palette = IntArray(INITIAL_PALETTE_CAPACITY)
-        palette[0] = values[0]
-        paletteSize = 1
-        bitsPerEntry = 0
-        data = null
+        storage = Storage(0, IntArray(INITIAL_PALETTE_CAPACITY).also { it[0] = values[0] }, 1, null)
         for (i in values.indices) set(i, values[i])
     }
 
     /** How many distinct values are stored, which is what decides the entry width. */
-    public val distinctValueCount: Int get() = paletteSize
+    public val distinctValueCount: Int get() = storage.paletteSize
 
     /** Bits each entry occupies; 0 while every entry is identical and no data array exists. */
-    public val bitsPerValue: Int get() = bitsPerEntry
+    public val bitsPerValue: Int get() = storage.bits
 
+    /**
+     * The palette slot for [value], adding it and widening the entries if it is new.
+     *
+     * Publishes the new [Storage] before the caller writes the slot into the data, so a reader
+     * never meets an index its palette does not have yet.
+     */
     private fun indexOfOrAdd(value: Int): Int {
-        for (i in 0 until paletteSize) if (palette[i] == value) return i
-        if (paletteSize == palette.size) palette = palette.copyOf(palette.size * 2)
-        palette[paletteSize] = value
-        paletteSize++
-        growIfNeeded()
-        return paletteSize - 1
-    }
+        val current = storage
+        for (i in 0 until current.paletteSize) if (current.palette[i] == value) return i
 
-    private fun growIfNeeded() {
-        val needed = bitsFor(paletteSize)
-        if (needed <= bitsPerEntry) return
-        val widened = needed.coerceAtLeast(MIN_BITS_PER_ENTRY)
-        val previous = data
-        val previousBits = bitsPerEntry
-        bitsPerEntry = widened
-        data = LongArray((size * widened + 63) / 64)
-        if (previous == null) {
-            // Was uniform: every entry already refers to palette slot 0, which is all-zero bits.
-            return
-        }
-        // Re-pack the existing indices at the wider width. Palette slots are unchanged, so the
-        // values themselves are untouched by the move.
-        for (i in 0 until size) {
-            write(i, readRaw(previous, previousBits, i))
-        }
-    }
-
-    private fun readRaw(
-        storage: LongArray,
-        bits: Int,
-        index: Int,
-    ): Int {
-        val bitIndex = index * bits
-        val wordIndex = bitIndex ushr 6
-        val bitOffset = bitIndex and 63
-        val mask = (1L shl bits) - 1L
-        val available = 64 - bitOffset
-        val raw =
-            if (available >= bits) {
-                (storage[wordIndex] ushr bitOffset) and mask
+        val palette =
+            if (current.paletteSize == current.palette.size) {
+                current.palette.copyOf(current.palette.size * 2)
             } else {
-                ((storage[wordIndex] ushr bitOffset) or (storage[wordIndex + 1] shl available)) and mask
+                current.palette
             }
-        return raw.toInt()
+        palette[current.paletteSize] = value
+        val paletteSize = current.paletteSize + 1
+
+        val needed = bitsFor(paletteSize)
+        if (needed <= current.bits) {
+            storage = Storage(current.bits, palette, paletteSize, current.words)
+            return paletteSize - 1
+        }
+
+        val widened = needed.coerceAtLeast(MIN_BITS_PER_ENTRY)
+        val words = LongArray((size * widened + 63) / 64)
+        val previous = current.words
+        // Palette slots are unchanged, so re-packing the indices at the wider width moves no values.
+        if (previous != null) {
+            for (i in 0 until size) writeInto(words, widened, i, readRaw(previous, current.bits, i))
+        }
+        storage = Storage(widened, palette, paletteSize, words)
+        return paletteSize - 1
     }
 
     private fun write(
         index: Int,
         paletteIndex: Int,
     ) {
-        val storage = data ?: return
-        val bitIndex = index * bitsPerEntry
-        val wordIndex = bitIndex ushr 6
-        val bitOffset = bitIndex and 63
-        val mask = (1L shl bitsPerEntry) - 1L
-        val value = paletteIndex.toLong() and mask
-        val available = 64 - bitOffset
-        storage[wordIndex] = (storage[wordIndex] and (mask shl bitOffset).inv()) or (value shl bitOffset)
-        if (available < bitsPerEntry) {
-            storage[wordIndex + 1] =
-                (storage[wordIndex + 1] and (mask ushr available).inv()) or (value ushr available)
-        }
+        val current = storage
+        val words = current.words ?: return
+        writeInto(words, current.bits, index, paletteIndex)
     }
 
     private companion object {
@@ -145,6 +123,44 @@ public class PalettedContainer(
             var bits = 0
             while ((1 shl bits) < entries) bits++
             return bits
+        }
+
+        fun readRaw(
+            words: LongArray,
+            bits: Int,
+            index: Int,
+        ): Int {
+            val bitIndex = index * bits
+            val wordIndex = bitIndex ushr 6
+            val bitOffset = bitIndex and 63
+            val mask = (1L shl bits) - 1L
+            val available = 64 - bitOffset
+            val raw =
+                if (available >= bits) {
+                    (words[wordIndex] ushr bitOffset) and mask
+                } else {
+                    // An entry straddling two words: the low bits finish in the next one.
+                    ((words[wordIndex] ushr bitOffset) or (words[wordIndex + 1] shl available)) and mask
+                }
+            return raw.toInt()
+        }
+
+        fun writeInto(
+            words: LongArray,
+            bits: Int,
+            index: Int,
+            paletteIndex: Int,
+        ) {
+            val bitIndex = index * bits
+            val wordIndex = bitIndex ushr 6
+            val bitOffset = bitIndex and 63
+            val mask = (1L shl bits) - 1L
+            val value = paletteIndex.toLong() and mask
+            val available = 64 - bitOffset
+            words[wordIndex] = (words[wordIndex] and (mask shl bitOffset).inv()) or (value shl bitOffset)
+            if (available < bits) {
+                words[wordIndex + 1] = (words[wordIndex + 1] and (mask ushr available).inv()) or (value ushr available)
+            }
         }
     }
 }
