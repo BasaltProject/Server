@@ -39,7 +39,7 @@ include(
     ":wire-multiversion",
     ":wire-bedrock",
     ":server-lua",
-    ":server-bsmod",
+    ":server-plugins",
     ":server-datagen",
 )
 

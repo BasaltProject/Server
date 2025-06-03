@@ -14,7 +14,7 @@ import org.basaltmc.wire.text.MiniMessage
  *
  * That is the whole feature, and the limit is the point. It covers the `/discord` and `/rules` that
  * every server writes and that today mean installing a plugin for three lines of text; anything with
- * a condition or an argument in it is a BSMod plugin, because a configuration file that grows those
+ * a condition or an argument in it is a plugin, because a configuration file that grows those
  * becomes a programming language nobody chose to design.
  *
  * [PermissionLevel.ALL] because the named permission is what decides who may run it, and a level
