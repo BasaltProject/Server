@@ -6,7 +6,7 @@ plugins {
 sqldelight {
     databases {
         create("PlayerDatabase") {
-            packageName.set("org.basaltmc.storage.db")
+            packageName.set("org.basaltmc.server.storage.db")
             srcDirs.setFrom("src/commonMain/sqldelight")
             // The default dialect is SQLite 3.18, which predates UPSERT. The SQLite actually linked
             // into the binary is the 3.53 amalgamation, so the generator should be told as much.

@@ -33,7 +33,7 @@ kotlin {
     targets.withType<KotlinNativeTarget>().configureEach {
         binaries {
             executable {
-                entryPoint = "org.basaltmc.server.main"
+                entryPoint = "org.basaltmc.server.runtime.main"
             }
         }
     }
@@ -51,7 +51,7 @@ kotlin {
  */
 tasks.register("generateConfigDefaults") {
     val input = file("src/nativeMain/resources/config-defaults")
-    val output = file("build/generated/config-defaults/kotlin/org/basaltmc/server/config")
+    val output = file("build/generated/config-defaults/kotlin/org/basaltmc/server/runtime/config")
     inputs.dir(input)
     outputs.dir(output)
     doLast {
@@ -74,7 +74,7 @@ tasks.register("generateConfigDefaults") {
             parts.add("internal const val " + name + ": String =\n    " + tripleQuote + text + tripleQuote)
         }
         val header =
-            "package org.basaltmc.server.config\n\n// Generated from " +
+            "package org.basaltmc.server.runtime.config\n\n// Generated from " +
                 "src/nativeMain/resources/config-defaults. Edit the .toml files, not this one.\n\n"
         File(output, "ConfigDefaults.kt").writeText(header + parts.joinToString("\n\n") + "\n")
     }
