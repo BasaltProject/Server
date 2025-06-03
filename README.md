@@ -175,10 +175,10 @@ one you are building for.
 
 ```bash
 # Native binary for the current host
-./gradlew :basalt-server:linkReleaseExecutableMacosArm64
+./gradlew :server-runtime:linkReleaseExecutableMacosArm64
 
 # Debug build and run
-./gradlew :basalt-server:runDebugExecutableMacosArm64
+./gradlew :server-runtime:runDebugExecutableMacosArm64
 ```
 
 Supported targets: `macosArm64`, `macosX64`, `linuxX64`, `linuxArm64`, `mingwX64`.
@@ -190,7 +190,7 @@ Supported targets: `macosArm64`, `macosX64`, `linuxX64`, `linuxArm64`, `mingwX64
 ./gradlew build
 
 # A single module
-./gradlew :basalt-protocol:macosArm64Test
+./gradlew :wire-protocol:macosArm64Test
 ```
 
 Native tests only run on their matching host. Beyond unit tests, parity is checked
@@ -226,8 +226,8 @@ Use the included wrapper rather than a system Gradle installation.
 | Datapack execution (loot tables, recipes, advancements) | Not started |
 | BSMod and the Lua runtime | Not started |
 | Tooling (CLI, VS Code, IntelliJ) | Not started |
-| Older Java clients (`basalt-multiversion`) | Not started |
-| Bedrock clients (`basalt-bedrock`) | Not started |
+| Older Java clients (`wire-multiversion`) | Not started |
+| Bedrock clients (`wire-bedrock`) | Not started |
 | Bukkit compatibility | Out of scope until BSMod is stable |
 
 What that adds up to today: a real client connects, authenticates, spawns in a
