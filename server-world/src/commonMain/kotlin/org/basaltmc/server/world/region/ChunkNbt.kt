@@ -58,12 +58,13 @@ public object ChunkNbt {
         tag.putLong("InhabitedTime", 0L)
         tag.putString("Status", "minecraft:full")
 
+        val scratch = PaletteScratch()
         val sections = mutableListOf<NbtTag>()
         for (i in 0 until chunk.sectionCount) {
             val sectionTag = NbtCompound()
             sectionTag.putByte("Y", (chunk.verticalBounds.minSection + i).toByte())
-            sectionTag["block_states"] = encodeBlockStates(chunk.section(i))
-            sectionTag["biomes"] = encodeBiomes(chunk.section(i))
+            sectionTag["block_states"] = encodeBlockStates(chunk.section(i), scratch)
+            sectionTag["biomes"] = encodeBiomes(chunk.section(i), scratch)
             sections += sectionTag
         }
         tag["sections"] = NbtList(NbtType.COMPOUND, sections)
@@ -227,13 +228,18 @@ public object ChunkNbt {
         return ChunkBlockEntity(localX, y, localZ, Identifier.parse(id), data)
     }
 
-    private fun encodeBlockStates(section: ChunkSection): NbtCompound =
+    private fun encodeBlockStates(
+        section: ChunkSection,
+        scratch: PaletteScratch,
+    ): NbtCompound =
         encodePalette(
-            values = section.blockStateIds(),
+            values = scratch.blockValues.also(section::copyBlockStateIdsInto),
             minIndirectBits = BLOCK_MIN_INDIRECT_BITS,
             maxIndirectBits = BLOCK_MAX_INDIRECT_BITS,
             directBits = blockDirectBits,
             elementType = NbtType.COMPOUND,
+            slotOfValue = scratch.blockSlots,
+            paletteValues = scratch.paletteValues,
         ) { stateId ->
             val block =
                 Blocks.byStateId(stateId) ?: throw ChunkNbtException("no block registered for state id $stateId")
@@ -247,13 +253,18 @@ public object ChunkNbt {
             entry
         }
 
-    private fun encodeBiomes(section: ChunkSection): NbtCompound =
+    private fun encodeBiomes(
+        section: ChunkSection,
+        scratch: PaletteScratch,
+    ): NbtCompound =
         encodePalette(
-            values = section.biomeIds(),
+            values = scratch.biomeValues.also(section::copyBiomeIdsInto),
             minIndirectBits = BIOME_MIN_INDIRECT_BITS,
             maxIndirectBits = BIOME_MAX_INDIRECT_BITS,
             directBits = biomeDirectBits,
             elementType = NbtType.STRING,
+            slotOfValue = scratch.biomeSlots,
+            paletteValues = scratch.paletteValues,
         ) { biomeId ->
             val identifier =
                 Biomes.REGISTRY.identifierOf(biomeId)
@@ -311,33 +322,64 @@ public object ChunkNbt {
         )
     }
 
+    /**
+     * The palette is derived in first-appearance order, exactly as before, but through primitive
+     * arrays: a `LinkedHashSet<Int>` plus a `Map<Int, Int>` boxed every one of the 4096 values twice
+     * per section, which was 200000 boxed lookups a chunk and all but two milliseconds of a save.
+     *
+     * [slotOfValue] holds `slot + 1` so a zeroed array means "absent" and only the entries actually
+     * used are cleared afterwards, leaving it reusable without refilling it.
+     */
     private inline fun encodePalette(
         values: IntArray,
         minIndirectBits: Int,
         maxIndirectBits: Int,
         directBits: Int,
         elementType: NbtType,
+        slotOfValue: IntArray,
+        paletteValues: IntArray,
         elementToNbt: (Int) -> NbtTag,
     ): NbtCompound {
-        val palette = LinkedHashSet<Int>()
-        for (value in values) palette.add(value)
+        var paletteSize = 0
+        for (value in values) {
+            if (slotOfValue[value] != 0) continue
+            paletteValues[paletteSize] = value
+            paletteSize++
+            slotOfValue[value] = paletteSize
+        }
+
+        val entries = ArrayList<NbtTag>(paletteSize)
+        for (i in 0 until paletteSize) entries.add(elementToNbt(paletteValues[i]))
 
         val tag = NbtCompound()
-        tag["palette"] = NbtList(elementType, palette.map(elementToNbt))
-        if (palette.size == 1) return tag
-
-        val neededBits = bitsFor(palette.size)
-        val indirect = neededBits <= maxIndirectBits
-        val bitsPerEntry = if (indirect) neededBits.coerceAtLeast(minIndirectBits) else directBits
-        val storage = BitStorage(bitsPerEntry, values.size)
-        if (indirect) {
-            val indexOf = palette.withIndex().associate { (index, value) -> value to index }
-            for (i in values.indices) storage[i] = indexOf.getValue(values[i])
-        } else {
-            for (i in values.indices) storage[i] = values[i]
+        tag["palette"] = NbtList(elementType, entries)
+        if (paletteSize > 1) {
+            val neededBits = bitsFor(paletteSize)
+            val indirect = neededBits <= maxIndirectBits
+            val bitsPerEntry = if (indirect) neededBits.coerceAtLeast(minIndirectBits) else directBits
+            val storage = BitStorage(bitsPerEntry, values.size)
+            if (indirect) {
+                for (i in values.indices) storage[i] = slotOfValue[values[i]] - 1
+            } else {
+                for (i in values.indices) storage[i] = values[i]
+            }
+            tag.putLongArray("data", storage.data)
         }
-        tag.putLongArray("data", storage.data)
+
+        for (i in 0 until paletteSize) slotOfValue[paletteValues[i]] = 0
         return tag
+    }
+
+    /**
+     * Reused across a chunk's sections, and owned by one [write] call: this object is shared, and
+     * saves run on their own thread while generation workers run on theirs.
+     */
+    private class PaletteScratch {
+        val blockSlots = IntArray(Blocks.stateCount)
+        val biomeSlots = IntArray(Biomes.REGISTRY.size)
+        val paletteValues = IntArray(SECTION_BLOCK_COUNT)
+        val blockValues = IntArray(SECTION_BLOCK_COUNT)
+        val biomeValues = IntArray(SECTION_BIOME_COUNT)
     }
 
     private fun decodePalette(

@@ -127,6 +127,12 @@ public class DensityCache(
         val minY = context.blockY.floorDiv(cellHeight) * cellHeight
         val minZ = context.blockZ.floorDiv(cellWidth) * cellWidth
 
+        // Read before the corners are filled: filling them re-enters [function], and the caller's
+        // context is reused across blocks rather than rebuilt for each one.
+        val fractionX = (context.blockX - minX).toDouble() / cellWidth
+        val fractionY = (context.blockY - minY).toDouble() / cellHeight
+        val fractionZ = (context.blockZ - minZ).toDouble() / cellWidth
+
         // The terrain fill walks a whole cell before moving to the next, so all but one of a
         // cell's 128 blocks find the eight corners already in hand and only pay the lerp.
         val key = packBlockPos(minX, minY, minZ)
@@ -144,9 +150,6 @@ public class DensityCache(
             lastCellValid[slot] = true
         }
 
-        val fractionX = (context.blockX - minX).toDouble() / cellWidth
-        val fractionY = (context.blockY - minY).toDouble() / cellHeight
-        val fractionZ = (context.blockZ - minZ).toDouble() / cellWidth
         return Mth.lerp3(
             fractionX,
             fractionY,

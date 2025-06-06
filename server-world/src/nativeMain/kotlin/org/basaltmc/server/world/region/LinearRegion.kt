@@ -23,6 +23,10 @@ public class LinearRegion(
     private val chunks: Array<ByteArray?> = arrayOfNulls(DIMENSION * DIMENSION),
     private val timestamps: IntArray = IntArray(DIMENSION * DIMENSION),
 ) {
+    /** What this region costs in memory. A cache bounded by region count is bounded by nothing. */
+    public var residentBytes: Long = chunks.sumOf { it?.size?.toLong() ?: 0L }
+        private set
+
     public fun chunkAt(
         localX: Int,
         localZ: Int,
@@ -40,6 +44,7 @@ public class LinearRegion(
         timestamp: Int,
     ) {
         val i = index(localX, localZ)
+        residentBytes += (data?.size ?: 0) - (chunks[i]?.size ?: 0)
         chunks[i] = data
         timestamps[i] = timestamp
     }

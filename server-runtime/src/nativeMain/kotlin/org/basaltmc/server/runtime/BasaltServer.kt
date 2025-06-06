@@ -269,6 +269,7 @@ public class BasaltServer(
                                     onlinePlayers = { playerRegistry.snapshot().size },
                                     maxPlayers = { config.maxPlayers },
                                     loadedChunks = { worlds.values.sumOf { world -> world.state.loadedChunkCount } },
+                                    regionCacheBytes = { worlds.values.sumOf { it.regions.cachedRegionBytes } },
                                     worldCount = { worlds.size },
                                     cpuPercent = cpuMeter::percent,
                                     liveHeapBytes = { liveHeapBytes() },

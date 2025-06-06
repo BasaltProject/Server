@@ -17,6 +17,8 @@ public class ReportSources(
     public val onlinePlayers: () -> Int,
     public val maxPlayers: () -> Int,
     public val loadedChunks: () -> Int,
+    /** Bytes of decompressed region files held in memory, which chunk counts do not account for. */
+    public val regionCacheBytes: () -> Long,
     public val worldCount: () -> Int,
     public val cpuPercent: () -> Double?,
     public val liveHeapBytes: () -> Long?,
@@ -71,6 +73,7 @@ public class TimingsReport(
         builder.append("""    "players_max": ${sources.maxPlayers()},""").append('\n')
         builder.append("""    "worlds": ${sources.worldCount()},""").append('\n')
         builder.append("""    "chunks_loaded": ${sources.loadedChunks()},""").append('\n')
+        builder.append("""    "region_cache_bytes": ${sources.regionCacheBytes()},""").append('\n')
         builder.append("""    "cpu_percent_of_one_core": ${number(sources.cpuPercent())},""").append('\n')
         builder.append("""    "heap_bytes_live": ${sources.liveHeapBytes() ?: "null"}""").append('\n')
         builder.append("  },\n")
