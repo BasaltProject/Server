@@ -1,6 +1,7 @@
 package org.basaltmc.server.runtime
 
 import org.basaltmc.server.random.LegacyRandom
+import org.basaltmc.server.registry.BlockEntityTypes
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.registry.ItemTools
 import org.basaltmc.server.registry.Items
@@ -985,11 +986,14 @@ public class ClientSession(
                 heightmaps = listOf(Heightmap(HeightmapType.MOTION_BLOCKING, heightmap)),
                 chunkData = chunkData,
                 blockEntities =
-                    chunk.blockEntities().map { blockEntity ->
+                    chunk.blockEntities().mapNotNull { blockEntity ->
+                        val typeId =
+                            BlockEntityTypes.idOf(blockEntity.type)
+                                ?: return@mapNotNull unknownBlockEntity(blockEntity.type)
                         ChunkBlockEntityInfo(
                             packedXZ = (blockEntity.localX shl 4) or blockEntity.localZ,
                             y = blockEntity.y,
-                            typeId = blockEntityTypeId(blockEntity.type.toString()),
+                            typeId = typeId,
                             tag = blockEntity.data,
                         )
                     },
@@ -1015,11 +1019,20 @@ public class ClientSession(
         }
     }
 
-    private fun blockEntityTypeId(identifier: String): Int =
-        when (identifier) {
-            "minecraft:beehive" -> 33
-            else -> error("no protocol block entity type ID registered for $identifier")
+    /**
+     * Leaves one block entity out of the chunk rather than failing the packet. It used to throw,
+     * which dropped the player: flying into a village, whose banners this build had no ID for, was
+     * enough. The block itself still arrives, only the data the client would decorate it with does
+     * not, and the log names the type once per session so the gap is visible.
+     */
+    private fun unknownBlockEntity(type: Identifier): ChunkBlockEntityInfo? {
+        if (loggedUnknownBlockEntities.add(type)) {
+            logger.warn { "No protocol ID for block entity type $type; leaving it out of the chunk." }
         }
+        return null
+    }
+
+    private val loggedUnknownBlockEntities = mutableSetOf<Identifier>()
 
     private fun handlePlay(
         packetId: Int,
