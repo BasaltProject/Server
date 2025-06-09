@@ -105,6 +105,11 @@ public class Chunk(
 
     public fun generatedEntities(): List<ChunkGeneratedEntity> = generatedEntitiesBacking.toList()
 
+    /** How many [generatedEntities] holds, for readers that only want one and not a copy of the list. */
+    public val generatedEntityCount: Int get() = generatedEntitiesBacking.size
+
+    public fun generatedEntityAt(index: Int): ChunkGeneratedEntity = generatedEntitiesBacking[index]
+
     public fun scheduleBlockTick(tick: ChunkScheduledTick) {
         scheduleTick(scheduledBlockTicksBacking, tick)
     }
