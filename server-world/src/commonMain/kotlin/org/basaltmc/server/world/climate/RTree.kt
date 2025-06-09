@@ -6,24 +6,36 @@ import org.basaltmc.wire.common.Mth
 /**
  * // parity: net.minecraft.world.level.biome.Climate.RTree, a bounding-volume tree over the seven
  * quantized climate axes, so the closest [ParameterPoint] is a descent rather than a full scan.
- * Built once per [ParameterList] and read-only after, so the shared instance needs no lock.
+ * The tree itself is built once per [ParameterList] and read-only after, so it needs no lock.
  *
- * One deviation: vanilla seeds each search from the previous result in a `ThreadLocal`, which
- * prunes slightly better but lets generation order decide *tied* targets. Seeding from the same
- * first leaf makes ties resolve identically on every run and thread; distances are unaffected.
+ * Each search is seeded with the last leaf this thread found, as vanilla's own `ThreadLocal` does.
+ * That is not only faster: a search seeded differently resolves *tied* targets differently, and a
+ * tie between two equally distant regions is decided by whichever the descent reaches first.
+ *
+ * [slot] stands in for vanilla's per-instance `ThreadLocal` field, since Kotlin/Native has no
+ * per-instance thread local. It comes from a plain counter because trees are built while a world's
+ * biome source is constructed, before any generation worker exists (the same reasoning
+ * `Marker.slot` documents).
  */
 internal class RTree<T> private constructor(
     private val root: Node<T>,
-    private val firstLeaf: Leaf<T>,
 ) {
-    fun search(target: LongArray): T = root.search(target, firstLeaf).value
+    private val slot: Int = nextSlot++
+
+    @Suppress("UNCHECKED_CAST")
+    fun search(target: LongArray): T {
+        val previous = lastClimateLeaf(slot) as Leaf<T>?
+        val leaf = root.search(target, previous)
+        setLastClimateLeaf(slot, leaf)
+        return leaf.value
+    }
 
     abstract class Node<T>(
         val parameterSpace: Array<Parameter>,
     ) {
         abstract fun search(
             target: LongArray,
-            candidate: Leaf<T>,
+            candidate: Leaf<T>?,
         ): Leaf<T>
 
         fun distance(target: LongArray): Long {
@@ -42,7 +54,7 @@ internal class RTree<T> private constructor(
     ) : Node<T>(parameterPoint.parameterSpace().toTypedArray()) {
         override fun search(
             target: LongArray,
-            candidate: Leaf<T>,
+            candidate: Leaf<T>?,
         ): Leaf<T> = this
     }
 
@@ -51,9 +63,10 @@ internal class RTree<T> private constructor(
     ) : Node<T>(buildParameterSpace(children)) {
         override fun search(
             target: LongArray,
-            candidate: Leaf<T>,
+            candidate: Leaf<T>?,
         ): Leaf<T> {
-            var minDistance = candidate.distance(target)
+            // No candidate means no distance computed for one, which is vanilla's own null branch.
+            var minDistance = if (candidate == null) Long.MAX_VALUE else candidate.distance(target)
             var closest = candidate
             for (child in children) {
                 val childDistance = child.distance(target)
@@ -66,7 +79,9 @@ internal class RTree<T> private constructor(
                     }
                 }
             }
-            return closest
+            // Non-null once any child has been descended into, which the first iteration always is:
+            // Long.MAX_VALUE is greater than any real distance.
+            return checkNotNull(closest) { "a subtree with children returned no leaf" }
         }
     }
 
@@ -79,8 +94,10 @@ internal class RTree<T> private constructor(
             val dimensions = values[0].first.parameterSpace().size
             check(dimensions == DIMENSIONS) { "Expecting parameter space to be $DIMENSIONS, got $dimensions" }
             val leaves = values.map { (point, value) -> Leaf(point, value) }
-            return RTree(build(leaves.toMutableList()), leaves[0])
+            return RTree(build(leaves.toMutableList()))
         }
+
+        private var nextSlot = 0
 
         private fun <T> build(children: MutableList<Node<T>>): Node<T> {
             check(children.isNotEmpty()) { "Need at least one child to build a node" }

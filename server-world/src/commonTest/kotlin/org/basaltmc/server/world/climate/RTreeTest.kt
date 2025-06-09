@@ -32,9 +32,11 @@ class RTreeTest {
      *
      * Not asserted as equality with [ParameterList.findValueBruteForce], because the two genuinely
      * differ when several distinct biomes sit at the exact same distance: the scan takes the first
-     * in list order, the index takes the first it reaches. Vanilla has the same ambiguity and
-     * resolves it from a `ThreadLocal` holding the previous lookup's result, so it does not have a
-     * single reproducible answer to match either. See [RTree]'s own KDoc.
+     * in list order, the index takes the first it reaches, which depends on the seed left by the
+     * previous lookup. That is vanilla's own behaviour, so the property, not the tie, is what holds.
+     *
+     * Five thousand lookups in a row also exercise that seeding: each one starts from the last
+     * one's leaf, which is exactly where a bad bounding box would prune away the real winner.
      */
     @Test
     fun `index always finds a closest region on the real overworld list`() {
