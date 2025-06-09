@@ -24,6 +24,11 @@ public class DensityCache(
     private val lastSeen2d = BooleanArray(slotCount)
     private val lastPos2d = LongArray(slotCount)
     private val lastValue2d = DoubleArray(slotCount)
+    private val lastSeenOnce = BooleanArray(slotCount)
+    private val lastOnceX = IntArray(slotCount)
+    private val lastOnceY = IntArray(slotCount)
+    private val lastOnceZ = IntArray(slotCount)
+    private val lastOnceValue = DoubleArray(slotCount)
 
     // The cell corners of this chunk, one dense grid per marker. A map keyed by packed position
     // boxed a Double on each of the eight corner lookups every block does, which is most of the
@@ -105,6 +110,34 @@ public class DensityCache(
         lastSeen2d[slot] = true
         lastPos2d[slot] = packed
         lastValue2d[slot] = value
+        return value
+    }
+
+    /**
+     * // parity: NoiseChunk.CacheOnce. Vanilla keys it on an interpolation counter it bumps once
+     * per sampled position; the position itself is the same identity, and the function is pure in
+     * it. Overworld `slopedCheese` is referenced from three places in the cave composition, so
+     * without this its whole subtree, `base3d` included, is evaluated three times per corner.
+     */
+    public fun cacheOnce(
+        slot: Int,
+        context: FunctionContext,
+        function: DensityFunction,
+    ): Double {
+        if (slot >= lastOnceValue.size) return function.compute(context)
+        if (lastSeenOnce[slot] &&
+            lastOnceX[slot] == context.blockX &&
+            lastOnceY[slot] == context.blockY &&
+            lastOnceZ[slot] == context.blockZ
+        ) {
+            return lastOnceValue[slot]
+        }
+        val value = function.compute(context)
+        lastSeenOnce[slot] = true
+        lastOnceX[slot] = context.blockX
+        lastOnceY[slot] = context.blockY
+        lastOnceZ[slot] = context.blockZ
+        lastOnceValue[slot] = value
         return value
     }
 
