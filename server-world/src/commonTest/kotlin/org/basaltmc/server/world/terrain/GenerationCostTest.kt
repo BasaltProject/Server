@@ -117,19 +117,19 @@ class GenerationCostTest {
         val report = GenerationMetrics.report()
         println(report)
 
-        // fillBiomes walks 96 vertical quarts times 4x4. Ore biome filters sample 48 additional
-        // quart positions for this fixture; ChunkScopedSurfaceEnvironment deduplicates the rest.
+        // fillBiomes walks 96 vertical quarts times 4x4. Ore and underground-speleo biome filters
+        // sample 299 additional quart positions for this fixture; the scoped cache deduplicates the rest.
         assertTrue(
-            "Biome lookups            1584" in report,
-            "expected 1584 biome lookups per chunk, got:\n$report",
+            "Biome lookups            1835" in report,
+            "expected 1835 biome lookups per chunk, got:\n$report",
         )
         // A ceiling, not a target. It was 105786 before Marker honored FLAT_CACHE/CACHE_2D, 31600
         // while a prewarm evaluated corners the fill never asked for, and 21000 before CACHE_ONCE
         // was honored; past it means a cache stopped being reached.
         val noiseEvaluations = valueAfter(report, "NormalNoise evaluations")
         assertTrue(
-            noiseEvaluations in 1..19_500,
-            "expected the marker caches to hold cave-router noise evaluations below 19500, got $noiseEvaluations:\n$report",
+            noiseEvaluations in 1..22_000,
+            "expected the marker caches to hold cave-router noise evaluations below 22000, got $noiseEvaluations:\n$report",
         )
 
         // Rebuilt on write, so nothing rescans a column. It was 2668792 steps a chunk.

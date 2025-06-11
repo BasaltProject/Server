@@ -14,15 +14,13 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * // parity: the 28 ore placed features in the Overworld `UNDERGROUND_ORES` step.
+ * // parity: the 28 ore, underwater magma, and four disk placed features in the Overworld
+ * `UNDERGROUND_ORES` step.
  *
- * [externalBlockState] supplies the surrounding generation region when one is available. Ore
- * features write a few blocks across chunk borders, and discard-sensitive configurations consume
- * RNG while testing those positions. Virtual external writes are retained for the rest of this
- * decoration step so later features observe the same state transitions as vanilla.
- * [externalSurfaceHeight] has the equivalent role for the `OCEAN_FLOOR_WG` precheck. Without a
- * region provider, placement remains exact inside the chunk and deliberately does not alias an
- * outside coordinate onto the local heightmap.
+ * [externalBlockState] and [externalSurfaceHeight] read the surrounding region when there is one:
+ * ores write across chunk borders and consume RNG testing those positions, so the writes are kept
+ * for the rest of the step and later features see what vanilla saw. Without a region provider,
+ * placement stays exact inside the chunk rather than aliasing an outside coordinate onto it.
  */
 public object OverworldOreDecoration {
     public fun decorate(
@@ -32,13 +30,46 @@ public object OverworldOreDecoration {
         externalSurfaceHeight: ((x: Int, z: Int) -> Int?)? = null,
         externalBlockState: ((x: Int, y: Int, z: Int) -> Int?)? = null,
     ) {
+        decorateFeatures(chunk, seed, environment, 0..LAST_GLOBAL_INDEX, externalSurfaceHeight, externalBlockState)
+    }
+
+    internal fun decorateFeatures(
+        chunk: Chunk,
+        seed: Long,
+        environment: SurfaceRuleEnvironment,
+        globalIndices: Iterable<Int>,
+        externalSurfaceHeight: ((x: Int, z: Int) -> Int?)? = null,
+        externalBlockState: ((x: Int, y: Int, z: Int) -> Int?)? = null,
+    ) {
         val region = PlacementRegion(chunk, externalSurfaceHeight, externalBlockState)
         val random = WorldgenRandom(XoroshiroRandom(seed))
         val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
-        for (placed in FEATURES) {
-            random.setFeatureSeed(decorationSeed, placed.globalIndex, UNDERGROUND_ORES_STEP)
-            placed.place(region, random, environment)
+        for (globalIndex in globalIndices) {
+            random.setFeatureSeed(decorationSeed, globalIndex, UNDERGROUND_ORES_STEP)
+            when (globalIndex) {
+                UNDERWATER_MAGMA_INDEX -> placeUnderwaterMagma(region, random, environment)
+                DISK_GRASS_INDEX -> placeDiskGrass(region, random, environment)
+                DISK_SAND_INDEX -> placeWaterDisk(region, random, environment, SAND_DISK, 3, DEFAULT_DISK_BIOMES)
+                DISK_CLAY_INDEX -> placeWaterDisk(region, random, environment, CLAY_DISK, 1, ALL_BIOMES)
+                DISK_GRAVEL_INDEX -> placeWaterDisk(region, random, environment, GRAVEL_DISK, 1, DEFAULT_DISK_BIOMES)
+                else -> FEATURES_BY_INDEX[globalIndex]?.place(region, random, environment)
+            }
         }
+    }
+
+    /** // parity: `ore_infested`, global feature index 6 in `UNDERGROUND_DECORATION`. */
+    public fun decorateInfested(
+        chunk: Chunk,
+        seed: Long,
+        environment: SurfaceRuleEnvironment,
+        externalSurfaceHeight: ((x: Int, z: Int) -> Int?)? = null,
+        externalBlockState: ((x: Int, y: Int, z: Int) -> Int?)? = null,
+    ) {
+        val region = PlacementRegion(chunk, externalSurfaceHeight, externalBlockState)
+        val random = WorldgenRandom(XoroshiroRandom(seed))
+        val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
+        random.setFeatureSeed(decorationSeed, INFESTED_GLOBAL_INDEX, UNDERGROUND_DECORATION_STEP)
+        INFESTED_ORE.place(region, random, environment)
     }
 
     private fun PlacedOre.place(
@@ -154,6 +185,125 @@ public object OverworldOreDecoration {
         return true
     }
 
+    private fun placeUnderwaterMagma(
+        region: PlacementRegion,
+        random: WorldgenRandom,
+        environment: SurfaceRuleEnvironment,
+    ) {
+        val attempts = 44 + random.nextInt(9)
+        repeat(attempts) {
+            val x = region.chunk.chunkX * 16 + random.nextInt(16)
+            val z = region.chunk.chunkZ * 16 + random.nextInt(16)
+            val y = WorldHeight.MIN_Y + random.nextInt(321)
+            val oceanFloor = region.oceanFloorHeight(x, z) ?: return@repeat
+            if (y > oceanFloor - 2 || environment.biomeAt(x, y, z).substringAfter(':') !in ALL_BIOMES) return@repeat
+            val floorY = findWaterColumnFloor(region, x, y, z) ?: return@repeat
+            for (placedZ in z - 1..z + 1) {
+                for (placedY in floorY - 1..floorY + 1) {
+                    for (placedX in x - 1..x + 1) {
+                        if (random.nextFloat() >= 0.5f ||
+                            !isValidMagmaPlacement(region, placedX, placedY, placedZ)
+                        ) {
+                            continue
+                        }
+                        region.setBlockStateId(placedX, placedY, placedZ, magmaStateId)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun findWaterColumnFloor(
+        region: PlacementRegion,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Int? {
+        if (region.getBlockStateId(x, y, z) != Blocks.WATER.stateId) return null
+        var scanY = y
+        var distance = 1
+        while (distance < 5 && region.getBlockStateId(x, scanY, z) == Blocks.WATER.stateId) {
+            scanY--
+            distance++
+        }
+        return if (region.getBlockStateId(x, scanY, z) != Blocks.WATER.stateId) scanY else null
+    }
+
+    private fun isValidMagmaPlacement(
+        region: PlacementRegion,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Boolean {
+        val current = region.getBlockStateId(x, y, z)
+        if (current == null || Blocks.isAir(current) || current == Blocks.WATER.stateId) return false
+        if (!isFullCube(region.getBlockStateId(x, y - 1, z))) return false
+        return isFullCube(region.getBlockStateId(x + 1, y, z)) &&
+            isFullCube(region.getBlockStateId(x - 1, y, z)) &&
+            isFullCube(region.getBlockStateId(x, y, z + 1)) &&
+            isFullCube(region.getBlockStateId(x, y, z - 1))
+    }
+
+    private fun isFullCube(stateId: Int?): Boolean =
+        stateId != null &&
+            Chunk.HeightmapType.OCEAN_FLOOR.matches(stateId) &&
+            Blocks.byStateId(stateId)?.block?.path !in NON_FULL_CUBE_PATHS
+
+    private fun placeDiskGrass(
+        region: PlacementRegion,
+        random: WorldgenRandom,
+        environment: SurfaceRuleEnvironment,
+    ) {
+        val x = region.chunk.chunkX * 16 + random.nextInt(16)
+        val z = region.chunk.chunkZ * 16 + random.nextInt(16)
+        val y = (region.oceanFloorHeight(x, z) ?: return) - 1
+        if (region.getBlockStateId(x, y, z) != mudStateId) return
+        if (environment.biomeAt(x, y, z).substringAfter(':') != "mangrove_swamp") return
+        placeDisk(region, random, x, y, z, GRASS_DISK)
+    }
+
+    private fun placeWaterDisk(
+        region: PlacementRegion,
+        random: WorldgenRandom,
+        environment: SurfaceRuleEnvironment,
+        config: DiskConfig,
+        attempts: Int,
+        biomes: Set<String>,
+    ) {
+        repeat(attempts) {
+            val x = region.chunk.chunkX * 16 + random.nextInt(16)
+            val z = region.chunk.chunkZ * 16 + random.nextInt(16)
+            val y = region.oceanFloorHeight(x, z) ?: return@repeat
+            if (region.getBlockStateId(x, y, z)?.let(Blocks::hasWaterFluid) != true) return@repeat
+            if (environment.biomeAt(x, y, z).substringAfter(':') !in biomes) return@repeat
+            placeDisk(region, random, x, y, z, config)
+        }
+    }
+
+    private fun placeDisk(
+        region: PlacementRegion,
+        random: WorldgenRandom,
+        originX: Int,
+        originY: Int,
+        originZ: Int,
+        config: DiskConfig,
+    ) {
+        val radius = config.minRadius + random.nextInt(config.maxRadius - config.minRadius + 1)
+        val radiusSquared = radius * radius
+        for (z in originZ - radius..originZ + radius) {
+            for (x in originX - radius..originX + radius) {
+                val dx = x - originX
+                val dz = z - originZ
+                if (dx * dx + dz * dz > radiusSquared) continue
+                for (y in originY + config.halfHeight downTo originY - config.halfHeight) {
+                    val current = region.getBlockStateId(x, y, z) ?: continue
+                    if (current !in config.targets) continue
+                    region.setBlockStateId(x, y, z, config.state(region, x, y, z))
+                }
+            }
+        }
+    }
+
     private fun removeContainedSpheres(
         spheres: DoubleArray,
         size: Int,
@@ -195,6 +345,16 @@ public object OverworldOreDecoration {
         private val localSurfaceHeight = chunk.heightmap(Chunk.HeightmapType.OCEAN_FLOOR)
         private val externalWrites = HashMap<BlockPosition, Int>()
 
+        fun oceanFloorHeight(
+            x: Int,
+            z: Int,
+        ): Int? =
+            if (x shr 4 == chunk.chunkX && z shr 4 == chunk.chunkZ) {
+                localSurfaceHeight[(x and 15) + (z and 15) * 16]
+            } else {
+                externalSurfaceHeight?.invoke(x, z)
+            }
+
         fun hasOceanFloorAtOrAbove(
             xStart: Int,
             zStart: Int,
@@ -227,7 +387,9 @@ public object OverworldOreDecoration {
             y: Int,
             z: Int,
         ): Int? =
-            if (x shr 4 == chunk.chunkX && z shr 4 == chunk.chunkZ) {
+            if (y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
+                Blocks.AIR.stateId
+            } else if (x shr 4 == chunk.chunkX && z shr 4 == chunk.chunkZ) {
                 chunk.getBlockStateId(x and 15, y, z and 15)
             } else {
                 externalWrites[BlockPosition(x, y, z)] ?: externalBlockState?.invoke(x, y, z)
@@ -256,6 +418,14 @@ public object OverworldOreDecoration {
     private fun stateId(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId
             ?: error("missing vanilla block minecraft:$path")
+
+    private data class DiskConfig(
+        val minRadius: Int,
+        val maxRadius: Int,
+        val halfHeight: Int,
+        val targets: Set<Int>,
+        val state: (PlacementRegion, Int, Int, Int) -> Int,
+    )
 
     private data class Target(
         val replaceable: Set<String>,
@@ -340,6 +510,14 @@ public object OverworldOreDecoration {
     ): PlacedOre = PlacedOre(index, count, height, biomes, feature)
 
     private const val UNDERGROUND_ORES_STEP = 6
+    private const val UNDERGROUND_DECORATION_STEP = 7
+    private const val INFESTED_GLOBAL_INDEX = 6
+    private const val UNDERWATER_MAGMA_INDEX = 26
+    private const val DISK_GRASS_INDEX = 29
+    private const val DISK_SAND_INDEX = 30
+    private const val DISK_CLAY_INDEX = 31
+    private const val DISK_GRAVEL_INDEX = 32
+    private const val LAST_GLOBAL_INDEX = 33
     private const val PI_FLOAT: Float = 3.1415927f
     private val ALL_BIOMES =
         setOf(
@@ -413,6 +591,7 @@ public object OverworldOreDecoration {
             "stony_peaks",
         )
     private val BADLANDS_BIOMES = setOf("badlands", "wooded_badlands", "eroded_badlands")
+    private val DEFAULT_DISK_BIOMES = ALL_BIOMES - setOf("swamp", "mangrove_swamp")
     private val BASE_STONE_OVERWORLD = setOf("stone", "granite", "diorite", "andesite", "tuff", "deepslate")
     private val STONE_ORE_REPLACEABLES = setOf("stone", "granite", "diorite", "andesite")
     private val DEEPSLATE_ORE_REPLACEABLES = setOf("deepslate", "tuff")
@@ -425,6 +604,39 @@ public object OverworldOreDecoration {
             Triple(0, 0, 1),
             Triple(0, 0, -1),
         )
+    private val NON_FULL_CUBE_PATHS =
+        setOf(
+            "snow",
+            "pointed_dripstone",
+            "iron_bars",
+            "glass_pane",
+        )
+
+    private val magmaStateId = stateId("magma_block")
+    private val sandStateId = stateId("sand")
+    private val sandstoneStateId = stateId("sandstone")
+    private val clayStateId = stateId("clay")
+    private val gravelStateId = stateId("gravel")
+    private val mudStateId = stateId("mud")
+    private val SAND_DISK =
+        DiskConfig(2, 6, 2, setOf(Blocks.DIRT.stateId, Blocks.GRASS_BLOCK.stateId)) { region, x, y, z ->
+            if (region.getBlockStateId(x, y - 1, z) == Blocks.AIR.stateId) sandstoneStateId else sandStateId
+        }
+    private val CLAY_DISK =
+        DiskConfig(2, 3, 1, setOf(Blocks.DIRT.stateId, clayStateId)) { _, _, _, _ -> clayStateId }
+    private val GRAVEL_DISK =
+        DiskConfig(2, 5, 2, setOf(Blocks.DIRT.stateId, Blocks.GRASS_BLOCK.stateId)) { _, _, _, _ -> gravelStateId }
+    private val GRASS_DISK =
+        DiskConfig(2, 6, 2, setOf(Blocks.DIRT.stateId, mudStateId)) { region, x, y, z ->
+            val above = region.getBlockStateId(x, y + 1, z)
+            if (!isFullCube(above) &&
+                above?.let(Blocks::hasWaterFluid) != true
+            ) {
+                Blocks.GRASS_BLOCK.stateId
+            } else {
+                Blocks.DIRT.stateId
+            }
+        }
 
     // parity: FeatureSorter global indexes for the 55 Overworld biome feature lists in 26.2.
     private val FEATURES =
@@ -547,5 +759,14 @@ public object OverworldOreDecoration {
                 pairedTarget(3, 0.0f, "emerald_ore", "deepslate_emerald_ore"),
                 MOUNTAIN_BIOMES,
             ),
+        )
+    private val FEATURES_BY_INDEX = FEATURES.associateBy(PlacedOre::globalIndex)
+    private val INFESTED_ORE =
+        placed(
+            INFESTED_GLOBAL_INDEX,
+            fixedCount(14),
+            uniformHeight(-64, 63),
+            pairedTarget(9, 0.0f, "infested_stone", "infested_deepslate"),
+            setOf("windswept_hills", "windswept_gravelly_hills", "windswept_forest"),
         )
 }

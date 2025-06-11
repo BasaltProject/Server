@@ -8,8 +8,8 @@ import org.basaltmc.wire.common.Identifier
 
 /**
  * Real Cherry Grove `vegetal_decoration` entries, in the real jar's own
- * `BiomeDefaultFeatures.addCherryGroveVegetation` order (decompiled): `patch_grass_plain` (the
- * exact real feature [PlainsDecoration.GRASS] builds), `flower_cherry` (pink petals) and
+ * `BiomeDefaultFeatures.addCherryGroveVegetation` order (decompiled). [GrassPatchDecoration]
+ * supplies the preceding `patch_grass_plain`; this component retains `flower_cherry` and
  * `trees_cherry`.
  *
  * Pink petals preserve all 16 weighted block states: amount 1-4 and four horizontal facings.
@@ -19,7 +19,6 @@ public object CherryGroveDecoration : BiomeVegetalDecoration {
         chunk: Chunk,
         random: WorldgenRandom,
     ) {
-        PlainsDecoration.GRASS.decorate(chunk, random)
         placePinkPetals(chunk, random)
         TreeDecoration.single(TreeConfigs.CHERRY_BEES_005, 10, 0.1f, 1).decorate(chunk, random)
     }

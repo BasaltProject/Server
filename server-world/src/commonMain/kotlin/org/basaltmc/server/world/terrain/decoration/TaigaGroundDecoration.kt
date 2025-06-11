@@ -38,6 +38,12 @@ public object TaigaGroundDecoration {
     public val OLD_GROWTH: BiomeVegetalDecoration =
         BiomeVegetalDecoration { chunk, random ->
             grass(outerCount = 7).decorate(chunk, random)
+            OLD_GROWTH_DEAD_BUSH.decorate(chunk, random)
+        }
+
+    /** The old-growth `patch_dead_bush` tail, used after exact grass seeding. */
+    public val OLD_GROWTH_DEAD_BUSH: BiomeVegetalDecoration =
+        BiomeVegetalDecoration { chunk, random ->
             place(
                 chunk,
                 random,

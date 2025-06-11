@@ -14,8 +14,6 @@ public object MeadowDecoration : BiomeVegetalDecoration {
         chunk: Chunk,
         random: WorldgenRandom,
     ) {
-        PlainsDecoration.TALL_GRASS.decorate(chunk, random)
-        GRASS.decorate(chunk, random)
         FLOWERS.decorate(chunk, random)
         TREES.decorate(chunk, random)
         ForestFloorDecoration.MEADOW_WILDFLOWERS.decorate(chunk, random)

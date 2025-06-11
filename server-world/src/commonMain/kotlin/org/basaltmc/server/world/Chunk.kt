@@ -179,6 +179,16 @@ public class Chunk(
         isDirty = true
     }
 
+    /** The biome network id at one quart, in the same coordinates [setBiomeId] takes. */
+    public fun getBiomeId(
+        quartX: Int,
+        quartY: Int,
+        quartZ: Int,
+    ): Int {
+        require(quartY in 0 until verticalBounds.height / 4) { "quartY=$quartY out of world bounds" }
+        return sections[quartY shr 2].getBiomeId(quartX, quartY and 3, quartZ)
+    }
+
     /** Topmost matching Y plus one per column, matching vanilla's heightmap convention. */
     public fun heightmap(type: HeightmapType = HeightmapType.MOTION_BLOCKING): IntArray {
         if (!heightsValid) rebuildHeights()
