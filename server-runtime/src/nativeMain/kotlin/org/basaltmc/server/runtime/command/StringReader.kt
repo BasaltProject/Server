@@ -57,6 +57,18 @@ public class StringReader(
         return readUnquotedString()
     }
 
+    /**
+     * A namespaced id: the same characters an unquoted string allows, plus `:` and `/`.
+     *
+     * parity: `Identifier.read`, which is why `minecraft:oak_log` is one argument rather than
+     * stopping at the colon the way brigadier's own unquoted reader would.
+     */
+    public fun readIdentifier(): String {
+        val start = cursor
+        while (canRead() && isAllowedInIdentifier(peek())) skip()
+        return string.substring(start, cursor)
+    }
+
     public fun readInt(): Int {
         val start = cursor
         while (canRead() && isAllowedInNumber(peek())) skip()
@@ -107,6 +119,8 @@ public class StringReader(
     private companion object {
         fun isAllowedInUnquotedString(c: Char): Boolean =
             c in '0'..'9' || c in 'A'..'Z' || c in 'a'..'z' || c == '_' || c == '-' || c == '.' || c == '+'
+
+        fun isAllowedInIdentifier(c: Char): Boolean = isAllowedInUnquotedString(c) || c == ':' || c == '/'
 
         fun isAllowedInNumber(c: Char): Boolean =
             c in '0'..'9' || c == '-' || c == '.' || c == '+' || c == 'e' || c == 'E'
