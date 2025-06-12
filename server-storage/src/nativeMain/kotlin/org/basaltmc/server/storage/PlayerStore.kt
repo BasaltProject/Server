@@ -30,6 +30,9 @@ public class PlayerStore private constructor(
 ) : AutoCloseable {
     public val players: PlayerRepository = PlayerRepository(database)
 
+    /** Bans and the whitelist, which the login path consults before anything else. */
+    public val access: AccessRepository = AccessRepository(database)
+
     /**
      * False once [close] has run. Callers that may still be winding down on their own threads check
      * it instead of finding out through the driver, which reports a use-after-close as a bare

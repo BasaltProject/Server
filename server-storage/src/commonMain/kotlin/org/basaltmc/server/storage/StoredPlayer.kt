@@ -83,6 +83,8 @@ public data class StoredPlayer(
     val inventory: StoredInventory = StoredInventory.empty(),
     val enderChest: StoredInventory = StoredInventory.empty(ENDER_CHEST_SLOTS),
     val stats: StoredStats = StoredStats.EMPTY,
+    /** Scoreboard tags, as `/tag` set them. parity: vanilla keeps these with the entity. */
+    val tags: Set<String> = emptySet(),
 ) {
     public companion object {
         public const val ENDER_CHEST_SLOTS: Int = 27

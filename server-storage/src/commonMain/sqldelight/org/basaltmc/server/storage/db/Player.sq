@@ -36,7 +36,10 @@ CREATE TABLE player (
     last_ip TEXT,
     inventory BLOB,
     ender_chest BLOB,
-    stats BLOB
+    stats BLOB,
+    -- Scoreboard tags, comma-separated. A list rather than a table because it is always read and
+    -- written whole, exactly like the inventory blob above it.
+    tags TEXT
 );
 
 -- Name lookup is how an operator refers to a player; the other two are what the admin queries scan.
@@ -63,9 +66,9 @@ upsert:
 INSERT INTO player(
     uuid, name, last_seen, first_seen, play_time_ticks, world, x, y, z, yaw, pitch,
     health, food, saturation, exhaustion, xp_level, xp_progress, xp_total, gamemode,
-    group_name, inventory, ender_chest, stats
+    group_name, inventory, ender_chest, stats, tags
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(uuid) DO UPDATE SET
     name = excluded.name,
     last_seen = excluded.last_seen,
@@ -84,7 +87,8 @@ ON CONFLICT(uuid) DO UPDATE SET
     group_name = excluded.group_name,
     inventory = excluded.inventory,
     ender_chest = excluded.ender_chest,
-    stats = excluded.stats;
+    stats = excluded.stats,
+    tags = excluded.tags;
 
 delete:
 DELETE FROM player WHERE uuid = ?;
