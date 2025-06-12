@@ -47,9 +47,11 @@ public object ItemTools {
     }
 
     /**
-     * How fast [item] mines [block], as a multiplier on the bare-hand speed of 1. Only reported for
-     * completeness: the dig itself is timed by the client, which knows this from its own copy of
-     * the same data.
+     * How fast [item] mines [block], as a multiplier on the bare-hand speed of 1.
+     *
+     * The dig itself is timed by the client, which knows this from its own copy of the same data.
+     * The server needs it anyway to decide whether a block comes apart in one go: that is the one
+     * moment vanilla asks the question server-side too.
      */
     public fun miningSpeed(
         item: Identifier?,
@@ -60,4 +62,33 @@ public object ItemTools {
         val rule = rulesFor(item).firstOrNull { tagContains(it.blockTag, block) } ?: return 1f
         return rule.speed ?: 1f
     }
+
+    /**
+     * How much of [block] one tick of mining takes off, 1 or more meaning it breaks at once.
+     *
+     * parity: `BlockState.getDestroyProgress` over `Player.getDestroySpeed`. Effects, attributes,
+     * being underwater and being off the ground are not modelled, so this is the dry-land,
+     * unaffected case: tool speed, the mining efficiency the enchantment adds, and the 30 or 100
+     * divisor that makes the wrong tool slow rather than useless.
+     */
+    public fun destroyProgressPerTick(
+        item: Identifier?,
+        block: Identifier,
+        hardness: Float,
+        requiresCorrectTool: Boolean,
+        efficiencyLevel: Int,
+        tagContains: (tag: String, block: Identifier) -> Boolean,
+    ): Float {
+        if (hardness < 0f) return 0f
+        if (hardness == 0f) return Float.MAX_VALUE
+        var speed = miningSpeed(item, block, tagContains)
+        // parity: the enchantment only helps a tool that is already faster than a bare hand, and
+        // its `minecraft:mining_efficiency` amount is `levels_squared` with one added.
+        if (speed > 1f && efficiencyLevel > 0) speed += efficiencyLevel * efficiencyLevel + 1f
+        val correct = !requiresCorrectTool || isCorrectForDrops(item, block, tagContains)
+        return speed / hardness / if (correct) CORRECT_TOOL_DIVISOR else WRONG_TOOL_DIVISOR
+    }
+
+    private const val CORRECT_TOOL_DIVISOR = 30f
+    private const val WRONG_TOOL_DIVISOR = 100f
 }
