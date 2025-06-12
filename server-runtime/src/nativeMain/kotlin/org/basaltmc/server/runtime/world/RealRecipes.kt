@@ -27,14 +27,52 @@ public class RealRecipes(
 ) {
     private val recipes: List<Recipe> = serverJar?.let(::load).orEmpty()
 
+    /** The id each parsed recipe came from, in the same order, so a match can be named. */
+    private var parsedIds: List<Identifier> = emptyList()
+
+    /**
+     * The recipe behind an id, for the book entries `/recipe give` sends.
+     *
+     * Only the recipes this build parsed have one: a recipe type it skipped can be *named* by
+     * `/recipe` (its file is there) but cannot be drawn, and is left out of the book rather than
+     * drawn wrong.
+     */
+    public fun recipeFor(id: Identifier): Recipe? {
+        val index = parsedIds.indexOf(id)
+        return if (index < 0) null else recipes[index]
+    }
+
     /** How many crafting recipes were understood, for the startup line that reports it. */
     public val size: Int get() = recipes.size
 
     /** What this grid layout crafts right now, or `null` if it is not a recipe. */
-    public fun resultFor(input: CraftingInput): ItemStack? = recipes.firstOrNull { it.matches(input) }?.result
+    public fun resultFor(input: CraftingInput): ItemStack? = matchFor(input)?.second
+
+    /**
+     * The recipe this grid matches, as its id and its result.
+     *
+     * The id is what `limited_crafting` checks against the player's recipe book, which is the whole
+     * reason a match needs a name rather than just a result.
+     */
+    public fun matchFor(input: CraftingInput): Pair<Identifier?, ItemStack>? {
+        val index = recipes.indexOfFirst { it.matches(input) }
+        if (index < 0) return null
+        return parsedIds.getOrNull(index) to recipes[index].result
+    }
+
+    /** Every recipe file's id, whether or not this build could parse it: what `/recipe *` names. */
+    public var ids: Set<Identifier> = emptySet()
+        private set
 
     private fun load(serverJar: ServerJarAssets): List<Recipe> {
         val tags = loadItemTags(serverJar)
+        val parsedIdList = mutableListOf<Identifier>()
+        ids =
+            serverJar
+                .entriesUnder(RECIPE_PREFIX)
+                .filter { it.endsWith(".json") }
+                .map { Identifier.vanilla(it.removePrefix(RECIPE_PREFIX).removeSuffix(".json")) }
+                .toSet()
         val parsed = mutableListOf<Recipe>()
         var skipped = 0
         for (entry in serverJar.entriesUnder(RECIPE_PREFIX)) {
@@ -47,8 +85,12 @@ public class RealRecipes(
                         skipped++
                         null
                     }
-            if (recipe != null) parsed += recipe
+            if (recipe != null) {
+                parsed += recipe
+                parsedIdList += Identifier.vanilla(entry.removePrefix(RECIPE_PREFIX).removeSuffix(".json"))
+            }
         }
+        parsedIds = parsedIdList
         logger.info { "Loaded ${parsed.size} crafting recipe(s) ($skipped other recipe type(s) skipped)." }
         return parsed
     }
