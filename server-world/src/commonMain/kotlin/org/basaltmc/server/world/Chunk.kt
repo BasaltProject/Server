@@ -98,6 +98,19 @@ public class Chunk(
 
     public fun blockEntities(): Collection<ChunkBlockEntity> = blockEntitiesByPosition.values
 
+    /** How many block entities this chunk holds, without copying the collection. */
+    public val blockEntityCount: Int get() = blockEntitiesByPosition.size
+
+    /** Scheduled block plus fluid ticks held, without copying either list. */
+    public val scheduledTickCount: Int get() = scheduledBlockTicksBacking.size + scheduledFluidTicksBacking.size
+
+    /** Approximate bytes the packed sections and heightmaps keep resident; attachments are counted, not sized. */
+    public fun residentBytes(): Long {
+        var bytes = heights.size.toLong() * 16 * 16 * Int.SIZE_BYTES
+        for (section in sections) bytes += section.residentBytes
+        return bytes
+    }
+
     public fun addGeneratedEntity(entity: ChunkGeneratedEntity) {
         generatedEntitiesBacking += entity
         isDirty = true

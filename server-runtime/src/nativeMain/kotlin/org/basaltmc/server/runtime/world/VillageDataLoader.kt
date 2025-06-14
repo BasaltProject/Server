@@ -37,6 +37,14 @@ public class VillageDataLoader(
     /** Resolves a block tag name to its member state ids, expanding nested `#tag` references. */
     public val tagLookup: (String) -> Set<Int>? = { name -> loadBlockTag(name) }
 
+    /** Cached template count and their total block infos, for the timings memory breakdown. */
+    public fun templateStats(): Pair<Int, Long> =
+        cacheMutex.withLock {
+            var blocks = 0L
+            for (template in templateCache.values) blocks += template?.blocks?.size ?: 0
+            templateCache.size to blocks
+        }
+
     private fun loadTemplate(location: String): StructureTemplate? =
         cachedOrCompute(templateCache, location) {
             val bytes =

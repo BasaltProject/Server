@@ -306,10 +306,30 @@ public object VanillaRegistryData {
     public fun frogVariant(): NbtCompound =
         NbtCompound().apply { putString("asset_id", "minecraft:entity/frog/frog_cold") }
 
-    public fun catVariant(): NbtCompound =
+    /**
+     * All eleven variants, in `CatVariants.bootstrap` order. The full set matters, not just one
+     * entry: structure cats carry a variant id into `set_entity_data`, and a client whose registry
+     * holds fewer entries than the id being sent drops the connection failing to decode it.
+     */
+    public val catVariants: List<String> =
+        listOf(
+            "tabby",
+            "black",
+            "red",
+            "siamese",
+            "british_shorthair",
+            "calico",
+            "persian",
+            "ragdoll",
+            "white",
+            "jellie",
+            "all_black",
+        )
+
+    public fun catVariant(id: String): NbtCompound =
         NbtCompound().apply {
-            putString("asset_id", "minecraft:entity/cat/cat_black")
-            putString("baby_asset_id", "minecraft:entity/cat/cat_black_baby")
+            putString("asset_id", "minecraft:entity/cat/cat_$id")
+            putString("baby_asset_id", "minecraft:entity/cat/cat_${id}_baby")
         }
 
     public fun catSoundVariant(): NbtCompound {

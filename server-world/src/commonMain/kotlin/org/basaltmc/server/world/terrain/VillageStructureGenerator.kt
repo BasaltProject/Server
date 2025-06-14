@@ -35,12 +35,22 @@ public class VillageStructureGenerator(
     private val biomeAt: (x: Int, y: Int, z: Int) -> String,
     private val maxDepth: Int,
     private val maxDistanceFromCenter: Int,
-    poolLookup: (String) -> StructureTemplatePool?,
+    private val poolLookup: (String) -> StructureTemplatePool?,
     private val templateLoader: TemplateLoader,
 ) {
-    private val assembly = JigsawAssembly(poolLookup, templateLoader, heightAt = { x, z -> surfaceHeightAt(x, z) })
+    // Bounded: it used to grow with every candidate ever visited, which on a long-running server is
+    // a leak. Overflow drops the whole map rather than picking victims, because a CAS-swapped
+    // immutable map carries no recency order; the ~9 candidates near the player are re-derived once
+    // and the rest was dead weight anyway.
     private val assemblyCache = AtomicReference<Map<CandidateKey, VillageStart?>>(emptyMap())
-    private val samplerCache = AtomicReference<Map<Pair<Int, Int>, DensityChunkSampler>>(emptyMap())
+
+    /** Cached candidate count and their total placed pieces, for the timings memory breakdown. */
+    public fun assemblyStats(): Pair<Int, Long> {
+        val cache = assemblyCache.value
+        var pieces = 0L
+        for (start in cache.values) pieces += start?.pieces?.size ?: 0
+        return cache.size to pieces
+    }
 
     public fun generateInto(
         chunk: Chunk,
@@ -177,27 +187,41 @@ public class VillageStructureGenerator(
         val startPosition = StructurePos(candidateChunkX * 16, 0, candidateChunkZ * 16)
         val random = WorldgenRandom(LegacyRandom(0L))
         random.setLargeFeatureSeed(seed, candidateChunkX, candidateChunkZ)
-        val variant = selectVariant(candidateChunkX, candidateChunkZ, seed)
+        // One sampler cache per assembly, alive exactly as long as the computation that needs it.
+        // The Plains pools have 36 `terrain_matching` entries, each asking once per attempted
+        // connection, so reuse *within* an assembly is what makes it finish; across assemblies
+        // there is nothing to reuse, because a finished assembly is cached and never recomputed.
+        // A shared bounded map here thrashed instead: overflowing mid-assembly threw away the very
+        // samplers the assembly was still using, and one chunk measured 7.9 seconds.
+        val samplers = HashMap<Long, DensityChunkSampler>()
+        val variant = selectVariant(candidateChunkX, candidateChunkZ, seed, samplers)
         val assembled =
             variant?.let {
                 VillageStart(
                     it,
-                    assembly.assemble(
-                        it.startPool,
-                        startPosition,
-                        maxDepth,
-                        random,
-                        projectStartToHeightmap = true,
-                        maxDistanceFromCenter = maxDistanceFromCenter,
-                        useExpansionHack = true,
-                    ),
+                    JigsawAssembly(poolLookup, templateLoader, heightAt = { x, z -> surfaceHeightAt(x, z, samplers) })
+                        .assemble(
+                            it.startPool,
+                            startPosition,
+                            maxDepth,
+                            random,
+                            projectStartToHeightmap = true,
+                            maxDistanceFromCenter = maxDistanceFromCenter,
+                            useExpansionHack = true,
+                        ),
                 )
             }
 
         while (true) {
             val current = assemblyCache.value
             if (current.containsKey(key)) return current[key]
-            if (assemblyCache.compareAndSet(current, current + (key to assembled))) return assembled
+            val next =
+                if (current.size >= ASSEMBLY_CACHE_CAPACITY) {
+                    mapOf(key to assembled)
+                } else {
+                    current + (key to assembled)
+                }
+            if (assemblyCache.compareAndSet(current, next)) return assembled
         }
     }
 
@@ -213,12 +237,13 @@ public class VillageStructureGenerator(
         candidateChunkX: Int,
         candidateChunkZ: Int,
         seed: Long,
+        samplers: HashMap<Long, DensityChunkSampler>,
     ): Variant? {
         val random = WorldgenRandom(LegacyRandom(0L))
         random.setLargeFeatureSeed(seed, candidateChunkX, candidateChunkZ)
         val centerX = candidateChunkX * 16 + 8
         val centerZ = candidateChunkZ * 16 + 8
-        val biome = biomeAt(centerX, surfaceHeightAt(centerX, centerZ), centerZ).substringAfter(':')
+        val biome = biomeAt(centerX, surfaceHeightAt(centerX, centerZ, samplers), centerZ).substringAfter(':')
         val options = VARIANTS.toMutableList()
         var total = options.size
         while (options.isNotEmpty()) {
@@ -243,18 +268,30 @@ public class VillageStructureGenerator(
      * corner; the uncached graph made repeated jigsaw height queries prohibitively expensive. The
      * chunk's heightmap is not an option because the column is often outside the generated chunk.
      *
-     * [samplerCache] keeps one sampler per chunk across calls: the Plains pools have 36
-     * `terrain_matching` entries, each asking once per attempted connection, not once per
-     * assembly, so rebuilding the interpolation grid every time is what made it never finish.
+     * [samplers] belongs to the calling assembly (see [assembledStart]): one sampler per chunk
+     * column touched, reused across the assembly's many `terrain_matching` queries and discarded
+     * with the map when the assembly is done.
      */
     private fun surfaceHeightAt(
         x: Int,
         z: Int,
+        samplers: HashMap<Long, DensityChunkSampler>,
     ): Int {
         val chunkX = x shr 4
         val chunkZ = z shr 4
-        val key = chunkX to chunkZ
-        val sampler = samplerCache.value[key] ?: createSampler(chunkX, chunkZ, key)
+        val key = (chunkX.toLong() and 0xFFFFFFFFL) or (chunkZ.toLong() shl 32)
+        val sampler =
+            samplers.getOrPut(key) {
+                DensityChunkSampler(
+                    router.finalDensity,
+                    chunkX,
+                    chunkZ,
+                    WorldHeight.MIN_Y,
+                    WorldHeight.HEIGHT,
+                    CELL_WIDTH,
+                    CELL_HEIGHT,
+                )
+            }
         val localX = x and 15
         val localZ = z and 15
         var y = WorldHeight.MAX_Y
@@ -265,34 +302,16 @@ public class VillageStructureGenerator(
         return (y + 1).coerceAtLeast(SEA_LEVEL)
     }
 
-    private fun createSampler(
-        chunkX: Int,
-        chunkZ: Int,
-        key: Pair<Int, Int>,
-    ): DensityChunkSampler {
-        val created =
-            DensityChunkSampler(
-                router.finalDensity,
-                chunkX,
-                chunkZ,
-                WorldHeight.MIN_Y,
-                WorldHeight.HEIGHT,
-                CELL_WIDTH,
-                CELL_HEIGHT,
-            )
-        while (true) {
-            val current = samplerCache.value
-            current[key]?.let { return it }
-            if (samplerCache.compareAndSet(current, current + (key to created))) return created
-        }
-    }
-
     private companion object {
         const val CELL_WIDTH = 4
         const val CELL_HEIGHT = 8
         const val SEA_LEVEL = 63
         const val BEARD_RADIUS = 12
         const val SURFACE_STRUCTURES_STEP = 4
+
+        // 64 candidate cells is over 2000 chunks of travel at the villages grid spacing; a full
+        // re-assembly after an overflow costs about a second per nearby candidate.
+        const val ASSEMBLY_CACHE_CAPACITY = 64
 
         data class Variant(
             val startPool: String,

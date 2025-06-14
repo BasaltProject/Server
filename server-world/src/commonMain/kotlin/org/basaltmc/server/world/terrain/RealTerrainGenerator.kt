@@ -78,9 +78,10 @@ public object RealTerrainGenerator {
         val aquifer = OverworldAquifer(router, seed, chunkX, chunkZ, WorldHeight.MIN_Y, WorldHeight.HEIGHT, cache)
         val oreVeins = OverworldOreVeinifier(router, seed, cache)
         GenerationMetrics.measure(GenerationMetrics.Phase.TERRAIN_FILL) {
-            // Cell by cell rather than column by column, so a cell of open sky (all eight corners
-            // non-positive and entirely at or above sea level, which is most of a chunk's height)
-            // is skipped whole: those blocks are air, and air is already what the chunk holds.
+            // Cell by cell rather than column by column, so a cell's eight interpolation corners
+            // are computed once and every block inside pays only the lerp (see DensityCache).
+            // Cells are never skipped wholesale: interpolation is marker-scoped, nodes outside the
+            // markers evaluate per block, so corner signs alone cannot prove a cell empty.
             // Within a cell the order is y, then z, then x, matching ChunkSection's own
             // (y shl 8) or (z shl 4) or x layout so writes run forwards through its array.
             for (cellY in 0 until sampler.verticalCells) {
@@ -180,6 +181,9 @@ public object RealTerrainGenerator {
         chunk: Chunk,
         environment: SurfaceRuleEnvironment,
     ) {
+        // A chunk holds a handful of distinct biomes, so the Identifier parse and the registry
+        // lookup are paid once per name instead of once per each of the 1536 quarts.
+        val idByName = HashMap<String, Int>()
         for (quartY in 0 until WorldHeight.HEIGHT / 4) {
             val blockY = WorldHeight.MIN_Y + quartY * 4
             for (quartX in 0 until 4) {
@@ -190,7 +194,7 @@ public object RealTerrainGenerator {
                             blockY,
                             chunk.chunkZ * 16 + quartZ * 4,
                         )
-                    val id = Biomes.REGISTRY.idOf(Identifier.parse(biome)) ?: 0
+                    val id = idByName.getOrPut(biome) { Biomes.REGISTRY.idOf(Identifier.parse(biome)) ?: 0 }
                     chunk.setBiomeId(quartX, quartY, quartZ, id)
                 }
             }

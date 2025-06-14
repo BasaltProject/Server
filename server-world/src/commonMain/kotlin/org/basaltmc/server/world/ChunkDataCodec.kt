@@ -17,9 +17,15 @@ import org.basaltmc.wire.protocol.play.PalettedContainer
 public object ChunkDataCodec {
     private const val BLOCK_DIRECT_BITS = 8
     private const val BIOME_DIRECT_BITS = 4
+    private const val BLOCKS_PER_SECTION = 16 * 16 * 16
+    private const val BIOMES_PER_SECTION = 4 * 4 * 4
 
     public fun encodeSections(chunk: Chunk): ByteArray {
         val buffer = ByteBuffer()
+        // One scratch per expansion, shared across all sections: expanding each section into its
+        // own fresh array put ~400 KB of garbage behind every chunk sent.
+        val blockScratch = IntArray(BLOCKS_PER_SECTION)
+        val biomeScratch = IntArray(BIOMES_PER_SECTION)
         for (i in 0 until chunk.sectionCount) {
             val section = chunk.section(i)
             buffer.writeShort(section.nonAirBlockCount.toShort())
@@ -27,16 +33,18 @@ public object ChunkDataCodec {
             // count), never just one: confirmed live, a real client overran the buffer reading the
             // next section's data because this field was missing entirely.
             buffer.writeShort(section.nonEmptyFluidCount.toShort())
+            section.copyBlockStateIdsInto(blockScratch)
             PalettedContainer.write(
                 buffer,
-                section.blockStateIds(),
+                blockScratch,
                 PalettedContainer.BLOCK_MIN_INDIRECT_BITS,
                 PalettedContainer.BLOCK_MAX_INDIRECT_BITS,
                 BLOCK_DIRECT_BITS,
             )
+            section.copyBiomeIdsInto(biomeScratch)
             PalettedContainer.write(
                 buffer,
-                section.biomeIds(),
+                biomeScratch,
                 PalettedContainer.BIOME_MIN_INDIRECT_BITS,
                 PalettedContainer.BIOME_MAX_INDIRECT_BITS,
                 BIOME_DIRECT_BITS,
