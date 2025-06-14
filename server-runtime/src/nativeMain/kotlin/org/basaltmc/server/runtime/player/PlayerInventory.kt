@@ -4,6 +4,7 @@ import org.basaltmc.server.registry.Items
 import org.basaltmc.server.storage.StoredInventory
 import org.basaltmc.server.storage.StoredItemStack
 import org.basaltmc.wire.common.Identifier
+import org.basaltmc.wire.nbt.NbtCompound
 import org.basaltmc.wire.protocol.play.WireItemStack
 
 /**
@@ -14,7 +15,13 @@ import org.basaltmc.wire.protocol.play.WireItemStack
  * Only the container: it holds stacks and hands them back. What a player can do with them is a
  * separate system, which is why a click is answered by re-sending the whole window.
  */
-public class PlayerInventory {
+public class PlayerInventory(
+    /**
+     * Enchantment id to registry index, or null while the enchantment registry has not been sent.
+     * Handed in rather than looked up: this class knows nothing about the server around it.
+     */
+    private val enchantmentIds: ((Identifier) -> Int?)? = null,
+) {
     private val slots = arrayOfNulls<StoredItemStack>(StoredInventory.PLAYER_SLOTS)
 
     /** Which hotbar slot is in hand, 0 to 8. */
@@ -128,10 +135,40 @@ public class PlayerInventory {
         // An item this build's registry does not know is left out rather than sent as some other
         // item: a wrong id is a wrong item in someone's hand.
         val id = Items.REGISTRY.byIdentifier(Identifier.parse(stack.id))?.protocolId ?: return null
-        return WireItemStack(id, stack.count)
+        return WireItemStack(id, stack.count, wireEnchantments(stack))
+    }
+
+    /**
+     * The stack's enchantments as registry ids, or nothing when they cannot be resolved.
+     *
+     * An enchantment whose id the client was never sent would draw as a missing entry, so an
+     * unresolved one is dropped rather than guessed: [enchantmentIds] is only non-null once the
+     * enchantment registry has actually gone out.
+     */
+    private fun wireEnchantments(stack: StoredItemStack): Map<Int, Int> {
+        val stored = stack.components[ENCHANTMENTS_COMPONENT] as? NbtCompound ?: return emptyMap()
+        val resolve = enchantmentIds ?: return emptyMap()
+        return buildMap {
+            for (name in stored.keys) {
+                val id = resolve(Identifier.parse(name)) ?: continue
+                put(id, stored.getInt(name))
+            }
+        }
     }
 
     public companion object {
+        /** The level [enchantment] is on [stack], or 0 when it is not on it at all. */
+        public fun enchantmentLevel(
+            stack: StoredItemStack,
+            enchantment: Identifier,
+        ): Int {
+            val stored = stack.components[ENCHANTMENTS_COMPONENT] as? NbtCompound ?: return 0
+            return if (enchantment.toString() in stored.keys) stored.getInt(enchantment.toString()) else 0
+        }
+
+        /** Where an enchanted stack keeps them, in the same component name the wire uses. */
+        public const val ENCHANTMENTS_COMPONENT: String = "minecraft:enchantments"
+
         /**
          * How many slots container 0 has on the wire, and why this class maps at all: the player's
          * window is `InventoryMenu`'s 46 slots (result, 2x2 grid, armour, storage, hotbar,

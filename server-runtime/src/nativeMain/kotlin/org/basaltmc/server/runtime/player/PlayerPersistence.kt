@@ -47,6 +47,7 @@ public object PlayerPersistence {
             group = session.group,
             stats = session.stats.snapshot(playTimeTicks),
             inventory = session.inventory.snapshot(),
+            tags = session.tags.toSet(),
         )
 
     /** Puts a stored row back onto a freshly created session, in place. */
@@ -67,5 +68,7 @@ public object PlayerPersistence {
         session.flying = session.gamemode == Gamemode.SPECTATOR
         session.stats.restore(stored.stats)
         session.inventory.restore(stored.inventory)
+        session.tags.clear()
+        session.tags += stored.tags
     }
 }
