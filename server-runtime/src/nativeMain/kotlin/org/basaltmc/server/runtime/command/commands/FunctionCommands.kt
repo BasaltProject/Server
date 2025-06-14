@@ -9,7 +9,7 @@ import org.basaltmc.server.runtime.command.CommandSyntaxException
 import org.basaltmc.server.runtime.command.GreedyStringArgument
 import org.basaltmc.server.runtime.command.IntegerArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
-import org.basaltmc.server.runtime.command.ResourceLocationArgument
+import org.basaltmc.server.runtime.command.RegistryArgument
 import org.basaltmc.server.runtime.command.TimeArgument
 import org.basaltmc.server.runtime.command.WordArgument
 import org.basaltmc.server.runtime.function.FunctionLibrary
@@ -79,7 +79,8 @@ public class FunctionCommand(
     private val runner: FunctionRunner,
 ) : Command(name = "function", permissionLevel = PermissionLevel.GAMEMASTERS) {
     override fun build(root: CommandNodeBuilder) {
-        root.argument("name", ResourceLocationArgument) {
+        root.argument("name", RegistryArgument.FUNCTION) {
+            suggestsFromServer { context -> context.matchingIds(library.all().map { it.id }) }
             executes { context ->
                 val id = context.get<Identifier>("name")
                 val result = runner.run(context.dispatcher, context.source, id)
@@ -136,12 +137,14 @@ public class ReturnCommand(
  * tick it was asked for rather than after a wall-clock delay.
  */
 public class ScheduleCommand(
+    private val library: FunctionLibrary,
     private val schedule: FunctionSchedule,
 ) : Command(name = "schedule", permissionLevel = PermissionLevel.GAMEMASTERS) {
     override fun build(root: CommandNodeBuilder) {
         root.literal("function") {
-            argument("name", ResourceLocationArgument) {
-                argument("time", TimeArgument(min = 1)) {
+            argument("function", RegistryArgument.FUNCTION) {
+                suggestsFromServer { context -> context.matchingIds(library.all().map { it.id }) }
+                argument("time", TimeArgument(min = 0)) {
                     executes { context -> schedule(context, replace = true) }
                     literal("append") { executes { context -> schedule(context, replace = false) } }
                     literal("replace") { executes { context -> schedule(context, replace = true) } }
@@ -149,9 +152,11 @@ public class ScheduleCommand(
             }
         }
         root.literal("clear") {
-            argument("name", ResourceLocationArgument) {
+            // parity: a greedy string, not a function name: a scheduled entry can be a `#tag` too.
+            argument("function", GreedyStringArgument) {
+                suggestsFromServer { context -> context.matchingIds(schedule.scheduledIds()) }
                 executes { context ->
-                    val id = context.get<Identifier>("name")
+                    val id = Identifier.parse(context.get<String>("function"))
                     val cleared = schedule.clear(id)
                     if (cleared == 0) {
                         throw CommandSyntaxException(
@@ -179,7 +184,7 @@ public class ScheduleCommand(
         context: CommandContext,
         replace: Boolean,
     ): Int {
-        val id = context.get<Identifier>("name")
+        val id = context.get<Identifier>("function")
         val delay = context.get<Int>("time")
         val runAt = schedule.schedule(id, delay, replace)
         context.success(
@@ -216,6 +221,9 @@ public class FunctionSchedule {
         return runAt
     }
 
+    /** What is waiting right now, which is what `/schedule clear` completes with. */
+    public fun scheduledIds(): List<Identifier> = entries.map { it.id }.distinct()
+
     public fun clear(id: Identifier): Int {
         val before = entries.size
         entries.removeAll { it.id == id }
@@ -243,10 +251,16 @@ public class DataPackCommand(
             literal("enabled") { executes { context -> list(context, true) } }
         }
         root.literal("enable") {
-            argument("name", WordArgument) { executes { context -> setEnabled(context, true) } }
+            argument("name", WordArgument) {
+                suggestsFromServer { context -> context.matching(library.availablePacks.filterNot(library::isEnabled)) }
+                executes { context -> setEnabled(context, true) }
+            }
         }
         root.literal("disable") {
-            argument("name", WordArgument) { executes { context -> setEnabled(context, false) } }
+            argument("name", WordArgument) {
+                suggestsFromServer { context -> context.matching(library.enabledPacks) }
+                executes { context -> setEnabled(context, false) }
+            }
         }
     }
 

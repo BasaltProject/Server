@@ -4,8 +4,8 @@ import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSyntaxException
+import org.basaltmc.server.runtime.command.GreedyStringArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
-import org.basaltmc.server.runtime.command.ResourceLocationArgument
 import org.basaltmc.server.runtime.timings.TimingsReport
 import org.basaltmc.wire.common.timings.Timings
 import org.basaltmc.wire.text.Component
@@ -165,21 +165,28 @@ public class PublishCommand(
     }
 }
 
-/** parity: `FetchProfileCommand`, which asks Mojang for the UUID behind a name. */
+/**
+ * parity: `FetchProfileCommand`, which asks Mojang for the UUID behind a name.
+ *
+ * Only the `name` form: its `id` and `entity` forms answer from the server's profile cache, which
+ * this build has not got, so they are left out rather than answered wrong.
+ */
 public class FetchProfileCommand(
     private val lookup: (String) -> String?,
 ) : Command(name = "fetchprofile", permissionLevel = PermissionLevel.ADMINS) {
     override fun build(root: CommandNodeBuilder) {
-        root.argument("name", ResourceLocationArgument) {
-            executes { context ->
-                val name = context.get<org.basaltmc.wire.common.Identifier>("name").path
-                val uuid =
-                    lookup(name)
-                        ?: throw CommandSyntaxException(
-                            Component.text("No Mojang account is called '$name', or the lookup failed."),
-                        )
-                context.success(Component.text("$name is $uuid"))
-                1
+        root.literal("name") {
+            argument("name", GreedyStringArgument) {
+                executes { context ->
+                    val name = context.get<String>("name")
+                    val uuid =
+                        lookup(name)
+                            ?: throw CommandSyntaxException(
+                                Component.text("No Mojang account is called '$name', or the lookup failed."),
+                            )
+                    context.success(Component.text("$name is $uuid"))
+                    1
+                }
             }
         }
     }

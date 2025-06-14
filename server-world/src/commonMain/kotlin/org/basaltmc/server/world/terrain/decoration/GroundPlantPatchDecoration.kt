@@ -76,6 +76,22 @@ public object GroundPlantPatchDecoration {
         }
     }
 
+    /** The vanilla placed feature names this step draws, which are the spec names themselves. */
+    public val PLACED_IDS: Set<String> get() = SPECS.map(PatchSpec::name).toSet()
+
+    /** The patch at one origin, which is what `/place feature` runs. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+        placedFeature: String,
+    ): Boolean {
+        val spec = SPECS.firstOrNull { it.name == placedFeature } ?: return false
+        val region = PatchRegion(chunk, null, null)
+        repeat(spec.innerCount) { placeCandidate(region, random, origin, spec) }
+        return true
+    }
+
     private fun placeCandidate(
         region: PatchRegion,
         random: WorldgenRandom,

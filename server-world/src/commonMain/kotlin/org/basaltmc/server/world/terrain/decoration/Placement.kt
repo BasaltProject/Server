@@ -296,3 +296,24 @@ public class CountExtraPlacement(
         return (0 until n).asSequence().map { origin }
     }
 }
+
+/**
+ * Runs [modifiers] from [origin] rather than from the chunk corner, and places the feature at every
+ * position they hand back.
+ *
+ * This is what a placed feature is minus the modifiers that scatter it over a chunk: the ones that
+ * shape the patch around a point stay, the ones that pick the point do not, because `/place feature`
+ * was told where.
+ */
+public fun placeFrom(
+    chunk: Chunk,
+    random: WorldgenRandom,
+    origin: DecorationPos,
+    modifiers: List<PlacementModifier>,
+    place: (DecorationPos) -> Unit,
+) {
+    val context = PlacementContext(chunk)
+    var positions: Sequence<DecorationPos> = sequenceOf(origin)
+    for (modifier in modifiers) positions = positions.flatMap { modifier.getPositions(context, random, it) }
+    positions.forEach(place)
+}

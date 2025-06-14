@@ -20,6 +20,12 @@ public object JungleVineDecoration : BiomeVegetalDecoration {
         positions.forEach { place(chunk, it) }
     }
 
+    /** parity: `vines`, grown from one position rather than scanned over a chunk. */
+    public fun placeAt(
+        chunk: Chunk,
+        origin: DecorationPos,
+    ): Boolean = place(chunk, origin)
+
     private fun place(
         chunk: Chunk,
         origin: DecorationPos,

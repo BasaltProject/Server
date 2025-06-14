@@ -5,8 +5,13 @@ import org.basaltmc.server.runtime.config.GroupsConfig
 import org.basaltmc.server.runtime.config.WorldDimension
 import org.basaltmc.server.runtime.player.PlayerRegistry
 import org.basaltmc.server.runtime.player.PlayerSession
+import org.basaltmc.server.runtime.scoreboard.Scoreboard
+import org.basaltmc.server.runtime.scoreboard.Teams
+import org.basaltmc.server.runtime.world.AdvancementTriggers
 import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
+import org.basaltmc.server.runtime.world.PlayerProgress
+import org.basaltmc.server.runtime.world.RealAdvancements
 import org.basaltmc.server.storage.AccessRepository
 import org.basaltmc.server.storage.PlayerRepository
 import org.basaltmc.wire.common.Identifier
@@ -69,6 +74,21 @@ public class CommandEnvironment(
     public val blockTagMembers: (Identifier) -> Set<Identifier>? = { null },
     /** The same for item tags, which `/clear` and the item predicates use. */
     public val itemTagMembers: (Identifier) -> Set<Identifier>? = { null },
+    /** The same for entity type tags, which a selector's `type=#minecraft:skeletons` resolves through. */
+    public val entityTagMembers: (Identifier) -> Set<Identifier>? = { null },
+    /**
+     * What a selector's `scores=`, `team=` and `advancements=` read.
+     *
+     * Nullable rather than empty defaults: without them the filter has nothing to answer with and
+     * matches nobody, which is also what vanilla does for an objective or advancement that does not
+     * exist, so a test fixture with no scoreboard behaves like a server with an empty one.
+     */
+    public val scoreboard: Scoreboard? = null,
+    public val teams: Teams? = null,
+    public val advancements: RealAdvancements? = null,
+    public val progress: PlayerProgress? = null,
+    /** What a command hands a criterion to, so `/recipe give` awards what learning it would. */
+    public val advancementTriggers: AdvancementTriggers? = null,
     /** `commands.toml`: which permission each command asks for, which exist, and what they answer. */
     private val commandsProvider: () -> CommandsConfig = { CommandsConfig(emptyMap(), emptyList(), emptyMap()) },
 ) {
@@ -109,6 +129,25 @@ public class CommandEnvironment(
                 for (player in players) player.connection.resendChunk(chunkX, chunkZ)
             }
         }
+    }
+
+    /** Pushes new biomes for a block range to whoever is in [world], without resending the columns. */
+    public fun syncBiomes(
+        world: LoadedWorld,
+        minX: Int,
+        minZ: Int,
+        maxX: Int,
+        maxZ: Int,
+    ) {
+        val players = playersIn(world)
+        if (players.isEmpty()) return
+        val columns =
+            buildList {
+                for (chunkX in (minX shr 4)..(maxX shr 4)) {
+                    for (chunkZ in (minZ shr 4)..(maxZ shr 4)) add(chunkX to chunkZ)
+                }
+            }
+        for (player in players) player.connection.sendBiomes(columns)
     }
 
     /** Pushes [world]'s weather, which is three game events rather than one packet, as vanilla sends it. */

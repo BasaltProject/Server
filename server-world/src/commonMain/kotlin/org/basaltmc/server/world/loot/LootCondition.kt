@@ -29,10 +29,10 @@ public sealed interface LootCondition {
     }
 
     /**
-     * Gates an alternative on the breaking tool's enchantments, almost always silk touch. Item
-     * stacks on the wire carry no components yet ([org.basaltmc.wire.protocol.play.WireItemStack]
-     * refuses to read one that does), so no enchantment can exist in this build: always false. Not
-     * a parity shortcut, a consequence of a gap that has to close first.
+     * Gates an alternative on the breaking tool's enchantments, almost always silk touch. Always
+     * false, because this evaluator is handed a random and nothing else: which tool broke the block
+     * never reaches it. Closing that means giving the loot context a tool, not a codec, so it is
+     * declared here rather than guessed at.
      */
     public data object MatchTool : LootCondition {
         override fun test(random: BasaltRandom): Boolean = false

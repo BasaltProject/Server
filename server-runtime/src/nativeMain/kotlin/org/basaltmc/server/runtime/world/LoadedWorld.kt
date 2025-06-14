@@ -37,8 +37,8 @@ public class LoadedWorld(
     /** Where this world's generation and saving are recorded. Off unless `/timings` is on. */
     private val timings: Timings = Timings(),
     private val overworldRouter: OverworldNoiseRouter? = null,
-    private val surfaceEnvironment: SurfaceRuleEnvironment? = null,
-    private val villageGenerator: VillageStructureGenerator? = null,
+    public val surfaceEnvironment: SurfaceRuleEnvironment? = null,
+    public val villageGenerator: VillageStructureGenerator? = null,
     private val normalGenerator: ((chunkX: Int, chunkZ: Int) -> Chunk)? = null,
 ) {
     public val name: String get() = declaration.name

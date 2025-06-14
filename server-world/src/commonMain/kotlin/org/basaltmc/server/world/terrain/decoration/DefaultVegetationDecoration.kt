@@ -39,6 +39,24 @@ public object DefaultVegetationDecoration : BiomeVegetalDecoration {
     /** // parity: placed_feature/flower_warm.json: the exact same real `flowerDefault` configured feature as [FLOWERS], just twice as common (jungle/savanna, non-shattered). */
     public val WARM_FLOWERS: BiomeVegetalDecoration = flowers(rarity = 16)
 
+    /** The vanilla placed feature names of the flower patches this draws. */
+    public val PLACED_IDS: Set<String> = setOf("flower_default", "flower_warm")
+
+    /** The patch at one origin, which is what `/place feature` runs. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ) {
+        val feature = SimpleBlockFeature({ r, _ -> if (r.nextInt(3) < 2) poppyStateId else dandelionStateId })
+        placeFrom(
+            chunk,
+            random,
+            origin,
+            listOf(CountPlacement(64), RandomOffsetPlacement(xzSpread = 6, ySpread = 2), AirTargetFilter()),
+        ) { position -> feature.place(chunk, random, position) }
+    }
+
     private fun flowers(rarity: Int): BiomeVegetalDecoration =
         BiomeVegetalDecoration { chunk, random ->
             val feature = SimpleBlockFeature({ r, _ -> if (r.nextInt(3) < 2) poppyStateId else dandelionStateId })

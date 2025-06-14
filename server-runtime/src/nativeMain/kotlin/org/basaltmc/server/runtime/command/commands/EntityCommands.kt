@@ -1,6 +1,7 @@
 package org.basaltmc.server.runtime.command.commands
 
 import kotlinx.serialization.json.Json
+import org.basaltmc.server.assets.ServerJarAssets
 import org.basaltmc.server.registry.EntityTypes
 import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandContext
@@ -10,10 +11,14 @@ import org.basaltmc.server.runtime.command.CommandTarget
 import org.basaltmc.server.runtime.command.Coordinates
 import org.basaltmc.server.runtime.command.DoubleArgument
 import org.basaltmc.server.runtime.command.EntitiesArgument
+import org.basaltmc.server.runtime.command.FloatArgument
 import org.basaltmc.server.runtime.command.NbtCompoundArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
+import org.basaltmc.server.runtime.command.RegistryArgument
 import org.basaltmc.server.runtime.command.ResourceLocationArgument
 import org.basaltmc.server.runtime.command.RotationArgument
+import org.basaltmc.server.runtime.command.SuggestionContext
+import org.basaltmc.server.runtime.command.SuggestionProviders
 import org.basaltmc.server.runtime.command.Vec3Argument
 import org.basaltmc.server.runtime.command.world
 import org.basaltmc.server.runtime.entity.Attribute
@@ -48,7 +53,8 @@ public class SummonCommand(
     private val players: PlayerRegistry,
 ) : Command(name = "summon", permissionLevel = PermissionLevel.GAMEMASTERS) {
     override fun build(root: CommandNodeBuilder) {
-        root.argument("entity", ResourceLocationArgument) {
+        root.argument("entity", RegistryArgument.resource("minecraft:entity_type")) {
+            suggestsFromClient(SuggestionProviders.SUMMONABLE_ENTITIES)
             executes { context -> summon(context, null) }
             argument("pos", Vec3Argument) {
                 executes { context -> summon(context, context.get("pos")) }
@@ -126,19 +132,26 @@ public class SummonCommand(
 }
 
 /** parity: `DamageCommand`, minus the damage *type*, which needs the damage type registry to matter. */
-public class DamageCommand : Command(name = "damage", permissionLevel = PermissionLevel.GAMEMASTERS) {
+public class DamageCommand(
+    private val serverJar: ServerJarAssets? = null,
+) : Command(name = "damage", permissionLevel = PermissionLevel.GAMEMASTERS) {
     override fun build(root: CommandNodeBuilder) {
         root.argument("target", EntitiesArgument(single = true)) {
-            argument("amount", DoubleArgument(min = 0.0)) {
+            argument("amount", FloatArgument(min = 0f)) {
                 executes { context -> damage(context) }
-                argument("damageType", ResourceLocationArgument) { executes { context -> damage(context) } }
+                argument("damageType", RegistryArgument.resource("minecraft:damage_type")) {
+                    suggestsFromServer { context ->
+                        context.matchingIds(serverJar?.dataIds("damage_type", ".json").orEmpty())
+                    }
+                    executes { context -> damage(context) }
+                }
             }
         }
     }
 
     private fun damage(context: CommandContext): Int {
         val target = context.get<List<CommandTarget>>("target").single()
-        val amount = context.get<Double>("amount")
+        val amount = context.get<Float>("amount").toDouble()
         when (target) {
             is CommandTarget.Player -> target.session.connection.hurt(amount.toFloat(), "generic")
             is CommandTarget.Entity -> {
@@ -245,7 +258,7 @@ public class RotateCommand : Command(name = "rotate", permissionLevel = Permissi
                 }
             }
             literal("facing") {
-                argument("pos", Vec3Argument) { executes { context -> facePosition(context) } }
+                argument("facingLocation", Vec3Argument) { executes { context -> facePosition(context) } }
                 literal("entity") {
                     argument("facingEntity", EntitiesArgument(single = true)) {
                         executes { context -> faceEntity(context) }
@@ -257,7 +270,7 @@ public class RotateCommand : Command(name = "rotate", permissionLevel = Permissi
 
     private fun facePosition(context: CommandContext): Int {
         val target = context.get<List<CommandTarget>>("target").single()
-        val (x, y, z) = context.get<Coordinates>("pos").resolve(context.source.position)
+        val (x, y, z) = context.get<Coordinates>("facingLocation").resolve(context.source.position)
         val (yaw, pitch) = anglesTowards(target, x, y, z)
         return rotate(context, yaw, pitch)
     }
@@ -314,7 +327,7 @@ public class RotateCommand : Command(name = "rotate", permissionLevel = Permissi
 /** parity: `SwingCommand`, which is the arm swing everyone else sees. */
 public class SwingCommand : Command(name = "swing", permissionLevel = PermissionLevel.GAMEMASTERS) {
     override fun build(root: CommandNodeBuilder) {
-        root.argument("target", EntitiesArgument(single = false)) {
+        root.argument("targets", EntitiesArgument(single = false)) {
             executes { context -> swing(context, offhand = false) }
             literal("mainhand") { executes { context -> swing(context, offhand = false) } }
             literal("offhand") { executes { context -> swing(context, offhand = true) } }
@@ -325,7 +338,7 @@ public class SwingCommand : Command(name = "swing", permissionLevel = Permission
         context: CommandContext,
         offhand: Boolean,
     ): Int {
-        val targets = context.get<List<CommandTarget>>("target")
+        val targets = context.get<List<CommandTarget>>("targets")
         val action = if (offhand) AnimatePacket.SWING_OFFHAND else AnimatePacket.SWING_MAIN_HAND
         for (target in targets) {
             val packet = AnimatePacket(target.entityId, action)
@@ -355,7 +368,7 @@ public class SwingCommand : Command(name = "swing", permissionLevel = Permission
 public class AttributeCommand : Command(name = "attribute", permissionLevel = PermissionLevel.GAMEMASTERS) {
     override fun build(root: CommandNodeBuilder) {
         root.argument("target", EntitiesArgument(single = true)) {
-            argument("attribute", ResourceLocationArgument) {
+            argument("attribute", RegistryArgument.resource("minecraft:attribute")) {
                 literal("get") {
                     executes { context -> get(context, 1.0, withModifiers = true) }
                     argument("scale", DoubleArgument(min = 0.0)) {
@@ -388,12 +401,14 @@ public class AttributeCommand : Command(name = "attribute", permissionLevel = Pe
                     }
                     literal("remove") {
                         argument("id", ResourceLocationArgument) {
+                            suggestsFromServer { context -> context.matching(modifierIds(context)) }
                             executes { context -> removeModifier(context) }
                         }
                     }
                     literal("value") {
                         literal("get") {
                             argument("id", ResourceLocationArgument) {
+                                suggestsFromServer { context -> context.matching(modifierIds(context)) }
                                 executes { context -> modifierValue(context, 1.0) }
                                 argument("scale", DoubleArgument(min = 0.0)) {
                                     executes { context -> modifierValue(context, context.get("scale")) }
@@ -404,6 +419,14 @@ public class AttributeCommand : Command(name = "attribute", permissionLevel = Pe
                 }
             }
         }
+    }
+
+    /** The modifiers the named entity already carries for the named attribute, and nothing else. */
+    private fun modifierIds(context: SuggestionContext): Set<String> {
+        val target = context.argument<List<CommandTarget>>("target")?.singleOrNull()
+        val entity = (target as? CommandTarget.Entity)?.entity ?: return emptySet()
+        val attribute = context.argument<Identifier>("attribute")?.toString() ?: return emptySet()
+        return entity.attributeModifiers[attribute]?.keys.orEmpty()
     }
 
     private fun entityOf(context: CommandContext): ServerEntity {

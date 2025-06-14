@@ -82,6 +82,43 @@ public object AquaticDecoration {
             ) { origin -> placeKelp(chunk, random, origin) }
         }
 
+    /** The vanilla placed feature names this step draws. */
+    public val PLACED_IDS: Set<String> =
+        setOf(
+            "seagrass_cold",
+            "seagrass_warm",
+            "seagrass_river",
+            "seagrass_swamp",
+            "seagrass_normal",
+            "seagrass_deep",
+            "seagrass_deep_cold",
+            "seagrass_deep_warm",
+            "kelp_cold",
+            "kelp_warm",
+            "sea_pickle",
+        )
+
+    /** One of them at one position, which is what `/place feature` runs. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+        placedFeature: String,
+    ): Boolean {
+        val oceanFloor = chunk.heightmap(Chunk.HeightmapType.OCEAN_FLOOR)
+        when (placedFeature) {
+            // parity: the shallow variants never place the tall half, the `deep` ones always do.
+            "seagrass_cold", "seagrass_warm", "seagrass_river", "seagrass_swamp", "seagrass_normal" ->
+                placeSeagrass(chunk, random, origin, oceanFloor, 0.0)
+            "seagrass_deep", "seagrass_deep_cold", "seagrass_deep_warm" ->
+                placeSeagrass(chunk, random, origin, oceanFloor, 1.0)
+            "kelp_cold", "kelp_warm" -> placeKelp(chunk, random, origin)
+            "sea_pickle" -> placeSeaPickles(chunk, random, origin, oceanFloor, count = 20)
+            else -> return false
+        }
+        return true
+    }
+
     private fun placeSeagrass(
         chunk: Chunk,
         random: WorldgenRandom,

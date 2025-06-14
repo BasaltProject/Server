@@ -5,9 +5,9 @@ import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSyntaxException
+import org.basaltmc.server.runtime.command.IntRangeArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.ResourceLocationArgument
-import org.basaltmc.server.runtime.command.WordArgument
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.text.Component
 
@@ -26,9 +26,10 @@ public class RandomCommand(
     override fun build(root: CommandNodeBuilder) {
         for (kind in listOf("value", "roll")) {
             root.literal(kind) {
-                argument("range", WordArgument) {
+                argument("range", IntRangeArgument) {
                     executes { context -> draw(context, kind, null) }
                     argument("sequence", ResourceLocationArgument) {
+                        suggestsFromServer { context -> context.matchingIds(sequences.keys) }
                         executes { context -> draw(context, kind, context.get("sequence")) }
                     }
                 }
@@ -36,7 +37,10 @@ public class RandomCommand(
         }
         root.literal("reset") {
             literal("*") { executes { context -> resetAll(context) } }
-            argument("sequence", ResourceLocationArgument) { executes { context -> reset(context) } }
+            argument("sequence", ResourceLocationArgument) {
+                suggestsFromServer { context -> context.matchingIds(sequences.keys) }
+                executes { context -> reset(context) }
+            }
         }
     }
 

@@ -1,10 +1,12 @@
 package org.basaltmc.server.runtime.player
 
 import org.basaltmc.server.registry.Items
+import org.basaltmc.server.runtime.item.ItemComponentCodecs
 import org.basaltmc.server.storage.StoredInventory
 import org.basaltmc.server.storage.StoredItemStack
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
+import org.basaltmc.wire.protocol.play.ItemComponent
 import org.basaltmc.wire.protocol.play.WireItemStack
 
 /**
@@ -24,6 +26,19 @@ public class PlayerInventory(
 ) {
     private val slots = arrayOfNulls<StoredItemStack>(StoredInventory.PLAYER_SLOTS)
 
+    /**
+     * Set by every write, cleared by whoever acted on it.
+     *
+     * parity: `Inventory.setChanged`, which is what vanilla's inventory trigger listens to: an
+     * advancement is not checked per item moved but once per tick, after everything has moved.
+     */
+    public var changed: Boolean = true
+        private set
+
+    public fun clearChanged() {
+        changed = false
+    }
+
     /** Which hotbar slot is in hand, 0 to 8. */
     public var heldSlot: Int = 0
         set(value) {
@@ -36,7 +51,9 @@ public class PlayerInventory(
         slot: Int,
         stack: StoredItemStack?,
     ) {
-        if (slot in slots.indices) slots[slot] = stack
+        if (slot !in slots.indices) return
+        slots[slot] = stack
+        changed = true
     }
 
     public val heldItem: StoredItemStack? get() = slots[HOTBAR_START + heldSlot]
@@ -68,11 +85,13 @@ public class PlayerInventory(
             slots[slot] = stack.copy(count = moved)
             remaining -= moved
         }
+        if (remaining != stack.count) changed = true
         return remaining
     }
 
     public fun clear() {
         slots.fill(null)
+        changed = true
     }
 
     /**
@@ -109,6 +128,7 @@ public class PlayerInventory(
         val temp = slots[a]
         slots[a] = slots[b]
         slots[b] = temp
+        changed = true
     }
 
     /**
@@ -124,6 +144,7 @@ public class PlayerInventory(
 
     public fun restore(stored: StoredInventory) {
         slots.fill(null)
+        changed = true
         for ((index, stack) in stored.slots.withIndex()) {
             if (index in slots.indices) slots[index] = stack
         }
@@ -135,25 +156,19 @@ public class PlayerInventory(
         // An item this build's registry does not know is left out rather than sent as some other
         // item: a wrong id is a wrong item in someone's hand.
         val id = Items.REGISTRY.byIdentifier(Identifier.parse(stack.id))?.protocolId ?: return null
-        return WireItemStack(id, stack.count, wireEnchantments(stack))
+        return WireItemStack(id, stack.count, wireComponents(stack))
     }
 
     /**
-     * The stack's enchantments as registry ids, or nothing when they cannot be resolved.
+     * The stack's components in wire form, dropping any that cannot be resolved.
      *
      * An enchantment whose id the client was never sent would draw as a missing entry, so an
      * unresolved one is dropped rather than guessed: [enchantmentIds] is only non-null once the
      * enchantment registry has actually gone out.
      */
-    private fun wireEnchantments(stack: StoredItemStack): Map<Int, Int> {
-        val stored = stack.components[ENCHANTMENTS_COMPONENT] as? NbtCompound ?: return emptyMap()
-        val resolve = enchantmentIds ?: return emptyMap()
-        return buildMap {
-            for (name in stored.keys) {
-                val id = resolve(Identifier.parse(name)) ?: continue
-                put(id, stored.getInt(name))
-            }
-        }
+    private fun wireComponents(stack: StoredItemStack): List<ItemComponent> {
+        val resolve = enchantmentIds ?: { _: Identifier -> null }
+        return ItemComponentCodecs.toWire(stack.components, resolve)
     }
 
     public companion object {
@@ -164,6 +179,12 @@ public class PlayerInventory(
         ): Int {
             val stored = stack.components[ENCHANTMENTS_COMPONENT] as? NbtCompound ?: return 0
             return if (enchantment.toString() in stored.keys) stored.getInt(enchantment.toString()) else 0
+        }
+
+        /** Every enchantment on [stack] with its level, by name. */
+        public fun enchantmentLevels(stack: StoredItemStack): Map<Identifier, Int> {
+            val stored = stack.components[ENCHANTMENTS_COMPONENT] as? NbtCompound ?: return emptyMap()
+            return stored.keys.associate { Identifier.parse(it) to stored.getInt(it) }
         }
 
         /** Where an enchanted stack keeps them, in the same component name the wire uses. */

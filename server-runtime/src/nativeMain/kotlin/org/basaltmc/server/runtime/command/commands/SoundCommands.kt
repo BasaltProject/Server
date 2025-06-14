@@ -9,6 +9,7 @@ import org.basaltmc.server.runtime.command.FloatArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.PlayersArgument
 import org.basaltmc.server.runtime.command.ResourceLocationArgument
+import org.basaltmc.server.runtime.command.SuggestionProviders
 import org.basaltmc.server.runtime.command.Vec3Argument
 import org.basaltmc.server.runtime.player.PlayerSession
 import org.basaltmc.wire.common.Identifier
@@ -26,6 +27,7 @@ import kotlin.random.Random
 public class PlaySoundCommand : Command(name = "playsound", permissionLevel = PermissionLevel.GAMEMASTERS) {
     override fun build(root: CommandNodeBuilder) {
         root.argument("sound", ResourceLocationArgument) {
+            suggestsFromClient(SuggestionProviders.AVAILABLE_SOUNDS)
             for (source in SoundSource.entries) {
                 literal(source.commandName) {
                     argument("targets", PlayersArgument(single = false)) {
@@ -150,6 +152,7 @@ public class StopSoundCommand : Command(name = "stopsound", permissionLevel = Pe
             literal("*") {
                 executes { context -> stop(context, null, null) }
                 argument("sound", ResourceLocationArgument) {
+                    suggestsFromClient(SuggestionProviders.AVAILABLE_SOUNDS)
                     executes { context -> stop(context, null, context.get("sound")) }
                 }
             }
@@ -157,6 +160,7 @@ public class StopSoundCommand : Command(name = "stopsound", permissionLevel = Pe
                 literal(source.commandName) {
                     executes { context -> stop(context, source, null) }
                     argument("sound", ResourceLocationArgument) {
+                        suggestsFromClient(SuggestionProviders.AVAILABLE_SOUNDS)
                         executes { context -> stop(context, source, context.get("sound")) }
                     }
                 }

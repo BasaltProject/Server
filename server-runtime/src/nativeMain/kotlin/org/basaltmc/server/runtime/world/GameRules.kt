@@ -43,6 +43,9 @@ public object GameRuleRegistry {
     /** parity: with this on, a player crafts only the recipes they have been taught. */
     public val LIMITED_CRAFTING: GameRule.Bool = GameRule.Bool("limited_crafting", false)
 
+    /** parity: `show_advancement_messages`, the rule vanilla renamed from `announceAdvancements`. */
+    public val SHOW_ADVANCEMENT_MESSAGES: GameRule.Bool = GameRule.Bool("show_advancement_messages", true)
+
     public val ALL: List<GameRule<*>> =
         listOf(
             ADVANCE_TIME,
@@ -89,7 +92,7 @@ public object GameRuleRegistry {
             GameRule.Bool("reduced_debug_info", false),
             GameRule.Integer("respawn_radius", 10, min = 0),
             SEND_COMMAND_FEEDBACK,
-            GameRule.Bool("show_advancement_messages", true),
+            SHOW_ADVANCEMENT_MESSAGES,
             SHOW_DEATH_MESSAGES,
             GameRule.Bool("spawner_blocks_work", true),
             GameRule.Bool("spawn_mobs", true),

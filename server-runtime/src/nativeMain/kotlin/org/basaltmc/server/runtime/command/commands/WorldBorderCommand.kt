@@ -6,6 +6,7 @@ import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSyntaxException
 import org.basaltmc.server.runtime.command.Coordinates
 import org.basaltmc.server.runtime.command.DoubleArgument
+import org.basaltmc.server.runtime.command.FloatArgument
 import org.basaltmc.server.runtime.command.IntegerArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.TimeArgument
@@ -51,12 +52,12 @@ public class WorldBorderCommand : Command(name = "worldborder", permissionLevel 
         }
         root.literal("damage") {
             literal("amount") {
-                argument("damagePerBlock", DoubleArgument(min = 0.0)) {
+                argument("damagePerBlock", FloatArgument(min = 0f)) {
                     executes { context -> damageAmount(context) }
                 }
             }
             literal("buffer") {
-                argument("distance", DoubleArgument(min = 0.0)) { executes { context -> damageBuffer(context) } }
+                argument("distance", FloatArgument(min = 0f)) { executes { context -> damageBuffer(context) } }
             }
         }
         root.literal("warning") {
@@ -64,7 +65,7 @@ public class WorldBorderCommand : Command(name = "worldborder", permissionLevel 
                 argument("distance", IntegerArgument(min = 0)) { executes { context -> warningDistance(context) } }
             }
             literal("time") {
-                argument("time", IntegerArgument(min = 0)) { executes { context -> warningTime(context) } }
+                argument("time", TimeArgument(min = 0)) { executes { context -> warningTime(context) } }
             }
         }
     }
@@ -170,7 +171,7 @@ public class WorldBorderCommand : Command(name = "worldborder", permissionLevel 
 
     private fun damageAmount(context: CommandContext): Int {
         val (_, border) = borderOf(context)
-        val amount = context.get<Double>("damagePerBlock")
+        val amount = context.get<Float>("damagePerBlock").toDouble()
         if (border.damagePerBlock == amount) {
             throw CommandSyntaxException(Component.translatable("commands.worldborder.damage.amount.failed"))
         }
@@ -184,7 +185,7 @@ public class WorldBorderCommand : Command(name = "worldborder", permissionLevel 
 
     private fun damageBuffer(context: CommandContext): Int {
         val (_, border) = borderOf(context)
-        val distance = context.get<Double>("distance")
+        val distance = context.get<Float>("distance").toDouble()
         if (border.damageBuffer == distance) {
             throw CommandSyntaxException(Component.translatable("commands.worldborder.damage.buffer.failed"))
         }

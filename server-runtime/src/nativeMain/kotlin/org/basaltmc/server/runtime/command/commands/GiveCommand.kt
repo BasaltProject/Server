@@ -9,6 +9,7 @@ import org.basaltmc.server.runtime.command.ItemArgument
 import org.basaltmc.server.runtime.command.ParsedItem
 import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.PlayersArgument
+import org.basaltmc.server.runtime.item.ItemComponentCodecs
 import org.basaltmc.server.runtime.player.PlayerSession
 import org.basaltmc.server.storage.StoredItemStack
 import org.basaltmc.wire.text.Component
@@ -16,8 +17,9 @@ import org.basaltmc.wire.text.Component
 /**
  * parity: `GiveCommand`.
  *
- * `/give @s diamond_sword[enchantments={sharpness:5}] 1` works; a component this build cannot write
- * is refused by name rather than silently handing over a plain sword.
+ * Every component the registry knows is accepted and stored. The ones this build has no network
+ * codec for are reported by name, the way `/summon` reports the NBT keys it ignores: the item is
+ * really carrying them, but no client draws them yet.
  */
 public class GiveCommand : Command(name = "give", permissionLevel = PermissionLevel.GAMEMASTERS) {
     override fun build(root: CommandNodeBuilder) {
@@ -44,6 +46,16 @@ public class GiveCommand : Command(name = "give", permissionLevel = PermissionLe
                 ?: throw CommandSyntaxException(
                     Component.translatable("argument.item.id.invalid", Component.text(parsed.id.toString())),
                 )
+
+        val notDrawn = ItemComponentCodecs.notDrawn(parsed.components)
+        if (notDrawn.isNotEmpty()) {
+            context.source.sendSystemMessage(
+                Component.text(
+                    "The item carries ${notDrawn.joinToString(", ")}, which no client can draw yet: " +
+                        "it is stored and saved, but the tooltip will not show it.",
+                ),
+            )
+        }
 
         for (target in targets) {
             val leftOver = target.inventory.add(StoredItemStack(item.id.toString(), count, parsed.components))

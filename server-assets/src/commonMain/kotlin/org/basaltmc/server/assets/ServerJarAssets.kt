@@ -1,5 +1,6 @@
 package org.basaltmc.server.assets
 
+import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.common.logging.Logger
 import org.basaltmc.wire.io.FileIO
 
@@ -53,6 +54,25 @@ public class ServerJarAssets(
      * directory listing.
      */
     public fun entriesUnder(prefix: String): List<String> = entryNames.filter { it.startsWith(prefix) }
+
+    /**
+     * Every id under `data/<namespace>/<directory>/`, which is how one registry directory is
+     * listed: what a command completes a registry argument with.
+     */
+    public fun dataIds(
+        directory: String,
+        extension: String,
+    ): List<Identifier> =
+        entriesUnder("data/").mapNotNull { entry ->
+            val rest = entry.removePrefix("data/")
+            val namespace = rest.substringBefore('/', "")
+            val path = rest.removePrefix("$namespace/$directory/")
+            if (namespace.isEmpty() || path == rest || !path.endsWith(extension)) {
+                null
+            } else {
+                Identifier(namespace, path.removeSuffix(extension))
+            }
+        }
 
     private fun pathFor(name: String): String = "$dataRoot/${name.removePrefix(VANILLA_PREFIX)}"
 

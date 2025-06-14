@@ -6,7 +6,7 @@ import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSyntaxException
 import org.basaltmc.server.runtime.command.Coordinates
-import org.basaltmc.server.runtime.command.DoubleArgument
+import org.basaltmc.server.runtime.command.FloatArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.PlayersArgument
 import org.basaltmc.server.runtime.command.Vec2Argument
@@ -28,8 +28,8 @@ import kotlin.random.Random
 public class SpreadPlayersCommand : Command(name = "spreadplayers", permissionLevel = PermissionLevel.GAMEMASTERS) {
     override fun build(root: CommandNodeBuilder) {
         root.argument("center", Vec2Argument) {
-            argument("spreadDistance", DoubleArgument(min = 0.0)) {
-                argument("maxRange", DoubleArgument(min = 1.0)) {
+            argument("spreadDistance", FloatArgument(min = 0f)) {
+                argument("maxRange", FloatArgument(min = 1f)) {
                     argument("respectTeams", BoolArgument) {
                         argument("targets", PlayersArgument(single = false)) {
                             executes { context -> spread(context, null) }

@@ -3,7 +3,7 @@ package org.basaltmc.server.runtime.command.commands
 import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSyntaxException
-import org.basaltmc.server.runtime.command.WordArgument
+import org.basaltmc.server.runtime.command.GreedyStringArgument
 import org.basaltmc.server.runtime.command.smartUsage
 import org.basaltmc.wire.text.Component
 
@@ -26,9 +26,14 @@ public class HelpCommand : Command(name = "help") {
             }
             usable.size
         }
-        root.argument("command", WordArgument) {
+        root.argument("command", GreedyStringArgument) {
+            suggestsFromServer { context ->
+                context.matching(context.dispatcher.usableCommands(context.source).map { it.name })
+            }
             executes { context ->
-                val name = context.get<String>("command")
+                // Greedy, as vanilla declares it, but only the command named by the first word is
+                // described: see the class docs for why the rest of the line is not.
+                val name = context.get<String>("command").substringBefore(' ')
                 val node =
                     context.dispatcher.usableCommands(context.source).firstOrNull { it.name == name }
                         ?: throw CommandSyntaxException(Component.translatable("commands.help.failed"))

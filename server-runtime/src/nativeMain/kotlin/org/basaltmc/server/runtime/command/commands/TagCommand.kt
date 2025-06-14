@@ -24,7 +24,19 @@ public class TagCommand : Command(name = "tag", permissionLevel = PermissionLeve
                 argument("name", WordArgument) { executes { context -> add(context) } }
             }
             literal("remove") {
-                argument("name", WordArgument) { executes { context -> remove(context) } }
+                argument("name", WordArgument) {
+                    // parity: only the tags the targets actually carry, which is what vanilla lists.
+                    suggestsFromServer { context ->
+                        context.matching(
+                            context
+                                .argument<List<CommandTarget>>("targets")
+                                .orEmpty()
+                                .flatMap { it.tags }
+                                .distinct(),
+                        )
+                    }
+                    executes { context -> remove(context) }
+                }
             }
             literal("list") { executes { context -> list(context) } }
         }

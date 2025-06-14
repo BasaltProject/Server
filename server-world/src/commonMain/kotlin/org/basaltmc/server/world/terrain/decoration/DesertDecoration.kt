@@ -18,6 +18,21 @@ public object DesertDecoration : BiomeVegetalDecoration {
         placeDeadBush(chunk, random)
     }
 
+    /** The patch at one origin, which is what `/place feature` runs for `patch_dead_bush`. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ) {
+        val feature = SimpleBlockFeature({ _, _ -> deadBushStateId })
+        placeFrom(
+            chunk,
+            random,
+            origin,
+            listOf(CountPlacement(4), RandomOffsetPlacement(xzSpread = 7, ySpread = 3), AirTargetFilter()),
+        ) { position -> feature.place(chunk, random, position) }
+    }
+
     // parity: placed_feature/patch_dead_bush_2.json (VegetationPlacements.worldSurfaceSquaredWithCount(2) + copyAndAdd).
     private fun placeDeadBush(
         chunk: Chunk,

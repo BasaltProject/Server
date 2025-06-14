@@ -40,6 +40,24 @@ public object MeadowDecoration : BiomeVegetalDecoration {
             ) { position -> feature.place(chunk, random, position) }
         }
 
+    /** The flower patch at one origin, which is what `/place feature` runs for `flower_meadow`. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ) {
+        placeFrom(
+            chunk,
+            random,
+            origin,
+            listOf(CountPlacement(96), RandomOffsetPlacement(xzSpread = 6, ySpread = 2), AirTargetFilter()),
+        ) { position ->
+            val stateId = flowerStateAt(position)
+            SimpleBlockFeature({ _, _ -> stateId }, isDoublePlant = stateId == tallGrassStateId)
+                .place(chunk, random, position)
+        }
+    }
+
     public val FLOWERS: BiomeVegetalDecoration =
         BiomeVegetalDecoration { chunk, random ->
             runPipeline(

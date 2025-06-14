@@ -52,6 +52,24 @@ public object IceSpikesDecoration {
             .biomeAt(chunk.chunkX * 16 + localX, y, chunk.chunkZ * 16 + localZ)
             .substringAfter(':') == "ice_spikes"
 
+    /** The vanilla placed feature names this step draws. */
+    public val PLACED_IDS: Set<String> = setOf("ice_spike", "ice_patch")
+
+    /** One of them at one position, which is what `/place feature` runs. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+        placedFeature: String,
+    ): Boolean {
+        when (placedFeature) {
+            "ice_spike" -> placeSpike(chunk, random, origin)
+            "ice_patch" -> placeIcePatch(chunk, random, origin)
+            else -> return false
+        }
+        return true
+    }
+
     private fun placeSpike(
         chunk: Chunk,
         random: WorldgenRandom,

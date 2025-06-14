@@ -62,6 +62,107 @@ public object NetherUndergroundDecoration {
         }
     }
 
+    /** The vanilla placed feature names this step draws. */
+    public val PLACED_IDS: Set<String> =
+        setOf(
+            "basalt_blobs",
+            "blackstone_blobs",
+            "spring_delta",
+            "spring_open",
+            "patch_fire",
+            "patch_soul_fire",
+            "glowstone_extra",
+            "glowstone",
+            "patch_crimson_roots",
+            "brown_mushroom_nether",
+            "red_mushroom_nether",
+        )
+
+    /**
+     * One of them at one position, which is the feature without the modifiers that scatter it over
+     * a chunk: what `/place feature` runs.
+     */
+    public fun placeAt(
+        chunk: Chunk,
+        random: BasaltRandom,
+        x: Int,
+        y: Int,
+        z: Int,
+        placedFeature: String,
+    ): Boolean {
+        when (placedFeature) {
+            "basalt_blobs" -> replaceBlob(chunk, random, x, y, z, "basalt")
+            "blackstone_blobs" -> replaceBlob(chunk, random, x, y, z, "blackstone")
+            "spring_delta" -> placeSpring(chunk, x, y, z, Spring.DELTA)
+            "spring_open" -> placeSpring(chunk, x, y, z, Spring.OPEN)
+            "patch_fire" -> placePatchAt(chunk, random, x, y, z, "netherrack", "fire")
+            "patch_soul_fire" -> placePatchAt(chunk, random, x, y, z, "soul_soil", "soul_fire")
+            "glowstone_extra", "glowstone" -> placeGlowstoneBlob(chunk, random, x, y, z)
+            "patch_crimson_roots" -> placeRootsAt(chunk, random, x, y, z)
+            "brown_mushroom_nether" -> placeMushroomAt(chunk, random, x, y, z, "brown_mushroom")
+            "red_mushroom_nether" -> placeMushroomAt(chunk, random, x, y, z, "red_mushroom")
+            else -> return false
+        }
+        return true
+    }
+
+    /** The fire patch itself, around an origin the caller chose. */
+    private fun placePatchAt(
+        chunk: Chunk,
+        random: BasaltRandom,
+        baseX: Int,
+        baseY: Int,
+        baseZ: Int,
+        support: String,
+        fire: String,
+    ) {
+        repeat(PATCH_ATTEMPTS) {
+            val x = baseX + triangle(random, 7)
+            val y = baseY + triangle(random, 3)
+            val z = baseZ + triangle(random, 7)
+            if (isAir(chunk, x, y, z) && blockPathAt(chunk, x, y - 1, z) == support) {
+                setBlock(chunk, x, y, z, stateId(fire))
+            }
+        }
+    }
+
+    private fun placeRootsAt(
+        chunk: Chunk,
+        random: BasaltRandom,
+        baseX: Int,
+        baseY: Int,
+        baseZ: Int,
+    ) {
+        repeat(PATCH_ATTEMPTS) {
+            val x = baseX + triangle(random, 7)
+            val y = baseY + triangle(random, 3)
+            val z = baseZ + triangle(random, 7)
+            val support = blockPathAt(chunk, x, y - 1, z)
+            if (isAir(chunk, x, y, z) && support in CRIMSON_ROOT_SUPPORT) {
+                setBlock(chunk, x, y, z, stateId("crimson_roots"))
+            }
+        }
+    }
+
+    private fun placeMushroomAt(
+        chunk: Chunk,
+        random: BasaltRandom,
+        baseX: Int,
+        baseY: Int,
+        baseZ: Int,
+        mushroom: String,
+    ) {
+        repeat(PATCH_ATTEMPTS) {
+            val x = baseX + triangle(random, 7)
+            val y = baseY + triangle(random, 3)
+            val z = baseZ + triangle(random, 7)
+            val support = blockPathAt(chunk, x, y - 1, z)
+            if (isAir(chunk, x, y, z) && support != null && supportsMushroom(support)) {
+                setBlock(chunk, x, y, z, stateId(mushroom))
+            }
+        }
+    }
+
     private fun placeReplaceBlobs(
         chunk: Chunk,
         random: BasaltRandom,

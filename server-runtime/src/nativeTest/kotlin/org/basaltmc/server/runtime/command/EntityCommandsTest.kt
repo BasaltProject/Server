@@ -107,9 +107,9 @@ class EntityCommandsTest {
     fun damageTakesHealthAndKillsAtZero() {
         run("summon minecraft:cow 0 64 0")
         val entity = world.state.entities().single()
-        run("damage cow 5")
+        run("damage @e[type=cow] 5")
         assertEquals(15.0, entity.health)
-        run("damage cow 20")
+        run("damage @e[type=cow] 20")
         assertTrue(entity.removed)
     }
 
@@ -119,11 +119,11 @@ class EntityCommandsTest {
         val entity = world.state.entities().single()
         // Both positions are block centres: a bare integer in a vec3 is centre-corrected, so the
         // target has to be one too or the entity ends up looking slightly off to the side.
-        run("rotate cow facing 0 64 10")
+        run("rotate @e[type=cow] facing 0 64 10")
         // Straight along +Z is yaw 0 in Minecraft's own convention. A tolerance because the exact
         // result is -0.0, which is equal to 0.0 as a number and not as a boxed Float.
         assertEquals(0f, entity.yaw, absoluteTolerance = 0.001f)
-        run("rotate cow facing 10 64 0")
+        run("rotate @e[type=cow] facing 10 64 0")
         // Straight along +X is -90: yaw grows clockwise from +Z.
         assertEquals(-90f, entity.yaw, absoluteTolerance = 0.001f)
     }
@@ -134,10 +134,10 @@ class EntityCommandsTest {
         run("summon minecraft:cow 1 64 0")
         val pig = world.state.entities().first { it.type.path == "pig" }
         val cow = world.state.entities().first { it.type.path == "cow" }
-        run("ride pig mount cow")
+        run("ride @e[type=pig] mount @e[type=cow]")
         assertEquals(cow.entityId, pig.vehicleId)
         assertTrue(pig.entityId in cow.passengerIds)
-        run("ride pig dismount")
+        run("ride @e[type=pig] dismount")
         assertNull(pig.vehicleId)
     }
 
@@ -145,22 +145,22 @@ class EntityCommandsTest {
     fun attributeBaseValuesAreSetReadAndReset() {
         run("summon minecraft:cow 0 64 0")
         val cow = world.state.entities().single()
-        run("attribute cow minecraft:max_health base set 40")
+        run("attribute @e[type=cow] minecraft:max_health base set 40")
         assertEquals(40.0, cow.attributeValues[Attribute.MAX_HEALTH])
-        run("attribute cow minecraft:max_health base reset")
+        run("attribute @e[type=cow] minecraft:max_health base reset")
         assertNull(cow.attributeValues[Attribute.MAX_HEALTH])
     }
 
     @Test
     fun anUnknownAttributeIsRefused() {
         run("summon minecraft:cow 0 64 0")
-        run("attribute cow minecraft:nonsense base get")
+        run("attribute @e[type=cow] minecraft:nonsense base get")
         assertTrue(source.messages.any { "attribute.unknown" in it })
     }
 
     @Test
     fun swingReportsHowManyItAnimated() {
         run("summon minecraft:cow 0 64 0")
-        assertEquals(1, run("swing cow"))
+        assertEquals(1, run("swing @e[type=cow]"))
     }
 }

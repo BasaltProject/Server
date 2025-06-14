@@ -84,6 +84,23 @@ public object BambooDecoration {
         }
     }
 
+    /** The vanilla placed feature names this step draws. */
+    public val PLACED_IDS: Set<String> = setOf("bamboo", "bamboo_light", "bamboo_vegetation")
+
+    /** One clump at one position, which is what `/place feature` runs. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+        placedFeature: String,
+    ): Boolean {
+        // parity: `bamboo_light` places no podzol under it, the dense one a fifth of the time.
+        val podzol = if (placedFeature == "bamboo_light") 0.0f else 0.2f
+        if (placedFeature !in PLACED_IDS) return false
+        place(BambooRegion(chunk, null, null), random, origin, podzol)
+        return true
+    }
+
     private fun place(
         region: BambooRegion,
         random: WorldgenRandom,

@@ -133,9 +133,9 @@ class ClosedGapsTest {
     @Test
     fun attributeModifiersApplyInVanillasOrder() {
         run("summon minecraft:cow 0 64 0")
-        run("attribute cow minecraft:max_health base set 20")
-        run("attribute cow minecraft:max_health modifier add basalt:flat 10 add_value")
-        run("attribute cow minecraft:max_health modifier add basalt:half 0.5 add_multiplied_total")
+        run("attribute @e[type=cow] minecraft:max_health base set 20")
+        run("attribute @e[type=cow] minecraft:max_health modifier add basalt:flat 10 add_value")
+        run("attribute @e[type=cow] minecraft:max_health modifier add basalt:half 0.5 add_multiplied_total")
         val cow = world.state.entities().single()
         // (20 + 10) * 1.5
         assertEquals(45.0, cow.attributeWithModifiers("minecraft:max_health"))
@@ -144,8 +144,8 @@ class ClosedGapsTest {
     @Test
     fun addingTheSameModifierTwiceIsRefused() {
         run("summon minecraft:cow 0 64 0")
-        run("attribute cow minecraft:max_health modifier add basalt:one 1 add_value")
-        run("attribute cow minecraft:max_health modifier add basalt:one 1 add_value")
+        run("attribute @e[type=cow] minecraft:max_health modifier add basalt:one 1 add_value")
+        run("attribute @e[type=cow] minecraft:max_health modifier add basalt:one 1 add_value")
         assertTrue(source.messages.any { "modifier_already_present" in it })
     }
 

@@ -8,7 +8,7 @@ import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSyntaxException
 import org.basaltmc.server.runtime.command.PermissionLevel
-import org.basaltmc.server.runtime.command.ResourceLocationArgument
+import org.basaltmc.server.runtime.command.RegistryArgument
 import org.basaltmc.server.runtime.command.world
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.text.Component
@@ -17,17 +17,19 @@ import org.basaltmc.wire.text.Component
  * parity: `FillBiomeCommand`, which works in quarts: biomes are stored one per 4x4x4 block, so a
  * region smaller than that still changes the whole quart it falls in, exactly as vanilla does.
  *
- * Changed chunks are marked dirty but not re-sent: pushing a biome change to a client needs the
- * `chunks_biomes` packet, which is not written yet, so players see the new biome after a reload.
+ * The change reaches clients through `chunks_biomes` rather than a chunk resend, which is what
+ * vanilla sends here too: only the biome containers are replaced, so the column does not blink.
  */
 public class FillBiomeCommand : Command(name = "fillbiome", permissionLevel = PermissionLevel.GAMEMASTERS) {
     override fun build(root: CommandNodeBuilder) {
         root.argument("from", BlockPosArgument) {
             argument("to", BlockPosArgument) {
-                argument("biome", ResourceLocationArgument) {
+                argument("biome", RegistryArgument.resource("minecraft:worldgen/biome")) {
+                    suggestsFromServer { context -> context.matchingIds(Biomes.REGISTRY.identifiers()) }
                     executes { context -> fill(context, null) }
                     literal("replace") {
-                        argument("filter", ResourceLocationArgument) {
+                        argument("filter", RegistryArgument.orTag("minecraft:worldgen/biome")) {
+                            suggestsFromServer { context -> context.matchingIds(Biomes.REGISTRY.identifiers()) }
                             executes { context -> fill(context, context.get("filter")) }
                         }
                     }
@@ -97,6 +99,14 @@ public class FillBiomeCommand : Command(name = "fillbiome", permissionLevel = Pe
                 }
             }
         }
+
+        context.environment.syncBiomes(
+            world,
+            minOf(fromX, toX),
+            minOf(fromZ, toZ),
+            maxOf(fromX, toX),
+            maxOf(fromZ, toZ),
+        )
 
         context.success(
             Component.translatable(

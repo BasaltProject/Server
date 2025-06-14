@@ -33,6 +33,18 @@ public object ForestFlowerDecoration {
             positions.forEach { origin -> placeSelectedPatch(chunk, context, random, origin) }
         }
 
+    /** The vanilla placed feature names this step draws. */
+    public val PLACED_IDS: Set<String> = setOf("forest_flowers", "flower_flower_forest", "flower_forest_flowers")
+
+    /** The flower patch at one origin, which is what `/place feature` runs. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ) {
+        placeSelectedPatch(chunk, PlacementContext(chunk), random, origin)
+    }
+
     private fun placeSelectedPatch(
         chunk: Chunk,
         context: PlacementContext,

@@ -68,6 +68,27 @@ public object CaveLocalModificationDecoration {
         placeGeode(region, random, seed, origin)
     }
 
+    /** The vanilla placed feature names this step draws. */
+    public val PLACED_IDS: Set<String> = setOf("amethyst_geode", "large_dripstone")
+
+    /** One of them at one position, which is what `/place feature` runs. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        x: Int,
+        y: Int,
+        z: Int,
+        placedFeature: String,
+    ): Boolean {
+        val region = LocalModificationRegion(chunk, null, null)
+        when (placedFeature) {
+            "amethyst_geode" -> placeGeode(region, random, chunk.chunkX.toLong(), DecorationPos(x, y, z))
+            "large_dripstone" -> placeLargeDripstone(region, random, DecorationPos(x, y, z))
+            else -> return false
+        }
+        return true
+    }
+
     private fun placeGeode(
         region: LocalModificationRegion,
         random: BasaltRandom,

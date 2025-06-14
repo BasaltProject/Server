@@ -1,5 +1,6 @@
 package org.basaltmc.server.runtime.command.commands
 
+import org.basaltmc.server.assets.ServerJarAssets
 import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.runtime.command.BlockCoordinates
@@ -10,23 +11,30 @@ import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSyntaxException
 import org.basaltmc.server.runtime.command.CommandTarget
 import org.basaltmc.server.runtime.command.EntitiesArgument
+import org.basaltmc.server.runtime.command.HexColorArgument
 import org.basaltmc.server.runtime.command.IntegerArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.PlayersArgument
+import org.basaltmc.server.runtime.command.RegistryArgument
 import org.basaltmc.server.runtime.command.ResourceLocationArgument
-import org.basaltmc.server.runtime.command.WordArgument
+import org.basaltmc.server.runtime.command.TeamColorArgument
+import org.basaltmc.server.runtime.command.TemplateMirrorArgument
+import org.basaltmc.server.runtime.command.TemplateRotationArgument
 import org.basaltmc.server.runtime.command.world
 import org.basaltmc.server.runtime.player.PlayerInventory
 import org.basaltmc.server.runtime.player.PlayerSession
+import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.RealDialogs
 import org.basaltmc.server.runtime.world.RealEnchantments
 import org.basaltmc.server.runtime.world.RealTestInstances
 import org.basaltmc.server.runtime.world.StructureTemplates
 import org.basaltmc.server.runtime.world.TestInstance
+import org.basaltmc.server.world.structure.PlacedStructurePiece
 import org.basaltmc.server.world.structure.StructureBoundingBox
 import org.basaltmc.server.world.structure.StructureMirror
 import org.basaltmc.server.world.structure.StructurePos
 import org.basaltmc.server.world.structure.StructureRotation
+import org.basaltmc.server.world.terrain.VillageStructureGenerator
 import org.basaltmc.server.world.terrain.decoration.PlacedFeatures
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
@@ -45,7 +53,9 @@ import kotlin.uuid.ExperimentalUuidApi
  * waypoint is the positioned kind, identified by the entity's own UUID, which is how vanilla tracks
  * a player's.
  */
-public class WaypointCommand : Command(name = "waypoint", permissionLevel = PermissionLevel.GAMEMASTERS) {
+public class WaypointCommand(
+    private val serverJar: ServerJarAssets? = null,
+) : Command(name = "waypoint", permissionLevel = PermissionLevel.GAMEMASTERS) {
     /** Style and colour per entity id, which is what `list` reports and `modify` changes. */
     private val icons = mutableMapOf<Int, Icon>()
 
@@ -57,14 +67,14 @@ public class WaypointCommand : Command(name = "waypoint", permissionLevel = Perm
     override fun build(root: CommandNodeBuilder) {
         root.literal("list") { executes { context -> list(context) } }
         root.literal("modify") {
-            argument("target", EntitiesArgument(single = true)) {
+            argument("waypoint", EntitiesArgument(single = true)) {
                 literal("color") {
                     literal("reset") { executes { context -> resetColor(context) } }
                     literal("hex") {
-                        argument("color", WordArgument) { executes { context -> setHexColor(context) } }
+                        argument("color", HexColorArgument) { executes { context -> setHexColor(context) } }
                     }
-                    for (color in TeamColor.entries) {
-                        literal(color.name.lowercase()) { executes { context -> setNamedColor(context, color) } }
+                    argument("color", TeamColorArgument) {
+                        executes { context -> setNamedColor(context, context.get("color")) }
                     }
                 }
                 literal("style") {
@@ -78,14 +88,14 @@ public class WaypointCommand : Command(name = "waypoint", permissionLevel = Perm
     }
 
     private fun iconOf(context: CommandContext): Icon {
-        val target = context.get<List<CommandTarget>>("target").single()
+        val target = context.get<List<CommandTarget>>("waypoint").single()
         return icons.getOrPut(target.entityId) { Icon() }
     }
 
     /** Sends the target's waypoint to everyone in its world, which is what draws the bar entry. */
     @OptIn(ExperimentalUuidApi::class)
     private fun broadcast(context: CommandContext) {
-        val target = context.get<List<CommandTarget>>("target").single()
+        val target = context.get<List<CommandTarget>>("waypoint").single()
         val icon = icons[target.entityId] ?: return
         val uuid =
             when (target) {
@@ -137,13 +147,12 @@ public class WaypointCommand : Command(name = "waypoint", permissionLevel = Perm
     }
 
     private fun setHexColor(context: CommandContext): Int {
-        val text = context.get<String>("color").removePrefix("#")
-        val value =
-            text.toIntOrNull(16)
-                ?: throw CommandSyntaxException(Component.text("'$text' is not a hexadecimal colour."))
+        val value = context.get<Int>("color")
         iconOf(context).color = value
         broadcast(context)
-        context.success(Component.translatable("commands.waypoint.modify.color", Component.text(text)))
+        context.success(
+            Component.translatable("commands.waypoint.modify.color", Component.text(value.toString(16))),
+        )
         return 0
     }
 
@@ -180,36 +189,51 @@ public class PlaceCommand(
 ) : Command(name = "place", permissionLevel = PermissionLevel.GAMEMASTERS) {
     override fun build(root: CommandNodeBuilder) {
         root.literal("feature") {
-            argument("id", ResourceLocationArgument) {
+            argument("feature", RegistryArgument.key("minecraft:worldgen/placed_feature")) {
+                suggestsFromServer { context -> context.matchingIds(PlacedFeatures.ids) }
                 executes { context -> placeFeature(context, null) }
                 argument("pos", BlockPosArgument) {
                     executes { context -> placeFeature(context, context.get("pos")) }
                 }
             }
         }
-        for (kind in listOf("jigsaw", "structure")) {
-            root.literal(kind) {
-                argument("id", ResourceLocationArgument) {
-                    executes { context -> refuse(context, kind, context.get("id")) }
+        root.literal("structure") {
+            argument("structure", RegistryArgument.key("minecraft:worldgen/structure")) {
+                suggestsFromServer { context -> context.matchingIds(VillageStructureGenerator.STRUCTURE_IDS) }
+                executes { context -> placeStructure(context, null) }
+                argument("pos", BlockPosArgument) {
+                    executes { context -> placeStructure(context, context.get("pos")) }
+                }
+            }
+        }
+        root.literal("jigsaw") {
+            argument("pool", RegistryArgument.key("minecraft:worldgen/template_pool")) {
+                suggestsFromServer { context -> context.matchingIds(templates.poolIds()) }
+                argument("target", ResourceLocationArgument) {
+                    argument("max_depth", IntegerArgument(min = 1, max = MAX_JIGSAW_DEPTH)) {
+                        executes { context -> placeJigsaw(context, null) }
+                        argument("position", BlockPosArgument) {
+                            executes { context -> placeJigsaw(context, context.get("position")) }
+                        }
+                    }
                 }
             }
         }
         root.literal("template") {
-            argument("id", ResourceLocationArgument) {
+            argument("template", ResourceLocationArgument) {
+                suggestsFromServer { context -> context.matchingIds(templates.templateIds()) }
                 executes { context -> place(context, null, StructureRotation.NONE, StructureMirror.NONE) }
                 argument("pos", BlockPosArgument) {
                     executes { context ->
                         place(context, context.get("pos"), StructureRotation.NONE, StructureMirror.NONE)
                     }
-                    for (rotation in StructureRotation.entries) {
-                        literal(rotation.serializedName) {
+                    argument("rotation", TemplateRotationArgument) {
+                        executes { context ->
+                            place(context, context.get("pos"), context.get("rotation"), StructureMirror.NONE)
+                        }
+                        argument("mirror", TemplateMirrorArgument) {
                             executes { context ->
-                                place(context, context.get("pos"), rotation, StructureMirror.NONE)
-                            }
-                            for (mirror in StructureMirror.entries) {
-                                literal(mirror.serializedName) {
-                                    executes { context -> place(context, context.get("pos"), rotation, mirror) }
-                                }
+                                place(context, context.get("pos"), context.get("rotation"), context.get("mirror"))
                             }
                         }
                     }
@@ -224,7 +248,7 @@ public class PlaceCommand(
         rotation: StructureRotation,
         mirror: StructureMirror,
     ): Int {
-        val id = context.get<Identifier>("id")
+        val id = context.get<Identifier>("template")
         val template =
             templates[id]
                 ?: throw CommandSyntaxException(
@@ -286,25 +310,51 @@ public class PlaceCommand(
         context: CommandContext,
         coordinates: BlockCoordinates?,
     ): Int {
-        val id = context.get<Identifier>("id")
-        val placement =
-            PlacedFeatures[id]
-                ?: throw CommandSyntaxException(
-                    Component.text(
-                        "'$id' is not a feature that can be placed on its own yet. Generation runs it per chunk, " +
-                            "not by id. Available: ${PlacedFeatures.ids.joinToString(", ")}.",
-                    ),
-                )
+        val id = context.get<Identifier>("feature")
         val world = context.world()
-        val (x, y, z) =
-            coordinates?.resolve(context.source.position) ?: context.source.position.let { (px, py, pz) ->
-                Triple(kotlin.math.floor(px).toInt(), kotlin.math.floor(py).toInt(), kotlin.math.floor(pz).toInt())
-            }
+        val placement = PlacedFeatures[id]
+        val contextual = PlacedFeatures.contextual(id)
+        if (placement == null && contextual == null) {
+            throw CommandSyntaxException(
+                Component.text(
+                    "'$id' has no positional body in this build, so generation can only run it per chunk. " +
+                        "Placeable by id: ${PlacedFeatures.ids.sortedBy { it.path }.joinToString(", ")}.",
+                ),
+            )
+        }
+        val (x, y, z) = resolveOrigin(context, coordinates)
         val chunk =
             world.state.chunkIfLoaded(x shr 4, z shr 4)
                 ?: throw CommandSyntaxException(Component.translatable("argument.pos.unloaded"))
 
-        placement.place(chunk, WorldgenRandom(XoroshiroRandom(Random.nextLong())), x and 15, y, z and 15)
+        val random = WorldgenRandom(XoroshiroRandom(Random.nextLong()))
+        if (placement != null) {
+            placement.place(chunk, random, x and 15, y, z and 15)
+        } else {
+            // The five features that need more than a chunk: the End's own, the fossils, the freeze
+            // pass. A world that cannot supply what they ask for says so rather than half-placing one.
+            val ran =
+                checkNotNull(contextual).place(
+                    chunk,
+                    random,
+                    x and 15,
+                    y,
+                    z and 15,
+                    PlacedFeatures.FeatureContext(
+                        seed = world.metadata.seed,
+                        surface = world.surfaceEnvironment,
+                        templates = { templateId -> templates[templateId] },
+                    ),
+                )
+            if (!ran) {
+                throw CommandSyntaxException(
+                    Component.text(
+                        "'$id' needs something world '${world.name}' does not have (its noise router, its " +
+                            "surface rules or the structure files from a downloaded server.jar).",
+                    ),
+                )
+            }
+        }
         context.environment.syncChunks(world, x, z, x, z)
         context.success(
             Component.translatable(
@@ -319,18 +369,134 @@ public class PlaceCommand(
         return 1
     }
 
-    private fun refuse(
+    /**
+     * parity: `PlaceCommand.placeStructure`, which generates the structure where it was told and
+     * skips the placement grid and the biome check that decide where one appears on its own.
+     */
+    private fun placeStructure(
         context: CommandContext,
-        kind: String,
-        id: Identifier,
-    ): Int =
-        throw CommandSyntaxException(
-            Component.text(
-                "Placing a $kind ('$id') on demand needs world generation to expose whole structures by id; " +
-                    "they generate correctly, but nothing can look one up yet. `/place template` does work and " +
-                    "places a structure file.",
+        coordinates: BlockCoordinates?,
+    ): Int {
+        val id = context.get<Identifier>("structure")
+        val world = context.world()
+        val villages =
+            world.villageGenerator
+                ?: throw CommandSyntaxException(
+                    Component.translatable("commands.place.structure.invalid", Component.text(id.toString())),
+                )
+        if (id !in villages.structureIds) {
+            throw CommandSyntaxException(
+                Component.text(
+                    "'$id' is not a structure this build generates. Available: " +
+                        villages.structureIds.joinToString(", ") + ". `/place template` places a structure file.",
+                ),
+            )
+        }
+        val (x, y, z) = resolveOrigin(context, coordinates)
+        val pieces =
+            villages.assembleAt(id, x shr 4, z shr 4, world.metadata.seed)
+                ?: throw CommandSyntaxException(
+                    Component.translatable("commands.place.structure.failed", Component.text(id.toString())),
+                )
+        writePieces(context, world, pieces, villages)
+        context.success(
+            Component.translatable(
+                "commands.place.structure.success",
+                Component.text(id.toString()),
+                Component.text(x.toString()),
+                Component.text(y.toString()),
+                Component.text(z.toString()),
             ),
+            broadcastToAdmins = true,
         )
+        return 1
+    }
+
+    /** Where a `/place` acts: the position it was given, or the whole-block position of the runner. */
+    private fun resolveOrigin(
+        context: CommandContext,
+        coordinates: BlockCoordinates?,
+    ): Triple<Int, Int, Int> =
+        coordinates?.resolve(context.source.position) ?: context.source.position.let { (x, y, z) ->
+            Triple(kotlin.math.floor(x).toInt(), kotlin.math.floor(y).toInt(), kotlin.math.floor(z).toInt())
+        }
+
+    /** Writes an assembly into every chunk it covers, and re-sends them. Every chunk has to be loaded. */
+    private fun writePieces(
+        context: CommandContext,
+        world: LoadedWorld,
+        pieces: List<PlacedStructurePiece>,
+        villages: VillageStructureGenerator,
+    ) {
+        var minX = Int.MAX_VALUE
+        var minZ = Int.MAX_VALUE
+        var maxX = Int.MIN_VALUE
+        var maxZ = Int.MIN_VALUE
+        for (piece in pieces) {
+            minX = minOf(minX, piece.boundingBox.minX)
+            minZ = minOf(minZ, piece.boundingBox.minZ)
+            maxX = maxOf(maxX, piece.boundingBox.maxX)
+            maxZ = maxOf(maxZ, piece.boundingBox.maxZ)
+        }
+        for (chunkX in (minX shr 4)..(maxX shr 4)) {
+            for (chunkZ in (minZ shr 4)..(maxZ shr 4)) {
+                val chunk =
+                    world.state.chunkIfLoaded(chunkX, chunkZ)
+                        ?: throw CommandSyntaxException(Component.translatable("argument.pos.unloaded"))
+                villages.placeInto(chunk, pieces, world.metadata.seed)
+            }
+        }
+        context.environment.syncChunks(world, minX, minZ, maxX, maxZ)
+    }
+
+    /** parity: `PlaceCommand.placeJigsaw`, which grows a template pool at a position with no structure around it. */
+    private fun placeJigsaw(
+        context: CommandContext,
+        coordinates: BlockCoordinates?,
+    ): Int {
+        val pool = context.get<Identifier>("pool")
+        val world = context.world()
+        val villages =
+            world.villageGenerator
+                ?: throw CommandSyntaxException(
+                    Component.translatable("commands.place.jigsaw.invalid", Component.text(pool.toString())),
+                )
+        if (!villages.hasPool(pool.toString())) {
+            throw CommandSyntaxException(
+                Component.translatable("commands.place.jigsaw.invalid", Component.text(pool.toString())),
+            )
+        }
+        val (x, y, z) = resolveOrigin(context, coordinates)
+        val pieces =
+            villages.assemblePool(
+                pool.toString(),
+                x shr 4,
+                z shr 4,
+                context.get("max_depth"),
+                world.metadata.seed,
+            )
+        if (pieces.isEmpty()) {
+            throw CommandSyntaxException(
+                Component.translatable("commands.place.jigsaw.failed", Component.text(pool.toString())),
+            )
+        }
+        writePieces(context, world, pieces, villages)
+        context.success(
+            Component.translatable(
+                "commands.place.jigsaw.success",
+                Component.text(x.toString()),
+                Component.text(y.toString()),
+                Component.text(z.toString()),
+            ),
+            broadcastToAdmins = true,
+        )
+        return 1
+    }
+
+    private companion object {
+        /** parity: vanilla's own `/place jigsaw` cap. */
+        const val MAX_JIGSAW_DEPTH = 20
+    }
 }
 
 /**
@@ -346,7 +512,8 @@ public class EnchantCommand(
 ) : Command(name = "enchant", permissionLevel = PermissionLevel.GAMEMASTERS) {
     override fun build(root: CommandNodeBuilder) {
         root.argument("targets", PlayersArgument(single = false)) {
-            argument("enchantment", ResourceLocationArgument) {
+            argument("enchantment", RegistryArgument.resource("minecraft:enchantment")) {
+                suggestsFromServer { context -> context.matchingIds(enchantments.ids) }
                 executes { context -> enchant(context, 1) }
                 argument("level", IntegerArgument(min = 0, max = MAX_LEVEL)) {
                     executes { context -> enchant(context, context.get("level")) }
@@ -444,7 +611,9 @@ public class DialogCommand(
     override fun build(root: CommandNodeBuilder) {
         root.literal("show") {
             argument("targets", PlayersArgument(single = false)) {
-                argument("dialog", ResourceLocationArgument) { executes { context -> show(context) } }
+                // No completions of our own: `minecraft:dialog` is a synced registry, so the client
+                // completes it from the same list this server sent it.
+                argument("dialog", RegistryArgument.DIALOG) { executes { context -> show(context) } }
             }
         }
         root.literal("clear") {
@@ -536,9 +705,10 @@ public class TestCommand(
             }
         }
         root.literal("run") {
-            argument("name", ResourceLocationArgument) {
+            argument("tests", RegistryArgument.selector("minecraft:test_instance")) {
+                suggestsFromServer { context -> context.matchingIds(instances.all.map { it.id }) }
                 executes { context ->
-                    val id = context.get<Identifier>("name")
+                    val id = context.get<Identifier>("tests")
                     val instance =
                         instances[id]
                             ?: throw CommandSyntaxException(

@@ -27,7 +27,27 @@ public object BushPatchDecoration {
         val z = chunk.chunkZ * 16 + random.nextInt(16)
         val y = context.height(x and 15, z and 15, Chunk.HeightmapType.MOTION_BLOCKING)
         if (environment.biomeAt(x, y, z).substringAfter(':') !in BIOMES) return
-        val origin = DecorationPos(x, y, z)
+        placeAt(chunk, random, DecorationPos(x, y, z), region)
+    }
+
+    /**
+     * The patch itself, at one origin: what the step calls once it has chosen a spot, and what
+     * `/place feature` calls with the spot it was given.
+     */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ) {
+        placeAt(chunk, random, origin, PatchRegion(chunk, null, null))
+    }
+
+    private fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+        region: PatchRegion,
+    ) {
         repeat(24) {
             val target =
                 DecorationPos(

@@ -23,6 +23,9 @@ public class StructureTemplates(
     @Volatile
     private var cache: Map<Identifier, StructureTemplate?> = emptyMap()
 
+    @Volatile
+    private var listings: Map<String, List<Identifier>> = emptyMap()
+
     public operator fun get(id: Identifier): StructureTemplate? {
         cache[id]?.let { return it }
         if (cache.containsKey(id)) return null
@@ -38,5 +41,22 @@ public class StructureTemplates(
                 .getOrNull()
         cache = cache + (id to loaded)
         return loaded
+    }
+
+    /** Every structure file the jar ships. parity: `PlaceCommand.SUGGEST_TEMPLATES`. */
+    public fun templateIds(): List<Identifier> = idsUnder("structure", ".nbt")
+
+    /** Every template pool the jar ships, which is what `/place jigsaw` grows one of. */
+    public fun poolIds(): List<Identifier> = idsUnder("worldgen/template_pool", ".json")
+
+    /** Listing the jar is a directory walk, so each answer is kept rather than walked again. */
+    private fun idsUnder(
+        directory: String,
+        extension: String,
+    ): List<Identifier> {
+        listings[directory]?.let { return it }
+        val ids = serverJar?.dataIds(directory, extension).orEmpty()
+        listings = listings + (directory to ids)
+        return ids
     }
 }

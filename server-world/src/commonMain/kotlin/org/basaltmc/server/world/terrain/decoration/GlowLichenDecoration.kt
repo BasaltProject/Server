@@ -56,6 +56,13 @@ public object GlowLichenDecoration : BiomeVegetalDecoration {
         }
     }
 
+    /** parity: `glow_lichen`, grown at one position rather than scattered through a chunk. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ): Boolean = placeGrowth(GlowLichenRegion(chunk, null), random, origin)
+
     private fun placeGrowth(
         region: GlowLichenRegion,
         random: WorldgenRandom,

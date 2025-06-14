@@ -55,6 +55,30 @@ public object CaveSpeleothemDecoration {
         }
     }
 
+    /** The vanilla placed feature names this step draws, by the config that draws them. */
+    public val PLACED_IDS: Set<String> =
+        setOf("pointed_dripstone", "dripstone_cluster", "sulfur_spike", "sulfur_spike_cluster")
+
+    /** One of them at one position, which is what `/place feature` runs. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: BasaltRandom,
+        origin: DecorationPos,
+        placedFeature: String,
+    ): Boolean {
+        val region = SpeleothemRegion(chunk, null)
+        return when (placedFeature) {
+            "pointed_dripstone" ->
+                placeSpeleothem(region, random, origin, POINTED_BY_INDEX.getValue(POINTED_DRIPSTONE_INDEX))
+            "sulfur_spike" -> placeSpeleothem(region, random, origin, POINTED_BY_INDEX.getValue(SULFUR_SPIKE_INDEX))
+            "dripstone_cluster" ->
+                placeCluster(region, random, origin, CLUSTERS.first { it.globalIndex == DRIPSTONE_CLUSTER_INDEX })
+            "sulfur_spike_cluster" ->
+                placeCluster(region, random, origin, CLUSTERS.first { it.globalIndex == SULFUR_CLUSTER_INDEX })
+            else -> false
+        }
+    }
+
     private fun placePointedFeature(
         region: SpeleothemRegion,
         random: WorldgenRandom,

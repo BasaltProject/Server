@@ -35,6 +35,22 @@ public object EndVegetalDecoration {
         }
     }
 
+    /** parity: `chorus_plant`, grown at one position rather than scattered over a chunk. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        router: EndNoiseRouter,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Boolean {
+        val world = ChorusWorld(chunk, router)
+        val origin = EndPos(x, y, z)
+        if (!world.isEmpty(origin) || world.pathAt(origin.below()) != "end_stone") return false
+        generatePlant(world, origin, random)
+        return true
+    }
+
     private fun generatePlant(
         world: ChorusWorld,
         origin: EndPos,

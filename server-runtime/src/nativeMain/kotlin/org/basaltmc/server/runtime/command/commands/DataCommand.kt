@@ -6,6 +6,7 @@ import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSyntaxException
+import org.basaltmc.server.runtime.command.EntityNbt
 import org.basaltmc.server.runtime.command.IntegerArgument
 import org.basaltmc.server.runtime.command.NbtCompoundArgument
 import org.basaltmc.server.runtime.command.NbtPathArgument
@@ -26,9 +27,7 @@ import org.basaltmc.wire.nbt.NbtInt
 import org.basaltmc.wire.nbt.NbtList
 import org.basaltmc.wire.nbt.NbtLong
 import org.basaltmc.wire.nbt.NbtShort
-import org.basaltmc.wire.nbt.NbtString
 import org.basaltmc.wire.nbt.NbtTag
-import org.basaltmc.wire.nbt.NbtType
 import org.basaltmc.wire.nbt.Snbt
 import org.basaltmc.wire.text.Component
 
@@ -109,15 +108,15 @@ public class DataCommand(
         }
         root.literal("modify") {
             holders {
-                argument("path", NbtPathArgument) {
+                argument("targetPath", NbtPathArgument) {
                     literal("set") {
                         literal("value") {
-                            argument("nbt", NbtTagArgument) { executes { context -> modify(context, false) } }
+                            argument("value", NbtTagArgument) { executes { context -> modify(context, false) } }
                         }
                     }
                     literal("merge") {
                         literal("value") {
-                            argument("nbt", NbtTagArgument) { executes { context -> modify(context, true) } }
+                            argument("value", NbtTagArgument) { executes { context -> modify(context, true) } }
                         }
                     }
                     for (mode in listOf("append", "prepend", "insert")) {
@@ -125,14 +124,14 @@ public class DataCommand(
                             if (mode == "insert") {
                                 argument("index", IntegerArgument()) {
                                     literal("value") {
-                                        argument("nbt", NbtTagArgument) {
+                                        argument("value", NbtTagArgument) {
                                             executes { context -> modifyList(context, mode) }
                                         }
                                     }
                                 }
                             } else {
                                 literal("value") {
-                                    argument("nbt", NbtTagArgument) {
+                                    argument("value", NbtTagArgument) {
                                         executes { context -> modifyList(context, mode) }
                                     }
                                 }
@@ -146,18 +145,28 @@ public class DataCommand(
 
     /** The three `(block|entity|storage)` forms, declared once per verb the way vanilla does. */
     private fun CommandNodeBuilder.holders(build: CommandNodeBuilder.() -> Unit) {
-        literal("block") { argument("pos", BlockPosArgument) { build() } }
+        literal("block") { argument("targetPos", BlockPosArgument) { build() } }
         literal("entity") { argument("target", PlayersArgument(single = true)) { build() } }
-        literal("storage") { argument("source", ResourceLocationArgument) { build() } }
+        literal("storage") { argument("target", ResourceLocationArgument) { build() } }
     }
 
-    private fun holderOf(context: CommandContext): Holder =
-        when {
-            context.has("source") -> Holder.Storage(context.get("source"))
-            context.has("pos") -> Holder.Block(context.get("pos"))
-            context.has("target") -> Holder.Entity(context.get<List<PlayerSession>>("target").single())
-            else -> throw CommandSyntaxException(Component.text("No data holder was given."))
+    private fun holderOf(context: CommandContext): Holder {
+        if (context.has("targetPos")) return Holder.Block(context.get("targetPos"))
+        // Vanilla calls both the storage id and the entity `target`; which one it is follows from
+        // what parsed there.
+        val target =
+            if (context.has("target")) {
+                context.get<Any>("target")
+            } else {
+                throw CommandSyntaxException(Component.text("No data holder was given."))
+            }
+        @Suppress("UNCHECKED_CAST")
+        return if (target is Identifier) {
+            Holder.Storage(target)
+        } else {
+            Holder.Entity((target as List<PlayerSession>).single())
         }
+    }
 
     private sealed interface Holder {
         class Storage(
@@ -264,8 +273,8 @@ public class DataCommand(
         merging: Boolean,
     ): Int {
         val holder = holderOf(context)
-        val path = context.get<String>("path")
-        val value = context.get<NbtTag>("nbt")
+        val path = context.get<String>("targetPath")
+        val value = context.get<NbtTag>("value")
         val root = read(context, holder)
         val existing = DataPaths.resolve(root, path)
         val next =
@@ -288,8 +297,8 @@ public class DataCommand(
         mode: String,
     ): Int {
         val holder = holderOf(context)
-        val path = context.get<String>("path")
-        val value = context.get<NbtTag>("nbt")
+        val path = context.get<String>("targetPath")
+        val value = context.get<NbtTag>("value")
         val root = read(context, holder)
         val existing = DataPaths.resolve(root, path)
         val elements =
@@ -371,22 +380,8 @@ public class DataCommand(
     private fun noSuchPath(path: String) =
         CommandSyntaxException(Component.translatable("arguments.nbtpath.nothing_found", Component.text(path)))
 
-    /** A live view of the player, in the shape vanilla's own entity NBT uses for the same fields. */
-    private fun playerNbt(player: PlayerSession): NbtCompound =
-        NbtCompound().apply {
-            putString("id", "minecraft:player")
-            putString("Name", player.name)
-            putFloat("Health", player.health)
-            putInt("XpLevel", player.experience.level)
-            putFloat("XpP", player.experience.progress)
-            putInt("XpTotal", player.experience.total)
-            putString("Dimension", player.worldName)
-            this["Pos"] =
-                NbtList(NbtType.DOUBLE, listOf(NbtDouble(player.x), NbtDouble(player.y), NbtDouble(player.z)))
-            this["Rotation"] = NbtList(NbtType.FLOAT, listOf(NbtFloat(player.yaw), NbtFloat(player.pitch)))
-            this["Tags"] = NbtList(NbtType.STRING, player.tags.map { NbtString(it) })
-            this["foodLevel"] = NbtInt(player.food.foodLevel)
-        }
+    /** A live view of the player, shared with a selector's `nbt=` so both read the same fields. */
+    private fun playerNbt(player: PlayerSession): NbtCompound = EntityNbt.of(player)
 
     /** The result `/data get` reports, which for a number is the number itself. */
     private fun numeric(tag: NbtTag): Int? =
@@ -477,13 +472,7 @@ public class DataAccess(
             else -> NbtInt(value.toInt())
         }
 
-    private fun playerCompound(player: org.basaltmc.server.runtime.player.PlayerSession): NbtCompound =
-        NbtCompound().apply {
-            putString("Name", player.name)
-            putFloat("Health", player.health)
-            putInt("XpLevel", player.experience.level)
-            this["Tags"] = NbtList(NbtType.STRING, player.tags.map { NbtString(it) })
-        }
+    private fun playerCompound(player: PlayerSession): NbtCompound = EntityNbt.of(player)
 }
 
 /**

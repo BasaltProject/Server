@@ -51,6 +51,22 @@ public object SwampDecoration : BiomeVegetalDecoration {
     }
 
     // parity: placed_feature/flower_swamp.json.
+
+    /** The patch at one origin, which is what `/place feature` runs for `flower_swamp`. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ) {
+        val feature = SimpleBlockFeature({ _, _ -> blueOrchidStateId })
+        placeFrom(
+            chunk,
+            random,
+            origin,
+            listOf(CountPlacement(64), RandomOffsetPlacement(xzSpread = 6, ySpread = 2), AirTargetFilter()),
+        ) { position -> feature.place(chunk, random, position) }
+    }
+
     private fun placeFlower(
         chunk: Chunk,
         random: WorldgenRandom,

@@ -71,6 +71,9 @@ public class ChunkSection {
     /** Approximate bytes both palettes keep resident, for the timings report's memory breakdown. */
     public val residentBytes: Int get() = blockStateIds.residentBytes + biomeIds.residentBytes
 
+    /** Whether this section's palette holds any state satisfying [predicate]. See `PalettedContainer.anyValue`. */
+    public fun mayContain(predicate: (Int) -> Boolean): Boolean = blockStateIds.anyValue(predicate)
+
     /** A copy of the raw state IDs, in `(y * 16 + z) * 16 + x` order: the layout `PalettedContainer` expects. */
     public fun blockStateIds(): IntArray = blockStateIds.toIntArray()
 

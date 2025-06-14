@@ -56,6 +56,38 @@ public object NetherOreDecoration {
         }
     }
 
+    /** The vanilla placed feature names of the Nether ores this step runs, by their global index. */
+    public val PLACED_IDS: Map<String, Int> =
+        mapOf(
+            "ore_magma" to 11,
+            "ore_gold_deltas" to 13,
+            "ore_quartz_deltas" to 14,
+            "ore_soul_sand" to 16,
+            "ore_gravel_nether" to 17,
+            "ore_blackstone" to 18,
+            "ore_gold_nether" to 19,
+            "ore_quartz_nether" to 20,
+            "ore_ancient_debris_large" to 21,
+            "ore_debris_small" to 22,
+        )
+
+    /** One vein at one position, which is what `/place feature` runs. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: BasaltRandom,
+        x: Int,
+        y: Int,
+        z: Int,
+        placedFeature: String,
+    ): Boolean {
+        val index = PLACED_IDS[placedFeature] ?: return false
+        when (val configured = (FEATURES_BY_INDEX[index] ?: return false).feature) {
+            is ConfiguredOre.Vein -> placeVein(chunk, random, x, y, z, configured)
+            is ConfiguredOre.Scattered -> placeScattered(chunk, random, x, y, z, configured)
+        }
+        return true
+    }
+
     private fun placeVein(
         chunk: Chunk,
         random: BasaltRandom,

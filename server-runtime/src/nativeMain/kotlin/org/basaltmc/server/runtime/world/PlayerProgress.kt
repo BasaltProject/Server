@@ -1,6 +1,7 @@
 package org.basaltmc.server.runtime.world
 
 import org.basaltmc.server.assets.ServerJarAssets
+import org.basaltmc.server.storage.ProgressRepository
 import org.basaltmc.server.world.advancement.Advancement
 import org.basaltmc.server.world.advancement.AdvancementJson
 import org.basaltmc.wire.common.Identifier
@@ -10,14 +11,16 @@ import org.basaltmc.wire.common.logging.Logger
  * Every advancement the operator's own `server.jar` ships, by id.
  *
  * Datapack content, so it is read from the download rather than committed (§7), the same way loot
- * tables and recipes are. Nothing *awards* them yet: the triggers are gameplay events that do not
- * exist, which is exactly why `/advancement grant` is the way one is completed for now.
+ * tables and recipes are. What awards them is [AdvancementTriggers]; `/advancement grant` remains
+ * the only way to complete one whose trigger this build cannot observe yet.
  */
 public class RealAdvancements(
     serverJar: ServerJarAssets?,
     private val logger: Logger = Logger("Advancements"),
+    /** Definitions handed in directly, which is how a test builds one without a jar to read. */
+    definitions: Map<Identifier, Advancement>? = null,
 ) {
-    private val advancements: Map<Identifier, Advancement> = serverJar?.let(::load).orEmpty()
+    private val advancements: Map<Identifier, Advancement> = definitions ?: serverJar?.let(::load).orEmpty()
 
     public val size: Int get() = advancements.size
 
@@ -68,49 +71,96 @@ public class RealAdvancements(
 }
 
 /**
- * What each player has been granted or taught, in memory for the run.
+ * What each player has been granted or taught, kept in memory and written through to `players.db`.
  *
- * Vanilla keeps both in the world folder (`advancements/<uuid>.json`, and the recipe book inside
- * the player's own data). Here they are not persisted yet, which is stated rather than implied: a
- * `/advancement grant` survives until the server stops.
+ * Keyed by UUID rather than by name, which is both what the database stores and what survives a
+ * rename: vanilla keys `advancements/<uuid>.json` the same way. [load] fills a player in at join;
+ * everything else answers from memory, so a lookup on the crafting path costs no query.
+ *
+ * The repository is null where there is no database, which is how the command tests run: the whole
+ * class then behaves as it did before persistence existed.
  */
-public class PlayerProgress {
+public class PlayerProgress(
+    private val repository: ProgressRepository? = null,
+) {
     private val advancements = mutableMapOf<String, MutableMap<Identifier, MutableSet<String>>>()
     private val recipes = mutableMapOf<String, MutableSet<Identifier>>()
 
+    /** Reads one player's rows in. Called at join, before anything can ask about them. */
+    public fun load(uuid: String) {
+        val stored = repository?.load(uuid) ?: return
+        advancements[uuid] =
+            stored.criteria
+                .mapKeys { (id, _) -> Identifier.parse(id) }
+                .mapValues { (_, names) -> names.toMutableSet() }
+                .toMutableMap()
+        recipes[uuid] = stored.recipes.map(Identifier::parse).toMutableSet()
+    }
+
+    /** Drops a player from memory at quit. Their rows stay in the database. */
+    public fun unload(uuid: String) {
+        advancements.remove(uuid)
+        recipes.remove(uuid)
+    }
+
     /** Marks one criterion as done. Returns false when it already was. */
     public fun grantCriterion(
-        player: String,
+        uuid: String,
         advancement: Identifier,
         criterion: String,
-    ): Boolean =
-        advancements.getOrPut(player) { mutableMapOf() }.getOrPut(advancement) { mutableSetOf() }.add(criterion)
+    ): Boolean {
+        val added =
+            advancements
+                .getOrPut(
+                    uuid,
+                ) { mutableMapOf() }
+                .getOrPut(advancement) { mutableSetOf() }
+                .add(criterion)
+        if (added) repository?.grantCriterion(uuid, advancement.toString(), criterion)
+        return added
+    }
 
     public fun revokeCriterion(
-        player: String,
+        uuid: String,
         advancement: Identifier,
         criterion: String,
-    ): Boolean = advancements[player]?.get(advancement)?.remove(criterion) == true
+    ): Boolean {
+        val removed = advancements[uuid]?.get(advancement)?.remove(criterion) == true
+        if (removed) repository?.revokeCriterion(uuid, advancement.toString(), criterion)
+        return removed
+    }
 
     public fun grantedCriteria(
-        player: String,
+        uuid: String,
         advancement: Identifier,
-    ): Set<String> = advancements[player]?.get(advancement).orEmpty()
+    ): Set<String> = advancements[uuid]?.get(advancement).orEmpty()
 
     public fun revokeAll(
-        player: String,
+        uuid: String,
         advancement: Identifier,
-    ): Boolean = advancements[player]?.remove(advancement) != null
+    ): Boolean {
+        val removed = advancements[uuid]?.remove(advancement) != null
+        if (removed) repository?.revokeAdvancement(uuid, advancement.toString())
+        return removed
+    }
 
-    public fun knownRecipes(player: String): Set<Identifier> = recipes[player].orEmpty()
+    public fun knownRecipes(uuid: String): Set<Identifier> = recipes[uuid].orEmpty()
 
     public fun learn(
-        player: String,
+        uuid: String,
         recipe: Identifier,
-    ): Boolean = recipes.getOrPut(player) { mutableSetOf() }.add(recipe)
+    ): Boolean {
+        val added = recipes.getOrPut(uuid) { mutableSetOf() }.add(recipe)
+        if (added) repository?.learnRecipe(uuid, recipe.toString())
+        return added
+    }
 
     public fun forget(
-        player: String,
+        uuid: String,
         recipe: Identifier,
-    ): Boolean = recipes[player]?.remove(recipe) == true
+    ): Boolean {
+        val removed = recipes[uuid]?.remove(recipe) == true
+        if (removed) repository?.forgetRecipe(uuid, recipe.toString())
+        return removed
+    }
 }

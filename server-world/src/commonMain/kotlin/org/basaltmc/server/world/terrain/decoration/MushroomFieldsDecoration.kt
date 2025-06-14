@@ -26,6 +26,16 @@ public object MushroomFieldsDecoration : BiomeVegetalDecoration {
         MushroomDecoration.TAIGA.decorate(chunk, random)
     }
 
+    /** parity: `mushroom_island_vegetation`, one huge mushroom at one position. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ) {
+        val kind = if (random.nextBoolean()) HugeMushroomFeature.Kind.RED else HugeMushroomFeature.Kind.BROWN
+        HugeMushroomFeature.place(chunk, random, origin.x, origin.y, origin.z, kind)
+    }
+
     private fun placeHugeMushroom(
         chunk: Chunk,
         random: WorldgenRandom,

@@ -47,6 +47,38 @@ public object GrassPatchDecoration {
         }
     }
 
+    /**
+     * The vanilla placed feature names of the grass patches this step runs, by the spec that draws
+     * them: the name says which provider and how many tries, the biomes decide where generation
+     * puts one and `/place feature` is told instead.
+     */
+    public val PLACED_GRASS_IDS: Map<String, Int> =
+        mapOf(
+            "patch_grass_jungle" to 11,
+            "patch_grass_savanna" to 12,
+            "patch_grass_meadow" to 35,
+            "patch_grass_plain" to 54,
+            "patch_taiga_grass" to 58,
+            "patch_grass_forest" to 59,
+            "patch_grass_taiga" to 60,
+            "patch_grass_taiga_2" to 60,
+            "patch_grass_normal" to 61,
+            "patch_grass_badlands" to 68,
+        )
+
+    /** The patch at one origin, which is what `/place feature` runs. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+        placedFeature: String,
+    ): Boolean {
+        val index = PLACED_GRASS_IDS[placedFeature] ?: return false
+        val spec = SPECS.firstOrNull { it.index == index } ?: return false
+        placePatch(GrassRegion(chunk, null, null), random, origin, spec)
+        return true
+    }
+
     private fun placePatch(
         region: GrassRegion,
         random: WorldgenRandom,

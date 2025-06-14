@@ -20,7 +20,10 @@ class ChunkRetainedMemoryTest {
         // unswept, which reads as a leak that is not there. Same reason /timings collects twice.
         GC.collect()
         GC.collect()
-        return GC.lastGCInfo?.memoryUsageAfter?.get("heap")?.totalObjectsSizeBytes ?: 0L
+        return GC.lastGCInfo
+            ?.memoryUsageAfter
+            ?.get("heap")
+            ?.totalObjectsSizeBytes ?: 0L
     }
 
     @Test

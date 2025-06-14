@@ -26,7 +26,23 @@ public object PumpkinPatchDecoration {
         val z = chunk.chunkZ * 16 + random.nextInt(16)
         val y = context.height(x and 15, z and 15, Chunk.HeightmapType.MOTION_BLOCKING)
         if (environment.biomeAt(x, y, z).substringAfter(':') !in BIOMES) return
-        val origin = DecorationPos(x, y, z)
+        placeAt(random, DecorationPos(x, y, z), region)
+    }
+
+    /** The patch at one origin: what the step calls after choosing a spot, and what `/place feature` calls. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ) {
+        placeAt(random, origin, PatchRegion(chunk, null, null))
+    }
+
+    private fun placeAt(
+        random: WorldgenRandom,
+        origin: DecorationPos,
+        region: PatchRegion,
+    ) {
         repeat(96) {
             val target =
                 DecorationPos(

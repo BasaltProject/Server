@@ -9,6 +9,9 @@ import org.basaltmc.server.runtime.command.CommandDispatcher
 import org.basaltmc.server.runtime.command.PlayerCommandSource
 import org.basaltmc.server.runtime.command.commands.BossBarRegistry
 import org.basaltmc.server.runtime.command.timePacket
+import org.basaltmc.server.runtime.item.ItemComponentCodecs
+import org.basaltmc.server.runtime.item.ItemDamageEffects
+import org.basaltmc.server.runtime.item.ItemWear
 import org.basaltmc.server.runtime.placeholder.PlaceholderSlots
 import org.basaltmc.server.runtime.player.Difficulty
 import org.basaltmc.server.runtime.player.FoodData
@@ -23,6 +26,7 @@ import org.basaltmc.server.runtime.registry.VanillaRegistryData
 import org.basaltmc.server.runtime.registry.VanillaTagData
 import org.basaltmc.server.runtime.ui.PlayerUi
 import org.basaltmc.server.runtime.ui.UiConfigs
+import org.basaltmc.server.runtime.world.AdvancementTriggers
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
 import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
@@ -96,12 +100,16 @@ import org.basaltmc.wire.protocol.play.ChatMessagePacket
 import org.basaltmc.wire.protocol.play.ChunkBatchFinishedPacket
 import org.basaltmc.wire.protocol.play.ChunkBatchReceivedPacket
 import org.basaltmc.wire.protocol.play.ChunkBatchStartPacket
+import org.basaltmc.wire.protocol.play.ChunkBiomeData
 import org.basaltmc.wire.protocol.play.ChunkBlockEntityInfo
+import org.basaltmc.wire.protocol.play.ChunksBiomesPacket
 import org.basaltmc.wire.protocol.play.ClientCommandPacket
 import org.basaltmc.wire.protocol.play.ClientboundBlockChangedAckPacket
 import org.basaltmc.wire.protocol.play.ClientboundBlockUpdatePacket
 import org.basaltmc.wire.protocol.play.ClientboundPlayerAbilitiesPacket
 import org.basaltmc.wire.protocol.play.ClientboundTakeItemEntityPacket
+import org.basaltmc.wire.protocol.play.CommandSuggestionRequestPacket
+import org.basaltmc.wire.protocol.play.CommandSuggestionsPacket
 import org.basaltmc.wire.protocol.play.CommandsPacket
 import org.basaltmc.wire.protocol.play.ContainerClosePacket
 import org.basaltmc.wire.protocol.play.ContainerSetContentPacket
@@ -227,6 +235,8 @@ public class ClientSession(
     private val timelines: RealTimelines? = null,
     /** What each player has been taught, which `limited_crafting` consults. */
     private val progress: PlayerProgress? = null,
+    /** What turns a picked-up item into an advancement. Null where nothing loaded the definitions. */
+    private val advancementTriggers: AdvancementTriggers? = null,
     private val blockTags: RealBlockTags? = null,
     /** The real item tags, sent to the client alongside the block ones. */
     private val itemTags: RealItemTags? = null,
@@ -250,6 +260,13 @@ public class ClientSession(
 
     /** The same lookup backwards, for a stack coming *from* the client. */
     private fun enchantmentNameOf(protocolId: Int): Identifier? = enchantments?.entries?.getOrNull(protocolId)?.first
+
+    /** What an enchantment takes off a durability cost, read from the definitions themselves. */
+    private val damageEffects =
+        ItemDamageEffects(
+            definitionOf = { enchantments?.definitionOf(it) },
+            itemInTag = { tag, item -> itemTags?.contains(tag, item) == true },
+        )
 
     // Read by this connection's PlayerSession, so the same placeholders answer for a logged-in
     // player and for a pending ping.
@@ -956,6 +973,9 @@ public class ClientSession(
 
         val others = registry.snapshot()
         registry.add(session)
+        // Their advancements and recipe book, before anything can ask about them: `limited_crafting`
+        // consults the book on the first click.
+        progress?.load(session.uuid.toString())
         logger.info { "${session.name} logged in with entity id $entityId at ($spawnX, $spawnY, $spawnZ)" }
         session.profileProperties = pendingProfile?.properties.orEmpty()
         session.skinParts = pendingSkinParts
@@ -1115,6 +1135,24 @@ public class ClientSession(
         sendPlayPacket(ChunkBatchFinishedPacket.ID) { ChunkBatchFinishedPacket(1).write(it) }
     }
 
+    /**
+     * New biomes for columns this client already has, without resending them.
+     *
+     * parity: `ClientboundChunksBiomesPacket`, which vanilla sends from `/fillbiome` for exactly
+     * this reason: a chunk resend would drop and rebuild the column, and the biome is the only
+     * thing that changed.
+     */
+    internal fun sendBiomes(chunks: List<Pair<Int, Int>>) {
+        val world = currentWorld ?: return
+        val columns =
+            chunks.mapNotNull { (chunkX, chunkZ) ->
+                val chunk = world.state.chunkIfLoaded(chunkX, chunkZ) ?: return@mapNotNull null
+                ChunkBiomeData(chunkX, chunkZ, ChunkDataCodec.encodeBiomes(chunk))
+            }
+        if (columns.isEmpty()) return
+        sendCompressed(ChunksBiomesPacket.ID) { ChunksBiomesPacket(columns).write(it) }
+    }
+
     private fun sendChunk(chunk: Chunk) {
         val chunkData = ChunkDataCodec.encodeSections(chunk)
         val light = ChunkDataCodec.encodeLight(chunk, currentWorld?.declaration?.dimension?.hasSkylight ?: true)
@@ -1199,6 +1237,7 @@ public class ClientSession(
                 broadcastChat(chat.message)
             }
             ChatCommandPacket.ID -> runCommand(ChatCommandPacket.read(body).command)
+            CommandSuggestionRequestPacket.ID -> sendSuggestions(CommandSuggestionRequestPacket.read(body))
             // A command carrying signed arguments. Nothing verifies the signatures yet, so it runs
             // exactly like its unsigned form: documented gap, same as signed chat.
             SignedChatCommandPacket.ID -> runCommand(SignedChatCommandPacket.read(body).command)
@@ -1403,6 +1442,29 @@ public class ClientSession(
                     }
             if (correctTool) dropLootFor(brokenBlock.block, action.pos)
         }
+        if (brokenBlock != null) wearHeldItemOnBreak(brokenBlock.block)
+    }
+
+    /**
+     * parity: `Item.mineBlock`, which wears the held item only when it has a `minecraft:tool`
+     * component, the block has some hardness, and that component costs something per block. A
+     * creative player wears nothing, as `ItemStack.processDurabilityChange` decides up front.
+     */
+    private fun wearHeldItemOnBreak(block: Identifier) {
+        val session = playerSession ?: return
+        if (session.gamemode == Gamemode.CREATIVE) return
+        if (Blocks.hardnessOf(block)?.isInstant != false) return
+        val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
+        val held = session.inventory[heldSlot] ?: return
+        val cost = ItemWear.costPerBlock(held)
+        if (cost <= 0) return
+        val worn =
+            ItemWear.hurt(held, cost, LegacyRandom(Random.nextLong())) { stack, amount, random ->
+                damageEffects.process(stack, amount, random)
+            }
+        if (worn == held) return
+        session.inventory[heldSlot] = worn
+        sendInventorySlot(heldSlot)
     }
 
     /**
@@ -1889,7 +1951,8 @@ public class ClientSession(
         val limited = currentWorld?.gameRules?.get(GameRuleRegistry.LIMITED_CRAFTING) == true
         val known =
             !limited ||
-                match?.first?.let { progress?.knownRecipes(playerSession?.name.orEmpty())?.contains(it) } == true
+                match?.first?.let { progress?.knownRecipes(playerSession?.uuid?.toString().orEmpty())?.contains(it) } ==
+                true
         craftingResult =
             match
                 ?.takeIf { known }
@@ -2280,20 +2343,12 @@ public class ClientSession(
     /**
      * The components of a stack the client sent back, as this build stores them.
      *
-     * Only the ones it can also write: a creative client echoes a slot whenever the inventory
-     * screen opens, so anything not rebuilt here is stripped off an item its owner merely looked at.
+     * A creative client echoes a slot whenever the inventory screen opens, so anything not rebuilt
+     * here is stripped off an item its owner merely looked at. What it cannot rebuild is what this
+     * server never sent in the first place, since a client has nothing else to echo.
      */
-    private fun componentsOf(wire: WireItemStack): NbtCompound {
-        val components = NbtCompound()
-        if (wire.enchantments.isEmpty()) return components
-        val stored = NbtCompound()
-        for ((protocolId, level) in wire.enchantments) {
-            val name = enchantmentNameOf(protocolId) ?: continue
-            stored.putInt(name.toString(), level)
-        }
-        if (stored.keys.isNotEmpty()) components[PlayerInventory.ENCHANTMENTS_COMPONENT] = stored
-        return components
-    }
+    private fun componentsOf(wire: WireItemStack): NbtCompound =
+        ItemComponentCodecs.toStored(wire.components) { enchantmentNameOf(it) }
 
     /**
      * Serverbound, id 0x38: creative inventory editing, and the only path a dragged item takes,
@@ -2568,6 +2623,16 @@ public class ClientSession(
         }
     }
 
+    /** Answers what the client is typing. A reply carries the request's own id or it is discarded. */
+    private fun sendSuggestions(request: CommandSuggestionRequestPacket) {
+        val session = playerSession ?: return
+        val dispatcher = commands ?: return
+        val source = PlayerCommandSource(session, dispatcher.environment.groups)
+        val result = dispatcher.suggest(source, request.command)
+        val packet = CommandSuggestionsPacket(request.id, result.start, result.length, result.suggestions)
+        sendPlayPacket(CommandSuggestionsPacket.ID) { packet.write(it) }
+    }
+
     /**
      * Runs a slash command on behalf of this player.
      *
@@ -2651,6 +2716,7 @@ public class ClientSession(
     private fun tickPlayer() {
         val session = playerSession ?: return
         playTimeTicks++
+        checkAdvancements(session)
         if (session.dead) return
         tryPickupNearbyItems()
         if (session.gamemode == Gamemode.CREATIVE || session.gamemode == Gamemode.SPECTATOR) return
@@ -2673,6 +2739,20 @@ public class ClientSession(
         ) {
             syncHealth()
         }
+    }
+
+    /**
+     * Fires the inventory trigger once a tick, when something moved.
+     *
+     * parity: `ServerPlayer.inventoryMenu.broadcastChanges`, which is where vanilla checks it too:
+     * once per tick after everything has moved, not once per item, so crafting a stack does not
+     * check the same advancement sixty-four times.
+     */
+    private fun checkAdvancements(session: PlayerSession) {
+        val triggers = advancementTriggers ?: return
+        if (!session.inventory.changed) return
+        session.inventory.clearChanged()
+        triggers.onInventoryChanged(session.name, session.uuid.toString(), session.inventory.snapshot().slots)
     }
 
     /** Damage that ignores armour and absorption, because neither exists yet: a documented gap. */
@@ -3000,6 +3080,7 @@ public class ClientSession(
         // one into writing a player who is already half gone.
         savePlayerState()
         registry.remove(session.uuid)
+        progress?.unload(session.uuid.toString())
         logger.info { "${session.name} left the game" }
         for (other in registry.snapshot()) {
             other.connection.sendPlayPacket(

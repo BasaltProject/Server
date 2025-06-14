@@ -57,25 +57,41 @@ public object MelonPatchDecoration {
             val z = chunk.chunkZ * 16 + random.nextInt(16)
             val y = context.height(x and 15, z and 15, Chunk.HeightmapType.MOTION_BLOCKING)
             if (environment.biomeAt(x, y, z).substringAfter(':') !in spec.biomes) continue
-            val origin = DecorationPos(x, y, z)
-            repeat(64) {
-                val target =
-                    DecorationPos(
-                        origin.x + random.nextInt(8) - random.nextInt(8),
-                        origin.y + random.nextInt(4) - random.nextInt(4),
-                        origin.z + random.nextInt(8) - random.nextInt(8),
-                    )
-                if (target.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return@repeat
-                val current = region.get(target)
-                val currentPath = Blocks.byStateId(current)?.block?.path
-                if (currentPath !in REPLACEABLE_BLOCKS || Blocks.hasFluid(current)) return@repeat
-                if (target.y == WorldHeight.MIN_Y ||
-                    region.get(target.copy(y = target.y - 1)) != Blocks.GRASS_BLOCK.stateId
-                ) {
-                    return@repeat
-                }
-                region.set(target, MELON_STATE_ID)
+            placeAt(random, DecorationPos(x, y, z), region)
+        }
+    }
+
+    /** The patch at one origin: what the step calls after choosing a spot, and what `/place feature` calls. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ) {
+        placeAt(random, origin, PatchRegion(chunk, null, null))
+    }
+
+    private fun placeAt(
+        random: WorldgenRandom,
+        origin: DecorationPos,
+        region: PatchRegion,
+    ) {
+        repeat(64) {
+            val target =
+                DecorationPos(
+                    origin.x + random.nextInt(8) - random.nextInt(8),
+                    origin.y + random.nextInt(4) - random.nextInt(4),
+                    origin.z + random.nextInt(8) - random.nextInt(8),
+                )
+            if (target.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return@repeat
+            val current = region.get(target)
+            val currentPath = Blocks.byStateId(current)?.block?.path
+            if (currentPath !in REPLACEABLE_BLOCKS || Blocks.hasFluid(current)) return@repeat
+            if (target.y == WorldHeight.MIN_Y ||
+                region.get(target.copy(y = target.y - 1)) != Blocks.GRASS_BLOCK.stateId
+            ) {
+                return@repeat
             }
+            region.set(target, MELON_STATE_ID)
         }
     }
 

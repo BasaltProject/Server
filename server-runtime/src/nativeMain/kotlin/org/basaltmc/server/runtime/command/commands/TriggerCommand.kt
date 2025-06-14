@@ -5,8 +5,8 @@ import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSyntaxException
 import org.basaltmc.server.runtime.command.IntegerArgument
+import org.basaltmc.server.runtime.command.ObjectiveArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
-import org.basaltmc.server.runtime.command.WordArgument
 import org.basaltmc.server.runtime.scoreboard.Scoreboard
 import org.basaltmc.wire.text.Component
 
@@ -21,7 +21,10 @@ public class TriggerCommand(
     private val scoreboard: Scoreboard,
 ) : Command(name = "trigger", permissionLevel = PermissionLevel.ALL) {
     override fun build(root: CommandNodeBuilder) {
-        root.argument("objective", WordArgument) {
+        root.argument("objective", ObjectiveArgument) {
+            suggestsFromServer { context ->
+                context.matching(scoreboard.allObjectives.filter { it.isTrigger }.map { it.name })
+            }
             executes { context -> trigger(context, "simple") { current -> current + 1 } }
             literal("add") {
                 argument("value", IntegerArgument()) {

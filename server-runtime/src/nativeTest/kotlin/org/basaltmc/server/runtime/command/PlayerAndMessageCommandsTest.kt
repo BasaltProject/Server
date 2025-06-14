@@ -111,7 +111,7 @@ class PlayerAndMessageCommandsTest {
 
     @Test
     fun anAngleWrapsIntoTheRangeVanillaUses() {
-        run("setworldspawn 0 64 0 540")
+        run("setworldspawn 0 64 0 540 0")
         // 540 degrees is 180, which vanilla stores as -180.
         assertEquals(-180f, world.spawnYaw)
     }

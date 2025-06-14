@@ -1,6 +1,5 @@
 package org.basaltmc.server.runtime.command.commands
 
-import org.basaltmc.server.runtime.command.AngleArgument
 import org.basaltmc.server.runtime.command.BlockCoordinates
 import org.basaltmc.server.runtime.command.BlockPosArgument
 import org.basaltmc.server.runtime.command.Command
@@ -9,6 +8,7 @@ import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSyntaxException
 import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.PlayersArgument
+import org.basaltmc.server.runtime.command.RotationArgument
 import org.basaltmc.server.runtime.command.world
 import org.basaltmc.server.runtime.player.PlayerSession
 import org.basaltmc.server.storage.StoredSpawnPoint
@@ -28,9 +28,14 @@ public class SpawnPointCommand : Command(name = "spawnpoint", permissionLevel = 
             executes { context -> setSpawn(context, context.get("targets"), null, 0f) }
             argument("pos", BlockPosArgument) {
                 executes { context -> setSpawn(context, context.get("targets"), context.get("pos"), 0f) }
-                argument("angle", AngleArgument) {
+                argument("rotation", RotationArgument) {
                     executes { context ->
-                        setSpawn(context, context.get("targets"), context.get("pos"), context.get("angle"))
+                        setSpawn(
+                            context,
+                            context.get("targets"),
+                            context.get("pos"),
+                            context.get<Pair<Float, Float>>("rotation").first,
+                        )
                     }
                 }
             }

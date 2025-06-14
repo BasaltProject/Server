@@ -59,6 +59,31 @@ public object OverworldSpringDecoration {
         }
     }
 
+    /** The vanilla placed feature names of the springs this step runs. */
+    public val PLACED_SPRING_IDS: Set<String> = setOf("spring_water", "spring_lava", "spring_lava_frozen")
+
+    /**
+     * One spring at one position: the feature without the modifiers that scatter it over a chunk,
+     * which is what `/place feature` runs.
+     */
+    public fun placeAt(
+        chunk: Chunk,
+        x: Int,
+        y: Int,
+        z: Int,
+        placedFeature: String,
+    ): Boolean {
+        val spring =
+            when (placedFeature) {
+                "spring_water" -> WATER
+                "spring_lava" -> LAVA
+                "spring_lava_frozen" -> FROZEN_LAVA
+                else -> return false
+            }
+        placeSpring(chunk, x, y, z, spring, null)
+        return true
+    }
+
     private fun placeAttempts(
         chunk: Chunk,
         random: WorldgenRandom,

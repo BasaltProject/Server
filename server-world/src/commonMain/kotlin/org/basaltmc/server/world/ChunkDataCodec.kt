@@ -53,6 +53,29 @@ public object ChunkDataCodec {
         return buffer.toByteArray()
     }
 
+    /**
+     * Just the biome containers, in section order: the body of one column in `chunks_biomes`.
+     *
+     * parity: `ClientboundChunksBiomesPacket.ChunkBiomeData.extractChunkData`, which writes the same
+     * containers [encodeSections] does and nothing else, so a client can swap them in place without
+     * touching blocks or light.
+     */
+    public fun encodeBiomes(chunk: Chunk): ByteArray {
+        val buffer = ByteBuffer()
+        val biomeScratch = IntArray(BIOMES_PER_SECTION)
+        for (i in 0 until chunk.sectionCount) {
+            chunk.section(i).copyBiomeIdsInto(biomeScratch)
+            PalettedContainer.write(
+                buffer,
+                biomeScratch,
+                PalettedContainer.BIOME_MIN_INDIRECT_BITS,
+                PalettedContainer.BIOME_MAX_INDIRECT_BITS,
+                BIOME_DIRECT_BITS,
+            )
+        }
+        return buffer.toByteArray()
+    }
+
     // Vanilla's Heightmap packs 256 values (relative to the chunk minimum, not absolute Y) into a
     // SimpleBitStorage sized `ceillog2(worldHeight + 1)` bits per entry: sending one raw long per
     // column instead (256 unpacked longs) doesn't crash but is silently ignored client-side ("size

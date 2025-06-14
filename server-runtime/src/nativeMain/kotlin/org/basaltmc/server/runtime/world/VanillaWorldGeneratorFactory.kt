@@ -53,17 +53,30 @@ public class VanillaWorldGeneratorFactory(
         }
         return WorldgenCacheStats(templates, templateBlocks, assemblies, assemblyPieces)
     }
+
+    /**
+     * A world's terrain, and the structure generator behind it when there is one worth naming.
+     *
+     * The generator is handed back rather than kept here because the commands that work on one
+     * structure (`/place structure`, `/locate structure`) need the very object generation uses: a
+     * second one built from the same seed would still be a second one.
+     */
+    public class Generators(
+        public val generate: (chunkX: Int, chunkZ: Int) -> Chunk,
+        public val villages: VillageStructureGenerator? = null,
+    )
+
     public fun create(
         declaration: WorldDeclaration,
         metadata: WorldMetadata,
-    ): (chunkX: Int, chunkZ: Int) -> Chunk =
+    ): Generators =
         when (declaration.dimension) {
             WorldDimension.OVERWORLD -> overworld(metadata.seed)
-            WorldDimension.NETHER -> nether(metadata.seed)
-            WorldDimension.END -> end(metadata.seed)
+            WorldDimension.NETHER -> Generators(nether(metadata.seed))
+            WorldDimension.END -> Generators(end(metadata.seed))
         }
 
-    private fun overworld(seed: Long): (Int, Int) -> Chunk {
+    private fun overworld(seed: Long): Generators {
         val positional = XoroshiroRandom(seed).forkPositional()
         val noises = RealNoiseParameters(serverJar, positional)
         // parity: RandomState wires BlendedNoise from random.fromHashOf("minecraft:terrain").
@@ -81,9 +94,15 @@ public class VanillaWorldGeneratorFactory(
                 poolLookup = villageLoader.poolLookup,
                 templateLoader = villageLoader.templateLoader,
             ).also(villages::add)
-        return { chunkX, chunkZ ->
-            RealTerrainGenerator.generate(router, surface, chunkX, chunkZ, seed, village)
-        }
+        return Generators(
+            generate = {
+                chunkX,
+                chunkZ,
+                ->
+                RealTerrainGenerator.generate(router, surface, chunkX, chunkZ, seed, village)
+            },
+            villages = village,
+        )
     }
 
     private fun nether(seed: Long): (Int, Int) -> Chunk {

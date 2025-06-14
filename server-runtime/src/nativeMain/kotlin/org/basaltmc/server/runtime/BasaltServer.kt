@@ -80,18 +80,22 @@ import org.basaltmc.server.runtime.scoreboard.Scoreboard
 import org.basaltmc.server.runtime.scoreboard.Teams
 import org.basaltmc.server.runtime.timings.ReportSources
 import org.basaltmc.server.runtime.timings.TimingsReport
+import org.basaltmc.server.runtime.world.AdvancementTriggers
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
+import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.PlayerProgress
 import org.basaltmc.server.runtime.world.RealAdvancements
 import org.basaltmc.server.runtime.world.RealBlockTags
 import org.basaltmc.server.runtime.world.RealDialogs
 import org.basaltmc.server.runtime.world.RealEnchantments
+import org.basaltmc.server.runtime.world.RealEntityTypeTags
 import org.basaltmc.server.runtime.world.RealItemTags
 import org.basaltmc.server.runtime.world.RealLootTables
 import org.basaltmc.server.runtime.world.RealRecipes
 import org.basaltmc.server.runtime.world.RealTestInstances
 import org.basaltmc.server.runtime.world.RealTimelines
+import org.basaltmc.server.runtime.world.RecipeBook
 import org.basaltmc.server.runtime.world.StructureTemplates
 import org.basaltmc.server.runtime.world.VanillaWorldGeneratorFactory
 import org.basaltmc.server.runtime.world.WORLDS_ROOT
@@ -114,6 +118,7 @@ import org.basaltmc.wire.io.sleepMillis
 import org.basaltmc.wire.protocol.play.Gamemode
 import org.basaltmc.wire.text.Component
 import org.basaltmc.wire.text.LangTable
+import org.basaltmc.wire.text.PlainTextSerializer
 import org.basaltmc.wire.text.TextColor
 import kotlin.concurrent.AtomicInt
 import kotlin.time.Clock
@@ -164,6 +169,7 @@ public class BasaltServer(
     private val recipes = RealRecipes(serverJar)
     private val blockTags = RealBlockTags(serverJar)
     private val itemTags = RealItemTags(serverJar)
+    private val entityTags = RealEntityTypeTags(serverJar)
     private val advancements = RealAdvancements(serverJar)
     private val enchantments = RealEnchantments(serverJar)
     private val dialogs = RealDialogs(serverJar)
@@ -172,9 +178,6 @@ public class BasaltServer(
 
     /** Structure files, loaded on demand: what `/place template` puts down. */
     private val structureTemplates = StructureTemplates(serverJar)
-
-    /** What each player has been granted or taught, for the run. See [PlayerProgress]. */
-    private val playerProgress = PlayerProgress()
 
     /**
      * What `/timings` measures. Off until asked for: a clock read per section per call is small but
@@ -213,6 +216,44 @@ public class BasaltServer(
     private val playerStore = PlayerStore.open(playersDatabasePath)
 
     /**
+     * What each player has been granted or taught. Declared after [playerStore] because it writes
+     * through to it: a property initializer that reads one declared below it reads an uninitialized
+     * field. See [PlayerProgress].
+     */
+    private val playerProgress = PlayerProgress(playerStore.progress)
+
+    /**
+     * What turns playing into an advancement.
+     *
+     * The announcement goes to everyone, as `PlayerList.broadcastSystemMessage` does, and only when
+     * the default world's `show_advancement_messages` allows it: game rules are per world here, and
+     * an advancement belongs to the player rather than to the world they happen to stand in.
+     */
+    private val advancementTriggers =
+        AdvancementTriggers(
+            advancements = advancements,
+            progress = playerProgress,
+            itemTagMembers = { tag -> itemTags.membersOf(tag.toString()) },
+            announce = { _, message ->
+                if (defaultWorld.gameRules[GameRuleRegistry.SHOW_ADVANCEMENT_MESSAGES]) {
+                    for (player in playerRegistry.snapshot()) player.sendSystemMessage(message)
+                    logger.info { PlainTextSerializer.serialize(message) }
+                }
+            },
+            awardExperience = { name, amount ->
+                playerRegistry.snapshot().firstOrNull { it.name == name }?.let { player ->
+                    player.experience.givePoints(amount)
+                    player.connection.syncExperience()
+                }
+            },
+            awardRecipe = { name, recipe ->
+                playerRegistry.snapshot().firstOrNull { it.name == name }?.let {
+                    RecipeBook.add(it, recipes, listOf(recipe))
+                }
+            },
+        )
+
+    /**
      * Every world `worlds.toml` declares, each with its own chunks, region files, generation
      * workers, settings and seed. Keyed by name, which is what a player's stored row refers to.
      */
@@ -227,6 +268,12 @@ public class BasaltServer(
                 } else {
                     WorldMetadata.loadOrCreate(root, declaration.seed, WorldMetadata.DEFAULT_SPAWN, logger)
                 }
+            val generators =
+                if (declaration.type == WorldType.NORMAL || declaration.type == WorldType.AMPLIFIED) {
+                    worldGeneratorFactory?.create(declaration, metadata)
+                } else {
+                    null
+                }
             declaration.name to
                 LoadedWorld(
                     declaration = declaration,
@@ -240,13 +287,10 @@ public class BasaltServer(
                     generationWorkers = if (config.generationMetrics) 1 else ChunkGenerationQueue.DEFAULT_WORKERS,
                     overworldRouter = overworldRouter,
                     surfaceEnvironment = surfaceEnvironment,
-                    villageGenerator = villageGenerator,
-                    normalGenerator =
-                        if (declaration.type == WorldType.NORMAL || declaration.type == WorldType.AMPLIFIED) {
-                            worldGeneratorFactory?.create(declaration, metadata)
-                        } else {
-                            null
-                        },
+                    // The one generation itself uses, so `/place structure` and `/locate structure`
+                    // act on the same villages the world already has.
+                    villageGenerator = generators?.villages ?: villageGenerator,
+                    normalGenerator = generators?.generate,
                 )
         }
 
@@ -349,7 +393,10 @@ public class BasaltServer(
                 worldCount = { worlds.size },
                 cpuPercent = cpuMeter::percent,
                 liveHeapBytes = { collectedLiveHeapBytes() },
-                residentBytes = { org.basaltmc.wire.io.processResidentBytes() },
+                residentBytes = {
+                    org.basaltmc.wire.io
+                        .processResidentBytes()
+                },
             ),
         )
     }
@@ -402,6 +449,12 @@ public class BasaltServer(
                 timings = timings,
                 blockTagMembers = { tag -> blockTags.membersOf(tag.toString()).ifEmpty { null } },
                 itemTagMembers = { tag -> itemTags.membersOf(tag.toString()).ifEmpty { null } },
+                entityTagMembers = { tag -> entityTags.membersOf(tag).ifEmpty { null } },
+                scoreboard = scoreboard,
+                teams = teams,
+                advancements = advancements,
+                progress = playerProgress,
+                advancementTriggers = advancementTriggers,
             ),
         ).also(::registerVanillaCommands)
             .also { it.register(ReloadCommand(live, ::onConfigsReloaded, functions::reload)) }
@@ -425,10 +478,10 @@ public class BasaltServer(
             .also { it.register(FetchProfileCommand(::fetchMojangUuid)) }
             .also { it.register(FunctionCommand(functions, functionRunner)) }
             .also { it.register(ReturnCommand(functionRunner)) }
-            .also { it.register(ScheduleCommand(functionSchedule)) }
+            .also { it.register(ScheduleCommand(functions, functionSchedule)) }
             .also { it.register(DataPackCommand(functions)) }
             .also { it.register(SummonCommand(playerRegistry)) }
-            .also { it.register(DamageCommand()) }
+            .also { it.register(DamageCommand(serverJar)) }
             .also { it.register(RideCommand()) }
             .also { it.register(RotateCommand()) }
             .also { it.register(SwingCommand()) }
@@ -437,7 +490,7 @@ public class BasaltServer(
             .also { it.register(AdvancementCommand(advancements, playerProgress)) }
             .also { it.register(RecipeCommand(playerProgress, recipes)) }
             .also { it.register(LocateCommand()) }
-            .also { it.register(WaypointCommand()) }
+            .also { it.register(WaypointCommand(serverJar)) }
             .also { it.register(PlaceCommand(structureTemplates)) }
             .also { it.register(EnchantCommand(enchantments)) }
             .also { it.register(DialogCommand(dialogs)) }
@@ -549,8 +602,10 @@ public class BasaltServer(
         // Twice, not once: measured in isolation, a single collection leaves tens of KB per
         // recently generated chunk unswept, and the second pass reclaims it. Only worth paying on
         // the explicit report path.
-        kotlin.native.runtime.GC.collect()
-        kotlin.native.runtime.GC.collect()
+        kotlin.native.runtime.GC
+            .collect()
+        kotlin.native.runtime.GC
+            .collect()
         return liveHeapBytes()
     }
 
@@ -791,6 +846,7 @@ public class BasaltServer(
                     dialogs = dialogs,
                     timelines = timelines,
                     progress = playerProgress,
+                    advancementTriggers = advancementTriggers,
                     blockTags = blockTags,
                     itemTags = itemTags,
                 ).run()

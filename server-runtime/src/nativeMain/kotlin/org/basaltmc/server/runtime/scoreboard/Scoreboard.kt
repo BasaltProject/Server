@@ -19,6 +19,24 @@ public class Objective(
 ) {
     /** parity: `ObjectiveCriteria.isReadOnly`: a `trigger` objective is the one `/trigger` may touch. */
     public val isTrigger: Boolean get() = criterion == "trigger"
+
+    public companion object {
+        /** parity: `ObjectiveCriteria`'s own registrations, minus the per-statistic ones. */
+        public val CRITERIA: List<String> =
+            listOf(
+                "dummy",
+                "trigger",
+                "deathCount",
+                "playerKillCount",
+                "totalKillCount",
+                "health",
+                "food",
+                "air",
+                "armor",
+                "xp",
+                "level",
+            )
+    }
 }
 
 /**

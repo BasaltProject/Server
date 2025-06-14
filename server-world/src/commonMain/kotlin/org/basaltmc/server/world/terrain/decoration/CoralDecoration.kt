@@ -39,6 +39,25 @@ public object CoralDecoration : BiomeVegetalDecoration {
         }
     }
 
+    /** The vanilla placed feature names this step draws. */
+    public val PLACED_IDS: Set<String> = setOf("warm_ocean_vegetation")
+
+    /** One coral growth at one position: vanilla picks between the three shapes, and so does this. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ) {
+        // parity: the shape is drawn first and the colour second, in that order.
+        val feature = random.nextInt(3)
+        val coralState = CORAL_BLOCKS[random.nextInt(CORAL_BLOCKS.size)]
+        when (feature) {
+            0 -> placeTree(chunk, random, origin, coralState)
+            1 -> placeClaw(chunk, random, origin, coralState)
+            else -> placeMushroom(chunk, random, origin, coralState)
+        }
+    }
+
     private fun placeTree(
         chunk: Chunk,
         random: WorldgenRandom,

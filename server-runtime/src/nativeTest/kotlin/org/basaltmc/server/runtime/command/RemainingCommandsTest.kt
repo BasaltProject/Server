@@ -130,8 +130,8 @@ class RemainingCommandsTest {
     @Test
     fun waypointRemembersWhatItWasToldAndListsIt() {
         run("summon minecraft:cow 0 64 0")
-        run("waypoint modify cow color red")
-        run("waypoint modify cow style set minecraft:bowtie")
+        run("waypoint modify @e[type=cow] color red")
+        run("waypoint modify @e[type=cow] style set minecraft:bowtie")
         assertEquals(1, run("waypoint list"))
     }
 
@@ -150,12 +150,22 @@ class RemainingCommandsTest {
 
     @Test
     fun theCommandsThatNeedMissingSubsystemsSayWhichOne() {
-        // A feature generation does not expose by id names itself and lists the ones it does.
-        run("place feature minecraft:oak")
-        assertTrue(source.messages.any { "is not a feature that can be placed on its own yet" in it })
+        // Every vanilla feature is placeable by id now; a name nobody registered still says so.
+        run("place feature minecraft:not_a_feature")
+        assertTrue(source.messages.any { "has no positional body in this build" in it })
 
+        // And the five that need more than a chunk say what this world cannot give them.
+        world.state.getOrGenerateChunk(0, 0)
+        run("place feature minecraft:fossil_lower 0 64 0")
+        assertTrue(source.messages.any { "does not have" in it }, source.messages.toString())
+
+        // This fixture's world is void, so it has no village generator to ask.
         run("place structure minecraft:village_plains")
-        assertTrue(source.messages.any { "whole structures by id" in it })
+        assertTrue(source.messages.any { "commands.place.structure.invalid" in it })
+
+        // No server jar in this fixture, so no template pools to grow from.
+        run("place jigsaw minecraft:village/plains/town_centers minecraft:empty 3")
+        assertTrue(source.messages.any { "commands.place.jigsaw.invalid" in it })
 
         // `template` is the form that works, and without a server jar there is nothing to load.
         run("place template minecraft:village/plains/houses/plains_small_house_1")
@@ -168,6 +178,20 @@ class RemainingCommandsTest {
         // that says so rather than writing a component no client could resolve.
         run("enchant @a minecraft:sharpness 1")
         assertTrue(source.messages.none { "Unknown command" in it })
+    }
+
+    @Test
+    fun aTreeIsPlacedByItsOwnPlacedFeatureName() {
+        val chunk = world.state.getOrGenerateChunk(0, 0)
+        val dirt = checkNotNull(Blocks.REGISTRY.byIdentifier(Identifier.vanilla("dirt"))).stateId
+        chunk.setBlockStateId(8, 63, 8, dirt)
+
+        assertEquals(1, run("place feature minecraft:oak 8 64 8"))
+        // Whatever the random hands out, an oak starts with a log on the block it was told to.
+        assertEquals(
+            Identifier.vanilla("oak_log"),
+            checkNotNull(Blocks.byStateId(chunk.getBlockStateId(8, 64, 8))).block,
+        )
     }
 
     @Test

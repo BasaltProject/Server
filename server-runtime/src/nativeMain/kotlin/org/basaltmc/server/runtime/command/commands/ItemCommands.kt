@@ -10,11 +10,12 @@ import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSyntaxException
 import org.basaltmc.server.runtime.command.IntegerArgument
 import org.basaltmc.server.runtime.command.ItemArgument
+import org.basaltmc.server.runtime.command.ItemSlotArgument
 import org.basaltmc.server.runtime.command.ParsedItem
 import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.PlayersArgument
-import org.basaltmc.server.runtime.command.WordArgument
 import org.basaltmc.server.runtime.command.world
+import org.basaltmc.server.runtime.item.ItemComponentCodecs
 import org.basaltmc.server.runtime.player.PlayerInventory
 import org.basaltmc.server.runtime.player.PlayerSession
 import org.basaltmc.server.runtime.world.RealLootTables
@@ -46,6 +47,11 @@ internal object ItemSlots {
             else -> null
         }
 
+    /** Every name [resolve] answers, for completions. The numbered ones are listed in full. */
+    val names: List<String> =
+        List(9) { "hotbar.$it" } + List(27) { "inventory.$it" } +
+            listOf("armor.feet", "armor.legs", "armor.chest", "armor.head", "weapon.offhand")
+
     private const val ARMOUR_START = 36
     private const val OFFHAND = 40
 }
@@ -61,7 +67,7 @@ public class ItemCommand : Command(name = "item", permissionLevel = PermissionLe
         root.literal("replace") {
             literal("entity") {
                 argument("targets", PlayersArgument(single = false)) {
-                    argument("slot", WordArgument) {
+                    argument("slot", ItemSlotArgument) {
                         literal("with") {
                             argument("item", ItemArgument) {
                                 executes { context -> replace(context, 1) }
@@ -89,6 +95,15 @@ public class ItemCommand : Command(name = "item", permissionLevel = PermissionLe
                 )
         val parsed = context.get<ParsedItem>("item")
         val item = parsed.id
+        val notDrawn = ItemComponentCodecs.notDrawn(parsed.components)
+        if (notDrawn.isNotEmpty()) {
+            context.source.sendSystemMessage(
+                Component.text(
+                    "The item carries ${notDrawn.joinToString(", ")}, which no client can draw yet: " +
+                        "it is stored and saved, but the tooltip will not show it.",
+                ),
+            )
+        }
         for (target in targets) {
             target.inventory[slot] = StoredItemStack(item.toString(), count, parsed.components)
             target.connection.sendInventoryAll()

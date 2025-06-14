@@ -133,35 +133,3 @@ internal val ALL_PARTICLE_TYPE_IDS: List<Pair<Int, String>> =
         123 to "firefly",
         124 to "sulfur_cube_goo",
     )
-
-/**
- * The particles that carry extra data after their id (a block state, an item, colours, positions).
- *
- * Listed rather than encoded: writing one without its options desynchronizes the client on the
- * next packet, so `/particle` refuses these by name until each option's codec exists.
- */
-internal val PARTICLES_WITH_OPTIONS: Set<String> =
-    setOf(
-        "block",
-        "block_marker",
-        "geyser",
-        "geyser_base",
-        "geyser_poof",
-        "geyser_plume",
-        "dragon_breath",
-        "dust",
-        "dust_color_transition",
-        "effect",
-        "entity_effect",
-        "falling_dust",
-        "tinted_leaves",
-        "sculk_charge",
-        "flash",
-        "instant_effect",
-        "item",
-        "vibration",
-        "trail",
-        "shriek",
-        "dust_pillar",
-        "block_crumble",
-    )

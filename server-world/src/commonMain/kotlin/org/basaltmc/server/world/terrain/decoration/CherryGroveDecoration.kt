@@ -25,6 +25,22 @@ public object CherryGroveDecoration : BiomeVegetalDecoration {
 
     // parity: placed_feature/flower_cherry.json + configured_feature/flower_cherry.json
     // (SIMPLE_BLOCK over a WeightedStateProvider of the 16 pink_petals states).
+
+    /** The petal patch at one origin, which is what `/place feature` runs for `flower_cherry`. */
+    public fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ) {
+        val feature = SimpleBlockFeature({ r, _ -> pinkPetalsStateId(r.nextInt(16)) })
+        placeFrom(
+            chunk,
+            random,
+            origin,
+            listOf(CountPlacement(96), RandomOffsetPlacement(xzSpread = 6, ySpread = 2), AirTargetFilter()),
+        ) { position -> feature.place(chunk, random, position) }
+    }
+
     private fun placePinkPetals(
         chunk: Chunk,
         random: WorldgenRandom,
