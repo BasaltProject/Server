@@ -16,6 +16,7 @@ import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
 import org.basaltmc.wire.common.logging.Logger
 import org.basaltmc.wire.common.timings.Timings
 import org.basaltmc.wire.common.timings.time
+import org.basaltmc.wire.io.FileIO
 import kotlin.math.abs
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -77,10 +78,20 @@ public class LoadedWorld(
     public val regions: RegionStore =
         RegionStore(
             declaration.name,
-            declaration.dimension.registryPath,
             worldsRoot,
             declaration.dimension.chunkHeight,
         )
+
+    init {
+        // Said rather than migrated: a world that looks empty is worse than a line in the log.
+        if (FileIO.directoryExists("$worldRoot/dimensions")) {
+            logger.warn {
+                "World '${declaration.name}' still has its regions under $worldRoot/dimensions/. " +
+                    "They are read from $worldRoot/region/ now: move the .linear files there, or " +
+                    "the world regenerates from its seed."
+            }
+        }
+    }
 
     public val state: WorldState = WorldState(emptyList(), loadOrGenerate = ::loadOrGenerateChunk)
 

@@ -29,11 +29,9 @@ class SaveThroughputTest {
 
     private fun cleanUp() {
         val root = "$worldsRoot/$worldName"
-        val dir = "$root/dimensions/minecraft/overworld/region"
+        val dir = "$root/region"
         for (name in FileIO.list(dir)) FileIO.delete("$dir/$name")
         FileIO.delete(dir)
-        FileIO.delete("$root/dimensions/minecraft/overworld")
-        FileIO.delete("$root/dimensions/minecraft")
         FileIO.delete("$root/dimensions")
         FileIO.delete(root)
     }
@@ -55,7 +53,7 @@ class SaveThroughputTest {
 
     @Test
     fun aSweepSpendsItsTimeInTheNbtAndNotInZstd() {
-        val store = RegionStore(worldName, "overworld", worldsRoot)
+        val store = RegionStore(worldName, worldsRoot)
         val chunks = (0 until CHUNKS).map { terrainChunk(it % 32, it / 32) }
 
         val started = TimeSource.Monotonic.markNow()
