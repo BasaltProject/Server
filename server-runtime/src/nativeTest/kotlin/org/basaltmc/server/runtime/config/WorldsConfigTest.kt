@@ -249,4 +249,155 @@ class WorldLevelKeyTest {
         // Resource locations are lowercase and a restricted alphabet; a world name is neither.
         assertEquals("basalt:my_world_2", world("My World 2", isDefault = false).levelKey)
     }
+
+    // --- Linked dimensions -------------------------------------------------------------------
+
+    @Test
+    fun theGeneratedDefaultLinksTheTwoSecondaryDimensionsToTheDefaultWorld() {
+        val directory = directory("generated_links")
+        platform.posix.remove(directory.pathOf(WorldsConfig.FILE_NAME))
+
+        val config =
+            WorldsConfig.load(directory, worldsRoot = "build/test-data/worlds_generated_links_root", logger = quiet())
+
+        val nether = config.worlds.single { it.dimension == WorldDimension.NETHER }
+        val end = config.worlds.single { it.dimension == WorldDimension.END }
+        assertEquals("world", nether.linkedTo)
+        assertEquals("world", end.linkedTo)
+        assertEquals(nether, config.portalTarget(config.default, WorldDimension.NETHER))
+        assertEquals(end, config.portalTarget(config.default, WorldDimension.END))
+        assertEquals(config.default, config.portalTarget(nether, WorldDimension.OVERWORLD))
+    }
+
+    /** The point of the link: two overworlds, each with a Nether of its own. */
+    @Test
+    fun eachOverworldKeepsItsOwnDimensions() {
+        val directory = directory("two_sets")
+        write(
+            directory,
+            """
+            [worlds.world]
+            default = true
+            [worlds.world_nether]
+            dimension = "nether"
+            linked_to = "world"
+            [worlds.skyblock]
+            [worlds.skyblock_nether]
+            dimension = "nether"
+            linked_to = "skyblock"
+            """.trimIndent(),
+        )
+
+        val config = WorldsConfig.load(directory, "build/test-data/worlds_two_sets_root", quiet())
+        val skyblock = config.worlds.single { it.name == "skyblock" }
+        val skyblockNether = config.worlds.single { it.name == "skyblock_nether" }
+
+        assertEquals(skyblockNether, config.portalTarget(skyblock, WorldDimension.NETHER))
+        assertEquals(skyblock, config.portalTarget(skyblockNether, WorldDimension.OVERWORLD))
+        assertEquals("world_nether", config.portalTarget(config.default, WorldDimension.NETHER)?.name)
+    }
+
+    @Test
+    fun aSecondaryDimensionWithNoLinkBelongsToTheDefaultWorld() {
+        val directory = directory("implicit_link")
+        write(
+            directory,
+            """
+            [worlds.world]
+            default = true
+            [worlds.nether]
+            dimension = "nether"
+            """.trimIndent(),
+        )
+
+        val config = WorldsConfig.load(directory, "build/test-data/worlds_implicit_link_root", quiet())
+
+        assertEquals("nether", config.portalTarget(config.default, WorldDimension.NETHER)?.name)
+    }
+
+    @Test
+    fun anOverworldMayNotClaimALink() {
+        val directory = directory("overworld_link")
+        write(
+            directory,
+            """
+            [worlds.world]
+            default = true
+            linked_to = "somewhere"
+            """.trimIndent(),
+        )
+
+        val failure =
+            assertFailsWith<TomlFormatException> {
+                WorldsConfig.load(directory, "build/test-data/worlds_overworld_link_root", quiet())
+            }
+        assertTrue("linked_to" in failure.message.orEmpty(), failure.message.orEmpty())
+    }
+
+    @Test
+    fun aLinkToSomethingThatIsNotThereStopsTheServer() {
+        val directory = directory("missing_link")
+        write(
+            directory,
+            """
+            [worlds.world]
+            default = true
+            [worlds.world_nether]
+            dimension = "nether"
+            linked_to = "nowhere"
+            """.trimIndent(),
+        )
+
+        val failure =
+            assertFailsWith<TomlFormatException> {
+                WorldsConfig.load(directory, "build/test-data/worlds_missing_link_root", quiet())
+            }
+        assertTrue("nowhere" in failure.message.orEmpty(), failure.message.orEmpty())
+    }
+
+    @Test
+    fun aLinkToAnotherNetherStopsTheServer() {
+        val directory = directory("nether_link")
+        write(
+            directory,
+            """
+            [worlds.world]
+            default = true
+            [worlds.world_nether]
+            dimension = "nether"
+            [worlds.deeper]
+            dimension = "end"
+            linked_to = "world_nether"
+            """.trimIndent(),
+        )
+
+        assertFailsWith<TomlFormatException> {
+            WorldsConfig.load(directory, "build/test-data/worlds_nether_link_root", quiet())
+        }
+    }
+
+    /** One overworld has one Nether: two claiming it is a question nobody can answer for the server. */
+    @Test
+    fun twoNethersForOneOverworldStopTheServer() {
+        val directory = directory("two_nethers")
+        write(
+            directory,
+            """
+            [worlds.world]
+            default = true
+            [worlds.a_nether]
+            dimension = "nether"
+            linked_to = "world"
+            [worlds.b_nether]
+            dimension = "nether"
+            linked_to = "world"
+            """.trimIndent(),
+        )
+
+        val failure =
+            assertFailsWith<TomlFormatException> {
+                WorldsConfig.load(directory, "build/test-data/worlds_two_nethers_root", quiet())
+            }
+        assertTrue("a_nether" in failure.message.orEmpty(), failure.message.orEmpty())
+    }
 }

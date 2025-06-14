@@ -40,6 +40,14 @@ public object GameRuleRegistry {
     public val RANDOM_TICK_SPEED: GameRule.Integer = GameRule.Integer("random_tick_speed", 3, min = 0)
     public val IMMEDIATE_RESPAWN: GameRule.Bool = GameRule.Bool("immediate_respawn", false)
 
+    /** parity: the three rules a Nether portal reads before it takes anyone anywhere. */
+    public val ALLOW_ENTERING_NETHER_USING_PORTALS: GameRule.Bool =
+        GameRule.Bool("allow_entering_nether_using_portals", true)
+    public val PLAYERS_NETHER_PORTAL_CREATIVE_DELAY: GameRule.Integer =
+        GameRule.Integer("players_nether_portal_creative_delay", 0, min = 0)
+    public val PLAYERS_NETHER_PORTAL_DEFAULT_DELAY: GameRule.Integer =
+        GameRule.Integer("players_nether_portal_default_delay", 80, min = 0)
+
     /** parity: with this on, a player crafts only the recipes they have been taught. */
     public val LIMITED_CRAFTING: GameRule.Bool = GameRule.Bool("limited_crafting", false)
 
@@ -50,7 +58,7 @@ public object GameRuleRegistry {
         listOf(
             ADVANCE_TIME,
             ADVANCE_WEATHER,
-            GameRule.Bool("allow_entering_nether_using_portals", true),
+            ALLOW_ENTERING_NETHER_USING_PORTALS,
             GameRule.Bool("block_drops", true),
             GameRule.Bool("block_explosion_drop_decay", true),
             GameRule.Bool("command_blocks_work", true),
@@ -82,8 +90,8 @@ public object GameRuleRegistry {
             GameRule.Bool("mob_griefing", true),
             GameRule.Bool("natural_health_regeneration", true),
             GameRule.Bool("player_movement_check", true),
-            GameRule.Integer("players_nether_portal_creative_delay", 0, min = 0),
-            GameRule.Integer("players_nether_portal_default_delay", 80, min = 0),
+            PLAYERS_NETHER_PORTAL_CREATIVE_DELAY,
+            PLAYERS_NETHER_PORTAL_DEFAULT_DELAY,
             GameRule.Integer("players_sleeping_percentage", 100, min = 0),
             GameRule.Bool("projectiles_can_break_blocks", true),
             GameRule.Bool("pvp", true),

@@ -173,8 +173,11 @@ public class LoadedWorld(
     /** One tick of everything that advances on its own. Returns true when clients need a time update. */
     public fun tickTime(): Boolean {
         gameTime++
-        val advanced = clock.tick(gameRules[GameRuleRegistry.ADVANCE_TIME])
-        if (gameRules[GameRuleRegistry.ADVANCE_WEATHER]) weather.tick()
+        // parity: only a dimension with a clock of its own has time to advance.
+        val advanced =
+            declaration.dimension.hasClock && clock.tick(gameRules[GameRuleRegistry.ADVANCE_TIME])
+        // parity: `ServerLevel.advanceWeatherCycle` runs only where the dimension can have weather.
+        if (declaration.dimension.canHaveWeather && gameRules[GameRuleRegistry.ADVANCE_WEATHER]) weather.tick()
         return advanced
     }
 

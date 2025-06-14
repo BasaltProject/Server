@@ -59,11 +59,25 @@ public enum class WorldDimension(
     public val seaLevel: Int,
     public val chunkHeight: ChunkHeight,
     public val hasSkylight: Boolean,
+    public val hasCeiling: Boolean,
+    /** parity: `DimensionType.coordinateScale`, the 1:8 that makes a Nether portal land where it does. */
+    public val coordinateScale: Double,
 ) {
-    OVERWORLD("overworld", "overworld", 0, 63, ChunkHeight.OVERWORLD, true),
-    NETHER("nether", "the_nether", 1, 32, ChunkHeight.NETHER, false),
-    END("end", "the_end", 2, 0, ChunkHeight.END, true),
+    OVERWORLD("overworld", "overworld", 0, 63, ChunkHeight.OVERWORLD, true, false, 1.0),
+    NETHER("nether", "the_nether", 1, 32, ChunkHeight.NETHER, false, true, 8.0),
+    END("end", "the_end", 2, 0, ChunkHeight.END, true, false, 1.0),
     ;
+
+    /** parity: `Level.canHaveWeather`, which is why it never rains in the Nether or the End. */
+    public val canHaveWeather: Boolean get() = hasSkylight && !hasCeiling && this != END
+
+    /**
+     * Whether time runs here at all.
+     *
+     * parity: `dimension_type.default_clock`. The Overworld and the End name a world clock in 26.2
+     * and the Nether names none, which is why its sky never moves however long anyone stays in it.
+     */
+    public val hasClock: Boolean get() = this != NETHER
 
     public val registryKey: String get() = "minecraft:$registryPath"
 
@@ -79,13 +93,21 @@ public enum class WorldDimension(
     }
 }
 
-/** One world as `worlds.toml` declares it. [seed] is null when the operator left it to chance. */
+/**
+ * One world as `worlds.toml` declares it. [seed] is null when the operator left it to chance.
+ *
+ * [linkedTo] is what makes several sets of dimensions possible: a Nether or an End names the
+ * Overworld whose portals lead to it, so `skyblock_nether` belongs to `skyblock` and not to
+ * whichever Nether happened to be declared first. Null on an Overworld, and on a secondary
+ * dimension that left it out, which then belongs to the default world.
+ */
 public data class WorldDeclaration(
     public val name: String,
     public val dimension: WorldDimension,
     public val type: WorldType,
     public val seed: Long?,
     public val isDefault: Boolean,
+    public val linkedTo: String? = null,
 )
 
 /**
@@ -104,6 +126,31 @@ public class WorldsConfig(
 ) {
     public val default: WorldDeclaration
         get() = worlds.firstOrNull { it.isDefault } ?: worlds.first()
+
+    /** The overworld [world] belongs to: itself, what it names, or the default world. */
+    public fun overworldOf(world: WorldDeclaration): WorldDeclaration {
+        if (world.dimension == WorldDimension.OVERWORLD) return world
+        val name = world.linkedTo ?: default.name
+        return worlds.firstOrNull { it.name == name } ?: default
+    }
+
+    /**
+     * The world a portal out of [world] leads to, or null when nothing is declared for it.
+     *
+     * Travel is always between an overworld and one of its own secondary dimensions, which is why
+     * a portal in a Nether comes back to the overworld that Nether belongs to rather than to
+     * whichever one is the default.
+     */
+    public fun portalTarget(
+        world: WorldDeclaration,
+        dimension: WorldDimension,
+    ): WorldDeclaration? {
+        val overworld = overworldOf(world)
+        if (dimension == WorldDimension.OVERWORLD) return overworld
+        return worlds.firstOrNull {
+            it.dimension == dimension && (it.linkedTo ?: default.name) == overworld.name
+        }
+    }
 
     /**
      * The settings for [world], generating its `settings.toml` if the world directory already
@@ -125,6 +172,45 @@ public class WorldsConfig(
 
     public companion object {
         public const val FILE_NAME: String = "worlds.toml"
+
+        /**
+         * Refuses a set of links that cannot mean one thing: an unknown target, a target that is
+         * not an overworld, or two worlds of the same dimension claiming the same one.
+         *
+         * Refusing rather than picking is the point. A server that silently sent every portal to
+         * one of two Nethers would be the same guessing game Paper leaves to a plugin.
+         */
+        private fun validateLinks(
+            worlds: List<WorldDeclaration>,
+            directory: ConfigDirectory,
+        ) {
+            val byName = worlds.associateBy { it.name }
+            val defaultWorld = worlds.firstOrNull { it.isDefault } ?: worlds.first()
+            val claimed = mutableMapOf<Pair<String, WorldDimension>, String>()
+            for (world in worlds) {
+                if (world.dimension == WorldDimension.OVERWORLD) continue
+                val targetName = world.linkedTo ?: defaultWorld.name
+                val target =
+                    byName[targetName]
+                        ?: throw TomlFormatException(
+                            "World '${world.name}' is linked to '$targetName', which " +
+                                "${directory.pathOf(FILE_NAME)} does not declare.",
+                        )
+                if (target.dimension != WorldDimension.OVERWORLD) {
+                    throw TomlFormatException(
+                        "World '${world.name}' is linked to '$targetName', which is a " +
+                            "${target.dimension.configName} rather than an overworld.",
+                    )
+                }
+                val already = claimed.put(targetName to world.dimension, world.name)
+                if (already != null) {
+                    throw TomlFormatException(
+                        "Worlds '$already' and '${world.name}' are both the " +
+                            "${world.dimension.configName} of '$targetName'. A world has one of each.",
+                    )
+                }
+            }
+        }
 
         public fun load(
             directory: ConfigDirectory = ConfigDirectory(),
@@ -161,12 +247,20 @@ public class WorldsConfig(
                                     "World '$name' declares an unknown dimension '$dimensionName'. " +
                                         "Known dimensions: ${WorldDimension.entries.joinToString { it.configName }}.",
                                 )
+                        val linkedTo = table.stringOrNull("linked_to")
+                        if (linkedTo != null && dimension == WorldDimension.OVERWORLD) {
+                            throw TomlFormatException(
+                                "World '$name' is an overworld and declares linked_to = \"$linkedTo\". " +
+                                    "Only a nether or an end names the overworld its portals lead to.",
+                            )
+                        }
                         WorldDeclaration(
                             name = name,
                             dimension = dimension,
                             type = type,
                             seed = table.intOrNull("seed"),
                             isDefault = table.boolOrNull("default") ?: false,
+                            linkedTo = linkedTo,
                         )
                     }.orEmpty()
 
@@ -187,6 +281,7 @@ public class WorldsConfig(
                     )}; using '${worlds.first().name}'."
                 }
             }
+            validateLinks(worlds, directory)
             return WorldsConfig(worlds, defaults, worldsRoot)
         }
     }

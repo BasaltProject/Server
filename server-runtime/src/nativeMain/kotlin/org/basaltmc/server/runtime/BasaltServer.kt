@@ -67,6 +67,7 @@ import org.basaltmc.server.runtime.command.commands.WorldBorderCommand
 import org.basaltmc.server.runtime.command.registerVanillaCommands
 import org.basaltmc.server.runtime.config.BasaltConfig
 import org.basaltmc.server.runtime.config.LiveConfigs
+import org.basaltmc.server.runtime.config.WorldDimension
 import org.basaltmc.server.runtime.config.WorldType
 import org.basaltmc.server.runtime.config.WorldsConfig
 import org.basaltmc.server.runtime.function.FunctionLibrary
@@ -76,14 +77,17 @@ import org.basaltmc.server.runtime.placeholder.ServerFacts
 import org.basaltmc.server.runtime.placeholder.ServerPlaceholders
 import org.basaltmc.server.runtime.player.Difficulty
 import org.basaltmc.server.runtime.player.PlayerRegistry
+import org.basaltmc.server.runtime.player.PlayerSession
 import org.basaltmc.server.runtime.scoreboard.Scoreboard
 import org.basaltmc.server.runtime.scoreboard.Teams
 import org.basaltmc.server.runtime.timings.ReportSources
 import org.basaltmc.server.runtime.timings.TimingsReport
 import org.basaltmc.server.runtime.world.AdvancementTriggers
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
+import org.basaltmc.server.runtime.world.EndPortals
 import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
+import org.basaltmc.server.runtime.world.NetherPortals
 import org.basaltmc.server.runtime.world.PlayerProgress
 import org.basaltmc.server.runtime.world.RealAdvancements
 import org.basaltmc.server.runtime.world.RealBlockTags
@@ -102,6 +106,8 @@ import org.basaltmc.server.runtime.world.WORLDS_ROOT
 import org.basaltmc.server.runtime.world.WorldMetadata
 import org.basaltmc.server.storage.PlayerStore
 import org.basaltmc.server.world.GenerationMetrics
+import org.basaltmc.server.world.portal.PortalAxis
+import org.basaltmc.server.world.portal.PortalShape
 import org.basaltmc.server.world.terrain.OverworldNoiseRouter
 import org.basaltmc.server.world.terrain.VillageStructureGenerator
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
@@ -121,6 +127,7 @@ import org.basaltmc.wire.text.LangTable
 import org.basaltmc.wire.text.PlainTextSerializer
 import org.basaltmc.wire.text.TextColor
 import kotlin.concurrent.AtomicInt
+import kotlin.math.floor
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -254,20 +261,40 @@ public class BasaltServer(
         )
 
     /**
+     * Every world's `level.nbt`, read before any world is built.
+     *
+     * Overworlds first, and that order is the point: a Nether or an End that declares no seed of
+     * its own takes the seed of the overworld it belongs to, which is what makes one set of
+     * dimensions one world. parity: a vanilla save has a single seed for its three dimensions.
+     */
+    private val worldMetadata: Map<String, WorldMetadata> =
+        buildMap {
+            for (declaration in worldsConfig.worlds.sortedBy { it.dimension != WorldDimension.OVERWORLD }) {
+                val metadata =
+                    if (declaration.name == worldsConfig.default.name && defaultWorldMetadata != null) {
+                        // Already loaded by `Main` to build the terrain generator; reusing it avoids
+                        // reading the file, and warning about a seed mismatch, twice.
+                        defaultWorldMetadata
+                    } else {
+                        val inherited = get(worldsConfig.overworldOf(declaration).name)?.seed
+                        WorldMetadata.loadOrCreate(
+                            "$worldsRoot/${declaration.name}",
+                            declaration.seed ?: inherited,
+                            WorldMetadata.DEFAULT_SPAWN,
+                            logger,
+                        )
+                    }
+                put(declaration.name, metadata)
+            }
+        }
+
+    /**
      * Every world `worlds.toml` declares, each with its own chunks, region files, generation
      * workers, settings and seed. Keyed by name, which is what a player's stored row refers to.
      */
     private val worlds: Map<String, LoadedWorld> =
         worldsConfig.worlds.associate { declaration ->
-            val root = "$worldsRoot/${declaration.name}"
-            val metadata =
-                if (declaration.name == worldsConfig.default.name && defaultWorldMetadata != null) {
-                    // Already loaded by `Main` to build the terrain generator; reusing it avoids
-                    // reading the file, and warning about a seed mismatch, twice.
-                    defaultWorldMetadata
-                } else {
-                    WorldMetadata.loadOrCreate(root, declaration.seed, WorldMetadata.DEFAULT_SPAWN, logger)
-                }
+            val metadata = worldMetadata.getValue(declaration.name)
             val generators =
                 if (declaration.type == WorldType.NORMAL || declaration.type == WorldType.AMPLIFIED) {
                     worldGeneratorFactory?.create(declaration, metadata)
@@ -694,6 +721,8 @@ public class BasaltServer(
                 .onFailure { logger.error(it) { "Time tick failed in world '${world.name}'" } }
             runCatching { tickBorderDamage(world) }
                 .onFailure { logger.error(it) { "Border damage failed in world '${world.name}'" } }
+            runCatching { tickPortals(world) }
+                .onFailure { logger.error(it) { "Portal tick failed in world '${world.name}'" } }
         }
         shutdownIfSignalled()
     }
@@ -713,6 +742,123 @@ public class BasaltServer(
             if (damage <= 0f) continue
             player.connection.hurt(damage, "outOfWorldBorder")
         }
+    }
+
+    /**
+     * Moves whoever has stood in a portal long enough, and counts down the wait for everyone else.
+     *
+     * parity: `Entity.handlePortal`. The delay is the two game rules (nothing in creative, four
+     * seconds otherwise), and the 300 tick cooldown afterwards is what stops the portal on the
+     * other side from sending them straight back.
+     */
+    private fun tickPortals(world: LoadedWorld) {
+        val creativeDelay = world.gameRules[GameRuleRegistry.PLAYERS_NETHER_PORTAL_CREATIVE_DELAY]
+        val defaultDelay = world.gameRules[GameRuleRegistry.PLAYERS_NETHER_PORTAL_DEFAULT_DELAY]
+        for (player in playerRegistry.snapshot()) {
+            if (player.worldName != world.name) continue
+            if (player.portalCooldown > 0) {
+                player.portalCooldown--
+                player.portalTicks = 0
+                continue
+            }
+            val state =
+                world.state.getBlockState(
+                    floor(player.x).toInt(),
+                    floor(player.y).toInt(),
+                    floor(player.z).toInt(),
+                )
+            if (state != null && EndPortals.isEndPortal(state)) {
+                // parity: `Portal.getPortalTransitionTime` is zero for an end portal, so it takes
+                // whoever stepped in on the tick they stepped in.
+                travelThroughEndPortal(world, player)
+                continue
+            }
+            val axis = state?.let(PortalShape::axisOf)
+            if (axis == null) {
+                player.portalTicks = 0
+                continue
+            }
+            player.portalTicks++
+            val delay = if (player.gamemode == Gamemode.CREATIVE) creativeDelay else defaultDelay
+            if (player.portalTicks < delay) continue
+            travelThroughPortal(world, player, axis)
+        }
+    }
+
+    /** The other side of a Nether portal: this world's own Nether, or the overworld it belongs to. */
+    private fun netherCounterpart(world: LoadedWorld): LoadedWorld? {
+        val wanted =
+            if (world.declaration.dimension == WorldDimension.NETHER) {
+                WorldDimension.OVERWORLD
+            } else {
+                WorldDimension.NETHER
+            }
+        return counterpart(world, wanted)
+    }
+
+    /**
+     * The world a portal out of [world] leads to, or null with a line in the log saying why.
+     *
+     * The pairing comes from `worlds.toml`: a Nether or an End names the Overworld it belongs to,
+     * so a server can have several sets of dimensions and a portal still knows which one it is in.
+     * A dimension nobody declared leaves the portal leading nowhere, and saying nothing about it is
+     * the one answer that leaves the operator guessing. Warned once per world and dimension, not
+     * once per tick: a player standing in a portal asks this twenty times a second.
+     */
+    private fun counterpart(
+        world: LoadedWorld,
+        dimension: WorldDimension,
+    ): LoadedWorld? {
+        val declaration = worldsConfig.portalTarget(world.declaration, dimension)
+        val target = declaration?.let { worlds[it.name] }
+        if (target == null && warnedMissingDimensions.add(world.name to dimension)) {
+            val overworld = worldsConfig.overworldOf(world.declaration).name
+            logger.warn {
+                "A portal in '${world.name}' leads to the ${dimension.configName} of '$overworld', " +
+                    "and worlds.toml declares none, so it leads nowhere. Declare one with " +
+                    "linked_to = \"$overworld\" to travel through it."
+            }
+        }
+        return target
+    }
+
+    /** Which missing dimensions have already been reported, per world. See [counterpart]. */
+    private val warnedMissingDimensions = mutableSetOf<Pair<String, WorldDimension>>()
+
+    private fun travelThroughPortal(
+        world: LoadedWorld,
+        player: PlayerSession,
+        axis: PortalAxis,
+    ) {
+        val target = netherCounterpart(world) ?: return
+        // parity: `Level.isAllowedToEnterPortal`, the game rule that keeps a server out of the Nether.
+        if (target.declaration.dimension == WorldDimension.NETHER &&
+            !world.gameRules[GameRuleRegistry.ALLOW_ENTERING_NETHER_USING_PORTALS]
+        ) {
+            return
+        }
+        val exit = NetherPortals.exitFor(world, target, player.x, player.y, player.z, axis) ?: return
+        player.portalTicks = 0
+        player.portalCooldown = NetherPortals.TRAVEL_COOLDOWN_TICKS
+        player.connection.switchWorld(target, exit.x, exit.y, exit.z)
+    }
+
+    /** The other side of an end portal: the End, or the world its own spawn is in. */
+    private fun endCounterpart(world: LoadedWorld): LoadedWorld? {
+        val wanted =
+            if (world.declaration.dimension == WorldDimension.END) WorldDimension.OVERWORLD else WorldDimension.END
+        return counterpart(world, wanted)
+    }
+
+    private fun travelThroughEndPortal(
+        world: LoadedWorld,
+        player: PlayerSession,
+    ) {
+        val target = endCounterpart(world) ?: return
+        val exit = EndPortals.exitFor(world, target)
+        player.portalTicks = 0
+        player.portalCooldown = NetherPortals.TRAVEL_COOLDOWN_TICKS
+        player.connection.switchWorld(target, exit.x, exit.y, exit.z)
     }
 
     /**
