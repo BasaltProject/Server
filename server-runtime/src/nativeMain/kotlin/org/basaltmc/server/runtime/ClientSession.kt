@@ -27,14 +27,17 @@ import org.basaltmc.server.runtime.registry.VanillaRegistryData
 import org.basaltmc.server.runtime.registry.VanillaTagData
 import org.basaltmc.server.runtime.ui.PlayerUi
 import org.basaltmc.server.runtime.ui.UiConfigs
+import org.basaltmc.server.runtime.world.ActiveEffect
 import org.basaltmc.server.runtime.world.AdvancementTriggers
 import org.basaltmc.server.runtime.world.Buckets
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
+import org.basaltmc.server.runtime.world.EnchantmentAttributes
 import org.basaltmc.server.runtime.world.EndPortals
 import org.basaltmc.server.runtime.world.FluidFlow
 import org.basaltmc.server.runtime.world.Fluids
 import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
+import org.basaltmc.server.runtime.world.MobEffects
 import org.basaltmc.server.runtime.world.NetherPortals
 import org.basaltmc.server.runtime.world.PlayerProgress
 import org.basaltmc.server.runtime.world.RealBlockTags
@@ -46,6 +49,7 @@ import org.basaltmc.server.runtime.world.RealItemTags
 import org.basaltmc.server.runtime.world.RealLootTables
 import org.basaltmc.server.runtime.world.RealRecipes
 import org.basaltmc.server.runtime.world.RealTimelines
+import org.basaltmc.server.runtime.world.Submersion
 import org.basaltmc.server.runtime.world.WorldState
 import org.basaltmc.server.runtime.world.WorldWeather
 import org.basaltmc.server.storage.BanKind
@@ -145,6 +149,7 @@ import org.basaltmc.wire.protocol.play.PlayerInfoUpdatePacket
 import org.basaltmc.wire.protocol.play.PlayerLoadedPacket
 import org.basaltmc.wire.protocol.play.PlayerPositionPacket
 import org.basaltmc.wire.protocol.play.RemoveEntitiesPacket
+import org.basaltmc.wire.protocol.play.RemoveMobEffectPacket
 import org.basaltmc.wire.protocol.play.RespawnPacket
 import org.basaltmc.wire.protocol.play.ServerboundContainerClickPacket
 import org.basaltmc.wire.protocol.play.ServerboundPickItemFromBlockPacket
@@ -170,7 +175,9 @@ import org.basaltmc.wire.protocol.play.SpawnEntityPacket
 import org.basaltmc.wire.protocol.play.SpawnInfo
 import org.basaltmc.wire.protocol.play.SpawnPositionPacket
 import org.basaltmc.wire.protocol.play.SystemChatPacket
+import org.basaltmc.wire.protocol.play.UpdateAttributesPacket
 import org.basaltmc.wire.protocol.play.UpdateLightPacket
+import org.basaltmc.wire.protocol.play.UpdateMobEffectPacket
 import org.basaltmc.wire.protocol.play.WireItemStack
 import org.basaltmc.wire.protocol.readVarInt
 import org.basaltmc.wire.protocol.status.PingRequestPacket
@@ -1303,6 +1310,7 @@ public class ClientSession(
                 val slot = ServerboundSetCarriedItemPacket.read(body).slot
                 if (slot in 0 until ServerboundSetCarriedItemPacket.HOTBAR_SIZE) {
                     playerSession?.inventory?.heldSlot = slot
+                    syncHeldAttributes()
                 }
             }
             ServerboundSetCreativeModeSlotPacket.ID ->
@@ -1381,8 +1389,20 @@ public class ClientSession(
                 hardness = hardness.destroyTime,
                 requiresCorrectTool = hardness.requiresCorrectTool,
                 efficiencyLevel = held?.let { PlayerInventory.enchantmentLevel(it, EFFICIENCY) } ?: 0,
+                hasteAmplifier = playerSession?.effects?.get(MobEffects.HASTE)?.amplifier ?: -1,
+                miningFatigueAmplifier = playerSession?.effects?.get(MobEffects.MINING_FATIGUE)?.amplifier ?: -1,
+                underwater = eyesInWater(),
+                inAir = playerSession?.onGround == false,
             ) { tag, tagged -> blockTags?.contains(tag, tagged) == true }
         return progress >= 1f
+    }
+
+    /** parity: `Player.getDestroySpeed` asks whether the eyes are under water, not the feet. */
+    private fun eyesInWater(): Boolean {
+        val session = playerSession ?: return false
+        val eyeY = session.y + Fluids.eyeHeight(session.sneaking)
+        val state = world.getBlockState(floor(session.x).toInt(), floor(eyeY).toInt(), floor(session.z).toInt())
+        return state != null && Fluids.of(state) == Submersion.WATER
     }
 
     /**
@@ -2637,9 +2657,23 @@ public class ClientSession(
         onGround: Boolean,
     ) {
         val session = playerSession ?: return
+        val feet = world.getBlockState(floor(x).toInt(), floor(y).toInt(), floor(z).toInt())
+        val inWater = feet != null && Fluids.of(feet) == Submersion.WATER
         session.food.addExhaustion(
-            FoodData.movementExhaustion(x - session.x, z - session.z, session.sprinting, onGround),
+            FoodData.movementExhaustion(
+                x - session.x,
+                y - session.y,
+                z - session.z,
+                session.sprinting,
+                onGround,
+                inWater,
+            ),
         )
+        // parity: the server reads a jump off the packets, exactly here: it left the ground moving up.
+        if (session.onGround && !onGround && y > session.y) {
+            session.food.addExhaustion(FoodData.jumpExhaustion(session.sprinting))
+            session.stats.increment(StoredStats.JUMP)
+        }
         // Horizontal only, and only on the ground, which is how vanilla tells walking apart from
         // falling and from being moved by something else.
         if (onGround) {
@@ -2885,6 +2919,39 @@ public class ClientSession(
     /** Re-sends the whole window, for a change that could have touched any slot. */
     internal fun sendInventoryAll() {
         sendInventory()
+        syncHeldAttributes()
+    }
+
+    /** Sends one effect, or its removal when it has run out. parity: the two mob effect packets. */
+    internal fun sendEffect(effect: ActiveEffect) {
+        val session = playerSession ?: return
+        val id = MobEffects.protocolIdOf(effect.effect) ?: return
+        sendPlayPacket(UpdateMobEffectPacket.ID) {
+            UpdateMobEffectPacket(
+                entityId = session.entityId,
+                effect = id,
+                amplifier = effect.amplifier,
+                durationTicks = effect.remainingTicks,
+                ambient = effect.ambient,
+                visible = effect.visible,
+                showIcon = effect.showIcon,
+            ).write(it)
+        }
+    }
+
+    internal fun sendEffectRemoved(effect: Identifier) {
+        val session = playerSession ?: return
+        val id = MobEffects.protocolIdOf(effect) ?: return
+        sendPlayPacket(RemoveMobEffectPacket.ID) { RemoveMobEffectPacket(session.entityId, id).write(it) }
+    }
+
+    internal fun syncHeldAttributes() {
+        val session = playerSession ?: return
+        val held = session.inventory[PlayerInventory.HOTBAR_START + session.inventory.heldSlot]
+        val snapshots = EnchantmentAttributes.snapshotsFor(held) { enchantments?.definitionOf(it) }
+        sendPlayPacket(UpdateAttributesPacket.ID) {
+            UpdateAttributesPacket(session.entityId, snapshots).write(it)
+        }
     }
 
     /**
@@ -2894,6 +2961,7 @@ public class ClientSession(
      */
     internal fun sendInventorySlot(slot: Int) {
         val session = playerSession ?: return
+        if (slot == PlayerInventory.HOTBAR_START + session.inventory.heldSlot) syncHeldAttributes()
         sendPlayPacket(ContainerSetSlotPacket.ID) {
             ContainerSetSlotPacket(
                 containerId = openMenu.containerId,
@@ -2973,6 +3041,16 @@ public class ClientSession(
         session.stats.addDamageTaken(amount)
         session.health = maxOf(session.health - amount, 0f)
         if (session.health <= 0f) die(deathMessageId) else syncHealth()
+    }
+
+    /** parity: `LivingEntity.heal`, capped at the maximum and reported like any other change. */
+    internal fun heal(amount: Float) {
+        val session = playerSession ?: return
+        if (session.dead) return
+        val healed = minOf(session.health + amount, PlayerSession.MAX_HEALTH)
+        if (healed == session.health) return
+        session.health = healed
+        syncHealth()
     }
 
     /** parity: `Entity.kill`, which is unblockable: creative mode does not survive it. */

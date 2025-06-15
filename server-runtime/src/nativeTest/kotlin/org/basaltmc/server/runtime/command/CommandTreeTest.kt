@@ -15,6 +15,7 @@ import org.basaltmc.server.runtime.command.commands.DataCommand
 import org.basaltmc.server.runtime.command.commands.DataPackCommand
 import org.basaltmc.server.runtime.command.commands.DebugCommand
 import org.basaltmc.server.runtime.command.commands.DialogCommand
+import org.basaltmc.server.runtime.command.commands.EffectCommand
 import org.basaltmc.server.runtime.command.commands.EnchantCommand
 import org.basaltmc.server.runtime.command.commands.ExecuteCommand
 import org.basaltmc.server.runtime.command.commands.FetchProfileCommand
@@ -216,6 +217,7 @@ class CommandTreeTest {
                 .also { it.register(DebugCommand(Timings(), dumpReport(), { 0L }, { 0L }, runner)) }
                 .also { it.register(UnpublishCommand()) }
                 .also { it.register(StopwatchCommand(Stopwatches { 0L })) }
+                .also { it.register(EffectCommand()) }
                 .also {
                     it.register(
                         ReloadCommand(

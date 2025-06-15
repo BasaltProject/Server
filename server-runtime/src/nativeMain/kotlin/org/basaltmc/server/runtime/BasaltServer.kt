@@ -18,6 +18,7 @@ import org.basaltmc.server.runtime.command.commands.DataCommand
 import org.basaltmc.server.runtime.command.commands.DataPackCommand
 import org.basaltmc.server.runtime.command.commands.DebugCommand
 import org.basaltmc.server.runtime.command.commands.DialogCommand
+import org.basaltmc.server.runtime.command.commands.EffectCommand
 import org.basaltmc.server.runtime.command.commands.EnchantCommand
 import org.basaltmc.server.runtime.command.commands.ExecuteCommand
 import org.basaltmc.server.runtime.command.commands.FetchProfileCommand
@@ -85,6 +86,7 @@ import org.basaltmc.server.runtime.scoreboard.Scoreboard
 import org.basaltmc.server.runtime.scoreboard.Teams
 import org.basaltmc.server.runtime.timings.ReportSources
 import org.basaltmc.server.runtime.timings.TimingsReport
+import org.basaltmc.server.runtime.world.ActiveEffect
 import org.basaltmc.server.runtime.world.AdvancementTriggers
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
 import org.basaltmc.server.runtime.world.EndPortals
@@ -92,6 +94,7 @@ import org.basaltmc.server.runtime.world.FluidFlow
 import org.basaltmc.server.runtime.world.Fluids
 import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
+import org.basaltmc.server.runtime.world.MobEffects
 import org.basaltmc.server.runtime.world.NetherPortals
 import org.basaltmc.server.runtime.world.PlayerProgress
 import org.basaltmc.server.runtime.world.RealAdvancements
@@ -521,6 +524,7 @@ public class BasaltServer(
             .also { it.register(PublishCommand { config.port }) }
             .also { it.register(UnpublishCommand()) }
             .also { it.register(StopwatchCommand(stopwatches)) }
+            .also { it.register(EffectCommand()) }
             .also { it.register(FetchProfileCommand(::fetchMojangUuid)) }
             .also { it.register(FunctionCommand(functions, functionRunner, DataAccess(commandStorage))) }
             .also { it.register(ReturnCommand(functionRunner)) }
@@ -746,6 +750,8 @@ public class BasaltServer(
                 .onFailure { logger.error(it) { "Drowning tick failed in world '${world.name}'" } }
             runCatching { tickFluids(world) }
                 .onFailure { logger.error(it) { "Fluid tick failed in world '${world.name}'" } }
+            runCatching { tickEffects(world) }
+                .onFailure { logger.error(it) { "Effect tick failed in world '${world.name}'" } }
         }
         shutdownIfSignalled()
     }
@@ -865,6 +871,61 @@ public class BasaltServer(
                 player.connection.syncSubmersion()
             }
         }
+    }
+
+    /**
+     * Counts every status effect down and applies the ones that act on a tick.
+     *
+     * parity: `LivingEntity.tickEffects` plus each effect's own `applyEffectTick`, whose intervals
+     * are the halvings by amplifier that make a stronger regeneration heal faster.
+     */
+    private fun tickEffects(world: LoadedWorld) {
+        for (player in playerRegistry.snapshot()) {
+            if (player.worldName != world.name || player.dead) continue
+            if (player.effects.isEmpty()) continue
+            for (active in player.effects.values.toList()) {
+                applyEffectTick(player, active)
+                if (active.infinite) continue
+                active.remainingTicks--
+                if (active.remainingTicks <= 0) {
+                    player.effects.remove(active.effect)
+                    player.connection.sendEffectRemoved(active.effect)
+                }
+            }
+        }
+    }
+
+    private fun applyEffectTick(
+        player: PlayerSession,
+        active: ActiveEffect,
+    ) {
+        val ticks = active.remainingTicks
+        when (active.effect) {
+            MobEffects.REGENERATION ->
+                if (onInterval(ticks, REGENERATION_INTERVAL, active.amplifier) &&
+                    player.health < PlayerSession.MAX_HEALTH
+                ) {
+                    player.connection.heal(1f)
+                }
+            MobEffects.POISON ->
+                if (onInterval(ticks, POISON_INTERVAL, active.amplifier) && player.health > 1f) {
+                    player.connection.hurt(1f, "magic")
+                }
+            MobEffects.WITHER ->
+                if (onInterval(ticks, WITHER_INTERVAL, active.amplifier)) player.connection.hurt(1f, "wither")
+            MobEffects.HUNGER -> player.food.addExhaustion(HUNGER_EXHAUSTION * (active.amplifier + 1))
+            else -> Unit
+        }
+    }
+
+    /** parity: `shouldApplyEffectTickThisTick`, whose interval halves with every level. */
+    private fun onInterval(
+        ticks: Int,
+        base: Int,
+        amplifier: Int,
+    ): Boolean {
+        val interval = base shr amplifier
+        return interval <= 0 || ticks % interval == 0
     }
 
     /**
@@ -1132,6 +1193,12 @@ public class BasaltServer(
     private companion object {
         /** parity: `Entity.lavaHurt`, which hurts every ten ticks, and fire, which does every twenty. */
         const val LAVA_DAMAGE_INTERVAL_TICKS = 10L
+
+        // parity: each effect's own `shouldApplyEffectTickThisTick`, halved per level.
+        const val REGENERATION_INTERVAL = 50
+        const val POISON_INTERVAL = 25
+        const val WITHER_INTERVAL = 40
+        const val HUNGER_EXHAUSTION = 0.005f
         const val FIRE_DAMAGE_INTERVAL_TICKS = 20
 
         // 1 declared a view/simulation distance of 1 chunk to the client, below what a real
