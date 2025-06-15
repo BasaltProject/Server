@@ -12,6 +12,7 @@ import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.PlayerProgress
 import org.basaltmc.server.runtime.world.RealAdvancements
+import org.basaltmc.server.runtime.world.RealTimelines
 import org.basaltmc.server.storage.AccessRepository
 import org.basaltmc.server.storage.PlayerRepository
 import org.basaltmc.wire.common.Identifier
@@ -84,6 +85,8 @@ public class CommandEnvironment(
      * exist, so a test fixture with no scoreboard behaves like a server with an empty one.
      */
     public val scoreboard: Scoreboard? = null,
+    /** What `/time query <timeline>` reads a period from, or null where no jar is loaded. */
+    public val timelines: RealTimelines? = null,
     public val teams: Teams? = null,
     public val advancements: RealAdvancements? = null,
     public val progress: PlayerProgress? = null,

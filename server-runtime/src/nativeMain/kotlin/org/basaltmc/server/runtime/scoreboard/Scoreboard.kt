@@ -1,6 +1,7 @@
 package org.basaltmc.server.runtime.scoreboard
 
 import org.basaltmc.wire.protocol.play.DisplaySlot
+import org.basaltmc.wire.protocol.play.NumberFormat
 import org.basaltmc.wire.protocol.play.ObjectiveRenderType
 import org.basaltmc.wire.text.Component
 
@@ -17,6 +18,12 @@ public class Objective(
     public var displayName: Component,
     public var renderType: ObjectiveRenderType = ObjectiveRenderType.INTEGER,
 ) {
+    /** parity: `numberformat`, which decides how the number on the right is drawn, or not drawn. */
+    public var numberFormat: NumberFormat? = null
+
+    /** parity: `displayautoupdate`, off when a sidebar should only change when told to. */
+    public var displayAutoUpdate: Boolean = true
+
     /** parity: `ObjectiveCriteria.isReadOnly`: a `trigger` objective is the one `/trigger` may touch. */
     public val isTrigger: Boolean get() = criterion == "trigger"
 
@@ -85,6 +92,36 @@ public class Scoreboard {
         holder: String,
         objectiveName: String,
     ): Int? = scores[holder]?.get(objectiveName)
+
+    /** Per-holder overrides `/scoreboard players display` sets, keyed by holder and objective. */
+    private val displayNames = mutableMapOf<Pair<String, String>, Component?>()
+    private val scoreFormats = mutableMapOf<Pair<String, String>, NumberFormat?>()
+
+    public fun displayNameOf(
+        holder: String,
+        objectiveName: String,
+    ): Component? = displayNames[holder to objectiveName]
+
+    public fun setDisplayName(
+        holder: String,
+        objectiveName: String,
+        name: Component?,
+    ) {
+        displayNames[holder to objectiveName] = name
+    }
+
+    public fun numberFormatOf(
+        holder: String,
+        objectiveName: String,
+    ): NumberFormat? = scoreFormats[holder to objectiveName]
+
+    public fun setNumberFormat(
+        holder: String,
+        objectiveName: String,
+        format: NumberFormat?,
+    ) {
+        scoreFormats[holder to objectiveName] = format
+    }
 
     public fun setScore(
         holder: String,

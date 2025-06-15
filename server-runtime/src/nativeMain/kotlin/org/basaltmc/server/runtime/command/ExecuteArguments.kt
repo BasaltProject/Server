@@ -1,6 +1,7 @@
 package org.basaltmc.server.runtime.command
 
 import org.basaltmc.wire.common.Identifier
+import org.basaltmc.wire.nbt.NbtCompound
 import org.basaltmc.wire.protocol.play.ArgumentParser
 
 /** Where a position means: the feet or the eyes. parity: `EntityAnchorArgument`. */
@@ -130,4 +131,15 @@ public object UuidArgument : ArgumentType<String> {
         }
         return text
     }
+}
+
+/** `minecraft:style`: the style half of a component, written as SNBT. */
+public object StyleArgument : ArgumentType<NbtCompound> {
+    override val wire: ArgumentParser = ArgumentParser.Style
+
+    override fun parse(
+        reader: StringReader,
+        source: CommandSource,
+        environment: CommandEnvironment,
+    ): NbtCompound = NbtCompoundArgument.parse(reader, source, environment)
 }

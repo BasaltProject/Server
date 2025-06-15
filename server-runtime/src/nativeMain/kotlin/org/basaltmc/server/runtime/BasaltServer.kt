@@ -494,6 +494,7 @@ public class BasaltServer(
                 itemTagMembers = { tag -> itemTags.membersOf(tag.toString()).ifEmpty { null } },
                 entityTagMembers = { tag -> entityTags.membersOf(tag).ifEmpty { null } },
                 scoreboard = scoreboard,
+                timelines = timelines,
                 teams = teams,
                 advancements = advancements,
                 progress = playerProgress,
