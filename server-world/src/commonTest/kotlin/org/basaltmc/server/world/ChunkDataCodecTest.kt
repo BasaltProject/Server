@@ -1,5 +1,7 @@
 package org.basaltmc.server.world
 
+import org.basaltmc.server.registry.Blocks
+import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.protocol.play.PalettedContainer
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -64,13 +66,28 @@ class ChunkDataCodecTest {
         }
     }
 
+    /** A dimension with no sky sends no sky light: what it has is what its own blocks give off. */
     @Test
-    fun dimensionsWithoutSkylightSendNoSkyMasksOrArrays() {
+    fun dimensionsWithoutSkylightSendNoSkyArrays() {
         val chunk = Chunk(0, 0, ChunkHeight.NETHER)
         val light = ChunkDataCodec.encodeLight(chunk, hasSkylight = false)
-        assertTrue(light.skyLightMask.isEmpty())
-        assertTrue(light.emptySkyLightMask.isEmpty())
+        assertEquals(0L, light.skyLightMask[0])
+        assertEquals(0L, light.emptySkyLightMask[0])
         assertTrue(light.skyLight.isEmpty())
+    }
+
+    @Test
+    fun aBurningBlockSendsBlockLightForItsOwnSection() {
+        val chunk = Chunk(0, 0, ChunkHeight.NETHER)
+        val glowstone = checkNotNull(Blocks.REGISTRY.idOf(Identifier.vanilla("glowstone")))
+        chunk.setBlockStateId(8, 40, 8, glowstone)
+
+        val light = ChunkDataCodec.encodeLight(chunk, hasSkylight = false)
+
+        // Its own section, and the two its fifteen levels reach into.
+        val mask = light.blockLightMask[0]
+        assertTrue((mask shr (40 / 16)) and 1L == 1L)
+        assertEquals(3, light.blockLight.size)
     }
 
     @Test

@@ -1158,7 +1158,12 @@ public class ClientSession(
 
     private fun sendChunk(chunk: Chunk) {
         val chunkData = ChunkDataCodec.encodeSections(chunk)
-        val light = ChunkDataCodec.encodeLight(chunk, currentWorld?.declaration?.dimension?.hasSkylight ?: true)
+        val world = currentWorld
+        val light =
+            ChunkDataCodec.encodeLight(
+                chunk,
+                world?.declaration?.dimension?.hasSkylight ?: true,
+            ) { x, y, z -> world?.state?.getBlockState(x, y, z) }
         val heightmap = ChunkDataCodec.encodeHeightmap(chunk)
         sendCompressed(MapChunkPacket.ID) {
             MapChunkPacket(
@@ -1179,11 +1184,11 @@ public class ClientSession(
                         )
                     },
                 skyLightMask = light.skyLightMask,
-                blockLightMask = longArrayOf(0L),
+                blockLightMask = light.blockLightMask,
                 emptySkyLightMask = light.emptySkyLightMask,
-                emptyBlockLightMask = longArrayOf(0L),
+                emptyBlockLightMask = light.emptyBlockLightMask,
                 skyLight = light.skyLight,
-                blockLight = emptyList(),
+                blockLight = light.blockLight,
             ).write(it)
         }
         sendCompressed(UpdateLightPacket.ID) {
@@ -1191,11 +1196,11 @@ public class ClientSession(
                 chunkX = chunk.chunkX,
                 chunkZ = chunk.chunkZ,
                 skyLightMask = light.skyLightMask,
-                blockLightMask = longArrayOf(0L),
+                blockLightMask = light.blockLightMask,
                 emptySkyLightMask = light.emptySkyLightMask,
-                emptyBlockLightMask = longArrayOf(0L),
+                emptyBlockLightMask = light.emptyBlockLightMask,
                 skyLight = light.skyLight,
-                blockLight = emptyList(),
+                blockLight = light.blockLight,
             ).write(it)
         }
     }
