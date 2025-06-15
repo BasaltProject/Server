@@ -1,9 +1,12 @@
 package org.basaltmc.server.runtime.registry
 
 /**
- * Every tag name vanilla 26.2 ships, grouped by the registry it tags. Names only: the client's
- * bootstrap lookup throws on an unknown tag key whether or not it has members, so empty tags
- * unblock Configuration. Real members per tag are a documented gap.
+ * Every tag name vanilla 26.2 ships, grouped by the registry it tags.
+ *
+ * Names alone unblock Configuration, since the client's bootstrap throws on an unknown tag key.
+ * Members are another matter: the client tests `FluidTags.WATER` before it renders as under water,
+ * and tool rules read the block tags. Block, item, fluid and entity type members come from the
+ * operator's own jar; the rest still go out empty.
  *
  * Only registries the client tracks are here, meaning the `BuiltInRegistries` ones plus
  * `RegistryDataLoader.SYNCHRONIZED_REGISTRIES`. Anything else is absent from the client's

@@ -85,6 +85,8 @@ import org.basaltmc.server.runtime.timings.TimingsReport
 import org.basaltmc.server.runtime.world.AdvancementTriggers
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
 import org.basaltmc.server.runtime.world.EndPortals
+import org.basaltmc.server.runtime.world.FluidFlow
+import org.basaltmc.server.runtime.world.Fluids
 import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.NetherPortals
@@ -94,6 +96,7 @@ import org.basaltmc.server.runtime.world.RealBlockTags
 import org.basaltmc.server.runtime.world.RealDialogs
 import org.basaltmc.server.runtime.world.RealEnchantments
 import org.basaltmc.server.runtime.world.RealEntityTypeTags
+import org.basaltmc.server.runtime.world.RealFluidTags
 import org.basaltmc.server.runtime.world.RealItemTags
 import org.basaltmc.server.runtime.world.RealLootTables
 import org.basaltmc.server.runtime.world.RealRecipes
@@ -101,6 +104,7 @@ import org.basaltmc.server.runtime.world.RealTestInstances
 import org.basaltmc.server.runtime.world.RealTimelines
 import org.basaltmc.server.runtime.world.RecipeBook
 import org.basaltmc.server.runtime.world.StructureTemplates
+import org.basaltmc.server.runtime.world.Submersion
 import org.basaltmc.server.runtime.world.VanillaWorldGeneratorFactory
 import org.basaltmc.server.runtime.world.WORLDS_ROOT
 import org.basaltmc.server.runtime.world.WorldMetadata
@@ -121,6 +125,8 @@ import org.basaltmc.wire.io.NativeThread
 import org.basaltmc.wire.io.ShutdownSignal
 import org.basaltmc.wire.io.TcpListener
 import org.basaltmc.wire.io.sleepMillis
+import org.basaltmc.wire.protocol.play.BlockPos
+import org.basaltmc.wire.protocol.play.ClientboundBlockUpdatePacket
 import org.basaltmc.wire.protocol.play.Gamemode
 import org.basaltmc.wire.text.Component
 import org.basaltmc.wire.text.LangTable
@@ -176,6 +182,7 @@ public class BasaltServer(
     private val recipes = RealRecipes(serverJar)
     private val blockTags = RealBlockTags(serverJar)
     private val itemTags = RealItemTags(serverJar)
+    private val fluidTags = RealFluidTags(serverJar)
     private val entityTags = RealEntityTypeTags(serverJar)
     private val advancements = RealAdvancements(serverJar)
     private val enchantments = RealEnchantments(serverJar)
@@ -723,6 +730,10 @@ public class BasaltServer(
                 .onFailure { logger.error(it) { "Border damage failed in world '${world.name}'" } }
             runCatching { tickPortals(world) }
                 .onFailure { logger.error(it) { "Portal tick failed in world '${world.name}'" } }
+            runCatching { tickSubmersion(world) }
+                .onFailure { logger.error(it) { "Drowning tick failed in world '${world.name}'" } }
+            runCatching { tickFluids(world) }
+                .onFailure { logger.error(it) { "Fluid tick failed in world '${world.name}'" } }
         }
         shutdownIfSignalled()
     }
@@ -782,6 +793,87 @@ public class BasaltServer(
             val delay = if (player.gamemode == Gamemode.CREATIVE) creativeDelay else defaultDelay
             if (player.portalTicks < delay) continue
             travelThroughPortal(world, player, axis)
+        }
+    }
+
+    /**
+     * Drowning, burning, and the two numbers the HUD draws them from.
+     *
+     * parity: `LivingEntity.baseTick` and `Entity.lavaHurt`. The client renders the water overlay
+     * from its own copy of the blocks, but the bubbles and the flames come from here: it draws them
+     * from the air supply and the shared flags the server sends, and neither moves on its own.
+     */
+    private fun tickSubmersion(world: LoadedWorld) {
+        for (player in playerRegistry.snapshot()) {
+            if (player.worldName != world.name) continue
+            if (player.dead) continue
+            val eyeY = player.y + Fluids.eyeHeight(player.sneaking)
+            val feet =
+                world.state.getBlockState(
+                    floor(player.x).toInt(),
+                    floor(player.y).toInt(),
+                    floor(player.z).toInt(),
+                )
+            val eyes = world.state.getBlockState(floor(player.x).toInt(), floor(eyeY).toInt(), floor(player.z).toInt())
+            val air = player.airSupply
+            val fire = player.fireTicks
+
+            val drowns = !player.invulnerable && eyes != null && Fluids.of(eyes) == Submersion.WATER
+            if (drowns) {
+                player.airSupply = Fluids.airAfterTick(player.airSupply, eyesInWater = true)
+                if (player.airSupply <= Fluids.DROWNING_AIR) {
+                    player.airSupply = 0
+                    player.connection.hurt(Fluids.DROWN_DAMAGE, "drown")
+                }
+            } else {
+                player.airSupply = Fluids.airAfterTick(player.airSupply, eyesInWater = false)
+            }
+
+            val inLava =
+                !player.invulnerable &&
+                    (
+                        (feet != null && Fluids.of(feet) == Submersion.LAVA) ||
+                            (eyes != null && Fluids.of(eyes) == Submersion.LAVA)
+                    )
+            if (inLava) {
+                player.fireTicks = Fluids.LAVA_FIRE_TICKS
+                if (world.gameTime % LAVA_DAMAGE_INTERVAL_TICKS == 0L) {
+                    player.connection.hurt(Fluids.LAVA_DAMAGE, "lava")
+                }
+            } else if (player.fireTicks > 0) {
+                player.fireTicks--
+                // parity: `Entity.baseTick` burns for one heart every second, and lava's own damage
+                // replaces it while standing in it.
+                if (player.fireTicks % FIRE_DAMAGE_INTERVAL_TICKS == 0) {
+                    player.connection.hurt(Fluids.FIRE_DAMAGE, "onFire")
+                }
+            }
+
+            if (player.airSupply != air || (player.fireTicks > 0) != (fire > 0)) {
+                player.connection.syncSubmersion()
+            }
+        }
+    }
+
+    /**
+     * Runs every fluid tick that came due and tells the players what moved.
+     *
+     * parity: `ServerLevel.tickFluid`, driven by the same per-chunk queue vanilla persists. A tick
+     * is scheduled by whatever changed a block next to a fluid, so a settled ocean costs nothing.
+     */
+    private fun tickFluids(world: LoadedWorld) {
+        val due = world.state.dueFluidTicks()
+        if (due.isEmpty()) return
+        val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
+        for (position in due) {
+            for (change in FluidFlow.tick(world, position[0], position[1], position[2])) {
+                val pos = BlockPos(change[0], change[1], change[2])
+                for (player in watchers) {
+                    player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                        ClientboundBlockUpdatePacket(pos, change[3]).write(it)
+                    }
+                }
+            }
         }
     }
 
@@ -994,6 +1086,8 @@ public class BasaltServer(
                     progress = playerProgress,
                     advancementTriggers = advancementTriggers,
                     blockTags = blockTags,
+                    fluidTags = fluidTags,
+                    entityTypeTags = entityTags,
                     itemTags = itemTags,
                 ).run()
             }
@@ -1024,6 +1118,10 @@ public class BasaltServer(
     }
 
     private companion object {
+        /** parity: `Entity.lavaHurt`, which hurts every ten ticks, and fire, which does every twenty. */
+        const val LAVA_DAMAGE_INTERVAL_TICKS = 10L
+        const val FIRE_DAMAGE_INTERVAL_TICKS = 20
+
         // 1 declared a view/simulation distance of 1 chunk to the client, below what a real
         // client expects and handles well (vanilla's own slider does not even go that low): it
         // looked like "only one chunk renders" even though every chunk actually had real terrain

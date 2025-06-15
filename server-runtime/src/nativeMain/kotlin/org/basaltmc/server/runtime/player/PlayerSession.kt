@@ -1,6 +1,7 @@
 package org.basaltmc.server.runtime.player
 
 import org.basaltmc.server.runtime.ClientSession
+import org.basaltmc.server.runtime.world.Fluids
 import org.basaltmc.wire.protocol.login.GameProfileProperty
 import org.basaltmc.wire.protocol.play.Gamemode
 import org.basaltmc.wire.protocol.play.SystemChatPacket
@@ -86,11 +87,20 @@ public class PlayerSession(
     public val inventory: PlayerInventory = PlayerInventory(connection.enchantmentIds)
 
     /**
+     * Air left and how long this player keeps burning.
+     *
+     * parity: `Entity`'s own two synced values. The client draws the bubbles and the flames from
+     * what the server sends, and moves neither on its own.
+     */
+    public var airSupply: Int = Fluids.MAX_AIR
+
+    public var fireTicks: Int = 0
+
+    /**
      * How long this player has been standing in a portal, and how long until one works again.
      *
-     * parity: `Entity.portalProcess`/`portalCooldown`. Both are counted here rather than on the
-     * connection because they belong to the player, not to the socket: a portal half entered
-     * survives a chunk reload the way vanilla's does.
+     * parity: `Entity.portalProcess`/`portalCooldown`, counted on the player rather than on the
+     * connection: a portal half entered survives a chunk reload the way vanilla's does.
      */
     public var portalTicks: Int = 0
 
@@ -123,6 +133,9 @@ public class PlayerSession(
         dead = false
         flying = gamemode == Gamemode.SPECTATOR
         sprinting = false
+        // parity: `ServerPlayer.restoreFrom` on a respawn, which starts them breathing and unlit.
+        airSupply = Fluids.MAX_AIR
+        fireTicks = 0
     }
 
     public companion object {
