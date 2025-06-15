@@ -29,6 +29,7 @@ import org.basaltmc.server.runtime.ui.PlayerUi
 import org.basaltmc.server.runtime.ui.UiConfigs
 import org.basaltmc.server.runtime.world.ActiveEffect
 import org.basaltmc.server.runtime.world.AdvancementTriggers
+import org.basaltmc.server.runtime.world.BlockPlacement
 import org.basaltmc.server.runtime.world.Buckets
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
 import org.basaltmc.server.runtime.world.EnchantmentAttributes
@@ -2000,13 +2001,24 @@ public class ClientSession(
             return ack()
         }
 
-        val blockStateId = held?.let { Blocks.REGISTRY.idOf(Identifier.parse(it.id)) }
-        if (held == null || blockStateId == null) return ack()
+        val heldBlock = held?.let { Identifier.parse(it.id) }
+        val defaultStateId = heldBlock?.let { Blocks.REGISTRY.idOf(it) }
+        if (held == null || heldBlock == null || defaultStateId == null) return ack()
 
         val placeAt = if (hit.inside) hit.pos else hit.pos.offset(hit.direction)
         val existing = world.getBlockState(placeAt.x, placeAt.y, placeAt.z)
         if (existing == null || !isAirLike(existing)) return ack()
 
+        val blockStateId =
+            BlockPlacement.stateFor(
+                block = heldBlock,
+                defaultStateId = defaultStateId,
+                face = hit.direction,
+                clickY = hit.clickY,
+                yaw = session.yaw,
+                pitch = session.pitch,
+                replacing = existing,
+            )
         val changed = world.setBlockState(placeAt.x, placeAt.y, placeAt.z, blockStateId)
         ack()
         if (!changed) return
