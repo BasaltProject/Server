@@ -125,7 +125,23 @@ public class WorldState(
         val key = key(chunkX, chunkZ)
         mutex.withLock { chunksByPos[key] }?.let { return it }
         val generated = loadOrGenerate(chunkX, chunkZ)
-        return mutex.withLock { chunksByPos.getOrPut(key) { generated } }
+        return mutex.withLock {
+            val existing = chunksByPos[key]
+            if (existing != null) {
+                existing
+            } else {
+                chunksByPos[key] = generated
+                // The neighbours were lit without this chunk, so their light let the sky in through
+                // where it now stands. parity: vanilla relights a chunk's neighbourhood on load.
+                for (offsetZ in -1..1) {
+                    for (offsetX in -1..1) {
+                        if (offsetX == 0 && offsetZ == 0) continue
+                        chunksByPos[key(chunkX + offsetX, chunkZ + offsetZ)]?.invalidateLight()
+                    }
+                }
+                generated
+            }
+        }
     }
 
     public fun getBlockState(

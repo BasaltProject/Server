@@ -2680,6 +2680,11 @@ public class ClientSession(
                         generationQueue.request(pos.x, pos.z, squaredDistanceToCenter(pos.x, pos.z))
                         continue
                     }
+                    // parity: vanilla only sends a chunk once it is FULL, which it cannot be until
+                    // the eight around it exist: light worked out with a neighbour missing lets the
+                    // sky in from nowhere, and the client keeps whatever it is sent. Under water
+                    // that is the difference between a dim sea floor and one lit like open air.
+                    if (!neighboursLoaded(pos.x, pos.z)) continue
                     found.add(chunk)
                     iterator.remove()
                 }
@@ -2690,6 +2695,25 @@ public class ClientSession(
         for (chunk in ready) sendChunk(chunk)
         sendCompressed(ChunkBatchFinishedPacket.ID) { ChunkBatchFinishedPacket(ready.size).write(it) }
         return ready.size
+    }
+
+    /** Whether the eight chunks around this one are in memory, asking for the ones that are not. */
+    private fun neighboursLoaded(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Boolean {
+        var complete = true
+        for (offsetZ in -1..1) {
+            for (offsetX in -1..1) {
+                if (offsetX == 0 && offsetZ == 0) continue
+                val x = chunkX + offsetX
+                val z = chunkZ + offsetZ
+                if (world.isLoaded(x, z)) continue
+                complete = false
+                generationQueue.request(x, z, squaredDistanceToCenter(x, z))
+            }
+        }
+        return complete
     }
 
     private fun squaredDistanceToCenter(

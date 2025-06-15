@@ -1,7 +1,9 @@
 package org.basaltmc.server.world
 
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.world.light.LightWindow
 import org.basaltmc.wire.common.Identifier
+import org.basaltmc.wire.protocol.play.NibbleArray
 import org.basaltmc.wire.protocol.play.PalettedContainer
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -87,6 +89,52 @@ class ChunkDataCodecTest {
             PalettedContainer.read(buffer, 64, PalettedContainer.BIOME_MAX_INDIRECT_BITS)
         }
         assertEquals(0, buffer.readableBytes)
+    }
+
+    /**
+     * Light worked out with a neighbour missing must not be kept: it lets the sky in from where
+     * nothing is known yet, and the sea floor came out lit like open air because of it.
+     */
+    @Test
+    fun lightFromAnIncompletePassIsNotKept() {
+        val chunk = Chunk(0, 0, ChunkHeight.OVERWORLD)
+        val water = Blocks.WATER.stateId
+        for (x in 0 until 16) {
+            for (z in 0 until 16) {
+                chunk.setBlockStateId(x, 55, z, Blocks.STONE.stateId)
+                for (y in 56..62) chunk.setBlockStateId(x, y, z, water)
+            }
+        }
+        val alone = LightWindow(chunk) { _, _ -> null }
+        assertEquals(false, alone.isComplete)
+        ChunkDataCodec.encodeLight(chunk, hasSkylight = true, window = alone)
+
+        val neighbours = mutableMapOf<Pair<Int, Int>, Chunk>()
+        val complete =
+            LightWindow(chunk) { chunkX, chunkZ ->
+                neighbours.getOrPut(chunkX to chunkZ) {
+                    Chunk(chunkX, chunkZ, ChunkHeight.OVERWORLD).also { neighbour ->
+                        for (x in 0 until 16) {
+                            for (z in 0 until 16) {
+                                neighbour.setBlockStateId(x, 55, z, Blocks.STONE.stateId)
+                                for (y in 56..62) neighbour.setBlockStateId(x, y, z, water)
+                            }
+                        }
+                    }
+                }
+            }
+        assertEquals(true, complete.isComplete)
+        val light = ChunkDataCodec.encodeLight(chunk, hasSkylight = true, window = complete)
+
+        // parity: water takes one level per block, so the sea floor is dim, not fully lit.
+        val sectionIndex = (56 - ChunkHeight.OVERWORLD.minY) / 16
+        var sent = 0
+        for (index in 0 until sectionIndex) {
+            if ((light.skyLightMask[0] shr (index + 1)) and 1L == 1L) sent++
+        }
+        val values = NibbleArray.unpack(light.skyLight[sent])
+        val floor = values[(((56 - ChunkHeight.OVERWORLD.minY) % 16) * 16 + 8) * 16 + 8]
+        assertTrue(floor in 1..9, "the sea floor came out at $floor")
     }
 
     @Test
