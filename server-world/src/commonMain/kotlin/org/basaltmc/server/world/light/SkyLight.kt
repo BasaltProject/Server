@@ -1,8 +1,7 @@
 package org.basaltmc.server.world.light
 
+import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
-import org.basaltmc.server.world.Chunk
-import org.basaltmc.wire.common.Identifier
 
 /**
  * Sky light for one chunk, column by column and then spread sideways.
@@ -22,25 +21,15 @@ public object SkyLight {
     /**
      * How much light a block takes out of what passes through it.
      *
-     * parity: `BlockBehaviour.getLightDampening`: fifteen for a block that renders solid, zero for
-     * one that lets the sky through (air, glass, a torch, grass), and one for the rest, which is
-     * water, ice and leaves. Slabs and stairs are the known miss: vanilla asks their shape and this
-     * has no shapes, so they count as solid.
+     * parity: `BlockBehaviour.getLightDampening`, whose answer comes with the block's own shape:
+     * fifteen for one that fills its cube, one for a shape that leaves a gap but holds a fluid,
+     * zero for the rest. A slab or a trapdoor therefore stops nothing at all, which used to be the
+     * known miss here back when everything solid-looking counted as opaque.
      */
     public fun opacity(stateId: Int): Int =
         if (stateId in 0 until TABLE.size) TABLE[stateId] else uncachedOpacity(stateId)
 
-    private fun uncachedOpacity(stateId: Int): Int =
-        when {
-            Blocks.isAir(stateId) -> 0
-            stateId in TRANSPARENT -> 0
-            Blocks.isLeavesState(stateId) -> 1
-            Blocks.hasFluid(stateId) -> 1
-            // Anything that does not stop a falling player does not stop light either: grass,
-            // flowers, torches, rails.
-            !Chunk.HeightmapType.MOTION_BLOCKING.matches(stateId) -> 0
-            else -> MAX
-        }
+    private fun uncachedOpacity(stateId: Int): Int = BlockShapes.dampening(stateId)
 
     /**
      * The sky light of the middle chunk of [window].
@@ -89,49 +78,6 @@ public object SkyLight {
         }
         return pass.run()
     }
-
-    private val DYE_COLOURS =
-        listOf(
-            "white",
-            "orange",
-            "magenta",
-            "light_blue",
-            "yellow",
-            "lime",
-            "pink",
-            "gray",
-            "light_gray",
-            "cyan",
-            "purple",
-            "blue",
-            "brown",
-            "green",
-            "red",
-            "black",
-        )
-
-    /** The blocks light goes through untouched, which vanilla decides from their render shape. */
-    private val TRANSPARENT: Set<Int> =
-        buildSet {
-            for (name in listOf(
-                "glass",
-                "tinted_glass",
-                "ice",
-                "barrier",
-                "light",
-                "structure_void",
-                "cave_air",
-                "void_air",
-                "nether_portal",
-                "end_portal",
-                "end_gateway",
-            )) {
-                Blocks.REGISTRY.idOf(Identifier.vanilla(name))?.let(::add)
-            }
-            for (colour in DYE_COLOURS) {
-                Blocks.REGISTRY.idOf(Identifier.vanilla("${colour}_stained_glass"))?.let(::add)
-            }
-        }
 
     /**
      * One answer per block state, worked out once.

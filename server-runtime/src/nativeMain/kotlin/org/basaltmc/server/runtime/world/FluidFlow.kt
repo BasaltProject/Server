@@ -1,7 +1,8 @@
 package org.basaltmc.server.runtime.world
 
+import org.basaltmc.server.registry.BlockFace
+import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
-import org.basaltmc.server.world.Chunk
 import org.basaltmc.wire.common.Identifier
 import kotlin.random.Random
 
@@ -20,8 +21,8 @@ public enum class FluidKind(
  * parity: `FlowingFluid`, with `WaterFluid`/`LavaFluid` for the constants and `LiquidBlock` for
  * when a tick is scheduled. A fluid moves only when [onBlockChanged] wakes it.
  *
- * Known gaps, both from having no voxel shapes: a slab or trapdoor does not stop a flow, and a
- * block a flow destroys drops nothing.
+ * A change is `x, y, z, new state, washed-away state`: the last is what the caller drops loot for,
+ * which is why the list is not just positions.
  */
 public object FluidFlow {
     /** parity: `WaterFluid.getTickDelay`, and `LavaFluid`'s, which is faster in the Nether. */
@@ -50,6 +51,10 @@ public object FluidFlow {
     private const val DOWN = 0
     private const val UP = 1
     private val HORIZONTAL = 2..5
+
+    /** The face of [OFFSETS], in the same order, for asking a block shape about a wall. */
+    private val FACES =
+        arrayOf(BlockFace.DOWN, BlockFace.UP, BlockFace.WEST, BlockFace.EAST, BlockFace.NORTH, BlockFace.SOUTH)
 
     private fun state(name: String): Int = Blocks.REGISTRY.idOf(Identifier.vanilla(name)) ?: Blocks.AIR.stateId
 
@@ -184,11 +189,9 @@ public object FluidFlow {
         return kind.baseStateId + level
     }
 
-    /** Fluids and air do not stop anything; everything a player cannot walk through does. */
+    /** parity: `BlockState.blocksMotion`, read from the block's own shape rather than guessed. */
     private fun blocksMotion(stateId: Int): Boolean =
-        !Blocks.isAir(stateId) &&
-            !isLiquidBlock(stateId) &&
-            Chunk.HeightmapType.MOTION_BLOCKING.matches(stateId)
+        !Blocks.isAir(stateId) && !isLiquidBlock(stateId) && BlockShapes.blocksMotion(stateId)
 
     private fun isLiquidBlock(stateId: Int): Boolean =
         stateId in FluidKind.WATER.baseStateId..FluidKind.WATER.baseStateId + 15 ||
@@ -233,10 +236,13 @@ public object FluidFlow {
             z: Int,
             stateId: Int,
         ) {
-            if (at(x, y, z) == stateId) return
+            val previous = at(x, y, z)
+            if (previous == stateId) return
             if (!world.state.setBlockState(x, y, z, stateId)) return
             states[packed(x, y, z)] = stateId
-            changes += intArrayOf(x, y, z, stateId)
+            // The fifth number is whatever the flow washed away, so the caller can drop it.
+            // parity: `FlowingFluid.spreadTo` calls `beforeDestroyingBlock` before the block goes.
+            changes += intArrayOf(x, y, z, stateId, previous)
             blockChanged(x, y, z)
         }
 
@@ -329,10 +335,12 @@ public object FluidFlow {
         ): Int {
             var highest = 0
             var sources = 0
+            val here = at(x, y, z)
             for (index in HORIZONTAL) {
                 val offset = OFFSETS[index]
                 val neighbour = at(x + offset[0], y + offset[1], z + offset[2])
                 if (kindOf(neighbour) != kind) continue
+                if (!canPassThroughWall(here, neighbour, FACES[index])) continue
                 if (isSource(neighbour)) sources++
                 highest = maxOf(highest, amountOf(neighbour))
             }
@@ -345,7 +353,9 @@ public object FluidFlow {
             }
 
             val above = at(x, y + 1, z)
-            if (kindOf(above) == kind) return stateFor(kind, MAX_AMOUNT, falling = true)
+            if (kindOf(above) == kind && canPassThroughWall(here, above, BlockFace.UP)) {
+                return stateFor(kind, MAX_AMOUNT, falling = true)
+            }
 
             val amount = highest - dropOff(world, kind)
             return if (amount <= 0) EMPTY else stateFor(kind, amount, falling = false)
@@ -368,7 +378,7 @@ public object FluidFlow {
             kind: FluidKind,
         ) {
             val below = at(x, y - 1, z)
-            if (canMaybePassThrough(kind, below)) {
+            if (canMaybePassThrough(kind, state, below, BlockFace.DOWN)) {
                 val newBelow = newLiquid(x, y - 1, z, kind)
                 if (newBelow != EMPTY && canBeReplacedWith(below, kind, downward = true)) {
                     spreadTo(x, y - 1, z, kind, downward = true, target = newBelow)
@@ -397,7 +407,7 @@ public object FluidFlow {
                 val nextX = x + offset[0]
                 val nextZ = z + offset[2]
                 val neighbour = at(nextX, y, nextZ)
-                if (!canMaybePassThrough(kind, neighbour)) continue
+                if (!canMaybePassThrough(kind, state, neighbour, FACES[index])) continue
                 val target = newLiquid(nextX, y, nextZ, kind)
                 if (target == EMPTY) continue
                 if (!canBeReplacedWith(neighbour, kind, downward = false)) continue
@@ -431,7 +441,7 @@ public object FluidFlow {
                 val nextX = x + offset[0]
                 val nextZ = z + offset[2]
                 val neighbour = at(nextX, y, nextZ)
-                if (!canMaybePassThrough(kind, neighbour)) continue
+                if (!canMaybePassThrough(kind, at(x, y, z), neighbour, FACES[index])) continue
                 if (isHole(nextX, y, nextZ, kind)) return pass
                 if (pass < slopeFindDistance(world, kind)) {
                     lowest = minOf(lowest, slopeDistance(nextX, y, nextZ, pass + 1, opposite(index), kind))
@@ -450,6 +460,7 @@ public object FluidFlow {
             kind: FluidKind,
         ): Boolean {
             val below = at(x, y - 1, z)
+            if (!canPassThroughWall(at(x, y, z), below, BlockFace.DOWN)) return false
             return kindOf(below) == kind || canHoldAnyFluid(below)
         }
 
@@ -471,11 +482,23 @@ public object FluidFlow {
         /** parity: `canMaybePassThrough`: a source of the same fluid is never overwritten. */
         fun canMaybePassThrough(
             kind: FluidKind,
+            source: Int,
             target: Int,
+            face: BlockFace,
         ): Boolean {
             if (kindOf(target) == kind && isSource(target)) return false
-            return canHoldAnyFluid(target)
+            return canHoldAnyFluid(target) && canPassThroughWall(source, target, face)
         }
+
+        /**
+         * parity: `FlowingFluid.canPassThroughWall`: the two shapes are merged before asking, so a
+         * slab under an upside-down slab walls the flow off even though neither fills its cube.
+         */
+        fun canPassThroughWall(
+            source: Int,
+            target: Int,
+            face: BlockFace,
+        ): Boolean = !BlockShapes.mergedFaceOccludes(source, target, face)
 
         /** parity: `WaterFluid`/`LavaFluid.canBeReplacedWith`: only lava falling into water, and water into deep lava. */
         fun canBeReplacedWith(

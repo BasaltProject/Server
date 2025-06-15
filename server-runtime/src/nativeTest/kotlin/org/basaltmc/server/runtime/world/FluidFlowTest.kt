@@ -132,6 +132,47 @@ class FluidFlowTest {
         for (x in 1..7) assertEquals(AIR, stateAt(x, 64, 0), "water left at x = $x")
     }
 
+    /** parity: `BlockState.blocksMotion`: a torch does not stop water, so the flow runs it over. */
+    @Test
+    fun waterRunsOverATorchAndSaysWhatItWashedAway() {
+        val torch = checkNotNull(Blocks.REGISTRY.idOf(Identifier.vanilla("torch")))
+        level.state.setBlockState(1, 64, 0, torch)
+        level.state.setBlockState(0, 64, 0, WATER)
+
+        val changes = FluidFlow.onBlockChanged(level, 0, 64, 0) + drainTicks()
+
+        assertTrue(FluidFlow.kindOf(stateAt(1, 64, 0)) == FluidKind.WATER, "the torch stopped the water")
+        val washed = changes.firstOrNull { it[0] == 1 && it[1] == 64 && it[2] == 0 }
+        assertEquals(torch, checkNotNull(washed)[4], "the torch was not reported as washed away")
+    }
+
+    /** parity: `canPassThroughWall`: an upside-down slab and the floor leave no gap to flow through. */
+    @Test
+    fun anUpsideDownSlabWallsOffWhatIsUnderIt() {
+        val topSlab = checkNotNull(Blocks.REGISTRY.idOf(Identifier.vanilla("stone_slab"))) - 2
+        level.state.setBlockState(1, 64, 0, topSlab)
+        // The floor under the slab is gone, so only the slab itself can hold the water out.
+        level.state.setBlockState(1, 63, 0, AIR)
+        level.state.setBlockState(0, 64, 0, WATER)
+        FluidFlow.onBlockChanged(level, 0, 64, 0)
+
+        settle()
+
+        assertEquals(AIR, stateAt(1, 63, 0), "water got under the slab")
+    }
+
+    /** Every change one round of due ticks produces, which is where the washed-away block is named. */
+    private fun drainTicks(): List<IntArray> {
+        val changes = mutableListOf<IntArray>()
+        repeat(200) {
+            for (position in level.state.dueFluidTicks()) {
+                changes += FluidFlow.tick(level, position[0], position[1], position[2])
+            }
+            if (level.state.chunkMemory().scheduledTicks == 0) return changes
+        }
+        return changes
+    }
+
     /** parity: `LiquidBlock.shouldSpreadLiquid`: flowing lava beside water turns to cobblestone. */
     @Test
     fun lavaMeetingWaterTurnsToRock() {
