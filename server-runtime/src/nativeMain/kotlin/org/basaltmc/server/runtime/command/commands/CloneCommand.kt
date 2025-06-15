@@ -2,6 +2,7 @@ package org.basaltmc.server.runtime.command.commands
 
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.runtime.command.BlockCoordinates
+import org.basaltmc.server.runtime.command.BlockEditor
 import org.basaltmc.server.runtime.command.BlockPosArgument
 import org.basaltmc.server.runtime.command.BlockPredicateArgument
 import org.basaltmc.server.runtime.command.BlockPredicateInput
@@ -10,7 +11,9 @@ import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSyntaxException
 import org.basaltmc.server.runtime.command.PermissionLevel
-import org.basaltmc.server.runtime.command.blocks
+import org.basaltmc.server.runtime.command.WorldArgument
+import org.basaltmc.server.runtime.command.world
+import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.wire.text.Component
 
 /**
@@ -25,36 +28,63 @@ public class CloneCommand : Command(name = "clone", permissionLevel = Permission
     override fun build(root: CommandNodeBuilder) {
         root.argument("begin", BlockPosArgument) {
             argument("end", BlockPosArgument) {
-                argument("destination", BlockPosArgument) {
-                    executes { context -> clone(context, Mode.NORMAL, null) }
-                    for (mode in Mode.entries) {
-                        literal(mode.name.lowercase()) { executes { context -> clone(context, mode, null) } }
+                argument("destination", BlockPosArgument) { modes() }
+                literal("to") {
+                    argument("targetDimension", WorldArgument) {
+                        argument("destination", BlockPosArgument) { modes() }
                     }
-                    literal("replace") {
-                        executes { context -> clone(context, Mode.NORMAL, null) }
-                        for (mode in Mode.entries) {
-                            literal(mode.name.lowercase()) { executes { context -> clone(context, mode, null) } }
-                        }
-                    }
-                    literal("masked") {
-                        executes { context -> clone(context, Mode.NORMAL, null, skipAir = true) }
-                        for (mode in Mode.entries) {
-                            literal(mode.name.lowercase()) {
-                                executes { context -> clone(context, mode, null, skipAir = true) }
-                            }
-                        }
-                    }
-                    literal("filtered") {
-                        argument("filter", BlockPredicateArgument) {
-                            executes { context -> clone(context, Mode.NORMAL, context.get("filter")) }
-                            for (mode in Mode.entries) {
-                                literal(mode.name.lowercase()) {
-                                    executes { context -> clone(context, mode, context.get("filter")) }
-                                }
+                }
+            }
+        }
+        root.literal("from") {
+            argument("sourceDimension", WorldArgument) {
+                argument("begin", BlockPosArgument) {
+                    argument("end", BlockPosArgument) {
+                        argument("destination", BlockPosArgument) { modes() }
+                        literal("to") {
+                            argument("targetDimension", WorldArgument) {
+                                argument("destination", BlockPosArgument) { modes() }
                             }
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * The tail every form shares: what to copy, and what to do with the source afterwards.
+     *
+     * `strict` is declared and accepted: vanilla uses it to copy states nothing would normally
+     * place, and this build's clone already writes them exactly, so it changes nothing here.
+     */
+    private fun CommandNodeBuilder.modes() {
+        // The bare movement is Basalt's own: vanilla asks for `replace`/`masked`/`filtered` first,
+        // and accepting it loose is syntax on top rather than syntax that differs.
+        movements(null, skipAir = false)
+        filters()
+        literal("strict") {
+            executes { context -> clone(context, Mode.NORMAL, null) }
+            filters()
+        }
+    }
+
+    private fun CommandNodeBuilder.filters() {
+        literal("replace") { movements(null, skipAir = false) }
+        literal("masked") { movements(null, skipAir = true) }
+        literal("filtered") {
+            argument("filter", BlockPredicateArgument) { movements("filter", skipAir = false) }
+        }
+    }
+
+    private fun CommandNodeBuilder.movements(
+        filterArgument: String?,
+        skipAir: Boolean,
+    ) {
+        executes { context -> clone(context, Mode.NORMAL, filterArgument?.let { context.get(it) }, skipAir) }
+        for (mode in Mode.entries) {
+            literal(mode.name.lowercase()) {
+                executes { context -> clone(context, mode, filterArgument?.let { context.get(it) }, skipAir) }
             }
         }
     }
@@ -65,7 +95,18 @@ public class CloneCommand : Command(name = "clone", permissionLevel = Permission
         filter: BlockPredicateInput?,
         skipAir: Boolean = false,
     ): Int {
-        val editor = context.blocks()
+        val source =
+            if (context.has(
+                    "sourceDimension",
+                )
+            ) {
+                context.get<LoadedWorld>("sourceDimension")
+            } else {
+                context.world()
+            }
+        val target = if (context.has("targetDimension")) context.get<LoadedWorld>("targetDimension") else source
+        val editor = BlockEditor(context.environment, source)
+        val destinationEditor = if (target === source) editor else BlockEditor(context.environment, target)
         val origin = context.source.position
         val (beginX, beginY, beginZ) = context.get<BlockCoordinates>("begin").resolve(origin)
         val (endX, endY, endZ) = context.get<BlockCoordinates>("end").resolve(origin)
@@ -99,14 +140,14 @@ public class CloneCommand : Command(name = "clone", permissionLevel = Permission
                 destY + spanY > minY &&
                 destZ <= maxZ &&
                 destZ + spanZ > minZ
-        if (overlaps && mode != Mode.FORCE) {
+        if (overlaps && target === source && mode != Mode.FORCE) {
             throw CommandSyntaxException(Component.translatable("commands.clone.overlap"))
         }
 
         editor.require(minX, minY, minZ)
         editor.require(maxX, maxY, maxZ)
-        editor.require(destX, destY, destZ)
-        editor.require(destX + spanX - 1, destY + spanY - 1, destZ + spanZ - 1)
+        destinationEditor.require(destX, destY, destZ)
+        destinationEditor.require(destX + spanX - 1, destY + spanY - 1, destZ + spanZ - 1)
 
         // Read first, write after: a `force` clone onto itself would otherwise copy blocks it has
         // already overwritten.
@@ -133,9 +174,10 @@ public class CloneCommand : Command(name = "clone", permissionLevel = Permission
         }
         for (index in copied.indices) {
             val (x, y, z) = copied[index]
-            if (editor.set(destX + x, destY + y, destZ + z, states[index])) count++
+            if (destinationEditor.set(destX + x, destY + y, destZ + z, states[index])) count++
         }
         editor.flush()
+        if (destinationEditor !== editor) destinationEditor.flush()
 
         if (count == 0) throw CommandSyntaxException(Component.translatable("commands.clone.failed"))
         context.success(

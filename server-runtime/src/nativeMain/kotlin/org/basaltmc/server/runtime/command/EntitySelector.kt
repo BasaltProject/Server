@@ -87,7 +87,11 @@ public class EntitySelector internal constructor(
         val z = anchorZ ?: sourceZ
 
         if (currentEntity) {
-            val self = source.player?.let { CommandTarget.Player(it) } ?: return emptyList()
+            // `/execute as` may have set something that is not a player, and `@s` is whoever it set.
+            val self =
+                (source as? ExecutionSource)?.entity
+                    ?: source.player?.let { CommandTarget.Player(it) }
+                    ?: return emptyList()
             return if (matches(self, x, y, z)) listOf(self) else emptyList()
         }
 

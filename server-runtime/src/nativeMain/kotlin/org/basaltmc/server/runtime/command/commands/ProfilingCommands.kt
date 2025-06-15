@@ -1,12 +1,20 @@
 package org.basaltmc.server.runtime.command.commands
 
+import org.basaltmc.server.runtime.command.BoolArgument
 import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSyntaxException
+import org.basaltmc.server.runtime.command.CommandTarget
+import org.basaltmc.server.runtime.command.EntitiesArgument
+import org.basaltmc.server.runtime.command.GameModeArgument
 import org.basaltmc.server.runtime.command.GreedyStringArgument
+import org.basaltmc.server.runtime.command.IntegerArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
+import org.basaltmc.server.runtime.command.RegistryArgument
+import org.basaltmc.server.runtime.command.UuidArgument
 import org.basaltmc.server.runtime.timings.TimingsReport
+import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.common.timings.Timings
 import org.basaltmc.wire.text.Component
 import org.basaltmc.wire.text.TextColor
@@ -24,10 +32,38 @@ public class DebugCommand(
     private val report: TimingsReport,
     private val nowNanos: () -> Long,
     private val ticksRun: () -> Long,
+    /** What `/debug function` runs, or null in a fixture with no functions. */
+    private val functions: FunctionRunner? = null,
 ) : Command(name = "debug", permissionLevel = PermissionLevel.ADMINS) {
     override fun build(root: CommandNodeBuilder) {
         root.literal("start") { executes { context -> start(context) } }
         root.literal("stop") { executes { context -> stop(context) } }
+        root.literal("function") {
+            argument("name", RegistryArgument.FUNCTION) {
+                executes { context -> traceFunction(context) }
+            }
+        }
+    }
+
+    /**
+     * parity: `/debug function`, which runs a function and reports what it did. Vanilla writes a
+     * trace file per command; this reports the count, which is the part a player sees.
+     */
+    private fun traceFunction(context: CommandContext): Int {
+        val runner =
+            functions
+                ?: throw CommandSyntaxException(Component.text("No functions are loaded."))
+        val id = context.get<Identifier>("name")
+        val result = runner.run(context.dispatcher, context.source, id)
+        context.success(
+            Component.translatable(
+                "commands.debug.function.success",
+                Component.text("1"),
+                Component.text(id.toString()),
+                Component.text(result.toString()),
+            ),
+        )
+        return result
     }
 
     private var ticksAtStart = 0L
@@ -153,14 +189,37 @@ public class PublishCommand(
     private val port: () -> Int,
 ) : Command(name = "publish", permissionLevel = PermissionLevel.OWNERS) {
     override fun build(root: CommandNodeBuilder) {
+        root.executes { context -> report(context) }
+        root.argument("allowCommands", BoolArgument) {
+            executes { context -> report(context) }
+            argument("gamemode", GameModeArgument) {
+                executes { context -> report(context) }
+                argument("port", IntegerArgument(min = 0, max = 65535)) { executes { context -> report(context) } }
+            }
+        }
+    }
+
+    private fun report(context: CommandContext): Int {
+        context.success(
+            Component.text(
+                "This is a dedicated server: it is already accepting connections on port ${port()}. " +
+                    "/publish exists only on a single-player world being opened to a local network.",
+            ),
+        )
+        return port()
+    }
+}
+
+/** parity: `UnpublishCommand`, which closes a single-player world to the network. Nothing to close here. */
+public class UnpublishCommand : Command(name = "unpublish", permissionLevel = PermissionLevel.OWNERS) {
+    override fun build(root: CommandNodeBuilder) {
         root.executes { context ->
             context.success(
                 Component.text(
-                    "This is a dedicated server: it is already accepting connections on port ${port()}. " +
-                        "/publish exists only on a single-player world being opened to a local network.",
+                    "This is a dedicated server: it is not published to a local network, so nothing closes.",
                 ),
             )
-            port()
+            1
         }
     }
 }
@@ -168,8 +227,8 @@ public class PublishCommand(
 /**
  * parity: `FetchProfileCommand`, which asks Mojang for the UUID behind a name.
  *
- * Only the `name` form: its `id` and `entity` forms answer from the server's profile cache, which
- * this build has not got, so they are left out rather than answered wrong.
+ * `name` asks Mojang; `entity` and `id` answer from who is connected, which is the only profile
+ * cache this build has.
  */
 public class FetchProfileCommand(
     private val lookup: (String) -> String?,
@@ -185,6 +244,31 @@ public class FetchProfileCommand(
                                 Component.text("No Mojang account is called '$name', or the lookup failed."),
                             )
                     context.success(Component.text("$name is $uuid"))
+                    1
+                }
+            }
+        }
+        root.literal("entity") {
+            argument("entity", EntitiesArgument(single = true)) {
+                executes { context ->
+                    val target = context.get<List<CommandTarget>>("entity").single()
+                    context.success(Component.text("${target.name} is ${target.uuid}"))
+                    1
+                }
+            }
+        }
+        root.literal("id") {
+            argument("id", UuidArgument) {
+                executes { context ->
+                    val uuid = context.get<String>("id")
+                    val player =
+                        context.environment.players
+                            .snapshot()
+                            .firstOrNull { it.uuid.toString() == uuid }
+                            ?: throw CommandSyntaxException(
+                                Component.text("Nobody connected has the id '$uuid', and this build keeps no cache."),
+                            )
+                    context.success(Component.text("$uuid is ${player.name}"))
                     1
                 }
             }

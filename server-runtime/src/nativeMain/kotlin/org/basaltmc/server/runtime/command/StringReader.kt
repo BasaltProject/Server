@@ -46,6 +46,20 @@ public class StringReader(
         return string.substring(start, cursor)
     }
 
+    /**
+     * Consumes [literal] if it is what comes next, followed by a space or the end of the line.
+     *
+     * parity: `LiteralCommandNode.parse`, which matches text rather than a word: `>=` and `<` are
+     * literals in `/execute if score` and no word reader would ever read them.
+     */
+    public fun readLiteral(literal: String): Boolean {
+        if (!string.startsWith(literal, cursor)) return false
+        val end = cursor + literal.length
+        if (end < string.length && string[end] != ' ') return false
+        cursor = end
+        return true
+    }
+
     /** A quoted string if the next character opens a quote, an unquoted word otherwise, as brigadier does. */
     public fun readString(): String {
         if (!canRead()) return ""

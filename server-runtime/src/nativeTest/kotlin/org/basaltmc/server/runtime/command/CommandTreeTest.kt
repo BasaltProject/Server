@@ -1,5 +1,6 @@
 package org.basaltmc.server.runtime.command
 
+import org.basaltmc.server.runtime.TickLoop
 import org.basaltmc.server.runtime.command.commands.AdvancementCommand
 import org.basaltmc.server.runtime.command.commands.AttributeCommand
 import org.basaltmc.server.runtime.command.commands.BanCommand
@@ -9,8 +10,10 @@ import org.basaltmc.server.runtime.command.commands.BossBarCommand
 import org.basaltmc.server.runtime.command.commands.BossBarRegistry
 import org.basaltmc.server.runtime.command.commands.CommandStorage
 import org.basaltmc.server.runtime.command.commands.DamageCommand
+import org.basaltmc.server.runtime.command.commands.DataAccess
 import org.basaltmc.server.runtime.command.commands.DataCommand
 import org.basaltmc.server.runtime.command.commands.DataPackCommand
+import org.basaltmc.server.runtime.command.commands.DebugCommand
 import org.basaltmc.server.runtime.command.commands.DialogCommand
 import org.basaltmc.server.runtime.command.commands.EnchantCommand
 import org.basaltmc.server.runtime.command.commands.ExecuteCommand
@@ -26,10 +29,12 @@ import org.basaltmc.server.runtime.command.commands.LocateCommand
 import org.basaltmc.server.runtime.command.commands.LootCommand
 import org.basaltmc.server.runtime.command.commands.PardonCommand
 import org.basaltmc.server.runtime.command.commands.ParticleCommand
+import org.basaltmc.server.runtime.command.commands.PerfCommand
 import org.basaltmc.server.runtime.command.commands.PlaceCommand
 import org.basaltmc.server.runtime.command.commands.PublishCommand
 import org.basaltmc.server.runtime.command.commands.RandomCommand
 import org.basaltmc.server.runtime.command.commands.RecipeCommand
+import org.basaltmc.server.runtime.command.commands.ReloadCommand
 import org.basaltmc.server.runtime.command.commands.RestartCommand
 import org.basaltmc.server.runtime.command.commands.ReturnCommand
 import org.basaltmc.server.runtime.command.commands.RideCommand
@@ -44,21 +49,33 @@ import org.basaltmc.server.runtime.command.commands.SetIdleTimeoutCommand
 import org.basaltmc.server.runtime.command.commands.SpawnPointCommand
 import org.basaltmc.server.runtime.command.commands.SpectateCommand
 import org.basaltmc.server.runtime.command.commands.SpreadPlayersCommand
+import org.basaltmc.server.runtime.command.commands.StopwatchCommand
+import org.basaltmc.server.runtime.command.commands.Stopwatches
 import org.basaltmc.server.runtime.command.commands.SummonCommand
 import org.basaltmc.server.runtime.command.commands.SwingCommand
 import org.basaltmc.server.runtime.command.commands.TeamCommand
 import org.basaltmc.server.runtime.command.commands.TeamMsgCommand
 import org.basaltmc.server.runtime.command.commands.TestCommand
+import org.basaltmc.server.runtime.command.commands.TickCommand
 import org.basaltmc.server.runtime.command.commands.TransferCommand
 import org.basaltmc.server.runtime.command.commands.TriggerCommand
+import org.basaltmc.server.runtime.command.commands.UnpublishCommand
 import org.basaltmc.server.runtime.command.commands.WaypointCommand
 import org.basaltmc.server.runtime.command.commands.WhitelistCommand
 import org.basaltmc.server.runtime.command.commands.WorldBorderCommand
+import org.basaltmc.server.runtime.config.AnimationsConfig
+import org.basaltmc.server.runtime.config.CommandsConfig
+import org.basaltmc.server.runtime.config.ConfigSnapshot
+import org.basaltmc.server.runtime.config.LiveConfigs
+import org.basaltmc.server.runtime.config.testServerList
 import org.basaltmc.server.runtime.function.FunctionLibrary
 import org.basaltmc.server.runtime.player.PlayerRegistry
 import org.basaltmc.server.runtime.player.PlayerSession
 import org.basaltmc.server.runtime.scoreboard.Scoreboard
 import org.basaltmc.server.runtime.scoreboard.Teams
+import org.basaltmc.server.runtime.timings.ReportSources
+import org.basaltmc.server.runtime.timings.TimingsReport
+import org.basaltmc.server.runtime.ui.UiConfigs
 import org.basaltmc.server.runtime.world.PlayerProgress
 import org.basaltmc.server.runtime.world.RealAdvancements
 import org.basaltmc.server.runtime.world.RealDialogs
@@ -68,6 +85,8 @@ import org.basaltmc.server.runtime.world.RealRecipes
 import org.basaltmc.server.runtime.world.RealTestInstances
 import org.basaltmc.server.runtime.world.StructureTemplates
 import org.basaltmc.server.world.terrain.VillageStructureGenerator
+import org.basaltmc.wire.common.timings.TickDurations
+import org.basaltmc.wire.common.timings.Timings
 import org.basaltmc.wire.io.FileIO
 import org.basaltmc.wire.text.Component
 import kotlin.test.Test
@@ -85,6 +104,31 @@ private class DumpSource : CommandSource {
 
     override fun sendSystemMessage(message: Component) = Unit
 }
+
+/** A report nobody reads: the profiling commands need one to build their tree. */
+private fun dumpReport(): TimingsReport =
+    TimingsReport(
+        Timings(),
+        TickDurations(),
+        ReportSources(
+            versionName = "26.2",
+            protocolVersion = 776,
+            uptimeSeconds = { 0L },
+            onlinePlayers = { 0 },
+            maxPlayers = { 0 },
+            loadedChunks = { 0 },
+            regionCacheBytes = { 0L },
+            chunkBytes = { 0L },
+            chunkBlockEntities = { 0 },
+            chunkScheduledTicks = { 0 },
+            chunkGeneratedEntities = { 0 },
+            worldgenCaches = { emptyList() },
+            worldCount = { 0 },
+            cpuPercent = { null },
+            liveHeapBytes = { null },
+            residentBytes = { null },
+        ),
+    )
 
 /**
  * Builds the whole tree, checks that every completion the server can answer is one the client will
@@ -116,8 +160,15 @@ class CommandTreeTest {
                     )
                 }.also { it.register(PublishCommand { 25565 }) }
                 .also { it.register(FetchProfileCommand { null }) }
-                .also { it.register(FunctionCommand(library, runner)) }
-                .also { it.register(ReturnCommand(runner)) }
+                .also {
+                    it.register(
+                        FunctionCommand(
+                            library,
+                            runner,
+                            DataAccess(CommandStorage("build/test-data/dump/storage.dat")),
+                        ),
+                    )
+                }.also { it.register(ReturnCommand(runner)) }
                 .also { it.register(ScheduleCommand(library, FunctionSchedule())) }
                 .also { it.register(DataPackCommand(library)) }
                 .also { it.register(SummonCommand(PlayerRegistry())) }
@@ -158,6 +209,29 @@ class CommandTreeTest {
                 .also { it.register(SaveOffCommand(SaveControl {})) }
                 .also { it.register(SaveOnCommand(SaveControl {})) }
                 .also { it.register(SetIdleTimeoutCommand {}) }
+                // The four the real server registers with runtime objects. They belong in the dump
+                // for the same reason as the rest: what is not here cannot be compared to vanilla.
+                .also { it.register(TickCommand(TickLoop(), TickDurations()) { 0L }) }
+                .also { it.register(PerfCommand(Timings(), dumpReport()) { 0L }) }
+                .also { it.register(DebugCommand(Timings(), dumpReport(), { 0L }, { 0L }, runner)) }
+                .also { it.register(UnpublishCommand()) }
+                .also { it.register(StopwatchCommand(Stopwatches { 0L })) }
+                .also {
+                    it.register(
+                        ReloadCommand(
+                            LiveConfigs(
+                                ConfigSnapshot(
+                                    groups = testGroups(),
+                                    serverList = testServerList(),
+                                    commands = CommandsConfig(emptyMap(), emptyList(), emptyMap()),
+                                    animations = AnimationsConfig(emptyMap()),
+                                    ui = UiConfigs(),
+                                ),
+                            ),
+                            {},
+                        ),
+                    )
+                }
 
         val packet = dispatcher.treeFor(DumpSource())
         val json = StringBuilder()

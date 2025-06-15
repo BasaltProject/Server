@@ -36,10 +36,17 @@ public class FillCommand : Command(name = "fill", permissionLevel = PermissionLe
                     literal("keep") {
                         executes { context -> fill(context, Mode.REPLACE, null, onlyAir = true) }
                     }
+                    // parity: `strict` writes the state as written; nothing here adjusts one anyway.
+                    literal("strict") { executes { context -> fill(context, Mode.REPLACE, null) } }
                     literal("replace") {
                         executes { context -> fill(context, Mode.REPLACE, null) }
                         argument("filter", BlockPredicateArgument) {
                             executes { context -> fill(context, Mode.REPLACE, context.get("filter")) }
+                            literal("strict") {
+                                executes { context ->
+                                    fill(context, Mode.REPLACE, context.get("filter"))
+                                }
+                            }
                             literal("outline") {
                                 executes { context -> fill(context, Mode.OUTLINE, context.get("filter")) }
                             }

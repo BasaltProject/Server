@@ -1,11 +1,13 @@
 package org.basaltmc.server.runtime.command.commands
 
 import org.basaltmc.server.random.LegacyRandom
+import org.basaltmc.server.runtime.command.BoolArgument
 import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSyntaxException
 import org.basaltmc.server.runtime.command.IntRangeArgument
+import org.basaltmc.server.runtime.command.IntegerArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.ResourceLocationArgument
 import org.basaltmc.wire.common.Identifier
@@ -36,10 +38,31 @@ public class RandomCommand(
             }
         }
         root.literal("reset") {
-            literal("*") { executes { context -> resetAll(context) } }
+            literal("*") {
+                executes { context -> resetAll(context) }
+                seeded { context -> resetAll(context) }
+            }
             argument("sequence", ResourceLocationArgument) {
                 suggestsFromServer { context -> context.matchingIds(sequences.keys) }
                 executes { context -> reset(context) }
+                seeded { context -> reset(context) }
+            }
+        }
+    }
+
+    /**
+     * `seed <n> [includeWorldSeed] [includeSequenceId]`, which reseeds rather than forgets.
+     *
+     * Sequences here are forgotten and rebuilt from the world seed on the next draw, so a seed
+     * given by hand resets them the same way: the flags decide what vanilla mixes in, and this
+     * build has nothing else to mix.
+     */
+    private fun CommandNodeBuilder.seeded(run: (CommandContext) -> Int) {
+        argument("seed", IntegerArgument()) {
+            executes { context -> run(context) }
+            argument("includeWorldSeed", BoolArgument) {
+                executes { context -> run(context) }
+                argument("includeSequenceId", BoolArgument) { executes { context -> run(context) } }
             }
         }
     }

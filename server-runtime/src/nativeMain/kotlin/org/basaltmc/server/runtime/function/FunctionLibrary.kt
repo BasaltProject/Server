@@ -27,11 +27,29 @@ public class FunctionLibrary(
     private val functions = mutableMapOf<Identifier, ServerFunction>()
     private val disabledPacks = mutableSetOf<String>()
 
+    /** Enabled packs in the order `/datapack enable ... before|after` put them. */
+    private val order = mutableListOf<String>()
+
     /** Every pack directory found, whether or not it is enabled. */
     public var availablePacks: List<String> = emptyList()
         private set
 
-    public val enabledPacks: List<String> get() = availablePacks.filter { it !in disabledPacks }
+    public val enabledPacks: List<String> get() = order.filter { it in availablePacks && it !in disabledPacks }
+
+    /** Where `/datapack enable` puts a pack, which decides which of two packs wins a name. */
+    public sealed interface Position {
+        public data object First : Position
+
+        public data object Last : Position
+
+        public class Before(
+            public val other: String,
+        ) : Position
+
+        public class After(
+            public val other: String,
+        ) : Position
+    }
 
     public operator fun get(id: Identifier): ServerFunction? = functions[id]?.takeIf { it.pack !in disabledPacks }
 
@@ -42,16 +60,49 @@ public class FunctionLibrary(
     public fun setEnabled(
         pack: String,
         enabled: Boolean,
+        position: Position = Position.Last,
     ): Boolean {
         if (pack !in availablePacks) return false
         val changed = if (enabled) disabledPacks.remove(pack) else disabledPacks.add(pack)
+        if (enabled) place(pack, position)
         return changed
+    }
+
+    private fun place(
+        pack: String,
+        position: Position,
+    ) {
+        order.remove(pack)
+        when (position) {
+            is Position.First -> order.add(0, pack)
+            is Position.Last -> order.add(pack)
+            is Position.Before -> order.add(order.indexOf(position.other).coerceAtLeast(0), pack)
+            is Position.After -> order.add((order.indexOf(position.other) + 1).coerceAtMost(order.size), pack)
+        }
+    }
+
+    /**
+     * Creates an empty pack directory with the `pack.mcmeta` that marks it as one.
+     *
+     * parity: `/datapack create`. Returns false if the name is already taken.
+     */
+    public fun create(
+        pack: String,
+        description: String,
+    ): Boolean {
+        val directory = "$root/$pack"
+        if (FileIO.directoryExists(directory)) return false
+        FileIO.createDirectories("$directory/data")
+        FileIO.writeText("$directory/pack.mcmeta", """{"pack":{"pack_format":0,"description":"$description"}}""")
+        reload()
+        return true
     }
 
     /** Reads every pack again. Called at startup and by `/reload`, exactly as vanilla reloads packs. */
     public fun reload(): Int {
         functions.clear()
         availablePacks = if (FileIO.directoryExists(root)) FileIO.list(root).sorted() else emptyList()
+        for (pack in availablePacks) if (pack !in order) order.add(pack)
         for (pack in availablePacks) {
             val dataRoot = "$root/$pack/data"
             if (!FileIO.directoryExists(dataRoot)) continue

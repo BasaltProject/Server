@@ -20,6 +20,10 @@ public class ExecutionSource(
     public val rotation: Pair<Float, Float> = (base as? ExecutionSource)?.rotation ?: (0f to 0f),
     /** parity: `anchored`, which decides whether a position means the feet or the eyes. */
     public val anchorEyes: Boolean = (base as? ExecutionSource)?.anchorEyes ?: false,
+    /** Who `@s` is, which `/execute as` sets and which can be something other than a player. */
+    public val entity: CommandTarget? = (base as? ExecutionSource)?.entity,
+    /** What `/execute store` hangs here: called with the result of whatever the chain ends up running. */
+    private val onResult: ((success: Boolean, result: Int) -> Unit)? = null,
 ) : CommandSource {
     override val name: String get() = player?.name ?: base.name
     override val displayName: Component get() = player?.let { Component.text(it.name) } ?: base.displayName
@@ -33,6 +37,16 @@ public class ExecutionSource(
 
     /** The source that started the chain, which is who feedback belongs to. */
     public val root: CommandSource get() = (base as? ExecutionSource)?.root ?: base
+
+    /** parity: `CommandSourceStack.withCallback`, which is how `store` collects a result. */
+    public fun withCallback(callback: (success: Boolean, result: Int) -> Unit): ExecutionSource =
+        ExecutionSource(this, player, position, world, rotation, anchorEyes, entity, callback)
+
+    /** Reports a result to every `store` in the chain, innermost first. */
+    public fun report(result: Int) {
+        onResult?.invoke(result != 0, result)
+        (base as? ExecutionSource)?.report(result)
+    }
 }
 
 /** The world a source acts in: what `/execute in` chose, else the runner's own. */

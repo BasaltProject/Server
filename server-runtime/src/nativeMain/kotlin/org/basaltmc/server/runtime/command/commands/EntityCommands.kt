@@ -11,6 +11,8 @@ import org.basaltmc.server.runtime.command.CommandTarget
 import org.basaltmc.server.runtime.command.Coordinates
 import org.basaltmc.server.runtime.command.DoubleArgument
 import org.basaltmc.server.runtime.command.EntitiesArgument
+import org.basaltmc.server.runtime.command.EntityAnchor
+import org.basaltmc.server.runtime.command.EntityAnchorArgument
 import org.basaltmc.server.runtime.command.FloatArgument
 import org.basaltmc.server.runtime.command.NbtCompoundArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
@@ -144,6 +146,21 @@ public class DamageCommand(
                         context.matchingIds(serverJar?.dataIds("damage_type", ".json").orEmpty())
                     }
                     executes { context -> damage(context) }
+                    // Where it came from and who dealt it. Neither changes the damage in this
+                    // build, which has no knockback or attribution: they are accepted, not acted on.
+                    literal("at") {
+                        argument("location", Vec3Argument) { executes { context -> damage(context) } }
+                    }
+                    literal("by") {
+                        argument("entity", EntitiesArgument(single = true)) {
+                            executes { context -> damage(context) }
+                            literal("from") {
+                                argument("cause", EntitiesArgument(single = true)) {
+                                    executes { context -> damage(context) }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -261,7 +278,12 @@ public class RotateCommand : Command(name = "rotate", permissionLevel = Permissi
                 argument("facingLocation", Vec3Argument) { executes { context -> facePosition(context) } }
                 literal("entity") {
                     argument("facingEntity", EntitiesArgument(single = true)) {
-                        executes { context -> faceEntity(context) }
+                        executes { context -> faceEntity(context, eyes = false) }
+                        argument("facingAnchor", EntityAnchorArgument) {
+                            executes { context ->
+                                faceEntity(context, context.get<EntityAnchor>("facingAnchor") == EntityAnchor.EYES)
+                            }
+                        }
                     }
                 }
             }
@@ -275,10 +297,14 @@ public class RotateCommand : Command(name = "rotate", permissionLevel = Permissi
         return rotate(context, yaw, pitch)
     }
 
-    private fun faceEntity(context: CommandContext): Int {
+    private fun faceEntity(
+        context: CommandContext,
+        eyes: Boolean,
+    ): Int {
         val target = context.get<List<CommandTarget>>("target").single()
         val other = context.get<List<CommandTarget>>("facingEntity").single()
-        val (yaw, pitch) = anglesTowards(target, other.x, other.y, other.z)
+        val y = other.y + if (eyes) EYE_HEIGHT else 0.0
+        val (yaw, pitch) = anglesTowards(target, other.x, y, other.z)
         return rotate(context, yaw, pitch)
     }
 
@@ -321,6 +347,7 @@ public class RotateCommand : Command(name = "rotate", permissionLevel = Permissi
 
     private companion object {
         const val DEGREES_PER_RADIAN = 57.2957795130823
+        const val EYE_HEIGHT = 1.62
     }
 }
 

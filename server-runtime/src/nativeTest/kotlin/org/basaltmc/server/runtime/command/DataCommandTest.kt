@@ -7,6 +7,7 @@ import org.basaltmc.server.runtime.player.PlayerSession
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
 import org.basaltmc.wire.nbt.NbtInt
+import org.basaltmc.wire.nbt.NbtString
 import org.basaltmc.wire.text.Component
 import org.basaltmc.wire.text.PlainTextSerializer
 import kotlin.test.Test
@@ -52,6 +53,45 @@ class DataCommandTest {
     fun modifySetWritesIntoStorage() {
         run("""data modify storage basalt:test counter set value 7""")
         assertEquals(7, (storage[id]["counter"] as NbtInt).value)
+    }
+
+    /** parity: `/data modify ... from`, which copies a value out of another holder. */
+    @Test
+    fun modifyFromCopiesAnotherHoldersValue() {
+        run("""data modify storage basalt:source name set value "Steve"""")
+        run("""data modify storage basalt:test who set from storage basalt:source name""")
+
+        assertEquals("Steve", (storage[id]["who"] as NbtString).value)
+    }
+
+    /** parity: `/data modify ... string`, whose slice indices count from the end when negative. */
+    @Test
+    fun modifyStringTakesASliceOfTheSourceValue() {
+        run("""data modify storage basalt:source name set value "Steve"""")
+        run("""data modify storage basalt:test short set string storage basalt:source name 0 3""")
+        run("""data modify storage basalt:test tail set string storage basalt:source name -2""")
+
+        assertEquals("Ste", (storage[id]["short"] as NbtString).value)
+        assertEquals("ve", (storage[id]["tail"] as NbtString).value)
+    }
+
+    /** parity: `/data get <path> <scale>`, whose result is the value multiplied by the scale. */
+    @Test
+    fun getScalesTheNumberItReports() {
+        run("""data modify storage basalt:test counter set value 7""")
+
+        assertEquals(7, run("""data get storage basalt:test counter"""))
+        assertEquals(70, run("""data get storage basalt:test counter 10"""))
+    }
+
+    /** `from` with no path at all copies the whole compound. */
+    @Test
+    fun modifyFromWithoutAPathCopiesEverything() {
+        run("""data modify storage basalt:source a set value 1""")
+        run("""data modify storage basalt:test copy set from storage basalt:source""")
+
+        val copy = storage[id]["copy"] as NbtCompound
+        assertEquals(1, (copy["a"] as NbtInt).value)
     }
 
     @Test

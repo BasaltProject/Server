@@ -1,20 +1,32 @@
 package org.basaltmc.server.runtime.command.commands
 
+import org.basaltmc.server.runtime.command.BlockCoordinates
+import org.basaltmc.server.runtime.command.BlockPosArgument
 import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandDispatcher
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSource
 import org.basaltmc.server.runtime.command.CommandSyntaxException
+import org.basaltmc.server.runtime.command.CommandTarget
+import org.basaltmc.server.runtime.command.ComponentArgument
+import org.basaltmc.server.runtime.command.EntitiesArgument
 import org.basaltmc.server.runtime.command.GreedyStringArgument
 import org.basaltmc.server.runtime.command.IntegerArgument
+import org.basaltmc.server.runtime.command.NbtCompoundArgument
+import org.basaltmc.server.runtime.command.NbtPathArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.RegistryArgument
+import org.basaltmc.server.runtime.command.ResourceLocationArgument
 import org.basaltmc.server.runtime.command.TimeArgument
 import org.basaltmc.server.runtime.command.WordArgument
 import org.basaltmc.server.runtime.function.FunctionLibrary
 import org.basaltmc.wire.common.Identifier
+import org.basaltmc.wire.nbt.NbtCompound
+import org.basaltmc.wire.nbt.NbtString
+import org.basaltmc.wire.nbt.Snbt
 import org.basaltmc.wire.text.Component
+import org.basaltmc.wire.text.PlainTextSerializer
 
 /**
  * Runs a function's lines, and holds what `/return` did while they run.
@@ -41,6 +53,7 @@ public class FunctionRunner(
         dispatcher: CommandDispatcher,
         source: CommandSource,
         id: Identifier,
+        arguments: NbtCompound? = null,
     ): Int {
         val function =
             library[id]
@@ -58,7 +71,7 @@ public class FunctionRunner(
         try {
             var result = 0
             for (line in function.lines) {
-                result = dispatcher.execute(source, line)
+                result = dispatcher.execute(source, expand(line, arguments))
                 pendingReturn?.let { return it }
             }
             return result
@@ -68,19 +81,127 @@ public class FunctionRunner(
         }
     }
 
+    /**
+     * parity: a macro line starts with `$` and takes `$(name)` from the arguments.
+     *
+     * A line with no `$` prefix is left alone, which is what makes a macro function ordinary lines
+     * plus a few substituted ones.
+     */
+    private fun expand(
+        line: String,
+        arguments: NbtCompound?,
+    ): String {
+        if (!line.startsWith("$")) return line
+        val body = line.removePrefix("$")
+        if (arguments == null) {
+            throw CommandSyntaxException(Component.translatable("commands.function.error.missing_arguments"))
+        }
+        val out = StringBuilder(body.length)
+        var index = 0
+        while (index < body.length) {
+            val open = body.indexOf("$(", index)
+            if (open < 0) {
+                out.append(body, index, body.length)
+                break
+            }
+            val close = body.indexOf(')', open)
+            if (close < 0) {
+                out.append(body, index, body.length)
+                break
+            }
+            out.append(body, index, open)
+            val name = body.substring(open + 2, close)
+            val value =
+                arguments[name]
+                    ?: throw CommandSyntaxException(
+                        Component.translatable(
+                            "commands.function.error.parameter_not_found",
+                            Component.text(name),
+                        ),
+                    )
+            out.append(if (value is NbtString) value.value else Snbt.stringify(value))
+            index = close + 1
+        }
+        return out.toString()
+    }
+
     private companion object {
         const val MAX_DEPTH = 64
     }
 }
 
-/** parity: `FunctionCommand`, minus its `with <source>` macro arguments, which need macro lines. */
+/** parity: `FunctionCommand`, macro arguments included. */
 public class FunctionCommand(
     private val library: FunctionLibrary,
     private val runner: FunctionRunner,
+    /** Where `with block|entity|storage` reads its arguments, or null in a fixture without data. */
+    private val data: DataAccess? = null,
 ) : Command(name = "function", permissionLevel = PermissionLevel.GAMEMASTERS) {
     override fun build(root: CommandNodeBuilder) {
         root.argument("name", RegistryArgument.FUNCTION) {
             suggestsFromServer { context -> context.matchingIds(library.all().map { it.id }) }
+            argument("arguments", NbtCompoundArgument) {
+                executes { context -> call(context, context.get("arguments")) }
+            }
+            literal("with") {
+                literal("block") {
+                    argument("sourcePos", BlockPosArgument) {
+                        executes { context ->
+                            call(
+                                context,
+                                macroFrom(
+                                    context,
+                                    DataHolderRef.Block(
+                                        context.get<BlockCoordinates>("sourcePos").resolve(context.source.position),
+                                    ),
+                                    null,
+                                ),
+                            )
+                        }
+                        argument("path", NbtPathArgument) {
+                            executes { context ->
+                                call(
+                                    context,
+                                    macroFrom(
+                                        context,
+                                        DataHolderRef.Block(
+                                            context.get<BlockCoordinates>("sourcePos").resolve(context.source.position),
+                                        ),
+                                        context.get("path"),
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                }
+                literal("entity") {
+                    argument("source", EntitiesArgument(single = true)) {
+                        executes { context -> call(context, macroFromEntity(context, null)) }
+                        argument("path", NbtPathArgument) {
+                            executes { context -> call(context, macroFromEntity(context, context.get("path"))) }
+                        }
+                    }
+                }
+                literal("storage") {
+                    argument("source", ResourceLocationArgument) {
+                        executes { context ->
+                            call(context, macroFrom(context, DataHolderRef.Storage(context.get("source")), null))
+                        }
+                        argument("path", NbtPathArgument) {
+                            executes { context ->
+                                call(
+                                    context,
+                                    macroFrom(
+                                        context,
+                                        DataHolderRef.Storage(context.get("source")),
+                                        context.get("path"),
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
             executes { context ->
                 val id = context.get<Identifier>("name")
                 val result = runner.run(context.dispatcher, context.source, id)
@@ -95,6 +216,47 @@ public class FunctionCommand(
                 result
             }
         }
+    }
+
+    /** Runs the function with the arguments a macro needs, and reports what it returned. */
+    private fun call(
+        context: CommandContext,
+        arguments: NbtCompound,
+    ): Int {
+        val id = context.get<Identifier>("name")
+        val result = runner.run(context.dispatcher, context.source, id, arguments)
+        context.success(
+            Component.translatable(
+                "commands.function.result",
+                Component.text(id.toString()),
+                Component.text(result.toString()),
+            ),
+            broadcastToAdmins = true,
+        )
+        return result
+    }
+
+    private fun macroFrom(
+        context: CommandContext,
+        holder: DataHolderRef,
+        path: String?,
+    ): NbtCompound =
+        data?.readCompound(context, holder, path)
+            ?: throw CommandSyntaxException(
+                Component.translatable("commands.function.error.missing_arguments"),
+            )
+
+    private fun macroFromEntity(
+        context: CommandContext,
+        path: String?,
+    ): NbtCompound {
+        val target = context.get<List<CommandTarget>>("source").single()
+        val player =
+            (target as? CommandTarget.Player)?.session
+                ?: throw CommandSyntaxException(
+                    Component.text("Only a player carries data in this build; ${target.name} does not."),
+                )
+        return macroFrom(context, DataHolderRef.Entity(player), path)
     }
 }
 
@@ -254,6 +416,30 @@ public class DataPackCommand(
             argument("name", WordArgument) {
                 suggestsFromServer { context -> context.matching(library.availablePacks.filterNot(library::isEnabled)) }
                 executes { context -> setEnabled(context, true) }
+                literal("first") { executes { context -> setEnabled(context, true, FunctionLibrary.Position.First) } }
+                literal("last") { executes { context -> setEnabled(context, true, FunctionLibrary.Position.Last) } }
+                for (relative in listOf("before", "after")) {
+                    literal(relative) {
+                        argument("existing", WordArgument) {
+                            suggestsFromServer { context -> context.matching(library.enabledPacks) }
+                            executes { context ->
+                                val other = context.get<String>("existing")
+                                val position =
+                                    if (relative == "before") {
+                                        FunctionLibrary.Position.Before(other)
+                                    } else {
+                                        FunctionLibrary.Position.After(other)
+                                    }
+                                setEnabled(context, true, position)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        root.literal("create") {
+            argument("id", WordArgument) {
+                argument("description", ComponentArgument) { executes { context -> create(context) } }
             }
         }
         root.literal("disable") {
@@ -289,12 +475,29 @@ public class DataPackCommand(
         return packs.size
     }
 
+    /** parity: `/datapack create`, which writes an empty pack and its `pack.mcmeta`. */
+    private fun create(context: CommandContext): Int {
+        val id = context.get<String>("id")
+        val description = PlainTextSerializer.serialize(context.get<Component>("description"))
+        if (!library.create(id, description)) {
+            throw CommandSyntaxException(
+                Component.translatable("commands.datapack.create.already_exists", Component.text(id)),
+            )
+        }
+        context.success(
+            Component.translatable("commands.datapack.create.success", Component.text(id)),
+            broadcastToAdmins = true,
+        )
+        return 1
+    }
+
     private fun setEnabled(
         context: CommandContext,
         enabled: Boolean,
+        position: FunctionLibrary.Position = FunctionLibrary.Position.Last,
     ): Int {
         val name = context.get<String>("name")
-        if (!library.setEnabled(name, enabled)) {
+        if (!library.setEnabled(name, enabled, position)) {
             throw CommandSyntaxException(
                 Component.translatable(
                     if (enabled) "commands.datapack.enable.failed" else "commands.datapack.disable.failed",

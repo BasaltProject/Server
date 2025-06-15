@@ -6,13 +6,15 @@ import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.CommandSyntaxException
+import org.basaltmc.server.runtime.command.CommandTarget
+import org.basaltmc.server.runtime.command.DoubleArgument
+import org.basaltmc.server.runtime.command.EntitiesArgument
 import org.basaltmc.server.runtime.command.EntityNbt
 import org.basaltmc.server.runtime.command.IntegerArgument
 import org.basaltmc.server.runtime.command.NbtCompoundArgument
 import org.basaltmc.server.runtime.command.NbtPathArgument
 import org.basaltmc.server.runtime.command.NbtTagArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
-import org.basaltmc.server.runtime.command.PlayersArgument
 import org.basaltmc.server.runtime.command.ResourceLocationArgument
 import org.basaltmc.server.runtime.command.world
 import org.basaltmc.server.runtime.player.PlayerSession
@@ -27,6 +29,7 @@ import org.basaltmc.wire.nbt.NbtInt
 import org.basaltmc.wire.nbt.NbtList
 import org.basaltmc.wire.nbt.NbtLong
 import org.basaltmc.wire.nbt.NbtShort
+import org.basaltmc.wire.nbt.NbtString
 import org.basaltmc.wire.nbt.NbtTag
 import org.basaltmc.wire.nbt.Snbt
 import org.basaltmc.wire.text.Component
@@ -92,8 +95,13 @@ public class DataCommand(
     override fun build(root: CommandNodeBuilder) {
         root.literal("get") {
             holders {
-                executes { context -> get(context, null) }
-                argument("path", NbtPathArgument) { executes { context -> get(context, context.get("path")) } }
+                executes { context -> get(context, null, 1.0) }
+                argument("path", NbtPathArgument) {
+                    executes { context -> get(context, context.get("path"), 1.0) }
+                    argument("scale", DoubleArgument()) {
+                        executes { context -> get(context, context.get("path"), context.get("scale")) }
+                    }
+                }
             }
         }
         root.literal("merge") {
@@ -109,32 +117,12 @@ public class DataCommand(
         root.literal("modify") {
             holders {
                 argument("targetPath", NbtPathArgument) {
-                    literal("set") {
-                        literal("value") {
-                            argument("value", NbtTagArgument) { executes { context -> modify(context, false) } }
-                        }
-                    }
-                    literal("merge") {
-                        literal("value") {
-                            argument("value", NbtTagArgument) { executes { context -> modify(context, true) } }
-                        }
-                    }
-                    for (mode in listOf("append", "prepend", "insert")) {
+                    for (mode in listOf("append", "insert", "merge", "prepend", "set")) {
                         literal(mode) {
                             if (mode == "insert") {
-                                argument("index", IntegerArgument()) {
-                                    literal("value") {
-                                        argument("value", NbtTagArgument) {
-                                            executes { context -> modifyList(context, mode) }
-                                        }
-                                    }
-                                }
+                                argument("index", IntegerArgument()) { sources(mode) }
                             } else {
-                                literal("value") {
-                                    argument("value", NbtTagArgument) {
-                                        executes { context -> modifyList(context, mode) }
-                                    }
-                                }
+                                sources(mode)
                             }
                         }
                     }
@@ -146,8 +134,95 @@ public class DataCommand(
     /** The three `(block|entity|storage)` forms, declared once per verb the way vanilla does. */
     private fun CommandNodeBuilder.holders(build: CommandNodeBuilder.() -> Unit) {
         literal("block") { argument("targetPos", BlockPosArgument) { build() } }
-        literal("entity") { argument("target", PlayersArgument(single = true)) { build() } }
+        literal("entity") { argument("target", EntitiesArgument(single = true)) { build() } }
         literal("storage") { argument("target", ResourceLocationArgument) { build() } }
+    }
+
+    /** The same three, named as vanilla names them on the reading side of a `modify`. */
+    private fun CommandNodeBuilder.sourceHolders(build: CommandNodeBuilder.() -> Unit) {
+        literal("block") { argument("sourcePos", BlockPosArgument) { build() } }
+        literal("entity") { argument("source", EntitiesArgument(single = true)) { build() } }
+        literal("storage") { argument("source", ResourceLocationArgument) { build() } }
+    }
+
+    /** Where a modified value comes from: a literal tag, another holder, or one as text. */
+    private fun CommandNodeBuilder.sources(mode: String) {
+        literal("value") {
+            argument("value", NbtTagArgument) {
+                executes { context ->
+                    applyModify(context, mode, context.get("value"))
+                }
+            }
+        }
+        literal("from") {
+            sourceHolders {
+                executes { context -> applyModify(context, mode, sourceValue(context, null)) }
+                argument("sourcePath", NbtPathArgument) {
+                    executes { context -> applyModify(context, mode, sourceValue(context, context.get("sourcePath"))) }
+                }
+            }
+        }
+        literal("string") {
+            sourceHolders {
+                executes { context -> applyModify(context, mode, sourceText(context, null)) }
+                argument("sourcePath", NbtPathArgument) {
+                    executes { context -> applyModify(context, mode, sourceText(context, context.get("sourcePath"))) }
+                    argument("start", IntegerArgument()) {
+                        executes { context ->
+                            applyModify(context, mode, sourceText(context, context.get("sourcePath")))
+                        }
+                        argument("end", IntegerArgument()) {
+                            executes { context ->
+                                applyModify(context, mode, sourceText(context, context.get("sourcePath")))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** parity: `/data modify ... from`, which copies whatever is at that path, compound or not. */
+    private fun sourceValue(
+        context: CommandContext,
+        path: String?,
+    ): NbtTag {
+        val root = read(context, sourceHolderOf(context))
+        if (path == null) return root
+        return DataPaths.resolve(root, path) ?: throw noSuchPath(path)
+    }
+
+    /** parity: `/data modify ... string`, which is the same value as text, optionally a slice of it. */
+    private fun sourceText(
+        context: CommandContext,
+        path: String?,
+    ): NbtTag {
+        val value = sourceValue(context, path)
+        val text = if (value is NbtString) value.value else Snbt.stringify(value)
+        val start = if (context.has("start")) index(context.get("start"), text.length) else 0
+        val end = if (context.has("end")) index(context.get("end"), text.length) else text.length
+        if (start > end || start !in 0..text.length || end !in 0..text.length) {
+            throw CommandSyntaxException(
+                Component.translatable(
+                    "commands.data.modify.invalid_substring",
+                    Component.text("$start"),
+                    Component.text("$end"),
+                ),
+            )
+        }
+        return NbtString(text.substring(start, end))
+    }
+
+    /** parity: a negative index counts back from the end of the string. */
+    private fun index(
+        value: Int,
+        length: Int,
+    ): Int = if (value < 0) length + value else value
+
+    private fun sourceHolderOf(context: CommandContext): Holder {
+        if (context.has("sourcePos")) return Holder.Block(context.get("sourcePos"))
+        val source = context.get<Any>("source")
+        return if (source is Identifier) Holder.Storage(source) else Holder.Entity(playerOf(source))
     }
 
     private fun holderOf(context: CommandContext): Holder {
@@ -160,12 +235,17 @@ public class DataCommand(
             } else {
                 throw CommandSyntaxException(Component.text("No data holder was given."))
             }
-        @Suppress("UNCHECKED_CAST")
-        return if (target is Identifier) {
-            Holder.Storage(target)
-        } else {
-            Holder.Entity((target as List<PlayerSession>).single())
-        }
+        return if (target is Identifier) Holder.Storage(target) else Holder.Entity(playerOf(target))
+    }
+
+    /** Only a player carries data this build can read, whatever the selector matched. */
+    @Suppress("UNCHECKED_CAST")
+    private fun playerOf(target: Any): PlayerSession {
+        val matched = (target as List<CommandTarget>).single()
+        return (matched as? CommandTarget.Player)?.session
+            ?: throw CommandSyntaxException(
+                Component.text("Only a player carries data in this build; ${matched.name} does not."),
+            )
     }
 
     private sealed interface Holder {
@@ -235,12 +315,25 @@ public class DataCommand(
     private fun get(
         context: CommandContext,
         path: String?,
+        scale: Double,
     ): Int {
         val holder = holderOf(context)
         val root = read(context, holder)
         val value = if (path == null) root else DataPaths.resolve(root, path) ?: throw noSuchPath(path)
+        val number = numeric(value)
+        if (path != null && number != null && context.has("scale")) {
+            val scaled = number * scale
+            context.success(
+                Component.translatable(
+                    "commands.data.get.query.scaled",
+                    Component.text(path),
+                    Component.text(scaled.toString()),
+                ),
+            )
+            return scaled.toInt()
+        }
         context.success(queryMessage(context, holder, value))
-        return numeric(value) ?: 1
+        return number ?: 1
     }
 
     private fun merge(context: CommandContext): Int {
@@ -268,13 +361,25 @@ public class DataCommand(
         return 1
     }
 
+    /** Which of the five `/data modify` operations to run with an already-resolved value. */
+    private fun applyModify(
+        context: CommandContext,
+        mode: String,
+        value: NbtTag,
+    ): Int =
+        when (mode) {
+            "set" -> modify(context, merging = false, value = value)
+            "merge" -> modify(context, merging = true, value = value)
+            else -> modifyList(context, mode, value)
+        }
+
     private fun modify(
         context: CommandContext,
         merging: Boolean,
+        value: NbtTag,
     ): Int {
         val holder = holderOf(context)
         val path = context.get<String>("targetPath")
-        val value = context.get<NbtTag>("value")
         val root = read(context, holder)
         val existing = DataPaths.resolve(root, path)
         val next =
@@ -295,10 +400,10 @@ public class DataCommand(
     private fun modifyList(
         context: CommandContext,
         mode: String,
+        value: NbtTag,
     ): Int {
         val holder = holderOf(context)
         val path = context.get<String>("targetPath")
-        val value = context.get<NbtTag>("value")
         val root = read(context, holder)
         val existing = DataPaths.resolve(root, path)
         val elements =
@@ -433,6 +538,26 @@ public class DataAccess(
                 is DataHolderRef.Entity -> playerCompound(holder.player)
             }
         return DataPaths.resolve(root, path) != null
+    }
+
+    /** The compound at this holder and path, for `/function ... with`. Null when there is none. */
+    public fun readCompound(
+        context: CommandContext,
+        holder: DataHolderRef,
+        path: String?,
+    ): NbtCompound? {
+        val root =
+            when (holder) {
+                is DataHolderRef.Storage -> storage[holder.id]
+                is DataHolderRef.Block -> {
+                    val (x, y, z) = holder.pos
+                    val chunk = context.world().state.chunkIfLoaded(x shr 4, z shr 4) ?: return null
+                    chunk.blockEntityAt(x and 15, y, z and 15)?.data ?: return null
+                }
+                is DataHolderRef.Entity -> playerCompound(holder.player)
+            }
+        if (path == null) return root
+        return DataPaths.resolve(root, path) as? NbtCompound
     }
 
     /** `/execute store ... storage <id> <path> <type> <scale>`, which writes the typed number. */

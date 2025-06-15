@@ -17,6 +17,9 @@ public class Team(
     public var friendlyFire: Boolean = true
     public var seeFriendlyInvisibles: Boolean = true
     public var nameTagVisibility: NameTagVisibility = NameTagVisibility.ALWAYS
+
+    /** parity: `deathMessageVisibility`, which decides who reads this team's death messages. */
+    public var deathMessageVisibility: NameTagVisibility = NameTagVisibility.ALWAYS
     public var collisionRule: CollisionRule = CollisionRule.ALWAYS
 
     /** Member names, which for a player is their name and for anything else its UUID, as vanilla does. */
