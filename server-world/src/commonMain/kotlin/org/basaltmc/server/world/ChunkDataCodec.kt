@@ -1,5 +1,7 @@
 package org.basaltmc.server.world
 
+import org.basaltmc.server.registry.Biomes
+import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.light.BlockLight
 import org.basaltmc.server.world.light.LightWindow
 import org.basaltmc.server.world.light.SkyLight
@@ -15,8 +17,14 @@ import org.basaltmc.wire.protocol.play.PalettedContainer
  * Sky light comes from [SkyLight], which lights each column and spreads sideways from there.
  */
 public object ChunkDataCodec {
-    private const val BLOCK_DIRECT_BITS = 8
-    private const val BIOME_DIRECT_BITS = 4
+    /**
+     * parity: `Strategy.globalPaletteBitsInMemory`, `ceillog2` of the registry size.
+     *
+     * A flat 8 and 4 here truncated the ids of any section past an indirect palette, and the client
+     * reads eight bits as a palette, so it lost the rest of the chunk with them.
+     */
+    private val BLOCK_DIRECT_BITS = ceilLog2(Blocks.stateCount)
+    private val BIOME_DIRECT_BITS = ceilLog2(Biomes.REGISTRY.size)
     private const val BLOCKS_PER_SECTION = 16 * 16 * 16
     private const val BIOMES_PER_SECTION = 4 * 4 * 4
 
