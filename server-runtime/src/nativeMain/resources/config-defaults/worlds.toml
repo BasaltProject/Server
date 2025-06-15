@@ -84,3 +84,7 @@ view-distance = 10
 # How often changes are written to the region files: a crash costs at most this
 # much. 0 disables it, leaving chunks to save when they unload or on stop.
 save-interval-seconds = 30
+# NOT VANILLA. The End's exit portal only opens when the dragon dies, and this build
+# has no dragon yet, so the End is a one-way trip unless you turn this on. With it on,
+# the portal in the middle of the End is open from the moment the world is created.
+open-end-exit-portal = false

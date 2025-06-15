@@ -93,6 +93,9 @@ public class LoadedWorld(
         }
     }
 
+    /** Where this world's portals are, including the ones in chunks nobody has loaded. */
+    public val portals: PortalIndex = PortalIndex().also { it.load(worldRoot) }
+
     public val state: WorldState = WorldState(emptyList(), loadOrGenerate = ::loadOrGenerateChunk)
 
     public val generationQueue: ChunkGenerationQueue =
@@ -270,7 +273,12 @@ public class LoadedWorld(
     private fun loadOrGenerateChunk(
         chunkX: Int,
         chunkZ: Int,
-    ): Chunk = regions.loadChunk(chunkX, chunkZ) ?: generateChunk(chunkX, chunkZ)
+    ): Chunk =
+        (regions.loadChunk(chunkX, chunkZ) ?: generateChunk(chunkX, chunkZ)).also { chunk ->
+            // What a chunk in memory says about its portals is always the truth; the index only
+            // has to remember the chunks that are not.
+            portals.scan(chunk)
+        }
 
     /**
      * Generates the small warm cache around spawn and reads the spawn height out of it.
@@ -319,6 +327,7 @@ public class LoadedWorld(
 
     public fun saveDirty() {
         save(state.dirtyChunks())
+        portals.save(worldRoot)
     }
 
     /**

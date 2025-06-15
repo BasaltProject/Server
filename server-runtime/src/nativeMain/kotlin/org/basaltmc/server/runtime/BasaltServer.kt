@@ -93,6 +93,7 @@ import org.basaltmc.server.runtime.world.ActiveEffect
 import org.basaltmc.server.runtime.world.AdvancementTriggers
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
 import org.basaltmc.server.runtime.world.DamageTypes
+import org.basaltmc.server.runtime.world.EndPodium
 import org.basaltmc.server.runtime.world.EndPortals
 import org.basaltmc.server.runtime.world.FluidFlow
 import org.basaltmc.server.runtime.world.FluidKind
@@ -355,6 +356,15 @@ public class BasaltServer(
                     "seed ${world.metadata.seed})."
             }
             world.warmSpawnArea(SPAWN_RADIUS_CHUNKS)
+            // parity: `EnderDragonFight` builds the podium the first time the End is loaded.
+            if (world.declaration.dimension == WorldDimension.END) {
+                EndPodium.ensure(world, active = world.settings.openEndExitPortal)?.let { origin ->
+                    logger.info {
+                        val state = if (world.settings.openEndExitPortal) "open" else "closed"
+                        "Built the End's exit podium at ${origin[0]}, ${origin[1]}, ${origin[2]} ($state)."
+                    }
+                }
+            }
             world.saveDirty()
         }
         if (GenerationMetrics.enabled) {

@@ -10,6 +10,7 @@ import org.basaltmc.server.world.portal.PortalShape
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.common.logging.LogLevel
 import org.basaltmc.wire.common.logging.Logger
+import org.basaltmc.wire.io.FileIO
 import kotlin.math.abs
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -41,6 +42,15 @@ private fun world(
         logger = Logger("PortalTest").apply { minLevel = LogLevel.ERROR },
         generationWorkers = 1,
     )
+
+private fun deleteRecursively(path: String) {
+    if (!FileIO.directoryExists(path)) return
+    for (entry in FileIO.list(path)) {
+        val child = "$path/$entry"
+        if (FileIO.directoryExists(child)) deleteRecursively(child) else FileIO.delete(child)
+    }
+    FileIO.delete(path)
+}
 
 /** Builds the usual 2x3 frame with its bottom-left interior block at the given position. */
 private fun buildFrame(
@@ -140,6 +150,48 @@ class NetherPortalsTest {
         assertEquals(overworld.name, exit.world.name)
         assertTrue(abs(exit.x - 800.0) <= 17.0, "x was ${exit.x}")
         assertTrue(abs(exit.z + 400.0) <= 17.0, "z was ${exit.z}")
+    }
+
+    /** The gap `PortalIndex` closed: a portal whose chunk is gone used to be built all over again. */
+    @Test
+    fun aPortalIsStillFoundAfterAReload() {
+        // Its own world, because this is the one test that writes to disk.
+        deleteRecursively("build/test-data/portals-evicted")
+        val built = world("evicted", WorldDimension.OVERWORLD)
+        try {
+            buildFrame(built, PortalAxis.X, x = 0, y = 64, z = 0)
+            assertNotNull(NetherPortals.light(built, 0, 64, 0))
+            built.saveDirty()
+        } finally {
+            built.stopGenerating(drainTimeoutMillis = 100)
+        }
+
+        // A second world on the same directory, with nothing in memory: only `portals.nbt` knows.
+        val reloaded = world("evicted", WorldDimension.OVERWORLD)
+        try {
+            assertNull(reloaded.state.chunkIfLoaded(0, 0), "nothing should be loaded yet")
+            val found = assertNotNull(NetherPortals.findClosestPortal(reloaded, 0, 64, 0, radius = 16))
+            assertEquals(listOf(0, 64, 0), found.toList())
+            assertNull(
+                NetherPortals.findClosestLoadedPortal(reloaded, 0, 64, 0, radius = 16),
+                "the chunk search should find nothing, which is the whole point of the index",
+            )
+        } finally {
+            reloaded.stopGenerating(drainTimeoutMillis = 100)
+        }
+    }
+
+    @Test
+    fun breakingAPortalTakesItOutOfTheIndex() {
+        buildFrame(overworld, PortalAxis.X, x = 0, y = 64, z = 0)
+        assertNotNull(NetherPortals.light(overworld, 0, 64, 0))
+        assertNotNull(NetherPortals.findClosestPortal(overworld, 0, 64, 0, radius = 16))
+
+        // One block of the frame away, and the whole portal goes out.
+        overworld.state.setBlockState(0, 63, 0, Blocks.AIR.stateId)
+        NetherPortals.extinguishAround(overworld, 0, 63, 0)
+
+        assertNull(NetherPortals.findClosestPortal(overworld, 0, 64, 0, radius = 16))
     }
 
     /** With no portal on the other side, one is built: the arrival block has to be a portal block. */

@@ -20,11 +20,10 @@ public data class PortalExit(
 /**
  * Lighting a Nether portal, and finding or building the one on the other side.
  *
- * parity: `PortalShape` for the frame, `PortalForcer` for the exit. The one deliberate difference
- * is where the search for an existing portal looks: vanilla asks a point-of-interest index written
- * as chunks generate, and this build has none, so it reads the chunks themselves and only sees the
- * ones already loaded. What it costs is a duplicate portal when the old one is out of memory; what
- * it saves is generating a few hundred chunks to answer one question.
+ * parity: `PortalShape` for the frame, `PortalForcer` for the exit, and [PortalIndex] in place of
+ * the point-of-interest index vanilla searches, so a portal is found again even when its chunk is
+ * long out of memory. What is still not vanilla is that neither will generate chunks to go looking:
+ * the search answers from what the index knows.
  */
 public object NetherPortals {
     /** parity: `Entity.getDimensionChangingDelay`, the 300 ticks that stop a portal loop. */
@@ -56,7 +55,9 @@ public object NetherPortals {
     ): PortalShape? {
         val shape = PortalShape.findEmpty(view(world), x, y, z, world.minY) ?: return null
         val state = PortalShape.portalState(shape.axis)
-        for (block in shape.interior()) world.state.setBlockState(block[0], block[1], block[2], state)
+        val lit = shape.interior()
+        for (block in lit) world.state.setBlockState(block[0], block[1], block[2], state)
+        reindex(world, lit)
         return shape
     }
 
@@ -93,7 +94,23 @@ public object NetherPortals {
             if (shape.isComplete) continue
             cleared += clearConnected(world, blockX, blockY, blockZ)
         }
+        reindex(world, cleared)
         return cleared
+    }
+
+    /** Tells the world's index about every chunk these blocks are in, once each. */
+    private fun reindex(
+        world: LoadedWorld,
+        blocks: List<IntArray>,
+    ) {
+        if (blocks.isEmpty()) return
+        val chunks = mutableSetOf<Long>()
+        for (block in blocks) {
+            val chunkX = block[0] shr 4
+            val chunkZ = block[2] shr 4
+            if (!chunks.add((chunkX.toLong() shl 32) or (chunkZ.toLong() and 0xFFFFFFFFL))) continue
+            world.state.chunkIfLoaded(chunkX, chunkZ)?.let(world.portals::scan)
+        }
     }
 
     /** Every portal block reachable from this one, turned back into air. */
@@ -146,13 +163,17 @@ public object NetherPortals {
         return PortalExit(to, landing[0] + 0.5, landing[1].toDouble(), landing[2] + 0.5)
     }
 
-    /**
-     * The nearest portal block to [x, y, z], in the chunks this world already has in memory.
-     *
-     * The palette check is what makes it affordable: a section that holds no portal block at all is
-     * skipped without reading one, the same trick `/locate poi` uses.
-     */
+    /** The nearest portal block to [x, y, z] the world's own index knows about. */
     public fun findClosestPortal(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        radius: Int,
+    ): IntArray? = world.portals.nearest(x, y, z, radius)
+
+    /** The same search over the chunks in memory, which is what [PortalIndex] is checked against. */
+    internal fun findClosestLoadedPortal(
         world: LoadedWorld,
         x: Int,
         y: Int,
@@ -315,11 +336,15 @@ public object NetherPortals {
             }
         }
         val portal = PortalShape.portalState(axis)
+        val lit = mutableListOf<IntArray>()
         for (column in 0 until 2) {
             for (row in 0 until 3) {
-                world.state.setBlockState(spot[0] + stepX * column, spot[1] + row, spot[2] + stepZ * column, portal)
+                val block = intArrayOf(spot[0] + stepX * column, spot[1] + row, spot[2] + stepZ * column)
+                world.state.setBlockState(block[0], block[1], block[2], portal)
+                lit += block
             }
         }
+        reindex(world, lit)
     }
 
     private val NEIGHBOURS =
