@@ -1,6 +1,7 @@
 package org.basaltmc.server.world
 
 import org.basaltmc.server.world.light.BlockLight
+import org.basaltmc.server.world.light.LightWindow
 import org.basaltmc.server.world.light.SkyLight
 import org.basaltmc.wire.io.ByteBuffer
 import org.basaltmc.wire.protocol.play.BitStorage
@@ -104,33 +105,29 @@ public object ChunkDataCodec {
     )
 
     /**
-     * The sky light of one chunk, section by section.
+     * The light of one chunk, section by section, computed once and kept on the chunk itself.
      *
-     * [blockAt] reads world coordinates outside the chunk, for the light that comes in from next
-     * door; see [SkyLight] for what it does with a neighbour that is not loaded.
+     * [window] is the chunk and its eight neighbours: light reaches less than a chunk, so that is
+     * everything that can shine into this one.
      */
     public fun encodeLight(
         chunk: Chunk,
         hasSkylight: Boolean = true,
-        blockAt: (x: Int, y: Int, z: Int) -> Int? = { _, _, _ -> null },
+        window: LightWindow = LightWindow(chunk) { _, _ -> null },
     ): LightData {
         val sky =
             if (!hasSkylight) {
                 null
             } else {
                 chunk.skyLight {
-                    val computed = SkyLight.compute(chunk, blockAt)
+                    val computed = SkyLight.compute(window)
                     Array(computed.size) { NibbleArray.pack(computed[it]) }
                 }
             }
         val block =
             chunk.blockLight {
-                if (!BlockLight.hasEmitters(chunk)) {
-                    emptyArray()
-                } else {
-                    val computed = BlockLight.compute(chunk, blockAt)
-                    Array(computed.size) { NibbleArray.pack(computed[it]) }
-                }
+                val computed = BlockLight.compute(window) ?: return@blockLight emptyArray()
+                Array(computed.size) { NibbleArray.pack(computed[it]) }
             }
         val (skyMask, emptySkyMask, skyArrays) = masked(sky)
         val (blockMask, emptyBlockMask, blockArrays) = masked(block)
