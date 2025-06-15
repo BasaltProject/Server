@@ -4,6 +4,7 @@ import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.registry.BlockEntityTypes
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.registry.EntityTypes
+import org.basaltmc.server.registry.ItemArmour
 import org.basaltmc.server.registry.ItemTools
 import org.basaltmc.server.registry.Items
 import org.basaltmc.server.runtime.command.CommandDispatcher
@@ -14,6 +15,7 @@ import org.basaltmc.server.runtime.item.ItemComponentCodecs
 import org.basaltmc.server.runtime.item.ItemDamageEffects
 import org.basaltmc.server.runtime.item.ItemWear
 import org.basaltmc.server.runtime.placeholder.PlaceholderSlots
+import org.basaltmc.server.runtime.player.Combat
 import org.basaltmc.server.runtime.player.Difficulty
 import org.basaltmc.server.runtime.player.FoodData
 import org.basaltmc.server.runtime.player.Menu
@@ -32,6 +34,8 @@ import org.basaltmc.server.runtime.world.AdvancementTriggers
 import org.basaltmc.server.runtime.world.BlockPlacement
 import org.basaltmc.server.runtime.world.Buckets
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
+import org.basaltmc.server.runtime.world.DamageProtection
+import org.basaltmc.server.runtime.world.DamageTypes
 import org.basaltmc.server.runtime.world.EnchantmentAttributes
 import org.basaltmc.server.runtime.world.EndPortals
 import org.basaltmc.server.runtime.world.FluidFlow
@@ -42,6 +46,7 @@ import org.basaltmc.server.runtime.world.MobEffects
 import org.basaltmc.server.runtime.world.NetherPortals
 import org.basaltmc.server.runtime.world.PlayerProgress
 import org.basaltmc.server.runtime.world.RealBlockTags
+import org.basaltmc.server.runtime.world.RealDamageTypeTags
 import org.basaltmc.server.runtime.world.RealDialogs
 import org.basaltmc.server.runtime.world.RealEnchantments
 import org.basaltmc.server.runtime.world.RealEntityTypeTags
@@ -261,6 +266,7 @@ public class ClientSession(
     private val itemTags: RealItemTags? = null,
     /** The fluid tags, which are what the client checks before it believes it is under water. */
     private val fluidTags: RealFluidTags? = null,
+    private val damageTypeTags: RealDamageTypeTags? = null,
     private val entityTypeTags: RealEntityTypeTags? = null,
 ) {
     private val logger = Logger("Session")
@@ -3017,7 +3023,7 @@ public class ClientSession(
             health = session.health,
             maxHealth = PlayerSession.MAX_HEALTH,
             heal = { amount -> session.health = minOf(session.health + amount, PlayerSession.MAX_HEALTH) },
-            hurt = { amount -> hurt(amount, DEATH_STARVE) },
+            hurt = { amount -> hurt(amount, DEATH_STARVE, DamageTypes.STARVE) },
         )
         // Only when something actually moved: `set_health` every tick is 20 packets a second per
         // player for a bar that changes a few times a minute.
@@ -3043,17 +3049,61 @@ public class ClientSession(
         triggers.onInventoryChanged(session.name, session.uuid.toString(), session.inventory.snapshot().slots)
     }
 
-    /** Damage that ignores armour and absorption, because neither exists yet: a documented gap. */
+    /**
+     * parity: `LivingEntity.hurt`, minus absorption, which no effect here grants yet.
+     *
+     * [damageType] is what decides how much of this armour and enchantments stop; a hit that does
+     * not name one is taken as going straight through, which is what almost every source in this
+     * build does anyway (`bypasses_armor` holds starving, drowning, withering and the rest).
+     */
     internal fun hurt(
         amount: Float,
         deathMessageId: String,
+        damageType: Identifier? = null,
     ) {
         val session = playerSession ?: return
         if (session.dead || session.invulnerable) return
-        session.stats.addDamageTaken(amount)
-        session.health = maxOf(session.health - amount, 0f)
+        val damage = reduced(session, amount, damageType)
+        if (damage <= 0f) return
+        session.stats.addDamageTaken(damage)
+        session.health = maxOf(session.health - damage, 0f)
         if (session.health <= 0f) die(deathMessageId) else syncHealth()
     }
+
+    /** parity: `getDamageAfterArmorAbsorb` then `getDamageAfterMagicAbsorb`, in that order. */
+    private fun reduced(
+        session: PlayerSession,
+        amount: Float,
+        damageType: Identifier?,
+    ): Float {
+        val tags = damageTypeTags
+        if (tags == null || damageType == null) return amount
+        var damage = amount
+        if (!tags.isIn(RealDamageTypeTags.BYPASSES_ARMOUR, damageType)) {
+            var armour = 0f
+            var toughness = 0f
+            for (stack in wornArmour(session)) {
+                val piece = stack?.let { ItemArmour.of(Identifier.parse(it.id)) } ?: continue
+                armour += piece.armour
+                toughness += piece.toughness
+            }
+            if (armour > 0f) damage = Combat.afterArmour(damage, armour, toughness)
+        }
+        if (tags.isIn(RealDamageTypeTags.BYPASSES_EFFECTS, damageType)) return damage
+        val resistance = session.effects[MobEffects.RESISTANCE]
+        if (resistance != null && !tags.isIn(RealDamageTypeTags.BYPASSES_RESISTANCE, damageType)) {
+            damage = Combat.afterResistance(damage, resistance.amplifier)
+        }
+        if (damage <= 0f || tags.isIn(RealDamageTypeTags.BYPASSES_ENCHANTMENTS, damageType)) return damage
+        val enchantments = enchantments ?: return damage
+        val protection =
+            DamageProtection.of(wornArmour(session), damageType, tags) { enchantments.definitionOf(it) }
+        return if (protection > 0f) Combat.afterProtection(damage, protection) else damage
+    }
+
+    private fun wornArmour(session: PlayerSession): List<StoredItemStack?> =
+        (PlayerInventory.ARMOUR_START until PlayerInventory.ARMOUR_START + PlayerInventory.ARMOUR_SLOTS)
+            .map { session.inventory[it] }
 
     /** parity: `LivingEntity.heal`, capped at the maximum and reported like any other change. */
     internal fun heal(amount: Float) {
