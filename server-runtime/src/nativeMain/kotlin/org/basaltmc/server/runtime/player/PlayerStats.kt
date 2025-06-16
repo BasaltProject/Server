@@ -48,6 +48,12 @@ public class PlayerStats {
         }
     }
 
+    /** Fallen distance, in centimetres like the walked one. */
+    public fun addFallen(blocks: Double) {
+        if (blocks <= 0.0) return
+        increment(StoredStats.FALL_ONE_CM, (blocks * 100.0).toLong())
+    }
+
     public fun addDamageTaken(amount: Float) {
         // Tenths of a heart, matching vanilla's own scale for this counter.
         increment(StoredStats.DAMAGE_TAKEN, (amount * 10f).roundToLong())

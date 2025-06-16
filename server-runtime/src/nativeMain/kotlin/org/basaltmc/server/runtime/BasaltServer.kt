@@ -91,6 +91,7 @@ import org.basaltmc.server.runtime.timings.ReportSources
 import org.basaltmc.server.runtime.timings.TimingsReport
 import org.basaltmc.server.runtime.world.ActiveEffect
 import org.basaltmc.server.runtime.world.AdvancementTriggers
+import org.basaltmc.server.runtime.world.Beds
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
 import org.basaltmc.server.runtime.world.DamageTypes
 import org.basaltmc.server.runtime.world.EndPodium
@@ -773,8 +774,37 @@ public class BasaltServer(
                 .onFailure { logger.error(it) { "Fluid tick failed in world '${world.name}'" } }
             runCatching { tickEffects(world) }
                 .onFailure { logger.error(it) { "Effect tick failed in world '${world.name}'" } }
+            runCatching { tickSleep(world) }
+                .onFailure { logger.error(it) { "Sleep tick failed in world '${world.name}'" } }
         }
         shutdownIfSignalled()
+    }
+
+    /**
+     * Skips the night when enough of the world's players have held a bed for five seconds.
+     *
+     * parity: `ServerLevel.tickTime`'s sleep path, `players_sleeping_percentage` and all: the clock
+     * jumps to the next morning, the rain stops and everyone gets up. Nobody is woken by daylight
+     * alone, because that is what getting up at dawn already does.
+     */
+    private fun tickSleep(world: LoadedWorld) {
+        val players = playerRegistry.snapshot().filter { it.worldName == world.name }
+        val awake = players.filter { it.gamemode != Gamemode.SPECTATOR }
+        if (awake.isEmpty()) return
+        val sleeping = awake.filter { it.sleepingBed != null }
+        if (sleeping.isEmpty()) return
+        val percentage = world.gameRules[GameRuleRegistry.PLAYERS_SLEEPING_PERCENTAGE]
+        val needed = maxOf(1, (awake.size * percentage + 99) / 100)
+        if (sleeping.size < needed) return
+        if (sleeping.any { it.sleepTicks < Beds.SLEEP_TICKS_BEFORE_MORNING }) return
+
+        world.clock.setTotalTicks(Beds.nextMorning(world.clock.totalTicks))
+        world.weather.raining = false
+        world.weather.thundering = false
+        for (player in players) {
+            player.connection.wakeUp()
+            player.connection.sendTime(world)
+        }
     }
 
     /**

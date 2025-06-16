@@ -77,6 +77,10 @@ public class PlayerSession(
     /** parity: `LivingEntity.getAbsorptionAmount`, the pool damage eats before health does. */
     public var absorption: Float = 0f
 
+    /** Where this player is asleep, and for how many ticks. parity: `LivingEntity.sleepingPos`. */
+    public var sleepingBed: Triple<Int, Int, Int>? = null
+    public var sleepTicks: Int = 0
+
     /** parity: `LivingEntity.invulnerableTime`, the half second after a hit when most others miss. */
     public var invulnerableTicks: Int = 0
 

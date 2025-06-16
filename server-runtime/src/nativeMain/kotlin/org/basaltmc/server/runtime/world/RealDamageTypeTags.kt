@@ -64,4 +64,5 @@ public object DamageTypes {
     public val MAGIC: Identifier = Identifier.vanilla("magic")
     public val WITHER: Identifier = Identifier.vanilla("wither")
     public val STARVE: Identifier = Identifier.vanilla("starve")
+    public val FALL: Identifier = Identifier.vanilla("fall")
 }

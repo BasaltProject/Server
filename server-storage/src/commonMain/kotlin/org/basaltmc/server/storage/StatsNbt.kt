@@ -45,6 +45,7 @@ public data class StoredStats(
         public val WALK_ONE_CM: String = custom("walk_one_cm")
         public val DAMAGE_TAKEN: String = custom("damage_taken")
         public val JUMP: String = custom("jump")
+        public val FALL_ONE_CM: String = custom("fall_one_cm")
     }
 }
 
