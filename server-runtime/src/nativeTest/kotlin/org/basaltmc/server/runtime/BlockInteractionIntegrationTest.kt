@@ -146,7 +146,9 @@ class BlockInteractionIntegrationTest {
         // room in it.
         val chunkBatchFinished =
             ChunkBatchFinishedPacket.read(drainUntil(connection, incoming, ChunkBatchFinishedPacket.ID))
-        assertEquals(49, chunkBatchFinished.batchSize)
+        // The 5x5 the player lands on. The rest of the view distance streams in afterwards rather
+        // than being waited for, which is what keeps joining from feeling dead for three seconds.
+        assertEquals(25, chunkBatchFinished.batchSize)
         sendCompressed(connection, ChunkBatchReceivedPacket.ID, threshold) { it.writeFloat(16f) }
 
         // The stored row's y is not actually restored on join (a separate, real bug found while
@@ -415,7 +417,7 @@ class BlockInteractionIntegrationTest {
         val incoming = ByteBuffer()
         val threshold = login(connection, incoming, "Wade")
         val batch = ChunkBatchFinishedPacket.read(drainUntil(connection, incoming, ChunkBatchFinishedPacket.ID))
-        assertEquals(49, batch.batchSize)
+        assertEquals(25, batch.batchSize)
         sendCompressed(connection, ChunkBatchReceivedPacket.ID, threshold) { it.writeFloat(16f) }
 
         sendCompressed(connection, ChatCommandPacket.ID, threshold) {
