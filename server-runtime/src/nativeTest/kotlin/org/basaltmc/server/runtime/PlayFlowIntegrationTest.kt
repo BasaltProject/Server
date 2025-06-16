@@ -36,6 +36,7 @@ import org.basaltmc.wire.protocol.play.MapChunkPacket
 import org.basaltmc.wire.protocol.play.PlayerInfoRemovePacket
 import org.basaltmc.wire.protocol.play.PlayerInfoUpdatePacket
 import org.basaltmc.wire.protocol.play.PlayerPositionPacket
+import org.basaltmc.wire.protocol.play.RotateHeadPacket
 import org.basaltmc.wire.protocol.play.ServerboundPlayerActionPacket
 import org.basaltmc.wire.protocol.play.ServerboundPositionPacket
 import org.basaltmc.wire.protocol.play.SetChunkCacheCenterPacket
@@ -293,6 +294,9 @@ class PlayFlowIntegrationTest {
     /** The id of the frame [readPastChunks] last returned, which it has already consumed. */
     private var lastPacketId = -1
 
+    /** The last system chat [readPastChunks] returned, already decoded: its body is consumed. */
+    private var lastSystemChat: SystemChatPacket? = null
+
     /**
      * The next frame that is not chunk streaming, answering every batch on the way.
      *
@@ -308,11 +312,27 @@ class PlayFlowIntegrationTest {
         while (true) {
             val body = readFrame(connection, incoming, compressionEnabled = true)
             val id = body.readVarInt()
-            when (id) {
-                MapChunkPacket.ID -> streamedChunksSeen++
-                UpdateLightPacket.ID, ChunkBatchStartPacket.ID -> Unit
-                ChunkBatchFinishedPacket.ID ->
+            when {
+                id == MapChunkPacket.ID -> streamedChunksSeen++
+                id == UpdateLightPacket.ID || id == ChunkBatchStartPacket.ID -> Unit
+                // Where a head is looking follows every move and every spawn, from two sources at
+                // once (the mover's own broadcast and the tracker's pairing), so its position in
+                // the stream is not something to assert. Its encoding has its own round-trip test.
+                id == RotateHeadPacket.ID -> Unit
+                id == ChunkBatchFinishedPacket.ID ->
                     sendCompressed(connection, ChunkBatchReceivedPacket.ID, threshold) { it.writeFloat(16f) }
+                // A system chat has to be decoded to be told apart, and the buffer cannot rewind,
+                // so it is kept decoded in [lastSystemChat] for whoever asked. "X joined the game"
+                // reaches everyone, including whoever just joined, so it lands wherever a test
+                // happens to be reading: skipped like the chunk traffic is.
+                id == SystemChatPacket.ID -> {
+                    val chat = SystemChatPacket.read(body)
+                    if (!chat.content.toString().contains("multiplayer.player.")) {
+                        lastSystemChat = chat
+                        lastPacketId = id
+                        return body
+                    }
+                }
                 else -> {
                     lastPacketId = id
                     return body
@@ -376,7 +396,12 @@ class PlayFlowIntegrationTest {
         val bobSpawnTeleport = EntityTeleportPacket.read(aliceSeesBobTeleportBody)
         assertEquals(bob.entityId, bobSpawnTeleport.entityId)
 
-        // Bob, in turn, was told where Alice already is (her moved-to position from above).
+        // Bob, in turn, was told where Alice already is (her moved-to position from above). The
+        // tab-list entry comes first here too: the tracker sends the pair together, in that order,
+        // so the client has the profile before the entity that refers to it.
+        readPastChunks(bob.connection, bob.incoming, bob.threshold)
+        assertEquals(PlayerInfoUpdatePacket.ID, lastPacketId)
+
         val bobSeesAliceSpawnBody = readPastChunks(bob.connection, bob.incoming, bob.threshold)
         assertEquals(SpawnEntityPacket.ID, lastPacketId)
         assertEquals(alice.entityId, SpawnEntityPacket.read(bobSeesAliceSpawnBody).entityId)
@@ -452,12 +477,12 @@ class PlayFlowIntegrationTest {
 
         val aliceSeesChatBody = readPastChunks(alice.connection, alice.incoming, alice.threshold)
         assertEquals(SystemChatPacket.ID, lastPacketId)
-        val aliceChat = SystemChatPacket.read(aliceSeesChatBody)
+        val aliceChat = checkNotNull(lastSystemChat)
         assertTrue(aliceChat.content.toString().contains("hello world"))
 
         val bobSeesChatBody = readPastChunks(bob.connection, bob.incoming, bob.threshold)
         assertEquals(SystemChatPacket.ID, lastPacketId)
-        val bobChat = SystemChatPacket.read(bobSeesChatBody)
+        val bobChat = checkNotNull(lastSystemChat)
         assertTrue(bobChat.content.toString().contains("hello world"))
 
         // "ejecuta un comando": /me needs no permission, so a plain player can run it, and its
@@ -469,19 +494,13 @@ class PlayFlowIntegrationTest {
 
         val aliceSeesEmoteBody = readPastChunks(alice.connection, alice.incoming, alice.threshold)
         assertEquals(SystemChatPacket.ID, lastPacketId)
-        val emote = SystemChatPacket.read(aliceSeesEmoteBody).content
+        val emote = checkNotNull(lastSystemChat).content
         assertTrue(emote.toString().contains("chat.type.emote"))
         assertTrue(emote.toString().contains("waves"))
 
         val bobSeesEmoteBody = readPastChunks(bob.connection, bob.incoming, bob.threshold)
         assertEquals(SystemChatPacket.ID, lastPacketId)
-        assertTrue(
-            SystemChatPacket
-                .read(bobSeesEmoteBody)
-                .content
-                .toString()
-                .contains("waves"),
-        )
+        assertTrue(checkNotNull(lastSystemChat).content.toString().contains("waves"))
 
         // A command this player may not run comes back as brigadier's own "Unknown command",
         // exactly as vanilla hides commands above your permission level rather than refusing them.
@@ -492,11 +511,7 @@ class PlayFlowIntegrationTest {
         val refusalBody = readPastChunks(alice.connection, alice.incoming, alice.threshold)
         assertEquals(SystemChatPacket.ID, lastPacketId)
         assertTrue(
-            SystemChatPacket
-                .read(refusalBody)
-                .content
-                .toString()
-                .contains("Unknown command"),
+            checkNotNull(lastSystemChat).content.toString().contains("Unknown command"),
         )
 
         // A syntax failure is two messages, not one: the error, then the grey line marking where
@@ -504,11 +519,7 @@ class PlayFlowIntegrationTest {
         val contextBody = readPastChunks(alice.connection, alice.incoming, alice.threshold)
         assertEquals(SystemChatPacket.ID, lastPacketId)
         assertTrue(
-            SystemChatPacket
-                .read(contextBody)
-                .content
-                .toString()
-                .contains("command.context.here"),
+            checkNotNull(lastSystemChat).content.toString().contains("command.context.here"),
         )
 
         // A deliberately truncated frame from Bob: a decoder that runs off the end of one costs
@@ -530,13 +541,7 @@ class PlayFlowIntegrationTest {
             survivorId = lastPacketId
         }
         assertEquals(SystemChatPacket.ID, survivorId)
-        assertTrue(
-            SystemChatPacket
-                .read(survivorBody)
-                .content
-                .toString()
-                .contains("is still here"),
-        )
+        assertTrue(checkNotNull(lastSystemChat).content.toString().contains("is still here"))
 
         alice.connection.close()
         bob.connection.close()

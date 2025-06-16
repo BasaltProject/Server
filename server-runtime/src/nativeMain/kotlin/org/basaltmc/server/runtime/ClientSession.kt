@@ -123,6 +123,8 @@ import org.basaltmc.wire.protocol.login.LoginDisconnectPacket
 import org.basaltmc.wire.protocol.login.LoginFinishedPacket
 import org.basaltmc.wire.protocol.login.LoginStartPacket
 import org.basaltmc.wire.protocol.play.AcceptTeleportationPacket
+import org.basaltmc.wire.protocol.play.AnimatePacket
+import org.basaltmc.wire.protocol.play.BlockDestructionPacket
 import org.basaltmc.wire.protocol.play.BlockHitResult
 import org.basaltmc.wire.protocol.play.BlockPos
 import org.basaltmc.wire.protocol.play.BossEventPacket
@@ -154,6 +156,7 @@ import org.basaltmc.wire.protocol.play.Gamemode
 import org.basaltmc.wire.protocol.play.GlobalPos
 import org.basaltmc.wire.protocol.play.Heightmap
 import org.basaltmc.wire.protocol.play.HeightmapType
+import org.basaltmc.wire.protocol.play.LevelEventPacket
 import org.basaltmc.wire.protocol.play.LoginPlayPacket
 import org.basaltmc.wire.protocol.play.MapChunkPacket
 import org.basaltmc.wire.protocol.play.OpenScreenPacket
@@ -166,9 +169,11 @@ import org.basaltmc.wire.protocol.play.PlayerInfoRemovePacket
 import org.basaltmc.wire.protocol.play.PlayerInfoUpdatePacket
 import org.basaltmc.wire.protocol.play.PlayerLoadedPacket
 import org.basaltmc.wire.protocol.play.PlayerPositionPacket
+import org.basaltmc.wire.protocol.play.Pose
 import org.basaltmc.wire.protocol.play.RemoveEntitiesPacket
 import org.basaltmc.wire.protocol.play.RemoveMobEffectPacket
 import org.basaltmc.wire.protocol.play.RespawnPacket
+import org.basaltmc.wire.protocol.play.RotateHeadPacket
 import org.basaltmc.wire.protocol.play.ServerboundContainerClickPacket
 import org.basaltmc.wire.protocol.play.ServerboundPickItemFromBlockPacket
 import org.basaltmc.wire.protocol.play.ServerboundPlayerAbilitiesPacket
@@ -341,6 +346,11 @@ public class ClientSession(
     /** parity: `Entity.fallDistance`, added up from the movement rather than asked of the client. */
     private var fallDistance = 0.0
 
+    /** Where this player is digging, for how long, and which crack stage everyone else has seen. */
+    private var diggingAt: BlockPos? = null
+    private var diggingTicks = 0
+    private var diggingStage = -1
+
     /** Which slot is being eaten from, and how many ticks of the mouthful are left. */
     private var eatingSlot = -1
     private var eatingTicks = 0
@@ -392,6 +402,21 @@ public class ClientSession(
     /** Summoned entities this client has been told about, so each is spawned once. */
     private val trackedEntities = HashSet<Int>()
 
+    /** Which other players this client currently has as entities, kept by [syncPlayers]. */
+    private val trackedPlayers = HashSet<Int>()
+
+    /**
+     * The flags and pose this player was last drawn with, so only changes go on the wire.
+     *
+     * They start at what an entity has by default, so a player who joins standing still and unlit
+     * costs no packet at all: the client already believes exactly that.
+     */
+    private var lastSharedFlags = 0
+    private var lastPose = Pose.STANDING
+
+    /** What each of them was last seen holding and wearing, so only changes go on the wire. */
+    private val trackedEquipment = HashMap<Int, List<StoredItemStack?>>()
+
     /** Static entities emitted by world generation that this client has been told about. */
     private val trackedGeneratedEntities = HashSet<Int>()
 
@@ -440,6 +465,8 @@ public class ClientSession(
                             timings.of("player.chunks").time { sendBudget -= flushReadyChunks(allowed).toFloat() }
                         }
                         timings.of("player.tick").time { tickPlayer() }
+                        timings.of("player.players").time { syncPlayers() }
+                        timings.of("player.posture").time { syncPosture() }
                         timings.of("player.items").time { syncItemEntities() }
                         timings.of("player.entities").time { syncSummonedEntities() }
                         timings.of("player.generated_entities").time { syncGeneratedEntities() }
@@ -1095,16 +1122,11 @@ public class ClientSession(
         sendCompressed(GameEventPacket.ID) {
             GameEventPacket(GameEventPacket.LEVEL_CHUNKS_LOAD_START, 0f).write(it)
         }
-        // Only the ground the player lands on is waited for; the rest of the view distance streams
-        // in through `flushReadyChunks` like it does after a respawn or a walk.
-        //
-        // It used to wait for the whole view distance, and that is what made joining feel dead for
-        // three seconds: this runs on the read thread, so nothing the client sent (a block broken,
-        // a block placed) was even read until the last of 441 chunks had been generated, and the
-        // tab list and the scoreboard, which are sent below, arrived just as late.
-        //
-        // One ring wider than what is sent, so every chunk that goes out already has its eight
-        // neighbours: light worked out without them lets the sky in from nowhere.
+        // Only the ground the player lands on is waited for; the rest streams in through
+        // `flushReadyChunks`. Waiting for the whole view distance made joining feel dead for three
+        // seconds, because this runs on the read thread and nothing the client sent was read until
+        // the last chunk was generated. One ring wider than what is sent, so every chunk that goes
+        // out already has its eight neighbours.
         val awaited =
             (-(LOGIN_CHUNK_RADIUS + 1)..(LOGIN_CHUNK_RADIUS + 1))
                 .flatMap { dx ->
@@ -1129,7 +1151,9 @@ public class ClientSession(
         chunkStreamMutex.withLock { for (pos in streaming) pendingChunks.add(pos) }
         for (pos in streaming) generationQueue.request(pos.x, pos.z, squaredDistanceToCenter(pos.x, pos.z))
 
-        for (other in others) {
+        // Only the players who cannot see this one as an entity: for the rest, [syncPlayers] sends
+        // the entry itself, immediately before the spawn, so the two never arrive out of order.
+        for (other in others.filter { it.worldName != session.worldName }) {
             other.connection.sendPlayPacket(PlayerInfoUpdatePacket.ID) {
                 PlayerInfoUpdatePacket
                     .initializing(
@@ -1144,45 +1168,27 @@ public class ClientSession(
                         ),
                     ).write(it)
             }
-            other.connection.sendPlayPacket(SpawnEntityPacket.ID) { buffer ->
-                spawnPlayerPacket(session).write(buffer)
-            }
-            other.connection.sendPlayPacket(SetEntityDataPacket.ID) { buffer ->
-                SetEntityDataPacket.skinParts(session.entityId, session.skinParts).write(buffer)
-            }
-            other.connection.sendPlayPacket(EntityTeleportPacket.ID) {
-                EntityTeleportPacket(
-                    session.entityId,
-                    session.x,
-                    session.y,
-                    session.z,
-                    0f,
-                    0f,
-                    onGround = true,
-                ).write(it)
-            }
-            sendCompressed(SpawnEntityPacket.ID) { buffer -> spawnPlayerPacket(other).write(buffer) }
-            sendCompressed(SetEntityDataPacket.ID) { buffer ->
-                SetEntityDataPacket.skinParts(other.entityId, other.skinParts).write(buffer)
-            }
-            sendCompressed(EntityTeleportPacket.ID) {
-                EntityTeleportPacket(
-                    other.entityId,
-                    other.x,
-                    other.y,
-                    other.z,
-                    other.yaw,
-                    other.pitch,
-                    other.onGround,
-                ).write(it)
-            }
         }
+        // Spawning the players who can see each other is not done here any more: it is
+        // [syncPlayers], on every connection's own loop. Doing it once at join meant a player who
+        // arrived later, or walked in from another world, was never spawned at all, and one who
+        // left stayed standing there: the world an entity is in has to be looked at again and
+        // again, not once.
 
         // Drawn here rather than left to the loop below. That loop sends chunks before it redraws
         // anything, so on a fresh join the scoreboard, tab list and boss bar waited behind the whole
         // terrain stream: seconds of a player staring at a bare screen for packets that were ready
         // immediately.
         tickUi()
+
+        // parity: `PlayerList.placeNewPlayer` announces it here, near the end and in yellow, not on
+        // the first packet of the join. Everyone means everyone on the server, not just this world:
+        // it is a server message, not a world one.
+        broadcastToEveryone(
+            Component
+                .translatable("multiplayer.player.joined", Component.text(session.name))
+                .color(TextColor.YELLOW),
+        )
 
         // Last, once the whole join sequence is on the wire. Started any earlier and this thread
         // interleaves chunk batches with the packets still being sent to finish joining, which a
@@ -1327,6 +1333,25 @@ public class ClientSession(
                 val move = ServerboundPositionLookPacket.read(body)
                 updatePosition(move.x, move.y, move.z, move.yaw, move.pitch, move.onGround)
             }
+            // parity: `ServerboundMovePlayerPacket.Rot`, which a client sends when it turns on the
+            // spot. Ignoring it meant standing still and looking around reached nobody: the head
+            // only ever moved when the feet did.
+            MOVE_PLAYER_ROT_ID -> {
+                val session = playerSession
+                val yaw = body.readFloat()
+                val pitch = body.readFloat()
+                val onGround = (body.readByte().toInt() and 1) != 0
+                if (session != null) updatePosition(session.x, session.y, session.z, yaw, pitch, onGround)
+            }
+            // parity: `ServerboundMovePlayerPacket.StatusOnly`, one byte: neither moved nor turned,
+            // only landed or left the ground.
+            MOVE_PLAYER_STATUS_ONLY_ID -> {
+                val session = playerSession
+                val onGround = (body.readByte().toInt() and 1) != 0
+                if (session != null) {
+                    updatePosition(session.x, session.y, session.z, session.yaw, session.pitch, onGround)
+                }
+            }
             ChatMessagePacket.ID -> {
                 val chat = ChatMessagePacket.read(body)
                 broadcastChat(chat.message)
@@ -1377,6 +1402,7 @@ public class ClientSession(
                 ContainerClosePacket.read(body)
                 playerSession?.let(::closeOpenMenu)
             }
+            SWING_PACKET_ID -> handleSwing(body.readVarInt())
             ServerboundUseItemOnPacket.ID -> handleUseItemOn(ServerboundUseItemOnPacket.read(body))
             ServerboundUseItemPacket.ID -> handleUseItem(ServerboundUseItemPacket.read(body))
             ServerboundPickItemFromBlockPacket.ID ->
@@ -1437,21 +1463,28 @@ public class ClientSession(
         if (block == null || hardness == null) return false
         if (hardness.isUnbreakable) return false
         if (hardness.isInstant) return true
+        return destroyProgressPerTick(block, hardness) >= 1f
+    }
+
+    /** How much of a block this player takes off per tick, tool, enchantments and effects included. */
+    private fun destroyProgressPerTick(
+        block: Identifier,
+        hardness: Blocks.BlockHardness? = Blocks.hardnessOf(block),
+    ): Float {
+        if (hardness == null || hardness.isUnbreakable) return 0f
         val held = playerSession?.inventory?.heldItem
         val heldItem = held?.let { runCatching { Identifier.parse(it.id) }.getOrNull() }
-        val progress =
-            ItemTools.destroyProgressPerTick(
-                item = heldItem,
-                block = block,
-                hardness = hardness.destroyTime,
-                requiresCorrectTool = hardness.requiresCorrectTool,
-                efficiencyLevel = held?.let { PlayerInventory.enchantmentLevel(it, EFFICIENCY) } ?: 0,
-                hasteAmplifier = playerSession?.effects?.get(MobEffects.HASTE)?.amplifier ?: -1,
-                miningFatigueAmplifier = playerSession?.effects?.get(MobEffects.MINING_FATIGUE)?.amplifier ?: -1,
-                underwater = eyesInWater(),
-                inAir = playerSession?.onGround == false,
-            ) { tag, tagged -> blockTags?.contains(tag, tagged) == true }
-        return progress >= 1f
+        return ItemTools.destroyProgressPerTick(
+            item = heldItem,
+            block = block,
+            hardness = hardness.destroyTime,
+            requiresCorrectTool = hardness.requiresCorrectTool,
+            efficiencyLevel = held?.let { PlayerInventory.enchantmentLevel(it, EFFICIENCY) } ?: 0,
+            hasteAmplifier = playerSession?.effects?.get(MobEffects.HASTE)?.amplifier ?: -1,
+            miningFatigueAmplifier = playerSession?.effects?.get(MobEffects.MINING_FATIGUE)?.amplifier ?: -1,
+            underwater = eyesInWater(),
+            inAir = playerSession?.onGround == false,
+        ) { tag, tagged -> blockTags?.contains(tag, tagged) == true }
     }
 
     /** parity: `Player.getDestroySpeed` asks whether the eyes are under water, not the feet. */
@@ -1480,6 +1513,15 @@ public class ClientSession(
             // parity: letting go before the animation ends eats nothing at all.
             ServerboundPlayerActionPacket.Action.RELEASE_USE_ITEM -> stopEating()
             ServerboundPlayerActionPacket.Action.SWAP_ITEM_WITH_OFFHAND -> swapWithOffhand()
+            else -> Unit
+        }
+        // The cracks everyone else sees. The digger draws its own, which is why this never goes
+        // back to them. parity: `ServerPlayerGameMode.destroyAndAck` and its `destroyProgress`.
+        when (action.action) {
+            ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK -> startDigging(action.pos)
+            ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK,
+            ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK,
+            -> stopDigging()
             else -> Unit
         }
 
@@ -1539,6 +1581,16 @@ public class ClientSession(
             }
         }
 
+        // parity: `Level.levelEvent(player, 2001, pos, state)`: the breaker predicts its own puff of
+        // particles and its sound, everyone else needs telling.
+        if (broken != null) {
+            val effect = LevelEventPacket(LevelEventPacket.PARTICLES_DESTROY_BLOCK, action.pos, broken)
+            for (other in playersInSameWorld()) {
+                if (other.entityId == playerSession?.entityId) continue
+                other.connection.sendPlayPacket(LevelEventPacket.ID) { effect.write(it) }
+            }
+        }
+        stopDigging()
         refreshSnowUnder(action.pos)
         // Breaking the frame puts the portal out, which is the other half of lighting one.
         currentWorld?.let { loaded ->
@@ -1821,6 +1873,84 @@ public class ClientSession(
         if (gone.isNotEmpty()) {
             sendPlayPacket(RemoveEntitiesPacket.ID) { RemoveEntitiesPacket(gone).write(it) }
         }
+    }
+
+    /**
+     * Spawns and removes the other players this client should be seeing, once per outbound tick.
+     *
+     * parity: `ChunkMap.TrackedEntity`, with the world as the test, since every player already
+     * receives every chunk of their own view. The tab list stays server-wide, as in vanilla: only
+     * the entity is per-world.
+     */
+    private fun syncPlayers() {
+        val session = playerSession ?: return
+        val registry = playerRegistry ?: return
+        val visible = registry.snapshot().filter { it.uuid != session.uuid && it.worldName == session.worldName }
+
+        for (other in visible) {
+            if (!trackedPlayers.add(other.entityId)) continue
+            // parity: the tab-list entry always precedes the entity. The client matches the two by
+            // profile uuid to find the skin, and an entity that arrives first is drawn bald and
+            // grey. Sending it again for someone already listed costs nothing and removes the race.
+            sendPlayPacket(PlayerInfoUpdatePacket.ID) { buffer ->
+                PlayerInfoUpdatePacket
+                    .initializing(
+                        listOf(
+                            PlayerInfoEntry(
+                                other.uuid,
+                                other.name,
+                                listed = true,
+                                gamemode = other.gamemode,
+                                properties = other.profileProperties,
+                            ),
+                        ),
+                    ).write(buffer)
+            }
+            sendPlayPacket(SpawnEntityPacket.ID) { buffer -> spawnPlayerPacket(other).write(buffer) }
+            sendPlayPacket(SetEntityDataPacket.ID) { buffer ->
+                SetEntityDataPacket.skinParts(other.entityId, other.skinParts).write(buffer)
+            }
+            sendPlayPacket(EntityTeleportPacket.ID) {
+                EntityTeleportPacket(other.entityId, other.x, other.y, other.z, other.yaw, other.pitch, other.onGround)
+                    .write(it)
+            }
+            sendPlayPacket(RotateHeadPacket.ID) { RotateHeadPacket(other.entityId, other.yaw).write(it) }
+        }
+
+        for (other in visible) syncEquipmentOf(other)
+
+        val stillThere = visible.map { it.entityId }.toSet()
+        val gone = trackedPlayers.filter { it !in stillThere }
+        if (gone.isEmpty()) return
+        trackedPlayers.removeAll(gone.toSet())
+        for (entityId in gone) trackedEquipment.remove(entityId)
+        sendPlayPacket(RemoveEntitiesPacket.ID) { RemoveEntitiesPacket(gone).write(it) }
+    }
+
+    /**
+     * What [other] is holding and wearing, sent when it changes.
+     *
+     * parity: `ServerEntity.sendChanges`, which is what draws a sword in someone's hand and the
+     * armour on their body. Without it every other player looks empty-handed and unarmoured however
+     * they are actually equipped.
+     */
+    private fun syncEquipmentOf(other: PlayerSession) {
+        val worn =
+            listOf(
+                other.inventory[PlayerInventory.HOTBAR_START + other.inventory.heldSlot],
+                other.inventory[PlayerInventory.OFFHAND_SLOT],
+            ) + (0 until PlayerInventory.ARMOUR_SLOTS).map { other.inventory[PlayerInventory.ARMOUR_START + it] }
+        if (trackedEquipment[other.entityId] == worn) return
+        val first = other.entityId !in trackedEquipment
+        trackedEquipment[other.entityId] = worn
+        // parity: `ServerEntity.sendPairingData` sends nothing for an entity carrying nothing, so
+        // an empty-handed player costs no packet at all.
+        if (first && worn.all { it == null }) return
+        val slots =
+            EQUIPMENT_SLOTS.mapIndexed { index, type ->
+                SetEquipmentPacket.Slot(type, other.inventory.toWire(worn[index]))
+            }
+        sendPlayPacket(SetEquipmentPacket.ID) { SetEquipmentPacket(other.entityId, slots).write(it) }
     }
 
     /**
@@ -2750,6 +2880,15 @@ public class ClientSession(
             headYaw = target.yaw,
         )
 
+    /** A system message to every player on the server, whatever world they are in. */
+    private fun broadcastToEveryone(message: Component) {
+        for (player in playerRegistry?.snapshot().orEmpty()) {
+            player.connection.sendPlayPacket(SystemChatPacket.ID) {
+                SystemChatPacket(message, isActionBar = false).write(it)
+            }
+        }
+    }
+
     /** Everyone who can actually see this player: the tab list is server-wide, entities are not. */
     private fun playersInSameWorld(): List<PlayerSession> {
         val name = playerSession?.worldName ?: return emptyList()
@@ -2809,6 +2948,11 @@ public class ClientSession(
                     pitch,
                     onGround,
                 ).write(it)
+            }
+            // The rotation above is the body. A head turns on its own, and without this one it only
+            // ever tipped up and down while the face stayed pointing the same way.
+            other.connection.sendPlayPacket(RotateHeadPacket.ID) {
+                RotateHeadPacket(session.entityId, yaw).write(it)
             }
         }
     }
@@ -3118,6 +3262,7 @@ public class ClientSession(
         tryPickupNearbyItems()
         tickEating(session)
         if (session.sleepingBed != null) session.sleepTicks++
+        tickDigging(session)
         if (session.gamemode == Gamemode.CREATIVE || session.gamemode == Gamemode.SPECTATOR) return
 
         val healthBefore = session.health
@@ -3467,10 +3612,46 @@ public class ClientSession(
         updatePosition(x, y, z, yaw, pitch, onGround = false)
     }
 
+    /**
+     * The shared flags byte: everything about how this player is standing that fits in eight bits.
+     *
+     * parity: `Entity.DATA_SHARED_FLAGS_ID`. One byte for all of them, which is why it is composed
+     * in one place: whoever writes only the bit they care about erases the others.
+     */
+    private fun sharedFlags(session: PlayerSession): Int {
+        var flags = 0
+        if (session.fireTicks > 0) flags = flags or SetEntityDataPacket.FLAG_ON_FIRE
+        if (session.sneaking) flags = flags or SetEntityDataPacket.FLAG_SNEAKING
+        if (session.sprinting) flags = flags or SetEntityDataPacket.FLAG_SPRINTING
+        return flags
+    }
+
+    /**
+     * How this player looks to everyone else: crouched, sprinting, burning, and the pose that goes
+     * with it. Sent only when it changes, which for a crouch is a handful of times a minute.
+     */
+    private fun syncPosture() {
+        val session = playerSession ?: return
+        if (session.sleepingBed != null) return
+        val flags = sharedFlags(session)
+        // parity: `Player.updatePlayerPose`, of which this build has the two poses it can tell
+        // apart: crouching and standing.
+        val pose = if (session.sneaking) Pose.CROUCHING else Pose.STANDING
+        if (flags == lastSharedFlags && pose == lastPose) return
+        lastSharedFlags = flags
+        lastPose = pose
+        val packet = SetEntityDataPacket.posture(session.entityId, flags, pose)
+        sendPlayPacket(SetEntityDataPacket.ID) { packet.write(it) }
+        for (other in playersInSameWorld()) {
+            if (other.uuid == session.uuid) continue
+            other.connection.sendPlayPacket(SetEntityDataPacket.ID) { packet.write(it) }
+        }
+    }
+
     /** The air left and whether this player burns, to them and to everyone who can see them. */
     internal fun syncSubmersion() {
         val session = playerSession ?: return
-        val packet = SetEntityDataPacket.submersion(session.entityId, session.airSupply, session.fireTicks > 0)
+        val packet = SetEntityDataPacket.submersion(session.entityId, session.airSupply, sharedFlags(session))
         sendPlayPacket(SetEntityDataPacket.ID) { packet.write(it) }
         for (other in playersInSameWorld()) {
             if (other.uuid == session.uuid) continue
@@ -3603,6 +3784,73 @@ public class ClientSession(
         val updated = SnowyBlocks.updated(world, pos.x, pos.y, pos.z) ?: return
         if (!world.state.setBlockState(pos.x, pos.y, pos.z, updated)) return
         broadcastBlockUpdate(pos, updated)
+    }
+
+    /**
+     * The arm swing everyone else sees. parity: `ServerGamePacketListenerImpl.handleAnimate`, which
+     * forwards it as `ClientboundAnimatePacket` to whoever is tracking that player.
+     *
+     * The swinging client animates its own arm, which is why this goes to the others and not back.
+     */
+    private fun handleSwing(hand: Int) {
+        val session = playerSession ?: return
+        val action = if (hand == OFFHAND) AnimatePacket.SWING_OFFHAND else AnimatePacket.SWING_MAIN_HAND
+        val packet = AnimatePacket(session.entityId, action)
+        for (other in playersInSameWorld()) {
+            if (other.entityId == session.entityId) continue
+            other.connection.sendPlayPacket(AnimatePacket.ID) { packet.write(it) }
+        }
+    }
+
+    /** Starts drawing cracks on [pos] for everyone else, at the speed this player actually mines. */
+    private fun startDigging(pos: BlockPos) {
+        val session = playerSession ?: return
+        if (session.gamemode != Gamemode.SURVIVAL && session.gamemode != Gamemode.ADVENTURE) return
+        diggingAt = pos
+        diggingTicks = 0
+        diggingStage = -1
+    }
+
+    private fun stopDigging() {
+        val pos = diggingAt ?: return
+        diggingAt = null
+        diggingStage = -1
+        broadcastDestruction(pos, BlockDestructionPacket.NONE)
+    }
+
+    /**
+     * One tick of the dig: works out how far along it is and, when the stage changes, tells everyone.
+     *
+     * The progress comes from the same [ItemTools.destroyProgressPerTick] the break itself uses, so
+     * the cracks run at the speed the tool really mines at rather than a guess.
+     */
+    private fun tickDigging(session: PlayerSession) {
+        val pos = diggingAt ?: return
+        val state = currentWorld?.state?.getBlockState(pos.x, pos.y, pos.z)
+        val block = state?.let(Blocks::byStateId)?.block
+        if (block == null || Blocks.isAir(state)) {
+            stopDigging()
+            return
+        }
+        diggingTicks++
+        val perTick = destroyProgressPerTick(block)
+        if (perTick <= 0f) return
+        val stage = ((diggingTicks * perTick) * BlockDestructionPacket.STAGES).toInt()
+        if (stage >= BlockDestructionPacket.STAGES || stage == diggingStage) return
+        diggingStage = stage
+        broadcastDestruction(pos, stage)
+    }
+
+    private fun broadcastDestruction(
+        pos: BlockPos,
+        stage: Int,
+    ) {
+        val session = playerSession ?: return
+        val packet = BlockDestructionPacket(session.entityId, pos, stage)
+        for (other in playersInSameWorld()) {
+            if (other.entityId == session.entityId) continue
+            other.connection.sendPlayPacket(BlockDestructionPacket.ID) { packet.write(it) }
+        }
     }
 
     /** parity: `BucketItem.use` with the block the client says it hit, rather than a second raycast. */
@@ -3936,6 +4184,12 @@ public class ClientSession(
         registry.remove(session.uuid)
         progress?.unload(session.uuid.toString())
         logger.info { "${session.name} left the game" }
+        // parity: `ServerGamePacketListenerImpl.onDisconnect`, the other half of the pair above.
+        broadcastToEveryone(
+            Component
+                .translatable("multiplayer.player.left", Component.text(session.name))
+                .color(TextColor.YELLOW),
+        )
         for (other in registry.snapshot()) {
             other.connection.sendPlayPacket(
                 PlayerInfoRemovePacket.ID,
@@ -4157,6 +4411,28 @@ public class ClientSession(
          * they are already standing there, which is what vanilla's chunk batches are for.
          */
         const val LOGIN_CHUNK_RADIUS = 2
+
+        /**
+         * The slots [syncEquipmentOf] sends, in the order it reads them: hands first, then the
+         * armour from the feet up, which is the order `PlayerInventory` keeps them in.
+         */
+        val EQUIPMENT_SLOTS =
+            listOf(
+                SetEquipmentPacket.Type.MAINHAND,
+                SetEquipmentPacket.Type.OFFHAND,
+                SetEquipmentPacket.Type.HEAD,
+                SetEquipmentPacket.Type.CHEST,
+                SetEquipmentPacket.Type.LEGS,
+                SetEquipmentPacket.Type.FEET,
+            )
+
+        /** `minecraft:move_player_rot` and `minecraft:move_player_status_only`, read directly. */
+        const val MOVE_PLAYER_ROT_ID = 0x20
+        const val MOVE_PLAYER_STATUS_ONLY_ID = 0x21
+
+        /** `minecraft:swing`, which this build reads directly: its body is one varint, the hand. */
+        const val SWING_PACKET_ID = 0x3f
+        const val OFFHAND = 1
 
         /** parity: `AbsorptionMobEffect`, two hearts per level. */
         const val ABSORPTION_PER_LEVEL = 4f

@@ -5,9 +5,8 @@ import org.basaltmc.wire.common.Identifier
 /**
  * Every block's properties and how its state ids run through them.
  *
- * The ids of a block are the nested loops of its properties, outermost first, so a state id and a
- * set of values convert into each other with arithmetic. That is what lets a block be placed
- * facing somewhere without a hand-written table for each family that can face anywhere.
+ * The ids are the nested loops of the properties, outermost first, so a state id and a set of
+ * values convert into each other with arithmetic instead of a table per family.
  *
  * parity: `StateDefinition`, which builds the same product in the same order.
  */

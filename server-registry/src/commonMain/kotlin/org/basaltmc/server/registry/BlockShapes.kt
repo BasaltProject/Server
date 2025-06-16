@@ -23,10 +23,8 @@ public enum class BlockFace(
 /**
  * The collision shape of every block state, as the boxes vanilla's own classes report.
  *
- * There is no general `VoxelShape` here and there does not need to be: everything this server asks
- * of a shape is whether it fills its cube, whether a face is sturdy, and whether two touching
- * shapes together wall off the face between them. All three answer from boxes in thirty-seconds,
- * which is exact for every vanilla block.
+ * No general `VoxelShape`, because nothing here needs one: the three questions asked of a shape all
+ * answer from boxes in thirty-seconds, which is exact for every vanilla block.
  *
  * parity: `BlockBehaviour.BlockStateBase.getCollisionShape`, `isFaceSturdy` and `getLightDampening`.
  */

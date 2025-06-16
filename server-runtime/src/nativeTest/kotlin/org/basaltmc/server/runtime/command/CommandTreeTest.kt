@@ -284,14 +284,10 @@ class CommandTreeTest {
     }
 
     /**
-     * The client crash of 2026-08-16: `/item modify ... <modifier>` was declared as a
-     * `minecraft:resource` over `minecraft:item_modifier`, and `/loot` the same over
-     * `minecraft:loot_table`. Both are datapack registries, which the client never receives, so
-     * `ResourceArgument` threw `Registry minecraft:item_modifier not found` while building the tree
-     * and the connection died with "network protocol error" before anyone could play.
-     *
-     * `minecraft:resource` and `minecraft:resource_or_tag` are the two parsers that look their
-     * registry up; `resource_key` and `resource_or_tag_key` only build a key and are safe.
+     * The client crash of 2026-08-16: `/item modify` and `/loot` named datapack registries the
+     * client never receives, so building the tree threw and the connection died before anyone
+     * could play. `resource` and `resource_or_tag` look their registry up; the `_key` pair does
+     * not, and is safe.
      */
     @Test
     fun noArgumentAsksTheClientForARegistryItDoesNotHave() {
