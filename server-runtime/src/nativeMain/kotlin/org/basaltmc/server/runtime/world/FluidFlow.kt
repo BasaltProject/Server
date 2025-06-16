@@ -294,8 +294,9 @@ public object FluidFlow {
         /** parity: `LavaFluid.getSpreadDelay`: lava rising into a block usually takes four times as long. */
         fun spreadDelay(kind: FluidKind): Int {
             val base = tickDelay(world, kind)
-            // parity gap: vanilla rolls this on the level's own RandomSource, so the same seed and
-            // the same lava do not reproduce vanilla's exact timing here.
+            // Not a parity gap despite the look of it: vanilla rolls this on `Level.random`, which
+            // is a `RandomSource.create()` with no seed of its own, so the same lava does not
+            // reproduce its own timing there either.
             return if (kind == FluidKind.LAVA && Random.nextInt(4) != 0) base * 4 else base
         }
 

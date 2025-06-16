@@ -79,6 +79,39 @@ class BlockPlacementTest {
         assertEquals("west", placed("lightning_rod", face = Direction.WEST)["facing"])
     }
 
+    /** parity: `FaceAttachedHorizontalDirectionalBlock`: what it hangs on is the face that was clicked. */
+    @Test
+    fun aLeverHangsOnWhateverWasClicked() {
+        val onFloor = placed("lever", face = Direction.UP, yaw = 0f)
+        assertEquals("floor", onFloor["face"])
+        assertEquals("south", onFloor["facing"], "on the floor it looks the way the player does")
+
+        val onWall = placed("lever", face = Direction.WEST)
+        assertEquals("wall", onWall["face"])
+        assertEquals("west", onWall["facing"], "on a wall it looks out of it")
+
+        assertEquals("ceiling", placed("lever", face = Direction.DOWN)["face"])
+    }
+
+    /** parity: `AnvilBlock`, the one that lands across the player rather than facing them. */
+    @Test
+    fun anAnvilLandsSideways() {
+        assertEquals("west", placed("anvil", yaw = 0f)["facing"])
+    }
+
+    /** Checked against the real classes: an amethyst bud grows out of the face it was put on. */
+    @Test
+    fun anAmethystBudPointsOutOfItsFace() {
+        assertEquals("up", placed("small_amethyst_bud", face = Direction.UP)["facing"])
+        assertEquals("north", placed("large_amethyst_bud", face = Direction.NORTH)["facing"])
+    }
+
+    /** parity: `DoorBlock`, which looks the same way the player does. */
+    @Test
+    fun aDoorFacesTheSameWayAsThePlayer() {
+        assertEquals("south", placed("oak_door", yaw = 0f)["facing"])
+    }
+
     @Test
     fun aBlockWithNothingToOrientIsPlacedAsItIs() {
         val stone = Blocks.STONE.stateId
