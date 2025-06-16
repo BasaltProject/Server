@@ -134,6 +134,7 @@ import org.basaltmc.wire.protocol.play.CommandsPacket
 import org.basaltmc.wire.protocol.play.ContainerClosePacket
 import org.basaltmc.wire.protocol.play.ContainerSetContentPacket
 import org.basaltmc.wire.protocol.play.ContainerSetSlotPacket
+import org.basaltmc.wire.protocol.play.DamageEventPacket
 import org.basaltmc.wire.protocol.play.EntityEventPacket
 import org.basaltmc.wire.protocol.play.EntityTeleportPacket
 import org.basaltmc.wire.protocol.play.ForgetLevelChunkPacket
@@ -2944,6 +2945,11 @@ public class ClientSession(
     internal fun sendEffect(effect: ActiveEffect) {
         val session = playerSession ?: return
         val id = MobEffects.protocolIdOf(effect.effect) ?: return
+        // parity: `AbsorptionMobEffect.onEffectStarted` adds its hearts on top of whatever is left.
+        if (effect.effect == MobEffects.ABSORPTION) {
+            session.absorption += ABSORPTION_PER_LEVEL * (effect.amplifier + 1)
+            syncAbsorption()
+        }
         sendPlayPacket(UpdateMobEffectPacket.ID) {
             UpdateMobEffectPacket(
                 entityId = session.entityId,
@@ -2960,6 +2966,12 @@ public class ClientSession(
     internal fun sendEffectRemoved(effect: Identifier) {
         val session = playerSession ?: return
         val id = MobEffects.protocolIdOf(effect) ?: return
+        // parity: `AbsorptionMobEffect.onEffectRemoved` takes back exactly what it gave, and here
+        // nothing else gives any, so the pool empties.
+        if (effect == MobEffects.ABSORPTION) {
+            session.absorption = 0f
+            syncAbsorption()
+        }
         sendPlayPacket(RemoveMobEffectPacket.ID) { RemoveMobEffectPacket(session.entityId, id).write(it) }
     }
 
@@ -3011,6 +3023,7 @@ public class ClientSession(
         val session = playerSession ?: return
         playTimeTicks++
         checkAdvancements(session)
+        if (session.invulnerableTicks > 0) session.invulnerableTicks--
         if (session.dead) return
         tryPickupNearbyItems()
         if (session.gamemode == Gamemode.CREATIVE || session.gamemode == Gamemode.SPECTATOR) return
@@ -3063,7 +3076,28 @@ public class ClientSession(
     ) {
         val session = playerSession ?: return
         if (session.dead || session.invulnerable) return
-        val damage = reduced(session, amount, damageType)
+        // parity: `LivingEntity.hurt`'s cooldown: inside the half second after a hit, only a bigger
+        // one lands, and only by the difference. It is what stops lava and burning stacking.
+        var incoming = amount
+        val cooling = session.invulnerableTicks > COOLDOWN_HALF_TICKS
+        if (cooling) {
+            if (amount <= session.lastHurt) return
+            incoming = amount - session.lastHurt
+            session.lastHurt = amount
+        } else {
+            session.lastHurt = amount
+            session.invulnerableTicks = HURT_COOLDOWN_TICKS
+        }
+        val reduced = reduced(session, incoming, damageType)
+        if (reduced <= 0f) return
+        if (!cooling) sendDamageEvent(session, damageType)
+        // parity: `LivingEntity.hurt` takes it out of absorption first, and only the rest off health.
+        val absorbed = minOf(session.absorption, reduced)
+        if (absorbed > 0f) {
+            session.absorption -= absorbed
+            syncAbsorption()
+        }
+        val damage = reduced - absorbed
         if (damage <= 0f) return
         session.stats.addDamageTaken(damage)
         session.health = maxOf(session.health - damage, 0f)
@@ -3132,6 +3166,8 @@ public class ClientSession(
         val session = playerSession ?: return
         session.dead = true
         session.health = 0f
+        // parity: `LivingEntity.die` empties the absorption pool, so respawning starts without it.
+        session.absorption = 0f
         session.stats.increment(StoredStats.DEATHS)
         syncHealth()
         val message = Component.translatable("death.attack.$deathMessageId", Component.text(session.name))
@@ -3352,6 +3388,35 @@ public class ClientSession(
         val session = playerSession ?: return
         sendCompressed(SetHealthPacket.ID) {
             SetHealthPacket(session.health, session.food.foodLevel, session.food.saturationLevel).write(it)
+        }
+    }
+
+    /** The red flash and the hurt sound, which the client plays off this and nothing else. */
+    private fun sendDamageEvent(
+        session: PlayerSession,
+        damageType: Identifier?,
+    ) {
+        val registryId = VanillaRegistryData.damageTypes.indexOfFirst { it.first == (damageType?.path ?: "generic") }
+        if (registryId < 0) return
+        val packet = DamageEventPacket(entityId = session.entityId, damageType = registryId)
+        sendPlayPacket(DamageEventPacket.ID) { packet.write(it) }
+        for (other in playersInSameWorld()) {
+            if (other.entityId == session.entityId) continue
+            other.connection.sendPlayPacket(DamageEventPacket.ID) { packet.write(it) }
+        }
+    }
+
+    /** parity: absorption rides on the player's own entity data, not on `set_health`. */
+    private fun syncAbsorption() {
+        val session = playerSession ?: return
+        sendCompressed(SetEntityDataPacket.ID) {
+            SetEntityDataPacket.playerAbsorption(session.entityId, session.absorption).write(it)
+        }
+        for (other in playersInSameWorld()) {
+            if (other.entityId == session.entityId) continue
+            other.connection.sendPlayPacket(SetEntityDataPacket.ID) { buffer ->
+                SetEntityDataPacket.playerAbsorption(session.entityId, session.absorption).write(buffer)
+            }
         }
     }
 
@@ -3640,6 +3705,14 @@ public class ClientSession(
         // parity: `Player.drop`'s own throw, and the small pop a broken block's drop gets.
         const val THROW_SPEED = 0.3
         const val THROW_LIFT = 0.1
+
+        /** parity: `AbsorptionMobEffect`, two hearts per level. */
+        const val ABSORPTION_PER_LEVEL = 4f
+
+        /** parity: `LivingEntity.invulnerableTime`, and the ten ticks of it that still let a hit in. */
+        const val HURT_COOLDOWN_TICKS = 20
+        const val COOLDOWN_HALF_TICKS = 10
+
         const val THROW_EYE_HEIGHT = 1.5
         const val BREAK_DROP_LIFT = 0.2
 

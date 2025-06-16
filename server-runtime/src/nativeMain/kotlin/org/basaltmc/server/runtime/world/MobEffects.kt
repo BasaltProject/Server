@@ -87,6 +87,7 @@ public object MobEffects {
     public val HASTE: Identifier = Identifier.vanilla("haste")
     public val MINING_FATIGUE: Identifier = Identifier.vanilla("mining_fatigue")
 
-    /** parity: the one that changes what a hit is worth rather than what it hits. */
+    /** parity: the two that change what a hit is worth rather than what it hits. */
     public val RESISTANCE: Identifier = Identifier.vanilla("resistance")
+    public val ABSORPTION: Identifier = Identifier.vanilla("absorption")
 }
