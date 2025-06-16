@@ -89,6 +89,7 @@ import org.basaltmc.server.world.terrain.VillageStructureGenerator
 import org.basaltmc.wire.common.timings.TickDurations
 import org.basaltmc.wire.common.timings.Timings
 import org.basaltmc.wire.io.FileIO
+import org.basaltmc.wire.protocol.play.ArgumentParser
 import org.basaltmc.wire.text.Component
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -140,8 +141,23 @@ private fun dumpReport(): TimingsReport =
  * hand against `server-datagen`'s output.
  */
 class CommandTreeTest {
-    @Test
-    fun buildsTheWholeTreeAndKeepsEveryProviderReachable() {
+    /**
+     * The datapack registries the client never gets a copy of, so it cannot resolve an entry of
+     * one. parity: `RegistryDataLoader.SYNCHRONIZED_REGISTRIES` is what it does get, and none of
+     * these are in it.
+     */
+    private val unsyncedRegistries =
+        setOf(
+            "minecraft:loot_table",
+            "minecraft:item_modifier",
+            "minecraft:predicate",
+            "minecraft:function",
+            "minecraft:advancement",
+            "minecraft:recipe",
+        )
+
+    /** Every command this server registers, which is what the client is actually sent. */
+    private fun fullDispatcher(): CommandDispatcher {
         val library = FunctionLibrary(root = "build/test-data/dump/datapacks")
         val runner = FunctionRunner(library)
         val dispatcher =
@@ -234,7 +250,12 @@ class CommandTreeTest {
                         ),
                     )
                 }
+        return dispatcher
+    }
 
+    @Test
+    fun buildsTheWholeTreeAndKeepsEveryProviderReachable() {
+        val dispatcher = fullDispatcher()
         val packet = dispatcher.treeFor(DumpSource())
         val json = StringBuilder()
         json.append("[\n")
@@ -260,6 +281,33 @@ class CommandTreeTest {
         val unreachable =
             dispatcher.unreachableSuggestions().map { "${it.first}: ${it.second}" }
         assertTrue(unreachable.isEmpty(), "arguments whose completions nobody will ask for: $unreachable")
+    }
+
+    /**
+     * The client crash of 2026-08-16: `/item modify ... <modifier>` was declared as a
+     * `minecraft:resource` over `minecraft:item_modifier`, and `/loot` the same over
+     * `minecraft:loot_table`. Both are datapack registries, which the client never receives, so
+     * `ResourceArgument` threw `Registry minecraft:item_modifier not found` while building the tree
+     * and the connection died with "network protocol error" before anyone could play.
+     *
+     * `minecraft:resource` and `minecraft:resource_or_tag` are the two parsers that look their
+     * registry up; `resource_key` and `resource_or_tag_key` only build a key and are safe.
+     */
+    @Test
+    fun noArgumentAsksTheClientForARegistryItDoesNotHave() {
+        val dispatcher = fullDispatcher()
+        val offenders = mutableListOf<String>()
+        for (node in dispatcher.treeFor(DumpSource()).nodes) {
+            val parser = node.parser
+            val registry =
+                when (parser) {
+                    is ArgumentParser.Resource -> parser.registry
+                    is ArgumentParser.ResourceOrTag -> parser.registry
+                    else -> null
+                } ?: continue
+            if (registry in unsyncedRegistries) offenders += "${node.name}: $registry"
+        }
+        assertTrue(offenders.isEmpty(), "arguments the client cannot resolve: $offenders")
     }
 
     /** The line from the bug report, answered end to end by the same tree the client is sent. */

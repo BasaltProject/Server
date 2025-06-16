@@ -46,6 +46,50 @@ class BlockShapesTest {
         assertEquals(1, BlockShapes.dampening(Blocks.WATER.stateId))
     }
 
+    /**
+     * What gives way to a placed block and what does not, checked against the jar rather than
+     * guessed: grass and a snow layer are replaced, a flower and a firefly bush are built on top
+     * of, and so are the leaves of a tree. Leaf litter, which lies on the ground, is replaced.
+     */
+    @Test
+    fun onlyWhatVanillaSaysIsReplaceable() {
+        for (name in listOf(
+            "air",
+            "water",
+            "lava",
+            "short_grass",
+            "tall_grass",
+            "fern",
+            "snow",
+            "dead_bush",
+            "vine",
+            "fire",
+            "leaf_litter",
+            "seagrass",
+        )) {
+            assertTrue(BlockShapes.isReplaceable(state(name)), "$name should give way")
+        }
+        for (name in listOf(
+            "dandelion",
+            "poppy",
+            "firefly_bush",
+            "oak_leaves",
+            "oak_sapling",
+            "moss_carpet",
+            "stone",
+        )) {
+            assertFalse(BlockShapes.isReplaceable(state(name)), "$name should not give way")
+        }
+    }
+
+    /** parity: `BlockState.isSolid`, which is what lets a bucket be emptied into water. */
+    @Test
+    fun aFluidIsNotSolid() {
+        assertFalse(BlockShapes.isSolidState(Blocks.WATER.stateId))
+        assertFalse(BlockShapes.isSolidState(state("lava")))
+        assertTrue(BlockShapes.isSolidState(Blocks.STONE.stateId))
+    }
+
     @Test
     fun aFullBlockAlwaysOccludes() {
         val stone = state("stone")

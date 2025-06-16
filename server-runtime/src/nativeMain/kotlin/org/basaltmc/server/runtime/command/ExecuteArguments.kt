@@ -100,6 +100,34 @@ public object LootPredicateArgument : ArgumentType<Identifier> {
     ): Identifier = ResourceLocationArgument.parse(reader, source, environment)
 }
 
+/**
+ * `minecraft:loot_table`: the id of a loot table.
+ *
+ * Not a `minecraft:resource` over the `minecraft:loot_table` registry, which is what this used to
+ * be: loot tables are a datapack registry and the client has no copy of one, so a real client threw
+ * `Registry minecraft:loot_table not found` building the command tree and dropped the connection.
+ */
+public object LootTableArgument : ArgumentType<Identifier> {
+    override val wire: ArgumentParser = ArgumentParser.LootTable
+
+    override fun parse(
+        reader: StringReader,
+        source: CommandSource,
+        environment: CommandEnvironment,
+    ): Identifier = ResourceLocationArgument.parse(reader, source, environment)
+}
+
+/** `minecraft:loot_modifier`: the id of an item modifier, for the same reason as [LootTableArgument]. */
+public object LootModifierArgument : ArgumentType<Identifier> {
+    override val wire: ArgumentParser = ArgumentParser.LootModifier
+
+    override fun parse(
+        reader: StringReader,
+        source: CommandSource,
+        environment: CommandEnvironment,
+    ): Identifier = ResourceLocationArgument.parse(reader, source, environment)
+}
+
 /** `minecraft:float_range`: `1`, `1..`, `..2` or `1..2`, kept as written. */
 public object FloatRangeArgument : ArgumentType<String> {
     override val wire: ArgumentParser = ArgumentParser.FloatRange

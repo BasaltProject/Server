@@ -154,8 +154,10 @@ class BlockInteractionIntegrationTest {
         // pickup range would never line up with the drop below without this. Not what is under
         // test here, so worked around rather than chased: a plain move to where the test needs to
         // stand, which the server already has a passing test for elsewhere.
+        // Two blocks up as well as over: standing in the block being placed is refused now
+        // (`BlockPlacement.isObstructed`), and standing on top of it would be too.
         sendCompressed(connection, ServerboundPositionPacket.ID, threshold) {
-            it.writeDouble(targetPos.x + 0.5)
+            it.writeDouble(targetPos.x + 2.5)
             it.writeDouble(targetPos.y.toDouble())
             it.writeDouble(targetPos.z + 0.5)
             it.writeByte(1)

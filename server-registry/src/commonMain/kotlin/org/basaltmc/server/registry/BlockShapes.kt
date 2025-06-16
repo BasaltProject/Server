@@ -36,6 +36,8 @@ public object BlockShapes {
 
     private val dampening: IntArray
     private val motion: BooleanArray
+    private val replaceable: BooleanArray
+    private val solid: BooleanArray
     private val sturdy: IntArray
     private val boxes: Array<IntArray>
     private val full: BooleanArray
@@ -49,6 +51,8 @@ public object BlockShapes {
         val entries = ALL_BLOCK_SHAPES
         dampening = IntArray(entries.size)
         motion = BooleanArray(entries.size)
+        replaceable = BooleanArray(entries.size)
+        solid = BooleanArray(entries.size)
         sturdy = IntArray(entries.size)
         boxes = Array(entries.size) { IntArray(0) }
         full = BooleanArray(entries.size)
@@ -57,10 +61,12 @@ public object BlockShapes {
             val parts = entry.split('|')
             dampening[index] = parts[0].toInt()
             motion[index] = parts[1] == "1"
+            replaceable[index] = parts[2] == "1"
+            solid[index] = parts[3] == "1"
             var mask = 0
-            for ((face, flag) in parts[2].withIndex()) if (flag == '1') mask = mask or (1 shl face)
+            for ((face, flag) in parts[4].withIndex()) if (flag == '1') mask = mask or (1 shl face)
             sturdy[index] = mask
-            val corners = parts[3].split(';').filter { it.isNotEmpty() }
+            val corners = parts[5].split(';').filter { it.isNotEmpty() }
             val flat = IntArray(corners.size * CORNERS)
             for ((box, text) in corners.withIndex()) {
                 for ((corner, value) in text.split(',').withIndex()) flat[box * CORNERS + corner] = value.toInt()
@@ -86,8 +92,25 @@ public object BlockShapes {
      */
     public fun blocksMotion(stateId: Int): Boolean = motion[shapeOf(stateId)]
 
+    /**
+     * Whether placing something here replaces this block instead of going next to it.
+     *
+     * parity: `BlockBehaviour.Properties.replaceable`, which is on for air, water, lava, tall
+     * grass, snow layers and the rest of the undergrowth, and off for a flower or a firefly bush.
+     */
+    public fun isReplaceable(stateId: Int): Boolean = replaceable[shapeOf(stateId)]
+
+    /** parity: `BlockState.isSolid`, which is what a poured bucket asks before flooding a block. */
+    public fun isSolidState(stateId: Int): Boolean = solid[shapeOf(stateId)]
+
     /** Whether the collision shape fills the whole cube, which is what stops a fluid dead. */
     public fun isFullCube(stateId: Int): Boolean = full[shapeOf(stateId)]
+
+    /** The boxes of the collision shape, six numbers each (min x, y, z then max x, y, z) in units. */
+    public fun collisionBoxes(stateId: Int): List<IntArray> {
+        val flat = boxes[shapeOf(stateId)]
+        return (0 until flat.size / CORNERS).map { box -> flat.copyOfRange(box * CORNERS, (box + 1) * CORNERS) }
+    }
 
     /** Whether the block has no collision at all: air, a torch, a flower. */
     public fun isEmptyShape(stateId: Int): Boolean = boxes[shapeOf(stateId)].isEmpty()

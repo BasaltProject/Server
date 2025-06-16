@@ -6,6 +6,8 @@ import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.protocol.play.Direction
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class BlockPlacementTest {
     private fun placed(
@@ -110,6 +112,55 @@ class BlockPlacementTest {
     @Test
     fun aDoorFacesTheSameWayAsThePlayer() {
         assertEquals("south", placed("oak_door", yaw = 0f)["facing"])
+    }
+
+    /** The complaint from the screenshots: a block went down inside the player and walled them in. */
+    @Test
+    fun aBlockDoesNotGoDownInsideAPlayer() {
+        val standing = BlockPlacement.playerBox(x = 0.5, y = 64.0, z = 0.5, sneaking = false)
+
+        assertTrue(BlockPlacement.isObstructed(Blocks.STONE.stateId, 0, 64, 0, listOf(standing)), "at the feet")
+        assertTrue(BlockPlacement.isObstructed(Blocks.STONE.stateId, 0, 65, 0, listOf(standing)), "at the head")
+        assertFalse(BlockPlacement.isObstructed(Blocks.STONE.stateId, 0, 66, 0, listOf(standing)), "above the head")
+        assertFalse(BlockPlacement.isObstructed(Blocks.STONE.stateId, 1, 64, 0, listOf(standing)), "beside them")
+    }
+
+    /** parity: `Shapes.joinIsNotEmpty` with AND: touching is not overlapping. */
+    @Test
+    fun theBlockUnderfootIsNotInTheWay() {
+        val standing = BlockPlacement.playerBox(x = 0.5, y = 64.0, z = 0.5, sneaking = false)
+        assertFalse(BlockPlacement.isObstructed(Blocks.STONE.stateId, 0, 63, 0, listOf(standing)))
+    }
+
+    /** parity: 1.8 tall standing and 1.5 crouching, which is a real quarter of a block of room. */
+    @Test
+    fun crouchingIsShorterThanStanding() {
+        val topSlab = checkNotNull(Blocks.REGISTRY.idOf(Identifier.vanilla("stone_slab"))) - 2
+        val standing = BlockPlacement.playerBox(x = 0.5, y = 64.0, z = 0.5, sneaking = false)
+        val crouching = BlockPlacement.playerBox(x = 0.5, y = 64.0, z = 0.5, sneaking = true)
+
+        // The upside-down slab fills 65.5 to 66.0: the standing head reaches it, the crouching one does not.
+        assertTrue(BlockPlacement.isObstructed(topSlab, 0, 65, 0, listOf(standing)))
+        assertFalse(BlockPlacement.isObstructed(topSlab, 0, 65, 0, listOf(crouching)))
+    }
+
+    /** parity: an empty collision shape never obstructs anyone, so a torch goes down inside you. */
+    @Test
+    fun somethingWithNoCollisionIsNeverInTheWay() {
+        val torch = checkNotNull(Blocks.REGISTRY.idOf(Identifier.vanilla("torch")))
+        val standing = BlockPlacement.playerBox(x = 0.5, y = 64.0, z = 0.5, sneaking = false)
+        assertFalse(BlockPlacement.isObstructed(torch, 0, 64, 0, listOf(standing)))
+    }
+
+    /** A bottom slab at the feet of someone standing on the ground does overlap them. */
+    @Test
+    fun aSlabAtTheFeetIsStillInTheWay() {
+        val slab = checkNotNull(Blocks.REGISTRY.idOf(Identifier.vanilla("stone_slab")))
+        val standing = BlockPlacement.playerBox(x = 0.5, y = 64.0, z = 0.5, sneaking = false)
+        assertTrue(BlockPlacement.isObstructed(slab, 0, 64, 0, listOf(standing)))
+        // The top half of the same block is not: a bottom slab only fills the lower half.
+        val onSlab = BlockPlacement.playerBox(x = 0.5, y = 64.5, z = 0.5, sneaking = false)
+        assertFalse(BlockPlacement.isObstructed(slab, 0, 64, 0, listOf(onSlab)))
     }
 
     @Test
