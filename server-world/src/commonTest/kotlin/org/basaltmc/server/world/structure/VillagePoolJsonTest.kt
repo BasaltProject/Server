@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
 /**
  * Synthetic JSON matching the real `template_pool`/`processor_list` schema shape (verified against
  * the real jar's own `town_centers.json`/`mossify_20_percent.json`), but with fabricated block
- * choices and `test:` namespaced names: not copied from any real Mojang datapack file, per §7.
+ * choices and `test:` namespaced names: not copied from any real Mojang datapack file.
  */
 class VillagePoolJsonTest {
     private fun fakeRandom() = WorldgenRandom(XoroshiroRandom(1L))

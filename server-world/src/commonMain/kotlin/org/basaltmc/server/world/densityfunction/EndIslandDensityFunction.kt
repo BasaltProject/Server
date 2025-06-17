@@ -11,7 +11,7 @@ import kotlin.math.sqrt
  * End dimension's island shape: a big island at the origin plus smaller ones scattered by
  * [islandNoise], seeded off the world seed with a fixed [SKIPPED_RANDOM_CALLS] offset (matching
  * vanilla's own `LegacyRandomSource` skip before constructing the noise, part of the exact RNG
- * consumption order §8 of this project's own roadmap requires). Deliberately kept in `float`
+ * consumption order parity requires). Deliberately kept in `float`
  * throughout (not widened to `double`) to match vanilla's own arithmetic bit for bit: this
  * algorithm's rounding is part of its observable output, not an implementation detail.
  */

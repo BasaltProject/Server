@@ -92,6 +92,7 @@ import org.basaltmc.server.runtime.timings.TimingsReport
 import org.basaltmc.server.runtime.world.ActiveEffect
 import org.basaltmc.server.runtime.world.AdvancementTriggers
 import org.basaltmc.server.runtime.world.Beds
+import org.basaltmc.server.runtime.world.BlockInteractions
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
 import org.basaltmc.server.runtime.world.DamageTypes
 import org.basaltmc.server.runtime.world.EndPodium
@@ -104,6 +105,7 @@ import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.MobEffects
 import org.basaltmc.server.runtime.world.NetherPortals
 import org.basaltmc.server.runtime.world.PlayerProgress
+import org.basaltmc.server.runtime.world.RandomTicks
 import org.basaltmc.server.runtime.world.RealAdvancements
 import org.basaltmc.server.runtime.world.RealBlockTags
 import org.basaltmc.server.runtime.world.RealDamageTypeTags
@@ -145,6 +147,8 @@ import org.basaltmc.wire.io.sleepMillis
 import org.basaltmc.wire.protocol.play.BlockPos
 import org.basaltmc.wire.protocol.play.ClientboundBlockUpdatePacket
 import org.basaltmc.wire.protocol.play.Gamemode
+import org.basaltmc.wire.protocol.play.SoundPacket
+import org.basaltmc.wire.protocol.play.SoundSource
 import org.basaltmc.wire.text.Component
 import org.basaltmc.wire.text.LangTable
 import org.basaltmc.wire.text.TextColor
@@ -486,6 +490,8 @@ public class BasaltServer(
     public val functions: FunctionLibrary = FunctionLibrary().also { it.reload() }
 
     private val functionRunner = FunctionRunner(functions)
+    private val randomTicks = RandomTicks()
+
     private val functionSchedule = FunctionSchedule()
 
     /** Who a scheduled function runs as: the console, which is what vanilla uses for the same job. */
@@ -792,6 +798,10 @@ public class BasaltServer(
                 .onFailure { logger.error(it) { "Drowning tick failed in world '${world.name}'" } }
             runCatching { tickFluids(world) }
                 .onFailure { logger.error(it) { "Fluid tick failed in world '${world.name}'" } }
+            runCatching { tickRandomBlocks(world) }
+                .onFailure { logger.error(it) { "Random block tick failed in world '${world.name}'" } }
+            runCatching { tickScheduledBlocks(world) }
+                .onFailure { logger.error(it) { "Scheduled block tick failed in world '${world.name}'" } }
             runCatching { tickEffects(world) }
                 .onFailure { logger.error(it) { "Effect tick failed in world '${world.name}'" } }
             runCatching { tickSleep(world) }
@@ -1022,6 +1032,85 @@ public class BasaltServer(
                 }
             }
         }
+    }
+
+    /**
+     * Runs the block ticks that have come due. For now that is buttons letting themselves back up;
+     * redstone (§6.2) is what fills the rest in.
+     */
+    private fun tickScheduledBlocks(world: LoadedWorld) {
+        val due = world.state.dueBlockTicks()
+        if (due.isEmpty()) return
+        val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
+        for (position in due) {
+            val released = BlockInteractions.release(world, position[0], position[1], position[2]) ?: continue
+            val pos = BlockPos(position[0], position[1], position[2])
+            for (player in watchers) {
+                player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                    ClientboundBlockUpdatePacket(pos, released.stateId).write(it)
+                }
+                player.connection.sendPlayPacket(SoundPacket.ID) {
+                    SoundPacket(
+                        sound = released.sound,
+                        source = SoundSource.BLOCKS,
+                        x = pos.x + 0.5,
+                        y = pos.y + 0.5,
+                        z = pos.z + 0.5,
+                        volume = 1f,
+                        pitch = 1f,
+                        seed = Random.nextLong(),
+                    ).write(it)
+                }
+            }
+        }
+    }
+
+    /**
+     * Lets the blocks vanilla picks at random act: crops grow, ice melts, cane climbs.
+     *
+     * parity: `ServerLevel.tickChunk`, which only runs over the chunks a player is near. Whoever is
+     * in the world decides that here too, so an empty world sits still rather than growing on.
+     */
+    private fun tickRandomBlocks(world: LoadedWorld) {
+        val speed = world.gameRules[GameRuleRegistry.RANDOM_TICK_SPEED]
+        if (speed <= 0) return
+        val chunks = simulatedChunks(world)
+        if (chunks.isEmpty()) return
+        val changes = randomTicks.tick(world, chunks, speed, LegacyRandom(Random.nextLong()))
+        if (changes.isEmpty()) return
+        val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
+        for (change in changes) {
+            val pos = BlockPos(change.x, change.y, change.z)
+            for (player in watchers) {
+                player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                    ClientboundBlockUpdatePacket(pos, change.stateId).write(it)
+                }
+            }
+        }
+    }
+
+    /**
+     * The chunks around whoever is in the world, without repeats.
+     *
+     * parity: vanilla's simulation distance, which is ten by default and separate from the view
+     * distance. This build has no setting of its own for it yet, so it follows the view distance up
+     * to vanilla's own default and no further.
+     */
+    private fun simulatedChunks(world: LoadedWorld): List<IntArray> {
+        val radius = minOf(world.settings.viewDistance, VANILLA_SIMULATION_DISTANCE)
+        val seen = HashSet<Long>()
+        val chunks = mutableListOf<IntArray>()
+        for (player in playerRegistry.snapshot()) {
+            if (player.worldName != world.name) continue
+            val centreX = player.x.toInt() shr 4
+            val centreZ = player.z.toInt() shr 4
+            for (x in centreX - radius..centreX + radius) {
+                for (z in centreZ - radius..centreZ + radius) {
+                    if (seen.add((x.toLong() shl 32) or (z.toLong() and 0xFFFFFFFFL))) chunks += intArrayOf(x, z)
+                }
+            }
+        }
+        return chunks
     }
 
     /**
@@ -1323,6 +1412,9 @@ public class BasaltServer(
 
         // parity: `ServerPlayer.tick` checks the border every ten ticks, not every one.
         const val BORDER_DAMAGE_INTERVAL_TICKS = 10L
+
+        /** parity: `simulation-distance` in `server.properties`, ten chunks. */
+        const val VANILLA_SIMULATION_DISTANCE = 10
 
         // Beyond the view distance, so a chunk already requested or prefetched by a session is
         // still there when that session gets round to sending it.

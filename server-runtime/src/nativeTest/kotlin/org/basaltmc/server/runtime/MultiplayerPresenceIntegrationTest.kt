@@ -64,7 +64,11 @@ class MultiplayerPresenceIntegrationTest {
                 SpawnEntityPacket.read(body).entityId == bob.entityId
             },
             expect("the join message", SystemChatPacket.ID) { body ->
-                SystemChatPacket.read(body).content.toString().contains("multiplayer.player.joined")
+                SystemChatPacket
+                    .read(body)
+                    .content
+                    .toString()
+                    .contains("multiplayer.player.joined")
             },
             // Without this everyone appears empty-handed whatever they are holding.
             expect("what Bob is holding", SetEquipmentPacket.ID) { body ->

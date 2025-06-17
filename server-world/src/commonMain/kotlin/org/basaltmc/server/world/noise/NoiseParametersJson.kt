@@ -14,8 +14,8 @@ public class NoiseParametersParseException(
 
 /**
  * Parses a single real `data/minecraft/worldgen/noise/<name>.json` datapack entry (a registry
- * element, per §7: read from the operator's own downloaded assets at runtime, never embedded in
- * this repo) into [NormalNoise.NoiseParameters]. Matches vanilla's
+ * element read from the operator's own downloaded assets at runtime, never embedded in this
+ * repo) into [NormalNoise.NoiseParameters]. Matches vanilla's
  * `NormalNoise.NoiseParameters.DIRECT_CODEC`: `{"firstOctave": int, "amplitudes": [double, ...]}`.
  */
 public object NoiseParametersJson {
