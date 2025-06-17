@@ -231,13 +231,10 @@ public object VanillaRegistryData {
     // The biome registry (`minecraft:worldgen/biome`) is synced in full by [VanillaBiomes]: all 66
     // vanilla entries, not a single plains stand-in.
 
-    // The 13 registries below are the only ones a real 26.2 client hard-requires non-empty to
-    // finish Configuration (confirmed live: RegistryDataLoader.SYNCHRONIZED_REGISTRIES marks
-    // exactly these with RegistryValidator.nonEmpty(), and no others). Their NETWORK_CODEC (used
-    // for network sync, not the full DIRECT_CODEC used for the datapack file) drops
-    // `spawn_conditions` entirely for the animal variants, so only asset references are needed.
-    // Field values are the real vanilla ones (one representative entry per registry, not the
-    // full set): full registry parity across all 29 synced registries is `server-datagen`'s job.
+    // The 13 registries below are the ones `RegistryDataLoader.SYNCHRONIZED_REGISTRIES` marks with
+    // `nonEmpty()`, which a client needs to finish Configuration. Their NETWORK_CODEC drops
+    // `spawn_conditions`, so only asset references are needed, and one real entry each is enough:
+    // the full set across all 29 synced registries is `server-datagen`'s job.
 
     public fun wolfVariant(): NbtCompound {
         fun assets(
@@ -398,14 +395,10 @@ public object VanillaRegistryData {
             putString("asset_id", "minecraft:humble")
         }
 
-    // trim_material isn't in the 13 "must be non-empty" set, but several base items (redstone dust,
-    // ingots, gems, resin brick: see Items.java's `.trimMaterial(...)` calls) carry a default
-    // `ProvidesTrimMaterial` component that resolves a specific entry by ResourceKey at Configuration
-    // end, independent of the registry's own emptiness. All eleven entries vanilla items reference
-    // are needed, not just one representative. Field shapes from TrimMaterial.DIRECT_CODEC
-    // (TrimMaterial has no NETWORK_CODEC, so the full codec is used for sync): `asset_name` and
-    // `description` flattened at the top level (MaterialAssetGroup.MAP_CODEC), `override_armor_assets`
-    // omitted since it defaults to empty.
+    // trim_material is not in the must-be-non-empty set, but several base items carry a default
+    // `ProvidesTrimMaterial` component resolving a specific entry by key, so all eleven entries
+    // vanilla items reference are needed. Field shapes from TrimMaterial.DIRECT_CODEC, which is what
+    // syncs it: there is no NETWORK_CODEC.
     public fun trimMaterial(
         id: String,
         colorRgb: Int,

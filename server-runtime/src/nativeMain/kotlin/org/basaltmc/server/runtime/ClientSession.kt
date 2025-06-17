@@ -3523,10 +3523,14 @@ public class ClientSession(
      *
      * A world change is a *level* change to the client, which is why each world has its own
      * [LoadedWorld.levelKey]: the respawn packet makes the client throw away its chunk cache and
-     * rebuild it, and it only does that when the level key differs. Everything else here follows
-     * from that: the tracker is reset because the client no longer has anything, the chunks are
-     * re-requested from the new world's queue, and the players left behind are told to forget this
-     * entity so it does not stand frozen in the world they are still in.
+     * rebuild it, and it only does that when the level key differs. The rest follows from that: the
+     * tracker is reset because the client no longer has anything, and the chunks are re-requested
+     * from the new world's queue.
+     *
+     * What everyone *else* sees is deliberately not sent from here. Each connection's [syncPlayers]
+     * owns its own tracking set, so a removal written straight to another player's socket left that
+     * set claiming this entity was still there, and coming back never spawned it again: the reason
+     * a player who crossed worlds twice stayed invisible until the other one relogged.
      */
     internal fun switchWorld(
         target: LoadedWorld,
@@ -3538,18 +3542,11 @@ public class ClientSession(
         val previous = currentWorld
         if (previous == null || previous.name == target.name) return false
 
-        val leftBehind = playersInSameWorld().filter { it.uuid != session.uuid }
         currentWorld = target
         session.worldName = target.name
         session.x = x
         session.y = y
         session.z = z
-
-        for (other in leftBehind) {
-            other.connection.sendPlayPacket(RemoveEntitiesPacket.ID) {
-                RemoveEntitiesPacket(listOf(session.entityId)).write(it)
-            }
-        }
 
         sendCompressed(RespawnPacket.ID) {
             RespawnPacket(spawnInfo(session.gamemode), dataToKeep = RespawnPacket.KEEP_ALL_DATA).write(it)
@@ -3575,21 +3572,6 @@ public class ClientSession(
         }
         for (pos in delta.toLoad) generationQueue.request(pos.x, pos.z, squaredDistanceToCenter(pos.x, pos.z))
 
-        // Whoever is already there needs to start seeing them.
-        for (other in playersInSameWorld()) {
-            if (other.uuid == session.uuid) continue
-            other.connection.sendPlayPacket(EntityTeleportPacket.ID) {
-                EntityTeleportPacket(
-                    session.entityId,
-                    x,
-                    y,
-                    z,
-                    session.yaw,
-                    session.pitch,
-                    false,
-                ).write(it)
-            }
-        }
         logger.info { "${session.name} moved to world '${target.name}'." }
         return true
     }
