@@ -10,7 +10,7 @@ import org.basaltmc.wire.common.logging.Logger
 /**
  * Every advancement the operator's own `server.jar` ships, by id.
  *
- * Datapack content, so it is read from the download rather than committed (§7), the same way loot
+ * Datapack content, so it is read from the download rather than committed, the same way loot
  * tables and recipes are. What awards them is [AdvancementTriggers]; `/advancement grant` remains
  * the only way to complete one whose trigger this build cannot observe yet.
  */

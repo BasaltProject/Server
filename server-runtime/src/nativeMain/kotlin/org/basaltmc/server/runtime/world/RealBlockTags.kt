@@ -13,7 +13,7 @@ import org.basaltmc.wire.common.logging.Logger
  *
  * This is what turns a tool's rules into an answer: a rule names `minecraft:mineable/pickaxe` or
  * `minecraft:incorrect_for_diamond_tool`, and only the real tag files say which blocks are in them.
- * Datapack content, so it is read from the download rather than committed (§7), the same as loot
+ * Datapack content, so it is read from the download rather than committed, the same as loot
  * tables and recipes.
  */
 public class RealBlockTags(

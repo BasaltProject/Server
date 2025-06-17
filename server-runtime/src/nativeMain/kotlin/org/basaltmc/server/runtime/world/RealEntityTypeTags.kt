@@ -12,7 +12,7 @@ import org.basaltmc.wire.common.logging.Logger
  * The entity type tag graph out of the operator's own `server.jar`, flattened once at startup.
  *
  * What `@e[type=#minecraft:skeletons]` resolves through. Datapack content, so it is read from the
- * download rather than committed (§7), the same as block and item tags.
+ * download rather than committed, the same as block and item tags.
  */
 public class RealEntityTypeTags(
     serverJar: ServerJarAssets?,

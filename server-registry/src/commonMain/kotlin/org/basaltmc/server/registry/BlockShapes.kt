@@ -37,6 +37,8 @@ public object BlockShapes {
     private val replaceable: BooleanArray
     private val solid: BooleanArray
     private val sturdy: IntArray
+    private val centre: IntArray
+    private val rigid: IntArray
     private val boxes: Array<IntArray>
     private val full: BooleanArray
 
@@ -52,6 +54,8 @@ public object BlockShapes {
         replaceable = BooleanArray(entries.size)
         solid = BooleanArray(entries.size)
         sturdy = IntArray(entries.size)
+        centre = IntArray(entries.size)
+        rigid = IntArray(entries.size)
         boxes = Array(entries.size) { IntArray(0) }
         full = BooleanArray(entries.size)
         faces = arrayOfNulls(entries.size * BlockFace.entries.size)
@@ -61,10 +65,10 @@ public object BlockShapes {
             motion[index] = parts[1] == "1"
             replaceable[index] = parts[2] == "1"
             solid[index] = parts[3] == "1"
-            var mask = 0
-            for ((face, flag) in parts[4].withIndex()) if (flag == '1') mask = mask or (1 shl face)
-            sturdy[index] = mask
-            val corners = parts[5].split(';').filter { it.isNotEmpty() }
+            sturdy[index] = faceBits(parts[4])
+            centre[index] = faceBits(parts[5])
+            rigid[index] = faceBits(parts[6])
+            val corners = parts[7].split(';').filter { it.isNotEmpty() }
             val flat = IntArray(corners.size * CORNERS)
             for ((box, text) in corners.withIndex()) {
                 for ((corner, value) in text.split(',').withIndex()) flat[box * CORNERS + corner] = value.toInt()
@@ -118,6 +122,24 @@ public object BlockShapes {
         stateId: Int,
         face: BlockFace,
     ): Boolean = sturdy[shapeOf(stateId)] and (1 shl face.ordinal) != 0
+
+    /** parity: `SupportType.CENTER`, the middle of a face, which is all a torch or a rail asks for. */
+    public fun supportsCentre(
+        stateId: Int,
+        face: BlockFace,
+    ): Boolean = centre[shapeOf(stateId)] and (1 shl face.ordinal) != 0
+
+    /** parity: `SupportType.RIGID`, the ring around a face rather than its middle. */
+    public fun supportsRigid(
+        stateId: Int,
+        face: BlockFace,
+    ): Boolean = rigid[shapeOf(stateId)] and (1 shl face.ordinal) != 0
+
+    private fun faceBits(flags: String): Int {
+        var mask = 0
+        for ((face, flag) in flags.withIndex()) if (flag == '1') mask = mask or (1 shl face)
+        return mask
+    }
 
     /**
      * Whether the two blocks together wall off the face between them, [face] pointing from

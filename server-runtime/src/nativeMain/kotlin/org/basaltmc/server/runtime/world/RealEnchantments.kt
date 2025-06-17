@@ -12,7 +12,7 @@ import org.basaltmc.wire.nbt.NbtCompound
  * carries.
  *
  * `minecraft:enchantment` is a datapack registry, so the client knows only what it was sent, and
- * the definitions are content: read from the download, never committed (§7).
+ * the definitions are content: read from the download, never committed.
  *
  * All or nothing. An entry the client cannot parse drops the connection at login, so one bad file
  * means an empty registry instead of a partial one.
