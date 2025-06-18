@@ -143,7 +143,9 @@ public object BlockSupport {
 
     private fun ruleOf(stateId: Int): Int = if (stateId in byState.indices) byState[stateId] else ALWAYS
 
-    /** A state's block registry id, which is what the listed sets are written in terms of. */
+    /** A state's block registry id, which is what every block-set table here is written in. */
+    public fun blockRegistryIdOf(stateId: Int): Int = blockIdOf(stateId)
+
     private fun blockIdOf(stateId: Int): Int {
         val table = blockOfState ?: buildBlockOfState().also { blockOfState = it }
         return if (stateId in table.indices) table[stateId] else -1

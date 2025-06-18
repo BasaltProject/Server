@@ -167,6 +167,28 @@ public object BlockShapes {
         return true
     }
 
+    /**
+     * Whether this state's [face] fills a rectangle of it, in units, rows before columns.
+     *
+     * parity: `Shapes.joinIsNotEmpty(test, faceShape, ONLY_FIRST)` inverted, which is how a wall
+     * asks whether what stands on it covers its post or one of its sides.
+     */
+    public fun faceCovers(
+        stateId: Int,
+        face: BlockFace,
+        minRow: Int,
+        maxRow: Int,
+        minColumn: Int,
+        maxColumn: Int,
+    ): Boolean {
+        val mask = faceMask(shapeOf(stateId), face)
+        val columns = columnBits(minColumn, maxColumn)
+        for (row in minRow until maxRow) {
+            if (mask[row] and columns != columns) return false
+        }
+        return true
+    }
+
     private fun shapeOf(stateId: Int): Int = if (stateId in byState.indices) byState[stateId] else 0
 
     private fun faceOf(

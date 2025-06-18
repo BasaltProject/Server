@@ -1,6 +1,7 @@
 package org.basaltmc.server.runtime.world
 
 import org.basaltmc.server.random.LegacyRandom
+import org.basaltmc.server.registry.BlockConnections
 import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.BlockSupport
@@ -111,6 +112,10 @@ public class RandomTicks {
             block.path in CROPS -> growCrop(world, x, y, z, stateId, block, random, changes)
             block.path == "nether_wart" -> growNetherWart(world, x, y, z, stateId, block, random, changes)
             block.path == "sugar_cane" -> growStalk(world, x, y, z, stateId, block, changes)
+            block.path == "cactus" -> growCactus(world, x, y, z, stateId, block, random, changes)
+            BlockConnections.isLeaves(stateId) -> decay(world, x, y, z, stateId, changes)
+            block.path == "grass_block" -> spreadGrass(world, x, y, z, stateId, random, changes)
+            block.path == "farmland" -> dryFarmland(world, x, y, z, stateId, changes)
             block.path == "ice" -> melt(world, x, y, z, stateId, Blocks.WATER.stateId, changes)
             block.path == "snow" -> melt(world, x, y, z, stateId, Blocks.AIR.stateId, changes)
         }
@@ -188,8 +193,6 @@ public class RandomTicks {
      * parity: `SugarCaneBlock.randomTick`: count the stalk under it, and at age fifteen put another
      * block on top and start again from zero.
      *
-     * A cactus grows by nearly the same rule and is deliberately not here: it also flowers at age
-     * eight and keeps ageing past its third block, and half of that is worse than none of it.
      */
     private fun growStalk(
         world: LoadedWorld,
@@ -213,6 +216,161 @@ public class RandomTicks {
         val fresh = BlockStateDefinitions.stateIdOf(block, mapOf("age" to "0"), stateId) ?: return
         set(world, x, y + 1, z, fresh, changes)
         set(world, x, y, z, fresh, changes)
+    }
+
+    /**
+     * parity: `CactusBlock.randomTick`, which is the same shape as sugar cane with two twists: at
+     * age eight it may flower instead, and a stalk that has reached three keeps ageing rather than
+     * stopping, so a cactus at fifteen and three tall does nothing at all.
+     */
+    private fun growCactus(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        stateId: Int,
+        block: Identifier,
+        random: LegacyRandom,
+        changes: MutableList<BlockChange>,
+    ) {
+        if (stateAt(world, x, y + 1, z) != Blocks.AIR.stateId) return
+        val age = BlockStateDefinitions.propertiesOf(stateId)["age"]?.toIntOrNull() ?: return
+        var height = 1
+        while (BlockStateDefinitions.blockOf(stateAt(world, x, y - height, z)) == block) {
+            if (++height == MAX_STALK_HEIGHT && age == STALK_MAX_AGE) return
+        }
+        if (age == FLOWER_AGE && NeighbourUpdates.isSupported(world, x, y + 1, z, stateId)) {
+            val odds = if (height >= MAX_STALK_HEIGHT) TALL_FLOWER_ODDS else SHORT_FLOWER_ODDS
+            if (random.nextDouble() <= odds) {
+                val flower = Blocks.REGISTRY.idOf(Identifier.vanilla("cactus_flower"))
+                flower?.let { set(world, x, y + 1, z, it, changes) }
+            }
+        } else if (age == STALK_MAX_AGE && height < MAX_STALK_HEIGHT) {
+            val fresh = BlockStateDefinitions.stateIdOf(block, mapOf("age" to "0"), stateId) ?: return
+            set(world, x, y + 1, z, fresh, changes)
+            set(world, x, y, z, fresh, changes)
+            return
+        }
+        if (age < STALK_MAX_AGE) {
+            val older = BlockStateDefinitions.stateIdOf(block, mapOf("age" to (age + 1).toString()), stateId) ?: return
+            set(world, x, y, z, older, changes)
+        }
+    }
+
+    /**
+     * parity: `SpreadingSnowyBlock.randomTick`: grass under something opaque turns back to dirt,
+     * and otherwise tries four times to spread onto a nearby dirt block.
+     *
+     * The four attempts are four rolls of the world's random whether they land anywhere or not,
+     * which is what keeps a field of grass spreading at vanilla's own pace.
+     */
+    private fun spreadGrass(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        stateId: Int,
+        random: LegacyRandom,
+        changes: MutableList<BlockChange>,
+    ) {
+        if (!staysGrass(world, x, y, z)) {
+            set(world, x, y, z, Blocks.DIRT.stateId, changes)
+            return
+        }
+        if (WorldLight.rawBrightness(world, x, y + 1, z) < GRASS_LIGHT) return
+        repeat(GRASS_ATTEMPTS) {
+            val tx = x + random.nextInt(3) - 1
+            val ty = y + random.nextInt(5) - 3
+            val tz = z + random.nextInt(3) - 1
+            if (stateAt(world, tx, ty, tz) != Blocks.DIRT.stateId) return@repeat
+            if (!staysGrass(world, tx, ty, tz)) return@repeat
+            if (BlockSupport.holdsWater(stateAt(world, tx, ty + 1, tz))) return@repeat
+            set(world, tx, ty, tz, stateId, changes)
+        }
+    }
+
+    /**
+     * parity: `SpreadingSnowyBlock.canStayAlive`: a single snow layer is fine, a full fluid is not,
+     * and anything else has to let light through.
+     */
+    private fun staysGrass(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Boolean {
+        val above = stateAt(world, x, y + 1, z)
+        val properties = BlockStateDefinitions.propertiesOf(above)
+        if (BlockStateDefinitions.blockOf(above)?.path == "snow" && properties["layers"] == "1") return true
+        if (BlockSupport.holdsWater(above)) return false
+        return BlockShapes.dampening(above) < WorldLight.MAX_LEVEL
+    }
+
+    /**
+     * parity: `FarmlandBlock.randomTick`: away from water it dries a step at a time, and at zero it
+     * goes back to dirt unless something growing on it holds it.
+     */
+    private fun dryFarmland(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        stateId: Int,
+        changes: MutableList<BlockChange>,
+    ) {
+        val block = BlockStateDefinitions.blockOf(stateId) ?: return
+        val moisture = BlockStateDefinitions.propertiesOf(stateId)["moisture"]?.toIntOrNull() ?: return
+        if (nearWater(world, x, y, z) || world.weather.raining) {
+            if (moisture >= MAX_MOISTURE) return
+            val wet = BlockStateDefinitions.stateIdOf(block, mapOf("moisture" to MAX_MOISTURE.toString()), stateId)
+            wet?.let { set(world, x, y, z, it, changes) }
+            return
+        }
+        if (moisture > 0) {
+            val drier = BlockStateDefinitions.stateIdOf(block, mapOf("moisture" to (moisture - 1).toString()), stateId)
+            drier?.let { set(world, x, y, z, it, changes) }
+            return
+        }
+        if (BlockConnections.maintainsFarmland(stateAt(world, x, y + 1, z))) return
+        set(world, x, y, z, Blocks.DIRT.stateId, changes)
+    }
+
+    /** parity: `FarmlandBlock.isNearWater`, four blocks out and one up. */
+    private fun nearWater(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Boolean {
+        for (dx in -WATER_RANGE..WATER_RANGE) {
+            for (dz in -WATER_RANGE..WATER_RANGE) {
+                for (dy in 0..1) {
+                    if (BlockSupport.holdsWater(stateAt(world, x + dx, y + dy, z + dz))) return true
+                }
+            }
+        }
+        return false
+    }
+
+    /**
+     * parity: `LeavesBlock.randomTick`, which drops leaves that are seven blocks from any trunk.
+     *
+     * A canopy still on its trunk is within seven blocks of it and stays; one that has been felled
+     * is not, and goes.
+     */
+    private fun decay(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        stateId: Int,
+        changes: MutableList<BlockChange>,
+    ) {
+        if (BlockStateDefinitions.propertiesOf(stateId)["persistent"] == "true") return
+        // Counted here rather than read off the state: see [NeighbourUpdates.leafDistance] for why
+        // the stored one cannot be trusted on a generated tree.
+        if (NeighbourUpdates.leafDistance(world, x, y, z) < DECAY_DISTANCE) return
+        set(world, x, y, z, Blocks.AIR.stateId, changes)
     }
 
     /** parity: `IceBlock` and `SnowLayerBlock`, both of which go by the light the blocks give off. */
@@ -259,5 +417,20 @@ public class RandomTicks {
 
         /** `11 - state.getLightDampening()` for ice, and a plain 11 for a snow layer, which dampens none. */
         const val MELT_LIGHT = 11
+
+        /** parity: `LeavesBlock.DECAY_DISTANCE`. */
+        const val DECAY_DISTANCE = 7
+
+        const val GRASS_LIGHT = 9
+        const val GRASS_ATTEMPTS = 4
+        const val MAX_MOISTURE = 7
+
+        /** parity: `FarmlandBlock.isNearWater`'s own four. */
+        const val WATER_RANGE = 4
+
+        /** parity: `CactusBlock`, which flowers at age eight and more often once it is tall. */
+        const val FLOWER_AGE = 8
+        const val SHORT_FLOWER_ODDS = 0.1
+        const val TALL_FLOWER_ODDS = 0.25
     }
 }

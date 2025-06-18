@@ -25,6 +25,12 @@ public class ServerEntity(
     public var yaw: Float = 0f,
     public var pitch: Float = 0f,
 ) {
+    /** What the spawn packet carries beyond the type: for a falling block, the state it holds. */
+    public var objectData: Int = 0
+
+    /** How fast it is going down, for the few entities this build moves itself. */
+    public var velocityY: Double = 0.0
+
     /** Attribute base values that were changed from their default. parity: `AttributeMap`, without modifiers. */
     public val attributeValues: MutableMap<String, Double> = mutableMapOf()
 

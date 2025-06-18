@@ -97,6 +97,8 @@ import org.basaltmc.server.runtime.world.ChunkGenerationQueue
 import org.basaltmc.server.runtime.world.DamageTypes
 import org.basaltmc.server.runtime.world.EndPodium
 import org.basaltmc.server.runtime.world.EndPortals
+import org.basaltmc.server.runtime.world.FallingBlocks
+import org.basaltmc.server.runtime.world.Fires
 import org.basaltmc.server.runtime.world.FluidFlow
 import org.basaltmc.server.runtime.world.FluidKind
 import org.basaltmc.server.runtime.world.Fluids
@@ -802,6 +804,8 @@ public class BasaltServer(
                 .onFailure { logger.error(it) { "Random block tick failed in world '${world.name}'" } }
             runCatching { tickScheduledBlocks(world) }
                 .onFailure { logger.error(it) { "Scheduled block tick failed in world '${world.name}'" } }
+            runCatching { tickFallingBlocks(world) }
+                .onFailure { logger.error(it) { "Falling block tick failed in world '${world.name}'" } }
             runCatching { tickEffects(world) }
                 .onFailure { logger.error(it) { "Effect tick failed in world '${world.name}'" } }
             runCatching { tickSleep(world) }
@@ -1043,6 +1047,40 @@ public class BasaltServer(
         if (due.isEmpty()) return
         val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
         for (position in due) {
+            // Fire acts on its own clock, and keeps asking for the next turn as it goes.
+            if (Fires.isFire(world.state.getBlockState(position[0], position[1], position[2]) ?: 0)) {
+                for (change in Fires.tick(
+                    world,
+                    position[0],
+                    position[1],
+                    position[2],
+                    LegacyRandom(Random.nextLong()),
+                )) {
+                    val pos = BlockPos(change.x, change.y, change.z)
+                    for (player in watchers) {
+                        player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                            ClientboundBlockUpdatePacket(pos, change.stateId).write(it)
+                        }
+                    }
+                }
+                continue
+            }
+            // A block that lost its footing turns into an entity; everything else here is a button.
+            if (FallingBlocks.falls(world.state.getBlockState(position[0], position[1], position[2]) ?: 0)) {
+                val fell =
+                    FallingBlocks.beginFalling(world, position[0], position[1], position[2]) {
+                        playerRegistry.allocateEntityId()
+                    }
+                if (fell != null) {
+                    val pos = BlockPos(position[0], position[1], position[2])
+                    for (player in watchers) {
+                        player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                            ClientboundBlockUpdatePacket(pos, Blocks.AIR.stateId).write(it)
+                        }
+                    }
+                }
+                continue
+            }
             val released = BlockInteractions.release(world, position[0], position[1], position[2]) ?: continue
             val pos = BlockPos(position[0], position[1], position[2])
             for (player in watchers) {
@@ -1060,6 +1098,22 @@ public class BasaltServer(
                         pitch = 1f,
                         seed = Random.nextLong(),
                     ).write(it)
+                }
+            }
+        }
+    }
+
+    /** Moves whatever is in mid-air, and puts it back down as a block where it lands. */
+    private fun tickFallingBlocks(world: LoadedWorld) {
+        val falling = world.state.entities().filter { !it.removed && it.type == FallingBlocks.ENTITY_TYPE }
+        if (falling.isEmpty()) return
+        val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
+        for (entity in falling) {
+            val landed = FallingBlocks.tick(world, entity) ?: continue
+            val pos = BlockPos(landed.x, landed.y, landed.z)
+            for (player in watchers) {
+                player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                    ClientboundBlockUpdatePacket(pos, landed.stateId).write(it)
                 }
             }
         }
