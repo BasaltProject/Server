@@ -5,9 +5,13 @@ import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.BlockSupport
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.registry.EntityTypes
 import org.basaltmc.server.registry.FireOdds
 import org.basaltmc.server.registry.Weathering
+import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.wire.common.Identifier
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * The rest of what vanilla grows, spreads and puts out on a random tick.
@@ -15,6 +19,7 @@ import org.basaltmc.wire.common.Identifier
  * One function per `randomTick` in the jar, kept apart from [RandomTicks] only because that file is
  * the picker and this one is the behaviour. Each says which class it came from.
  */
+@OptIn(ExperimentalUuidApi::class)
 public object BlockGrowth {
     /** parity: `NyliumBlock.randomTick`: nylium under something opaque goes back to netherrack. */
     public fun nylium(
@@ -660,8 +665,187 @@ public object BlockGrowth {
         val properties = BlockStateDefinitions.propertiesOf(stateId)
         val hydration = properties["hydration"]?.toIntOrNull() ?: 0
         if (properties["waterlogged"] != "true" && hydration <= 0) return
-        world.state.scheduleBlockTick(x, y, z, Identifier.vanilla("dried_ghast"), DRIED_GHAST_DELAY)
+        world.state.scheduleBlockTick(x, y, z, ScheduledBlocks.DRIED_GHAST, DRIED_GHAST_DELAY)
     }
+
+    /**
+     * parity: `SpeleothemBlock.randomTick` over `growStalactiteOrStalagmiteIfPossible`: a stalactite
+     * hanging under dripstone grows a tip down, or drips a stalagmite up from the floor below it.
+     *
+     * What is not here is the other half of `PointedDripstoneBlock.randomTick`, which fills a
+     * cauldron under it. Cauldrons are §6.5, and the block is what this system owns.
+     */
+    public fun dripstone(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        stateId: Int,
+        random: LegacyRandom,
+        changes: MutableList<BlockChange>,
+    ) {
+        if (random.nextFloat() >= DRIPSTONE_CHANCE) return
+        val properties = BlockStateDefinitions.propertiesOf(stateId)
+        if (properties["vertical_direction"] != "down") return
+        // parity: `isStalactiteStartPos`, the topmost block of the stalactite.
+        if (isDripstone(world, x, y + 1, z)) return
+        // parity: `canGrow`, which asks for the block it hangs from, a dripstone block.
+        if (BlockStateDefinitions.blockOf(world.state.getBlockState(x, y + 1, z) ?: 0)?.path !=
+            "dripstone_block"
+        ) {
+            return
+        }
+
+        var tipY = y
+        var found = false
+        repeat(DRIPSTONE_REACH) {
+            val here = world.state.getBlockState(x, tipY, z) ?: return
+            val thickness = BlockStateDefinitions.propertiesOf(here)["thickness"]
+            if (thickness == "tip") {
+                found = true
+                return@repeat
+            }
+            if (!isDripstone(world, x, tipY - 1, z)) return
+            tipY--
+        }
+        if (!found) return
+        val tip = world.state.getBlockState(x, tipY, z) ?: return
+        val tipProperties = BlockStateDefinitions.propertiesOf(tip)
+        // parity: `isFreeHangingStalactite`, which will not grow from a waterlogged tip.
+        if (tipProperties["waterlogged"] == "true") return
+        val below = world.state.getBlockState(x, tipY - 1, z) ?: return
+        if (below != Blocks.AIR.stateId) return
+
+        if (random.nextBoolean()) {
+            placeTip(world, x, tipY - 1, z, "down", changes)
+            return
+        }
+        // parity: `growStalagmiteBelow`, ten blocks down for a floor to grow up from.
+        var floorY = tipY - 1
+        repeat(DRIPSTONE_DROP) {
+            val here = world.state.getBlockState(x, floorY, z) ?: return
+            if (BlockSupport.holdsWater(here)) return
+            if (here != Blocks.AIR.stateId) {
+                if (BlockShapes.isFaceSturdy(here, org.basaltmc.server.registry.BlockFace.UP)) {
+                    placeTip(world, x, floorY + 1, z, "up", changes)
+                }
+                return
+            }
+            floorY--
+        }
+    }
+
+    private fun isDripstone(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Boolean = BlockStateDefinitions.blockOf(world.state.getBlockState(x, y, z) ?: 0)?.path == "pointed_dripstone"
+
+    private fun placeTip(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        direction: String,
+        changes: MutableList<BlockChange>,
+    ) {
+        val tip =
+            BlockStateDefinitions.stateIdOf(
+                Identifier.vanilla("pointed_dripstone"),
+                mapOf("vertical_direction" to direction, "thickness" to "tip", "waterlogged" to "false"),
+            ) ?: return
+        set(world, x, y, z, tip, changes)
+    }
+
+    /**
+     * parity: `EyeblossomBlock.randomTick` over the `gameplay/eyeblossom_open` attribute, whose
+     * only source in vanilla's data is the `day` timeline: true from tick 12600, false from 23401.
+     *
+     * The attribute system itself is not modelled, but this attribute has exactly one track and it
+     * is one this build already keeps: the world clock.
+     */
+    public fun eyeblossom(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        stateId: Int,
+        changes: MutableList<BlockChange>,
+    ) {
+        val path = BlockStateDefinitions.blockOf(stateId)?.path ?: return
+        val open = path.startsWith("open_") || path.startsWith("potted_open_")
+        if (open == eyeblossomsAreOpen(world)) return
+        val other =
+            when (path) {
+                "open_eyeblossom" -> "closed_eyeblossom"
+                "closed_eyeblossom" -> "open_eyeblossom"
+                "potted_open_eyeblossom" -> "potted_closed_eyeblossom"
+                "potted_closed_eyeblossom" -> "potted_open_eyeblossom"
+                else -> return
+            }
+        val turned =
+            BlockStateDefinitions.stateIdOf(Identifier.vanilla(other), BlockStateDefinitions.propertiesOf(stateId))
+                ?: Blocks.REGISTRY.idOf(Identifier.vanilla(other))
+                ?: return
+        set(world, x, y, z, turned, changes)
+    }
+
+    /** parity: the `day` timeline's two keyframes for this attribute. */
+    private fun eyeblossomsAreOpen(world: LoadedWorld): Boolean {
+        val time = ((world.clock.totalTicks % DAY_TICKS) + DAY_TICKS) % DAY_TICKS
+        return time >= EYEBLOSSOM_OPENS && time < EYEBLOSSOM_CLOSES
+    }
+
+    /**
+     * parity: `NetherPortalBlock.randomTick`, which is where the zombified piglins in an overworld
+     * portal come from. The attribute defaults to off and the overworld's dimension type turns it
+     * on, so it follows the dimension here.
+     *
+     * The piglin it spawns stands still: nothing has a brain yet (§6.4). What this owns is the
+     * block's own rule, and that is what runs.
+     */
+    public fun netherPortal(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        random: LegacyRandom,
+        allocateEntityId: () -> Int,
+    ): ServerEntity? {
+        if (!world.declaration.dimension.spawnsPortalPiglins) return null
+        if (!world.gameRules[GameRuleRegistry.SPAWN_MONSTERS]) return null
+        val difficulty = difficultyOf(world)
+        if (difficulty <= 0) return null
+        if (random.nextInt(PORTAL_ODDS) >= difficulty) return null
+
+        var floorY = y
+        while (BlockStateDefinitions.blockOf(world.state.getBlockState(x, floorY, z) ?: 0)?.path == "nether_portal") {
+            floorY--
+        }
+        val ground = world.state.getBlockState(x, floorY, z) ?: return null
+        if (!BlockShapes.isFaceSturdy(ground, org.basaltmc.server.registry.BlockFace.UP)) return null
+        val type = EntityTypes[Identifier.vanilla("zombified_piglin")] ?: return null
+        val entity =
+            ServerEntity(
+                entityId = allocateEntityId(),
+                uuid = Uuid.random(),
+                type = Identifier.vanilla("zombified_piglin"),
+                protocolType = type.protocolId,
+                x = x + 0.5,
+                y = (floorY + 1).toDouble(),
+                z = z + 0.5,
+            )
+        return world.state.spawnEntity(entity)
+    }
+
+    private fun difficultyOf(world: LoadedWorld): Int =
+        when (world.settings.difficulty) {
+            "peaceful" -> 0
+            "easy" -> 1
+            "normal" -> 2
+            else -> 3
+        }
 
     private fun shrink(
         world: LoadedWorld,
@@ -793,6 +977,19 @@ public object BlockGrowth {
     private const val CHORUS_BRANCH_AGE = 4
     private const val VINE_ODDS = 4
     private const val VINE_CROWD = 5
+
+    /** parity: `SpeleothemBlock.randomTick`'s own chance, its reach and its drop. */
+    private const val DRIPSTONE_CHANCE = 0.011377778f
+    private const val DRIPSTONE_REACH = 7
+    private const val DRIPSTONE_DROP = 10
+
+    /** parity: the `day` timeline's keyframes for `gameplay/eyeblossom_open`. */
+    private const val EYEBLOSSOM_OPENS = 12600L
+    private const val EYEBLOSSOM_CLOSES = 23401L
+    private const val DAY_TICKS = 24000L
+
+    /** parity: `NetherPortalBlock.randomTick`'s `nextInt(2000) < difficulty`. */
+    private const val PORTAL_ODDS = 2000
 
     /** parity: `DriedGhastBlock.randomTick`'s own delay. */
     private const val DRIED_GHAST_DELAY = 5000

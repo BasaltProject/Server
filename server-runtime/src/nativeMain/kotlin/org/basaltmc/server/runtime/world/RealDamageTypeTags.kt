@@ -65,4 +65,7 @@ public object DamageTypes {
     public val WITHER: Identifier = Identifier.vanilla("wither")
     public val STARVE: Identifier = Identifier.vanilla("starve")
     public val FALL: Identifier = Identifier.vanilla("fall")
+
+    /** parity: `DamageTypes.BAD_RESPAWN_POINT`, what a bed in the wrong dimension kills you with. */
+    public val BAD_RESPAWN_POINT: Identifier = Identifier.vanilla("bad_respawn_point")
 }

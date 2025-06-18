@@ -45,6 +45,7 @@ import org.basaltmc.server.runtime.world.DamageProtection
 import org.basaltmc.server.runtime.world.DamageTypes
 import org.basaltmc.server.runtime.world.EnchantmentAttributes
 import org.basaltmc.server.runtime.world.EndPortals
+import org.basaltmc.server.runtime.world.Explosions
 import org.basaltmc.server.runtime.world.Fires
 import org.basaltmc.server.runtime.world.FluidFlow
 import org.basaltmc.server.runtime.world.Fluids
@@ -1814,6 +1815,49 @@ public class ClientSession(
             player.connection.sendPlayPacket(BlockEntityDataPacket.ID) {
                 BlockEntityDataPacket(pos, typeId, data).write(it)
             }
+        }
+    }
+
+    /**
+     * Sets off an explosion, drops what it broke and hurts whoever was standing in it.
+     *
+     * parity: `ServerExplosion`. The knockback it gives is not sent: this build has no entity
+     * motion packet yet, and that is the packet audit's business rather than this one's.
+     */
+    private fun blowUp(
+        world: LoadedWorld,
+        x: Double,
+        y: Double,
+        z: Double,
+        power: Float,
+    ) {
+        val broken = Explosions.explode(world, x, y, z, power, LegacyRandom(Random.nextLong()))
+        for (block in broken) {
+            val at = BlockPos(block.x, block.y, block.z)
+            broadcastBlockUpdate(at, Blocks.AIR.stateId)
+            Blocks.byStateId(block.stateId)?.let { dropLootFor(it.block, at) }
+        }
+        for (block in broken) {
+            NeighbourUpdates.afterChange(
+                world,
+                block.x,
+                block.y,
+                block.z,
+                onReshaped = { stateId, bx, by, bz -> broadcastBlockUpdate(BlockPos(bx, by, bz), stateId) },
+            ) { stateId, bx, by, bz ->
+                val at = BlockPos(bx, by, bz)
+                broadcastBlockUpdate(at, Blocks.AIR.stateId)
+                Blocks.byStateId(stateId)?.let { dropLootFor(it.block, at) }
+            }
+        }
+        for (player in playersInSameWorld()) {
+            val distance =
+                kotlin.math.sqrt(
+                    (player.x - x) * (player.x - x) + (player.y - y) * (player.y - y) + (player.z - z) * (player.z - z),
+                )
+            val damage = Explosions.damageAt(distance, power, power * 2f)
+            if (damage <= 0f) continue
+            player.connection.hurt(damage, "badRespawnPoint", DamageTypes.BAD_RESPAWN_POINT)
         }
     }
 
@@ -4015,6 +4059,9 @@ public class ClientSession(
                 broadcastBlockUpdate(BlockPos(block[0], block[1], block[2]), block[3])
             }
             sendActionBar(Component.translatable("block.minecraft.bed.not_valid"))
+            // parity: `BedBlock.useWithoutItem`, which does not merely refuse: it takes the bed out
+            // and sets off an explosion of five where it stood.
+            blowUp(world, head.x + 0.5, head.y + 0.5, head.z + 0.5, Explosions.BED_POWER)
             return
         }
         // parity: `ServerPlayer.startSleepInBed` sets the spawn point once the bed is reachable and

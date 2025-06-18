@@ -69,14 +69,17 @@ public object Blocks {
     public data class BlockHardness(
         public val destroyTime: Float,
         public val requiresCorrectTool: Boolean,
+        /** parity: `Block.getExplosionResistance`, what an explosion has to spend to get through. */
+        public val explosionResistance: Float = 0f,
     ) {
         public val isInstant: Boolean get() = destroyTime == 0f
         public val isUnbreakable: Boolean get() = destroyTime < 0f
     }
 
     private val hardnessByBlock: Map<Identifier, BlockHardness> =
-        ALL_BLOCK_HARDNESS.associate { (path, destroyTime, requiresTool) ->
-            Identifier.vanilla(path) to BlockHardness(destroyTime, requiresTool)
+        ALL_BLOCK_HARDNESS.associate { entry ->
+            Identifier.vanilla(entry.path) to
+                BlockHardness(entry.destroyTime, entry.requiresCorrectTool, entry.explosionResistance)
         }
 
     /**

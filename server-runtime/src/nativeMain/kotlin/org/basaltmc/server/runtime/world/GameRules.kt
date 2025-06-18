@@ -41,6 +41,9 @@ public object GameRuleRegistry {
 
     /** Named because the vine spread asks for it by name. parity: `GameRules.RULE_SPREAD_VINES`. */
     public val SPREAD_VINES: GameRule.Bool = GameRule.Bool("spread_vines", true)
+
+    /** Named because a nether portal asks it before spawning anything. */
+    public val SPAWN_MONSTERS: GameRule.Bool = GameRule.Bool("spawn_monsters", true)
     public val IMMEDIATE_RESPAWN: GameRule.Bool = GameRule.Bool("immediate_respawn", false)
 
     /** parity: the three rules a Nether portal reads before it takes anyone anywhere. */
@@ -122,7 +125,7 @@ public object GameRuleRegistry {
             SHOW_DEATH_MESSAGES,
             GameRule.Bool("spawner_blocks_work", true),
             GameRule.Bool("spawn_mobs", true),
-            GameRule.Bool("spawn_monsters", true),
+            SPAWN_MONSTERS,
             GameRule.Bool("spawn_patrols", true),
             GameRule.Bool("spawn_phantoms", true),
             GameRule.Bool("spawn_wandering_traders", true),

@@ -75,8 +75,13 @@ public enum class WorldDimension(
     public val hasCeiling: Boolean,
     /** parity: `DimensionType.coordinateScale`, the 1:8 that makes a Nether portal land where it does. */
     public val coordinateScale: Double,
+    /**
+     * parity: `gameplay/nether_portal_spawns_piglin`, which the overworld's own dimension type
+     * turns on and every other one leaves off.
+     */
+    public val spawnsPortalPiglins: Boolean = false,
 ) {
-    OVERWORLD("overworld", "overworld", 0, 63, ChunkHeight.OVERWORLD, true, false, 1.0),
+    OVERWORLD("overworld", "overworld", 0, 63, ChunkHeight.OVERWORLD, true, false, 1.0, spawnsPortalPiglins = true),
     NETHER("nether", "the_nether", 1, 32, ChunkHeight.NETHER, false, true, 8.0),
     END("end", "the_end", 2, 0, ChunkHeight.END, true, false, 1.0),
     ;
