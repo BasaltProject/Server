@@ -6,6 +6,7 @@ import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.BlockSupport
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.registry.Weathering
 import org.basaltmc.wire.common.Identifier
 
 /** A block a random tick changed, so the caller can tell the clients about it. */
@@ -114,8 +115,43 @@ public class RandomTicks {
             block.path == "sugar_cane" -> growStalk(world, x, y, z, stateId, block, changes)
             block.path == "cactus" -> growCactus(world, x, y, z, stateId, block, random, changes)
             BlockConnections.isLeaves(stateId) -> decay(world, x, y, z, stateId, changes)
-            block.path == "grass_block" -> spreadGrass(world, x, y, z, stateId, random, changes)
+            SaplingGrowth.isSapling(stateId) -> growSapling(world, x, y, z, stateId, random, changes)
+            // parity: `SpreadingSnowyBlock`, whose two blocks are grass and mycelium. Podzol is a
+            // plain `SnowyBlock` and does not tick at all.
+            block.path == "grass_block" || block.path == "mycelium" ->
+                spreadGrass(world, x, y, z, stateId, random, changes)
             block.path == "farmland" -> dryFarmland(world, x, y, z, stateId, changes)
+            block.path == "crimson_nylium" || block.path == "warped_nylium" ->
+                BlockGrowth.nylium(world, x, y, z, changes)
+            block.path == "redstone_ore" || block.path == "deepslate_redstone_ore" ->
+                BlockGrowth.redstoneOre(world, x, y, z, stateId, changes)
+            block.path == "cocoa" -> BlockGrowth.cocoa(world, x, y, z, stateId, random, changes)
+            block.path == "sweet_berry_bush" -> BlockGrowth.sweetBerries(world, x, y, z, stateId, random, changes)
+            block.path == "brown_mushroom" || block.path == "red_mushroom" ->
+                BlockGrowth.mushroom(world, x, y, z, stateId, random, changes)
+            block.path == "pumpkin_stem" || block.path == "melon_stem" ->
+                BlockGrowth.stem(world, x, y, z, stateId, growthSpeed(world, x, y, z, block), random, changes)
+            block.path == "bamboo" -> BlockGrowth.bamboo(world, x, y, z, stateId, random, changes)
+            block.path == "bamboo_sapling" -> BlockGrowth.bambooSapling(world, x, y, z, random, changes)
+            block.path == "vine" -> BlockGrowth.vine(world, x, y, z, stateId, random, changes)
+            block.path == "dried_ghast" -> BlockGrowth.driedGhast(world, x, y, z, stateId)
+            block.path == "chorus_flower" -> BlockGrowth.chorusFlower(world, x, y, z, stateId, random, changes)
+            block.path == "budding_amethyst" -> BlockGrowth.buddingAmethyst(world, x, y, z, random, changes)
+            block.path == "turtle_egg" -> BlockGrowth.turtleEgg(world, x, y, z, stateId, random, changes)
+            block.path == "lava" -> BlockGrowth.lava(world, x, y, z, random, changes)
+            block.path in CLIMBING_PLANTS ->
+                BlockGrowth.growingPlant(
+                    world,
+                    x,
+                    y,
+                    z,
+                    stateId,
+                    upwards = block.path == "kelp" || block.path == "twisting_vines",
+                    chance = if (block.path == "kelp") KELP_CHANCE else VINE_CHANCE,
+                    random = random,
+                    changes = changes,
+                )
+            Weathering.weathers(block.path) -> BlockGrowth.weather(world, x, y, z, stateId, random, changes)
             block.path == "ice" -> melt(world, x, y, z, stateId, Blocks.WATER.stateId, changes)
             block.path == "snow" -> melt(world, x, y, z, stateId, Blocks.AIR.stateId, changes)
         }
@@ -132,6 +168,9 @@ public class RandomTicks {
         random: LegacyRandom,
         changes: MutableList<BlockChange>,
     ) {
+        // parity: `BeetrootBlock.randomTick`, which throws away two turns in three before asking
+        // its parent anything. Without this a beetroot grows three times as fast as vanilla's.
+        if (block.path == "beetroots" && random.nextInt(BEETROOT_ODDS) == 0) return
         if (WorldLight.rawBrightness(world, x, y, z) < CROP_LIGHT) return
         val definition = BlockStateDefinitions.of(block) ?: return
         val ages = definition.valuesOf("age")
@@ -218,6 +257,21 @@ public class RandomTicks {
         set(world, x, y, z, fresh, changes)
     }
 
+    /** parity: `SaplingBlock.randomTick`: light nine above it, then one roll in seven. */
+    private fun growSapling(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        stateId: Int,
+        random: LegacyRandom,
+        changes: MutableList<BlockChange>,
+    ) {
+        if (WorldLight.rawBrightness(world, x, y + 1, z) < SaplingGrowth.GROWTH_LIGHT) return
+        if (random.nextInt(SaplingGrowth.GROWTH_ODDS) != 0) return
+        changes += SaplingGrowth.advance(world, x, y, z, stateId, random)
+    }
+
     /**
      * parity: `CactusBlock.randomTick`, which is the same shape as sugar cane with two twists: at
      * age eight it may flower instead, and a stalk that has reached three keeps ageing rather than
@@ -282,6 +336,7 @@ public class RandomTicks {
             val tx = x + random.nextInt(3) - 1
             val ty = y + random.nextInt(5) - 3
             val tz = z + random.nextInt(3) - 1
+            // parity: both spread onto plain dirt, which is `SpreadingSnowyBlock`'s base block.
             if (stateAt(world, tx, ty, tz) != Blocks.DIRT.stateId) return@repeat
             if (!staysGrass(world, tx, ty, tz)) return@repeat
             if (BlockSupport.holdsWater(stateAt(world, tx, ty + 1, tz))) return@repeat
@@ -410,6 +465,9 @@ public class RandomTicks {
         /** The blocks that grow by `CropBlock`'s own rule. Melons and pumpkins bring their stems later. */
         val CROPS = setOf("wheat", "carrots", "potatoes", "beetroots", "torchflower_crop")
         const val CROP_LIGHT = 9
+
+        /** parity: `BeetrootBlock.randomTick`'s `nextInt(3) != 0`. */
+        const val BEETROOT_ODDS = 3
         const val NETHER_WART_MAX_AGE = 3
         const val NETHER_WART_ODDS = 10
         const val STALK_MAX_AGE = 15
@@ -417,6 +475,11 @@ public class RandomTicks {
 
         /** `11 - state.getLightDampening()` for ice, and a plain 11 for a snow layer, which dampens none. */
         const val MELT_LIGHT = 11
+
+        /** parity: the four `GrowingPlantHeadBlock` subclasses and their own odds. */
+        val CLIMBING_PLANTS = setOf("kelp", "cave_vines", "twisting_vines", "weeping_vines")
+        const val KELP_CHANCE = 0.14
+        const val VINE_CHANCE = 0.1
 
         /** parity: `LeavesBlock.DECAY_DISTANCE`. */
         const val DECAY_DISTANCE = 7

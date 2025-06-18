@@ -245,6 +245,59 @@ class RandomTicksTest {
         assertFalse(NeighbourUpdates.isSupported(world, 1, 79, 8), "a cactus cannot touch a solid block")
     }
 
+    /** parity: `SpreadingSnowyBlock` covers mycelium too, and podzol is not one of them. */
+    @Test
+    fun myceliumSpreadsLikeGrassDoes() {
+        world.state.setBlockState(2, 74, 2, state("mycelium", mapOf("snowy" to "false")))
+        world.state.setBlockState(3, 74, 2, Blocks.DIRT.stateId)
+
+        assertTrue(
+            run(2, 74, 2, rounds = 3000) {
+                BlockStateDefinitions.blockOf(checkNotNull(world.state.getBlockState(3, 74, 2)))?.path == "mycelium"
+            },
+            "the dirt beside it should have turned to mycelium",
+        )
+    }
+
+    /**
+     * parity: `BeetrootBlock.randomTick`, which throws away one turn in three before asking the
+     * crop rule anything, so beetroots grow about two thirds as often as wheat.
+     *
+     * Counted over many turns rather than raced once: one turn of each consumes a different number
+     * of draws, so comparing single timings would be comparing two different dice, not two rules.
+     */
+    @Test
+    fun beetrootsGrowLessOftenThanWheat() {
+        world.state.setBlockState(5, 74, 5, state("farmland", mapOf("moisture" to "7")))
+        world.state.setBlockState(8, 74, 5, state("farmland", mapOf("moisture" to "7")))
+
+        val beetroots = growthsOver(5, 75, 5, "beetroots")
+        val wheat = growthsOver(8, 75, 5, "wheat")
+
+        assertTrue(
+            beetroots < wheat,
+            "beetroots grew $beetroots times and wheat $wheat, and beetroots should be the rarer",
+        )
+    }
+
+    /** How many of 3000 turns grew this crop, resetting it each time so it never runs out of ages. */
+    private fun growthsOver(
+        x: Int,
+        y: Int,
+        z: Int,
+        crop: String,
+    ): Int {
+        val random = LegacyRandom(3L)
+        val young = state(crop, mapOf("age" to "0"))
+        var grown = 0
+        repeat(3000) {
+            world.state.setBlockState(x, y, z, young)
+            ticks.tickBlock(world, x, y, z, random)
+            if (world.state.getBlockState(x, y, z) != young) grown++
+        }
+        return grown
+    }
+
     private companion object {
         const val WHEAT_MAX_AGE = 7
         const val NETHER_WART_MAX_AGE = 3

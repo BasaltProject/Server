@@ -36,6 +36,7 @@ import org.basaltmc.wire.protocol.play.MapChunkPacket
 import org.basaltmc.wire.protocol.play.PlayerInfoRemovePacket
 import org.basaltmc.wire.protocol.play.PlayerInfoUpdatePacket
 import org.basaltmc.wire.protocol.play.PlayerPositionPacket
+import org.basaltmc.wire.protocol.play.RemoveEntitiesPacket
 import org.basaltmc.wire.protocol.play.RotateHeadPacket
 import org.basaltmc.wire.protocol.play.ServerboundPlayerActionPacket
 import org.basaltmc.wire.protocol.play.ServerboundPositionPacket
@@ -534,9 +535,11 @@ class PlayFlowIntegrationTest {
         // Dropping Bob takes him off Alice's tab list, sent from his own session thread the moment
         // the decoder gives up on him. That can land either side of her next answer, so it is
         // skipped here rather than ordered, same as keep-alives are in [readFrame].
+        // The tab entry and the entity both go when someone leaves, and they come from different
+        // threads than the chat does, so neither has a place in this order.
         var survivorBody = readPastChunks(alice.connection, alice.incoming, alice.threshold)
         var survivorId = lastPacketId
-        if (survivorId == PlayerInfoRemovePacket.ID) {
+        while (survivorId == PlayerInfoRemovePacket.ID || survivorId == RemoveEntitiesPacket.ID) {
             survivorBody = readPastChunks(alice.connection, alice.incoming, alice.threshold)
             survivorId = lastPacketId
         }

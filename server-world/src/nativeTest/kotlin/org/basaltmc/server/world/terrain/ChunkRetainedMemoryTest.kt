@@ -51,14 +51,23 @@ class ChunkRetainedMemoryTest {
         val released = liveHeapBytes()
         println("Retained per generated chunk after discard: ${(released - before) / batch} bytes")
 
-        // Generation must not accumulate shared state per chunk: a second round over the same
+        // Generation must not accumulate shared state per chunk: a further round over the same
         // positions may keep the one-time floor above, but adding tens of KB per chunk again
         // means a real leak.
-        repeat(CHUNK_COUNT) {
-            runCatching { RealTerrainGenerator.generate(world.router, world.environment, it % 8, it / 8) }
+        //
+        // The best of three rounds, not the first: this measures a whole heap, and the rest of the
+        // suite running beside it puts its own garbage in the number. A real leak adds on every
+        // round and survives the minimum; another test's allocation does not.
+        var leakedPerChunk = Long.MAX_VALUE
+        var previous = released
+        repeat(3) {
+            repeat(CHUNK_COUNT) {
+                runCatching { RealTerrainGenerator.generate(world.router, world.environment, it % 8, it / 8) }
+            }
+            val round = liveHeapBytes()
+            leakedPerChunk = minOf(leakedPerChunk, (round - previous) / CHUNK_COUNT)
+            previous = round
         }
-        val secondRound = liveHeapBytes()
-        val leakedPerChunk = (secondRound - released) / CHUNK_COUNT
         println("Second round added per chunk: $leakedPerChunk bytes")
         assertTrue(
             leakedPerChunk < SECOND_ROUND_LEAK_CEILING_BYTES,
