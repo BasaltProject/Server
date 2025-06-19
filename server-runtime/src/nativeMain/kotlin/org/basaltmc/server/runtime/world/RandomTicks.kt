@@ -118,6 +118,7 @@ public class RandomTicks {
         val block = BlockStateDefinitions.blockOf(stateId) ?: return
         when {
             block.path in CROPS -> growCrop(world, x, y, z, stateId, block, random, changes)
+            block.path == "pitcher_crop" -> growPitcher(world, x, y, z, stateId, block, random, changes)
             block.path == "nether_wart" -> growNetherWart(world, x, y, z, stateId, block, random, changes)
             block.path == "sugar_cane" -> growStalk(world, x, y, z, stateId, block, changes)
             block.path == "cactus" -> growCactus(world, x, y, z, stateId, block, random, changes)
@@ -143,7 +144,8 @@ public class RandomTicks {
             block.path == "nether_portal" ->
                 allocateEntityId?.let { BlockGrowth.netherPortal(world, x, y, z, random, it) }
             block.path.endsWith("eyeblossom") -> BlockGrowth.eyeblossom(world, x, y, z, stateId, changes)
-            block.path == "pointed_dripstone" -> BlockGrowth.dripstone(world, x, y, z, stateId, random, changes)
+            block.path == "pointed_dripstone" || block.path == "sulfur_spike" ->
+                BlockGrowth.dripstone(world, x, y, z, stateId, random, changes)
             block.path == "vine" -> BlockGrowth.vine(world, x, y, z, stateId, random, changes)
             block.path == "dried_ghast" -> BlockGrowth.driedGhast(world, x, y, z, stateId)
             block.path == "chorus_flower" -> BlockGrowth.chorusFlower(world, x, y, z, stateId, random, changes)
@@ -179,9 +181,10 @@ public class RandomTicks {
         random: LegacyRandom,
         changes: MutableList<BlockChange>,
     ) {
-        // parity: `BeetrootBlock.randomTick`, which throws away two turns in three before asking
-        // its parent anything. Without this a beetroot grows three times as fast as vanilla's.
-        if (block.path == "beetroots" && random.nextInt(BEETROOT_ODDS) == 0) return
+        // parity: `BeetrootBlock.randomTick` and `TorchflowerCropBlock.randomTick`, both of which
+        // throw away one turn in three before asking their parent anything. Without this they grow
+        // three times as fast as vanilla's.
+        if (block.path in SLOW_CROPS && random.nextInt(SLOW_CROP_ODDS) == 0) return
         if (WorldLight.rawBrightness(world, x, y, z) < CROP_LIGHT) return
         val definition = BlockStateDefinitions.of(block) ?: return
         val ages = definition.valuesOf("age")
@@ -191,6 +194,48 @@ public class RandomTicks {
         if (random.nextInt((25f / speed).toInt() + 1) != 0) return
         val grown = BlockStateDefinitions.stateIdOf(block, mapOf("age" to (age + 1).toString()), stateId) ?: return
         set(world, x, y, z, grown, changes)
+    }
+
+    /**
+     * parity: `PitcherCropBlock.randomTick` and its `grow`.
+     *
+     * Only the lower half ever ticks, and from age three up the crop is two blocks tall, so growing
+     * into that age writes the upper half as well.
+     */
+    private fun growPitcher(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        stateId: Int,
+        block: Identifier,
+        random: LegacyRandom,
+        changes: MutableList<BlockChange>,
+    ) {
+        val age = BlockStateDefinitions.propertiesOf(stateId)["age"]?.toIntOrNull() ?: return
+        val speed = growthSpeed(world, x, y, z, block)
+        if (random.nextInt((25f / speed).toInt() + 1) != 0) return
+        val grown = minOf(age + 1, PITCHER_MAX_AGE)
+        // parity: `PitcherCropBlock.canGrow`, which asks for light eight and not the nine a crop
+        // needs to grow at all, and for room above once the crop is tall.
+        if (age >= PITCHER_MAX_AGE) return
+        if (WorldLight.rawBrightness(world, x, y, z) < SURVIVAL_LIGHT) return
+        if (y + 1 > world.maxY) return
+        val doubled = grown >= PITCHER_DOUBLE_AGE
+        if (doubled) {
+            val above = world.state.getBlockState(x, y + 1, z) ?: return
+            val abovePath = BlockStateDefinitions.blockOf(above)?.path
+            if (above != Blocks.AIR.stateId && abovePath != "pitcher_crop") return
+        }
+        val lower =
+            BlockStateDefinitions.stateIdOf(block, mapOf("age" to grown.toString(), "half" to "lower"), stateId)
+                ?: return
+        set(world, x, y, z, lower, changes)
+        if (!doubled) return
+        val upper =
+            BlockStateDefinitions.stateIdOf(block, mapOf("age" to grown.toString(), "half" to "upper"), stateId)
+                ?: return
+        set(world, x, y + 1, z, upper, changes)
     }
 
     /** parity: `CropBlock.getGrowthSpeed`, farmland underneath and the neighbours' rows and all. */
@@ -478,8 +523,18 @@ public class RandomTicks {
         val CROPS = setOf("wheat", "carrots", "potatoes", "beetroots", "torchflower_crop")
         const val CROP_LIGHT = 9
 
-        /** parity: `BeetrootBlock.randomTick`'s `nextInt(3) != 0`. */
-        const val BEETROOT_ODDS = 3
+        /** The two that keep their parent's rate down to a third of it. */
+        val SLOW_CROPS = setOf("beetroots", "torchflower_crop")
+
+        /** parity: `PitcherCropBlock.MAX_AGE` and its `DOUBLE_PLANT_AGE_INTERSECTION`. */
+        const val PITCHER_MAX_AGE = 4
+        const val PITCHER_DOUBLE_AGE = 3
+
+        /** parity: `CropBlock.hasSufficientLight`, eight and not the nine a crop grows by. */
+        const val SURVIVAL_LIGHT = 8
+
+        /** parity: `BeetrootBlock.randomTick`'s `nextInt(3) != 0`, and torchflower's own. */
+        const val SLOW_CROP_ODDS = 3
         const val NETHER_WART_MAX_AGE = 3
         const val NETHER_WART_ODDS = 10
         const val STALK_MAX_AGE = 15

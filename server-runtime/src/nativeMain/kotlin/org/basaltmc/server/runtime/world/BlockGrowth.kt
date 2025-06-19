@@ -337,7 +337,7 @@ public object BlockGrowth {
 
     /**
      * parity: `TurtleEggBlock.randomTick`, minus the turtles: the egg cracks its two stages and
-     * then goes, and hatching a turtle waits for the entities of §6.4. The odds are the default of
+     * then goes, and hatching a turtle waits for entities. The odds are the default of
      * the `turtle_egg_hatch_chance` attribute, which is what an unmodified world gives every block.
      */
     public fun turtleEgg(
@@ -673,7 +673,7 @@ public object BlockGrowth {
      * hanging under dripstone grows a tip down, or drips a stalagmite up from the floor below it.
      *
      * What is not here is the other half of `PointedDripstoneBlock.randomTick`, which fills a
-     * cauldron under it. Cauldrons are §6.5, and the block is what this system owns.
+     * cauldron under it, which waits for cauldrons to hold anything.
      */
     public fun dripstone(
         world: LoadedWorld,
@@ -685,27 +685,25 @@ public object BlockGrowth {
         changes: MutableList<BlockChange>,
     ) {
         if (random.nextFloat() >= DRIPSTONE_CHANCE) return
+        val spike = BlockStateDefinitions.blockOf(stateId)?.path ?: return
+        val grownOn = GROWS_ON[spike] ?: return
         val properties = BlockStateDefinitions.propertiesOf(stateId)
         if (properties["vertical_direction"] != "down") return
         // parity: `isStalactiteStartPos`, the topmost block of the stalactite.
-        if (isDripstone(world, x, y + 1, z)) return
-        // parity: `canGrow`, which asks for the block it hangs from, a dripstone block.
-        if (BlockStateDefinitions.blockOf(world.state.getBlockState(x, y + 1, z) ?: 0)?.path !=
-            "dripstone_block"
-        ) {
-            return
-        }
+        if (isSpeleothem(world, x, y + 1, z, spike)) return
+        // parity: `canGrow`, which asks for the block it hangs from.
+        if (BlockStateDefinitions.blockOf(world.state.getBlockState(x, y + 1, z) ?: 0)?.path != grownOn) return
 
         var tipY = y
         var found = false
-        repeat(DRIPSTONE_REACH) {
+        repeat(REACH_OF[spike] ?: DRIPSTONE_REACH) {
             val here = world.state.getBlockState(x, tipY, z) ?: return
             val thickness = BlockStateDefinitions.propertiesOf(here)["thickness"]
             if (thickness == "tip") {
                 found = true
                 return@repeat
             }
-            if (!isDripstone(world, x, tipY - 1, z)) return
+            if (!isSpeleothem(world, x, tipY - 1, z, spike)) return
             tipY--
         }
         if (!found) return
@@ -717,7 +715,7 @@ public object BlockGrowth {
         if (below != Blocks.AIR.stateId) return
 
         if (random.nextBoolean()) {
-            placeTip(world, x, tipY - 1, z, "down", changes)
+            placeTip(world, x, tipY - 1, z, "down", spike, changes)
             return
         }
         // parity: `growStalagmiteBelow`, ten blocks down for a floor to grow up from.
@@ -727,7 +725,7 @@ public object BlockGrowth {
             if (BlockSupport.holdsWater(here)) return
             if (here != Blocks.AIR.stateId) {
                 if (BlockShapes.isFaceSturdy(here, org.basaltmc.server.registry.BlockFace.UP)) {
-                    placeTip(world, x, floorY + 1, z, "up", changes)
+                    placeTip(world, x, floorY + 1, z, "up", spike, changes)
                 }
                 return
             }
@@ -735,12 +733,13 @@ public object BlockGrowth {
         }
     }
 
-    private fun isDripstone(
+    private fun isSpeleothem(
         world: LoadedWorld,
         x: Int,
         y: Int,
         z: Int,
-    ): Boolean = BlockStateDefinitions.blockOf(world.state.getBlockState(x, y, z) ?: 0)?.path == "pointed_dripstone"
+        spike: String,
+    ): Boolean = BlockStateDefinitions.blockOf(world.state.getBlockState(x, y, z) ?: 0)?.path == spike
 
     private fun placeTip(
         world: LoadedWorld,
@@ -748,11 +747,12 @@ public object BlockGrowth {
         y: Int,
         z: Int,
         direction: String,
+        spike: String,
         changes: MutableList<BlockChange>,
     ) {
         val tip =
             BlockStateDefinitions.stateIdOf(
-                Identifier.vanilla("pointed_dripstone"),
+                Identifier.vanilla(spike),
                 mapOf("vertical_direction" to direction, "thickness" to "tip", "waterlogged" to "false"),
             ) ?: return
         set(world, x, y, z, tip, changes)
@@ -802,8 +802,7 @@ public object BlockGrowth {
      * portal come from. The attribute defaults to off and the overworld's dimension type turns it
      * on, so it follows the dimension here.
      *
-     * The piglin it spawns stands still: nothing has a brain yet (§6.4). What this owns is the
-     * block's own rule, and that is what runs.
+     * The piglin it spawns stands still, because nothing has a brain yet.
      */
     public fun netherPortal(
         world: LoadedWorld,
@@ -981,6 +980,10 @@ public object BlockGrowth {
     /** parity: `SpeleothemBlock.randomTick`'s own chance, its reach and its drop. */
     private const val DRIPSTONE_CHANCE = 0.011377778f
     private const val DRIPSTONE_REACH = 7
+
+    /** parity: each `SpeleothemBlock`'s `blockToGrowOn` and `getMaxGrowthLength`. */
+    private val GROWS_ON = mapOf("pointed_dripstone" to "dripstone_block", "sulfur_spike" to "sulfur")
+    private val REACH_OF = mapOf("pointed_dripstone" to 7, "sulfur_spike" to 2)
     private const val DRIPSTONE_DROP = 10
 
     /** parity: the `day` timeline's keyframes for `gameplay/eyeblossom_open`. */

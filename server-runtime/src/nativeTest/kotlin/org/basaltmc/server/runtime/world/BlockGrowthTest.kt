@@ -183,7 +183,7 @@ class BlockGrowthTest {
         )
     }
 
-    /** parity: `TurtleEggBlock.randomTick`, whose two cracks come before the turtles of §6.4. */
+    /** parity: `TurtleEggBlock.randomTick`, whose two cracks come before any turtle. */
     @Test
     fun aTurtleEggCracksTwiceAndThenGoes() {
         world.state.setBlockState(10, 80, 1, state("sand"))
@@ -268,6 +268,29 @@ class BlockGrowthTest {
         )
     }
 
+    /** parity: `SulfurSpikeBlock`, the same speleothem on sulfur and reaching two instead of seven. */
+    @Test
+    fun aSulfurSpikeGrowsTheSameWay() {
+        world.state.setBlockState(9, 92, 5, state("sulfur"))
+        world.state.setBlockState(
+            9,
+            91,
+            5,
+            state(
+                "sulfur_spike",
+                mapOf("vertical_direction" to "down", "thickness" to "tip", "waterlogged" to "false"),
+            ),
+        )
+        world.state.setBlockState(9, 85, 5, Blocks.STONE.stateId)
+
+        assertTrue(
+            run(9, 91, 5, rounds = 20000) {
+                pathAt(9, 90, 5) == "sulfur_spike" || pathAt(9, 86, 5) == "sulfur_spike"
+            },
+            "it should have grown down or dripped a spike up from the floor",
+        )
+    }
+
     /**
      * parity: the `day` timeline's two keyframes for `gameplay/eyeblossom_open`: open from 12600,
      * closed from 23401. The attribute has exactly one source in vanilla's data, and it is the
@@ -289,7 +312,7 @@ class BlockGrowthTest {
 
     /**
      * parity: `NetherPortalBlock.randomTick`. The piglin stands still because nothing has a brain
-     * yet (§6.4); what is under test is the block's own rule.
+     * yet; what is under test is the block's own rule.
      */
     @Test
     fun aPortalSpawnsAPiglinInTheOverworld() {
