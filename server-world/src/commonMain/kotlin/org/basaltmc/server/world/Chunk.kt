@@ -1,5 +1,6 @@
 package org.basaltmc.server.world
 
+import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.wire.common.Identifier
 
@@ -40,6 +41,11 @@ public class Chunk(
     public var isDirty: Boolean = false
         private set
 
+    /** Marks a change the block states do not carry, like a furnace counting down inside its own NBT. */
+    public fun markDirty() {
+        isDirty = true
+    }
+
     /** Called after this chunk has been persisted, or right after loading one straight off disk. */
     public fun markClean() {
         isDirty = false
@@ -54,7 +60,9 @@ public class Chunk(
         val section = sectionFor(y)
         val observer = blockWriteObserver
         if (observer == null) {
-            if (blockEntitiesByPosition.isNotEmpty() && section.getBlockStateId(x, y and 15, z) != stateId) {
+            if (blockEntitiesByPosition.isNotEmpty() &&
+                changesBlock(section.getBlockStateId(x, y and 15, z), stateId)
+            ) {
                 blockEntitiesByPosition.remove(blockEntityKey(x, y, z))
             }
             if (section.setBlockStateId(x, y and 15, z, stateId)) {
@@ -67,10 +75,23 @@ public class Chunk(
             if (oldStateId != stateId) {
                 isDirty = true
                 updateHeights(x, y, z, stateId)
-                blockEntitiesByPosition.remove(blockEntityKey(x, y, z))
+                if (changesBlock(oldStateId, stateId)) blockEntitiesByPosition.remove(blockEntityKey(x, y, z))
                 observer(x, y, z, oldStateId, stateId)
             }
         }
+    }
+
+    /**
+     * parity: `LevelChunk.setBlockState`, which drops the block entity only when the *block* changes.
+     * A furnace lighting up, a campfire being put out or a chest taking on water keeps its own: they
+     * are the same block in another state, and what is inside them does not fall out.
+     */
+    private fun changesBlock(
+        oldStateId: Int,
+        newStateId: Int,
+    ): Boolean {
+        if (oldStateId == newStateId) return false
+        return BlockStateDefinitions.blockOf(oldStateId) != BlockStateDefinitions.blockOf(newStateId)
     }
 
     /**

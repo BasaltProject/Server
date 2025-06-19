@@ -52,6 +52,10 @@ public object NeighbourUpdates {
         // the egg is down. Re-scheduling keeps a delay already counting, so a neighbour moving
         // nearby does not put the egg back to the start.
         ScheduledBlocks.scheduleHatch(world, x, y, z, Random.nextLong())
+        // parity: the neighbour update every redstone component listens to: the dust settles at
+        // once and the components book their own turn, which is what their delay is.
+        for (change in Redstone.settle(world, x, y, z)) onReshaped(change.stateId, change.x, change.y, change.z)
+        RedstoneComponents.scheduleAround(world, x, y, z)
         // parity: `SpongeBlock.onPlace`, which drinks before anything else gets a turn.
         Sponges.absorb(world, x, y, z, onReshaped)
         Sponges.dryIfEvaporating(world, x, y, z, onReshaped)

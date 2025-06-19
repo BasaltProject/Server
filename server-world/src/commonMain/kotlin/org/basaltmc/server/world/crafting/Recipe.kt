@@ -3,9 +3,8 @@ package org.basaltmc.server.world.crafting
 import org.basaltmc.server.world.loot.ItemStack
 
 /**
- * A crafting-table recipe. Only the two ingredient-based crafting-table types (`minecraft:
- * crafting_shaped`, `minecraft:crafting_shapeless`) are modeled; furnace/stonecutter/smithing and
- * the special (dye, firework, banner duplicate...) recipe types are a documented gap, see
+ * A recipe: the two ingredient-based crafting-table types and the four cooking ones. Stonecutter,
+ * smithing and the special (dye, firework, banner duplicate...) types are a documented gap, see
  * [RecipeJson].
  */
 public sealed class Recipe {
@@ -13,6 +12,37 @@ public sealed class Recipe {
     public abstract val result: ItemStack
 
     public abstract fun matches(input: CraftingInput): Boolean
+
+    /**
+     * What each of the four blocks that cook accepts, mirroring `AbstractCookingRecipe`'s subtypes.
+     * A furnace cooks [SMELTING], a blast furnace [BLASTING], a smoker [SMOKING] and a campfire
+     * [CAMPFIRE].
+     */
+    public enum class Cooker {
+        SMELTING,
+        BLASTING,
+        SMOKING,
+        CAMPFIRE,
+    }
+
+    /**
+     * parity: `AbstractCookingRecipe`: one ingredient in, one stack out, over [cookingTime] ticks
+     * and worth [experience] when it is taken.
+     */
+    public data class Cooking(
+        override val group: String,
+        override val result: ItemStack,
+        val cooker: Cooker,
+        val ingredient: Ingredient,
+        val experience: Float,
+        val cookingTime: Int,
+    ) : Recipe() {
+        /** A cooking recipe holds one item, so the grid form of the question is one non-empty slot. */
+        override fun matches(input: CraftingInput): Boolean =
+            input.ingredientCount == 1 && ingredient.test(input.item(0, 0))
+
+        public fun accepts(stack: ItemStack?): Boolean = ingredient.test(stack)
+    }
 
     /** Mirrors `ShapedRecipe`/`ShapedRecipePattern`: a fixed-shape grid of ingredients, tried both as-is and mirrored. */
     public data class Shaped(

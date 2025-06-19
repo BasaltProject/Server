@@ -92,6 +92,7 @@ import org.basaltmc.server.runtime.timings.TimingsReport
 import org.basaltmc.server.runtime.world.ActiveEffect
 import org.basaltmc.server.runtime.world.AdvancementTriggers
 import org.basaltmc.server.runtime.world.Beds
+import org.basaltmc.server.runtime.world.BlockEntityTicks
 import org.basaltmc.server.runtime.world.BlockInteractions
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
 import org.basaltmc.server.runtime.world.DamageTypes
@@ -122,6 +123,8 @@ import org.basaltmc.server.runtime.world.RealTestInstances
 import org.basaltmc.server.runtime.world.RealTimelineTags
 import org.basaltmc.server.runtime.world.RealTimelines
 import org.basaltmc.server.runtime.world.RecipeBook
+import org.basaltmc.server.runtime.world.Redstone
+import org.basaltmc.server.runtime.world.RedstoneComponents
 import org.basaltmc.server.runtime.world.ScheduledBlocks
 import org.basaltmc.server.runtime.world.StructureTemplates
 import org.basaltmc.server.runtime.world.Submersion
@@ -811,6 +814,8 @@ public class BasaltServer(
                 .onFailure { logger.error(it) { "Random block tick failed in world '${world.name}'" } }
             runCatching { tickScheduledBlocks(world) }
                 .onFailure { logger.error(it) { "Scheduled block tick failed in world '${world.name}'" } }
+            runCatching { tickBlockEntities(world) }
+                .onFailure { logger.error(it) { "Block entity tick failed in world '${world.name}'" } }
             runCatching { tickFallingBlocks(world) }
                 .onFailure { logger.error(it) { "Falling block tick failed in world '${world.name}'" } }
             runCatching { tickEffects(world) }
@@ -1098,6 +1103,13 @@ public class BasaltServer(
                 scheduled,
             )
             ScheduledBlocks.driedGhast(world, position[0], position[1], position[2], scheduled)
+            // parity: `RedstoneTorchBlock.tick` and `DiodeBlock.tick`, which is where a component's
+            // delay is actually spent. What it changes then settles the dust around it.
+            RedstoneComponents.tick(world, position[0], position[1], position[2])?.let { moved ->
+                scheduled += moved
+                scheduled += Redstone.settle(world, moved.x, moved.y, moved.z)
+                RedstoneComponents.scheduleAround(world, moved.x, moved.y, moved.z)
+            }
             ScheduledBlocks.frogspawn(world, position[0], position[1], position[2], scheduled)
             org.basaltmc.server.runtime.world.Geysers
                 .tick(world, position[0], position[1], position[2], scheduled)
@@ -1173,6 +1185,27 @@ public class BasaltServer(
             randomTicks.tick(world, chunks, speed, LegacyRandom(Random.nextLong())) {
                 playerRegistry.allocateEntityId()
             }
+        if (changes.isEmpty()) return
+        val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
+        for (change in changes) {
+            val pos = BlockPos(change.x, change.y, change.z)
+            for (player in watchers) {
+                player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                    ClientboundBlockUpdatePacket(pos, change.stateId).write(it)
+                }
+            }
+        }
+    }
+
+    /**
+     * Lets the block entities that have something to do act: today the three that smelt.
+     *
+     * parity: `ServerLevel.tickBlockEntities`, over the same chunks a random tick visits.
+     */
+    private fun tickBlockEntities(world: LoadedWorld) {
+        val chunks = simulatedChunks(world)
+        if (chunks.isEmpty()) return
+        val changes = BlockEntityTicks.tick(world, chunks) { cooker, stack -> recipes.cookingFor(cooker, stack) }
         if (changes.isEmpty()) return
         val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
         for (change in changes) {

@@ -14,6 +14,15 @@ public sealed interface MenuSlot {
 
     /** The crafting result. Can be taken from, never placed into. */
     public data object Result : MenuSlot
+
+    /**
+     * A slot of the block the window belongs to: a furnace's input, fuel and result.
+     *
+     * The block keeps its own contents, so the session only says which of them a click meant.
+     */
+    public data class Block(
+        public val index: Int,
+    ) : MenuSlot
 }
 
 /**
@@ -64,6 +73,55 @@ public class Menu(
                             in 9..35 -> MenuSlot.Inventory(slot - 9)
                             in 36..44 -> MenuSlot.Inventory(slot - 36 + PlayerInventory.HOTBAR_START)
                             45 -> MenuSlot.Inventory(40)
+                            else -> null
+                        }
+                    },
+            )
+
+        /** How many slots a cooker's window has: three of its own, then the player's 36. */
+        private const val COOKER_SLOT_COUNT = 39
+
+        /** A single chest: 27 of its own, then the player's 36. parity: `ChestMenu.threeRows`. */
+        private const val CHEST_SLOT_COUNT = 63
+
+        /** parity: `ChestMenu`'s own three rows of nine. */
+        public const val CHEST_SIZE: Int = 27
+
+        /**
+         * A chest, a trapped chest or a barrel: its own rows first, then the player's storage and
+         * hotbar. The block keeps the contents, so a click only says which of its slots was meant.
+         */
+        public fun chest(containerId: Int): Menu =
+            Menu(
+                containerId = containerId,
+                gridWidth = 0,
+                gridHeight = 0,
+                slots =
+                    List(CHEST_SLOT_COUNT) { slot ->
+                        when (slot) {
+                            in 0 until CHEST_SIZE -> MenuSlot.Block(slot)
+                            in CHEST_SIZE..53 -> MenuSlot.Inventory(slot - CHEST_SIZE)
+                            in 54..62 -> MenuSlot.Inventory(slot - 54 + PlayerInventory.HOTBAR_START)
+                            else -> null
+                        }
+                    },
+            )
+
+        /**
+         * A furnace, a blast furnace or a smoker: input, fuel, result, then the player's storage and
+         * hotbar. parity: `AbstractFurnaceMenu`'s own slot order.
+         */
+        public fun furnace(containerId: Int): Menu =
+            Menu(
+                containerId = containerId,
+                gridWidth = 0,
+                gridHeight = 0,
+                slots =
+                    List(COOKER_SLOT_COUNT) { slot ->
+                        when (slot) {
+                            in 0..2 -> MenuSlot.Block(slot)
+                            in 3..29 -> MenuSlot.Inventory(slot - 3)
+                            in 30..38 -> MenuSlot.Inventory(slot - 30 + PlayerInventory.HOTBAR_START)
                             else -> null
                         }
                     },
