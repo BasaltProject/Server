@@ -127,13 +127,13 @@ public object ChunkDataCodec {
             if (!hasSkylight) {
                 null
             } else {
-                chunk.skyLight(keep = window.isComplete) {
+                chunk.skyLight {
                     val computed = SkyLight.compute(window)
                     Array(computed.size) { NibbleArray.pack(computed[it]) }
                 }
             }
         val block =
-            chunk.blockLight(keep = window.isComplete) {
+            chunk.blockLight {
                 val computed = BlockLight.compute(window) ?: return@blockLight emptyArray()
                 Array(computed.size) { NibbleArray.pack(computed[it]) }
             }

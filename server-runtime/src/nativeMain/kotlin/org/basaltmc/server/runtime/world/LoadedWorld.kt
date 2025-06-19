@@ -6,6 +6,7 @@ import org.basaltmc.server.runtime.config.WorldSettings
 import org.basaltmc.server.runtime.config.WorldType
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.FlatWorldGenerator
+import org.basaltmc.server.world.LeafDistances
 import org.basaltmc.server.world.NoiseWorldGenerator
 import org.basaltmc.server.world.VoidWorldGenerator
 import org.basaltmc.server.world.terrain.OverworldBiomeSource
@@ -278,6 +279,8 @@ public class LoadedWorld(
             // What a chunk in memory says about its portals is always the truth; the index only
             // has to remember the chunks that are not.
             portals.scan(chunk)
+            // Off the tick thread, and once: from here on a leaf knows its own distance.
+            LeafDistances.assign(chunk)
         }
 
     /**

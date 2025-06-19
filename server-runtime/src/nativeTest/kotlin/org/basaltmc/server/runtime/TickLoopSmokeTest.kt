@@ -5,6 +5,7 @@ import org.basaltmc.wire.io.sleepMillis
 import kotlin.concurrent.AtomicInt
 import kotlin.concurrent.AtomicLong
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.ExperimentalTime
 import kotlin.time.TimeSource
@@ -50,13 +51,34 @@ class TickLoopSmokeTest {
     @Test
     fun aSweepLongerThanTheCatchUpWindowDoesNotCostTicks() {
         val sweeps = AtomicInt(0)
+        // Five seconds, which is the shortest interval the floor of a hundred ticks allows.
         val rate =
-            measure(seconds = 6, saveIntervalSeconds = 2) {
+            measure(seconds = 12, saveIntervalSeconds = 5) {
                 sweeps.incrementAndGet()
                 sleepMillis(SLOW_SWEEP_MILLIS)
             }
         assertTrue(rate >= 19.0, "a loop sweeping for ${SLOW_SWEEP_MILLIS}ms managed $rate TPS")
-        assertTrue(sweeps.value >= 2, "the save interval stopped firing on time (${sweeps.value} sweeps in 6s)")
+        assertTrue(sweeps.value >= 2, "the save interval stopped firing on time (${sweeps.value} sweeps in 12s)")
+    }
+
+    /** Turning the periodic save off must not also stop chunks being dropped. */
+    @Test
+    fun unloadingKeepsRunningWithTheSaveIntervalOff() {
+        val unloads = AtomicInt(0)
+        val saves = AtomicInt(0)
+        val loop =
+            TickLoop(
+                saveIntervalSeconds = 0,
+                unloadIntervalSeconds = 1,
+                onSaveInterval = { saves.incrementAndGet() },
+                onUnloadInterval = { unloads.incrementAndGet() },
+            )
+        loop.start()
+        sleepMillis(2500L)
+        loop.stop()
+
+        assertEquals(0, saves.value, "nothing asked for a periodic save")
+        assertTrue(unloads.value >= 1, "the unload sweep never ran (${unloads.value} in 2.5s)")
     }
 
     private fun measure(

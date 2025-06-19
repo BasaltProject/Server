@@ -405,7 +405,8 @@ public class BasaltServer(
         TickLoop(
             defaultWorld.settings.saveIntervalSeconds,
             durations = tickDurations,
-            onSaveInterval = { timings.of("tick.save").time { if (saveControl.enabled) persistAndUnload() } },
+            onSaveInterval = { timings.of("tick.save").time { if (saveControl.enabled) persistEverything() } },
+            onUnloadInterval = { timings.of("tick.unload").time { unloadUnreachableChunks() } },
             onTick = ::tickWorlds,
         )
 
@@ -512,8 +513,8 @@ public class BasaltServer(
     /** The `/bossbar` bars this server knows, shown to whoever joins and is named by one. */
     public val bossBars: BossBarRegistry = BossBarRegistry()
 
-    /** `/save-off` stops the periodic sweep; `/save-all` runs one on demand. */
-    private val saveControl: SaveControl = SaveControl(::persistAndUnload)
+    /** `/save-off` stops the periodic save; `/save-all` runs one on demand. */
+    private val saveControl: SaveControl = SaveControl(::persistEverything)
 
     /** What `/setidletimeout` last set. Recorded and reported; nothing disconnects on it yet. */
     private var idleTimeoutMinutes: Int = 0
@@ -728,21 +729,26 @@ public class BasaltServer(
     }
 
     /** One tick-loop hook for all of it: unloading has to save what it drops, so they belong together. */
-    private fun persistAndUnload() {
+
+    /** parity: `MinecraftServer.saveEverything`, the whole autosave: every world, then the players. */
+    private fun persistEverything() {
         // Emitted before the work, not after: if this method ever stops completing, the last thing
         // in the log is where it got to, instead of nothing at all.
-        logger.debug { "Sweep starting across ${worlds.size} world(s)." }
+        logger.debug { "Save starting across ${worlds.size} world(s)." }
         for (world in worlds.values) {
             world.saveDirty()
             // Clock, weather and game rules, which no chunk carries: cheap enough to write on every
-            // sweep, and losing an hour of world time to a crash is worse than one small file write.
+            // save, and losing an hour of world time to a crash is worse than one small file write.
             runCatching { commandStorage.save() }
                 .onFailure { logger.error(it) { "Could not save command storage" } }
             runCatching { world.saveMetadata() }
                 .onFailure { logger.error(it) { "Could not save level.nbt for world '${world.name}'" } }
         }
         persistPlayers()
+    }
 
+    /** Chunks nobody can reach go, whatever changed in them written on the way out. */
+    private fun unloadUnreachableChunks() {
         var loaded = 0
         var unloaded = 0
         for (world in worlds.values) {

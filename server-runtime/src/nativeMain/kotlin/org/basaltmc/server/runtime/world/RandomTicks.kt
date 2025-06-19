@@ -432,10 +432,11 @@ public class RandomTicks {
         stateId: Int,
         changes: MutableList<BlockChange>,
     ) {
-        if (BlockStateDefinitions.propertiesOf(stateId)["persistent"] == "true") return
-        // Counted here rather than read off the state: see [NeighbourUpdates.leafDistance] for why
-        // the stored one cannot be trusted on a generated tree.
-        if (NeighbourUpdates.leafDistance(world, x, y, z) < DECAY_DISTANCE) return
+        // parity: `LeavesBlock.decaying`, which only reads the state. The stored distance is right
+        // because `LeafDistances` stamps it when the chunk arrives and `updateShape` keeps it so.
+        val properties = BlockStateDefinitions.propertiesOf(stateId)
+        if (properties["persistent"] == "true") return
+        if ((properties["distance"]?.toIntOrNull() ?: DECAY_DISTANCE) < DECAY_DISTANCE) return
         set(world, x, y, z, Blocks.AIR.stateId, changes)
     }
 

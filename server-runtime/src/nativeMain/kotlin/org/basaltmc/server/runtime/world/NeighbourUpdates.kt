@@ -203,13 +203,11 @@ public object NeighbourUpdates {
     }
 
     /**
-     * How far these leaves are from a trunk, walked out through the leaves themselves.
+     * How far these leaves are from a trunk.
      *
-     * parity: the answer `LeavesBlock.updateDistance` converges on, reached differently. Vanilla
-     * reads its neighbours' stored `distance`, which works because worldgen writes it and a
-     * scheduled tick keeps it right. Worldgen here writes leaves in their default state, whose
-     * distance is seven, so reading the neighbours would call every canopy in the world dead. This
-     * walks out to the trunk instead, which is right whatever the stored value says.
+     * parity: `LeavesBlock.updateDistance`, six lookups and no more: a trunk counts as zero and a
+     * neighbouring leaf as whatever it says it is. That works because the stored value is right to
+     * begin with, which is [org.basaltmc.server.world.LeafDistances]' job when the chunk arrives.
      */
     public fun leafDistance(
         world: LoadedWorld,
@@ -217,30 +215,13 @@ public object NeighbourUpdates {
         y: Int,
         z: Int,
     ): Int {
-        val visited = HashSet<Long>()
-        var frontier = mutableListOf(packed(x, y, z))
-        visited += frontier[0]
-        for (step in 1..DECAY_DISTANCE) {
-            val next = mutableListOf<Long>()
-            for (position in frontier) {
-                val px = unpackX(position)
-                val py = unpackY(position)
-                val pz = unpackZ(position)
-                for (face in BlockFace.entries) {
-                    val nx = px + offsetX(face)
-                    val ny = py + offsetY(face)
-                    val nz = pz + offsetZ(face)
-                    val neighbour = stateAt(world, nx, ny, nz)
-                    if (BlockConnections.preventsLeafDecay(neighbour)) return step
-                    if (step == DECAY_DISTANCE || !BlockConnections.isLeaves(neighbour)) continue
-                    val key = packed(nx, ny, nz)
-                    if (visited.add(key)) next += key
-                }
-            }
-            if (next.isEmpty()) break
-            frontier = next
+        var nearest = DECAY_DISTANCE
+        for (face in BlockFace.entries) {
+            val neighbour = stateAt(world, x + offsetX(face), y + offsetY(face), z + offsetZ(face))
+            nearest = minOf(nearest, distanceOf(neighbour) + 1)
+            if (nearest == 1) return 1
         }
-        return DECAY_DISTANCE
+        return nearest
     }
 
     private fun offsetX(face: BlockFace): Int =
@@ -269,18 +250,6 @@ public object NeighbourUpdates {
         } else {
             0
         }
-
-    private fun packed(
-        x: Int,
-        y: Int,
-        z: Int,
-    ): Long = (x.toLong() and 0x3FFFFFF shl 38) or (z.toLong() and 0x3FFFFFF shl 12) or (y.toLong() and 0xFFF)
-
-    private fun unpackX(packed: Long): Int = (packed shr 38).toInt() shl 6 shr 6
-
-    private fun unpackZ(packed: Long): Int = (packed shl 26 shr 38).toInt()
-
-    private fun unpackY(packed: Long): Int = (packed shl 52 shr 52).toInt()
 
     /**
      * parity: `CactusBlock.canSurvive`, written out here because it is one of the rules a probe of
