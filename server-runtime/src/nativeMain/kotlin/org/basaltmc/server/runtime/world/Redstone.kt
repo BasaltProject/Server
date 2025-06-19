@@ -48,7 +48,9 @@ public object Redstone {
                 if (properties["lit"] == "true" && properties["facing"] != from.name.lowercase()) MAX_SIGNAL else 0
             // parity: `DiodeBlock.getSignal`: a repeater and a comparator feed the side their input
             // is *not* on, which is what `FACING == direction` says.
-            path == "repeater" || path == "comparator" ->
+            // parity: `DiodeBlock.getSignal` and `ObserverBlock.getSignal`, both of which feed only
+            // the side `FACING` names.
+            path == "repeater" || path == "comparator" || path == "observer" ->
                 if (properties["powered"] == "true" && properties["facing"] == from.name.lowercase()) {
                     MAX_SIGNAL
                 } else {
@@ -91,7 +93,8 @@ public object Redstone {
                 if (from == BlockFace.UP) plateSignal(properties) else 0
             path == "light_weighted_pressure_plate" || path == "heavy_weighted_pressure_plate" ->
                 if (from == BlockFace.UP) properties["power"]?.toIntOrNull() ?: 0 else 0
-            path == "repeater" || path == "comparator" -> signalOf(stateId, from)
+            // parity: an observer and a diode power the block they feed strongly.
+            path == "repeater" || path == "comparator" || path == "observer" -> signalOf(stateId, from)
             else -> 0
         }
     }

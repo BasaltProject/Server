@@ -40,6 +40,25 @@ public object BlockEntityTicks {
             val chunk = world.state.chunkIfLoaded(position[0], position[1]) ?: continue
             if (chunk.blockEntityCount == 0) continue
             for (entity in chunk.blockEntities()) {
+                val x0 = (position[0] shl 4) + entity.localX
+                val z0 = (position[1] shl 4) + entity.localZ
+                // parity: `HopperBlockEntity.pushItemsTick`, one move per turn and then a rest.
+                if (entity.type.path == "hopper") {
+                    if (Hoppers.tick(world, x0, entity.y, z0)) chunk.markDirty()
+                    continue
+                }
+                // parity: `BrewingStandBlockEntity.serverTick`, which also shows what it holds on
+                // the block itself.
+                if (entity.type.path == "brewing_stand") {
+                    val stand = BrewingStands.read(entity.data)
+                    if (BrewingStands.tick(stand)) {
+                        BrewingStands.write(stand, entity.data)
+                        chunk.markDirty()
+                        bottleChange(world, x0, entity.y, z0, BrewingStands.bottleBits(stand))
+                            ?.let { changes += Changed(x0, entity.y, z0, it) }
+                    }
+                    continue
+                }
                 val cooker = Furnaces.COOKERS[entity.type.path] ?: continue
                 val x = (position[0] shl 4) + entity.localX
                 val z = (position[1] shl 4) + entity.localZ
@@ -51,6 +70,24 @@ public object BlockEntityTicks {
             }
         }
         return changes
+    }
+
+    /** parity: the three `HAS_BOTTLE` bits a stand shows for the bottles standing in it. */
+    private fun bottleChange(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        bottles: BooleanArray,
+    ): Int? {
+        val stateId = world.state.getBlockState(x, y, z) ?: return null
+        val block = BlockStateDefinitions.blockOf(stateId) ?: return null
+        val wanted = mutableMapOf<String, String>()
+        for (slot in bottles.indices) wanted["has_bottle_$slot"] = bottles[slot].toString()
+        val turned = BlockStateDefinitions.stateIdOf(block, wanted, stateId) ?: return null
+        if (turned == stateId) return null
+        if (!world.state.setBlockState(x, y, z, turned)) return null
+        return turned
     }
 
     /**

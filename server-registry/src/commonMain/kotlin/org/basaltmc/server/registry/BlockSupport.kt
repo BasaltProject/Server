@@ -1,5 +1,14 @@
 package org.basaltmc.server.registry
 
+/** parity: `net.minecraft.world.level.material.PushReaction`. */
+public enum class PushReaction {
+    NORMAL,
+    DESTROY,
+    BLOCK,
+    IGNORE,
+    PUSH_ONLY,
+}
+
 /**
  * Whether a block state can stay where it is, from the real block classes' own `canSurvive`.
  *
@@ -32,6 +41,7 @@ public object BlockSupport {
     private val byState: IntArray
     private val randomTicking: BooleanArray
     private val redstoneConductors: BooleanArray
+    private val pushReactions: Map<Int, PushReaction>
 
     /** Which block owns each state, filled on first use: only set-shaped rules need it. */
     private var blockOfState: IntArray? = null
@@ -62,6 +72,8 @@ public object BlockSupport {
         for (state in RANDOM_TICKING_STATES) randomTicking[state] = true
         redstoneConductors = BooleanArray((REDSTONE_CONDUCTOR_STATES.maxOrNull() ?: 0) + 1)
         for (state in REDSTONE_CONDUCTOR_STATES) redstoneConductors[state] = true
+        pushReactions =
+            ALL_PUSH_REACTIONS.associate { (state, reaction) -> state to PushReaction.valueOf(reaction) }
     }
 
     /** Whether anything has to hold this state up at all. */
@@ -81,6 +93,14 @@ public object BlockSupport {
         val table = waterlike ?: buildWaterlike().also { waterlike = it }
         return stateId in table.indices && table[stateId]
     }
+
+    /**
+     * What a piston does with a state.
+     *
+     * parity: `BlockState.getPistonPushReaction`. The table lists only the states that are not
+     * `NORMAL`, which is nearly everything: a block nobody named simply moves.
+     */
+    public fun pushReaction(stateId: Int): PushReaction = pushReactions[stateId] ?: PushReaction.NORMAL
 
     /**
      * parity: `BlockStateBase.isRedstoneConductor`: what a signal reaches through and what a wire

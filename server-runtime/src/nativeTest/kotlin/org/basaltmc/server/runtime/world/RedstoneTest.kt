@@ -212,6 +212,68 @@ class RedstoneTest {
         assertEquals(6, due.delay, "three notches, two ticks each")
     }
 
+    /**
+     * parity: `ObserverBlock`: it watches one block and blinks for two ticks when that one moves.
+     * Anything else moving around it is none of its business.
+     */
+    @Test
+    fun anObserverBlinksAtWhatItWatches() {
+        // Facing north, so it watches the block at z-1.
+        world.state.setBlockState(
+            4,
+            70,
+            6,
+            state("observer", mapOf("facing" to "north", "powered" to "false")),
+        )
+
+        RedstoneComponents.watchFor(world, 4, 70, 5)
+        val watched =
+            world.state
+                .chunkIfLoaded(0, 0)
+                ?.scheduledBlockTicks()
+                .orEmpty()
+        assertEquals(
+            1,
+            watched.count { it.localX == 4 && it.y == 70 && it.type.path == "observer" },
+            "the block it faces moved, so it booked its turn",
+        )
+
+        val on = checkNotNull(RedstoneComponents.tick(world, 4, 70, 6))
+        assertEquals("true", BlockStateDefinitions.propertiesOf(on.stateId)["powered"], "it fires")
+        assertEquals(
+            15,
+            Redstone.signalOf(on.stateId, org.basaltmc.server.registry.BlockFace.NORTH),
+            "and feeds the side it faces",
+        )
+
+        val off = checkNotNull(RedstoneComponents.tick(world, 4, 70, 6))
+        assertEquals("false", BlockStateDefinitions.propertiesOf(off.stateId)["powered"], "and stops two ticks later")
+    }
+
+    /** A block moving behind or beside an observer leaves it alone. */
+    @Test
+    fun anObserverIgnoresWhatItIsNotWatching() {
+        world.state.setBlockState(
+            8,
+            70,
+            6,
+            state("observer", mapOf("facing" to "north", "powered" to "false")),
+        )
+
+        RedstoneComponents.watchFor(world, 8, 70, 7)
+
+        val pending =
+            world.state
+                .chunkIfLoaded(0, 0)
+                ?.scheduledBlockTicks()
+                .orEmpty()
+        assertEquals(
+            0,
+            pending.count { it.localX == 8 && it.y == 70 && it.type.path == "observer" },
+            "the block behind it moved, which is nothing to it",
+        )
+    }
+
     /** The table the signal walks over: a slab conducts, glass does not. */
     @Test
     fun whatCountsAsSolidForRedstone() {
