@@ -151,7 +151,6 @@ public object BlockPlacement {
 
     private fun isPlayerFacingBlock(block: Identifier): Boolean =
         block.path.endsWith("_stairs") ||
-            // A door is only half placed here (there is no second block), but it faces right.
             block.path.endsWith("_door") ||
             PLAYER_FACING_BLOCKS.any { block.path == it || block.path.endsWith("_$it") }
 
@@ -214,4 +213,78 @@ public object BlockPlacement {
     private const val QUARTER_TURN = 90f
     private const val HALF_TURN = 180.0
     private const val HALF = 0.5f
+}
+
+/** Where a block's second half goes, and what state it is in. */
+public class SecondHalf(
+    public val x: Int,
+    public val y: Int,
+    public val z: Int,
+    public val stateId: Int,
+)
+
+/**
+ * The other block a two-block one needs.
+ *
+ * parity: `setPlacedBy` on `DoorBlock`, `BedBlock` and `DoublePlantBlock`, which is what turns the
+ * one block the client asked for into the pair the game really has. Without it the half that was
+ * placed has no partner, and `updateShape` takes it straight back out.
+ */
+public object DoubleBlocks {
+    /** The second half of [stateId] placed at these coordinates, or null for an ordinary block. */
+    public fun secondHalf(
+        stateId: Int,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): SecondHalf? {
+        val block = BlockStateDefinitions.blockOf(stateId) ?: return null
+        val properties = BlockStateDefinitions.propertiesOf(stateId)
+        if (properties["half"] == "lower") {
+            val upper = BlockStateDefinitions.stateIdOf(block, mapOf("half" to "upper"), stateId) ?: return null
+            return SecondHalf(x, y + 1, z, upper)
+        }
+        if (properties["part"] == "foot") {
+            val facing = properties["facing"] ?: return null
+            val head = BlockStateDefinitions.stateIdOf(block, mapOf("part" to "head"), stateId) ?: return null
+            return SecondHalf(x + offsetX(facing), y, z + offsetZ(facing), head)
+        }
+        return null
+    }
+
+    /** The state a two-block one starts as: the lower half or the foot, never the other one. */
+    public fun firstHalf(stateId: Int): Int {
+        val block = BlockStateDefinitions.blockOf(stateId) ?: return stateId
+        val properties = BlockStateDefinitions.propertiesOf(stateId)
+        if ("half" in properties &&
+            properties["half"] != "lower" &&
+            "upper" in (
+                BlockStateDefinitions.of(block)?.valuesOf("half") ?: emptyList()
+            )
+        ) {
+            return BlockStateDefinitions.stateIdOf(block, mapOf("half" to "lower"), stateId) ?: stateId
+        }
+        if ("part" in properties && properties["part"] != "foot") {
+            return BlockStateDefinitions.stateIdOf(block, mapOf("part" to "foot"), stateId) ?: stateId
+        }
+        return stateId
+    }
+
+    private fun offsetX(facing: String): Int =
+        if (facing == "west") {
+            -1
+        } else if (facing == "east") {
+            1
+        } else {
+            0
+        }
+
+    private fun offsetZ(facing: String): Int =
+        if (facing == "north") {
+            -1
+        } else if (facing == "south") {
+            1
+        } else {
+            0
+        }
 }
