@@ -52,6 +52,9 @@ public object NeighbourUpdates {
         // the egg is down. Re-scheduling keeps a delay already counting, so a neighbour moving
         // nearby does not put the egg back to the start.
         ScheduledBlocks.scheduleHatch(world, x, y, z, Random.nextLong())
+        // parity: `SpongeBlock.onPlace`, which drinks before anything else gets a turn.
+        Sponges.absorb(world, x, y, z, onReshaped)
+        Sponges.dryIfEvaporating(world, x, y, z, onReshaped)
         // parity: `FrogspawnBlock.onPlace`, the same idea on a longer and rougher clock.
         ScheduledBlocks.scheduleFrogspawn(world, x, y, z, Random.nextLong())
         val pending = ArrayDeque<Int>(INITIAL_QUEUE)
@@ -258,6 +261,11 @@ public object NeighbourUpdates {
             0
         }
 
+    private fun isFullSnow(stateId: Int): Boolean {
+        if (BlockStateDefinitions.blockOf(stateId)?.path != "snow") return false
+        return BlockStateDefinitions.propertiesOf(stateId)["layers"] == "8"
+    }
+
     private fun speleothemSurvives(
         world: LoadedWorld,
         x: Int,
@@ -329,6 +337,9 @@ public object NeighbourUpdates {
         // tries each block in its default state, and the default spike points up, so a hanging
         // column looked to it like a spike held up by nothing.
         if (path != null && path in SPELEOTHEMS) return speleothemSurvives(world, x, y, z, stateId, path)
+        // parity: `SnowLayerBlock.canSurvive`'s last clause, snow standing on a full stack of snow.
+        // The probe tries each block in its default state, and a default snow layer is one deep.
+        if (path == "snow" && isFullSnow(stateAt(world, x, y - 1, z))) return true
         // parity: `CropBlock.canSurvive`, which asks for light eight on top of its soil. The probe
         // that built the support table answers one neighbour at a time and cannot see the sky, so
         // it was told the light is fifteen and the light half is checked here instead.
