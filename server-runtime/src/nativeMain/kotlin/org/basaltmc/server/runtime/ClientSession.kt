@@ -4,6 +4,7 @@ import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.registry.BlockEntityTypes
 import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
+import org.basaltmc.server.registry.BlockSupport
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.registry.ConsumeEffect
 import org.basaltmc.server.registry.EntityTypes
@@ -42,6 +43,7 @@ import org.basaltmc.server.runtime.world.BlockInventory
 import org.basaltmc.server.runtime.world.BlockPlacement
 import org.basaltmc.server.runtime.world.Buckets
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
+import org.basaltmc.server.runtime.world.ContainerOpeners
 import org.basaltmc.server.runtime.world.Containers
 import org.basaltmc.server.runtime.world.DamageProtection
 import org.basaltmc.server.runtime.world.DamageTypes
@@ -138,6 +140,7 @@ import org.basaltmc.wire.protocol.play.AcceptTeleportationPacket
 import org.basaltmc.wire.protocol.play.AnimatePacket
 import org.basaltmc.wire.protocol.play.BlockDestructionPacket
 import org.basaltmc.wire.protocol.play.BlockEntityDataPacket
+import org.basaltmc.wire.protocol.play.BlockEventPacket
 import org.basaltmc.wire.protocol.play.BlockHitResult
 import org.basaltmc.wire.protocol.play.BlockPos
 import org.basaltmc.wire.protocol.play.BossEventPacket
@@ -2633,6 +2636,63 @@ public class ClientSession(
             ).write(it)
         }
         sendInventory()
+        announceOpeners(pos, block, ContainerOpeners.open(session.worldName, pos.x, pos.y, pos.z))
+    }
+
+    /**
+     * What everyone else sees when somebody opens or closes a container: the lid, and the sound.
+     *
+     * parity: `ContainerOpenersCounter`, which only calls `onOpen` for the first person in and
+     * `onClose` for the last one out, plus `ChestBlockEntity.signalOpenCount`'s block event on every
+     * change. A barrel has no lid to animate: it carries `open` in its own state instead.
+     */
+    private fun announceOpeners(
+        pos: BlockPos,
+        block: String,
+        openers: Int,
+    ) {
+        val world = currentWorld ?: return
+        val stateId = world.state.getBlockState(pos.x, pos.y, pos.z) ?: return
+        if (block == "barrel") {
+            val opened =
+                BlockStateDefinitions.stateIdOf(
+                    Identifier.vanilla("barrel"),
+                    mapOf("open" to (openers > 0).toString()),
+                    stateId,
+                )
+            if (opened != null && opened != stateId && world.state.setBlockState(pos.x, pos.y, pos.z, opened)) {
+                broadcastBlockUpdate(pos, opened)
+            }
+        } else {
+            val blockId = BlockSupport.blockRegistryIdOf(stateId)
+            for (player in playersInSameWorld()) {
+                player.connection.sendPlayPacket(BlockEventPacket.ID) {
+                    BlockEventPacket(pos, b0 = 1, b1 = openers, blockId = blockId).write(it)
+                }
+            }
+        }
+        // Only the first in and the last out make a sound, which is why a busy chest is not a rattle.
+        val sound =
+            when {
+                openers == 1 -> if (block == "barrel") "block.barrel.open" else "block.chest.open"
+                openers == 0 -> if (block == "barrel") "block.barrel.close" else "block.chest.close"
+                else -> return
+            }
+        for (player in playersInSameWorld()) {
+            player.connection.sendPlayPacket(SoundPacket.ID) {
+                SoundPacket(
+                    sound = sound,
+                    source = SoundSource.BLOCKS,
+                    x = pos.x + 0.5,
+                    y = pos.y + 0.5,
+                    z = pos.z + 0.5,
+                    volume = 0.5f,
+                    // parity: `ChestBlockEntity.playSound`, a tenth of a tone of randomness.
+                    pitch = Random.nextFloat() * 0.1f + 0.9f,
+                    seed = Random.nextLong(),
+                ).write(it)
+            }
+        }
     }
 
     /** The block's own slots, read straight off its block entity. */
@@ -2742,10 +2802,27 @@ public class ClientSession(
             return
         }
         returnCraftingGrid(session)
+        val closing = openBlock
+        val closingBlock = closing?.let { openContainerBlock(it) }
         openMenu = Menu.playerInventory()
         openBlock = null
+        if (closing != null && closingBlock != null) {
+            announceOpeners(
+                closing,
+                closingBlock,
+                ContainerOpeners.close(session.worldName, closing.x, closing.y, closing.z),
+            )
+        }
         recomputeCraftingResult()
         sendInventory()
+    }
+
+    /** Which container is open, by name, so closing one knows what lid it is shutting. */
+    private fun openContainerBlock(pos: BlockPos): String? {
+        val world = currentWorld ?: return null
+        val stateId = world.state.getBlockState(pos.x, pos.y, pos.z) ?: return null
+        val path = BlockStateDefinitions.blockOf(stateId)?.path ?: return null
+        return path.takeIf { it in Containers.PLAIN }
     }
 
     /** Reads one slot of the open window, whatever it refers to. */
@@ -4582,6 +4659,8 @@ public class ClientSession(
         val registry = playerRegistry ?: return
         // Leaving while asleep would otherwise leave the bed occupied for ever.
         wakeUp()
+        // And leaving with a chest open would leave its lid up and a trapped chest powered.
+        closeOpenMenu(session)
         // Before removing them from the registry, so a save triggered elsewhere cannot race this
         // one into writing a player who is already half gone.
         savePlayerState()
@@ -4833,7 +4912,6 @@ public class ClientSession(
         /** What a scheduled block tick on a button is filed under. */
         val BUTTON_TICK = Identifier.vanilla("button")
 
-        /** `minecraft:move_player_rot` and `minecraft:move_player_status_only`, read directly. */
         /** parity: `AbstractFurnaceBlockEntity`'s three slots, which is how a cooker is told apart. */
         const val FURNACE_SLOTS = 3
 

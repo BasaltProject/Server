@@ -6,7 +6,9 @@ import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.BlockSupport
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.registry.PushReaction
+import org.basaltmc.server.world.ChunkBlockEntity
 import org.basaltmc.wire.common.Identifier
+import org.basaltmc.wire.nbt.NbtCompound
 
 /**
  * What a piston can move, and what happens when it does.
@@ -16,9 +18,8 @@ import org.basaltmc.wire.common.Identifier
  * all. Obsidian stops it, a torch breaks, bedrock is unbreakable and a block that is `IGNORE` is
  * left where it stands.
  *
- * The two-tick slide is not modelled: vanilla puts a `moving_piston` block entity in the way and
- * animates it, and here the blocks arrive at once. What moves and what refuses is the part parity
- * is built on, and that is what this answers.
+ * The two-tick slide is a `moving_piston` carrying the state it will become, as in vanilla; what is
+ * not drawn is the sliding itself, only the tick it lands on.
  */
 public object Pistons {
     /** parity: `PistonStructureResolver`'s own twelve. */
@@ -261,6 +262,346 @@ public object Pistons {
             }
         }
         return changes
+    }
+
+    public val PISTON: Identifier = Identifier.vanilla("piston")
+
+    public val MOVING_PISTON: Identifier = Identifier.vanilla("piston")
+
+    /** parity: `PistonBaseBlock`'s own two ticks between the arm starting to move and the blocks landing. */
+    public const val MOVE_TICKS: Int = 2
+
+    /**
+     * parity: `PistonBaseBlock.checkIfExtend`: a piston extends when it is powered from anywhere but
+     * its own face, and pulls back when that power goes.
+     *
+     * The move itself lands two ticks later, which is when vanilla's `moving_piston` finishes its
+     * slide. The slide is not drawn (that needs the block entity that carries a block along); the
+     * tick it lands on is the same.
+     */
+    public fun trigger(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+    ) {
+        val stateId = world.state.getBlockState(x, y, z) ?: return
+        val path = BlockStateDefinitions.blockOf(stateId)?.path ?: return
+        if (path != "piston" && path != "sticky_piston") return
+        val properties = BlockStateDefinitions.propertiesOf(stateId)
+        val facing = properties["facing"] ?: return
+        val direction = BlockFace.entries.firstOrNull { it.name.lowercase() == facing } ?: return
+        val extended = properties["extended"] == "true"
+        val powered = signalToPiston(world, x, y, z, direction)
+        if (powered == extended) return
+        if (powered) {
+            val push = resolve(world, x, y, z, direction, extending = true) ?: return
+            beginMove(world, push, direction, sticky = path == "sticky_piston")
+        }
+        world.state.scheduleBlockTick(x, y, z, PISTON, MOVE_TICKS)
+    }
+
+    /**
+     * parity: `PistonBaseBlock.getNeighborSignal`, which ignores its own face: a piston cannot be
+     * powered by what it is about to push.
+     */
+    private fun signalToPiston(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        facing: BlockFace,
+    ): Boolean {
+        for (face in BlockFace.entries) {
+            if (face == facing) continue
+            val nx = x + face.stepX
+            val ny = y + face.stepY
+            val nz = z + face.stepZ
+            if (Redstone.signalFrom(world, nx, ny, nz, face) > 0) return true
+        }
+        // parity: the block above is asked twice, once for itself and once for what is over it,
+        // which is the quirk that makes a piston fire from a signal two blocks up.
+        if (Redstone.signalFrom(world, x, y + 1, z, BlockFace.UP) > 0) return true
+        for (face in BlockFace.entries) {
+            if (face == BlockFace.DOWN) continue
+            val nx = x + face.stepX
+            val ny = y + 1 + face.stepY
+            val nz = z + face.stepZ
+            if (Redstone.signalFrom(world, nx, ny, nz, face) > 0) return true
+        }
+        return false
+    }
+
+    /**
+     * The move landing: the blocks go one along, the head appears or goes, and a sticky piston takes
+     * the block in front of it back with it.
+     */
+    public fun finish(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        players: List<PlayerPosition> = emptyList(),
+        onPlayerPushed: (PlayerPosition) -> Unit = {},
+    ): List<BlockChange> {
+        val stateId = world.state.getBlockState(x, y, z) ?: return emptyList()
+        val path = BlockStateDefinitions.blockOf(stateId)?.path ?: return emptyList()
+        if (path != "piston" && path != "sticky_piston") return emptyList()
+        val properties = BlockStateDefinitions.propertiesOf(stateId)
+        val facing = properties["facing"] ?: return emptyList()
+        val direction = BlockFace.entries.firstOrNull { it.name.lowercase() == facing } ?: return emptyList()
+        val extended = properties["extended"] == "true"
+        val powered = signalToPiston(world, x, y, z, direction)
+        if (powered == extended) return emptyList()
+        return if (powered) {
+            extend(
+                world,
+                x,
+                y,
+                z,
+                stateId,
+                direction,
+                path,
+                players,
+                onPlayerPushed,
+            )
+        } else {
+            retract(world, x, y, z, stateId, direction, path)
+        }
+    }
+
+    /**
+     * parity: `MovingPistonBlock` and its block entity: while the arm slides, each block on the way
+     * is a `moving_piston` carrying the state it will become. That is what a client draws mid-slide,
+     * and it is why a block being pushed is not solid for those two ticks.
+     */
+    private fun beginMove(
+        world: LoadedWorld,
+        push: Push,
+        direction: BlockFace,
+        sticky: Boolean,
+    ) {
+        val moving =
+            BlockStateDefinitions.stateIdOf(
+                Identifier.vanilla("moving_piston"),
+                mapOf("facing" to direction.name.lowercase(), "type" to if (sticky) "sticky" else "normal"),
+            ) ?: return
+        for (position in push.moved) {
+            val carried = world.state.getBlockState(position[0], position[1], position[2]) ?: continue
+            val chunk = world.state.chunkIfLoaded(position[0] shr 4, position[2] shr 4) ?: continue
+            if (!world.state.setBlockState(position[0], position[1], position[2], moving)) continue
+            val data = NbtCompound()
+            data.putInt("blockState", carried)
+            data.putString("facing", direction.name.lowercase())
+            data.putBoolean("extending", true)
+            data.putBoolean("source", false)
+            chunk.setBlockEntity(
+                ChunkBlockEntity(position[0] and 15, position[1], position[2] and 15, MOVING_PISTON, data),
+            )
+        }
+    }
+
+    private fun extend(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        stateId: Int,
+        direction: BlockFace,
+        path: String,
+        players: List<PlayerPosition>,
+        onPlayerPushed: (PlayerPosition) -> Unit,
+    ): List<BlockChange> {
+        val changes = mutableListOf<BlockChange>()
+        // The blocks are `moving_piston` right now, each carrying what it is about to become.
+        val carried = carriedBlocks(world, x, y, z, direction)
+        // Whatever they sweep comes along, which is `moveCollidedEntities`.
+        dragAlong(world, carried.map { it.first }, direction, players, onPlayerPushed)
+        changes += landCarried(world, carried, direction)
+        // parity: the arm, which is a block of its own and carries whether the piston is sticky.
+        val headX = x + direction.stepX
+        val headY = y + direction.stepY
+        val headZ = z + direction.stepZ
+        val head =
+            BlockStateDefinitions.stateIdOf(
+                Identifier.vanilla("piston_head"),
+                mapOf(
+                    "facing" to direction.name.lowercase(),
+                    "type" to if (path == "sticky_piston") "sticky" else "normal",
+                    "short" to "false",
+                ),
+            )
+        if (head != null && world.state.setBlockState(headX, headY, headZ, head)) {
+            changes += BlockChange(headX, headY, headZ, head)
+        }
+        val body = BlockStateDefinitions.stateIdOf(Identifier.vanilla(path), mapOf("extended" to "true"), stateId)
+        if (body != null && world.state.setBlockState(x, y, z, body)) changes += BlockChange(x, y, z, body)
+        return changes
+    }
+
+    /**
+     * The blocks mid-slide: every `moving_piston` around the piston, with the state it carries,
+     * furthest along first so nothing lands on a block that has not moved yet.
+     */
+    private fun carriedBlocks(
+        world: LoadedWorld,
+        pistonX: Int,
+        pistonY: Int,
+        pistonZ: Int,
+        direction: BlockFace,
+    ): List<Pair<IntArray, Int>> {
+        // A push reaches twelve blocks plus its branches, so the chunk the piston is in and the
+        // eight around it hold every block that is on the move.
+        val carried = mutableListOf<Pair<IntArray, Int>>()
+        for (offsetZ in -1..1) {
+            for (offsetX in -1..1) {
+                val chunk =
+                    world.state.chunkIfLoaded((pistonX shr 4) + offsetX, (pistonZ shr 4) + offsetZ) ?: continue
+                for (entity in chunk.blockEntities()) {
+                    if (entity.type != MOVING_PISTON) continue
+                    val state = (entity.data["blockState"] as? org.basaltmc.wire.nbt.NbtInt)?.value ?: continue
+                    val x = ((chunk.chunkX) shl 4) + entity.localX
+                    val z = ((chunk.chunkZ) shl 4) + entity.localZ
+                    if (kotlin.math.abs(x - pistonX) > PUSH_LIMIT + 1) continue
+                    if (kotlin.math.abs(entity.y - pistonY) > PUSH_LIMIT + 1) continue
+                    if (kotlin.math.abs(z - pistonZ) > PUSH_LIMIT + 1) continue
+                    carried += intArrayOf(x, entity.y, z) to state
+                }
+            }
+        }
+        carried.sortByDescending {
+            it.first[0] * direction.stepX + it.first[1] * direction.stepY + it.first[2] * direction.stepZ
+        }
+        return carried
+    }
+
+    /**
+     * Puts every carried block down one along, which is what `PistonMovingBlockEntity.finalTick`
+     * does when the slide ends.
+     */
+    private fun landCarried(
+        world: LoadedWorld,
+        carried: List<Pair<IntArray, Int>>,
+        direction: BlockFace,
+    ): List<BlockChange> {
+        val changes = mutableListOf<BlockChange>()
+        for ((position, stateId) in carried) {
+            val toX = position[0] + direction.stepX
+            val toY = position[1] + direction.stepY
+            val toZ = position[2] + direction.stepZ
+            if (world.state.setBlockState(position[0], position[1], position[2], Blocks.AIR.stateId)) {
+                changes += BlockChange(position[0], position[1], position[2], Blocks.AIR.stateId)
+            }
+            if (world.state.setBlockState(toX, toY, toZ, stateId)) changes += BlockChange(toX, toY, toZ, stateId)
+        }
+        return changes
+    }
+
+    /** parity: a sticky piston brings one block back with it; a plain one leaves it where it is. */
+    private fun retract(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        stateId: Int,
+        direction: BlockFace,
+        path: String,
+    ): List<BlockChange> {
+        val changes = mutableListOf<BlockChange>()
+        val headX = x + direction.stepX
+        val headY = y + direction.stepY
+        val headZ = z + direction.stepZ
+        if (world.state.setBlockState(headX, headY, headZ, Blocks.AIR.stateId)) {
+            changes += BlockChange(headX, headY, headZ, Blocks.AIR.stateId)
+        }
+        if (path == "sticky_piston") {
+            val pulledX = headX + direction.stepX
+            val pulledY = headY + direction.stepY
+            val pulledZ = headZ + direction.stepZ
+            val pulled = world.state.getBlockState(pulledX, pulledY, pulledZ)
+            if (pulled != null &&
+                pulled != Blocks.AIR.stateId &&
+                isPushable(world, pulledX, pulledY, pulledZ, direction.opposite, allowDestroyable = false)
+            ) {
+                if (world.state.setBlockState(headX, headY, headZ, pulled)) {
+                    changes += BlockChange(headX, headY, headZ, pulled)
+                }
+                if (world.state.setBlockState(pulledX, pulledY, pulledZ, Blocks.AIR.stateId)) {
+                    changes += BlockChange(pulledX, pulledY, pulledZ, Blocks.AIR.stateId)
+                }
+            }
+        }
+        val body = BlockStateDefinitions.stateIdOf(Identifier.vanilla(path), mapOf("extended" to "false"), stateId)
+        if (body != null && world.state.setBlockState(x, y, z, body)) changes += BlockChange(x, y, z, body)
+        return changes
+    }
+
+    /**
+     * Moves whatever the pushed blocks sweep over.
+     *
+     * parity: `PistonMovingBlockEntity.moveCollidedEntities`, which shifts every entity inside the
+     * area a moving block covers on its way. Here that is the players and the dropped items; a
+     * player is handed back through [onPlayerPushed], because moving one means telling its client.
+     */
+    public fun dragAlong(
+        world: LoadedWorld,
+        moving: List<IntArray>,
+        direction: BlockFace,
+        players: List<PlayerPosition> = emptyList(),
+        onPlayerPushed: (PlayerPosition) -> Unit = {},
+    ) {
+        if (moving.isEmpty()) return
+        val items = world.state.items()
+        for (position in moving) {
+            for (item in items) {
+                if (!inSweptArea(item.x, item.y, item.z, position, direction)) continue
+                item.x += direction.stepX
+                item.y += direction.stepY
+                item.z += direction.stepZ
+            }
+            for (player in players) {
+                if (!inSweptArea(player.x, player.y, player.z, position, direction)) continue
+                onPlayerPushed(
+                    PlayerPosition(
+                        player.uuid,
+                        player.x + direction.stepX,
+                        player.y + direction.stepY,
+                        player.z + direction.stepZ,
+                    ),
+                )
+            }
+        }
+    }
+
+    /** Somebody the piston has to shove, and where they end up. */
+    public class PlayerPosition(
+        public val uuid: String,
+        public val x: Double,
+        public val y: Double,
+        public val z: Double,
+    )
+
+    /** The box a moving block sweeps: where it is now and where it lands. */
+    private fun inSweptArea(
+        x: Double,
+        y: Double,
+        z: Double,
+        block: IntArray,
+        direction: BlockFace,
+    ): Boolean {
+        val fromX = block[0]
+        val fromY = block[1]
+        val fromZ = block[2]
+        val toX = fromX + direction.stepX
+        val toY = fromY + direction.stepY
+        val toZ = fromZ + direction.stepZ
+        val minX = minOf(fromX, toX)
+        val minY = minOf(fromY, toY)
+        val minZ = minOf(fromZ, toZ)
+        val maxX = maxOf(fromX, toX) + 1
+        val maxY = maxOf(fromY, toY) + 1
+        val maxZ = maxOf(fromZ, toZ) + 1
+        return x >= minX && x < maxX && y >= minY && y < maxY && z >= minZ && z < maxZ
     }
 
     /** parity: the four blocks `isPushable` names one by one before it looks at anything else. */

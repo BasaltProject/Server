@@ -67,6 +67,11 @@ public object NeighbourUpdates {
                 ?.let { onReshaped(it.stateId, it.x, it.y, it.z) }
         }
         Dispensers.onNeighbourChange(world, x, y, z)?.let { onReshaped(it.stateId, it.x, it.y, it.z) }
+        // parity: `PistonBaseBlock.checkIfExtend`, which books the move rather than making it now.
+        Pistons.trigger(world, x, y, z)
+        for (face in BlockFace.entries) {
+            Pistons.trigger(world, x + face.stepX, y + face.stepY, z + face.stepZ)
+        }
         // parity: `SpongeBlock.onPlace`, which drinks before anything else gets a turn.
         Sponges.absorb(world, x, y, z, onReshaped)
         Sponges.dryIfEvaporating(world, x, y, z, onReshaped)

@@ -25,6 +25,27 @@ public object Fires {
 
     public fun isFire(stateId: Int): Boolean = BlockStateDefinitions.blockOf(stateId)?.path == "fire"
 
+    /**
+     * Lights a fire where there is room for one, answering whether it caught.
+     *
+     * parity: `FlintAndSteelDispenseItemBehavior` and the same check a player's flint and steel
+     * makes: the space has to be empty and the fire has to have something to stand on.
+     */
+    public fun ignite(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Boolean {
+        val existing = world.state.getBlockState(x, y, z) ?: return false
+        if (existing != Blocks.AIR.stateId) return false
+        val fire = BlockStateDefinitions.stateIdOf(Identifier.vanilla("fire"), emptyMap()) ?: return false
+        if (!NeighbourUpdates.isSupported(world, x, y, z, fire)) return false
+        if (!world.state.setBlockState(x, y, z, fire)) return false
+        schedule(world, x, y, z, LegacyRandom(world.gameTime))
+        return true
+    }
+
     /** Asks for the fire at these coordinates to act after the usual delay. */
     public fun schedule(
         world: LoadedWorld,
