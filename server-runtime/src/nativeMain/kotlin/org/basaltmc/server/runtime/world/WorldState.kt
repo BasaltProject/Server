@@ -1,6 +1,9 @@
 package org.basaltmc.server.runtime.world
 
+import org.basaltmc.server.registry.BlockMovement
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.runtime.entity.Aabb
+import org.basaltmc.server.runtime.entity.EntityCollision
 import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkGeneratedEntity
@@ -10,6 +13,7 @@ import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.common.collections.Long2ObjectMap
 import org.basaltmc.wire.io.NativeMutex
 import kotlin.concurrent.Volatile
+import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -333,6 +337,9 @@ public class WorldState(
 
     // --- Summoned entities ---
 
+    /** Reused by [moveItem] so a tick of items allocates nothing. */
+    private val movement = DoubleArray(3)
+
     private val entities = LinkedHashMap<Int, ServerEntity>()
 
     /** Everything `/summon` put here, alive or just removed and not yet forgotten by clients. */
@@ -390,10 +397,9 @@ public class WorldState(
     /**
      * One tick of item physics for the whole world, returning the entity ids that despawned.
      *
-     * parity: `ItemEntity.tick`, minus what this build has no model for. Gravity, air drag, ground
-     * friction, the half-damped vertical bounce and the 6000-tick lifetime are vanilla's own
-     * numbers, read off the real 26.2 jar rather than guessed. Fluids, block friction other than
-     * the default, entity collision and merging with neighbouring stacks are documented gaps.
+     * parity: `ItemEntity.tick`: gravity, the move against the real block shapes, air drag, the
+     * friction of the block underneath and the half-damped bounce on landing, over the 6000-tick
+     * lifetime. Fluids and merging with a neighbouring stack are documented gaps.
      *
      * Deliberately does no I/O and takes no other lock: it runs on the tick thread, which must
      * never touch a socket (see [org.basaltmc.server.runtime.TickLoop]).
@@ -418,58 +424,57 @@ public class WorldState(
 
     /** Integrates one item for one tick. Called with [mutex] already held. */
     private fun moveItem(item: DroppedItem) {
+        // parity: `ItemEntity.getDefaultGravity`, applied before the move rather than after it.
         item.velocityY -= GRAVITY
 
-        val nextX = item.x + item.velocityX
-        val nextY = item.y + item.velocityY
-        val nextZ = item.z + item.velocityZ
+        val box = Aabb.of(item.x, item.y, item.z, ITEM_WIDTH, ITEM_HEIGHT)
+        EntityCollision.collide(this, box, item.velocityX, item.velocityY, item.velocityZ, movement)
+        val movedX = movement[0]
+        val movedY = movement[1]
+        val movedZ = movement[2]
+        item.x += movedX
+        item.y += movedY
+        item.z += movedZ
 
-        // Only the vertical sweep is resolved against blocks: after friction the horizontal drift
-        // is small enough that walking an item into a wall is not what this build gets wrong.
-        if (item.velocityY < 0 && isSolidAt(nextX, nextY, nextZ)) {
-            item.x = nextX
-            item.z = nextZ
-            item.y = floor(nextY) + 1.0
-
-            // A gentle landing settles rather than bouncing. It has to: gravity adds 0.04 per tick
-            // and a half-damped bounce gives back less than that once the fall is slow, so bouncing
-            // unconditionally never converges and the item jitters on the floor forever, sending a
-            // movement packet every tick for the rest of its five minutes.
-            if (item.velocityY > -BOUNCE_THRESHOLD) {
-                item.velocityX = 0.0
-                item.velocityY = 0.0
-                item.velocityZ = 0.0
-                item.resting = true
-                return
-            }
-
-            item.velocityY *= BOUNCE_DAMPING
-            item.velocityX *= GROUND_FRICTION
-            item.velocityZ *= GROUND_FRICTION
-        } else {
-            item.x = nextX
-            item.y = nextY
-            item.z = nextZ
+        // parity: `Entity.restituteMovementAfterCollisions` with no bounce: a stopped axis is zeroed.
+        val onGround = movedY != item.velocityY && item.velocityY < 0.0
+        val bounciness = if (onGround) BlockMovement.bouncinessOf(blockUnder(item)) * ITEM_BOUNCE_SHARE else 0f
+        if (movedX != item.velocityX) item.velocityX = 0.0
+        if (movedZ != item.velocityZ) item.velocityZ = 0.0
+        if (movedY != item.velocityY) {
+            item.velocityY = if (bounciness > 0f) -item.velocityY * bounciness else 0.0
         }
 
-        item.velocityX *= AIR_DRAG
+        // parity: `ItemEntity.tick`'s own drag: the air takes its share every tick, and the block
+        // underneath takes its friction on top of that.
+        var horizontalDrag = AIR_DRAG
+        if (onGround) horizontalDrag *= BlockMovement.frictionOf(blockUnder(item)).toDouble()
+        item.velocityX *= horizontalDrag
         item.velocityY *= AIR_DRAG
         item.velocityZ *= AIR_DRAG
+        if (onGround && item.velocityY < 0.0) item.velocityY *= BOUNCE_DAMPING
+
+        // parity: the check that lets vanilla skip a settled item's physics, plus the vertical half
+        // of it. Here it also stops the movement packets, which is what makes a floor covered in
+        // drops free to look at; an item still bouncing off slime is not settled and keeps moving.
+        item.resting =
+            onGround &&
+            item.velocityX * item.velocityX + item.velocityZ * item.velocityZ <= RESTING_SPEED_SQUARED &&
+            abs(item.velocityY) <= RESTING_SPEED
+        if (item.resting) {
+            item.velocityX = 0.0
+            item.velocityY = 0.0
+            item.velocityZ = 0.0
+        }
     }
 
-    /** Whether the block containing this point stops an item. Called with [mutex] already held. */
-    private fun isSolidAt(
-        x: Double,
-        y: Double,
-        z: Double,
-    ): Boolean {
-        val blockX = kotlin.math.floor(x).toInt()
-        val blockY = kotlin.math.floor(y).toInt()
-        val blockZ = kotlin.math.floor(z).toInt()
-        val chunk = chunksByPos[key(blockX shr 4, blockZ shr 4)] ?: return true
-        val stateId = chunk.getBlockStateId(blockX and 15, blockY, blockZ and 15)
-        return stateId != AIR_STATE_ID && stateId != CAVE_AIR_STATE_ID && stateId != VOID_AIR_STATE_ID
-    }
+    /** parity: `getBlockPosBelowThatAffectsMyMovement`, the block whose friction an item feels. */
+    private fun blockUnder(item: DroppedItem): Int =
+        getBlockState(
+            floor(item.x).toInt(),
+            floor(item.y - FRICTION_PROBE_DEPTH).toInt(),
+            floor(item.z).toInt(),
+        ) ?: AIR_STATE_ID
 
     public companion object {
         private fun snapshotOf(chunks: Map<Long, Chunk>): Long2ObjectMap<Chunk> {
@@ -489,15 +494,27 @@ public class WorldState(
         /** parity: what a player's own toss gets, so it does not immediately fly back into their inventory. */
         public const val DEFAULT_PICKUP_DELAY: Int = 40
 
-        // parity: ItemEntity.getDefaultGravity, Entity.getAirDrag, the default block friction, and
-        // ItemEntity.tick's own `movement.multiply(1.0, -0.5, 1.0)` on landing.
+        // parity: `ItemEntity.getDefaultGravity`, `Entity.getAirDrag` and `ItemEntity.tick`'s own
+        // `movement.multiply(1.0, -0.5, 1.0)` on landing.
         private const val GRAVITY = 0.04
         private const val AIR_DRAG = 0.98
-        private const val GROUND_FRICTION = 0.6
         private const val BOUNCE_DAMPING = -0.5
 
-        /** A landing slower than this settles instead of bouncing. Above one tick of gravity, so it always converges. */
-        private const val BOUNCE_THRESHOLD = 0.1
+        /** parity: `EntityType.ITEM`'s own box, a quarter of a block each way. */
+        private const val ITEM_WIDTH = 0.25
+        private const val ITEM_HEIGHT = 0.25
+
+        /** parity: `Entity.getBlockBounciness`, which gives anything that is not alive four fifths. */
+        private const val ITEM_BOUNCE_SHARE = 0.8f
+
+        /** parity: `getBlockPosBelowThatAffectsMyMovement`, which looks half a block under the feet. */
+        private const val FRICTION_PROBE_DEPTH = 0.5
+
+        /** parity: the 1.0E-5 horizontal speed under which `ItemEntity.tick` skips its own physics. */
+        private const val RESTING_SPEED_SQUARED = 1.0e-5
+
+        /** And the vertical speed that counts as none, so a bounce is never mistaken for a rest. */
+        private const val RESTING_SPEED = 1.0e-3
 
         private val AIR_STATE_ID = Blocks.AIR.stateId
         private val CAVE_AIR_STATE_ID = Blocks.CAVE_AIR.stateId

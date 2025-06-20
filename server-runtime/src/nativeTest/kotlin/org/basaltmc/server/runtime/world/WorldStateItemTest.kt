@@ -124,4 +124,70 @@ class WorldStateItemTest {
         repeat(WorldState.DEFAULT_PICKUP_DELAY) { world.tickItems() }
         assertTrue(item.canBePickedUp)
     }
+
+    /** A floor of one named block, so friction and bounce can be told apart from stone's. */
+    private fun worldFlooredWith(block: String): WorldState {
+        val chunk = Chunk(0, 0)
+        val stateId =
+            checkNotNull(
+                org.basaltmc.server.registry.BlockStateDefinitions
+                    .stateIdOf(Identifier.vanilla(block), emptyMap()),
+            )
+        for (x in 0 until 16) {
+            for (z in 0 until 16) chunk.setBlockStateId(x, 64, z, stateId)
+        }
+        return WorldState(listOf(chunk))
+    }
+
+    private fun slideOn(block: String): Double {
+        val world = worldFlooredWith(block)
+        val item = world.spawnItem(droppedItem(x = 4.5, y = 65.0, z = 8.5))
+        item.velocityX = 0.5
+        repeat(20) { world.tickItems() }
+        return item.x - 4.5
+    }
+
+    /** parity: `ItemEntity.tick` multiplies the drag by the friction of the block underneath. */
+    @Test
+    fun anItemSlidesFurtherOnIce() {
+        val onStone = slideOn("stone")
+        val onIce = slideOn("ice")
+
+        assertTrue(onStone > 0.0, "it slid at all: $onStone")
+        assertTrue(onIce > onStone * 2, "ice should carry it much further: $onIce against $onStone")
+    }
+
+    /** parity: `Entity.restituteMovementAfterCollisions`, and the four fifths a non-living entity keeps. */
+    @Test
+    fun anItemBouncesOffSlime() {
+        val world = worldFlooredWith("slime_block")
+        val item = world.spawnItem(droppedItem(x = 8.5, y = 68.0, z = 8.5))
+
+        var highestBounce = 0.0
+        var landed = false
+        repeat(60) {
+            world.tickItems()
+            if (item.velocityY > 0.0) {
+                landed = true
+                highestBounce = maxOf(highestBounce, item.velocityY)
+            }
+        }
+
+        assertTrue(landed, "it never bounced off the slime")
+        assertTrue(highestBounce > 0.1, "the bounce was barely there: $highestBounce")
+    }
+
+    /** parity: `Entity.collide`, which stops a sideways move dead against a wall. */
+    @Test
+    fun aWallStopsAnItemSliding() {
+        val world = worldWithFloor()
+        checkNotNull(world.chunkIfLoaded(0, 0)).setBlockStateId(10, 65, 8, Blocks.STONE.stateId)
+        val item = world.spawnItem(droppedItem(x = 8.5, y = 65.0, z = 8.5))
+        item.velocityX = 0.5
+
+        repeat(20) { world.tickItems() }
+
+        assertTrue(item.x < 10.0, "it went through the wall: ${item.x}")
+        assertEquals(0.0, item.velocityX, "and the wall took its speed")
+    }
 }
