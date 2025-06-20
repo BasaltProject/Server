@@ -16,6 +16,14 @@ import org.basaltmc.server.world.loot.ItemStack
  * vanilla's.
  */
 public object BlockEntityTicks {
+    /** Something a block entity handed back to the world, which the caller has to spawn. */
+    public class Dropped(
+        public val x: Int,
+        public val y: Int,
+        public val z: Int,
+        public val stack: ItemStack,
+    )
+
     /** A block entity that changed, so the caller can tell whoever is watching that chunk. */
     public class Changed(
         public val x: Int,
@@ -34,6 +42,7 @@ public object BlockEntityTicks {
         world: LoadedWorld,
         chunks: List<IntArray>,
         recipeFor: (Recipe.Cooker, ItemStack) -> Recipe.Cooking?,
+        onDropped: (Dropped) -> Unit = {},
     ): List<Changed> {
         val changes = mutableListOf<Changed>()
         // parity: `DaylightDetectorBlock`'s own ticker, which looks once every twenty ticks.
@@ -59,6 +68,28 @@ public object BlockEntityTicks {
                 // parity: `HopperBlockEntity.pushItemsTick`, one move per turn and then a rest.
                 if (entity.type.path == "hopper") {
                     if (Hoppers.tick(world, x0, entity.y, z0)) chunk.markDirty()
+                    continue
+                }
+                // parity: `CampfireBlockEntity.cookTick` while it burns, `cooldownTick` when it does
+                // not: what is on a fire that went out loses its progress two at a time.
+                if (Campfires.isCampfire(entity.type.path)) {
+                    val stateId = world.state.getBlockState(x0, entity.y, z0) ?: continue
+                    val campfire = Campfires.read(entity.data)
+                    val done =
+                        Campfires.tick(campfire, Campfires.isLitCampfire(stateId)) { stack ->
+                            recipeFor(Recipe.Cooker.CAMPFIRE, stack)
+                        }
+                    Campfires.write(campfire, entity.data)
+                    chunk.markDirty()
+                    for (result in done) onDropped(Dropped(x0, entity.y, z0, result))
+                    continue
+                }
+                // parity: `CrafterBlockEntity.serverTick`, six ticks of animation and nothing else.
+                if (entity.type.path == "crafter") {
+                    Crafters.tick(world, x0, entity.y, z0, entity.data)?.let {
+                        chunk.markDirty()
+                        changes += Changed(x0, entity.y, z0, it.stateId)
+                    }
                     continue
                 }
                 // parity: `BrewingStandBlockEntity.serverTick`, which also shows what it holds on

@@ -28,6 +28,9 @@ public object Containers {
             "hopper" to 5,
             "dispenser" to 9,
             "dropper" to 9,
+            "crafter" to 9,
+            // parity: `BrewingStandBlock.getAnalogOutputSignal`, its five slots read like any container.
+            "brewing_stand" to BrewingStands.SIZE,
         )
 
     /** The blocks that only hold, with no machinery of their own. */
@@ -48,10 +51,52 @@ public object Containers {
     ): Int? {
         val stateId = world.state.getBlockState(x, y, z) ?: return null
         val path = BlockStateDefinitions.blockOf(stateId)?.path ?: return null
+        stateSignal(path, BlockStateDefinitions.propertiesOf(stateId))?.let { return it }
         val size = SIZES[path] ?: return null
         val chunk = world.state.chunkIfLoaded(x shr 4, z shr 4) ?: return 0
         val entity = chunk.blockEntityAt(x and 15, y, z and 15) ?: return 0
+        // parity: `CrafterBlockEntity.getRedstoneSignal` counts slots, not how full they are.
+        if (path == "crafter") return Crafters.comparatorSignal(entity.data)
         val slots = BlockInventory.read(entity.data, size).map { (it?.count ?: 0) to DEFAULT_MAX_STACK }
         return Redstone.containerSignal(slots, size)
     }
+
+    /**
+     * The blocks a comparator reads straight off their own state, with no contents involved.
+     *
+     * parity: each block's `getAnalogOutputSignal`. They are one line each in the jar and they are
+     * one line each here; what they have in common is that the number is already in the state.
+     */
+    private fun stateSignal(
+        path: String,
+        properties: Map<String, String>,
+    ): Int? =
+        when {
+            // parity: `CakeBlock.getOutputSignal`, two per slice left, so a whole cake reads fourteen.
+            path == "cake" -> (FULL_CAKE - (properties["bites"]?.toIntOrNull() ?: 0)) * 2
+            // parity: `CandleCakeBlock`, always a full cake: a cake with a candle has no bites.
+            path.endsWith("candle_cake") -> FULL_CAKE * 2
+            path == "composter" -> properties["level"]?.toIntOrNull() ?: 0
+            path == "water_cauldron" || path == "powder_snow_cauldron" -> properties["level"]?.toIntOrNull() ?: 0
+            // parity: `LavaCauldronBlock`, which is always three because lava has no levels.
+            path == "lava_cauldron" -> LAVA_CAULDRON_SIGNAL
+            // parity: `RespawnAnchorBlock.getScaledChargeLevel`, four charges spread over fifteen.
+            path == "respawn_anchor" ->
+                ((properties["charges"]?.toIntOrNull() ?: 0) / MAX_CHARGES.toFloat() * Redstone.MAX_SIGNAL).toInt()
+            path == "end_portal_frame" -> if (properties["eye"] == "true") Redstone.MAX_SIGNAL else 0
+            path == "beehive" || path == "bee_nest" -> properties["honey_level"]?.toIntOrNull() ?: 0
+            path.endsWith("copper_bulb") -> if (properties["lit"] == "true") Redstone.MAX_SIGNAL else 0
+            // parity: `CopperGolemStatueBlock`, one per pose in the order the enum declares them.
+            path == "copper_golem_statue" || path.endsWith("_copper_golem_statue") ->
+                GOLEM_POSES.indexOf(properties["copper_golem_pose"]).let { if (it < 0) 0 else it + 1 }
+            else -> null
+        }
+
+    /** parity: `CakeBlock`'s seven slices, which is what `getOutputSignal` counts down from. */
+    private const val FULL_CAKE = 7
+    private const val LAVA_CAULDRON_SIGNAL = 3
+    private const val MAX_CHARGES = 4
+
+    /** parity: `CopperGolemStatueBlock.Pose`, in its declared order, which is what the signal counts. */
+    private val GOLEM_POSES = listOf("standing", "sitting", "running", "star")
 }

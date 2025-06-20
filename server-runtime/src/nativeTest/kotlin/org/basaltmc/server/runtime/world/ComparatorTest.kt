@@ -116,4 +116,53 @@ class ComparatorTest {
 
         assertNull(RedstoneComponents.tick(world, 13, 70, 2), "nothing to report")
     }
+
+    /**
+     * parity: the `getAnalogOutputSignal`s that read the block's own state rather than any contents:
+     * a cake counts its slices, a cauldron and a composter their level, an anchor its charges.
+     */
+    @Test
+    fun someBlocksAreReadStraightOffTheirState() {
+        fun readingOf(
+            name: String,
+            properties: Map<String, String>,
+        ): Int? {
+            world.state.setBlockState(6, 78, 6, state(name, properties))
+            return Containers.analogSignal(world, 6, 78, 6)
+        }
+
+        assertEquals(14, readingOf("cake", mapOf("bites" to "0")), "a whole cake is fourteen")
+        assertEquals(8, readingOf("cake", mapOf("bites" to "3")))
+        assertEquals(14, readingOf("candle_cake", mapOf("lit" to "false")), "a cake with a candle is whole")
+        assertEquals(5, readingOf("composter", mapOf("level" to "5")))
+        assertEquals(2, readingOf("water_cauldron", mapOf("level" to "2")))
+        assertEquals(3, readingOf("lava_cauldron", emptyMap()), "lava has no levels, so it is always three")
+        assertEquals(0, readingOf("respawn_anchor", mapOf("charges" to "0")))
+        assertEquals(7, readingOf("respawn_anchor", mapOf("charges" to "2")), "two of four, floored")
+        assertEquals(15, readingOf("respawn_anchor", mapOf("charges" to "4")))
+        assertEquals(15, readingOf("end_portal_frame", mapOf("eye" to "true", "facing" to "north")))
+        assertEquals(0, readingOf("end_portal_frame", mapOf("eye" to "false", "facing" to "north")))
+        assertEquals(4, readingOf("beehive", mapOf("honey_level" to "4", "facing" to "north")))
+        assertEquals(15, readingOf("copper_bulb", mapOf("lit" to "true", "powered" to "false")))
+        assertEquals(0, readingOf("copper_bulb", mapOf("lit" to "false", "powered" to "false")))
+        assertEquals(
+            1,
+            readingOf(
+                "copper_golem_statue",
+                mapOf("copper_golem_pose" to "standing", "facing" to "north", "waterlogged" to "false"),
+            ),
+        )
+        assertEquals(
+            4,
+            readingOf(
+                "copper_golem_statue",
+                mapOf(
+                    "copper_golem_pose" to "star",
+                    "facing" to "north",
+                    "waterlogged" to "false",
+                ),
+            ),
+            "one per pose, in the order the enum declares them",
+        )
+    }
 }

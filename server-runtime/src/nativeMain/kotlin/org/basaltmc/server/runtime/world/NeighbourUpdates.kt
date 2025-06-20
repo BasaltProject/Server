@@ -67,6 +67,13 @@ public object NeighbourUpdates {
                 ?.let { onReshaped(it.stateId, it.x, it.y, it.z) }
         }
         Dispensers.onNeighbourChange(world, x, y, z)?.let { onReshaped(it.stateId, it.x, it.y, it.z) }
+        // parity: `CrafterBlock.neighborChanged`, the same rising edge with its own four ticks.
+        Crafters.onNeighbourChange(world, x, y, z)?.let { onReshaped(it.stateId, it.x, it.y, it.z) }
+        for (face in BlockFace.entries) {
+            Crafters
+                .onNeighbourChange(world, x + face.stepX, y + face.stepY, z + face.stepZ)
+                ?.let { onReshaped(it.stateId, it.x, it.y, it.z) }
+        }
         // parity: `PistonBaseBlock.checkIfExtend`, which books the move rather than making it now.
         Pistons.trigger(world, x, y, z)
         for (face in BlockFace.entries) {

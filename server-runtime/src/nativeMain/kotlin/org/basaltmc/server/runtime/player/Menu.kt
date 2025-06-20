@@ -107,6 +107,30 @@ public class Menu(
                     },
             )
 
+        /** parity: `CrafterMenu`: nine of the block's own, then the player's 36. */
+        public const val CRAFTER_SIZE: Int = 9
+        private const val CRAFTER_SLOT_COUNT = 45
+
+        /**
+         * A crafter: its nine slots, then the player's storage and hotbar. There is no result slot,
+         * because nobody takes anything out of a crafter by hand: it pushes what it makes.
+         */
+        public fun crafter(containerId: Int): Menu =
+            Menu(
+                containerId = containerId,
+                gridWidth = 0,
+                gridHeight = 0,
+                slots =
+                    List(CRAFTER_SLOT_COUNT) { slot ->
+                        when (slot) {
+                            in 0 until CRAFTER_SIZE -> MenuSlot.Block(slot)
+                            in CRAFTER_SIZE..35 -> MenuSlot.Inventory(slot - CRAFTER_SIZE)
+                            in 36..44 -> MenuSlot.Inventory(slot - 36 + PlayerInventory.HOTBAR_START)
+                            else -> null
+                        }
+                    },
+            )
+
         /**
          * A furnace, a blast furnace or a smoker: input, fuel, result, then the player's storage and
          * hotbar. parity: `AbstractFurnaceMenu`'s own slot order.
