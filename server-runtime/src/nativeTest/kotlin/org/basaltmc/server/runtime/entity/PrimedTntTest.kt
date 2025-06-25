@@ -91,4 +91,25 @@ class PrimedTntTest {
         assertTrue(tnt.velocityX < 1.0, "the landing should have slowed it: ${tnt.velocityX}")
         assertTrue(tnt.x > 8.5, "and it still travelled: ${tnt.x}")
     }
+
+    /** parity: `PrimedTnt`'s own eighty: `/summon tnt` gives one with a fuse, not one that is late. */
+    @Test
+    fun oneSummonedRatherThanLitStillHasAFuse() {
+        val world = worldWithFloor()
+        val tnt =
+            world.spawnEntity(
+                ServerEntity(
+                    entityId = 9,
+                    uuid = kotlin.uuid.Uuid.random(),
+                    type = PrimedTnt.TYPE,
+                    protocolType = 100,
+                    x = 8.5,
+                    y = 70.0,
+                    z = 8.5,
+                ),
+            )
+
+        assertFalse(PrimedTnt.tick(world, tnt), "it must not go off on the tick it appears")
+        assertEquals(PrimedTnt.DEFAULT_FUSE - 1, tnt.fuse)
+    }
 }

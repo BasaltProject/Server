@@ -259,4 +259,48 @@ class EntitySelectorTest {
         summon("cow", 1.0, 0.0, customName = "Bessie")
         assertEquals(0, select("Bessie").size)
     }
+
+    /** parity: `@e` is every entity, and what is lying on the floor is one of them. */
+    @Test
+    fun droppedItemsAreEntitiesToo() {
+        world.state.spawnItem(
+            org.basaltmc.server.runtime.world.WorldState
+                .DroppedItem(
+                    entityId = nextId++,
+                    uuid = Uuid.random(),
+                    item = Identifier.vanilla("diamond"),
+                    count = 3,
+                    x = 5.0,
+                    y = 64.0,
+                    z = 5.0,
+                ),
+        )
+        summon("cow", 6.0, 6.0)
+
+        val items = select("@e[type=item]")
+
+        assertEquals(1, items.size, "the dropped diamond")
+        assertEquals(Identifier.vanilla("item"), items.single().type)
+        assertEquals(2, select("@e").size, "and @e sees both it and the cow")
+    }
+
+    /** A selector that filters by distance reaches an item the same way it reaches a mob. */
+    @Test
+    fun anItemIsFilteredLikeAnythingElse() {
+        world.state.spawnItem(
+            org.basaltmc.server.runtime.world.WorldState
+                .DroppedItem(
+                    entityId = nextId++,
+                    uuid = Uuid.random(),
+                    item = Identifier.vanilla("diamond"),
+                    count = 1,
+                    x = 40.0,
+                    y = 64.0,
+                    z = 0.0,
+                ),
+        )
+
+        assertTrue(select("@e[type=item,distance=..10]").isEmpty(), "forty blocks away is out of range")
+        assertEquals(1, select("@e[type=item,distance=..50]").size)
+    }
 }

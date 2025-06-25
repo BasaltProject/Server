@@ -59,6 +59,8 @@ import org.basaltmc.server.runtime.world.FluidFlow
 import org.basaltmc.server.runtime.world.Fluids
 import org.basaltmc.server.runtime.world.Furnaces
 import org.basaltmc.server.runtime.world.GameRuleRegistry
+import org.basaltmc.server.runtime.world.Jukeboxes
+import org.basaltmc.server.runtime.world.Lecterns
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.MobEffects
 import org.basaltmc.server.runtime.world.MossCarpetTopper
@@ -77,11 +79,13 @@ import org.basaltmc.server.runtime.world.RealRecipes
 import org.basaltmc.server.runtime.world.RealTimelineTags
 import org.basaltmc.server.runtime.world.RealTimelines
 import org.basaltmc.server.runtime.world.RealVillagerTrades
+import org.basaltmc.server.runtime.world.Redstone
 import org.basaltmc.server.runtime.world.ScaffoldingPlacement
 import org.basaltmc.server.runtime.world.Signs
 import org.basaltmc.server.runtime.world.SnowyBlocks
 import org.basaltmc.server.runtime.world.Submersion
 import org.basaltmc.server.runtime.world.Trades
+import org.basaltmc.server.runtime.world.Vibrations
 import org.basaltmc.server.runtime.world.WallVariants
 import org.basaltmc.server.runtime.world.WorldState
 import org.basaltmc.server.runtime.world.WorldWeather
@@ -165,6 +169,7 @@ import org.basaltmc.wire.protocol.play.ClientboundTakeItemEntityPacket
 import org.basaltmc.wire.protocol.play.CommandSuggestionRequestPacket
 import org.basaltmc.wire.protocol.play.CommandSuggestionsPacket
 import org.basaltmc.wire.protocol.play.CommandsPacket
+import org.basaltmc.wire.protocol.play.ContainerButtonClickPacket
 import org.basaltmc.wire.protocol.play.ContainerClosePacket
 import org.basaltmc.wire.protocol.play.ContainerSetContentPacket
 import org.basaltmc.wire.protocol.play.ContainerSetDataPacket
@@ -180,6 +185,7 @@ import org.basaltmc.wire.protocol.play.GlobalPos
 import org.basaltmc.wire.protocol.play.Heightmap
 import org.basaltmc.wire.protocol.play.HeightmapType
 import org.basaltmc.wire.protocol.play.InteractPacket
+import org.basaltmc.wire.protocol.play.LecternMenuType
 import org.basaltmc.wire.protocol.play.LevelEventPacket
 import org.basaltmc.wire.protocol.play.LoginPlayPacket
 import org.basaltmc.wire.protocol.play.MapChunkPacket
@@ -302,6 +308,8 @@ public class ClientSession(
     private val recipes: RealRecipes? = null,
     /** What a villager offers, out of the jar's own data. `null` means nobody trades. */
     private val villagerTrades: RealVillagerTrades? = null,
+    /** The songs a jukebox can play, for the number a comparator reads off one. */
+    private val jukeboxes: Jukeboxes? = null,
     /** The real block tags, which decide whether the held tool is the right one. */
     private val bossBars: BossBarRegistry? = null,
     /** Whether the whitelist is being enforced right now, which `/whitelist on` can change. */
@@ -439,6 +447,10 @@ public class ClientSession(
     private var quickCraftActive = false
     private var quickCraftType = 0
     private val quickCraftSlots = LinkedHashSet<Int>()
+
+    /** The lectern this client has open, and the page it is showing. */
+    private var openLecternAt: BlockPos? = null
+    private var lecternPage: Int = 0
 
     /** The villager this client is trading with, and what it offered. */
     private var openTradingWith: Int? = null
@@ -1438,6 +1450,8 @@ public class ClientSession(
             }
             InteractPacket.ID -> handleInteract(InteractPacket.read(body))
             SelectTradePacket.ID -> selectTrade(SelectTradePacket.read(body).index)
+            ContainerButtonClickPacket.ID ->
+                clickContainerButton(ContainerButtonClickPacket.read(body).buttonId)
             SignUpdatePacket.ID -> writeSign(SignUpdatePacket.read(body))
             SWING_PACKET_ID -> handleSwing(body.readVarInt())
             ServerboundUseItemOnPacket.ID -> handleUseItemOn(ServerboundUseItemOnPacket.read(body))
@@ -1630,6 +1644,8 @@ public class ClientSession(
         stopDigging()
         refreshSnowUnder(action.pos)
         notifyNeighbours(action.pos)
+        // parity: `GameEvent.BLOCK_DESTROY`, which a sculk sensor hears as twelve.
+        heardBySculk("block_destroy", action.pos)
         // Breaking the frame puts the portal out, which is the other half of lighting one.
         currentWorld?.let { loaded ->
             for (block in NetherPortals.extinguishAround(loaded, action.pos.x, action.pos.y, action.pos.z)) {
@@ -1887,6 +1903,27 @@ public class ClientSession(
             val damage = Explosions.damageAt(distance, power, power * 2f)
             if (damage <= 0f) continue
             player.connection.hurt(damage, "badRespawnPoint", DamageTypes.BAD_RESPAWN_POINT)
+        }
+    }
+
+    /**
+     * Tells the sculk sensors around [pos] that something happened there.
+     *
+     * parity: `Level.gameEvent`, whose whole audience in this build is the sensors: what they hear
+     * is the event's own frequency, and what that lights is ordinary redstone.
+     */
+    private fun heardBySculk(
+        event: String,
+        pos: BlockPos,
+    ) {
+        val world = currentWorld ?: return
+        val changes = mutableListOf<org.basaltmc.server.runtime.world.BlockChange>()
+        Vibrations.emit(world, event, pos.x + 0.5, pos.y + 0.5, pos.z + 0.5, changes)
+        for (change in changes) {
+            broadcastBlockUpdate(BlockPos(change.x, change.y, change.z), change.stateId)
+            for (settled in Redstone.settle(world, change.x, change.y, change.z)) {
+                broadcastBlockUpdate(BlockPos(settled.x, settled.y, settled.z), settled.stateId)
+            }
         }
     }
 
@@ -2350,6 +2387,12 @@ public class ClientSession(
                 openCrafter(session, hit.pos)
                 return ack()
             }
+            // parity: `JukeboxBlock.useItemOn`/`useWithoutItem`: a disc goes in, and clicking a
+            // playing one takes it back out.
+            if (cookerPath == "jukebox" && useJukebox(session, hit.pos)) return ack()
+            // parity: `LecternBlock.useItemOn`, which takes a book, and `useWithoutItem`, which
+            // opens the one already on it.
+            if (cookerPath == "lectern" && useLectern(session, hit.pos)) return ack()
             // parity: `CampfireBlock.useItemOn`, which takes one piece of food onto the fire and
             // refuses anything a campfire cannot cook.
             if (cookerPath != null && Campfires.isCampfire(cookerPath) && placeOnCampfire(session, hit.pos)) {
@@ -2524,6 +2567,8 @@ public class ClientSession(
         refreshSnowUnder(placeAt)
         refreshSnowAt(placeAt)
         notifyNeighbours(placeAt)
+        // parity: `GameEvent.BLOCK_PLACE`, thirteen: a block going down is louder than one coming up.
+        heardBySculk("block_place", placeAt)
         if (Signs.isSign(blockStateId)) openNewSign(placeAt, blockStateId)
         currentWorld?.let { loaded ->
             for (block in FluidFlow.onBlockChanged(loaded, placeAt.x, placeAt.y, placeAt.z)) {
@@ -2738,6 +2783,127 @@ public class ClientSession(
             session.inventory[heldSlot] = if (held.count <= 1) null else held.copy(count = held.count - 1)
             sendInventorySlot(heldSlot)
         }
+    }
+
+    /**
+     * A click on a lectern: put the held book on it, or open the one already there.
+     *
+     * parity: `LecternBlock.tryPlaceBook` and its menu. Turning a page pulses the block for two
+     * ticks, which is the whole reason a lectern is a redstone component at all.
+     */
+    private fun useLectern(
+        session: PlayerSession,
+        pos: BlockPos,
+    ): Boolean {
+        val world = currentWorld ?: return false
+        val stateId = world.state.getBlockState(pos.x, pos.y, pos.z) ?: return false
+        val hasBook = BlockStateDefinitions.propertiesOf(stateId)["has_book"] == "true"
+        if (hasBook) {
+            openLectern(session, pos)
+            return true
+        }
+        val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
+        val held = session.inventory[heldSlot] ?: return false
+        val item = Identifier.parse(held.id)
+        if (!Lecterns.isBook(item)) return false
+        val change = Lecterns.placeBook(world, pos.x, pos.y, pos.z, item) ?: return false
+        broadcastBlockUpdate(BlockPos(change.x, change.y, change.z), change.stateId)
+        session.inventory[heldSlot] = if (held.count <= 1) null else held.copy(count = held.count - 1)
+        sendInventorySlot(heldSlot)
+        notifyNeighbours(pos)
+        return true
+    }
+
+    /** parity: `LecternMenu`, one book slot and the page it is open at. */
+    private fun openLectern(
+        session: PlayerSession,
+        pos: BlockPos,
+    ) {
+        returnCraftingGrid(session)
+        nextContainerId = if (nextContainerId >= MAX_CONTAINER_ID) FIRST_BLOCK_CONTAINER_ID else nextContainerId + 1
+        openMenu = Menu.playerInventory()
+        openBlock = pos
+        openLecternAt = pos
+        sendCompressed(OpenScreenPacket.ID) {
+            OpenScreenPacket(
+                containerId = nextContainerId,
+                menuType = LecternMenuType.ID,
+                title = Component.translatable("block.minecraft.lectern"),
+            ).write(it)
+        }
+    }
+
+    /**
+     * A button inside an open window, which today is the lectern's pages.
+     *
+     * parity: `LecternMenu.clickMenuButton`: one back, two forward, three to take the book, and a
+     * hundred plus the page to jump to it.
+     */
+    private fun clickContainerButton(button: Int) {
+        val session = playerSession ?: return
+        val world = currentWorld ?: return
+        val pos = openLecternAt ?: return
+        val page = lecternPage
+        val wanted =
+            when {
+                button >= ContainerButtonClickPacket.LECTERN_JUMP_TO_PAGE ->
+                    button - ContainerButtonClickPacket.LECTERN_JUMP_TO_PAGE
+                button == ContainerButtonClickPacket.LECTERN_PREVIOUS_PAGE -> page - 1
+                button == ContainerButtonClickPacket.LECTERN_NEXT_PAGE -> page + 1
+                button == ContainerButtonClickPacket.LECTERN_TAKE_BOOK -> {
+                    val taken = Lecterns.takeBook(world, pos.x, pos.y, pos.z) ?: return
+                    val (change, book) = taken
+                    broadcastBlockUpdate(BlockPos(change.x, change.y, change.z), change.stateId)
+                    val left = session.inventory.add(StoredItemStack(book.toString(), 1))
+                    if (left > 0) spawnDroppedItem(book, left, session.x, session.y, session.z)
+                    sendInventory()
+                    notifyNeighbours(pos)
+                    openLecternAt = null
+                    return
+                }
+                else -> return
+            }
+        if (wanted < 0) return
+        lecternPage = wanted
+        val change = Lecterns.turnPage(world, pos.x, pos.y, pos.z, wanted) ?: return
+        broadcastBlockUpdate(BlockPos(change.x, change.y, change.z), change.stateId)
+        notifyNeighbours(pos)
+    }
+
+    /**
+     * A click on a jukebox: put the held disc in, or take out what is playing.
+     *
+     * parity: `JukeboxBlock`, whose whole interaction is those two. What a comparator then reads is
+     * the song's own number, and while it plays the block itself gives off a full signal.
+     */
+    private fun useJukebox(
+        session: PlayerSession,
+        pos: BlockPos,
+    ): Boolean {
+        val world = currentWorld ?: return false
+        val ejected = Jukeboxes.eject(world, pos.x, pos.y, pos.z)
+        if (ejected != null) {
+            val (change, disc) = ejected
+            broadcastBlockUpdate(BlockPos(change.x, change.y, change.z), change.stateId)
+            spawnDroppedItem(disc, 1, pos.x + 0.5, pos.y + 1.0, pos.z + 0.5)
+            notifyNeighbours(pos)
+            return true
+        }
+        val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
+        val held = session.inventory[heldSlot] ?: return false
+        val item = Identifier.parse(held.id)
+        if (!Jukeboxes.isDisc(item)) return false
+        val song = Jukeboxes.songOf(item)
+        val change =
+            Jukeboxes.insert(world, pos.x, pos.y, pos.z, item, jukeboxes?.comparatorOutputOf(song) ?: 0)
+                ?: return false
+        broadcastBlockUpdate(BlockPos(change.x, change.y, change.z), change.stateId)
+        if (session.gamemode != Gamemode.CREATIVE) {
+            session.inventory[heldSlot] = if (held.count <= 1) null else held.copy(count = held.count - 1)
+            sendInventorySlot(heldSlot)
+        }
+        notifyNeighbours(pos)
+        return true
     }
 
     /**

@@ -172,10 +172,16 @@ public class DamageCommand(
         when (target) {
             is CommandTarget.Player ->
                 target.session.connection.hurt(amount.toFloat(), "generic", context.get<Identifier>("damageType"))
+            // parity: an item entity takes damage from fire and explosions, neither of which this
+            // reaches: `/damage` on one does nothing rather than pretending.
+            is CommandTarget.Item -> Unit
             is CommandTarget.Entity -> {
                 val entity = target.entity
                 entity.health -= amount
-                if (entity.health <= 0.0) entity.removed = true
+                if (entity.health <= 0.0) {
+                    entity.killed = true
+                    entity.removed = true
+                }
             }
         }
         context.success(
@@ -338,6 +344,8 @@ public class RotateCommand : Command(name = "rotate", permissionLevel = Permissi
                 target.entity.yaw = yaw
                 target.entity.pitch = pitch
             }
+            // A dropped item is drawn spinning on its own clock, so it has no rotation to set.
+            is CommandTarget.Item -> Unit
         }
         context.success(
             Component.translatable("commands.rotate.success", Component.text(target.name)),

@@ -31,6 +31,10 @@ public object Containers {
             "crafter" to 9,
             // parity: `BrewingStandBlock.getAnalogOutputSignal`, its five slots read like any container.
             "brewing_stand" to BrewingStands.SIZE,
+            // A jukebox holds one disc, and what a comparator reads off it is the song, not the slot.
+            "jukebox" to 1,
+            // A lectern holds one book, and what a comparator reads off it is the page.
+            "lectern" to 1,
         )
 
     /** The blocks that only hold, with no machinery of their own. */
@@ -57,6 +61,14 @@ public object Containers {
         val entity = chunk.blockEntityAt(x and 15, y, z and 15) ?: return 0
         // parity: `CrafterBlockEntity.getRedstoneSignal` counts slots, not how full they are.
         if (path == "crafter") return Crafters.comparatorSignal(entity.data)
+        // parity: `JukeboxBlock.getAnalogOutputSignal`, the number of the song that is playing.
+        if (path == "jukebox") return Jukeboxes.comparatorOutputAt(entity.data)
+        // parity: `LecternBlock.getAnalogOutputSignal`, which is nothing at all without a book, and
+        // otherwise how far through it the reader is.
+        if (path == "lectern") {
+            val hasBook = BlockStateDefinitions.propertiesOf(stateId)["has_book"] == "true"
+            return if (hasBook) Lecterns.comparatorSignal(entity.data) else 0
+        }
         val slots = BlockInventory.read(entity.data, size).map { (it?.count ?: 0) to DEFAULT_MAX_STACK }
         return Redstone.containerSignal(slots, size)
     }

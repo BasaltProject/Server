@@ -111,6 +111,8 @@ public class TagCommand : Command(name = "tag", permissionLevel = PermissionLeve
         when (target) {
             is CommandTarget.Player -> target.session.tags
             is CommandTarget.Entity -> target.entity.tags
+            // parity: a dropped item can be tagged in vanilla; here it keeps no tags to give back.
+            is CommandTarget.Item -> mutableSetOf()
         }
 
     private fun list(context: CommandContext): Int {

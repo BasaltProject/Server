@@ -81,6 +81,7 @@ import org.basaltmc.server.runtime.config.WorldType
 import org.basaltmc.server.runtime.config.WorldsConfig
 import org.basaltmc.server.runtime.entity.Attribute
 import org.basaltmc.server.runtime.entity.Breeding
+import org.basaltmc.server.runtime.entity.EntityPhysics
 import org.basaltmc.server.runtime.entity.MobBrain
 import org.basaltmc.server.runtime.entity.MobCategory
 import org.basaltmc.server.runtime.entity.MobDespawn
@@ -107,6 +108,7 @@ import org.basaltmc.server.runtime.world.BlockInteractions
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
 import org.basaltmc.server.runtime.world.Crafters
 import org.basaltmc.server.runtime.world.DamageTypes
+import org.basaltmc.server.runtime.world.DetectorRails
 import org.basaltmc.server.runtime.world.Dispensers
 import org.basaltmc.server.runtime.world.EndPodium
 import org.basaltmc.server.runtime.world.EndPortals
@@ -117,6 +119,9 @@ import org.basaltmc.server.runtime.world.FluidFlow
 import org.basaltmc.server.runtime.world.FluidKind
 import org.basaltmc.server.runtime.world.Fluids
 import org.basaltmc.server.runtime.world.GameRuleRegistry
+import org.basaltmc.server.runtime.world.Jukeboxes
+import org.basaltmc.server.runtime.world.Lecterns
+import org.basaltmc.server.runtime.world.Lightning
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.MobEffects
 import org.basaltmc.server.runtime.world.NaturalSpawner
@@ -151,6 +156,7 @@ import org.basaltmc.server.runtime.world.StructureTemplates
 import org.basaltmc.server.runtime.world.Submersion
 import org.basaltmc.server.runtime.world.Tripwires
 import org.basaltmc.server.runtime.world.VanillaWorldGeneratorFactory
+import org.basaltmc.server.runtime.world.Vibrations
 import org.basaltmc.server.runtime.world.WORLDS_ROOT
 import org.basaltmc.server.runtime.world.WorldMetadata
 import org.basaltmc.server.runtime.world.WorldState
@@ -238,6 +244,9 @@ public class BasaltServer(
 
     /** What each villager offers, out of the same jar. */
     private val villagerTrades = RealVillagerTrades(serverJar)
+
+    /** The song data a comparator reads off a playing jukebox. */
+    private val jukeboxes = Jukeboxes(serverJar)
     private val recipes = RealRecipes(serverJar)
     private val blockTags = RealBlockTags(serverJar)
     private val itemTags = RealItemTags(serverJar)
@@ -1168,6 +1177,16 @@ public class BasaltServer(
                         }
                 Tripwires.press(world, position[0], position[1], position[2], stillOn, scheduled)
             }
+            // parity: `LecternBlock.tick`, the two ticks a page turn pulses for.
+            Lecterns.endPulse(world, position[0], position[1], position[2])?.let { scheduled += it }
+            // parity: `DetectorRailBlock.tick`, the recheck a pressed rail books for itself.
+            DetectorRails
+                .check(world, position[0], position[1], position[2], world.state.entities())
+                ?.let { scheduled += it }
+            // parity: `SculkSensorBlock.tick`: thirty ticks awake, then ten of cooldown.
+            Vibrations.tick(world, position[0], position[1], position[2])?.let { scheduled += it }
+            // parity: `LightningRodBlock`'s own scheduled tick, eight after the strike.
+            Lightning.releaseRod(world, position[0], position[1], position[2])?.let { scheduled += it }
             // parity: `TargetBlock`'s own scheduled tick, which lets the signal go again.
             ProjectileHits.releaseTarget(world, position[0], position[1], position[2])?.let { scheduled += it }
             // parity: `DispenserBlock.tick`, the four ticks after the signal arrived.
@@ -1387,6 +1406,9 @@ public class BasaltServer(
         }
     }
 
+    /** parity: `AbstractMinecart.getDefaultGravity`, the same 0.04 as anything else that is not alive. */
+    private val minecartGravity = 0.04
+
     /** How far from a piston a player can be and still be in the way of what it pushes. */
     private val pistonReach = 14.0
 
@@ -1471,6 +1493,16 @@ public class BasaltServer(
                 )
             }
         }
+        // parity: `Entity.die`, which drops the entity's own loot table where it stood. Whatever was
+        // killed since the last tick is dealt with here, once, before anything else moves.
+        for (dead in world.state.entities().filter { it.killed }) {
+            dead.killed = false
+            dropDeathLoot(world, dead)
+            // parity: `GameEvent.ENTITY_DIE`, the loudest thing a sculk sensor hears.
+            val heard = mutableListOf<org.basaltmc.server.runtime.world.BlockChange>()
+            Vibrations.emit(world, "entity_die", dead.x, dead.y, dead.z, heard)
+            for (change in heard) announceRedstone(world, watchers, change)
+        }
         // One snapshot for the whole tick: `entities()` takes the world's lock and copies the list,
         // and asking for it per entity turned a pen of cows into a lock convoy.
         val living = world.state.entities().filter { !it.removed }
@@ -1488,11 +1520,29 @@ public class BasaltServer(
                     entity.z,
                     PrimedTnt.EXPLOSION_POWER,
                 )
+                // parity: `GameEvent.EXPLODE`, which is fifteen: the top of the scale.
+                val heard = mutableListOf<org.basaltmc.server.runtime.world.BlockChange>()
+                Vibrations.emit(world, "explode", entity.x, entity.y, entity.z, heard)
+                for (change in heard) announceRedstone(world, watchers, change)
                 continue
             }
             val projectile = Projectiles.kindOf(entity.type)
             if (projectile != null) {
                 tickProjectile(world, watchers, entity, projectile)
+                continue
+            }
+            // parity: `AbstractMinecart`, which falls like anything else until it is on a rail.
+            if (DetectorRails.isMinecart(entity.type)) {
+                EntityPhysics.move(world.state, entity, gravity = minecartGravity)
+                val pressed =
+                    DetectorRails.check(
+                        world,
+                        floor(entity.x).toInt(),
+                        floor(entity.y).toInt(),
+                        floor(entity.z).toInt(),
+                        living,
+                    )
+                pressed?.let { announceRedstone(world, watchers, it) }
                 continue
             }
             // parity: `Mob.aiStep`, which is what makes an animal wander rather than stand there.
@@ -1512,6 +1562,28 @@ public class BasaltServer(
                 val nearest = watchers.minOfOrNull { MobBrain.distanceTo(entity, it.x, it.y, it.z) }
                 if (MobDespawn.shouldDespawn(entity, category, nearest, random)) entity.removed = true
             }
+        }
+    }
+
+    /** parity: `Entity.die` over `LootTable`, the drops a mob leaves where it fell. */
+    private fun dropDeathLoot(
+        world: LoadedWorld,
+        entity: org.basaltmc.server.runtime.entity.ServerEntity,
+    ) {
+        val table = lootTables.forEntity(entity.type) ?: return
+        for (stack in table.generate(LegacyRandom(Random.nextLong()))) {
+            if (Items.REGISTRY.byIdentifier(stack.item) == null) continue
+            world.state.spawnItem(
+                WorldState.DroppedItem(
+                    entityId = playerRegistry.allocateEntityId(),
+                    uuid = Uuid.random(),
+                    item = stack.item,
+                    count = stack.count,
+                    x = entity.x,
+                    y = entity.y + entity.height / 2,
+                    z = entity.z,
+                ),
+            )
         }
     }
 
@@ -1866,6 +1938,40 @@ public class BasaltServer(
             commands.environment.syncWeather(world)
         }
         if (world.gameTime % TIME_SYNC_INTERVAL_TICKS == 0L) commands.environment.syncTime(world)
+        if (world.weather.thundering) strikeLightning(world)
+    }
+
+    /**
+     * The storm's own share of a tick: one roll per simulated chunk, and a strike where it lands.
+     *
+     * parity: `ServerLevel.tickChunk`, whose thunder is a one in a hundred thousand per chunk. A
+     * lightning rod within 128 blocks takes the strike, which is the whole point of putting one up.
+     */
+    private fun strikeLightning(world: LoadedWorld) {
+        val chunks = simulatedChunks(world)
+        if (chunks.isEmpty()) return
+        val random = LegacyRandom(Random.nextLong())
+        val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
+        for (chunk in chunks) {
+            if (!Lightning.shouldStrike(random)) continue
+            val x = (chunk[0] shl 4) + random.nextInt(16)
+            val z = (chunk[1] shl 4) + random.nextInt(16)
+            val target = Lightning.targetFor(world, x, z) ?: continue
+            val changes = mutableListOf<org.basaltmc.server.runtime.world.BlockChange>()
+            // parity: `LightningBolt.tick`, where fire is only lit on normal and hard.
+            val lightFires = world.difficulty == "normal" || world.difficulty == "hard"
+            Lightning.strike(world, target[0], target[1], target[2], lightFires, changes)
+            // parity: `GameEvent.LIGHTNING_STRIKE`, which a sculk sensor hears as fourteen.
+            Vibrations.emit(
+                world,
+                "lightning_strike",
+                target[0].toDouble(),
+                target[1].toDouble(),
+                target[2].toDouble(),
+                changes,
+            )
+            for (change in changes) announceRedstone(world, watchers, change)
+        }
     }
 
     /**
@@ -1978,6 +2084,7 @@ public class BasaltServer(
                     lootTables = lootTables,
                     recipes = recipes,
                     villagerTrades = villagerTrades,
+                    jukeboxes = jukeboxes,
                     bossBars = bossBars,
                     whitelistEnforced = { whitelistEnforced },
                     enchantments = enchantments,

@@ -3,6 +3,7 @@ package org.basaltmc.server.runtime.command
 import org.basaltmc.server.registry.EntityTypes
 import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.server.runtime.player.PlayerSession
+import org.basaltmc.server.runtime.world.WorldState
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.protocol.play.ArgumentParser
 import org.basaltmc.wire.text.Component
@@ -73,12 +74,44 @@ public sealed interface CommandTarget {
         override val alive: Boolean get() = !entity.removed && entity.health > 0.0
         override val scoreboardName: String get() = entity.uuid.toString()
 
-        /** A point: entity dimensions are a table this build does not have, so `dx=` sees no volume. */
-        override val width: Double get() = 0.0
-        override val height: Double get() = 0.0
+        /** parity: the entity's own box, which is what a `dx=` volume is tested against. */
+        override val width: Double get() = entity.width
+        override val height: Double get() = entity.height
+    }
+
+    /**
+     * A dropped item.
+     *
+     * parity: `@e` is every entity, and an item on the floor is one: `/kill @e[type=item]` is how a
+     * server operator clears the ground. They live in their own list here rather than the entity
+     * registry, which is why they need their own case.
+     */
+    public class Item(
+        public val item: WorldState.DroppedItem,
+        override val worldName: String = "",
+    ) : CommandTarget {
+        override val name: String get() = item.item.path
+        override val entityId: Int get() = item.entityId
+        override val uuid: String get() = item.uuid.toString()
+        override val type: Identifier get() = ITEM_TYPE
+        override val x: Double get() = item.x
+        override val y: Double get() = item.y
+        override val z: Double get() = item.z
+        override val yaw: Float get() = 0f
+        override val pitch: Float get() = 0f
+        override val tags: Set<String> get() = emptySet()
+        override val alive: Boolean get() = true
+        override val scoreboardName: String get() = item.uuid.toString()
+        override val width: Double get() = ITEM_WIDTH
+        override val height: Double get() = ITEM_HEIGHT
     }
 
     public companion object {
+        /** parity: `EntityTypes.ITEM` and its own quarter-block box. */
+        public val ITEM_TYPE: Identifier = Identifier.vanilla("item")
+        public const val ITEM_WIDTH: Double = 0.25
+        public const val ITEM_HEIGHT: Double = 0.25
+
         /** parity: `EntityTypes.PLAYER`'s dimensions, which is what a `dx=` box is tested against. */
         public const val PLAYER_WIDTH: Double = 0.6
         public const val PLAYER_HEIGHT: Double = 1.8

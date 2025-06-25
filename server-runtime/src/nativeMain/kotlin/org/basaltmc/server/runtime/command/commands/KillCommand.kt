@@ -25,7 +25,16 @@ public class KillCommand : Command(name = "kill", permissionLevel = PermissionLe
             when (target) {
                 is CommandTarget.Player -> target.session.connection.killPlayer(DEATH_GENERIC_KILL)
                 // A summoned entity has no death animation to play, so it simply stops existing.
-                is CommandTarget.Entity -> target.entity.removed = true
+                is CommandTarget.Entity -> {
+                    // parity: `/kill` kills, so what it kills drops what it would have dropped.
+                    target.entity.killed = true
+                    target.entity.removed = true
+                }
+                // parity: an item entity is discarded rather than killed: it leaves nothing behind.
+                is CommandTarget.Item ->
+                    context.environment.worlds[target.worldName]
+                        ?.state
+                        ?.removeItem(target.entityId)
             }
         }
         val message =

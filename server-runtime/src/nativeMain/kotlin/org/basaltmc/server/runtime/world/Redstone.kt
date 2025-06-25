@@ -76,6 +76,8 @@ public object Redstone {
                 properties["power"]?.toIntOrNull() ?: 0
             // parity: `TrappedChestBlock.getSignal`, one per person looking inside, capped at fifteen.
             path == "trapped_chest" -> openers.coerceIn(0, MAX_SIGNAL)
+            // parity: `JukeboxBlock.ownSignal`, fifteen while a disc is playing.
+            path == "jukebox" -> if (properties["has_record"] == "true") MAX_SIGNAL else 0
             else -> 0
         }
     }
