@@ -4,6 +4,7 @@ import org.basaltmc.server.assets.ServerJarAssets
 import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.registry.EntityTypes
 import org.basaltmc.server.registry.Items
 import org.basaltmc.server.runtime.command.CommandDispatcher
 import org.basaltmc.server.runtime.command.CommandEnvironment
@@ -78,6 +79,8 @@ import org.basaltmc.server.runtime.config.LiveConfigs
 import org.basaltmc.server.runtime.config.WorldDimension
 import org.basaltmc.server.runtime.config.WorldType
 import org.basaltmc.server.runtime.config.WorldsConfig
+import org.basaltmc.server.runtime.entity.PrimedTnt
+import org.basaltmc.server.runtime.entity.Projectiles
 import org.basaltmc.server.runtime.function.FunctionLibrary
 import org.basaltmc.server.runtime.placeholder.AnimationPlaceholders
 import org.basaltmc.server.runtime.placeholder.PlayerPlaceholders
@@ -101,6 +104,7 @@ import org.basaltmc.server.runtime.world.DamageTypes
 import org.basaltmc.server.runtime.world.Dispensers
 import org.basaltmc.server.runtime.world.EndPodium
 import org.basaltmc.server.runtime.world.EndPortals
+import org.basaltmc.server.runtime.world.Explosions
 import org.basaltmc.server.runtime.world.FallingBlocks
 import org.basaltmc.server.runtime.world.Fires
 import org.basaltmc.server.runtime.world.FluidFlow
@@ -109,10 +113,12 @@ import org.basaltmc.server.runtime.world.Fluids
 import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.MobEffects
+import org.basaltmc.server.runtime.world.NeighbourUpdates
 import org.basaltmc.server.runtime.world.NetherPortals
 import org.basaltmc.server.runtime.world.Pistons
 import org.basaltmc.server.runtime.world.PlayerProgress
 import org.basaltmc.server.runtime.world.PressurePlates
+import org.basaltmc.server.runtime.world.ProjectileHits
 import org.basaltmc.server.runtime.world.RandomTicks
 import org.basaltmc.server.runtime.world.RealAdvancements
 import org.basaltmc.server.runtime.world.RealBlockTags
@@ -168,6 +174,7 @@ import org.basaltmc.wire.text.resolvePlainText
 import kotlin.concurrent.AtomicInt
 import kotlin.math.abs
 import kotlin.math.floor
+import kotlin.math.sqrt
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -825,6 +832,8 @@ public class BasaltServer(
                 .onFailure { logger.error(it) { "Block entity tick failed in world '${world.name}'" } }
             runCatching { tickFallingBlocks(world) }
                 .onFailure { logger.error(it) { "Falling block tick failed in world '${world.name}'" } }
+            runCatching { tickEntities(world) }
+                .onFailure { logger.error(it) { "Entity tick failed in world '${world.name}'" } }
             runCatching { tickEffects(world) }
                 .onFailure { logger.error(it) { "Effect tick failed in world '${world.name}'" } }
             runCatching { tickSleep(world) }
@@ -1126,6 +1135,8 @@ public class BasaltServer(
                         standingOn(world, position[0], position[1], position[2], watchers),
                     )?.let { scheduled += it }
             }
+            // parity: `TargetBlock`'s own scheduled tick, which lets the signal go again.
+            ProjectileHits.releaseTarget(world, position[0], position[1], position[2])?.let { scheduled += it }
             // parity: `DispenserBlock.tick`, the four ticks after the signal arrived.
             scheduled += finishPiston(world, position, watchers)
             Dispensers.fire(world, position[0], position[1], position[2], LegacyRandom(Random.nextLong())) {
@@ -1287,6 +1298,150 @@ public class BasaltServer(
 
     /** How far from a piston a player can be and still be in the way of what it pushes. */
     private val pistonReach = 14.0
+
+    /**
+     * Ticks the entities that are not players, items or falling blocks: today that is primed TNT.
+     *
+     * parity: `ServerLevel.tickNonPassenger`, one turn per entity per tick, in the order they were
+     * spawned. What each one does is its own class's `tick`.
+     */
+    private fun tickEntities(world: LoadedWorld) {
+        val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
+        // parity: `TntBlock.explode`, which spawns the entity as the block goes. It is done here
+        // because the block half runs wherever a neighbour changed, which may be a client's thread.
+        val protocolType = EntityTypes[PrimedTnt.TYPE]?.protocolId
+        if (protocolType != null) {
+            for (position in world.state.takePrimedTnt()) {
+                PrimedTnt.prime(
+                    world.state,
+                    position[0],
+                    position[1],
+                    position[2],
+                    entityId = playerRegistry.allocateEntityId(),
+                    protocolType = protocolType,
+                )
+            }
+        }
+        for (entity in world.state.entities()) {
+            if (entity.removed) continue
+            if (entity.type == PrimedTnt.TYPE) {
+                if (!PrimedTnt.tick(world.state, entity)) continue
+                entity.removed = true
+                blowUp(
+                    world,
+                    watchers,
+                    entity.x,
+                    entity.y + PrimedTnt.EXPLOSION_OFFSET,
+                    entity.z,
+                    PrimedTnt.EXPLOSION_POWER,
+                )
+                continue
+            }
+            val projectile = Projectiles.kindOf(entity.type)
+            if (projectile != null) tickProjectile(world, watchers, entity, projectile)
+        }
+    }
+
+    /**
+     * One tick of something in flight, and whatever it hits on the way.
+     *
+     * parity: `Projectile.hitTargetOrDeflectSelf`: what sticks stays where it landed, what does not
+     * is gone the moment it lands. What the block itself does about it is `onProjectileHit`.
+     */
+    private fun tickProjectile(
+        world: LoadedWorld,
+        watchers: List<PlayerSession>,
+        entity: org.basaltmc.server.runtime.entity.ServerEntity,
+        kind: Projectiles.Kind,
+    ) {
+        val hit = Projectiles.tick(world.state, entity, kind) ?: return
+        ProjectileHits.onHit(world, hit, byArrow = kind.sticks)?.let { change ->
+            announceRedstone(world, watchers, change)
+        }
+        if (!kind.sticks) entity.removed = true
+    }
+
+    /**
+     * Sets off an explosion, drops what it broke and hurts whoever was standing in it.
+     *
+     * parity: `ServerExplosion`, the same shape as the bed's own: what it breaks drops with no tool
+     * involved, and the neighbours of every hole are told afterwards.
+     */
+    private fun blowUp(
+        world: LoadedWorld,
+        watchers: List<PlayerSession>,
+        x: Double,
+        y: Double,
+        z: Double,
+        power: Float,
+    ) {
+        val broken = Explosions.explode(world, x, y, z, power, LegacyRandom(Random.nextLong()))
+        for (block in broken) {
+            val at = BlockPos(block.x, block.y, block.z)
+            for (player in watchers) {
+                player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                    ClientboundBlockUpdatePacket(at, Blocks.AIR.stateId).write(it)
+                }
+            }
+            Blocks.byStateId(block.stateId)?.let { dropExplodedBlock(world, it.block, at) }
+        }
+        for (block in broken) {
+            NeighbourUpdates.afterChange(
+                world,
+                block.x,
+                block.y,
+                block.z,
+                onReshaped = { stateId, bx, by, bz ->
+                    val at = BlockPos(bx, by, bz)
+                    for (player in watchers) {
+                        player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                            ClientboundBlockUpdatePacket(at, stateId).write(it)
+                        }
+                    }
+                },
+            ) { stateId, bx, by, bz ->
+                val at = BlockPos(bx, by, bz)
+                for (player in watchers) {
+                    player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                        ClientboundBlockUpdatePacket(at, Blocks.AIR.stateId).write(it)
+                    }
+                }
+                Blocks.byStateId(stateId)?.let { dropExplodedBlock(world, it.block, at) }
+            }
+        }
+        for (player in watchers) {
+            val distance =
+                sqrt(
+                    (player.x - x) * (player.x - x) + (player.y - y) * (player.y - y) + (player.z - z) * (player.z - z),
+                )
+            val damage = Explosions.damageAt(distance, power, power * 2f)
+            if (damage <= 0f) continue
+            player.connection.hurt(damage, "explosion", DamageTypes.EXPLOSION)
+        }
+    }
+
+    /** What a hole in the ground leaves behind, dropped where the block was. */
+    private fun dropExplodedBlock(
+        world: LoadedWorld,
+        block: Identifier,
+        pos: BlockPos,
+    ) {
+        val table = lootTables.forBlock(block) ?: return
+        for (stack in table.generate(LegacyRandom(Random.nextLong()))) {
+            if (Items.REGISTRY.byIdentifier(stack.item) == null) continue
+            world.state.spawnItem(
+                WorldState.DroppedItem(
+                    entityId = playerRegistry.allocateEntityId(),
+                    uuid = Uuid.random(),
+                    item = stack.item,
+                    count = stack.count,
+                    x = pos.x + 0.5,
+                    y = pos.y + 0.5,
+                    z = pos.z + 0.5,
+                ),
+            )
+        }
+    }
 
     /** Moves whatever is in mid-air, and puts it back down as a block where it lands. */
     private fun tickFallingBlocks(world: LoadedWorld) {

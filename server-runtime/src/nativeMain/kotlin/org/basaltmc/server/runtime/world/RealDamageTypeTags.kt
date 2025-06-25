@@ -68,4 +68,7 @@ public object DamageTypes {
 
     /** parity: `DamageTypes.BAD_RESPAWN_POINT`, what a bed in the wrong dimension kills you with. */
     public val BAD_RESPAWN_POINT: Identifier = Identifier.vanilla("bad_respawn_point")
+
+    /** parity: `DamageTypes.EXPLOSION`, what TNT with nobody to blame kills you with. */
+    public val EXPLOSION: Identifier = Identifier.vanilla("explosion")
 }

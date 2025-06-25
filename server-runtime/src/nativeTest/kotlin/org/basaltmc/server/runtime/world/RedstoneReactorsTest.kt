@@ -160,15 +160,12 @@ class RedstoneReactorsTest {
 
         RedstoneReactors.update(world, 14, 71, 2)
 
-        val pending =
-            world.state
-                .chunkIfLoaded(0, 0)
-                ?.scheduledBlockTicks()
-                .orEmpty()
-        assertTrue(
-            pending.any { it.localX == 14 && it.y == 70 && it.type.path == "tnt" && it.delay == 80 },
-            "eighty ticks, which is vanilla's fuse: $pending",
+        // parity: `TntBlock.explode` takes the block away and leaves the entity in its place.
+        assertEquals(
+            "air",
+            BlockStateDefinitions.blockOf(world.state.getBlockState(14, 70, 2) ?: 0)?.path,
         )
+        assertEquals(listOf(listOf(14, 70, 2)), world.state.takePrimedTnt().map { it.toList() })
     }
 
     /** A block nobody powered stays where it is. */

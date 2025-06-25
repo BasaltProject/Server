@@ -222,6 +222,20 @@ public class WorldState(
         }
     }
 
+    /** parity: `LevelTicks.hasScheduledTick`, which is what stops a target being re-armed mid-hold. */
+    public fun hasScheduledBlockTick(
+        x: Int,
+        y: Int,
+        z: Int,
+        type: Identifier,
+    ): Boolean =
+        mutex.withLock {
+            val chunk = chunksByPos[key(x shr 4, z shr 4)] ?: return@withLock false
+            chunk.scheduledBlockTicks().any {
+                it.type == type && it.localX == (x and 15) && it.y == y && it.localZ == (z and 15)
+            }
+        }
+
     /** Every fluid tick that comes due this tick, as `(x, y, z)` in world coordinates. */
     public fun dueFluidTicks(): List<IntArray> = dueTicks { chunk, due -> chunk.advanceFluidTicks(due) }
 
@@ -351,6 +365,35 @@ public class WorldState(
         mutex.withLock {
             entities[entity.entityId] = entity
             entity
+        }
+
+    /**
+     * The TNT blocks that were lit this tick and still have to become entities.
+     *
+     * The block itself goes the moment the signal reaches it, but only the caller knows how to
+     * allocate an entity id, so what it left behind waits here for one tick at most.
+     */
+    private val primedTnt = mutableListOf<IntArray>()
+
+    /** parity: `TntBlock.explode`, which spawns the entity where the block stood. */
+    public fun primeTnt(
+        x: Int,
+        y: Int,
+        z: Int,
+    ) {
+        mutex.withLock { primedTnt += intArrayOf(x, y, z) }
+    }
+
+    /** Takes what was lit, leaving the queue empty. */
+    public fun takePrimedTnt(): List<IntArray> =
+        mutex.withLock {
+            if (primedTnt.isEmpty()) {
+                emptyList()
+            } else {
+                val lit = primedTnt.toList()
+                primedTnt.clear()
+                lit
+            }
         }
 
     /** Drops everything marked removed, and returns their ids so clients can be told once. */
