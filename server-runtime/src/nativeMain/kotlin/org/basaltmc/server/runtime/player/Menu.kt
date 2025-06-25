@@ -107,6 +107,29 @@ public class Menu(
                     },
             )
 
+        /** parity: `MerchantMenu`: two slots to pay with, one to take from, then the player's 36. */
+        private const val MERCHANT_SLOT_COUNT = 39
+
+        /**
+         * A villager's window. The three trading slots are the menu's own rather than any block's,
+         * so nothing behind them is a container: the trade itself is what moves the items.
+         */
+        public fun merchant(containerId: Int): Menu =
+            Menu(
+                containerId = containerId,
+                gridWidth = 0,
+                gridHeight = 0,
+                slots =
+                    List(MERCHANT_SLOT_COUNT) { slot ->
+                        when (slot) {
+                            in 0..2 -> null
+                            in 3..29 -> MenuSlot.Inventory(slot - 3)
+                            in 30..38 -> MenuSlot.Inventory(slot - 30 + PlayerInventory.HOTBAR_START)
+                            else -> null
+                        }
+                    },
+            )
+
         /** parity: `CrafterMenu`: nine of the block's own, then the player's 36. */
         public const val CRAFTER_SIZE: Int = 9
         private const val CRAFTER_SLOT_COUNT = 45

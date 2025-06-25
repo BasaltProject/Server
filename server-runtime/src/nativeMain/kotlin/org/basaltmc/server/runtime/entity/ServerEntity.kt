@@ -58,6 +58,13 @@ public class ServerEntity(
     /** parity: `PARENT_AGE_AFTER_BREEDING`, the five minutes before either can breed again. */
     public var breedCooldown: Int = 0
 
+    /** parity: `VillagerData.profession`, which decides what it offers. */
+    public var profession: String = "farmer"
+
+    /** parity: `VillagerData.level` and `Villager.villagerXp`, which is what unlocks the next tier. */
+    public var villagerLevel: Int = 1
+    public var villagerExperience: Int = 0
+
     /** Ticks before it goes off, or [NO_FUSE] for anything that is not primed. parity: `PrimedTnt.fuse`. */
     public var fuse: Int = NO_FUSE
 

@@ -17,6 +17,7 @@ import org.basaltmc.server.runtime.command.PlayerCommandSource
 import org.basaltmc.server.runtime.command.commands.BossBarRegistry
 import org.basaltmc.server.runtime.command.timePacket
 import org.basaltmc.server.runtime.entity.Breeding
+import org.basaltmc.server.runtime.entity.Villagers
 import org.basaltmc.server.runtime.item.ItemComponentCodecs
 import org.basaltmc.server.runtime.item.ItemDamageEffects
 import org.basaltmc.server.runtime.item.ItemWear
@@ -75,10 +76,12 @@ import org.basaltmc.server.runtime.world.RealLootTables
 import org.basaltmc.server.runtime.world.RealRecipes
 import org.basaltmc.server.runtime.world.RealTimelineTags
 import org.basaltmc.server.runtime.world.RealTimelines
+import org.basaltmc.server.runtime.world.RealVillagerTrades
 import org.basaltmc.server.runtime.world.ScaffoldingPlacement
 import org.basaltmc.server.runtime.world.Signs
 import org.basaltmc.server.runtime.world.SnowyBlocks
 import org.basaltmc.server.runtime.world.Submersion
+import org.basaltmc.server.runtime.world.Trades
 import org.basaltmc.server.runtime.world.WallVariants
 import org.basaltmc.server.runtime.world.WorldState
 import org.basaltmc.server.runtime.world.WorldWeather
@@ -180,6 +183,9 @@ import org.basaltmc.wire.protocol.play.InteractPacket
 import org.basaltmc.wire.protocol.play.LevelEventPacket
 import org.basaltmc.wire.protocol.play.LoginPlayPacket
 import org.basaltmc.wire.protocol.play.MapChunkPacket
+import org.basaltmc.wire.protocol.play.MerchantCost
+import org.basaltmc.wire.protocol.play.MerchantOffer
+import org.basaltmc.wire.protocol.play.MerchantOffersPacket
 import org.basaltmc.wire.protocol.play.OpenScreenPacket
 import org.basaltmc.wire.protocol.play.OpenSignEditorPacket
 import org.basaltmc.wire.protocol.play.PlayDisconnectPacket
@@ -196,6 +202,7 @@ import org.basaltmc.wire.protocol.play.RemoveEntitiesPacket
 import org.basaltmc.wire.protocol.play.RemoveMobEffectPacket
 import org.basaltmc.wire.protocol.play.RespawnPacket
 import org.basaltmc.wire.protocol.play.RotateHeadPacket
+import org.basaltmc.wire.protocol.play.SelectTradePacket
 import org.basaltmc.wire.protocol.play.ServerboundContainerClickPacket
 import org.basaltmc.wire.protocol.play.ServerboundPickItemFromBlockPacket
 import org.basaltmc.wire.protocol.play.ServerboundPlayerAbilitiesPacket
@@ -293,6 +300,8 @@ public class ClientSession(
     private val lootTables: RealLootTables? = null,
     /** Every crafting recipe the server knows. `null` means nothing can be crafted. */
     private val recipes: RealRecipes? = null,
+    /** What a villager offers, out of the jar's own data. `null` means nobody trades. */
+    private val villagerTrades: RealVillagerTrades? = null,
     /** The real block tags, which decide whether the held tool is the right one. */
     private val bossBars: BossBarRegistry? = null,
     /** Whether the whitelist is being enforced right now, which `/whitelist on` can change. */
@@ -430,6 +439,10 @@ public class ClientSession(
     private var quickCraftActive = false
     private var quickCraftType = 0
     private val quickCraftSlots = LinkedHashSet<Int>()
+
+    /** The villager this client is trading with, and what it offered. */
+    private var openTradingWith: Int? = null
+    private var openOffers: List<Trades.Offer>? = null
 
     /** Which dropped items this client has been told about. See [syncItemEntities]. */
     private val trackedItems = HashSet<Int>()
@@ -1424,6 +1437,7 @@ public class ClientSession(
                 playerSession?.let(::closeOpenMenu)
             }
             InteractPacket.ID -> handleInteract(InteractPacket.read(body))
+            SelectTradePacket.ID -> selectTrade(SelectTradePacket.read(body).index)
             SignUpdatePacket.ID -> writeSign(SignUpdatePacket.read(body))
             SWING_PACKET_ID -> handleSwing(body.readVarInt())
             ServerboundUseItemOnPacket.ID -> handleUseItemOn(ServerboundUseItemOnPacket.read(body))
@@ -2709,6 +2723,11 @@ public class ClientSession(
         val world = currentWorld ?: return
         val entity = world.state.entity(interact.entityId) ?: return
         if (entity.removed) return
+        // parity: `Villager.mobInteract` opens its trades whatever is in the player's hand.
+        if (entity.type == Villagers.TYPE) {
+            openTrades(entity)
+            return
+        }
         val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
         val held = session.inventory[heldSlot] ?: return
         val item = Identifier.parse(held.id)
@@ -2719,6 +2738,103 @@ public class ClientSession(
             session.inventory[heldSlot] = if (held.count <= 1) null else held.copy(count = held.count - 1)
             sendInventorySlot(heldSlot)
         }
+    }
+
+    /**
+     * Opens a villager's trades.
+     *
+     * parity: `Villager.mobInteract` over `MerchantMenu`: the offers go out as they are, and what
+     * the player then picks is a `select_trade`. The offers themselves come out of the jar's own
+     * data, so a farmer offers what a farmer offers.
+     */
+    private fun openTrades(villager: org.basaltmc.server.runtime.entity.ServerEntity) {
+        val session = playerSession ?: return
+        val trades = villagerTrades ?: return
+        val offers = Villagers.offersFor(trades, villager.profession, villager.villagerLevel)
+        if (offers.isEmpty()) return
+        returnCraftingGrid(session)
+        nextContainerId = if (nextContainerId >= MAX_CONTAINER_ID) FIRST_BLOCK_CONTAINER_ID else nextContainerId + 1
+        openMenu = Menu.merchant(nextContainerId)
+        openBlock = null
+        openTradingWith = villager.entityId
+        openOffers = offers
+        sendCompressed(OpenScreenPacket.ID) {
+            OpenScreenPacket(
+                containerId = openMenu.containerId,
+                menuType = OpenScreenPacket.MERCHANT_MENU,
+                title = Component.translatable("entity.minecraft.villager"),
+            ).write(it)
+        }
+        sendOffers()
+        sendInventory()
+    }
+
+    /** parity: `ClientboundMerchantOffersPacket`, sent when the window opens and after every trade. */
+    private fun sendOffers() {
+        val offers = openOffers ?: return
+        val villager = openTradingWith?.let { currentWorld?.state?.entity(it) } ?: return
+        val wire =
+            offers.mapNotNull { offer ->
+                val costA = Items.REGISTRY.byIdentifier(offer.costA.item)?.protocolId ?: return@mapNotNull null
+                val result = Items.REGISTRY.byIdentifier(offer.result.item)?.protocolId ?: return@mapNotNull null
+                val costB =
+                    offer.costB?.let { second ->
+                        Items.REGISTRY.byIdentifier(second.item)?.protocolId?.let { id ->
+                            MerchantCost(id, Trades.priceOf(offer, second))
+                        }
+                    }
+                MerchantOffer(
+                    costA = MerchantCost(costA, Trades.priceOf(offer, offer.costA)),
+                    result = WireItemStack(result, offer.result.count),
+                    costB = costB,
+                    outOfStock = offer.outOfStock,
+                    uses = offer.uses,
+                    maxUses = offer.maxUses,
+                    experience = offer.experience,
+                    specialPrice = offer.specialPrice,
+                    priceMultiplier = offer.priceMultiplier,
+                    demand = offer.demand,
+                )
+            }
+        sendPlayPacket(MerchantOffersPacket.ID) {
+            MerchantOffersPacket(
+                containerId = openMenu.containerId,
+                offers = wire,
+                level = villager.villagerLevel,
+                experience = villager.villagerExperience,
+                showProgress = true,
+                canRestock = true,
+            ).write(it)
+        }
+    }
+
+    /**
+     * Takes the trade the player picked.
+     *
+     * parity: `MerchantMenu.clickMenuButton`: the offer is checked against what they are carrying,
+     * the cost comes out of the inventory, the result goes in, and the offer's own use is counted.
+     */
+    private fun selectTrade(index: Int) {
+        val session = playerSession ?: return
+        val offers = openOffers ?: return
+        val offer = offers.getOrNull(index) ?: return
+        if (offer.outOfStock) return
+        val (costA, costB) = Trades.currentCost(offer)
+        if (session.inventory.countOf(costA.item.toString()) < costA.count) return
+        if (costB != null && session.inventory.countOf(costB.item.toString()) < costB.count) return
+
+        session.inventory.take(costA.item.toString(), costA.count)
+        costB?.let { session.inventory.take(it.item.toString(), it.count) }
+        val given =
+            session.inventory.add(StoredItemStack(offer.result.item.toString(), offer.result.count))
+        if (given > 0) {
+            spawnDroppedItem(offer.result.item, given, session.x, session.y, session.z)
+        }
+        Trades.take(offer)
+        val villager = openTradingWith?.let { currentWorld?.state?.entity(it) }
+        villager?.let { it.villagerExperience += offer.experience }
+        sendInventory()
+        sendOffers()
     }
 
     /**

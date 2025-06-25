@@ -89,6 +89,30 @@ public class PlayerInventory(
         return remaining
     }
 
+    /** How many of [id] this player is carrying, over every slot the inventory fills from. */
+    public fun countOf(id: String): Int = FILL_ORDER.sumOf { slot -> slots[slot]?.takeIf { it.id == id }?.count ?: 0 }
+
+    /**
+     * Takes [count] of [id] out, from the first slot that has any. Answers how many were actually
+     * taken, which is what the caller checks before it hands anything over in exchange.
+     */
+    public fun take(
+        id: String,
+        count: Int,
+    ): Int {
+        var left = count
+        for (slot in FILL_ORDER) {
+            if (left <= 0) break
+            val stack = slots[slot] ?: continue
+            if (stack.id != id) continue
+            val taken = minOf(stack.count, left)
+            slots[slot] = if (stack.count <= taken) null else stack.copy(count = stack.count - taken)
+            left -= taken
+            changed = true
+        }
+        return count - left
+    }
+
     public fun clear() {
         slots.fill(null)
         changed = true
