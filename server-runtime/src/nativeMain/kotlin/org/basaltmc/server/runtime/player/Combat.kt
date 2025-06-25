@@ -1,6 +1,7 @@
 package org.basaltmc.server.runtime.player
 
 import kotlin.math.floor
+import kotlin.math.sqrt
 
 /**
  * How much of a hit actually lands: armour first, then resistance and protection.
@@ -51,6 +52,82 @@ public object Combat {
         val power = fallDistance + FALL_EPSILON - safeFallDistance
         return if (power <= 0.0) 0 else floor(power).toInt()
     }
+
+    /**
+     * How much of a swing has recharged, from zero to one.
+     *
+     * parity: `Player.getAttackStrengthScale(0.5)`, whose delay is twenty ticks over the attack
+     * speed: a hand swings four times a second, an iron sword one and a half.
+     */
+    public fun attackStrengthScale(
+        ticksSinceSwing: Int,
+        attackSpeed: Double,
+    ): Float {
+        if (attackSpeed <= 0.0) return 1f
+        val delay = 1.0 / attackSpeed * TICKS_PER_SECOND
+        return ((ticksSinceSwing + SWING_HALF_TICK) / delay).toFloat().coerceIn(0f, 1f)
+    }
+
+    /**
+     * parity: `Player.baseDamageScaleFactor`: a swing that has not recharged still lands a fifth of
+     * the damage, and the rest comes back with the square of the charge.
+     */
+    public fun chargeScale(strength: Float): Float = MIN_CHARGE_DAMAGE + strength * strength * (1f - MIN_CHARGE_DAMAGE)
+
+    /**
+     * What the difficulty leaves of a hit dealt by something that is not a player.
+     *
+     * parity: `Player.hurtServer`: peaceful takes nothing, easy halves it and adds one back (never
+     * more than the hit itself), normal is the hit, and hard is half again.
+     */
+    public fun afterDifficulty(
+        damage: Float,
+        difficulty: String,
+    ): Float =
+        when (difficulty) {
+            "peaceful" -> 0f
+            "easy" -> minOf(damage / 2f + 1f, damage)
+            "hard" -> damage * 3f / 2f
+            else -> damage
+        }
+
+    /** parity: `Player.attack`, where a critical hit is worth half again. */
+    public const val CRITICAL_MULTIPLIER: Float = 1.5f
+
+    /** parity: `getAttackStrengthScale(0.5)`'s own half tick, and the tick rate it divides. */
+    private const val SWING_HALF_TICK = 0.5
+    private const val TICKS_PER_SECOND = 20.0
+    private const val MIN_CHARGE_DAMAGE = 0.2f
+
+    /**
+     * parity: `LivingEntity.knockback`: the speed keeps half of what it had, the push is taken off
+     * it, and on the ground it also gets a lift capped at 0.4.
+     */
+    public fun knockback(
+        power: Double,
+        towardsX: Double,
+        towardsZ: Double,
+        velocityX: Double,
+        velocityY: Double,
+        velocityZ: Double,
+        onGround: Boolean,
+        knockbackResistance: Double = 0.0,
+    ): DoubleArray {
+        val strength = power * (1.0 - knockbackResistance)
+        if (strength <= 0.0) return doubleArrayOf(velocityX, velocityY, velocityZ)
+        val length = sqrt(towardsX * towardsX + towardsZ * towardsZ)
+        if (length < KNOCKBACK_EPSILON) return doubleArrayOf(velocityX, velocityY, velocityZ)
+        val pushX = towardsX / length * strength
+        val pushZ = towardsZ / length * strength
+        return doubleArrayOf(
+            velocityX / 2.0 - pushX,
+            if (onGround) minOf(MAX_KNOCKBACK_LIFT, velocityY / 2.0 + strength) else velocityY,
+            velocityZ / 2.0 - pushZ,
+        )
+    }
+
+    private const val KNOCKBACK_EPSILON = 1.0E-5
+    private const val MAX_KNOCKBACK_LIFT = 0.4
 
     /**
      * parity: `LivingEntity.getDamageAfterMagicAbsorb`'s resistance case, which counts in fifths

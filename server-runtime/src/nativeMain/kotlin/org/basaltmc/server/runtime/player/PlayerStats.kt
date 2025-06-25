@@ -59,6 +59,10 @@ public class PlayerStats {
         increment(StoredStats.DAMAGE_TAKEN, (amount * 10f).roundToLong())
     }
 
+    public fun addDamageDealt(amount: Float) {
+        increment(StoredStats.DAMAGE_DEALT, (amount * 10f).roundToLong())
+    }
+
     /** A snapshot for saving. [playTimeTicks] is kept in its own column and folded in here too. */
     public fun snapshot(playTimeTicks: Long): StoredStats =
         lock.withLock {

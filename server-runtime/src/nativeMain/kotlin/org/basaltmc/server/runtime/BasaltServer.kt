@@ -5,6 +5,8 @@ import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.BlockSupport
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.registry.EntityAttributes
+import org.basaltmc.server.registry.EntityTypeShapes
 import org.basaltmc.server.registry.EntityTypes
 import org.basaltmc.server.registry.Items
 import org.basaltmc.server.runtime.command.CommandDispatcher
@@ -82,10 +84,13 @@ import org.basaltmc.server.runtime.config.WorldType
 import org.basaltmc.server.runtime.config.WorldsConfig
 import org.basaltmc.server.runtime.entity.Attribute
 import org.basaltmc.server.runtime.entity.Breeding
+import org.basaltmc.server.runtime.entity.DamageSource
+import org.basaltmc.server.runtime.entity.EntityCombat
 import org.basaltmc.server.runtime.entity.EntityPhysics
 import org.basaltmc.server.runtime.entity.Minecarts
 import org.basaltmc.server.runtime.entity.MobBrain
 import org.basaltmc.server.runtime.entity.MobCategory
+import org.basaltmc.server.runtime.entity.MobCombat
 import org.basaltmc.server.runtime.entity.MobDespawn
 import org.basaltmc.server.runtime.entity.Mobs
 import org.basaltmc.server.runtime.entity.PrimedTnt
@@ -95,9 +100,11 @@ import org.basaltmc.server.runtime.placeholder.AnimationPlaceholders
 import org.basaltmc.server.runtime.placeholder.PlayerPlaceholders
 import org.basaltmc.server.runtime.placeholder.ServerFacts
 import org.basaltmc.server.runtime.placeholder.ServerPlaceholders
+import org.basaltmc.server.runtime.player.Combat
 import org.basaltmc.server.runtime.player.Difficulty
 import org.basaltmc.server.runtime.player.PlayerRegistry
 import org.basaltmc.server.runtime.player.PlayerSession
+import org.basaltmc.server.runtime.registry.VanillaRegistryData
 import org.basaltmc.server.runtime.scoreboard.Scoreboard
 import org.basaltmc.server.runtime.scoreboard.Teams
 import org.basaltmc.server.runtime.timings.ReportSources
@@ -161,6 +168,7 @@ import org.basaltmc.server.runtime.world.Tripwires
 import org.basaltmc.server.runtime.world.VanillaWorldGeneratorFactory
 import org.basaltmc.server.runtime.world.Vibrations
 import org.basaltmc.server.runtime.world.WORLDS_ROOT
+import org.basaltmc.server.runtime.world.WorldLight
 import org.basaltmc.server.runtime.world.WorldMetadata
 import org.basaltmc.server.runtime.world.WorldState
 import org.basaltmc.server.storage.PlayerStore
@@ -181,13 +189,17 @@ import org.basaltmc.wire.io.NativeThread
 import org.basaltmc.wire.io.ShutdownSignal
 import org.basaltmc.wire.io.TcpListener
 import org.basaltmc.wire.io.sleepMillis
+import org.basaltmc.wire.protocol.play.AnimatePacket
 import org.basaltmc.wire.protocol.play.BlockEventPacket
 import org.basaltmc.wire.protocol.play.BlockPos
 import org.basaltmc.wire.protocol.play.ClientboundBlockUpdatePacket
+import org.basaltmc.wire.protocol.play.DamageEventPacket
+import org.basaltmc.wire.protocol.play.EntityEventPacket
 import org.basaltmc.wire.protocol.play.ExplodePacket
 import org.basaltmc.wire.protocol.play.ExplosionParticle
 import org.basaltmc.wire.protocol.play.Gamemode
 import org.basaltmc.wire.protocol.play.LevelEventPacket
+import org.basaltmc.wire.protocol.play.SetEntityMotionPacket
 import org.basaltmc.wire.protocol.play.SoundPacket
 import org.basaltmc.wire.protocol.play.SoundSource
 import org.basaltmc.wire.text.Component
@@ -196,6 +208,7 @@ import org.basaltmc.wire.text.TextColor
 import org.basaltmc.wire.text.resolvePlainText
 import kotlin.concurrent.AtomicInt
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.sqrt
 import kotlin.random.Random
@@ -1609,6 +1622,20 @@ public class BasaltServer(
         // One snapshot for the whole tick: `entities()` takes the world's lock and copies the list,
         // and asking for it per entity turned a pen of cows into a lock convoy.
         val living = world.state.entities().filter { !it.removed }
+        // parity: `TargetingConditions.forCombat`, which skips anybody a mob cannot fight.
+        val targets =
+            watchers
+                .filter { !it.dead && it.gamemode != Gamemode.CREATIVE && it.gamemode != Gamemode.SPECTATOR }
+                .map {
+                    MobCombat.Target(
+                        it.entityId,
+                        it.x,
+                        it.y,
+                        it.z,
+                        EntityTypeShapes.widthOf(PLAYER_TYPE),
+                        EntityTypeShapes.heightOf(PLAYER_TYPE),
+                    )
+                }
         val random = LegacyRandom(Random.nextLong())
         for (entity in living) {
             if (entity.removed) continue
@@ -1631,7 +1658,7 @@ public class BasaltServer(
             }
             val projectile = Projectiles.kindOf(entity.type)
             if (projectile != null) {
-                tickProjectile(world, watchers, entity, projectile)
+                tickProjectile(world, watchers, living, entity, projectile)
                 continue
             }
             // parity: `AbstractMinecart.tick`: on a rail it follows the track, and off one it falls.
@@ -1653,12 +1680,11 @@ public class BasaltServer(
             // parity: `Mob.aiStep`, which is what makes an animal wander rather than stand there.
             if (Mobs.isMob(entity.type)) {
                 entity.idleTicks++
-                MobBrain.tick(
-                    world.state,
-                    entity,
-                    random,
-                    speed = entity.attributeWithModifiers(Attribute.MOVEMENT_SPEED),
-                )
+                EntityCombat.tick(entity)
+                val speed = entity.attributeWithModifiers(Attribute.MOVEMENT_SPEED)
+                if (!chase(world, watchers, targets, entity, random, speed)) {
+                    MobBrain.tick(world.state, entity, random, speed = speed)
+                }
                 // parity: `Animal.aiStep` and `BreedGoal`, which is where a calf comes from.
                 val partner = Breeding.tick(entity, living)
                 if (partner != null) breed(world, entity, partner)
@@ -1668,6 +1694,62 @@ public class BasaltServer(
                 if (MobDespawn.shouldDespawn(entity, category, nearest, random)) entity.removed = true
             }
         }
+    }
+
+    /**
+     * One tick of a mob hunting somebody. Answers false when it is not hunting, which leaves it to
+     * wander instead.
+     *
+     * parity: `NearestAttackableTargetGoal` picking the target and `MeleeAttackGoal` walking it
+     * down; what the swing itself costs is `Mob.doHurtTarget`, the attack damage attribute.
+     */
+    private fun chase(
+        world: LoadedWorld,
+        watchers: List<PlayerSession>,
+        targets: List<MobCombat.Target>,
+        mob: org.basaltmc.server.runtime.entity.ServerEntity,
+        random: LegacyRandom,
+        speed: Double,
+    ): Boolean {
+        if (!MobCombat.isMelee(mob.type)) return false
+        var target = targets.firstOrNull { it.entityId == mob.targetId }
+        if (target == null) {
+            val light =
+                if (MobCombat.needsDarkness(mob.type)) lightAt(world, MobCombat.blockPosition(mob)) else 0
+            target = MobCombat.acquire(mob, targets, random, light) ?: return false
+            mob.targetId = target.entityId
+        }
+        if (!MobCombat.tick(world.state, mob, target, random, speed)) return true
+
+        val player = watchers.firstOrNull { it.entityId == target.entityId } ?: return true
+        // parity: `Mob.swing`, which is the arm the client draws; the hit itself follows it.
+        for (watcher in watchers) {
+            watcher.connection.sendPlayPacket(AnimatePacket.ID) {
+                AnimatePacket(mob.entityId, AnimatePacket.SWING_MAIN_HAND).write(it)
+            }
+        }
+        // parity: `Player.hurtServer`, where what a mob deals is halved and rounded up on easy and
+        // half again on hard: only a player takes this, and only from something that is not one.
+        player.connection.hurt(
+            Combat.afterDifficulty(EntityCombat.attackDamageOf(mob), world.difficulty),
+            DEATH_MOB,
+            DamageTypes.MOB_ATTACK,
+            DamageSource(mob.entityId, mob.x, mob.z),
+        )
+        return true
+    }
+
+    /** The light a mob is standing in, which is all the spiders need to know. */
+    private fun lightAt(
+        world: LoadedWorld,
+        position: IntArray,
+    ): Int {
+        val block = WorldLight.blockLight(world, position[0], position[1], position[2])
+        val sky = WorldLight.skyLight(world, position[0], position[1], position[2])
+        // parity: `Entity.getLightLevelDependentMagicValue`, whose sky half is darkened by the time
+        // of day. Night is taken as darkness rather than tracking the sky brightness itself.
+        val daylight = if (Beds.isNight(world.clock.totalTicks)) 0 else sky
+        return maxOf(block, daylight)
     }
 
     /** parity: `Entity.die` over `LootTable`, the drops a mob leaves where it fell. */
@@ -1723,14 +1805,173 @@ public class BasaltServer(
     private fun tickProjectile(
         world: LoadedWorld,
         watchers: List<PlayerSession>,
+        living: List<org.basaltmc.server.runtime.entity.ServerEntity>,
         entity: org.basaltmc.server.runtime.entity.ServerEntity,
         kind: Projectiles.Kind,
     ) {
-        val hit = Projectiles.tick(world.state, entity, kind) ?: return
+        val fromX = entity.x
+        val fromY = entity.y
+        val fromZ = entity.z
+        val hit = Projectiles.tick(world.state, entity, kind)
+        if (kind.sticks && hitEntityAlong(watchers, living, entity, fromX, fromY, fromZ)) return
+        if (hit == null) return
         ProjectileHits.onHit(world, hit, byArrow = kind.sticks)?.let { change ->
             announceRedstone(world, watchers, change)
         }
         if (!kind.sticks) entity.removed = true
+    }
+
+    /**
+     * Whatever the arrow passed through on its way, hurt.
+     *
+     * parity: `ProjectileUtil.getEntityHitResult` for the picking and `AbstractArrow.onHitEntity`
+     * for the damage: it is the speed times the arrow's own two points, rounded up, and a fully
+     * drawn bow adds a roll on top of it.
+     */
+    private fun hitEntityAlong(
+        watchers: List<PlayerSession>,
+        living: List<org.basaltmc.server.runtime.entity.ServerEntity>,
+        arrow: org.basaltmc.server.runtime.entity.ServerEntity,
+        fromX: Double,
+        fromY: Double,
+        fromZ: Double,
+    ): Boolean {
+        var nearest = Double.MAX_VALUE
+        var mob: org.basaltmc.server.runtime.entity.ServerEntity? = null
+        var player: PlayerSession? = null
+        for (candidate in living) {
+            if (candidate.entityId == arrow.entityId || candidate.entityId == arrow.ownerId) continue
+            if (!EntityAttributes.isLiving(candidate.type)) continue
+            val at =
+                clip(
+                    arrow,
+                    fromX,
+                    fromY,
+                    fromZ,
+                    candidate.x,
+                    candidate.y,
+                    candidate.z,
+                    candidate.width,
+                    candidate.height,
+                )
+            if (at == null || at >= nearest) continue
+            nearest = at
+            mob = candidate
+            player = null
+        }
+        for (candidate in watchers) {
+            if (candidate.entityId == arrow.ownerId || candidate.dead) continue
+            if (candidate.gamemode == Gamemode.CREATIVE || candidate.gamemode == Gamemode.SPECTATOR) continue
+            val width = EntityTypeShapes.widthOf(PLAYER_TYPE)
+            val height = EntityTypeShapes.heightOf(PLAYER_TYPE)
+            val at = clip(arrow, fromX, fromY, fromZ, candidate.x, candidate.y, candidate.z, width, height)
+            if (at == null || at >= nearest) continue
+            nearest = at
+            mob = null
+            player = candidate
+        }
+        if (mob == null && player == null) return false
+
+        val speed =
+            sqrt(
+                arrow.velocityX * arrow.velocityX + arrow.velocityY * arrow.velocityY +
+                    arrow.velocityZ * arrow.velocityZ,
+            )
+        var damage = ceil(speed * ARROW_BASE_DAMAGE).toInt()
+        if (arrow.critical) damage += Random.nextInt(damage / 2 + 2)
+
+        val target = mob
+        if (target != null) {
+            val result = EntityCombat.hurt(target, damage.toFloat(), fromX, fromZ)
+            if (!result.landed) {
+                // parity: an arrow that found somebody still inside their hurt cooldown bounces off.
+                arrow.velocityX *= ARROW_BOUNCE
+                arrow.velocityY *= ARROW_BOUNCE
+                arrow.velocityZ *= ARROW_BOUNCE
+                return true
+            }
+            arrow.removed = true
+            arrow.ownerId?.let { target.targetId = it }
+            announceEntityHit(watchers, target, DamageTypes.ARROW, arrow.entityId, result.died)
+            return true
+        }
+        arrow.removed = true
+        player?.connection?.hurt(
+            damage.toFloat(),
+            DEATH_ARROW,
+            DamageTypes.ARROW,
+            DamageSource(arrow.entityId, fromX, fromZ),
+        )
+        return true
+    }
+
+    /** Where along its flight the arrow met this box, or null when it did not. */
+    private fun clip(
+        arrow: org.basaltmc.server.runtime.entity.ServerEntity,
+        fromX: Double,
+        fromY: Double,
+        fromZ: Double,
+        x: Double,
+        y: Double,
+        z: Double,
+        width: Double,
+        height: Double,
+    ): Double? =
+        Projectiles.clipBox(
+            fromX,
+            fromY,
+            fromZ,
+            arrow.x,
+            arrow.y,
+            arrow.z,
+            x - width / 2.0,
+            y,
+            z - width / 2.0,
+            x + width / 2.0,
+            y + height,
+            z + width / 2.0,
+        )
+
+    /** The flash, the push and the sound of an entity being hit by something that is not a player. */
+    private fun announceEntityHit(
+        watchers: List<PlayerSession>,
+        entity: org.basaltmc.server.runtime.entity.ServerEntity,
+        damageType: Identifier,
+        causeEntityId: Int,
+        died: Boolean,
+    ) {
+        val registryId = VanillaRegistryData.damageTypes.indexOfFirst { it.first == damageType.path }
+        val sound = if (died) EntityCombat.deathSound(entity.type) else EntityCombat.hurtSound(entity.type)
+        for (watcher in watchers) {
+            if (registryId >= 0) {
+                watcher.connection.sendPlayPacket(DamageEventPacket.ID) {
+                    DamageEventPacket(entity.entityId, registryId, causeEntityId, causeEntityId).write(it)
+                }
+            }
+            watcher.connection.sendPlayPacket(SetEntityMotionPacket.ID) {
+                SetEntityMotionPacket(entity.entityId, entity.velocityX, entity.velocityY, entity.velocityZ).write(it)
+            }
+            watcher.connection.sendPlayPacket(SoundPacket.ID) {
+                SoundPacket(
+                    sound,
+                    SoundSource.HOSTILE,
+                    entity.x,
+                    entity.y,
+                    entity.z,
+                    1f,
+                    1f,
+                    Random.nextLong(),
+                ).write(it)
+            }
+            if (died) {
+                watcher.connection.sendPlayPacket(EntityEventPacket.ID) {
+                    EntityEventPacket(entity.entityId, EntityEventPacket.LIVING_DEATH.toByte()).write(it)
+                }
+            }
+        }
+        if (!died) return
+        entity.killed = true
+        entity.removed = true
     }
 
     /** parity: `Explosion.isSmall`, which is what picks the small flash over the big one. */
@@ -2281,6 +2522,19 @@ public class BasaltServer(
         // (confirmed directly by reading the saved region files back). 3 keeps startup bounded
         // while staying in the range a real client behaves normally at.
         const val SPAWN_RADIUS_CHUNKS = 3
+
+        /** parity: `EntityTypes.PLAYER`, whose box is what a mob's reach is measured against. */
+        val PLAYER_TYPE: Identifier = Identifier.vanilla("player")
+
+        /** parity: `death.attack.mob`, the message a mob with no name kills you with. */
+        const val DEATH_MOB = "mob"
+
+        /** parity: `death.attack.arrow`, and `AbstractArrow`'s own two points of damage. */
+        const val DEATH_ARROW = "arrow"
+        const val ARROW_BASE_DAMAGE = 2.0
+
+        /** parity: `AbstractArrow.onHitEntity`'s own `scale(0.2)` when the hit did not land. */
+        const val ARROW_BOUNCE = 0.2
 
         // Beside worlds/, never inside one.
         const val PLAYERS_DATABASE = "players.db"

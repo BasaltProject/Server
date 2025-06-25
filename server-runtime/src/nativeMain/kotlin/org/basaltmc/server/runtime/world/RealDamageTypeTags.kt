@@ -71,4 +71,13 @@ public object DamageTypes {
 
     /** parity: `DamageTypes.EXPLOSION`, what TNT with nobody to blame kills you with. */
     public val EXPLOSION: Identifier = Identifier.vanilla("explosion")
+
+    /** parity: `DamageTypes.PLAYER_ATTACK`, a player's own hand or weapon. */
+    public val PLAYER_ATTACK: Identifier = Identifier.vanilla("player_attack")
+
+    /** parity: `DamageTypes.MOB_ATTACK`, what a mob that walked up to you deals. */
+    public val MOB_ATTACK: Identifier = Identifier.vanilla("mob_attack")
+
+    /** parity: `DamageTypes.ARROW`, which blames whoever shot it. */
+    public val ARROW: Identifier = Identifier.vanilla("arrow")
 }

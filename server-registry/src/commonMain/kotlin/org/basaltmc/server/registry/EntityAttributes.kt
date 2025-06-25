@@ -37,6 +37,7 @@ public object EntityAttributes {
     public const val FOLLOW_RANGE: String = "follow_range"
     public const val ATTACK_DAMAGE: String = "attack_damage"
     public const val ARMOR: String = "armor"
+    public const val ARMOR_TOUGHNESS: String = "armor_toughness"
     public const val KNOCKBACK_RESISTANCE: String = "knockback_resistance"
     public const val SAFE_FALL_DISTANCE: String = "safe_fall_distance"
 }
