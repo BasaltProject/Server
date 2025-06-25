@@ -16,6 +16,7 @@ import org.basaltmc.server.runtime.command.CommandDispatcher
 import org.basaltmc.server.runtime.command.PlayerCommandSource
 import org.basaltmc.server.runtime.command.commands.BossBarRegistry
 import org.basaltmc.server.runtime.command.timePacket
+import org.basaltmc.server.runtime.entity.Breeding
 import org.basaltmc.server.runtime.item.ItemComponentCodecs
 import org.basaltmc.server.runtime.item.ItemDamageEffects
 import org.basaltmc.server.runtime.item.ItemWear
@@ -175,6 +176,7 @@ import org.basaltmc.wire.protocol.play.Gamemode
 import org.basaltmc.wire.protocol.play.GlobalPos
 import org.basaltmc.wire.protocol.play.Heightmap
 import org.basaltmc.wire.protocol.play.HeightmapType
+import org.basaltmc.wire.protocol.play.InteractPacket
 import org.basaltmc.wire.protocol.play.LevelEventPacket
 import org.basaltmc.wire.protocol.play.LoginPlayPacket
 import org.basaltmc.wire.protocol.play.MapChunkPacket
@@ -434,6 +436,9 @@ public class ClientSession(
 
     /** Summoned entities this client has been told about, so each is spawned once. */
     private val trackedEntities = HashSet<Int>()
+
+    /** Where each of them was last reported, so a mob standing still costs nothing. */
+    private val lastEntityPositions = HashMap<Int, DoubleArray>()
 
     /** Which other players this client currently has as entities, kept by [syncPlayers]. */
     private val trackedPlayers = HashSet<Int>()
@@ -1418,6 +1423,7 @@ public class ClientSession(
                 ContainerClosePacket.read(body)
                 playerSession?.let(::closeOpenMenu)
             }
+            InteractPacket.ID -> handleInteract(InteractPacket.read(body))
             SignUpdatePacket.ID -> writeSign(SignUpdatePacket.read(body))
             SWING_PACKET_ID -> handleSwing(body.readVarInt())
             ServerboundUseItemOnPacket.ID -> handleUseItemOn(ServerboundUseItemOnPacket.read(body))
@@ -1992,9 +1998,21 @@ public class ClientSession(
                 }
                 continue
             }
-            // parity: `ServerEntity.sendChanges` sends a position *sync* for anything that has to be
-            // exact, and it carries the velocity. That is what lets the client interpolate: a
-            // teleport every tick snaps, which is what made a falling block judder down.
+            // parity: `ServerEntity.sendChanges`, which sends nothing at all for an entity that has
+            // not moved. A pen of animals standing still is free to watch; without this every one of
+            // them costs a packet per player per tick.
+            val last = lastEntityPositions[entity.entityId]
+            val moved =
+                last == null ||
+                    abs(last[0] - entity.x) > POSITION_EPSILON ||
+                    abs(last[1] - entity.y) > POSITION_EPSILON ||
+                    abs(last[2] - entity.z) > POSITION_EPSILON ||
+                    abs(last[3] - entity.yaw.toDouble()) > ROTATION_EPSILON
+            if (!moved) continue
+            lastEntityPositions[entity.entityId] =
+                doubleArrayOf(entity.x, entity.y, entity.z, entity.yaw.toDouble())
+            // parity: the position *sync*, which carries the velocity so the client can interpolate:
+            // a teleport every tick snaps, which is what made a falling block judder down.
             sendPlayPacket(EntityPositionSyncPacket.ID) {
                 EntityPositionSyncPacket(
                     entityId = entity.entityId,
@@ -2011,6 +2029,7 @@ public class ClientSession(
             }
         }
         val gone = world.collectRemovedEntities().filter { trackedEntities.remove(it) }
+        for (entityId in gone) lastEntityPositions.remove(entityId)
         if (gone.isNotEmpty()) {
             sendPlayPacket(RemoveEntitiesPacket.ID) { RemoveEntitiesPacket(gone).write(it) }
         }
@@ -2674,6 +2693,31 @@ public class ClientSession(
                     seed = Random.nextLong(),
                 ).write(it)
             }
+        }
+    }
+
+    /**
+     * Right-clicking an entity.
+     *
+     * parity: `Animal.mobInteract`, the half of it this build has: the right food puts an animal in
+     * love, and a hand that is not holding it does nothing. What a villager or a boat does with the
+     * same click is their own business and waits for them.
+     */
+    private fun handleInteract(interact: InteractPacket) {
+        val session = playerSession ?: return
+        if (session.gamemode == Gamemode.SPECTATOR) return
+        val world = currentWorld ?: return
+        val entity = world.state.entity(interact.entityId) ?: return
+        if (entity.removed) return
+        val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
+        val held = session.inventory[heldSlot] ?: return
+        val item = Identifier.parse(held.id)
+        if (!Breeding.isFood(entity.type, item)) return
+        if (!Breeding.canFallInLove(entity)) return
+        Breeding.feed(entity)
+        if (session.gamemode != Gamemode.CREATIVE) {
+            session.inventory[heldSlot] = if (held.count <= 1) null else held.copy(count = held.count - 1)
+            sendInventorySlot(heldSlot)
         }
     }
 
@@ -4970,6 +5014,10 @@ public class ClientSession(
 
         /** `minecraft:swing`, which this build reads directly: its body is one varint, the hand. */
         const val SWING_PACKET_ID = 0x3f
+
+        /** How far an entity has to move before it is worth a packet, and how far it has to turn. */
+        const val POSITION_EPSILON = 0.001
+        const val ROTATION_EPSILON = 0.5
         const val OFFHAND = 1
 
         /** parity: `AbsorptionMobEffect`, two hearts per level. */

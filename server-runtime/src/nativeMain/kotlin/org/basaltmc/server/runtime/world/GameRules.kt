@@ -60,6 +60,9 @@ public object GameRuleRegistry {
     /** parity: `show_advancement_messages`, the rule vanilla renamed from `announceAdvancements`. */
     public val SHOW_ADVANCEMENT_MESSAGES: GameRule.Bool = GameRule.Bool("show_advancement_messages", true)
 
+    /** parity: `spawn_mobs`, which vanilla renamed from `doMobSpawning`. */
+    public val SPAWN_MOBS: GameRule.Bool = GameRule.Bool("spawn_mobs", true)
+
     /** parity: what makes two water sources next to each other fill the block between them. */
     public val WATER_SOURCE_CONVERSION: GameRule.Bool = GameRule.Bool("water_source_conversion", true)
 
@@ -124,7 +127,7 @@ public object GameRuleRegistry {
             SHOW_ADVANCEMENT_MESSAGES,
             SHOW_DEATH_MESSAGES,
             GameRule.Bool("spawner_blocks_work", true),
-            GameRule.Bool("spawn_mobs", true),
+            SPAWN_MOBS,
             SPAWN_MONSTERS,
             GameRule.Bool("spawn_patrols", true),
             GameRule.Bool("spawn_phantoms", true),

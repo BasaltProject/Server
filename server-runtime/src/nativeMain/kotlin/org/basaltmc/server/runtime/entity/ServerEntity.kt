@@ -1,5 +1,6 @@
 package org.basaltmc.server.runtime.entity
 
+import org.basaltmc.server.registry.EntityAttributes
 import org.basaltmc.server.registry.EntityTypeShapes
 import org.basaltmc.wire.common.Identifier
 import kotlin.uuid.ExperimentalUuidApi
@@ -37,11 +38,46 @@ public class ServerEntity(
     /** Whether the last move ended against something below. parity: `Entity.onGround`. */
     public var onGround: Boolean = false
 
-    /** Ticks lived. parity: `Entity.tickCount`, which is what most timers count from. */
+    /** Whether the last move was stopped sideways. parity: `Entity.horizontalCollision`. */
+    public var horizontallyBlocked: Boolean = false
+
+    /**
+     * Its age. parity: `AgeableMob.age`: negative is a baby counting up to nothing, positive is a
+     * grown animal counting down the wait before it can breed again, and zero is ready.
+     *
+     * For anything that is not an animal this is simply the ticks it has lived.
+     */
     public var age: Int = 0
+
+    /** parity: `Animal.inLove`, the thirty seconds a fed animal spends looking for a partner. */
+    public var loveTicks: Int = 0
+
+    /** parity: `BreedGoal.loveTime`, the three seconds two of them have to stay together. */
+    public var courtshipTicks: Int = 0
+
+    /** parity: `PARENT_AGE_AFTER_BREEDING`, the five minutes before either can breed again. */
+    public var breedCooldown: Int = 0
 
     /** Ticks before it goes off, or [NO_FUSE] for anything that is not primed. parity: `PrimedTnt.fuse`. */
     public var fuse: Int = NO_FUSE
+
+    /** Where it is walking, as x/y/z, or null when it is standing still. parity: `MoveControl`'s wanted position. */
+    public var walkTarget: DoubleArray? = null
+
+    /** The way there, block by block. parity: `PathNavigation.path`, walked one node at a time. */
+    public var path: List<IntArray>? = null
+
+    /** Which node of it comes next. parity: `Path.nextNodeIndex`. */
+    public var pathIndex: Int = 0
+
+    /**
+     * Ticks with nobody near it. parity: `Mob.noActionTime`, which is what the random despawn waits
+     * on, and what standing beside a mob resets.
+     */
+    public var idleTicks: Int = 0
+
+    /** Whether it is here to stay. parity: `Mob.isPersistenceRequired`, set by naming or by a command. */
+    public var persistent: Boolean = false
 
     /** Attribute base values that were changed from their default. parity: `AttributeMap`, without modifiers. */
     public val attributeValues: MutableMap<String, Double> = mutableMapOf()
@@ -51,7 +87,7 @@ public class ServerEntity(
      * property declared below it reads an uninitialized field, which on Kotlin/Native is a crash
      * rather than a null.
      */
-    public var health: Double = DEFAULT_MAX_HEALTH
+    public var health: Double = EntityAttributes.baseValue(type, EntityAttributes.MAX_HEALTH) ?: DEFAULT_MAX_HEALTH
 
     /** Scoreboard tags, as `/tag` sets them on an entity. */
     public val tags: MutableSet<String> = mutableSetOf()
@@ -68,8 +104,18 @@ public class ServerEntity(
     /** Modifiers by attribute then by id. parity: `AttributeInstance`'s three operations. */
     public val attributeModifiers: MutableMap<String, MutableMap<String, AttributeModifier>> = mutableMapOf()
 
-    /** The base value of one attribute, or its vanilla default when nothing set it. */
-    public fun attribute(id: String): Double = attributeValues[id] ?: Attribute.defaultFor(id) ?: 0.0
+    /**
+     * The base value of one attribute: what a command set, else what this kind of entity is born
+     * with, else the attribute's own default.
+     *
+     * parity: `AttributeMap`, which is built from `DefaultAttributes.getSupplier(type)`: a cow walks
+     * at 0.2 and a zombie at 0.23 because their own suppliers say so, not because of any global.
+     */
+    public fun attribute(id: String): Double =
+        attributeValues[id]
+            ?: EntityAttributes.baseValue(type, id)
+            ?: Attribute.defaultFor(id)
+            ?: 0.0
 
     /**
      * The value with modifiers applied. parity: `AttributeInstance.calculateValue`: every addition

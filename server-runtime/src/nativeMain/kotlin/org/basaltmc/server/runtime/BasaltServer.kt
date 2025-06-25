@@ -79,6 +79,12 @@ import org.basaltmc.server.runtime.config.LiveConfigs
 import org.basaltmc.server.runtime.config.WorldDimension
 import org.basaltmc.server.runtime.config.WorldType
 import org.basaltmc.server.runtime.config.WorldsConfig
+import org.basaltmc.server.runtime.entity.Attribute
+import org.basaltmc.server.runtime.entity.Breeding
+import org.basaltmc.server.runtime.entity.MobBrain
+import org.basaltmc.server.runtime.entity.MobCategory
+import org.basaltmc.server.runtime.entity.MobDespawn
+import org.basaltmc.server.runtime.entity.Mobs
 import org.basaltmc.server.runtime.entity.PrimedTnt
 import org.basaltmc.server.runtime.entity.Projectiles
 import org.basaltmc.server.runtime.function.FunctionLibrary
@@ -113,6 +119,7 @@ import org.basaltmc.server.runtime.world.Fluids
 import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.MobEffects
+import org.basaltmc.server.runtime.world.NaturalSpawner
 import org.basaltmc.server.runtime.world.NeighbourUpdates
 import org.basaltmc.server.runtime.world.NetherPortals
 import org.basaltmc.server.runtime.world.Pistons
@@ -121,6 +128,7 @@ import org.basaltmc.server.runtime.world.PressurePlates
 import org.basaltmc.server.runtime.world.ProjectileHits
 import org.basaltmc.server.runtime.world.RandomTicks
 import org.basaltmc.server.runtime.world.RealAdvancements
+import org.basaltmc.server.runtime.world.RealBiomeSpawns
 import org.basaltmc.server.runtime.world.RealBlockTags
 import org.basaltmc.server.runtime.world.RealDamageTypeTags
 import org.basaltmc.server.runtime.world.RealDialogs
@@ -223,6 +231,9 @@ public class BasaltServer(
     private val playerRegistry = PlayerRegistry()
     private val cpuMeter = CpuMeter()
     private val lootTables = RealLootTables(serverJar)
+
+    /** What each biome offers the spawner, out of the operator's own jar. */
+    private val biomeSpawns = RealBiomeSpawns(serverJar)
     private val recipes = RealRecipes(serverJar)
     private val blockTags = RealBlockTags(serverJar)
     private val itemTags = RealItemTags(serverJar)
@@ -837,6 +848,8 @@ public class BasaltServer(
                 .onFailure { logger.error(it) { "Falling block tick failed in world '${world.name}'" } }
             runCatching { tickEntities(world) }
                 .onFailure { logger.error(it) { "Entity tick failed in world '${world.name}'" } }
+            runCatching { tickSpawning(world) }
+                .onFailure { logger.error(it) { "Mob spawning failed in world '${world.name}'" } }
             runCatching { tickEffects(world) }
                 .onFailure { logger.error(it) { "Effect tick failed in world '${world.name}'" } }
             runCatching { tickSleep(world) }
@@ -1374,6 +1387,64 @@ public class BasaltServer(
     private val pistonReach = 14.0
 
     /**
+     * Fills the world around the players with the mobs their biomes offer.
+     *
+     * parity: `NaturalSpawner.spawnForChunk`, once per simulated chunk per tick, under a cap per
+     * category that scales with how much of the world is being simulated. `doMobSpawning` turns the
+     * whole thing off, as it does in vanilla.
+     */
+    private fun tickSpawning(world: LoadedWorld) {
+        if (!world.gameRules[GameRuleRegistry.SPAWN_MOBS]) return
+        val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
+        if (watchers.isEmpty()) return
+        val chunks = simulatedChunks(world)
+        if (chunks.isEmpty()) return
+
+        val alive = world.state.entities().filter { !it.removed }
+        val random = LegacyRandom(Random.nextLong())
+        // parity: `NaturalSpawner`'s own order, monsters first: the caps are counted per category.
+        for (category in listOf(MobCategory.MONSTER, MobCategory.CREATURE, MobCategory.AMBIENT)) {
+            val cap = NaturalSpawner.capFor(category, chunks.size)
+            val living = alive.count { Mobs.categoryOf(it.type) == category.categoryName }
+            if (living >= cap) continue
+            // parity: one position per chunk per tick, rather than a sweep of the whole world.
+            val chunk = chunks[random.nextInt(chunks.size)]
+            val requests =
+                NaturalSpawner.spawnForChunk(
+                    world,
+                    chunk[0],
+                    chunk[1],
+                    category,
+                    entriesFor = { biome -> biomeSpawns.listFor(biome, category.categoryName) },
+                    playerDistanceSquared = { x, y, z ->
+                        watchers.minOfOrNull { player ->
+                            val dx = player.x - x
+                            val dy = player.y - y
+                            val dz = player.z - z
+                            dx * dx + dy * dy + dz * dz
+                        }
+                    },
+                    random = random,
+                )
+            for (request in requests) {
+                val protocolType = EntityTypes[request.type]?.protocolId ?: continue
+                world.state.spawnEntity(
+                    org.basaltmc.server.runtime.entity.ServerEntity(
+                        entityId = playerRegistry.allocateEntityId(),
+                        uuid = Uuid.random(),
+                        type = request.type,
+                        protocolType = protocolType,
+                        x = request.x,
+                        y = request.y,
+                        z = request.z,
+                        yaw = request.yaw,
+                    ),
+                )
+            }
+        }
+    }
+
+    /**
      * Ticks the entities that are not players, items or falling blocks: today that is primed TNT.
      *
      * parity: `ServerLevel.tickNonPassenger`, one turn per entity per tick, in the order they were
@@ -1396,7 +1467,11 @@ public class BasaltServer(
                 )
             }
         }
-        for (entity in world.state.entities()) {
+        // One snapshot for the whole tick: `entities()` takes the world's lock and copies the list,
+        // and asking for it per entity turned a pen of cows into a lock convoy.
+        val living = world.state.entities().filter { !it.removed }
+        val random = LegacyRandom(Random.nextLong())
+        for (entity in living) {
             if (entity.removed) continue
             if (entity.type == PrimedTnt.TYPE) {
                 if (!PrimedTnt.tick(world.state, entity)) continue
@@ -1412,8 +1487,50 @@ public class BasaltServer(
                 continue
             }
             val projectile = Projectiles.kindOf(entity.type)
-            if (projectile != null) tickProjectile(world, watchers, entity, projectile)
+            if (projectile != null) {
+                tickProjectile(world, watchers, entity, projectile)
+                continue
+            }
+            // parity: `Mob.aiStep`, which is what makes an animal wander rather than stand there.
+            if (Mobs.isMob(entity.type)) {
+                entity.idleTicks++
+                MobBrain.tick(
+                    world.state,
+                    entity,
+                    random,
+                    speed = entity.attributeWithModifiers(Attribute.MOVEMENT_SPEED),
+                )
+                // parity: `Animal.aiStep` and `BreedGoal`, which is where a calf comes from.
+                val partner = Breeding.tick(entity, living)
+                if (partner != null) breed(world, entity, partner)
+                // parity: `Mob.checkDespawn`, which vanilla runs on the same tick as the AI.
+                val category = MobCategory.byName(Mobs.categoryOf(entity.type)) ?: MobCategory.MISC
+                val nearest = watchers.minOfOrNull { MobBrain.distanceTo(entity, it.x, it.y, it.z) }
+                if (MobDespawn.shouldDespawn(entity, category, nearest, random)) entity.removed = true
+            }
         }
+    }
+
+    /** parity: `Animal.spawnChildFromBreeding`: the calf appears where its parent stands. */
+    private fun breed(
+        world: LoadedWorld,
+        animal: org.basaltmc.server.runtime.entity.ServerEntity,
+        partner: org.basaltmc.server.runtime.entity.ServerEntity,
+    ) {
+        val protocolType = EntityTypes[animal.type]?.protocolId ?: return
+        val baby =
+            org.basaltmc.server.runtime.entity.ServerEntity(
+                entityId = playerRegistry.allocateEntityId(),
+                uuid = Uuid.random(),
+                type = animal.type,
+                protocolType = protocolType,
+                x = animal.x,
+                y = animal.y,
+                z = animal.z,
+            )
+        baby.age = Breeding.BABY_AGE
+        world.state.spawnEntity(baby)
+        Breeding.afterBreeding(animal, partner)
     }
 
     /**

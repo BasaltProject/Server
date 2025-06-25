@@ -1,0 +1,190 @@
+package org.basaltmc.server.runtime.entity
+
+import org.basaltmc.server.random.BasaltRandom
+import org.basaltmc.server.registry.BlockShapes
+import org.basaltmc.server.runtime.world.WorldState
+import kotlin.math.PI
+import kotlin.math.atan2
+import kotlin.math.floor
+import kotlin.math.sqrt
+
+/**
+ * What a mob does when nothing else is happening: wander, and look where it is going.
+ *
+ * parity: `RandomStrollGoal` over `DefaultRandomPos.getPos`: one roll in 120 a tick, ten candidate
+ * positions within ten blocks across and seven up, and the best one is walked to. Walking is
+ * `MoveControl`: turn towards the target, walk forward, jump at what is in the way.
+ */
+public object MobBrain {
+    /** parity: `RandomStrollGoal`'s own 120 ticks between attempts. */
+    public const val STROLL_INTERVAL: Int = 120
+
+    /** parity: `WaterAvoidingRandomStrollGoal`'s ten across and seven up. */
+    private const val STROLL_RANGE = 10
+    private const val STROLL_HEIGHT = 7
+
+    /** parity: `DefaultRandomPos.generateRandomPos`, which tries ten and keeps the best. */
+    private const val CANDIDATES = 10
+
+    /** How close counts as arrived. parity: `PathNavigation`'s own tolerance, one block. */
+    private const val ARRIVED = 1.0
+
+    /** parity: `MoveControl.tick`'s turn rate, thirty degrees a tick. */
+    private const val TURN_RATE = 30f
+
+    /**
+     * One tick of wandering. [speed] is `Attributes.MOVEMENT_SPEED`, and [modifier] the goal's own
+     * multiplier on it.
+     */
+    public fun tick(
+        world: WorldState,
+        mob: ServerEntity,
+        random: BasaltRandom,
+        speed: Double,
+        modifier: Double = 1.0,
+    ) {
+        mob.age++
+        if (mob.walkTarget == null) {
+            if (random.nextInt(STROLL_INTERVAL) == 0) startStroll(world, mob, random)
+            LivingMovement.travel(world, mob, forward = 0.0, strafe = 0.0, speed = speed)
+            return
+        }
+
+        // parity: `PathNavigation.tick`, which walks the path a node at a time rather than pushing
+        // straight at the target: that is what takes a mob round a wall instead of into it.
+        val node = nextNode(mob)
+        if (node == null) {
+            mob.walkTarget = null
+            mob.path = null
+            LivingMovement.travel(world, mob, forward = 0.0, strafe = 0.0, speed = speed)
+            return
+        }
+
+        val dx = node[0] - mob.x
+        val dz = node[2] - mob.z
+        turnTowards(mob, dx, dz)
+        LivingMovement.travel(world, mob, forward = 1.0, strafe = 0.0, speed = speed * modifier)
+        // parity: `MoveControl`'s own jump when the way is blocked but the step was not enough.
+        if (mob.horizontallyBlocked && mob.onGround) LivingMovement.jump(world, mob)
+    }
+
+    /** Picks somewhere to go and works out the way there; without a way, it stays put. */
+    private fun startStroll(
+        world: WorldState,
+        mob: ServerEntity,
+        random: BasaltRandom,
+    ) {
+        val target = strollTarget(world, mob, random) ?: return
+        val path =
+            PathFinder.find(
+                world,
+                floor(mob.x).toInt(),
+                floor(mob.y).toInt(),
+                floor(mob.z).toInt(),
+                floor(target[0]).toInt(),
+                floor(target[1]).toInt(),
+                floor(target[2]).toInt(),
+            ) ?: return
+        if (path.isEmpty()) return
+        mob.walkTarget = target
+        mob.path = path
+        mob.pathIndex = 0
+    }
+
+    /** The node it is walking to now, stepping on when it arrives. Null when the path is walked out. */
+    private fun nextNode(mob: ServerEntity): DoubleArray? {
+        val path = mob.path ?: return mob.walkTarget?.takeIf { farFrom(mob, it) }
+        while (mob.pathIndex < path.size) {
+            val node = path[mob.pathIndex]
+            val centre = doubleArrayOf(node[0] + 0.5, node[1].toDouble(), node[2] + 0.5)
+            if (farFrom(mob, centre)) return centre
+            mob.pathIndex++
+        }
+        return null
+    }
+
+    private fun farFrom(
+        mob: ServerEntity,
+        point: DoubleArray,
+    ): Boolean {
+        val dx = point[0] - mob.x
+        val dz = point[2] - mob.z
+        return dx * dx + dz * dz >= ARRIVED * ARRIVED
+    }
+
+    /**
+     * parity: `DefaultRandomPos.getPos`: ten tries at a spot within range, and the one standing on
+     * the most solid ground wins. A spot with nothing under it is never chosen.
+     */
+    public fun strollTarget(
+        world: WorldState,
+        mob: ServerEntity,
+        random: BasaltRandom,
+    ): DoubleArray? {
+        var best: DoubleArray? = null
+        var bestWeight = Double.NEGATIVE_INFINITY
+        repeat(CANDIDATES) {
+            val x = floor(mob.x).toInt() + random.nextInt(2 * STROLL_RANGE + 1) - STROLL_RANGE
+            val y = floor(mob.y).toInt() + random.nextInt(2 * STROLL_HEIGHT + 1) - STROLL_HEIGHT
+            val z = floor(mob.z).toInt() + random.nextInt(2 * STROLL_RANGE + 1) - STROLL_RANGE
+            val weight = walkTargetValue(world, x, y, z)
+            if (weight <= bestWeight) return@repeat
+            bestWeight = weight
+            best = doubleArrayOf(x + 0.5, y.toDouble(), z + 0.5)
+        }
+        return best
+    }
+
+    /**
+     * parity: `PathfinderMob.getWalkTargetValue`, which is zero for anything that will do; here it
+     * simply refuses what cannot be stood on, which is what makes a wander stay on the ground.
+     */
+    private fun walkTargetValue(
+        world: WorldState,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Double {
+        val ground = world.getBlockState(x, y - 1, z) ?: return Double.NEGATIVE_INFINITY
+        if (BlockShapes.isEmptyShape(ground)) return Double.NEGATIVE_INFINITY
+        val feet = world.getBlockState(x, y, z) ?: return Double.NEGATIVE_INFINITY
+        val head = world.getBlockState(x, y + 1, z) ?: return Double.NEGATIVE_INFINITY
+        if (!BlockShapes.isEmptyShape(feet) || !BlockShapes.isEmptyShape(head)) return Double.NEGATIVE_INFINITY
+        return 0.0
+    }
+
+    /** parity: `MoveControl.tick`, which turns at most thirty degrees a tick towards the target. */
+    private fun turnTowards(
+        mob: ServerEntity,
+        dx: Double,
+        dz: Double,
+    ) {
+        val wanted = (atan2(dz, dx) * 180.0 / PI).toFloat() - 90f
+        mob.yaw = approachAngle(mob.yaw, wanted, TURN_RATE)
+    }
+
+    /** parity: `Mth.approachDegrees`, the shortest way round, capped at [limit]. */
+    private fun approachAngle(
+        from: Float,
+        to: Float,
+        limit: Float,
+    ): Float {
+        var difference = (to - from) % 360f
+        if (difference < -180f) difference += 360f
+        if (difference > 180f) difference -= 360f
+        return from + difference.coerceIn(-limit, limit)
+    }
+
+    /** How far a mob is from a point, for the goals that care. */
+    public fun distanceTo(
+        mob: ServerEntity,
+        x: Double,
+        y: Double,
+        z: Double,
+    ): Double {
+        val dx = mob.x - x
+        val dy = mob.y - y
+        val dz = mob.z - z
+        return sqrt(dx * dx + dy * dy + dz * dz)
+    }
+}
