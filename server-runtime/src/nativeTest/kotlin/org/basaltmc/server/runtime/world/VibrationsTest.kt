@@ -140,4 +140,31 @@ class VibrationsTest {
         assertEquals(10, Redstone.directSignalOf(stateId, BlockFace.UP), "strongly downwards only")
         assertEquals(0, Redstone.directSignalOf(stateId, BlockFace.NORTH))
     }
+
+    /** The index a footstep asks before it looks for anything, so walking costs nothing. */
+    @Test
+    fun theWorldRemembersWhereItsSensorsAre() {
+        assertTrue(!world.state.hasSculkSensorNear(14.5, 70.0, 14.5, Vibrations.RANGE), "none yet")
+
+        sensorAt(14, 70, 14)
+
+        assertTrue(world.state.hasSculkSensorNear(14.5, 70.0, 14.5, Vibrations.RANGE))
+        assertTrue(
+            !world.state.hasSculkSensorNear(40.5, 70.0, 40.5, Vibrations.RANGE),
+            "and it is only near the ones it is near",
+        )
+
+        world.state.setBlockState(14, 70, 14, org.basaltmc.server.registry.Blocks.AIR.stateId)
+        assertTrue(!world.state.hasSculkSensorNear(14.5, 70.0, 14.5, Vibrations.RANGE), "broken, so forgotten")
+    }
+
+    /** parity: `GameEvent.STEP` is one, the quietest thing a sensor answers to. */
+    @Test
+    fun aFootstepIsTheQuietestVibration() {
+        sensorAt(15, 70, 15)
+
+        Vibrations.emit(world, "step", 14.5, 70.5, 15.5, mutableListOf())
+
+        assertEquals("1", propertiesAt(15, 70, 15)["power"])
+    }
 }

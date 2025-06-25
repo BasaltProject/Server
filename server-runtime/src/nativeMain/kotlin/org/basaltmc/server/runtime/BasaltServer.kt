@@ -82,6 +82,7 @@ import org.basaltmc.server.runtime.config.WorldsConfig
 import org.basaltmc.server.runtime.entity.Attribute
 import org.basaltmc.server.runtime.entity.Breeding
 import org.basaltmc.server.runtime.entity.EntityPhysics
+import org.basaltmc.server.runtime.entity.Minecarts
 import org.basaltmc.server.runtime.entity.MobBrain
 import org.basaltmc.server.runtime.entity.MobCategory
 import org.basaltmc.server.runtime.entity.MobDespawn
@@ -853,6 +854,8 @@ public class BasaltServer(
                 .onFailure { logger.error(it) { "Pressure plate tick failed in world '${world.name}'" } }
             runCatching { tickTripwires(world) }
                 .onFailure { logger.error(it) { "Tripwire tick failed in world '${world.name}'" } }
+            runCatching { tickFootsteps(world) }
+                .onFailure { logger.error(it) { "Footstep tick failed in world '${world.name}'" } }
             runCatching { tickScheduledBlocks(world) }
                 .onFailure { logger.error(it) { "Scheduled block tick failed in world '${world.name}'" } }
             runCatching { tickBlockEntities(world) }
@@ -1277,6 +1280,29 @@ public class BasaltServer(
     }
 
     /**
+     * The footsteps a sculk sensor hears.
+     *
+     * parity: `GameEvent.STEP`, which vanilla raises as an entity moves. A player only emits one
+     * when they have crossed into another block *and* a sensor is known to be near: the index is
+     * what makes that affordable to ask every tick (see [WorldState.hasSculkSensorNear]).
+     */
+    private fun tickFootsteps(world: LoadedWorld) {
+        val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
+        if (watchers.isEmpty()) return
+        val changes = mutableListOf<org.basaltmc.server.runtime.world.BlockChange>()
+        for (player in watchers) {
+            if (player.gamemode == Gamemode.SPECTATOR) continue
+            if (!player.onGround) continue
+            val block = pack(floor(player.x).toInt(), floor(player.y).toInt(), floor(player.z).toInt())
+            if (lastFootstep[player.entityId] == block) continue
+            lastFootstep[player.entityId] = block
+            if (!world.state.hasSculkSensorNear(player.x, player.y, player.z, Vibrations.RANGE)) continue
+            Vibrations.emit(world, "step", player.x, player.y, player.z, changes)
+        }
+        for (change in changes) announceRedstone(world, watchers, change)
+    }
+
+    /**
      * Presses the tripwires something is standing in.
      *
      * parity: `TripWireBlock.entityInside`, which is a collision in vanilla and a walk over the
@@ -1406,6 +1432,9 @@ public class BasaltServer(
         }
     }
 
+    /** Which block each player was last heard stepping in, so one step is one vibration. */
+    private val lastFootstep = HashMap<Int, Long>()
+
     /** parity: `AbstractMinecart.getDefaultGravity`, the same 0.04 as anything else that is not alive. */
     private val minecartGravity = 0.04
 
@@ -1531,9 +1560,11 @@ public class BasaltServer(
                 tickProjectile(world, watchers, entity, projectile)
                 continue
             }
-            // parity: `AbstractMinecart`, which falls like anything else until it is on a rail.
+            // parity: `AbstractMinecart.tick`: on a rail it follows the track, and off one it falls.
             if (DetectorRails.isMinecart(entity.type)) {
-                EntityPhysics.move(world.state, entity, gravity = minecartGravity)
+                if (!Minecarts.moveAlongTrack(world.state, entity)) {
+                    EntityPhysics.move(world.state, entity, gravity = minecartGravity)
+                }
                 val pressed =
                     DetectorRails.check(
                         world,
