@@ -194,6 +194,14 @@ public object BlockPlacement {
             properties["signal_fire"] = (below == "hay_block").toString()
             properties["lit"] = (properties["waterlogged"] != "true").toString()
         }
+        // parity: `ChestBlock.getStateForPlacement` into `getChestType`: a chest put down beside a
+        // single chest facing the same way becomes half of a double one there and then. Nothing
+        // else pairs them: `updateShape` only ever *completes* a pair somebody already started.
+        if (path in Containers.CHESTS && world != null) {
+            val facing = properties["facing"] ?: name(opposite(playerDirection(yaw)))
+            properties["facing"] = facing
+            properties["type"] = chestType(world, x, y, z, block, fromName(facing) ?: Direction.NORTH)
+        }
         // parity: `NoteBlock.getStateForPlacement`, which takes its instrument from what it lands on.
         if (path == "note_block" && world != null) {
             properties["instrument"] = NoteBlocks.instrumentAt(world, x, y, z).serializedName
@@ -455,6 +463,38 @@ public object BlockPlacement {
             abs(x) >= abs(z) -> if (x > 0) Direction.EAST else Direction.WEST
             else -> if (z > 0) Direction.SOUTH else Direction.NORTH
         }
+    }
+
+    /** parity: `ChestBlock.getChestType`, which looks left first and right second. */
+    private fun chestType(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        block: Identifier,
+        facing: Direction,
+    ): String =
+        when (facing) {
+            partnerFacing(world, x, y, z, block, clockwise(facing)) -> "left"
+            partnerFacing(world, x, y, z, block, counterClockwise(facing)) -> "right"
+            else -> "single"
+        }
+
+    /** parity: `candidatePartnerFacing`: only a *single* chest of the same kind is a candidate. */
+    private fun partnerFacing(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        block: Identifier,
+        towards: Direction,
+    ): Direction? {
+        val stateId =
+            world.state.getBlockState(x + stepX(towards), y, z + stepZ(towards)) ?: return null
+        if (BlockStateDefinitions.blockOf(stateId) != block) return null
+        val properties = BlockStateDefinitions.propertiesOf(stateId)
+        if (properties["type"] != "single") return null
+        return properties["facing"]?.let { fromName(it) }
     }
 
     private fun clockwise(face: Direction): Direction =

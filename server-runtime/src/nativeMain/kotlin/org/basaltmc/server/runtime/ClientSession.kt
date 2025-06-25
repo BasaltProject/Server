@@ -8,7 +8,9 @@ import org.basaltmc.server.registry.BlockSupport
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.registry.ConsumeEffect
 import org.basaltmc.server.registry.EntityTypes
+import org.basaltmc.server.registry.Fuels
 import org.basaltmc.server.registry.ItemArmour
+import org.basaltmc.server.registry.ItemBlocks
 import org.basaltmc.server.registry.ItemFood
 import org.basaltmc.server.registry.ItemTools
 import org.basaltmc.server.registry.Items
@@ -17,6 +19,7 @@ import org.basaltmc.server.runtime.command.PlayerCommandSource
 import org.basaltmc.server.runtime.command.commands.BossBarRegistry
 import org.basaltmc.server.runtime.command.timePacket
 import org.basaltmc.server.runtime.entity.Breeding
+import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.server.runtime.entity.Villagers
 import org.basaltmc.server.runtime.item.ItemComponentCodecs
 import org.basaltmc.server.runtime.item.ItemDamageEffects
@@ -54,6 +57,7 @@ import org.basaltmc.server.runtime.world.DamageProtection
 import org.basaltmc.server.runtime.world.DamageTypes
 import org.basaltmc.server.runtime.world.DecoratedPots
 import org.basaltmc.server.runtime.world.DoubleBlocks
+import org.basaltmc.server.runtime.world.DoubleChests
 import org.basaltmc.server.runtime.world.EnchantmentAttributes
 import org.basaltmc.server.runtime.world.EndPortals
 import org.basaltmc.server.runtime.world.Explosions
@@ -71,6 +75,7 @@ import org.basaltmc.server.runtime.world.NeighbourUpdates
 import org.basaltmc.server.runtime.world.NetherPortals
 import org.basaltmc.server.runtime.world.NoteBlocks
 import org.basaltmc.server.runtime.world.PlayerProgress
+import org.basaltmc.server.runtime.world.Rails
 import org.basaltmc.server.runtime.world.RealBlockTags
 import org.basaltmc.server.runtime.world.RealDamageTypeTags
 import org.basaltmc.server.runtime.world.RealDialogs
@@ -442,6 +447,14 @@ public class ClientSession(
      * the session and go back to `players.db`, not to the chest that was clicked.
      */
     private var openEnderChest: Boolean = false
+
+    /**
+     * The other half of an open double chest, whose slots follow the first half's.
+     *
+     * parity: `ChestBlock.DOUBLE_INVENTORY_COMBINER` over a `CompoundContainer`: two block entities,
+     * one window, and which of them leads is decided by the state rather than by which was clicked.
+     */
+    private var openBlockSecond: BlockPos? = null
 
     /** What the open cooker last showed, so a bar is only re-sent when it moves. */
     private var openBlockData = IntArray(4) { -1 }
@@ -1852,7 +1865,7 @@ public class ClientSession(
     private val bellHitTop = 0.8124f
 
     /** The other half of a block change: what it asks everyone nearby to hear or see. */
-    private fun broadcastEffects(
+    internal fun broadcastEffects(
         pos: BlockPos,
         stateId: Int,
         effects: List<BlockEffect>,
@@ -2047,16 +2060,23 @@ public class ClientSession(
      */
     private fun notifyNeighbours(pos: BlockPos) {
         val world = currentWorld ?: return
+        val effects = mutableListOf<org.basaltmc.server.runtime.world.BlockChange>()
         NeighbourUpdates.afterChange(
             world,
             pos.x,
             pos.y,
             pos.z,
             onReshaped = { stateId, x, y, z -> broadcastBlockUpdate(BlockPos(x, y, z), stateId) },
+            effects = effects,
+            // parity: `updateNeighbourShapes` reshapes the neighbours and never the block itself.
+            reshapeSelf = false,
         ) { stateId, x, y, z ->
             val at = BlockPos(x, y, z)
             broadcastBlockUpdate(at, Blocks.AIR.stateId)
             Blocks.byStateId(stateId)?.let { dropLootFor(it.block, at) }
+        }
+        for (change in effects) {
+            broadcastEffects(BlockPos(change.x, change.y, change.z), change.stateId, change.effects)
         }
     }
 
@@ -2587,6 +2607,10 @@ public class ClientSession(
         if (held != null && heldBlock != null && startEating(session, heldBlock, heldSlot)) return ack()
         // A bucket aimed at a block: the client only sends `use_item` when nothing is in the way,
         // so without this, water poured anywhere near a wall went nowhere. parity: `BucketItem.use`.
+        // parity: `SpawnEggItem.useOn`, which drops the mob on top of what was clicked.
+        if (held != null && heldBlock != null && heldBlock.path.endsWith("_spawn_egg")) {
+            if (useSpawnEgg(session, heldBlock, heldSlot, held, hit)) return ack()
+        }
         if (held != null && heldBlock != null && Buckets.isBucket(heldBlock)) {
             useBucketOn(session, heldBlock, heldSlot, held, hit)
             return ack()
@@ -2596,8 +2620,10 @@ public class ClientSession(
         val againstAWall =
             hit.direction != org.basaltmc.wire.protocol.play.Direction.UP &&
                 hit.direction != org.basaltmc.wire.protocol.play.Direction.DOWN
+        // parity: `BlockItem.getBlock`, which is not the item's own name for redstone dust, string
+        // or any seed.
         val placedBlock =
-            heldBlock?.let { if (againstAWall) WallVariants.of(it) ?: it else it }
+            heldBlock?.let { ItemBlocks.of(it) }?.let { if (againstAWall) WallVariants.of(it) ?: it else it }
         val defaultStateId = placedBlock?.let { Blocks.REGISTRY.idOf(it) }
         if (held == null || placedBlock == null || defaultStateId == null) return ack()
 
@@ -2678,6 +2704,16 @@ public class ClientSession(
         val changed = world.setBlockState(placeAt.x, placeAt.y, placeAt.z, blockStateId)
         ack()
         if (!changed) return
+        // parity: `getStateForPlacement` joins a fence, a wall or a staircase to what is already
+        // there, and the shape it settles on is what the announcement below carries.
+        loadedWorld?.let { placedIn ->
+            NeighbourUpdates.connect(placedIn, placeAt.x, placeAt.y, placeAt.z, blockStateId)
+            // parity: `BaseRailBlock.onPlace` into `RailState.place`, which bends the new rail and
+            // every rail it decided to meet.
+            Rails.place(placedIn, placeAt.x, placeAt.y, placeAt.z) { x, y, z, stateId ->
+                broadcastBlockUpdate(BlockPos(x, y, z), stateId)
+            }
+        }
         second?.let { world.setBlockState(it.x, it.y, it.z, it.stateId) }
         // parity: `AbstractFurnaceBlock.newBlockEntity`: a cooker is nothing without the entity that
         // holds its slots and its fire.
@@ -2847,6 +2883,7 @@ public class ClientSession(
         nextContainerId = if (nextContainerId >= MAX_CONTAINER_ID) FIRST_BLOCK_CONTAINER_ID else nextContainerId + 1
         openMenu = Menu.chest(nextContainerId)
         openBlock = null
+        openBlockSecond = null
         openEnderChest = true
         openBlockSize = StoredPlayer.ENDER_CHEST_SLOTS
         openBlockData = IntArray(4) { -1 }
@@ -2878,19 +2915,27 @@ public class ClientSession(
     ) {
         returnCraftingGrid(session)
         nextContainerId = if (nextContainerId >= MAX_CONTAINER_ID) FIRST_BLOCK_CONTAINER_ID else nextContainerId + 1
-        openMenu = Menu.chest(nextContainerId)
-        openBlock = pos
+        // parity: `ChestBlock.getMenuProvider`, which hands both halves over as one container.
+        val halves = DoubleChests.halves(currentWorld, pos.x, pos.y, pos.z)
         openEnderChest = false
-        openBlockSize = Menu.CHEST_SIZE
+        openBlockSecond = halves?.second?.let { BlockPos(it[0], it[1], it[2]) }
+        openBlock = halves?.first?.let { BlockPos(it[0], it[1], it[2]) } ?: pos
+        val paired = openBlockSecond != null
+        openMenu = if (paired) Menu.doubleChest(nextContainerId) else Menu.chest(nextContainerId)
+        openBlockSize = if (paired) Menu.DOUBLE_CHEST_SIZE else Menu.CHEST_SIZE
         openBlockData = IntArray(4) { -1 }
         sendCompressed(OpenScreenPacket.ID) {
             OpenScreenPacket(
                 containerId = openMenu.containerId,
-                menuType = OpenScreenPacket.CHEST_MENU,
+                menuType = if (paired) OpenScreenPacket.DOUBLE_CHEST_MENU else OpenScreenPacket.CHEST_MENU,
                 // parity: the shulker box is the one whose translation key is not its own path.
                 title =
                     Component.translatable(
-                        if (Shulkers.isShulkerBox(block)) "container.shulkerBox" else "container.$block",
+                        when {
+                            Shulkers.isShulkerBox(block) -> "container.shulkerBox"
+                            paired -> "container.chestDouble"
+                            else -> "container.$block"
+                        },
                     ),
             ).write(it)
         }
@@ -3127,6 +3172,7 @@ public class ClientSession(
         nextContainerId = if (nextContainerId >= MAX_CONTAINER_ID) FIRST_BLOCK_CONTAINER_ID else nextContainerId + 1
         openMenu = Menu.merchant(nextContainerId)
         openBlock = null
+        openBlockSecond = null
         openTradingWith = villager.entityId
         openOffers = offers
         sendCompressed(OpenScreenPacket.ID) {
@@ -3206,6 +3252,43 @@ public class ClientSession(
         villager?.let { it.villagerExperience += offer.experience }
         sendInventory()
         sendOffers()
+    }
+
+    /**
+     * parity: `SpawnEggItem.useOn`: the mob lands on the face that was clicked, unless the block
+     * itself has no collision, in which case it lands inside it.
+     */
+    private fun useSpawnEgg(
+        session: PlayerSession,
+        egg: Identifier,
+        heldSlot: Int,
+        held: StoredItemStack,
+        hit: BlockHitResult,
+    ): Boolean {
+        val world = currentWorld ?: return false
+        val type = Identifier.vanilla(egg.path.removeSuffix("_spawn_egg"))
+        val entityType = EntityTypes[type] ?: return false
+        val clicked = world.state.getBlockState(hit.pos.x, hit.pos.y, hit.pos.z) ?: return false
+        val at =
+            if (BlockShapes.isEmptyShape(clicked)) hit.pos else hit.pos.offset(hit.direction)
+        val entityId = playerRegistry?.allocateEntityId() ?: return false
+        world.state.spawnEntity(
+            ServerEntity(
+                entityId = entityId,
+                uuid = Uuid.random(),
+                type = type,
+                protocolType = entityType.protocolId,
+                x = at.x + 0.5,
+                // parity: `EntityType.spawn` puts it on top of the block, not inside it.
+                y = at.y.toDouble(),
+                z = at.z + 0.5,
+            ),
+        )
+        if (session.gamemode != Gamemode.CREATIVE) {
+            session.inventory[heldSlot] = if (held.count <= 1) null else held.copy(count = held.count - 1)
+            sendInventorySlot(heldSlot)
+        }
+        return true
     }
 
     /**
@@ -3404,17 +3487,34 @@ public class ClientSession(
     /** The block's own slots, read straight off its block entity. */
     private fun readBlockSlot(index: Int): StoredItemStack? {
         if (openEnderChest) return playerSession?.enderChest?.getOrNull(index)
-        val entity = openBlockEntity() ?: return null
-        val stack = BlockInventory.read(entity.data, openBlockSize).getOrNull(index) ?: return null
+        val (position, local) = halfFor(index) ?: return null
+        val entity = blockEntityAt(position) ?: return null
+        val stack = BlockInventory.read(entity.data, halfSize()).getOrNull(local) ?: return null
         return StoredItemStack(stack.item.toString(), stack.count)
     }
 
-    private fun openBlockEntity(): org.basaltmc.server.world.ChunkBlockEntity? {
-        val position = openBlock ?: return null
+    /**
+     * Which block a window slot belongs to, and its index within that block.
+     *
+     * A double chest is two containers of 27 behind one window of 54, so everything past the first
+     * half lands in the second block. Anything else is its own block and its own numbering.
+     */
+    private fun halfFor(index: Int): Pair<BlockPos, Int>? {
+        val second = openBlockSecond
+        if (second != null && index >= Menu.CHEST_SIZE) return second to (index - Menu.CHEST_SIZE)
+        return (openBlock ?: return null) to index
+    }
+
+    /** How many slots the block behind a window slot has of its own. */
+    private fun halfSize(): Int = if (openBlockSecond != null) Menu.CHEST_SIZE else openBlockSize
+
+    private fun blockEntityAt(position: BlockPos): org.basaltmc.server.world.ChunkBlockEntity? {
         val world = currentWorld ?: return null
         val chunk = world.state.chunkIfLoaded(position.x shr 4, position.z shr 4) ?: return null
         return chunk.blockEntityAt(position.x and 15, position.y, position.z and 15)
     }
+
+    private fun openBlockEntity(): org.basaltmc.server.world.ChunkBlockEntity? = blockEntityAt(openBlock ?: return null)
 
     private fun writeBlockSlot(
         index: Int,
@@ -3425,15 +3525,28 @@ public class ClientSession(
             if (index in slots.indices) slots[index] = stack
             return
         }
-        val position = openBlock ?: return
+        val (position, local) = halfFor(index) ?: return
         val world = currentWorld ?: return
         val chunk = world.state.chunkIfLoaded(position.x shr 4, position.z shr 4) ?: return
-        val entity = chunk.blockEntityAt(position.x and 15, position.y, position.z and 15) ?: return
+        // A block that never got its block entity (one from worldgen, or one written by a command)
+        // used to swallow whatever was put into it: the cursor was already empty and the write had
+        // nowhere to land. It gets one here instead.
+        val entity =
+            chunk.blockEntityAt(position.x and 15, position.y, position.z and 15)
+                ?: BlockStateDefinitions
+                    .blockOf(world.state.getBlockState(position.x, position.y, position.z) ?: return)
+                    ?.let {
+                        ChunkBlockEntity(position.x and 15, position.y, position.z and 15, it, NbtCompound())
+                            .also { entity -> chunk.setBlockEntity(entity) }
+                    } ?: return
         // Every slot of the block, not the three a cooker has: writing back fewer than it holds is
         // what would empty a chest the moment somebody moved its first item.
-        val slots = BlockInventory.read(entity.data, openBlockSize)
-        if (index !in slots.indices) return
-        slots[index] =
+        val slots = BlockInventory.read(entity.data, halfSize())
+        if (local !in slots.indices) {
+            logger.warn { "dropped a write to slot $local of a container that has ${slots.size}" }
+            return
+        }
+        slots[local] =
             stack?.let {
                 org.basaltmc.server.world.loot
                     .ItemStack(Identifier.parse(it.id), it.count)
@@ -3442,7 +3555,7 @@ public class ClientSession(
         // parity: `AbstractFurnaceBlockEntity.setItem`, which recomputes the cook time when the
         // thing being cooked changes: a new item does not inherit the last one's progress.
         val cooking = BlockStateDefinitions.blockOf(world.state.getBlockState(position.x, position.y, position.z) ?: 0)
-        if (index == Furnaces.INPUT_SLOT && cooking?.path in Furnaces.COOKERS) {
+        if (local == Furnaces.INPUT_SLOT && cooking?.path in Furnaces.COOKERS) {
             val state = Furnaces.read(entity.data)
             state.cookingTimer = 0
             state.cookingTotalTime = Furnaces.cookTimeFor(state) { source -> cookingFor(position, source) }
@@ -3526,6 +3639,7 @@ public class ClientSession(
         val closingBlock = closing?.let { openContainerBlock(it) }
         openMenu = Menu.playerInventory()
         openBlock = null
+        openBlockSecond = null
         openEnderChest = false
         if (closing != null && closingBlock != null) {
             announceOpeners(
@@ -3582,7 +3696,13 @@ public class ClientSession(
      * and so does the cooked one.
      */
     private fun canPlaceInto(slot: MenuSlot): Boolean =
-        slot != MenuSlot.Result && !(slot is MenuSlot.Block && slot.index == Furnaces.RESULT_SLOT)
+        when {
+            slot == MenuSlot.Result -> false
+            // parity: `FurnaceResultSlot.mayPlace`, which is a *furnace's* third slot and nobody
+            // else's: a chest's third slot took nothing until this stopped being unconditional.
+            slot is MenuSlot.Block && openBlockSize == FURNACE_SLOTS && slot.index == Furnaces.RESULT_SLOT -> false
+            else -> true
+        }
 
     /**
      * Recomputes what the grid makes. Called after anything touches it, which is what makes the
@@ -3942,39 +4062,66 @@ public class ClientSession(
         }
 
         val stack = readSlot(session, slot) ?: return
-        // Anything outside the inventory proper (the grid) comes back into it; inside it, the two
-        // halves swap, hotbar to storage and storage to hotbar.
-        val targets =
+        // parity: `AbstractContainerMenu.quickMoveStack`, whose whole job is picking the other side:
+        // with a block open, the inventory sends to the block and the block sends to the inventory.
+        // Without a block open the two halves of the inventory swap, hotbar to storage and back.
+        val intoBlock = slot is MenuSlot.Inventory && hasBlockSlots()
+        val targets: List<MenuSlot> =
             when {
+                intoBlock -> (0 until openBlockSize).map { MenuSlot.Block(it) }
                 slot !is MenuSlot.Inventory ->
-                    (PlayerInventory.HOTBAR_START until PlayerInventory.MAIN_SLOTS) +
-                        (0 until PlayerInventory.HOTBAR_START)
-                slot.index < PlayerInventory.HOTBAR_START ->
                     (
-                        PlayerInventory.HOTBAR_START until
-                            PlayerInventory.MAIN_SLOTS
-                    ).toList()
-                else -> (0 until PlayerInventory.HOTBAR_START).toList()
+                        (PlayerInventory.HOTBAR_START until PlayerInventory.MAIN_SLOTS) +
+                            (0 until PlayerInventory.HOTBAR_START)
+                    ).map { MenuSlot.Inventory(it) }
+                slot.index < PlayerInventory.HOTBAR_START ->
+                    (PlayerInventory.HOTBAR_START until PlayerInventory.MAIN_SLOTS).map { MenuSlot.Inventory(it) }
+                else -> (0 until PlayerInventory.HOTBAR_START).map { MenuSlot.Inventory(it) }
             }
 
         var remaining = stack.count
+        // Stacking onto what is already there comes first, exactly as vanilla's `moveItemStackTo`.
         for (target in targets) {
             if (remaining <= 0) break
-            val existing = session.inventory[target] ?: continue
+            if (!accepts(target, stack)) continue
+            val existing = readSlot(session, target) ?: continue
             if (existing.id != stack.id || existing.components != stack.components) continue
             val room = PlayerInventory.MAX_STACK - existing.count
             if (room <= 0) continue
             val moved = minOf(room, remaining)
-            session.inventory[target] = existing.copy(count = existing.count + moved)
+            writeSlot(session, target, existing.copy(count = existing.count + moved))
             remaining -= moved
         }
         for (target in targets) {
             if (remaining <= 0) break
-            if (session.inventory[target] != null) continue
-            session.inventory[target] = stack.copy(count = remaining)
+            if (!accepts(target, stack)) continue
+            if (readSlot(session, target) != null) continue
+            writeSlot(session, target, stack.copy(count = remaining))
             remaining = 0
         }
         writeSlot(session, slot, if (remaining <= 0) null else stack.copy(count = remaining))
+    }
+
+    /** Whether the open screen has slots of its own to shift-click into. */
+    private fun hasBlockSlots(): Boolean = openBlock != null || openEnderChest
+
+    /**
+     * parity: `Slot.mayPlace`, which is why a shift-clicked log lands in a furnace's fuel slot and
+     * not on top of what is being smelted.
+     */
+    private fun accepts(
+        target: MenuSlot,
+        stack: StoredItemStack,
+    ): Boolean {
+        if (target !is MenuSlot.Block) return true
+        if (openBlockSize != FURNACE_SLOTS) return true
+        val item = runCatching { Identifier.parse(stack.id) }.getOrNull() ?: return false
+        return when (target.index) {
+            Furnaces.INPUT_SLOT -> true
+            Furnaces.FUEL_SLOT -> Fuels.isFuel(item)
+            // Nothing goes into the slot the cooked thing comes out of.
+            else -> false
+        }
     }
 
     /** Throws a stack into the world from this player, the same arc `Q` uses. */
@@ -5097,6 +5244,9 @@ public class ClientSession(
             world.state.scheduleBlockTick(pos.x, pos.y, pos.z, BUTTON_TICK, delay)
         }
         for (block in toggled.changes) broadcastBlockUpdate(BlockPos(block[0], block[1], block[2]), block[3])
+        // parity: `LeverBlock.updateNeighbours` and `ButtonBlock.updateNeighbours`. Without this the
+        // lever moved and powered nothing at all, which is most of what a lever is for.
+        for (block in toggled.changes) notifyNeighbours(BlockPos(block[0], block[1], block[2]))
         val sound =
             SoundPacket(
                 sound = toggled.sound,

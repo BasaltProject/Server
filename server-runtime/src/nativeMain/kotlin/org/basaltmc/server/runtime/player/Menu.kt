@@ -107,6 +107,30 @@ public class Menu(
                     },
             )
 
+        /** parity: `ChestMenu.sixRows`, the double chest: 54 of its own, then the player's 36. */
+        public const val DOUBLE_CHEST_SIZE: Int = 54
+        private const val DOUBLE_CHEST_SLOT_COUNT = 90
+
+        /**
+         * Two chests as one window. The first 27 slots are the *first* half as vanilla orders them,
+         * which is not always the one that was clicked: see `ChestBlock.DOUBLE_INVENTORY_COMBINER`.
+         */
+        public fun doubleChest(containerId: Int): Menu =
+            Menu(
+                containerId = containerId,
+                gridWidth = 0,
+                gridHeight = 0,
+                slots =
+                    List(DOUBLE_CHEST_SLOT_COUNT) { slot ->
+                        when (slot) {
+                            in 0 until DOUBLE_CHEST_SIZE -> MenuSlot.Block(slot)
+                            in DOUBLE_CHEST_SIZE..80 -> MenuSlot.Inventory(slot - DOUBLE_CHEST_SIZE)
+                            in 81..89 -> MenuSlot.Inventory(slot - 81 + PlayerInventory.HOTBAR_START)
+                            else -> null
+                        }
+                    },
+            )
+
         /** parity: `MerchantMenu`: two slots to pay with, one to take from, then the player's 36. */
         private const val MERCHANT_SLOT_COUNT = 39
 
