@@ -18,8 +18,9 @@
   <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-green">
 </p>
 
-> ⚠️ **Early development.** Basalt Server is not ready for any server, public or
-> private. The status table below is the honest state of the project.
+> ⚠️ **Early development.** You can connect a client and play with a good part of
+> the game, but plenty is missing or wrong. Not ready for any server, public or
+> private.
 
 ## Overview
 
@@ -28,66 +29,46 @@ entirely in **Kotlin/Native** and shipped as a native binary for each platform.
 There is no JVM anywhere in the runtime: no bundled JRE, no embedded VM, no hidden
 Java process.
 
-It is the server component of the **Basalt** project.
-
-**Which clients can connect.** The server speaks Java Edition's protocol and uses
-its world format, so that is the client it serves today. Older Java clients and
-Bedrock clients are both planned, translated at the edge, and neither is
-implemented yet. Nothing below claims otherwise.
+It speaks Java Edition's protocol and uses its world format, so that is the client
+it serves today. Older Java clients and Bedrock clients are planned, translated at
+the edge, and neither is implemented yet.
 
 Two goals drive every decision:
 
-- **Vanilla parity.** A Basalt Server with no plugins must behave exactly like
-  the official one. Same seed, same world. Same drops, same damage, same redstone,
+- **Vanilla parity.** A Basalt Server with no plugins must behave exactly like the
+  official one. Same seed, same world. Same drops, same damage, same redstone,
   same mobs, bugs included. Parity is the acceptance criterion for every system,
   not a long-term aspiration.
-- **A plugin platform worth switching to.** Basalt's plugin API is native and
-  written in Lua, with first-class tooling: a CLI, a VS Code extension and an
-  IntelliJ IDEA plugin.
+- **A plugin platform worth switching to.** The plugin API is native and written
+  in Lua, with first-class tooling: a CLI, a VS Code extension and an IntelliJ
+  IDEA plugin.
 
 | | |
 |---|---|
 | Language | Kotlin/Native, 100 %. No Java, no JVM at runtime |
 | Target version | Minecraft 26.2 (protocol 776) |
 | Distribution | Native binaries per platform |
+| World storage | Linear regions by default; Anvil worlds are read and converted on load |
 | Plugin API | Lua, `.bspkg` packages |
 | Message model | Adventure-style immutable components; no legacy `§` formatting |
-| Configuration | A single `basalt.toml` |
+| Configuration | A `config/` folder, one TOML file per domain |
 | License | GPL-3.0 |
 
 ## Why native
 
-A Minecraft server spends its life doing the same three things: moving bytes,
-ticking a world, and waiting. None of that needs a virtual machine.
+A Minecraft server spends its life moving bytes, ticking a world and waiting.
+None of that needs a virtual machine.
 
-| | |
-|---|---|
-| **Startup** | The binary starts immediately. No JVM boot, no class loading, no JIT warm-up |
-| **Memory** | No heap sizing, no `-Xmx` tuning, no GC pauses to hide behind |
-| **Deployment** | One binary, one config file. No Java version to install, match, or debug |
-| **Predictability** | Performance is the same on tick 1 and on tick 1,000,000 |
-
-## Feature scope
-
-| Area | What it means |
-|---|---|
-| **Vanilla parity** | Bit-exact RNG, identical tick ordering, seed-identical world generation, vanilla datapack execution |
-| **World storage** | Linear region format by default (smaller, fewer disk I/O ops than Anvil); existing Anvil (`.mca`) worlds are detected and converted automatically on load |
-| **Plugins** | Lua API, `.bspkg` package format, hot reload, sandboxed execution, dependency resolution |
-| **Tooling** | Official CLI, VS Code extension, IntelliJ IDEA plugin, generated API docs and type definitions |
-| **Legacy clients** | Multi-version support so older Java clients can connect, translated at the edge |
-| **Bedrock clients** | Bedrock protocol translation, so Bedrock players join the same server |
-| **Bukkit migration** | A compatibility path for the existing ecosystem. Post-1.0, and never at the cost of the no-JVM rule |
+The binary starts immediately: no VM boot, no class loading, no warm-up. There is
+no heap to size and no collector to hide behind. Deployment is one binary and a
+config folder, with no runtime to install or match. Tick 1 and tick 1,000,000 cost
+the same.
 
 ## Plugins
 
-Plugins are written in Lua, packaged as `.bspkg` files
-containing a manifest, code, resources and metadata, and run inside a sandbox with
-a per-tick instruction budget, so a broken plugin cannot take the server down.
-
-The Lua runtime is [BlueLuaK](https://github.com/BluevaDevelopment/BlueLuaK), a
-Kotlin Multiplatform Lua implementation, which means the same runtime everywhere
-Basalt runs, with no native Lua dependency to install.
+Plugins are written in Lua and packaged as `.bspkg` files, each with a manifest,
+code, resources and metadata. They run inside a sandbox with a per-tick
+instruction budget, so a broken plugin cannot take the server down.
 
 ```lua
 -- hello.lua
@@ -99,62 +80,43 @@ end)
 Text is authored in MiniMessage and rendered through the component model, never
 through legacy colour codes.
 
+The Lua runtime is [BlueLuaK](https://github.com/BluevaDevelopment/BlueLuaK), a
+Kotlin Multiplatform implementation, so it is the same runtime everywhere Basalt
+runs with no native Lua dependency to install.
+
 ## Configuration
 
-Everything the server exposes lives in a single **`basalt.toml`**, generated
-with comments and vanilla defaults on first start. No `server.properties`, no
-`bukkit.yml`, no `spigot.yml`, no `paper-global.yml`, no `config/` directory to
-hunt through.
+Configuration lives in **`config/`**, one TOML file per domain, generated with
+comments and vanilla defaults on first start:
 
-```toml
-[server]
-motd = "A Basalt Server"
-max-players = 20
-
-[server]
-port = 25565
-
-[world]
-view-distance = 10
-save-interval-seconds = 30
+```
+config/
+  server.toml        network, logging, performance
+  worlds.toml        world defaults, inherited by worlds/<name>/settings.toml
+  groups.toml        permission groups
+  server_list.toml   what the server list shows
+  commands.toml      per-command settings
 ```
 
 Anything that makes the server behave differently from vanilla is opt-in and
-labelled as such in the generated comments. If a `server.properties` is present on
-first start, its values are imported once.
+labelled as such in the generated comments. A `server.properties` found on first
+start is imported once.
 
 ## Game assets and the EULA
 
-Basalt Server does **not** contain or distribute any proprietary Minecraft content.
-No structures, no loot tables, no datapacks, no textures, no client or server jars.
+Basalt Server does **not** contain or distribute any proprietary Minecraft
+content: no structures, no loot tables, no datapacks, no textures, no jars.
 
 Once you accept the [Minecraft EULA](https://www.minecraft.net/en-us/eula), the
-server downloads the official server download directly from Mojang, verifies its
-SHA-1, unpacks only the data it needs into a local cache, and deletes the archive:
+server downloads the official server download from Mojang, verifies its SHA-1 and
+unpacks only the data it needs into a local cache. That happens once per version;
+later starts touch neither the network nor the archive.
 
-1. `https://piston-meta.mojang.com/mc/game/version_manifest_v2.json`
-2. `https://piston-meta.mojang.com/v1/packages/{sha1}/{version}.json`
-3. `https://piston-data.mojang.com/v1/objects/{sha1}/server.jar`
-
-That happens once per version. Later starts read the unpacked files and touch
-neither the network nor the archive. Assets come from the official source, never
-from this repository.
-
-### Accepting the EULA
-
-Same mechanism as the official server, and **the server never prompts you**. On
-first start it writes `eula.toml` with `eula = false` and stops. Set it to
-`eula = true` and start again. An accepted `eula.txt` from an existing server is
-read once and migrated, so hosting panels and migrated worlds keep working.
-
-For non-interactive environments such as Docker or `systemd`, pass the flag
-instead:
-
-```bash
-./basalt --accept-eula
-```
-
-Passing it is a deliberate act and counts as accepting the EULA.
+**The server never prompts you.** On first start it writes `eula.toml` with
+`eula = false` and stops. Set it to `eula = true` and start again. An accepted
+`eula.txt` from an existing server is read once and migrated. For non-interactive
+environments, `./basalt --accept-eula` is a deliberate act and counts as
+accepting it.
 
 ## Building
 
@@ -165,13 +127,12 @@ with the proxy and pulled in as a submodule, so clone with it:
 git clone --recurse-submodules https://github.com/BasaltProject/Server.git
 ```
 
-In an existing clone, `git submodule update --init` does the same thing. Without
-it the build fails immediately: half the modules are missing.
-
-Gradle orchestrates the build; it is not part of the runtime.
+In an existing clone, `git submodule update --init` does the same. Without it the
+build fails immediately: half the modules are missing.
 
 Kotlin/Native tasks carry the target in their name; replace `MacosArm64` with the
-one you are building for.
+one you are building for. Gradle orchestrates the build and is not part of the
+runtime; it needs JDK 25, which the server itself does not.
 
 ```bash
 # Native binary for the current host
@@ -182,57 +143,8 @@ one you are building for.
 ```
 
 Supported targets: `macosArm64`, `macosX64`, `linuxX64`, `linuxArm64`, `mingwX64`.
-
-## Testing
-
-```bash
-# Everything CI runs: compile, style and every suite on this host
-./gradlew build
-
-# A single module
-./gradlew :wire-protocol:macosArm64Test
-```
-
-Native tests only run on their matching host. Beyond unit tests, parity is checked
-by replaying scripted scenarios against an official server and diffing the result.
-
-## Requirements
-
-| Component | Requirement |
-|---|---|
-| JDK | 25, for Gradle only. Not needed to run the server |
-| Kotlin | 2.4.10 |
-| Gradle | Through the included wrapper |
-| Native toolchain | Required to link or run Kotlin/Native binaries on the host |
-
-Use the included wrapper rather than a system Gradle installation.
-
-## Development Status
-
-| Area | Status |
-|---|---|
-| Build, module layout and cross-platform CI | Working |
-| Core platform (sockets, buffers, zlib/zstd/gzip, crypto) | Working |
-| NBT, SNBT and the component model | Working |
-| Vanilla RNG parity (LCG, xoroshiro, gaussian, positional) | Working |
-| Protocol, handshake, login, configuration and play | Working |
-| Online mode: encryption, Mojang session, profiles | Working |
-| Official asset download and the EULA flow | Working |
-| World storage: Linear regions, with Anvil worlds read on load | Working |
-| World generation: density router, surface rules, biomes, decoration | In progress |
-| Structures | Plains villages only |
-| Entities | Skeleton only: an ECS store and a movement system |
-| Gameplay parity (redstone, mobs, combat, inventories) | Not started |
-| Datapack execution (loot tables, recipes, advancements) | Not started |
-| Plugins and the Lua runtime | Not started |
-| Tooling (CLI, VS Code, IntelliJ) | Not started |
-| Older Java clients (`wire-multiversion`) | Not started |
-| Bedrock clients (`wire-bedrock`) | Not started |
-| Bukkit compatibility | Out of scope until the plugin API is stable |
-
-What that adds up to today: a real client connects, authenticates, spawns in a
-generated world, flies around while chunks stream in, breaks blocks, chats, and
-sees other players do the same. Everything below that line is still missing.
+Kotlin/Native does not cross-compile between host families, so each one is built
+on its own.
 
 ## Related repositories
 
