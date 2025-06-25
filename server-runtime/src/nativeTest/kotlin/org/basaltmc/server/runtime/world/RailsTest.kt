@@ -33,6 +33,9 @@ class RailsTest {
         world.stopGenerating(drainTimeoutMillis = 100)
     }
 
+    private fun state(name: String): Int =
+        checkNotNull(BlockStateDefinitions.stateIdOf(Identifier.vanilla(name), emptyMap()))
+
     private fun rail(
         x: Int,
         y: Int,
@@ -91,6 +94,45 @@ class RailsTest {
 
         val shape = shapeAt(11, 70, 2)
         assertEquals(true, shape == "east_west" || shape == "north_south", "it stayed straight: $shape")
+    }
+
+    /**
+     * parity: `canConnectTo`, which is what stops a track being rerouted by every rail laid beside
+     * it: a rail already joined at both ends takes no more, and neither of them bends.
+     */
+    @Test
+    fun aRailBesideAFullTrackIsIgnored() {
+        rail(2, 70, 10)
+        rail(3, 70, 10)
+        rail(4, 70, 10)
+        assertEquals("east_west", shapeAt(3, 70, 10), "the middle is joined at both ends")
+
+        rail(3, 70, 11)
+
+        assertEquals("east_west", shapeAt(3, 70, 10), "and stays that way")
+        assertEquals("north_south", shapeAt(3, 70, 11), "while the new one lies as it was placed")
+    }
+
+    /**
+     * parity: `BaseRailBlock.updateState` is empty: a rail laid two blocks away is not a reason for
+     * an existing rail to re-decide anything. Re-deciding on every update rerouted a track behind
+     * whoever was laying it.
+     */
+    @Test
+    fun aRailIsNotRebentByWhatHappensNearIt() {
+        for (x in 1..4) {
+            for (z in 13..16) world.state.setBlockState(x, 69, z, state("stone"))
+        }
+        rail(2, 70, 14)
+        rail(3, 70, 14)
+        assertEquals("east_west", shapeAt(2, 70, 14))
+
+        // A rail put down south of the far one, and an ordinary block beside the first.
+        rail(3, 70, 15)
+        world.state.setBlockState(2, 70, 13, state("stone"))
+        NeighbourUpdates.afterChange(world, 2, 70, 13, reshapeSelf = false) { _, _, _, _ -> }
+
+        assertEquals("east_west", shapeAt(2, 70, 14), "it stayed as it was laid")
     }
 
     /** parity: a rail one block higher makes the one below it climb. */

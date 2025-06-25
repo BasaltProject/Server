@@ -97,8 +97,20 @@ public object Blocks {
     /** This block's destroy time and tool requirement, or `null` for one this build's table does not list. */
     public fun hardnessOf(block: Identifier): BlockHardness? = hardnessByBlock[block]
 
-    /** Resolves both registered default states and the non-default states emitted by worldgen. */
-    public fun byStateId(stateId: Int): BlockState? = derivedStatesById[stateId] ?: REGISTRY.byId(stateId)
+    /**
+     * The block state with this id, whatever it is.
+     *
+     * The two tables only hold default states and the ones worldgen writes, so anything else was
+     * answered as "not a block": a copper chest facing anywhere was nothing the interaction code
+     * could see, and clicking it did nothing at all. The state definition knows every combination,
+     * so it answers the rest.
+     */
+    public fun byStateId(stateId: Int): BlockState? =
+        derivedStatesById[stateId]
+            ?: REGISTRY.byId(stateId)
+            ?: BlockStateDefinitions.blockOf(stateId)?.let {
+                BlockState(it, stateId, BlockStateDefinitions.propertiesOf(stateId))
+            }
 
     /**
      * Resolves a block plus its serialized vanilla properties back to a network state ID.

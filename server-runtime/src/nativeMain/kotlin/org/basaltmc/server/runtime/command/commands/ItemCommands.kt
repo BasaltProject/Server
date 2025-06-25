@@ -261,11 +261,10 @@ public class ItemCommand : Command(name = "item", permissionLevel = PermissionLe
                 putInt("count", stack.count)
             }
         chunk.setBlockEntity(
-            existing.copy(
-                data =
-                    existing.data.also {
-                        it["Items"] = NbtList(NbtType.COMPOUND, (kept + written).map { entry -> entry as NbtTag })
-                    },
+            existing.withData(
+                existing.data.also {
+                    it["Items"] = NbtList(NbtType.COMPOUND, (kept + written).map { entry -> entry as NbtTag })
+                },
             ),
         )
         context.success(
@@ -530,12 +529,11 @@ public class LootCommand(
                 }
         }
         chunk.setBlockEntity(
-            existing.copy(
-                data =
-                    existing.data.also {
-                        it["Items"] =
-                            NbtList(NbtType.COMPOUND, items.map { entry -> entry as NbtTag })
-                    },
+            existing.withData(
+                existing.data.also {
+                    it["Items"] =
+                        NbtList(NbtType.COMPOUND, items.map { entry -> entry as NbtTag })
+                },
             ),
         )
         report(context, stacks)
@@ -582,11 +580,10 @@ public class LootCommand(
                 putInt("count", first.count)
             }
         chunk.setBlockEntity(
-            existing.copy(
-                data =
-                    existing.data.also {
-                        it["Items"] = NbtList(NbtType.COMPOUND, (kept + written).map { entry -> entry as NbtTag })
-                    },
+            existing.withData(
+                existing.data.also {
+                    it["Items"] = NbtList(NbtType.COMPOUND, (kept + written).map { entry -> entry as NbtTag })
+                },
             ),
         )
         report(context, stacks)

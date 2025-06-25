@@ -36,6 +36,20 @@ public sealed interface LootFunction {
     }
 
     /**
+     * Something copied off the block entity onto the stack: contents, a name, part of the state.
+     *
+     * parity: `CopyComponentsFunction` and its three cousins. The copying itself belongs to whoever
+     * knows the block, so this only says the table is understood: a table refused for one function
+     * it did not know dropped nothing at all, which is how a shulker box came to vanish.
+     */
+    public data object CopyFromBlock : LootFunction {
+        override fun apply(
+            stack: ItemStack,
+            random: BasaltRandom,
+        ): ItemStack = stack
+    }
+
+    /**
      * parity: `SmeltItemFunction`, which is what a burning cow's cooked beef comes from. Nothing
      * here dies on fire yet, so the drop is left raw, which is what an ordinary kill gives.
      */

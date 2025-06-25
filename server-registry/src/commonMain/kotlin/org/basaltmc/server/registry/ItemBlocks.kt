@@ -13,6 +13,16 @@ public object ItemBlocks {
     private val byItem: Map<Identifier, Identifier> =
         ALL_ITEM_BLOCKS.associate { (item, block) -> Identifier.vanilla(item) to Identifier.vanilla(block) }
 
+    private val byBlock: Map<Identifier, Identifier> = byItem.entries.associate { (item, block) -> block to item }
+
     /** The block [item] places, which is [item] itself unless the table says otherwise. */
     public fun of(item: Identifier): Identifier = byItem[item] ?: item
+
+    /**
+     * The item [block] is picked up as, which is [block] itself unless the table says otherwise.
+     *
+     * parity: `Block.asItem`. Without it, middle-clicking dust, a crop or a cocoa pod gave nothing,
+     * because no item is called `redstone_wire`.
+     */
+    public fun itemOf(block: Identifier): Identifier = byBlock[block] ?: block
 }
