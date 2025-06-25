@@ -154,6 +154,25 @@ public object BlockInteractions {
         return BlockRelease(released, soundFor(block, Toggle.BUTTON, open = false))
     }
 
+    /**
+     * The same sound, for the blocks redstone opens rather than a hand: a door, a trapdoor or a
+     * fence gate. Anything else answers null, because nothing else makes a noise on a signal.
+     */
+    public fun redstoneSound(
+        stateId: Int,
+        open: Boolean,
+    ): String? {
+        val block = BlockStateDefinitions.blockOf(stateId) ?: return null
+        val kind =
+            when {
+                block.path.endsWith("_door") -> Toggle.DOOR
+                block.path.endsWith("_trapdoor") -> Toggle.TRAPDOOR
+                block.path.endsWith("_fence_gate") -> Toggle.FENCE_GATE
+                else -> return null
+            }
+        return soundFor(block, kind, open)
+    }
+
     private fun soundFor(
         block: Identifier,
         kind: Toggle,

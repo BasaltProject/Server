@@ -13,6 +13,7 @@ import org.basaltmc.server.world.NoiseWorldGenerator
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.common.collections.Long2ObjectMap
 import org.basaltmc.wire.io.NativeMutex
+import org.basaltmc.wire.nbt.NbtCompound
 import kotlin.concurrent.Volatile
 import kotlin.math.abs
 import kotlin.math.floor
@@ -387,6 +388,13 @@ public class WorldState(
         public var pickupDelay: Int = DEFAULT_PICKUP_DELAY,
         /** Ticks lived. parity: `ItemEntity` despawns at [LIFETIME_TICKS]. */
         public var age: Int = 0,
+        /**
+         * What the stack carries besides its id and count, as a shulker box carries its contents.
+         *
+         * parity: `ItemEntity` holds a whole `ItemStack`, components and all. Only what a block put
+         * there travels this way today, which is enough for a box picked up and put back down.
+         */
+        public val components: NbtCompound = NbtCompound(),
     ) {
         /** Whether this settled: once true the server stops sending movement for it, as vanilla does. */
         public var resting: Boolean = false

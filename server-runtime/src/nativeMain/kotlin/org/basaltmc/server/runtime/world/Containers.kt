@@ -35,10 +35,32 @@ public object Containers {
             "jukebox" to 1,
             // A lectern holds one book, and what a comparator reads off it is the page.
             "lectern" to 1,
+            // parity: `ContainerSingleItem`, one stack and no screen.
+            "decorated_pot" to DecoratedPots.SIZE,
+            // parity: `ChiseledBookShelfBlockEntity`, six slots read by which was touched last.
+            "chiseled_bookshelf" to ChiseledBookshelves.SIZE,
+            "shulker_box" to Shulkers.SIZE,
+            "white_shulker_box" to Shulkers.SIZE,
+            "orange_shulker_box" to Shulkers.SIZE,
+            "magenta_shulker_box" to Shulkers.SIZE,
+            "light_blue_shulker_box" to Shulkers.SIZE,
+            "yellow_shulker_box" to Shulkers.SIZE,
+            "lime_shulker_box" to Shulkers.SIZE,
+            "pink_shulker_box" to Shulkers.SIZE,
+            "gray_shulker_box" to Shulkers.SIZE,
+            "light_gray_shulker_box" to Shulkers.SIZE,
+            "cyan_shulker_box" to Shulkers.SIZE,
+            "purple_shulker_box" to Shulkers.SIZE,
+            "blue_shulker_box" to Shulkers.SIZE,
+            "brown_shulker_box" to Shulkers.SIZE,
+            "green_shulker_box" to Shulkers.SIZE,
+            "red_shulker_box" to Shulkers.SIZE,
+            "black_shulker_box" to Shulkers.SIZE,
         )
 
     /** The blocks that only hold, with no machinery of their own. */
-    public val PLAIN: Set<String> = setOf("chest", "trapped_chest", "barrel", "hopper", "dispenser", "dropper")
+    public val PLAIN: Set<String> =
+        setOf("chest", "trapped_chest", "barrel", "hopper", "dispenser", "dropper") + Shulkers.BLOCKS
 
     /** parity: `Item.getMaxStackSize`, which this build does not read yet: everything stacks to 64. */
     private const val DEFAULT_MAX_STACK = 64
@@ -52,13 +74,22 @@ public object Containers {
         x: Int,
         y: Int,
         z: Int,
+        from: String? = null,
     ): Int? {
         val stateId = world.state.getBlockState(x, y, z) ?: return null
         val path = BlockStateDefinitions.blockOf(stateId)?.path ?: return null
         stateSignal(path, BlockStateDefinitions.propertiesOf(stateId))?.let { return it }
+        // parity: `ShelfBlock.getAnalogOutputSignal`, three bits and only from behind.
+        if (Shelves.isShelf(path)) {
+            val chunk = world.state.chunkIfLoaded(x shr 4, z shr 4) ?: return 0
+            val entity = chunk.blockEntityAt(x and 15, y, z and 15)
+            return Shelves.comparatorSignal(entity, BlockStateDefinitions.propertiesOf(stateId)["facing"], from)
+        }
         val size = SIZES[path] ?: return null
         val chunk = world.state.chunkIfLoaded(x shr 4, z shr 4) ?: return 0
         val entity = chunk.blockEntityAt(x and 15, y, z and 15) ?: return 0
+        // parity: `ChiseledBookShelfBlock.getAnalogOutputSignal`, the last slot touched plus one.
+        if (path == "chiseled_bookshelf") return ChiseledBookshelves.comparatorSignal(entity.data)
         // parity: `CrafterBlockEntity.getRedstoneSignal` counts slots, not how full they are.
         if (path == "crafter") return Crafters.comparatorSignal(entity.data)
         // parity: `JukeboxBlock.getAnalogOutputSignal`, the number of the song that is playing.

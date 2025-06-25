@@ -3,6 +3,8 @@ package org.basaltmc.server.runtime.player
 import org.basaltmc.server.runtime.ClientSession
 import org.basaltmc.server.runtime.world.ActiveEffect
 import org.basaltmc.server.runtime.world.Fluids
+import org.basaltmc.server.storage.StoredItemStack
+import org.basaltmc.server.storage.StoredPlayer
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.protocol.login.GameProfileProperty
 import org.basaltmc.wire.protocol.play.Gamemode
@@ -101,6 +103,15 @@ public class PlayerSession(
 
     /** The 41 slots this player carries. See [PlayerInventory] for what is and is not modelled. */
     public val inventory: PlayerInventory = PlayerInventory(connection.enchantmentIds)
+
+    /**
+     * The twenty-seven slots that follow this player rather than the block.
+     *
+     * parity: `PlayerEnderChestContainer`, which is why every ender chest in the world shows the
+     * same things to one player and different things to the next. Persisted in `players.db`, not in
+     * any world.
+     */
+    public val enderChest: Array<StoredItemStack?> = arrayOfNulls(StoredPlayer.ENDER_CHEST_SLOTS)
 
     /**
      * Air left and how long this player keeps burning.

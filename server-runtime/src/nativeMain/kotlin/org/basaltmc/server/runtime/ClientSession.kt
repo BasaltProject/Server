@@ -40,16 +40,19 @@ import org.basaltmc.server.runtime.world.ActiveEffect
 import org.basaltmc.server.runtime.world.AdvancementTriggers
 import org.basaltmc.server.runtime.world.BedProblem
 import org.basaltmc.server.runtime.world.Beds
+import org.basaltmc.server.runtime.world.BlockEffect
 import org.basaltmc.server.runtime.world.BlockInteractions
 import org.basaltmc.server.runtime.world.BlockInventory
 import org.basaltmc.server.runtime.world.BlockPlacement
 import org.basaltmc.server.runtime.world.Buckets
 import org.basaltmc.server.runtime.world.Campfires
+import org.basaltmc.server.runtime.world.ChiseledBookshelves
 import org.basaltmc.server.runtime.world.ChunkGenerationQueue
 import org.basaltmc.server.runtime.world.ContainerOpeners
 import org.basaltmc.server.runtime.world.Containers
 import org.basaltmc.server.runtime.world.DamageProtection
 import org.basaltmc.server.runtime.world.DamageTypes
+import org.basaltmc.server.runtime.world.DecoratedPots
 import org.basaltmc.server.runtime.world.DoubleBlocks
 import org.basaltmc.server.runtime.world.EnchantmentAttributes
 import org.basaltmc.server.runtime.world.EndPortals
@@ -66,6 +69,7 @@ import org.basaltmc.server.runtime.world.MobEffects
 import org.basaltmc.server.runtime.world.MossCarpetTopper
 import org.basaltmc.server.runtime.world.NeighbourUpdates
 import org.basaltmc.server.runtime.world.NetherPortals
+import org.basaltmc.server.runtime.world.NoteBlocks
 import org.basaltmc.server.runtime.world.PlayerProgress
 import org.basaltmc.server.runtime.world.RealBlockTags
 import org.basaltmc.server.runtime.world.RealDamageTypeTags
@@ -81,6 +85,8 @@ import org.basaltmc.server.runtime.world.RealTimelines
 import org.basaltmc.server.runtime.world.RealVillagerTrades
 import org.basaltmc.server.runtime.world.Redstone
 import org.basaltmc.server.runtime.world.ScaffoldingPlacement
+import org.basaltmc.server.runtime.world.Shelves
+import org.basaltmc.server.runtime.world.Shulkers
 import org.basaltmc.server.runtime.world.Signs
 import org.basaltmc.server.runtime.world.SnowyBlocks
 import org.basaltmc.server.runtime.world.Submersion
@@ -175,6 +181,7 @@ import org.basaltmc.wire.protocol.play.ContainerSetContentPacket
 import org.basaltmc.wire.protocol.play.ContainerSetDataPacket
 import org.basaltmc.wire.protocol.play.ContainerSetSlotPacket
 import org.basaltmc.wire.protocol.play.DamageEventPacket
+import org.basaltmc.wire.protocol.play.Direction
 import org.basaltmc.wire.protocol.play.EntityEventPacket
 import org.basaltmc.wire.protocol.play.EntityPositionSyncPacket
 import org.basaltmc.wire.protocol.play.EntityTeleportPacket
@@ -427,6 +434,14 @@ public class ClientSession(
 
     /** The cooker whose window is open, if the open window belongs to one. */
     private var openBlock: BlockPos? = null
+
+    /**
+     * Whether the open screen is this player's own ender chest rather than a block's slots.
+     *
+     * parity: `PlayerEnderChestContainer` belongs to the player, so the twenty-seven slots come off
+     * the session and go back to `players.db`, not to the chest that was clicked.
+     */
+    private var openEnderChest: Boolean = false
 
     /** What the open cooker last showed, so a bar is only re-sent when it moves. */
     private var openBlockData = IntArray(4) { -1 }
@@ -1569,7 +1584,17 @@ public class ClientSession(
         // The cracks everyone else sees. The digger draws its own, which is why this never goes
         // back to them. parity: `ServerPlayerGameMode.destroyAndAck` and its `destroyProgress`.
         when (action.action) {
-            ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK -> startDigging(action.pos)
+            ServerboundPlayerActionPacket.Action.START_DESTROY_BLOCK -> {
+                // parity: `NoteBlock.attack`, which plays the note without moving it on.
+                currentWorld?.let { loaded ->
+                    val struck = NoteBlocks.strike(loaded, action.pos.x, action.pos.y, action.pos.z)
+                    if (struck.isNotEmpty()) {
+                        val stateId = world.getBlockState(action.pos.x, action.pos.y, action.pos.z) ?: 0
+                        broadcastEffects(action.pos, stateId, struck)
+                    }
+                }
+                startDigging(action.pos)
+            }
             ServerboundPlayerActionPacket.Action.ABORT_DESTROY_BLOCK,
             ServerboundPlayerActionPacket.Action.STOP_DESTROY_BLOCK,
             -> stopDigging()
@@ -1617,6 +1642,13 @@ public class ClientSession(
         }
 
         val broken = world.getBlockState(action.pos.x, action.pos.y, action.pos.z)
+        // parity: `ShulkerBoxBlock.getDrops`, read before the block goes: breaking it takes the
+        // block entity with it, and the contents have to travel in the item.
+        val carried =
+            currentWorld
+                ?.takeIf {
+                    Shulkers.isShulkerBox(BlockStateDefinitions.blockOf(broken ?: 0)?.path)
+                }?.let { Shulkers.contentsOf(it, action.pos.x, action.pos.y, action.pos.z) }
         val leaves = meltedIce(broken, action.pos) ?: Blocks.AIR.stateId
         val changed = world.setBlockState(action.pos.x, action.pos.y, action.pos.z, leaves)
         sendCompressed(ClientboundBlockChangedAckPacket.ID) {
@@ -1672,7 +1704,7 @@ public class ClientSession(
                     ItemTools.isCorrectForDrops(heldItem, brokenBlock.block) { tag, block ->
                         blockTags?.contains(tag, block) == true
                     }
-            if (correctTool) dropLootFor(brokenBlock.block, action.pos)
+            if (correctTool) dropLootFor(brokenBlock.block, action.pos, carried)
         }
         if (brokenBlock != null) wearHeldItemOnBreak(brokenBlock.block)
     }
@@ -1780,6 +1812,86 @@ public class ClientSession(
         for (player in playersInSameWorld()) {
             player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
                 ClientboundBlockUpdatePacket(pos, stateId).write(it)
+            }
+        }
+    }
+
+    /**
+     * parity: `BellBlock.onHit` with `isProperHit`: a bell only swings when it is struck on a side
+     * it can swing towards, and never from a hand above or below it.
+     */
+    private fun ringBell(hit: BlockHitResult): Boolean {
+        val stateId = world.getBlockState(hit.pos.x, hit.pos.y, hit.pos.z) ?: return false
+        val properties = BlockStateDefinitions.propertiesOf(stateId)
+        val face = hit.direction
+        if (face == Direction.UP || face == Direction.DOWN) return false
+        if (hit.clickY > bellHitTop) return false
+        val facing = properties["facing"] ?: "north"
+        val sameAxis = axisOf(facing) == axisOf(face.name.lowercase())
+        val proper =
+            when (properties["attachment"]) {
+                "floor" -> sameAxis
+                "ceiling" -> true
+                else -> !sameAxis
+            }
+        if (!proper) return false
+        broadcastEffects(
+            hit.pos,
+            stateId,
+            listOf(
+                BlockEffect.Event(b0 = 1, b1 = frameDirectionData(face.name.lowercase())),
+                BlockEffect.Sound("block.bell.use", SoundSource.BLOCKS, volume = 2f, pitch = 1f),
+            ),
+        )
+        return true
+    }
+
+    private fun axisOf(direction: String): String = if (direction == "north" || direction == "south") "z" else "x"
+
+    /** parity: `BellBlock.isProperHit`, which will not take a click on the very top of the block. */
+    private val bellHitTop = 0.8124f
+
+    /** The other half of a block change: what it asks everyone nearby to hear or see. */
+    private fun broadcastEffects(
+        pos: BlockPos,
+        stateId: Int,
+        effects: List<BlockEffect>,
+    ) {
+        for (effect in effects) {
+            when (effect) {
+                is BlockEffect.Sound -> {
+                    val sound =
+                        SoundPacket(
+                            sound = effect.name,
+                            source = effect.source,
+                            x = pos.x + 0.5,
+                            y = pos.y + 0.5,
+                            z = pos.z + 0.5,
+                            volume = effect.volume,
+                            pitch = effect.pitch,
+                            seed = Random.nextLong(),
+                        )
+                    for (player in playersInSameWorld()) {
+                        player.connection.sendPlayPacket(SoundPacket.ID) { sound.write(it) }
+                    }
+                }
+
+                is BlockEffect.Event -> {
+                    val blockId = BlockSupport.blockRegistryIdOf(stateId)
+                    for (player in playersInSameWorld()) {
+                        player.connection.sendPlayPacket(BlockEventPacket.ID) {
+                            BlockEventPacket(pos, effect.b0, effect.b1, blockId).write(it)
+                        }
+                    }
+                }
+
+                is BlockEffect.Effect -> {
+                    for (player in playersInSameWorld()) {
+                        player.connection.sendPlayPacket(LevelEventPacket.ID) {
+                            LevelEventPacket(effect.type, pos, effect.data).write(it)
+                        }
+                    }
+                }
             }
         }
     }
@@ -1960,6 +2072,7 @@ public class ClientSession(
     private fun dropLootFor(
         block: Identifier,
         pos: BlockPos,
+        carried: NbtCompound? = null,
     ) {
         val table = lootTables?.forBlock(block) ?: return
         val drops = table.generate(LegacyRandom(Random.nextLong()))
@@ -1967,6 +2080,8 @@ public class ClientSession(
         for (stack in drops) {
             // Falls under its own gravity now ([WorldState.tickItems]) instead of being snapped to
             // the ground up front, so a block broken in mid-air drops as it should.
+            val components = NbtCompound()
+            if (carried != null && stack.item == block) components[Shulkers.CONTAINER] = carried
             spawnDroppedItem(
                 item = stack.item,
                 count = stack.count,
@@ -1975,6 +2090,7 @@ public class ClientSession(
                 z = pos.z + 0.5,
                 velocityY = BREAK_DROP_LIFT,
                 pickupDelay = BREAK_DROP_PICKUP_DELAY,
+                components = components,
             )
         }
     }
@@ -1993,6 +2109,7 @@ public class ClientSession(
         velocityY: Double = 0.0,
         velocityZ: Double = 0.0,
         pickupDelay: Int = WorldState.DEFAULT_PICKUP_DELAY,
+        components: NbtCompound = NbtCompound(),
     ) {
         if (count <= 0) return
         if (Items.REGISTRY.byIdentifier(item) == null) return
@@ -2013,6 +2130,7 @@ public class ClientSession(
                 velocityY = velocityY,
                 velocityZ = velocityZ,
                 pickupDelay = pickupDelay,
+                components = components,
             ),
         )
     }
@@ -2311,7 +2429,10 @@ public class ClientSession(
             // parity: a player's own toss cannot be picked straight back up (`ItemEntity.pickupDelay`).
             if (!candidate.canBePickedUp) continue
             val removed = world.removeItem(candidate.entityId) ?: continue
-            val leftover = session.inventory.add(StoredItemStack(removed.item.toString(), removed.count))
+            val leftover =
+                session.inventory.add(
+                    StoredItemStack(removed.item.toString(), removed.count, removed.components),
+                )
             val picked = removed.count - leftover
             if (picked <= 0) {
                 // Nowhere for it to go: put it back exactly as it was, nothing happened.
@@ -2398,6 +2519,39 @@ public class ClientSession(
             if (cookerPath != null && Campfires.isCampfire(cookerPath) && placeOnCampfire(session, hit.pos)) {
                 return ack()
             }
+            // parity: `EnderChestBlock.useWithoutItem`, the player's own slots and not the block's.
+            if (cookerPath == "ender_chest") {
+                openEnderChest(session, hit.pos)
+                return ack()
+            }
+            // parity: `ChiseledBookShelfBlock`, which takes a book into the slot that was clicked
+            // and gives it back from the same one.
+            if (ChiseledBookshelves.isBookshelf(cookerPath)) {
+                useBookshelf(session, hit)
+                return ack()
+            }
+            // parity: `ShelfBlock.useItemOn`, one slot by hand and the whole hotbar when powered.
+            if (Shelves.isShelf(cookerPath)) {
+                useShelf(session, hit)
+                return ack()
+            }
+            // parity: `DecoratedPotBlock.useItemOn`, one item at a time into its single slot, and
+            // `useWithoutItem`, which only rocks it.
+            if (DecoratedPots.isPot(cookerPath)) {
+                usePot(session, hit.pos)
+                return ack()
+            }
+            // parity: `NoteBlock.useWithoutItem`, which moves the note on one and plays it.
+            if (cookerPath == "note_block") {
+                val loaded = currentWorld ?: return ack()
+                NoteBlocks.tune(loaded, hit.pos.x, hit.pos.y, hit.pos.z)?.let { change ->
+                    broadcastBlockUpdate(hit.pos, change.stateId)
+                    broadcastEffects(hit.pos, change.stateId, change.effects)
+                }
+                return ack()
+            }
+            // parity: `BellBlock.useWithoutItem`, which only rings from a side that can swing it.
+            if (cookerPath == "bell" && ringBell(hit)) return ack()
             val clickedState = world.getBlockState(hit.pos.x, hit.pos.y, hit.pos.z)
             if (clickedState != null && Beds.isBed(clickedState)) {
                 useBed(session, hit.pos, clickedState)
@@ -2541,6 +2695,13 @@ public class ClientSession(
                 ),
             )
         }
+        // parity: `BlockItem.updateCustomBlockEntityTag`: a shulker box placed from an item that
+        // carries contents gets them back, which is the other half of breaking one.
+        if (Shulkers.isShulkerBox(placedPath)) {
+            (held.components[Shulkers.CONTAINER] as? NbtCompound)?.let { carried ->
+                loadedWorld?.let { Shulkers.restore(it, placeAt.x, placeAt.y, placeAt.z, carried) }
+            }
+        }
         // parity: `MossyCarpetBlock.setPlacedBy`, which grows a second carpet over the one placed.
         if (BlockStateDefinitions.blockOf(blockStateId)?.path == "pale_moss_carpet") {
             loadedWorld?.let { placedIn ->
@@ -2672,7 +2833,40 @@ public class ClientSession(
     }
 
     /**
-     * Opens a chest, a trapped chest or a barrel.
+     * parity: `EnderChestBlock.useWithoutItem`: the same twenty-seven slots wherever the chest is,
+     * and nothing at all when something solid sits on top of it, exactly like a chest.
+     */
+    private fun openEnderChest(
+        session: PlayerSession,
+        pos: BlockPos,
+    ) {
+        val world = currentWorld ?: return
+        val above = world.state.getBlockState(pos.x, pos.y + 1, pos.z) ?: return
+        if (BlockSupport.conductsRedstone(above)) return
+        returnCraftingGrid(session)
+        nextContainerId = if (nextContainerId >= MAX_CONTAINER_ID) FIRST_BLOCK_CONTAINER_ID else nextContainerId + 1
+        openMenu = Menu.chest(nextContainerId)
+        openBlock = null
+        openEnderChest = true
+        openBlockSize = StoredPlayer.ENDER_CHEST_SLOTS
+        openBlockData = IntArray(4) { -1 }
+        sendCompressed(OpenScreenPacket.ID) {
+            OpenScreenPacket(
+                containerId = openMenu.containerId,
+                menuType = OpenScreenPacket.CHEST_MENU,
+                title = Component.translatable("container.enderchest"),
+            ).write(it)
+        }
+        sendInventory()
+        broadcastEffects(
+            pos,
+            world.state.getBlockState(pos.x, pos.y, pos.z) ?: 0,
+            listOf(BlockEffect.Sound("block.ender_chest.open", SoundSource.BLOCKS, 0.5f, 1f)),
+        )
+    }
+
+    /**
+     * Opens a chest, a trapped chest, a barrel or a shulker box.
      *
      * parity: `ChestBlock.use`, which opens the block's own container. Double chests are not paired
      * yet, so each half opens as its own three rows.
@@ -2686,13 +2880,18 @@ public class ClientSession(
         nextContainerId = if (nextContainerId >= MAX_CONTAINER_ID) FIRST_BLOCK_CONTAINER_ID else nextContainerId + 1
         openMenu = Menu.chest(nextContainerId)
         openBlock = pos
+        openEnderChest = false
         openBlockSize = Menu.CHEST_SIZE
         openBlockData = IntArray(4) { -1 }
         sendCompressed(OpenScreenPacket.ID) {
             OpenScreenPacket(
                 containerId = openMenu.containerId,
                 menuType = OpenScreenPacket.CHEST_MENU,
-                title = Component.translatable("container.$block"),
+                // parity: the shulker box is the one whose translation key is not its own path.
+                title =
+                    Component.translatable(
+                        if (Shulkers.isShulkerBox(block)) "container.shulkerBox" else "container.$block",
+                    ),
             ).write(it)
         }
         sendInventory()
@@ -2732,10 +2931,16 @@ public class ClientSession(
             }
         }
         // Only the first in and the last out make a sound, which is why a busy chest is not a rattle.
-        val sound =
+        val family =
             when {
-                openers == 1 -> if (block == "barrel") "block.barrel.open" else "block.chest.open"
-                openers == 0 -> if (block == "barrel") "block.barrel.close" else "block.chest.close"
+                block == "barrel" -> "barrel"
+                Shulkers.isShulkerBox(block) -> "shulker_box"
+                else -> "chest"
+            }
+        val sound =
+            when (openers) {
+                1 -> "block.$family.open"
+                0 -> "block.$family.close"
                 else -> return
             }
         for (player in playersInSameWorld()) {
@@ -3004,6 +3209,139 @@ public class ClientSession(
     }
 
     /**
+     * parity: `ChiseledBookShelfBlock.useItemOn` and `useWithoutItem`: a book goes into the slot the
+     * click landed on, and an empty hand takes back whatever is in that one.
+     */
+    private fun useBookshelf(
+        session: PlayerSession,
+        hit: BlockHitResult,
+    ) {
+        val world = currentWorld ?: return
+        val stateId = world.state.getBlockState(hit.pos.x, hit.pos.y, hit.pos.z) ?: return
+        val slot =
+            ChiseledBookshelves.slotAt(stateId, hit.direction.name.lowercase(), hit.clickX, hit.clickY, hit.clickZ)
+                ?: return
+        val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
+        val held = session.inventory[heldSlot]
+        val book = held?.let { Identifier.parse(it.id) }
+        val isBook = book != null && itemTags?.contains("minecraft:bookshelf_books", book) == true
+        val interaction =
+            if (isBook) {
+                ChiseledBookshelves.putBook(world, hit.pos.x, hit.pos.y, hit.pos.z, slot, checkNotNull(book))
+            } else {
+                ChiseledBookshelves.takeBook(world, hit.pos.x, hit.pos.y, hit.pos.z, slot)
+            } ?: return
+        broadcastBlockUpdate(hit.pos, interaction.change.stateId)
+        broadcastEffects(hit.pos, interaction.change.stateId, interaction.change.effects)
+        val taken = interaction.taken
+        if (taken != null) {
+            giveOrDrop(session, StoredItemStack(taken.toString(), 1), hit.pos)
+        } else if (held != null && session.gamemode != Gamemode.CREATIVE) {
+            session.inventory[heldSlot] = if (held.count <= 1) null else held.copy(count = held.count - 1)
+            sendInventorySlot(heldSlot)
+        }
+    }
+
+    /**
+     * parity: `ShelfBlock.useItemOn`: unpowered it swaps the held item with the slot that was
+     * clicked, and powered it swaps the whole hotbar against the shelves in the chain.
+     */
+    private fun useShelf(
+        session: PlayerSession,
+        hit: BlockHitResult,
+    ) {
+        val world = currentWorld ?: return
+        val stateId = world.state.getBlockState(hit.pos.x, hit.pos.y, hit.pos.z) ?: return
+        val slot = Shelves.slotAt(stateId, hit.direction.name.lowercase(), hit.clickX, hit.clickY, hit.clickZ) ?: return
+        if (BlockStateDefinitions.propertiesOf(stateId)["powered"] == "true") {
+            swapHotbarWithShelf(session, hit.pos, stateId)
+            return
+        }
+        val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
+        val held = session.inventory[heldSlot]
+        val placed =
+            held?.let {
+                org.basaltmc.server.world.loot
+                    .ItemStack(Identifier.parse(it.id), it.count)
+            }
+        val result = Shelves.swap(world, hit.pos.x, hit.pos.y, hit.pos.z, slot, placed) ?: return
+        session.inventory[heldSlot] =
+            result.removed?.let { StoredItemStack(it.item.toString(), it.count) }
+        sendInventorySlot(heldSlot)
+        broadcastEffects(hit.pos, stateId, result.effects)
+    }
+
+    /** parity: `ShelfBlock.swapHotbar`, nine slots against the chain's nine. */
+    private fun swapHotbarWithShelf(
+        session: PlayerSession,
+        pos: BlockPos,
+        stateId: Int,
+    ) {
+        val world = currentWorld ?: return
+        val hotbar =
+            Array(PlayerInventory.HOTBAR_SIZE) { index ->
+                session.inventory[PlayerInventory.HOTBAR_START + index]?.let {
+                    org.basaltmc.server.world.loot
+                        .ItemStack(Identifier.parse(it.id), it.count)
+                }
+            }
+        if (!Shelves.swapHotbar(world, pos.x, pos.y, pos.z, hotbar)) return
+        for (index in hotbar.indices) {
+            session.inventory[PlayerInventory.HOTBAR_START + index] =
+                hotbar[index]?.let { StoredItemStack(it.item.toString(), it.count) }
+        }
+        sendInventoryAll()
+        broadcastEffects(
+            pos,
+            stateId,
+            listOf(BlockEffect.Sound("block.shelf.multi_swap", SoundSource.BLOCKS, 1f, 1f)),
+        )
+    }
+
+    /** Into the player's inventory if it fits, and onto the floor if it does not. */
+    private fun giveOrDrop(
+        session: PlayerSession,
+        stack: StoredItemStack,
+        pos: BlockPos,
+    ) {
+        val leftover = session.inventory.add(stack)
+        sendInventoryAll()
+        if (leftover <= 0) return
+        spawnDroppedItem(
+            item = Identifier.parse(stack.id),
+            count = leftover,
+            x = pos.x + 0.5,
+            y = pos.y + 0.5,
+            z = pos.z + 0.5,
+        )
+    }
+
+    /**
+     * parity: `DecoratedPotBlock.useItemOn` and `useWithoutItem`. An empty hand, a full pot or the
+     * wrong item all end the same way: the pot rocks and takes nothing.
+     */
+    private fun usePot(
+        session: PlayerSession,
+        pos: BlockPos,
+    ) {
+        val world = currentWorld ?: return
+        val stateId = world.state.getBlockState(pos.x, pos.y, pos.z) ?: return
+        val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
+        val held = session.inventory[heldSlot]
+        val inserted =
+            held?.let { DecoratedPots.insert(world, pos.x, pos.y, pos.z, Identifier.parse(it.id)) }
+        if (inserted == null) {
+            broadcastEffects(pos, stateId, DecoratedPots.rebuff())
+            return
+        }
+        if (session.gamemode != Gamemode.CREATIVE) {
+            session.inventory[heldSlot] = if (held.count <= 1) null else held.copy(count = held.count - 1)
+            sendInventorySlot(heldSlot)
+        }
+        broadcastEffects(pos, stateId, inserted)
+    }
+
+    /**
      * Puts what the player is holding onto a campfire.
      *
      * parity: `CampfireBlock.useItemOn`: one piece into the first free slot, at the recipe's own
@@ -3065,6 +3403,7 @@ public class ClientSession(
 
     /** The block's own slots, read straight off its block entity. */
     private fun readBlockSlot(index: Int): StoredItemStack? {
+        if (openEnderChest) return playerSession?.enderChest?.getOrNull(index)
         val entity = openBlockEntity() ?: return null
         val stack = BlockInventory.read(entity.data, openBlockSize).getOrNull(index) ?: return null
         return StoredItemStack(stack.item.toString(), stack.count)
@@ -3081,6 +3420,11 @@ public class ClientSession(
         index: Int,
         stack: StoredItemStack?,
     ) {
+        if (openEnderChest) {
+            val slots = playerSession?.enderChest ?: return
+            if (index in slots.indices) slots[index] = stack
+            return
+        }
         val position = openBlock ?: return
         val world = currentWorld ?: return
         val chunk = world.state.chunkIfLoaded(position.x shr 4, position.z shr 4) ?: return
@@ -3182,6 +3526,7 @@ public class ClientSession(
         val closingBlock = closing?.let { openContainerBlock(it) }
         openMenu = Menu.playerInventory()
         openBlock = null
+        openEnderChest = false
         if (closing != null && closingBlock != null) {
             announceOpeners(
                 closing,

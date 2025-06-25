@@ -146,6 +146,7 @@ public object NeighbourUpdates {
         ScheduledBlocks.scaffolding(world, x, y, z)?.let { return it }
         // A column is more than one block, so it reports through the caller rather than as one state.
         ScheduledBlocks.bubbleColumn(world, x, y, z, bubbles)
+        NoteBlocks.retune(world, x, y, z, stateId)?.let { return it }
         Reshapes.of(world, x, y, z, stateId)?.let { return it }
         if (BlockConnections.isLeaves(stateId)) return retreeLeaves(world, x, y, z, stateId)
         if (BlockConnections.isStairs(stateId)) return turnStairs(world, x, y, z, stateId)

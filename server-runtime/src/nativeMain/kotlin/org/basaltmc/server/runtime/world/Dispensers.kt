@@ -68,6 +68,7 @@ public object Dispensers {
         y: Int,
         z: Int,
         random: LegacyRandom,
+        effects: MutableList<BlockEffect> = mutableListOf(),
         allocateEntityId: () -> Int,
     ): Boolean {
         val stateId = world.state.getBlockState(x, y, z) ?: return false
@@ -76,7 +77,12 @@ public object Dispensers {
         val chunk = world.state.chunkIfLoaded(x shr 4, z shr 4) ?: return false
         val entity = chunk.blockEntityAt(x and 15, y, z and 15) ?: return false
         val slots = BlockInventory.read(entity.data, SIZE)
-        val slot = randomFullSlot(slots, random) ?: return false
+        val slot =
+            randomFullSlot(slots, random) ?: run {
+                // parity: `DispenserBlock.dispenseFrom`, which clicks at nothing when it is empty.
+                effects += BlockEffect.Effect(BlockEffect.Effect.DISPENSER_FAIL, 0)
+                return false
+            }
         val facing = BlockStateDefinitions.propertiesOf(stateId)["facing"] ?: return false
         val out = BlockFace.entries.firstOrNull { it.name.lowercase() == facing } ?: return false
         val stack = slots[slot] ?: return false
