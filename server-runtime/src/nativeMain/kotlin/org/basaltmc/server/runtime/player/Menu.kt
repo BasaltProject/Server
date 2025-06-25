@@ -131,6 +131,53 @@ public class Menu(
                     },
             )
 
+        /** parity: `StonecutterMenu`: one slot in, one out, then the player's 36. */
+        private const val STONECUTTER_SLOT_COUNT = 38
+
+        /** The stonecutter's two slots: what goes in, and what the chosen button makes of it. */
+        public const val STONECUTTER_INPUT: Int = 0
+        public const val STONECUTTER_RESULT: Int = 1
+
+        public fun stonecutter(containerId: Int): Menu =
+            Menu(
+                containerId = containerId,
+                gridWidth = 0,
+                gridHeight = 0,
+                slots =
+                    List(STONECUTTER_SLOT_COUNT) { slot ->
+                        when (slot) {
+                            in 0..1 -> MenuSlot.Block(slot)
+                            in 2..28 -> MenuSlot.Inventory(slot - 2)
+                            in 29..37 -> MenuSlot.Inventory(slot - 29 + PlayerInventory.HOTBAR_START)
+                            else -> null
+                        }
+                    },
+            )
+
+        /** parity: `SmithingMenu`: template, base, addition, result, then the player's 36. */
+        private const val SMITHING_SLOT_COUNT = 40
+
+        public const val SMITHING_TEMPLATE: Int = 0
+        public const val SMITHING_BASE: Int = 1
+        public const val SMITHING_ADDITION: Int = 2
+        public const val SMITHING_RESULT: Int = 3
+
+        public fun smithing(containerId: Int): Menu =
+            Menu(
+                containerId = containerId,
+                gridWidth = 0,
+                gridHeight = 0,
+                slots =
+                    List(SMITHING_SLOT_COUNT) { slot ->
+                        when (slot) {
+                            in 0..3 -> MenuSlot.Block(slot)
+                            in 4..30 -> MenuSlot.Inventory(slot - 4)
+                            in 31..39 -> MenuSlot.Inventory(slot - 31 + PlayerInventory.HOTBAR_START)
+                            else -> null
+                        }
+                    },
+            )
+
         /** parity: `MerchantMenu`: two slots to pay with, one to take from, then the player's 36. */
         private const val MERCHANT_SLOT_COUNT = 39
 

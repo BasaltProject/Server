@@ -20,17 +20,19 @@ public data class LootPool(
     public fun generate(
         random: BasaltRandom,
         luck: Float,
+        explosionRadius: Float? = null,
         output: (ItemStack) -> Unit,
     ) {
         if (!conditions.all { it.test(random) }) return
 
         val count = rolls.getInt(random) + floor(bonusRolls.getFloat(random) * luck).toInt()
-        repeat(count) { addRandomItem(random, luck, output) }
+        repeat(count) { addRandomItem(random, luck, explosionRadius, output) }
     }
 
     private fun addRandomItem(
         random: BasaltRandom,
         luck: Float,
+        explosionRadius: Float?,
         output: (ItemStack) -> Unit,
     ) {
         val validEntries = mutableListOf<LootEntry>()
@@ -57,7 +59,7 @@ public data class LootPool(
             }
 
         var stack = chosen.createItemStack(random)
-        for (function in functions) stack = function.apply(stack, random)
+        for (function in functions) stack = function.apply(stack, random, explosionRadius)
         output(stack)
     }
 

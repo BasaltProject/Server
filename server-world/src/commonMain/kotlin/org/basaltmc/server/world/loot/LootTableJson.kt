@@ -108,6 +108,9 @@ public object LootTableJson {
                     count = parseNumberProvider(function.getValue("count")),
                     limit = (function["limit"] as? JsonPrimitive)?.content?.toDoubleOrNull()?.toInt(),
                 )
+            // parity: `ApplyExplosionDecay`, which is what leaves a crater with only some of what
+            // it broke. Refusing it left every table that carries it dropping nothing at all.
+            "minecraft:explosion_decay" -> LootFunction.ExplosionDecay
             // parity: `copy_components`, `copy_custom_data`, `copy_state` and `copy_name`: all four
             // carry something off the block entity onto the stack. What they carry is put on by the
             // caller that knows the block (a shulker box's contents, say), so the drop itself is

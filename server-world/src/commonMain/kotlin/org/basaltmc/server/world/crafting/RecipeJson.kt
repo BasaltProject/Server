@@ -34,7 +34,10 @@ public object RecipeJson {
     ): Recipe {
         val type = root.getValue("type").jsonPrimitive.content
         val group = (root["group"] as? JsonPrimitive)?.content ?: ""
-        val result = parseResult(root.getValue("result") as JsonObject)
+        // parity: two recipe types carry no result at all, because theirs comes out of the grid: a
+        // trim is the armour that went in, and a repair is the tool that went in.
+        val result =
+            (root["result"] as? JsonObject)?.let { parseResult(it) } ?: ItemStack(Identifier.vanilla("air"), 1)
         return when (type) {
             "minecraft:crafting_shaped" -> parseShaped(root, group, result, resolveTag)
             "minecraft:crafting_shapeless" -> parseShapeless(root, group, result, resolveTag)
@@ -45,6 +48,89 @@ public object RecipeJson {
             "minecraft:smoking" -> parseCooking(root, group, result, Recipe.Cooker.SMOKING, 100, resolveTag)
             "minecraft:campfire_cooking" ->
                 parseCooking(root, group, result, Recipe.Cooker.CAMPFIRE, 100, resolveTag)
+            // parity: `TransmuteRecipe`: two ingredients in any arrangement, one of which decides
+            // what comes out. The result keeps the input's components in vanilla; nothing here
+            // carries components through a craft yet, so it comes out plain.
+            "minecraft:crafting_transmute" ->
+                Recipe.Shapeless(
+                    group,
+                    result,
+                    listOf(
+                        parseIngredient(root.getValue("input"), resolveTag),
+                        parseIngredient(root.getValue("material"), resolveTag),
+                    ),
+                )
+            // parity: `StonecutterRecipe`, whose ingredient is a single one and whose result is
+            // whatever the button that was clicked showed.
+            "minecraft:stonecutting" ->
+                Recipe.Stonecutting(group, result, parseIngredient(root.getValue("ingredient"), resolveTag))
+            // parity: `SmithingTransformRecipe` and `SmithingTrimRecipe`. A trim recipe has no
+            // result of its own: what comes out is the base with the pattern on it.
+            "minecraft:smithing_transform" ->
+                Recipe.Smithing(
+                    group,
+                    result,
+                    template = parseIngredient(root.getValue("template"), resolveTag),
+                    base = parseIngredient(root.getValue("base"), resolveTag),
+                    addition = parseIngredient(root.getValue("addition"), resolveTag),
+                )
+            "minecraft:smithing_trim" ->
+                Recipe.Smithing(
+                    group,
+                    result,
+                    template = parseIngredient(root.getValue("template"), resolveTag),
+                    base = parseIngredient(root.getValue("base"), resolveTag),
+                    addition = parseIngredient(root.getValue("addition"), resolveTag),
+                    trimPattern = Identifier.parse(root.getValue("pattern").jsonPrimitive.content),
+                )
+            // parity: the specials, which name their own ingredients in 26.2: what is code is the
+            // rule, not the list of items.
+            "minecraft:crafting_dye" ->
+                special(
+                    root,
+                    group,
+                    result,
+                    Recipe.Special.Kind.DYE,
+                    "target",
+                    "dye",
+                    resolveTag,
+                )
+            "minecraft:crafting_imbue" ->
+                special(root, group, result, Recipe.Special.Kind.IMBUE, "source", "material", resolveTag)
+            "minecraft:crafting_decorated_pot" ->
+                special(root, group, result, Recipe.Special.Kind.DECORATED_POT, null, "back", resolveTag)
+            "minecraft:crafting_special_bookcloning" ->
+                special(root, group, result, Recipe.Special.Kind.BOOK_CLONING, "source", "material", resolveTag)
+            "minecraft:crafting_special_bannerduplicate" ->
+                special(root, group, result, Recipe.Special.Kind.BANNER_DUPLICATE, "banner", null, resolveTag)
+            "minecraft:crafting_special_shielddecoration" ->
+                special(root, group, result, Recipe.Special.Kind.SHIELD_DECORATION, "target", "banner", resolveTag)
+            "minecraft:crafting_special_mapextending" ->
+                special(root, group, result, Recipe.Special.Kind.MAP_EXTENDING, "map", "material", resolveTag)
+            "minecraft:crafting_special_firework_rocket" ->
+                Recipe.Special(
+                    group,
+                    result,
+                    Recipe.Special.Kind.FIREWORK_ROCKET,
+                    target = root["shell"]?.let { parseIngredient(it, resolveTag) },
+                    material = root["fuel"]?.let { parseIngredient(it, resolveTag) },
+                    extra = root["star"]?.let { parseIngredient(it, resolveTag) },
+                )
+            "minecraft:crafting_special_firework_star" ->
+                Recipe.Special(
+                    group,
+                    result,
+                    Recipe.Special.Kind.FIREWORK_STAR,
+                    target = root["fuel"]?.let { parseIngredient(it, resolveTag) },
+                    material = root["dye"]?.let { parseIngredient(it, resolveTag) },
+                    modifiers = fireworkModifiers(root, resolveTag),
+                )
+            "minecraft:crafting_special_firework_star_fade" ->
+                special(root, group, result, Recipe.Special.Kind.FIREWORK_STAR_FADE, "target", "dye", resolveTag)
+            // parity: `RepairItemRecipe`, the one that names nothing because both its inputs are
+            // whatever damaged item you put in.
+            "minecraft:crafting_special_repairitem" ->
+                Recipe.Special(group, result, Recipe.Special.Kind.REPAIR_ITEM)
             else -> throw RecipeParseException("Unsupported recipe type: $type")
         }
     }
@@ -113,6 +199,37 @@ public object RecipeJson {
         val ingredients = (root.getValue("ingredients") as JsonArray).map { parseIngredient(it, resolveTag) }
         return Recipe.Shapeless(group, result, ingredients)
     }
+
+    /** parity: `FireworkStarRecipe`'s four shapes plus its trail and twinkle, each named. */
+    private fun fireworkModifiers(
+        root: JsonObject,
+        resolveTag: (Identifier) -> Set<Identifier>,
+    ): List<Pair<String, Ingredient>> =
+        buildList {
+            (root["shapes"] as? JsonObject)?.forEach { (shape, element) ->
+                add(shape to parseIngredient(element, resolveTag))
+            }
+            root["trail"]?.let { add("trail" to parseIngredient(it, resolveTag)) }
+            root["twinkle"]?.let { add("twinkle" to parseIngredient(it, resolveTag)) }
+        }
+
+    /** One special recipe, with whichever of its two ingredient fields the file carries. */
+    private fun special(
+        root: JsonObject,
+        group: String,
+        result: ItemStack,
+        kind: Recipe.Special.Kind,
+        targetKey: String?,
+        materialKey: String?,
+        resolveTag: (Identifier) -> Set<Identifier>,
+    ): Recipe.Special =
+        Recipe.Special(
+            group = group,
+            result = result,
+            kind = kind,
+            target = targetKey?.let { key -> root[key]?.let { parseIngredient(it, resolveTag) } },
+            material = materialKey?.let { key -> root[key]?.let { parseIngredient(it, resolveTag) } },
+        )
 
     private fun parseIngredient(
         element: JsonElement,

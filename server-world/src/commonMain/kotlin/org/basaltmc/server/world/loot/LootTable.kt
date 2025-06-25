@@ -16,13 +16,16 @@ public data class LootTable(
     public fun generate(
         random: BasaltRandom,
         luck: Float = 0f,
+        /** parity: `LootContextParams.EXPLOSION_RADIUS`, which is what `explosion_decay` reads. */
+        explosionRadius: Float? = null,
     ): List<ItemStack> {
         val output = mutableListOf<ItemStack>()
         for (pool in pools) {
-            pool.generate(random, luck) { stack ->
+            pool.generate(random, luck, explosionRadius) { stack ->
                 var decorated = stack
-                for (function in functions) decorated = function.apply(decorated, random)
-                output += decorated
+                for (function in functions) decorated = function.apply(decorated, random, explosionRadius)
+                // A stack an explosion swallowed whole is not a drop at all.
+                if (decorated.count > 0) output += decorated
             }
         }
         return output

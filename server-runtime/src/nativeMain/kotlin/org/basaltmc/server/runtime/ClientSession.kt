@@ -248,10 +248,12 @@ import org.basaltmc.wire.protocol.play.SoundSource
 import org.basaltmc.wire.protocol.play.SpawnEntityPacket
 import org.basaltmc.wire.protocol.play.SpawnInfo
 import org.basaltmc.wire.protocol.play.SpawnPositionPacket
+import org.basaltmc.wire.protocol.play.StonecutterOption
 import org.basaltmc.wire.protocol.play.SystemChatPacket
 import org.basaltmc.wire.protocol.play.UpdateAttributesPacket
 import org.basaltmc.wire.protocol.play.UpdateLightPacket
 import org.basaltmc.wire.protocol.play.UpdateMobEffectPacket
+import org.basaltmc.wire.protocol.play.UpdateRecipesPacket
 import org.basaltmc.wire.protocol.play.WireItemStack
 import org.basaltmc.wire.protocol.readVarInt
 import org.basaltmc.wire.protocol.status.PingRequestPacket
@@ -465,6 +467,19 @@ public class ClientSession(
      * good and a trapped chest powered for good.
      */
     private var openedAt: BlockPos? = null
+
+    /** Whether the open screen is a stonecutter, whose two slots are the menu's own and not a block's. */
+    private var openStonecutter: Boolean = false
+
+    /** parity: `StonecutterMenu.input`/`resultSlot`, which live in the menu rather than in the block. */
+    private var stonecutterInput: StoredItemStack? = null
+    private var stonecutterResult: StoredItemStack? = null
+
+    /** Whether the open screen is a smithing table, whose four slots are the menu's own. */
+    private var openSmithing: Boolean = false
+
+    /** parity: `SmithingMenu`'s three inputs and its result, none of which belong to the block. */
+    private val smithingSlots = arrayOfNulls<StoredItemStack>(4)
 
     /** What the open cooker last showed, so a bar is only re-sent when it moves. */
     private var openBlockData = IntArray(4) { -1 }
@@ -1102,6 +1117,10 @@ public class ClientSession(
         // them: abilities decide whether the client will even let itself fly, and without a command
         // tree its own parser rejects every slash command before one reaches the server.
         sendAbilities()
+        // parity: `PlayerList.placeNewPlayer` sends the recipes right here, between the abilities
+        // and the permission level. The stonecutter draws its own buttons from them, so without it
+        // that screen opens empty however many recipes the server knows.
+        sendStonecutterRecipes()
         sendCommandTree()
 
         // Without these, a real client's "loading terrain" screen never dismisses: it has no
@@ -2552,6 +2571,16 @@ public class ClientSession(
             if (cookerPath != null && Campfires.isCampfire(cookerPath) && placeOnCampfire(session, hit.pos)) {
                 return ack()
             }
+            // parity: `SmithingTableBlock.useWithoutItem`, whose four slots belong to the screen.
+            if (cookerPath == "smithing_table") {
+                openSmithingMenu(session)
+                return ack()
+            }
+            // parity: `StonecutterBlock.useWithoutItem`, whose two slots belong to the screen.
+            if (cookerPath == "stonecutter") {
+                openStonecutterMenu(session)
+                return ack()
+            }
             // parity: `EnderChestBlock.useWithoutItem`, the player's own slots and not the block's.
             if (cookerPath == "ender_chest") {
                 openEnderChest(session, hit.pos)
@@ -2726,17 +2755,25 @@ public class ClientSession(
         ack()
         if (!changed) return
         // parity: `getStateForPlacement` joins a fence, a wall or a staircase to what is already
-        // there, and the shape it settles on is what the announcement below carries.
+        // there, and the announcement below has to carry the state it settled on rather than the one
+        // it was placed as.
+        var settledStateId = blockStateId
         loadedWorld?.let { placedIn ->
-            NeighbourUpdates.connect(placedIn, placeAt.x, placeAt.y, placeAt.z, blockStateId)
+            NeighbourUpdates.connect(placedIn, placeAt.x, placeAt.y, placeAt.z, blockStateId)?.let {
+                settledStateId = it
+            }
             // parity: `BaseRailBlock.onPlace` into `RailState.place`, which bends the new rail and
             // every rail it decided to meet.
             Rails.place(placedIn, placeAt.x, placeAt.y, placeAt.z) { x, y, z, stateId ->
-                broadcastBlockUpdate(BlockPos(x, y, z), stateId)
+                if (x == placeAt.x && y == placeAt.y && z == placeAt.z) {
+                    settledStateId = stateId
+                } else {
+                    broadcastBlockUpdate(BlockPos(x, y, z), stateId)
+                }
             }
             // parity: `RedStoneWireBlock.getStateForPlacement`, which draws the dust as it lands.
-            RedstoneWire.reshape(placedIn, placeAt.x, placeAt.y, placeAt.z, blockStateId)?.let {
-                broadcastBlockUpdate(placeAt, it)
+            RedstoneWire.reshape(placedIn, placeAt.x, placeAt.y, placeAt.z, settledStateId)?.let {
+                settledStateId = it
             }
         }
         second?.let { world.setBlockState(it.x, it.y, it.z, it.stateId) }
@@ -2775,7 +2812,7 @@ public class ClientSession(
 
         for (player in playersInSameWorld()) {
             player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
-                ClientboundBlockUpdatePacket(placeAt, blockStateId).write(it)
+                ClientboundBlockUpdatePacket(placeAt, settledStateId).write(it)
             }
         }
         second?.let { broadcastBlockUpdate(BlockPos(it.x, it.y, it.z), it.stateId) }
@@ -2923,6 +2960,24 @@ public class ClientSession(
     }
 
     /**
+     * What a container's window is called.
+     *
+     * parity: the name comes from the *block entity*, not the block, so all ten chests are
+     * `container.chest` and every shulker box is `container.shulkerBox`. Naming them after the block
+     * left a copper chest showing `container.waxed_copper_chest` in raw text.
+     */
+    private fun containerTitleKey(
+        block: String,
+        paired: Boolean,
+    ): String =
+        when {
+            Shulkers.isShulkerBox(block) -> "container.shulkerBox"
+            paired -> "container.chestDouble"
+            block in Containers.CHESTS -> "container.chest"
+            else -> "container.$block"
+        }
+
+    /**
      * Opens a chest, a trapped chest, a barrel or a shulker box.
      *
      * parity: `ChestBlock.use`, which opens the block's own container. Double chests are not paired
@@ -2948,15 +3003,7 @@ public class ClientSession(
             OpenScreenPacket(
                 containerId = openMenu.containerId,
                 menuType = if (paired) OpenScreenPacket.DOUBLE_CHEST_MENU else OpenScreenPacket.CHEST_MENU,
-                // parity: the shulker box is the one whose translation key is not its own path.
-                title =
-                    Component.translatable(
-                        when {
-                            Shulkers.isShulkerBox(block) -> "container.shulkerBox"
-                            paired -> "container.chestDouble"
-                            else -> "container.$block"
-                        },
-                    ),
+                title = Component.translatable(containerTitleKey(block, paired)),
             ).write(it)
         }
         sendInventory()
@@ -3110,14 +3157,158 @@ public class ClientSession(
     }
 
     /**
-     * A button inside an open window, which today is the lectern's pages.
+     * parity: `ClientboundUpdateRecipesPacket`, of which this sends the stonecutter half.
      *
-     * parity: `LecternMenu.clickMenuButton`: one back, two forward, three to take the book, and a
-     * hundred plus the page to jump to it.
+     * The recipe book's own item sets go out empty: they only drive the highlighting of what can be
+     * crafted, and drawing a stonecutter's buttons does not depend on them.
+     */
+    private fun sendStonecutterRecipes() {
+        val recipes = recipes ?: return
+        val options =
+            recipes.stonecutting.mapNotNull { recipe ->
+                val result = Items.REGISTRY.byIdentifier(recipe.result.item) ?: return@mapNotNull null
+                val inputs = recipe.ingredient.items.mapNotNull { Items.REGISTRY.byIdentifier(it)?.protocolId }
+                if (inputs.isEmpty()) return@mapNotNull null
+                StonecutterOption(inputs, WireItemStack(result.protocolId, recipe.result.count))
+            }
+        logger.debug { "Sending ${options.size} stonecutter recipe(s)." }
+        sendCompressed(UpdateRecipesPacket.ID) { UpdateRecipesPacket(options).write(it) }
+    }
+
+    /**
+     * parity: `SmithingTableBlock.useWithoutItem` over `SmithingMenu`: a template, a base and an
+     * addition, and whatever the three of them make. Like the stonecutter, the slots are the
+     * screen's own, so what is left in them comes back when it closes.
+     */
+    private fun openSmithingMenu(session: PlayerSession) {
+        returnCraftingGrid(session)
+        nextContainerId = if (nextContainerId >= MAX_CONTAINER_ID) FIRST_BLOCK_CONTAINER_ID else nextContainerId + 1
+        openMenu = Menu.smithing(nextContainerId)
+        openBlock = null
+        openBlockSecond = null
+        openEnderChest = false
+        openStonecutter = false
+        openSmithing = true
+        smithingSlots.fill(null)
+        openBlockSize = smithingSlots.size
+        openBlockData = IntArray(4) { -1 }
+        sendCompressed(OpenScreenPacket.ID) {
+            OpenScreenPacket(
+                containerId = openMenu.containerId,
+                menuType = OpenScreenPacket.SMITHING_MENU,
+                title = Component.translatable("container.upgrade"),
+            ).write(it)
+        }
+        sendInventory()
+    }
+
+    /** parity: `SmithingMenu.createResult`, run whenever any of the three inputs changes. */
+    private fun recomputeSmithingResult() {
+        val recipes = recipes
+        val template = smithingSlots[Menu.SMITHING_TEMPLATE]?.let(::craftingStackOf)
+        val base = smithingSlots[Menu.SMITHING_BASE]?.let(::craftingStackOf)
+        val addition = smithingSlots[Menu.SMITHING_ADDITION]?.let(::craftingStackOf)
+        val recipe = recipes?.smithingFor(template, base, addition)
+        smithingSlots[Menu.SMITHING_RESULT] =
+            if (recipe == null || base == null || addition == null) {
+                null
+            } else {
+                recipe.assemble(base, addition)?.let { StoredItemStack(it.item.toString(), it.count, it.components) }
+            }
+    }
+
+    /** parity: `SmithingMenu.onTake`, which eats one of each of the three inputs. */
+    private fun takeSmithingResult() {
+        for (slot in listOf(Menu.SMITHING_TEMPLATE, Menu.SMITHING_BASE, Menu.SMITHING_ADDITION)) {
+            val stack = smithingSlots[slot] ?: continue
+            smithingSlots[slot] = if (stack.count <= 1) null else stack.copy(count = stack.count - 1)
+        }
+        recomputeSmithingResult()
+    }
+
+    /** A stored stack as the crafting side sees it, components and all. */
+    private fun craftingStackOf(stack: StoredItemStack): org.basaltmc.server.world.loot.ItemStack =
+        org.basaltmc.server.world.loot
+            .ItemStack(Identifier.parse(stack.id), stack.count, stack.components)
+
+    /**
+     * parity: `StonecutterBlock.useWithoutItem` over `StonecutterMenu`.
+     *
+     * Its two slots are the menu's own, not a block's: whatever is left in the input when the screen
+     * closes comes back to the player, exactly as vanilla's `removed` does.
+     */
+    private fun openStonecutterMenu(session: PlayerSession) {
+        returnCraftingGrid(session)
+        nextContainerId = if (nextContainerId >= MAX_CONTAINER_ID) FIRST_BLOCK_CONTAINER_ID else nextContainerId + 1
+        openMenu = Menu.stonecutter(nextContainerId)
+        openBlock = null
+        openBlockSecond = null
+        openEnderChest = false
+        openStonecutter = true
+        stonecutterInput = null
+        stonecutterResult = null
+        openBlockSize = 2
+        openBlockData = IntArray(4) { -1 }
+        sendCompressed(OpenScreenPacket.ID) {
+            OpenScreenPacket(
+                containerId = openMenu.containerId,
+                menuType = OpenScreenPacket.STONECUTTER_MENU,
+                title = Component.translatable("container.stonecutter"),
+            ).write(it)
+        }
+        sendInventory()
+    }
+
+    /** parity: `StonecutterMenu.clickMenuButton` into `setupResultSlot`. */
+    private fun selectStonecutterRecipe(
+        session: PlayerSession,
+        button: Int,
+    ) {
+        val input = stonecutterInput
+        val recipes = recipes
+        if (input == null || recipes == null) {
+            stonecutterResult = null
+            sendInventory()
+            return
+        }
+        val options =
+            recipes.stonecuttingFor(
+                org.basaltmc.server.world.loot
+                    .ItemStack(Identifier.parse(input.id), input.count),
+            )
+        val chosen = options.getOrNull(button)
+        stonecutterResult = chosen?.let { StoredItemStack(it.result.item.toString(), it.result.count) }
+        sendInventory()
+    }
+
+    /**
+     * parity: `StonecutterMenu.ResultSlot.onTake`: taking the result eats one of the input and
+     * leaves the same button selected, so a stack can be cut one at a time without clicking again.
+     */
+    private fun takeStonecutterResult(session: PlayerSession) {
+        val input = stonecutterInput ?: return
+        stonecutterInput = if (input.count <= 1) null else input.copy(count = input.count - 1)
+        if (stonecutterInput == null) {
+            stonecutterResult = null
+        }
+    }
+
+    /**
+     * A button inside an open window: the lectern's pages, or the stonecutter's list.
+     *
+     * parity: `LecternMenu.clickMenuButton` (one back, two forward, three to take the book, and a
+     * hundred plus the page to jump to it) and `StonecutterMenu.clickMenuButton`, whose button is an
+     * index into the recipes that fit the input.
      */
     private fun clickContainerButton(button: Int) {
         val session = playerSession ?: return
         val world = currentWorld ?: return
+        // parity: `StonecutterMenu.clickMenuButton`, whose button is an index into the recipes that
+        // fit whatever is in the input slot, in the order the client was sent them.
+        if (openStonecutter) {
+            selectStonecutterRecipe(session, button)
+            return
+        }
         val pos = openLecternAt ?: return
         val page = lecternPage
         val wanted =
@@ -3596,6 +3787,10 @@ public class ClientSession(
 
     /** The block's own slots, read straight off its block entity. */
     private fun readBlockSlot(index: Int): StoredItemStack? {
+        if (openSmithing) return smithingSlots.getOrNull(index)
+        if (openStonecutter) {
+            return if (index == Menu.STONECUTTER_INPUT) stonecutterInput else stonecutterResult
+        }
         if (openEnderChest) return playerSession?.enderChest?.getOrNull(index)
         val (position, local) = halfFor(index) ?: return null
         val entity = blockEntityAt(position) ?: return null
@@ -3630,6 +3825,28 @@ public class ClientSession(
         index: Int,
         stack: StoredItemStack?,
     ) {
+        if (openSmithing) {
+            if (index !in smithingSlots.indices) return
+            if (index == Menu.SMITHING_RESULT) {
+                // Taking the result is the only way this slot is written, and it costs the inputs.
+                if (stack == null) takeSmithingResult()
+                return
+            }
+            smithingSlots[index] = stack
+            recomputeSmithingResult()
+            return
+        }
+        if (openStonecutter) {
+            val session = playerSession ?: return
+            if (index == Menu.STONECUTTER_INPUT) {
+                stonecutterInput = stack
+                // parity: `slotsChanged`, which clears the choice whenever the input changes.
+                stonecutterResult = null
+            } else if (stack == null) {
+                takeStonecutterResult(session)
+            }
+            return
+        }
         if (openEnderChest) {
             val slots = playerSession?.enderChest ?: return
             if (index in slots.indices) slots[index] = stack
@@ -3752,6 +3969,27 @@ public class ClientSession(
         openBlock = null
         openBlockSecond = null
         openEnderChest = false
+        // parity: `SmithingMenu.removed`, which hands the three inputs back.
+        if (openSmithing) {
+            for (slot in listOf(Menu.SMITHING_TEMPLATE, Menu.SMITHING_BASE, Menu.SMITHING_ADDITION)) {
+                smithingSlots[slot]?.let { leftover ->
+                    val left = session.inventory.add(leftover)
+                    if (left > 0) dropStack(session, leftover.copy(count = left))
+                }
+            }
+            smithingSlots.fill(null)
+            openSmithing = false
+        }
+        // parity: `StonecutterMenu.removed`, which hands whatever was in the input back.
+        if (openStonecutter) {
+            stonecutterInput?.let { leftover ->
+                val left = session.inventory.add(leftover)
+                if (left > 0) dropStack(session, leftover.copy(count = left))
+            }
+            stonecutterInput = null
+            stonecutterResult = null
+            openStonecutter = false
+        }
         if (closing != null && closingBlock != null) {
             announceOpeners(
                 closing,
@@ -3820,6 +4058,10 @@ public class ClientSession(
             // parity: `FurnaceResultSlot.mayPlace`, which is a *furnace's* third slot and nobody
             // else's: a chest's third slot took nothing until this stopped being unconditional.
             slot is MenuSlot.Block && openBlockSize == FURNACE_SLOTS && slot.index == Furnaces.RESULT_SLOT -> false
+            // parity: `StonecutterMenu.ResultSlot.mayPlace`, which is always false.
+            slot is MenuSlot.Block && openStonecutter && slot.index == Menu.STONECUTTER_RESULT -> false
+            // parity: `SmithingMenu`'s result slot, the same.
+            slot is MenuSlot.Block && openSmithing && slot.index == Menu.SMITHING_RESULT -> false
             else -> true
         }
 
@@ -3837,7 +4079,11 @@ public class ClientSession(
         val height = openMenu.gridHeight
         val cells =
             List(width * height) { index ->
-                craftingGrid.getOrNull(index)?.let { LootItemStack(Identifier.parse(it.id), it.count) }
+                // The components go into the grid too: a dye, a copy or a repair is defined by what
+                // it does to them, so a recipe that cannot see them cannot exist.
+                craftingGrid.getOrNull(index)?.let {
+                    LootItemStack(Identifier.parse(it.id), it.count, it.components)
+                }
             }
         val match = recipes.matchFor(CraftingInput.of(width, height, cells))
         // parity: the `limited_crafting` game rule, which is what makes `/recipe give` and
@@ -3852,7 +4098,34 @@ public class ClientSession(
             match
                 ?.takeIf { known }
                 ?.second
-                ?.let { StoredItemStack(it.item.toString(), it.count) }
+                ?.let { StoredItemStack(it.item.toString(), it.count, it.components) }
+    }
+
+    /** What each grid cell is left holding, from the recipe that is about to be taken. */
+    private fun craftingRemainders(): List<StoredItemStack?> {
+        val recipes = recipes ?: return emptyList()
+        val width = openMenu.gridWidth
+        val height = openMenu.gridHeight
+        val cells =
+            List(width * height) { index ->
+                craftingGrid.getOrNull(index)?.let {
+                    LootItemStack(Identifier.parse(it.id), it.count, it.components)
+                }
+            }
+        val input = CraftingInput.of(width, height, cells)
+        val recipe = recipes.recipeMatching(input)?.second ?: return emptyList()
+        // The grid is trimmed to its occupied box, so the recipe answers in that box's order: walk
+        // the same cells in the same order to line the two up.
+        val answered = recipe.remainingItems(input).iterator()
+        return List(width * height) { index ->
+            if (craftingGrid.getOrNull(index) == null) {
+                null
+            } else if (answered.hasNext()) {
+                answered.next()?.let { StoredItemStack(it.item.toString(), it.count, it.components) }
+            } else {
+                null
+            }
+        }
     }
 
     /**
@@ -3873,10 +4146,19 @@ public class ClientSession(
         } else {
             carriedItem = result
         }
+        // parity: `Recipe.getRemainingItems`: a cell whose item leaves something behind (a bucket, a
+        // bottle) keeps it instead of emptying, and the book being copied stays where it was.
+        val remaining = craftingRemainders()
         for (index in 0 until openMenu.gridSize) {
             val cell = craftingGrid.getOrNull(index) ?: continue
             val left = cell.count - 1
-            craftingGrid[index] = if (left <= 0) null else cell.copy(count = left)
+            val leftover = remaining.getOrNull(index)
+            craftingGrid[index] =
+                when {
+                    left > 0 -> cell.copy(count = left)
+                    leftover != null -> leftover
+                    else -> null
+                }
         }
         recomputeCraftingResult()
     }
@@ -4222,7 +4504,7 @@ public class ClientSession(
     }
 
     /** Whether the open screen has slots of its own to shift-click into. */
-    private fun hasBlockSlots(): Boolean = openBlock != null || openEnderChest
+    private fun hasBlockSlots(): Boolean = openBlock != null || openEnderChest || openStonecutter || openSmithing
 
     /**
      * parity: `Slot.mayPlace`, which is why a shift-clicked log lands in a furnace's fuel slot and
@@ -4233,6 +4515,10 @@ public class ClientSession(
         stack: StoredItemStack,
     ): Boolean {
         if (target !is MenuSlot.Block) return true
+        // parity: `StonecutterMenu.quickMoveStack` only ever moves into the input.
+        if (openStonecutter) return target.index == Menu.STONECUTTER_INPUT
+        // parity: `SmithingMenu.quickMoveStack`, which tries the three inputs and never the result.
+        if (openSmithing) return target.index != Menu.SMITHING_RESULT
         if (openBlockSize != FURNACE_SLOTS) return true
         val item = runCatching { Identifier.parse(stack.id) }.getOrNull() ?: return false
         return when (target.index) {

@@ -8,7 +8,6 @@ import org.basaltmc.server.registry.tags.TagSet
 import org.basaltmc.server.world.crafting.CraftingInput
 import org.basaltmc.server.world.crafting.Recipe
 import org.basaltmc.server.world.crafting.RecipeJson
-import org.basaltmc.server.world.crafting.RecipeParseException
 import org.basaltmc.server.world.loot.ItemStack
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.common.logging.Logger
@@ -43,6 +42,17 @@ public class RealRecipes(
         stack: ItemStack,
     ): Recipe.Cooking? = cooking[cooker]?.firstOrNull { it.accepts(stack) }
 
+    /**
+     * Every stonecutting recipe, in the order they were read.
+     *
+     * The order is the contract with the client: it filters this same list by what is in the input
+     * slot and sends back an index into what is left, so both sides have to agree on it.
+     */
+    public val stonecutting: List<Recipe.Stonecutting> by lazy { recipes.filterIsInstance<Recipe.Stonecutting>() }
+
+    /** What a stonecutter can make of [stack], in the order the client will draw the buttons. */
+    public fun stonecuttingFor(stack: ItemStack): List<Recipe.Stonecutting> = stonecutting.filter { it.accepts(stack) }
+
     /** The id each parsed recipe came from, in the same order, so a match can be named. */
     private var parsedIds: List<Identifier> = emptyList()
 
@@ -71,10 +81,28 @@ public class RealRecipes(
      * reason a match needs a name rather than just a result.
      */
     public fun matchFor(input: CraftingInput): Pair<Identifier?, ItemStack>? {
+        val match = recipeMatching(input) ?: return null
+        // parity: `Recipe.assemble`, not `getResultItem`: a dye, a copy or a repair is defined by
+        // what it carries over from the grid, so its result cannot be a fixed stack.
+        return match.first to match.second.assemble(input)
+    }
+
+    /** The recipe this grid matches, with its id: what a caller needs to ask what it leaves behind. */
+    public fun recipeMatching(input: CraftingInput): Pair<Identifier?, Recipe>? {
         val index = recipes.indexOfFirst { it.matches(input) }
         if (index < 0) return null
-        return parsedIds.getOrNull(index) to recipes[index].result
+        return parsedIds.getOrNull(index) to recipes[index]
     }
+
+    /** Every smithing recipe, which the smithing table walks in order like the stonecutter does. */
+    public val smithing: List<Recipe.Smithing> by lazy { recipes.filterIsInstance<Recipe.Smithing>() }
+
+    /** What a smithing table makes of these three slots, or null when they are not a recipe. */
+    public fun smithingFor(
+        template: ItemStack?,
+        base: ItemStack?,
+        addition: ItemStack?,
+    ): Recipe.Smithing? = smithing.firstOrNull { it.accepts(template, base, addition) }
 
     /** Every recipe file's id, whether or not this build could parse it: what `/recipe *` names. */
     public var ids: Set<Identifier> = emptySet()
@@ -96,8 +124,10 @@ public class RealRecipes(
             val recipe =
                 runCatching { RecipeJson.parse(serverJar.readText(entry)) { tags[it].orEmpty() } }
                     .getOrElse { error ->
-                        // Every non-crafting recipe type lands here, which is most of the folder.
-                        if (error !is RecipeParseException) logger.debug { "Skipped $entry: ${error.message}" }
+                        // A type with no model here, or a file this build could not read: both are
+                        // named, because a silent skip is how a whole family of recipes went missing
+                        // without anyone noticing.
+                        logger.debug { "Skipped $entry: ${error.message}" }
                         skipped++
                         null
                     }
