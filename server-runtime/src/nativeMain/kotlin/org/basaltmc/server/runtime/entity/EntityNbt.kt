@@ -29,12 +29,15 @@ public object EntityNbt {
         tag["Health"] = NbtDouble(entity.health)
         tag["Age"] = NbtDouble(entity.age.toDouble())
         tag["Fuse"] = NbtDouble(entity.fuse.toDouble())
+        tag["Size"] = NbtDouble(entity.cubeSize.toDouble())
         tag["PersistenceRequired"] = NbtDouble(if (entity.persistent) 1.0 else 0.0)
         tag["LoveTicks"] = NbtDouble(entity.loveTicks.toDouble())
         tag["BreedCooldown"] = NbtDouble(entity.breedCooldown.toDouble())
         tag["VillagerProfession"] = NbtString(entity.profession)
         tag["VillagerLevel"] = NbtDouble(entity.villagerLevel.toDouble())
         tag["VillagerExperience"] = NbtDouble(entity.villagerExperience.toDouble())
+        entity.owner?.let { tag["Owner"] = NbtString(it) }
+        tag["Sitting"] = NbtDouble(if (entity.sitting) 1.0 else 0.0)
         entity.customName?.let { tag["CustomName"] = NbtString(it) }
         if (entity.tags.isNotEmpty()) {
             tag["Tags"] = NbtList(NbtType.STRING, entity.tags.map { NbtString(it) })
@@ -76,12 +79,15 @@ public object EntityNbt {
         entity.health = tag.getDouble("Health").takeIf { it > 0.0 } ?: entity.health
         entity.age = tag.getDouble("Age").toInt()
         entity.fuse = tag.getDouble("Fuse").toInt()
+        entity.cubeSize = tag.getDouble("Size").toInt().coerceAtLeast(1)
         entity.persistent = tag.getDouble("PersistenceRequired") != 0.0
         entity.loveTicks = tag.getDouble("LoveTicks").toInt()
         entity.breedCooldown = tag.getDouble("BreedCooldown").toInt()
         tag.getString("VillagerProfession").takeIf { it.isNotEmpty() }?.let { entity.profession = it }
         entity.villagerLevel = tag.getDouble("VillagerLevel").toInt().coerceAtLeast(1)
         entity.villagerExperience = tag.getDouble("VillagerExperience").toInt()
+        tag.getString("Owner").takeIf { it.isNotEmpty() }?.let { entity.owner = it }
+        entity.sitting = tag.getDouble("Sitting") != 0.0
         tag.getString("CustomName").takeIf { it.isNotEmpty() }?.let { entity.customName = it }
         (tag["Tags"] as? NbtList)?.filterIsInstance<NbtString>()?.forEach { entity.tags += it.value }
         return entity

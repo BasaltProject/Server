@@ -2,6 +2,7 @@ package org.basaltmc.server.runtime
 
 import org.basaltmc.server.assets.ServerJarAssets
 import org.basaltmc.server.random.LegacyRandom
+import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.BlockSupport
 import org.basaltmc.server.registry.Blocks
@@ -87,6 +88,7 @@ import org.basaltmc.server.runtime.entity.Breeding
 import org.basaltmc.server.runtime.entity.DamageSource
 import org.basaltmc.server.runtime.entity.EntityCombat
 import org.basaltmc.server.runtime.entity.EntityNbt
+import org.basaltmc.server.runtime.entity.Flyers
 import org.basaltmc.server.runtime.entity.Minecarts
 import org.basaltmc.server.runtime.entity.MobBrain
 import org.basaltmc.server.runtime.entity.MobCategory
@@ -95,6 +97,19 @@ import org.basaltmc.server.runtime.entity.MobDespawn
 import org.basaltmc.server.runtime.entity.Mobs
 import org.basaltmc.server.runtime.entity.PrimedTnt
 import org.basaltmc.server.runtime.entity.Projectiles
+import org.basaltmc.server.runtime.entity.Raid
+import org.basaltmc.server.runtime.entity.RaidManager
+import org.basaltmc.server.runtime.entity.RaidStatus
+import org.basaltmc.server.runtime.entity.RaidWaves
+import org.basaltmc.server.runtime.entity.SunBurn
+import org.basaltmc.server.runtime.entity.ai.LookControl
+import org.basaltmc.server.runtime.entity.ai.MobActions
+import org.basaltmc.server.runtime.entity.ai.MobContext
+import org.basaltmc.server.runtime.entity.ai.MobGoals
+import org.basaltmc.server.runtime.entity.ai.MoveControl
+import org.basaltmc.server.runtime.entity.ai.Navigation
+import org.basaltmc.server.runtime.entity.ai.PlayerView
+import org.basaltmc.server.runtime.entity.ai.VillageBlocks
 import org.basaltmc.server.runtime.function.FunctionLibrary
 import org.basaltmc.server.runtime.placeholder.AnimationPlaceholders
 import org.basaltmc.server.runtime.placeholder.PlayerPlaceholders
@@ -192,13 +207,20 @@ import org.basaltmc.wire.io.sleepMillis
 import org.basaltmc.wire.protocol.play.AnimatePacket
 import org.basaltmc.wire.protocol.play.BlockEventPacket
 import org.basaltmc.wire.protocol.play.BlockPos
+import org.basaltmc.wire.protocol.play.BossBarColor
+import org.basaltmc.wire.protocol.play.BossBarOverlay
+import org.basaltmc.wire.protocol.play.BossEventPacket
 import org.basaltmc.wire.protocol.play.ClientboundBlockUpdatePacket
 import org.basaltmc.wire.protocol.play.DamageEventPacket
 import org.basaltmc.wire.protocol.play.EntityEventPacket
+import org.basaltmc.wire.protocol.play.EntityTeleportPacket
 import org.basaltmc.wire.protocol.play.ExplodePacket
 import org.basaltmc.wire.protocol.play.ExplosionParticle
 import org.basaltmc.wire.protocol.play.Gamemode
 import org.basaltmc.wire.protocol.play.LevelEventPacket
+import org.basaltmc.wire.protocol.play.LevelParticlesPacket
+import org.basaltmc.wire.protocol.play.Pose
+import org.basaltmc.wire.protocol.play.SetEntityDataPacket
 import org.basaltmc.wire.protocol.play.SetEntityMotionPacket
 import org.basaltmc.wire.protocol.play.SoundPacket
 import org.basaltmc.wire.protocol.play.SoundSource
@@ -207,9 +229,13 @@ import org.basaltmc.wire.text.LangTable
 import org.basaltmc.wire.text.TextColor
 import org.basaltmc.wire.text.resolvePlainText
 import kotlin.concurrent.AtomicInt
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.math.ceil
+import kotlin.math.cos
 import kotlin.math.floor
+import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.random.Random
 import kotlin.time.Clock
@@ -575,6 +601,9 @@ public class BasaltServer(
     /** The `/bossbar` bars this server knows, shown to whoever joins and is named by one. */
     public val bossBars: BossBarRegistry = BossBarRegistry()
 
+    /** parity: `Raids`, one per world, which this build keeps in memory rather than saved data. */
+    private val raidManagers: MutableMap<String, RaidManager> = mutableMapOf()
+
     /** `/save-off` stops the periodic save; `/save-all` runs one on demand. */
     private val saveControl: SaveControl = SaveControl(::persistEverything)
 
@@ -887,10 +916,311 @@ public class BasaltServer(
                 .onFailure { logger.error(it) { "Mob spawning failed in world '${world.name}'" } }
             runCatching { tickEffects(world) }
                 .onFailure { logger.error(it) { "Effect tick failed in world '${world.name}'" } }
+            runCatching { tickRaids(world) }
+                .onFailure { logger.error(it) { "Raid tick failed in world '${world.name}'" } }
             runCatching { tickSleep(world) }
                 .onFailure { logger.error(it) { "Sleep tick failed in world '${world.name}'" } }
         }
         shutdownIfSignalled()
+    }
+
+    /** One mob of this type where it was asked for, or null when the type is not one this build has. */
+    private fun spawnMob(
+        world: LoadedWorld,
+        type: Identifier,
+        x: Double,
+        y: Double,
+        z: Double,
+    ): org.basaltmc.server.runtime.entity.ServerEntity? {
+        val protocolType = EntityTypes[type]?.protocolId ?: return null
+        val entity =
+            org.basaltmc.server.runtime.entity.ServerEntity(
+                entityId = playerRegistry.allocateEntityId(),
+                uuid = Uuid.random(),
+                type = type,
+                protocolType = protocolType,
+                x = x,
+                y = y,
+                z = z,
+            )
+        world.state.spawnEntity(entity)
+        return entity
+    }
+
+    /** One raid manager per world, made the first time anything asks for one. */
+    private fun raidsIn(world: LoadedWorld): RaidManager = raidManagers.getOrPut(world.name) { RaidManager() }
+
+    /**
+     * Every raid in one world.
+     *
+     * parity: `Raids.tick` over `Raid.tick`: a wave every time the last one is dead, fifteen seconds
+     * apart, and the raid ends when its waves do rather than when the village stops being one.
+     */
+    private fun tickRaids(world: LoadedWorld) {
+        val manager = raidManagers[world.name] ?: return
+        if (manager.all.isEmpty()) return
+        val players = playerRegistry.snapshot().filter { it.worldName == world.name }
+        val finished = mutableListOf<Raid>()
+        for (raid in manager.all.toList()) {
+            tickRaid(world, players, raid)
+            if (raid.status == RaidStatus.ONGOING || raid.celebrationTicks > 0) continue
+            hideRaidBar(players, raid)
+            finished.add(raid)
+        }
+        manager.forget(finished)
+    }
+
+    private fun tickRaid(
+        world: LoadedWorld,
+        players: List<PlayerSession>,
+        raid: Raid,
+    ) {
+        if (raid.status != RaidStatus.ONGOING) {
+            raid.celebrationTicks--
+            return
+        }
+        raid.ticksActive++
+        if (raid.ticksActive >= Raid.TIMEOUT_TICKS) {
+            raid.status = RaidStatus.STOPPED
+            raid.celebrationTicks = 0
+            return
+        }
+        var health = 0.0
+        raid.raiders.retainAll { id ->
+            val raider = world.state.entity(id)
+            if (raider == null || raider.removed || raider.health <= 0.0) return@retainAll false
+            health += raider.health
+            true
+        }
+        // parity: `updatePlayers`, which is who the bar belongs to and who ends up a hero.
+        for (player in players) {
+            if (raid.distanceSquaredTo(player.x, player.y, player.z) >= Raid.VALID_RADIUS_SQUARED) continue
+            raid.heroes.add(player.entityId)
+        }
+        if (raid.raiders.isEmpty()) {
+            if (!raid.hasMoreWaves) {
+                winRaid(players, raid)
+                return
+            }
+            if (raid.cooldown > 0) {
+                raid.cooldown--
+            } else {
+                spawnRaidWave(world, players, raid)
+                raid.cooldown = Raid.PRE_RAID_TICKS
+            }
+        }
+        updateRaidBar(players, raid, health)
+    }
+
+    /** parity: `spawnGroup`, whose counts are `RaiderType`'s own arrays. */
+    private fun spawnRaidWave(
+        world: LoadedWorld,
+        players: List<PlayerSession>,
+        raid: Raid,
+    ) {
+        val wave = raid.groupsSpawned + 1
+        val position = raidSpawnPosition(world, raid)
+        if (position == null) {
+            logger.debug { "Raid wave $wave found nowhere to spawn around ${raid.centerX}, ${raid.centerZ}" }
+            return
+        }
+        var total = 0.0
+        for (type in RaidWaves.types) {
+            repeat(RaidWaves.countFor(type, wave)) {
+                val raider =
+                    spawnMob(
+                        world,
+                        Identifier.vanilla(type),
+                        position[0] + 0.5,
+                        position[1].toDouble(),
+                        position[2] + 0.5,
+                    ) ?: return@repeat
+                raider.persistent = true
+                raider.raidCenter = intArrayOf(raid.centerX, raid.centerY, raid.centerZ)
+                raid.raiders.add(raider.entityId)
+                total += raider.health
+            }
+        }
+        raid.groupsSpawned = wave
+        raid.totalHealth = total
+        // parity: `playSound`, the horn everyone within sixty-four blocks hears.
+        sendEffects(
+            players.filter { raid.distanceSquaredTo(it.x, it.y, it.z) < RAID_HORN_RANGE_SQUARED },
+            position[0],
+            position[1],
+            position[2],
+            Blocks.AIR.stateId,
+            listOf(BlockEffect.Sound(SOUND_RAID_HORN, SoundSource.NEUTRAL, RAID_HORN_VOLUME, 1f)),
+        )
+    }
+
+    /** parity: `findRandomSpawnPos`, a ring around the village with ground under it. */
+    private fun raidSpawnPosition(
+        world: LoadedWorld,
+        raid: Raid,
+    ): IntArray? {
+        repeat(RAID_SPAWN_ATTEMPTS) {
+            val angle = Random.nextDouble() * 2.0 * PI
+            val distance = RAID_SPAWN_MIN + Random.nextDouble() * (RAID_SPAWN_MAX - RAID_SPAWN_MIN)
+            val x = raid.centerX + (cos(angle) * distance).toInt()
+            val z = raid.centerZ + (sin(angle) * distance).toInt()
+            val ground = groundBelow(world, x, raid.centerY + RAID_SPAWN_LIFT, z) ?: return@repeat
+            return intArrayOf(x, ground, z)
+        }
+        return null
+    }
+
+    /** The first solid block under a column, which is where anything spawned outdoors stands. */
+    private fun groundBelow(
+        world: LoadedWorld,
+        x: Int,
+        fromY: Int,
+        z: Int,
+    ): Int? {
+        var y = fromY
+        var dropped = 0
+        while (dropped < RAID_SPAWN_DROP) {
+            val below = world.state.getBlockState(x, y - 1, z) ?: return null
+            val here = world.state.getBlockState(x, y, z) ?: return null
+            if (!BlockShapes.isEmptyShape(below) && BlockShapes.isEmptyShape(here)) return y
+            y--
+            dropped++
+        }
+        return null
+    }
+
+    /** parity: the victory, which is the hero effect for everybody who was there for it. */
+    private fun winRaid(
+        players: List<PlayerSession>,
+        raid: Raid,
+    ) {
+        raid.status = RaidStatus.VICTORY
+        raid.celebrationTicks = Raid.CELEBRATION_TICKS
+        for (player in players) {
+            if (player.entityId !in raid.heroes) continue
+            player.connection.addEffect(MobEffects.HERO_OF_THE_VILLAGE, Raid.HERO_DURATION_TICKS, raid.omenLevel - 1)
+        }
+    }
+
+    private fun updateRaidBar(
+        players: List<PlayerSession>,
+        raid: Raid,
+        health: Double,
+    ) {
+        if (raid.groupsSpawned == 0) return
+        val progress =
+            if (raid.totalHealth <= 0.0) 0f else (health / raid.totalHealth).toFloat().coerceIn(0f, 1f)
+        for (player in players) {
+            val inRaid = raid.distanceSquaredTo(player.x, player.y, player.z) < Raid.VALID_RADIUS_SQUARED
+            if (!inRaid) {
+                if (raid.watchers.remove(player.entityId)) sendRaidBar(player, raid, BossEventPacket.Operation.Remove)
+                continue
+            }
+            if (raid.watchers.add(player.entityId)) {
+                sendRaidBar(
+                    player,
+                    raid,
+                    BossEventPacket.Operation.Add(
+                        Component.translatable(RAID_BAR_KEY),
+                        progress,
+                        BossBarColor.RED,
+                        BossBarOverlay.NOTCHED_10,
+                    ),
+                )
+            } else {
+                sendRaidBar(player, raid, BossEventPacket.Operation.UpdateProgress(progress))
+            }
+        }
+    }
+
+    private fun hideRaidBar(
+        players: List<PlayerSession>,
+        raid: Raid,
+    ) {
+        for (player in players) {
+            if (!raid.watchers.remove(player.entityId)) continue
+            sendRaidBar(player, raid, BossEventPacket.Operation.Remove)
+        }
+    }
+
+    private fun sendRaidBar(
+        player: PlayerSession,
+        raid: Raid,
+        operation: BossEventPacket.Operation,
+    ) {
+        player.connection.sendPlayPacket(BossEventPacket.ID) { BossEventPacket(raid.barId, operation).write(it) }
+    }
+
+    /**
+     * parity: `BadOmenMobEffect`, which swaps itself for a raid omen the moment its carrier walks
+     * into a village, and `RaidOmenMobEffect`, which starts the raid where that happened.
+     */
+    private fun tickOmens(
+        world: LoadedWorld,
+        player: PlayerSession,
+        active: ActiveEffect,
+    ) {
+        if (player.gamemode == Gamemode.SPECTATOR) return
+        if (active.effect == MobEffects.BAD_OMEN) {
+            if (world.difficulty == "peaceful") return
+            // The effect's own countdown is the clock here: it runs whether or not the day does.
+            if (active.remainingTicks % VILLAGE_CHECK_INTERVAL != 0) return
+            if (!isVillage(world, player.x, player.y, player.z)) return
+            val raid = raidsIn(world).nearby(player.x, player.y, player.z)
+            if (raid != null && raid.omenLevel >= Raid.MAX_OMEN_LEVEL) return
+            player.effects.remove(MobEffects.BAD_OMEN)
+            player.connection.sendEffectRemoved(MobEffects.BAD_OMEN)
+            player.raidOmenPosition =
+                intArrayOf(
+                    floor(player.x).toInt(),
+                    floor(player.y).toInt(),
+                    floor(player.z).toInt(),
+                )
+            player.connection.addEffect(MobEffects.RAID_OMEN, RAID_OMEN_TICKS, active.amplifier)
+            return
+        }
+        if (active.effect != MobEffects.RAID_OMEN || active.remainingTicks > 1) return
+        val position = player.raidOmenPosition ?: return
+        player.raidOmenPosition = null
+        val raid =
+            raidsIn(world).createOrExtend(position[0], position[1], position[2], active.amplifier, world.difficulty)
+        if (raid != null) {
+            logger.debug {
+                "Raid at ${raid.centerX}, ${raid.centerY}, ${raid.centerZ} in world '${world.name}': " +
+                    "${raid.totalGroups} wave(s), omen level ${raid.omenLevel}"
+            }
+        }
+    }
+
+    /**
+     * Whether this is a village at all.
+     *
+     * parity: `ServerLevel.isVillage`, which counts the village points of interest around a spot.
+     * There is no point of interest map here, so the beds are counted directly: a place people
+     * sleep in is what a raid is aimed at either way.
+     */
+    private fun isVillage(
+        world: LoadedWorld,
+        x: Double,
+        y: Double,
+        z: Double,
+    ): Boolean {
+        val originX = floor(x).toInt()
+        val originY = floor(y).toInt()
+        val originZ = floor(z).toInt()
+        var beds = 0
+        for (dy in -VILLAGE_HEIGHT..VILLAGE_HEIGHT) {
+            for (dx in -VILLAGE_RADIUS..VILLAGE_RADIUS) {
+                for (dz in -VILLAGE_RADIUS..VILLAGE_RADIUS) {
+                    val state = world.state.getBlockState(originX + dx, originY + dy, originZ + dz) ?: continue
+                    val block = Blocks.byStateId(state)?.block?.path ?: continue
+                    if (block !in VillageBlocks.BEDS) continue
+                    beds++
+                    if (beds >= VILLAGE_BEDS) return true
+                }
+            }
+        }
+        return false
     }
 
     /**
@@ -1080,6 +1410,8 @@ public class BasaltServer(
                     player.connection.hurt(1f, "wither", DamageTypes.WITHER)
                 }
             MobEffects.HUNGER -> player.food.addExhaustion(HUNGER_EXHAUSTION * (active.amplifier + 1))
+            MobEffects.BAD_OMEN, MobEffects.RAID_OMEN ->
+                worlds[player.worldName]?.let { tickOmens(it, player, active) }
             else -> Unit
         }
     }
@@ -1640,6 +1972,28 @@ public class BasaltServer(
         // and asking for it per entity turned a pen of cows into a lock convoy.
         val living = world.state.entities().filter { !it.removed }
         // parity: `TargetingConditions.forCombat`, which skips anybody a mob cannot fight.
+        val views =
+            watchers.map { player ->
+                PlayerView(
+                    entityId = player.entityId,
+                    uuid = player.uuid.toString(),
+                    x = player.x,
+                    y = player.y,
+                    z = player.z,
+                    width = EntityTypeShapes.widthOf(PLAYER_TYPE),
+                    height = EntityTypeShapes.heightOf(PLAYER_TYPE),
+                    // parity: `TargetingConditions.forCombat`, which skips whoever cannot be fought.
+                    targetable =
+                        !player.dead &&
+                            player.gamemode != Gamemode.CREATIVE &&
+                            player.gamemode != Gamemode.SPECTATOR,
+                    heldItem =
+                        player.inventory.heldItem?.let { runCatching { Identifier.parse(it.id) }.getOrNull() },
+                    sneaking = player.sneaking,
+                    yaw = player.yaw,
+                    pitch = player.pitch,
+                )
+            }
         val targets =
             watchers
                 .filter { !it.dead && it.gamemode != Gamemode.CREATIVE && it.gamemode != Gamemode.SPECTATOR }
@@ -1717,11 +2071,11 @@ public class BasaltServer(
             // parity: `Mob.aiStep`, which is what makes an animal wander rather than stand there.
             if (Mobs.isMob(entity.type)) {
                 entity.idleTicks++
+                entity.tickCount++
                 EntityCombat.tick(entity)
-                val speed = entity.attributeWithModifiers(Attribute.MOVEMENT_SPEED)
-                if (!chase(world, watchers, targets, entity, random, speed)) {
-                    MobBrain.tick(world.state, entity, random, speed = speed)
-                }
+                if (entity.panicTicks > 0) entity.panicTicks--
+                tickFire(world, watchers, entity, random)
+                tickMobAi(world, entity, views, living, random)
                 // parity: `Animal.aiStep` and `BreedGoal`, which is where a calf comes from.
                 val partner = Breeding.tick(entity, living)
                 if (partner != null) breed(world, entity, partner)
@@ -1734,46 +2088,514 @@ public class BasaltServer(
     }
 
     /**
-     * One tick of a mob hunting somebody. Answers false when it is not hunting, which leaves it to
-     * wander instead.
+     * What the goals are allowed to make the world do: swing, hit, breed, eat.
      *
-     * parity: `NearestAttackableTargetGoal` picking the target and `MeleeAttackGoal` walking it
-     * down; what the swing itself costs is `Mob.doHurtTarget`, the attack damage attribute.
+     * The goals cannot reach the server themselves, so this is the whole of their arm's length.
      */
-    private fun chase(
-        world: LoadedWorld,
-        watchers: List<PlayerSession>,
-        targets: List<MobCombat.Target>,
-        mob: org.basaltmc.server.runtime.entity.ServerEntity,
-        random: LegacyRandom,
-        speed: Double,
-    ): Boolean {
-        if (!MobCombat.isMelee(mob.type)) return false
-        var target = targets.firstOrNull { it.entityId == mob.targetId }
-        if (target == null) {
-            val light =
-                if (MobCombat.needsDarkness(mob.type)) lightAt(world, MobCombat.blockPosition(mob)) else 0
-            target = MobCombat.acquire(mob, targets, random, light) ?: return false
-            mob.targetId = target.entityId
-        }
-        if (!MobCombat.tick(world.state, mob, target, random, speed)) return true
+    private val mobActions =
+        object : MobActions {
+            override fun swing(mob: org.basaltmc.server.runtime.entity.ServerEntity) {
+                val world = worlds.values.firstOrNull { it.state.entity(mob.entityId) != null } ?: return
+                for (player in playerRegistry.snapshot().filter { it.worldName == world.name }) {
+                    player.connection.sendPlayPacket(AnimatePacket.ID) {
+                        AnimatePacket(mob.entityId, AnimatePacket.SWING_MAIN_HAND).write(it)
+                    }
+                }
+            }
 
-        val player = watchers.firstOrNull { it.entityId == target.entityId } ?: return true
-        // parity: `Mob.swing`, which is the arm the client draws; the hit itself follows it.
-        for (watcher in watchers) {
-            watcher.connection.sendPlayPacket(AnimatePacket.ID) {
-                AnimatePacket(mob.entityId, AnimatePacket.SWING_MAIN_HAND).write(it)
+            override fun hurtPlayer(
+                mob: org.basaltmc.server.runtime.entity.ServerEntity,
+                playerId: Int,
+                damage: Float,
+            ) {
+                val player = playerRegistry.snapshot().firstOrNull { it.entityId == playerId } ?: return
+                val world = worlds[player.worldName] ?: return
+                // parity: `Player.hurtServer`, where the difficulty decides how much of it lands.
+                player.connection.hurt(
+                    Combat.afterDifficulty(damage, world.difficulty),
+                    DEATH_MOB,
+                    DamageTypes.MOB_ATTACK,
+                    DamageSource(mob.entityId, mob.x, mob.z),
+                )
+                // parity: `OwnerHurtByTargetGoal`: a pet goes for whatever hit the person it follows.
+                for (pet in world.state.entities()) {
+                    if (pet.owner == player.uuid.toString()) pet.ownerHurtBy = mob.entityId
+                }
+            }
+
+            override fun hurtMob(
+                mob: org.basaltmc.server.runtime.entity.ServerEntity,
+                target: org.basaltmc.server.runtime.entity.ServerEntity,
+                damage: Float,
+            ) {
+                val world = worlds.values.firstOrNull { it.state.entity(target.entityId) != null } ?: return
+                val result = EntityCombat.hurt(target, damage, mob.x, mob.z)
+                if (!result.landed) return
+                target.hurtBy = mob.entityId
+                target.panicTicks = PANIC_TICKS
+                val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
+                announceEntityHit(watchers, target, DamageTypes.MOB_ATTACK, mob.entityId, result.died)
+            }
+
+            override fun breed(
+                mob: org.basaltmc.server.runtime.entity.ServerEntity,
+                partner: org.basaltmc.server.runtime.entity.ServerEntity,
+            ) {
+                val world = worlds.values.firstOrNull { it.state.entity(mob.entityId) != null } ?: return
+                breed(world, mob, partner)
+            }
+
+            override fun eatGrass(mob: org.basaltmc.server.runtime.entity.ServerEntity) {
+                val world = worlds.values.firstOrNull { it.state.entity(mob.entityId) != null } ?: return
+                eatGrassUnder(world, mob)
+            }
+
+            override fun setCharging(
+                mob: org.basaltmc.server.runtime.entity.ServerEntity,
+                charging: Boolean,
+            ) {
+                if (mob.charging == charging) return
+                mob.charging = charging
+                val world = worlds.values.firstOrNull { it.state.entity(mob.entityId) != null } ?: return
+                val index = if (mob.type.path == "blaze") BLAZE_CHARGED_INDEX else GHAST_CHARGING_INDEX
+                val entry =
+                    if (mob.type.path == "blaze") {
+                        SetEntityDataPacket.Entry.Bytes(index, (if (charging) BLAZE_CHARGED_FLAG else 0).toByte())
+                    } else {
+                        SetEntityDataPacket.Entry.Booleans(index, charging)
+                    }
+                for (player in playerRegistry.snapshot().filter { it.worldName == world.name }) {
+                    player.connection.sendPlayPacket(SetEntityDataPacket.ID) {
+                        SetEntityDataPacket(mob.entityId, listOf(entry)).write(it)
+                    }
+                }
+            }
+
+            override fun shootFireball(
+                mob: org.basaltmc.server.runtime.entity.ServerEntity,
+                targetX: Double,
+                targetY: Double,
+                targetZ: Double,
+                large: Boolean,
+            ) {
+                val world = worlds.values.firstOrNull { it.state.entity(mob.entityId) != null } ?: return
+                val kind = if (large) Projectiles.FIREBALL else Projectiles.SMALL_FIREBALL
+                val protocolType = EntityTypes[kind.type]?.protocolId ?: return
+                val fromY = mob.y + mob.height * FIREBALL_EYE_SHARE
+                val ball =
+                    Projectiles.spawn(
+                        world = world.state,
+                        kind = kind,
+                        entityId = playerRegistry.allocateEntityId(),
+                        protocolType = protocolType,
+                        x = mob.x,
+                        y = fromY,
+                        z = mob.z,
+                        dirX = targetX - mob.x,
+                        dirY = targetY - fromY,
+                        dirZ = targetZ - mob.z,
+                        power = FIREBALL_POWER,
+                        uncertainty = if (large) 0f else SMALL_FIREBALL_SPREAD,
+                        random = LegacyRandom(Random.nextLong()),
+                    )
+                ball.ownerId = mob.entityId
+                ball.explosionPower = if (large) GHAST_EXPLOSION_POWER else 0f
+                sendEffects(
+                    playerRegistry.snapshot().filter { it.worldName == world.name },
+                    floor(mob.x).toInt(),
+                    floor(mob.y).toInt(),
+                    floor(mob.z).toInt(),
+                    Blocks.AIR.stateId,
+                    listOf(BlockEffect.Sound(SOUND_FIREBALL_SHOOT, SoundSource.HOSTILE, 1f, 1f)),
+                )
+            }
+
+            override fun setBeamTarget(
+                mob: org.basaltmc.server.runtime.entity.ServerEntity,
+                targetId: Int?,
+            ) {
+                val world = worlds.values.firstOrNull { it.state.entity(mob.entityId) != null } ?: return
+                for (player in playerRegistry.snapshot().filter { it.worldName == world.name }) {
+                    player.connection.sendPlayPacket(SetEntityDataPacket.ID) {
+                        SetEntityDataPacket(
+                            mob.entityId,
+                            listOf(SetEntityDataPacket.Entry.Ints(GUARDIAN_BEAM_INDEX, targetId ?: 0)),
+                        ).write(it)
+                    }
+                }
+            }
+
+            override fun setSleeping(
+                mob: org.basaltmc.server.runtime.entity.ServerEntity,
+                sleeping: Boolean,
+            ) {
+                if (mob.sleeping == sleeping) return
+                mob.sleeping = sleeping
+                val world = worlds.values.firstOrNull { it.state.entity(mob.entityId) != null } ?: return
+                val pose = if (sleeping) Pose.SLEEPING else Pose.STANDING
+                for (player in playerRegistry.snapshot().filter { it.worldName == world.name }) {
+                    player.connection.sendPlayPacket(SetEntityDataPacket.ID) {
+                        SetEntityDataPacket(
+                            mob.entityId,
+                            listOf(SetEntityDataPacket.Entry.Poses(SetEntityDataPacket.POSE_INDEX, pose)),
+                        ).write(it)
+                    }
+                }
+            }
+
+            override fun setCasting(
+                mob: org.basaltmc.server.runtime.entity.ServerEntity,
+                casting: Boolean,
+            ) {
+                val world = worlds.values.firstOrNull { it.state.entity(mob.entityId) != null } ?: return
+                val spell = if (casting) SPELL_CASTING else SPELL_NONE
+                for (player in playerRegistry.snapshot().filter { it.worldName == world.name }) {
+                    player.connection.sendPlayPacket(SetEntityDataPacket.ID) {
+                        SetEntityDataPacket(
+                            mob.entityId,
+                            listOf(SetEntityDataPacket.Entry.Bytes(SPELL_INDEX, spell.toByte())),
+                        ).write(it)
+                    }
+                }
+            }
+
+            override fun throwPotion(
+                mob: org.basaltmc.server.runtime.entity.ServerEntity,
+                targetX: Double,
+                targetY: Double,
+                targetZ: Double,
+                potion: String,
+            ) {
+                val world = worlds.values.firstOrNull { it.state.entity(mob.entityId) != null } ?: return
+                val protocolType = EntityTypes[Projectiles.SPLASH_POTION.type]?.protocolId ?: return
+                val fromY = mob.y + mob.height * POTION_THROW_SHARE
+                val dx = targetX - mob.x
+                val dz = targetZ - mob.z
+                val flat = sqrt(dx * dx + dz * dz)
+                val bottle =
+                    Projectiles.spawn(
+                        world = world.state,
+                        kind = Projectiles.SPLASH_POTION,
+                        entityId = playerRegistry.allocateEntityId(),
+                        protocolType = protocolType,
+                        x = mob.x,
+                        y = fromY,
+                        z = mob.z,
+                        dirX = dx,
+                        // parity: `performRangedAttack`'s own arc, a fifth of the distance across.
+                        dirY = targetY - fromY + flat * POTION_ARC,
+                        dirZ = dz,
+                        power = POTION_POWER,
+                        uncertainty = POTION_SPREAD,
+                        random = LegacyRandom(Random.nextLong()),
+                    )
+                bottle.ownerId = mob.entityId
+                bottle.potionEffect = potion
+                sendEffects(
+                    playerRegistry.snapshot().filter { it.worldName == world.name },
+                    floor(mob.x).toInt(),
+                    floor(mob.y).toInt(),
+                    floor(mob.z).toInt(),
+                    Blocks.AIR.stateId,
+                    listOf(BlockEffect.Sound(SOUND_WITCH_THROW, SoundSource.HOSTILE, 1f, 1f)),
+                )
+            }
+
+            override fun castFangs(
+                mob: org.basaltmc.server.runtime.entity.ServerEntity,
+                targetX: Double,
+                targetY: Double,
+                targetZ: Double,
+            ) {
+                val world = worlds.values.firstOrNull { it.state.entity(mob.entityId) != null } ?: return
+                val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
+                // parity: `Evoker.EvokerAttackSpellGoal`, two lines of fangs walking towards you.
+                val angle = atan2(targetZ - mob.z, targetX - mob.x)
+                for (step in 0 until FANG_STEPS) {
+                    val reach = FANG_START + step * FANG_SPACING
+                    val x = mob.x + cos(angle) * reach
+                    val z = mob.z + sin(angle) * reach
+                    for (player in watchers) {
+                        val dx = player.x - x
+                        val dz = player.z - z
+                        if (dx * dx + dz * dz > FANG_HIT_RANGE) continue
+                        player.connection.hurt(
+                            FANG_DAMAGE,
+                            DEATH_MOB,
+                            DamageTypes.MOB_ATTACK,
+                            DamageSource(mob.entityId, mob.x, mob.z),
+                        )
+                    }
+                    for (watcher in watchers) {
+                        watcher.connection.sendPlayPacket(LevelParticlesPacket.ID) {
+                            LevelParticlesPacket(
+                                particleId("crit"),
+                                x,
+                                targetY + FANG_PARTICLE_LIFT,
+                                z,
+                                count = FANG_PARTICLES,
+                            ).write(it)
+                        }
+                    }
+                }
+                sendEffects(
+                    watchers,
+                    floor(mob.x).toInt(),
+                    floor(mob.y).toInt(),
+                    floor(mob.z).toInt(),
+                    Blocks.AIR.stateId,
+                    listOf(BlockEffect.Sound(SOUND_FANGS, SoundSource.HOSTILE, 1f, 1f)),
+                )
+            }
+
+            override fun summonVexes(
+                mob: org.basaltmc.server.runtime.entity.ServerEntity,
+                count: Int,
+            ) {
+                val world = worlds.values.firstOrNull { it.state.entity(mob.entityId) != null } ?: return
+                repeat(count) {
+                    val vex =
+                        spawnMob(
+                            world,
+                            VEX_TYPE,
+                            mob.x + Random.nextDouble() * 2.0 - 1.0,
+                            mob.y + 1.0,
+                            mob.z + Random.nextDouble() * 2.0 - 1.0,
+                        )
+                    vex?.targetId = mob.targetId
+                }
+            }
+
+            override fun applyEffect(
+                playerId: Int,
+                effect: String,
+                durationTicks: Int,
+                amplifier: Int,
+            ) {
+                val player = playerRegistry.snapshot().firstOrNull { it.entityId == playerId } ?: return
+                player.connection.addEffect(Identifier.vanilla(effect), durationTicks, amplifier)
+            }
+
+            override fun teleported(mob: org.basaltmc.server.runtime.entity.ServerEntity) {
+                val world = worlds.values.firstOrNull { it.state.entity(mob.entityId) != null } ?: return
+                val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
+                sendEffects(
+                    watchers,
+                    floor(mob.x).toInt(),
+                    floor(mob.y).toInt(),
+                    floor(mob.z).toInt(),
+                    Blocks.AIR.stateId,
+                    listOf(BlockEffect.Sound(SOUND_ENDERMAN_TELEPORT, SoundSource.HOSTILE, 1f, 1f)),
+                )
+                // The client has to be told where it went: it is a jump, not a walk.
+                for (player in watchers) {
+                    player.connection.sendPlayPacket(EntityTeleportPacket.ID) {
+                        EntityTeleportPacket(mob.entityId, mob.x, mob.y, mob.z, mob.yaw, mob.pitch, true).write(it)
+                    }
+                }
+            }
+
+            override fun primeCreeper(mob: org.basaltmc.server.runtime.entity.ServerEntity) {
+                val world = worlds.values.firstOrNull { it.state.entity(mob.entityId) != null } ?: return
+                val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
+                sendEffects(
+                    watchers,
+                    floor(mob.x).toInt(),
+                    floor(mob.y).toInt(),
+                    floor(mob.z).toInt(),
+                    Blocks.AIR.stateId,
+                    listOf(BlockEffect.Sound(SOUND_CREEPER_PRIMED, SoundSource.HOSTILE, 1f, 0.5f)),
+                )
+            }
+
+            override fun explodeCreeper(mob: org.basaltmc.server.runtime.entity.ServerEntity) {
+                val world = worlds.values.firstOrNull { it.state.entity(mob.entityId) != null } ?: return
+                val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
+                mob.removed = true
+                blowUp(world, watchers, mob.x, mob.y, mob.z, CREEPER_EXPLOSION_POWER)
+            }
+
+            override fun shootArrow(
+                mob: org.basaltmc.server.runtime.entity.ServerEntity,
+                targetX: Double,
+                targetY: Double,
+                targetZ: Double,
+                power: Float,
+            ) {
+                val world = worlds.values.firstOrNull { it.state.entity(mob.entityId) != null } ?: return
+                val protocolType = EntityTypes[Projectiles.ARROW.type]?.protocolId ?: return
+                val fromY = mob.y + mob.height * ARROW_EYE_SHARE
+                val dx = targetX - mob.x
+                val dy = targetY + ARROW_AIM_SHARE - fromY
+                val dz = targetZ - mob.z
+                val flat = sqrt(dx * dx + dz * dz)
+                val arrow =
+                    Projectiles.spawn(
+                        world = world.state,
+                        kind = Projectiles.ARROW,
+                        entityId = playerRegistry.allocateEntityId(),
+                        protocolType = protocolType,
+                        x = mob.x,
+                        y = fromY,
+                        z = mob.z,
+                        dirX = dx,
+                        // parity: the arc a skeleton adds, a fifth of the distance to the target.
+                        dirY = dy + flat * ARROW_ARC,
+                        dirZ = dz,
+                        power = ARROW_POWER,
+                        uncertainty = arrowSpread(world),
+                        random = LegacyRandom(Random.nextLong()),
+                    )
+                arrow.ownerId = mob.entityId
+                sendEffects(
+                    playerRegistry.snapshot().filter { it.worldName == world.name },
+                    floor(mob.x).toInt(),
+                    floor(mob.y).toInt(),
+                    floor(mob.z).toInt(),
+                    Blocks.AIR.stateId,
+                    listOf(BlockEffect.Sound(SOUND_SKELETON_SHOOT, SoundSource.HOSTILE, 1f, 1f)),
+                )
             }
         }
-        // parity: `Player.hurtServer`, where what a mob deals is halved and rounded up on easy and
-        // half again on hard: only a player takes this, and only from something that is not one.
-        player.connection.hurt(
-            Combat.afterDifficulty(EntityCombat.attackDamageOf(mob), world.difficulty),
-            DEATH_MOB,
-            DamageTypes.MOB_ATTACK,
-            DamageSource(mob.entityId, mob.x, mob.z),
+
+    /** parity: `14 - difficulty * 4`, the spread a skeleton's shot has. */
+    private fun arrowSpread(world: LoadedWorld): Float =
+        when (world.difficulty) {
+            "peaceful" -> 14f
+            "easy" -> 10f
+            "normal" -> 6f
+            else -> 2f
+        }
+
+    /**
+     * parity: `EatBlockGoal`: the grass in front becomes air and the block below becomes dirt, and
+     * a lamb that eats grows a little.
+     */
+    private fun eatGrassUnder(
+        world: LoadedWorld,
+        mob: org.basaltmc.server.runtime.entity.ServerEntity,
+    ) {
+        val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
+        val x = floor(mob.x).toInt()
+        val y = floor(mob.y).toInt()
+        val z = floor(mob.z).toInt()
+        val here = world.state.getBlockState(x, y, z)
+        val shortGrass = Blocks.REGISTRY.idOf(Identifier.vanilla("short_grass"))
+        if (here != null && here == shortGrass) {
+            if (world.state.setBlockState(x, y, z, Blocks.AIR.stateId)) {
+                announceBlock(
+                    watchers,
+                    org.basaltmc.server.runtime.world
+                        .BlockChange(x, y, z, Blocks.AIR.stateId),
+                )
+            }
+            return
+        }
+        val below = world.state.getBlockState(x, y - 1, z) ?: return
+        if (below != Blocks.GRASS_BLOCK.stateId) return
+        val dirt = Blocks.REGISTRY.idOf(Identifier.vanilla("dirt")) ?: return
+        if (!world.state.setBlockState(x, y - 1, z, dirt)) return
+        announceBlock(
+            watchers,
+            org.basaltmc.server.runtime.world
+                .BlockChange(x, y - 1, z, dirt),
         )
-        return true
+    }
+
+    /**
+     * The undead burning in the sun, and what burning costs anything that is on fire.
+     *
+     * parity: `Mob.burnUndead` and `Entity.baseTick`: eight seconds of fire, a point of damage every
+     * twenty ticks of it, and the flames the client draws off the shared flags.
+     */
+    private fun tickFire(
+        world: LoadedWorld,
+        watchers: List<PlayerSession>,
+        mob: org.basaltmc.server.runtime.entity.ServerEntity,
+        random: LegacyRandom,
+    ) {
+        val wasBurning = mob.fireTicks > 0
+        val blockX = floor(mob.x).toInt()
+        val blockY = floor(mob.y).toInt()
+        val blockZ = floor(mob.z).toInt()
+        if (SunBurn.burns(mob.type)) {
+            val day = !Beds.isNight(world.clock.totalTicks)
+            val light = WorldLight.skyLight(world, blockX, blockY, blockZ)
+            val openSky = WorldLight.skyLight(world, blockX, blockY + 1, blockZ) >= SKY_LIGHT_MAX
+            val inWater = Fluids.of(world.state.getBlockState(blockX, blockY, blockZ) ?: 0) == Submersion.WATER
+            if (SunBurn.shouldBurn(mob.type, day, light, openSky, inWater, random)) {
+                mob.fireTicks = SunBurn.FIRE_TICKS
+            }
+        }
+        if (mob.fireTicks > 0) {
+            mob.fireTicks--
+            if (mob.fireTicks % SunBurn.DAMAGE_INTERVAL == 0) {
+                val result = EntityCombat.hurt(mob, SunBurn.FIRE_DAMAGE)
+                if (result.landed) announceEntityHit(watchers, mob, DamageTypes.ON_FIRE, -1, result.died)
+            }
+        }
+        val burning = mob.fireTicks > 0
+        if (burning == wasBurning) return
+        val flags = if (burning) SetEntityDataPacket.FLAG_ON_FIRE else 0
+        for (player in watchers) {
+            player.connection.sendPlayPacket(SetEntityDataPacket.ID) {
+                SetEntityDataPacket(
+                    mob.entityId,
+                    listOf(SetEntityDataPacket.Entry.Bytes(SetEntityDataPacket.SHARED_FLAGS_INDEX, flags.toByte())),
+                ).write(it)
+            }
+        }
+    }
+
+    /**
+     * One mob's turn to decide and then move.
+     *
+     * parity: `Mob.serverAiStep`: the selectors decide on every other tick (staggered by the entity
+     * id, so half the mobs decide on each), and then the navigation, the move control and the look
+     * control run every tick.
+     */
+    private fun tickMobAi(
+        world: LoadedWorld,
+        mob: org.basaltmc.server.runtime.entity.ServerEntity,
+        views: List<PlayerView>,
+        living: List<org.basaltmc.server.runtime.entity.ServerEntity>,
+        random: LegacyRandom,
+    ) {
+        val selector = mob.goals ?: MobGoals.forType(mob.type)?.also { mob.goals = it } ?: return
+        val context =
+            MobContext(
+                world = world.state,
+                mob = mob,
+                random = random,
+                // The tick's own snapshot, taken once for the whole world: asking for it per mob
+                // turned a pen of cows into a copy of the entity list per cow per tick.
+                entities = living,
+                players = views,
+                actions = mobActions,
+                light = lightAt(world, MobCombat.blockPosition(mob)),
+                night = Beds.isNight(world.clock.totalTicks),
+                dayTime = world.clock.totalTicks,
+                raidNearby = raidManagers[world.name]?.nearby(mob.x, mob.y, mob.z) != null,
+                speed = mob.attributeWithModifiers(Attribute.MOVEMENT_SPEED),
+            )
+        // parity: `Mob.serverAiStep`, which decides on every other tick and staggers the mobs by
+        // their own id so they do not all think on the same one.
+        if ((mob.tickCount + mob.entityId) % 2 != 0) {
+            selector.tickRunning(context, all = false)
+        } else {
+            selector.tick(context)
+        }
+        // parity: `Mob.travel`'s flying branch: what flies is never walked along a path, and the
+        // goals move it themselves, so all that is left here is the drift.
+        if (Flyers.flies(mob.type)) {
+            org.basaltmc.server.runtime.entity.FlyingMovement
+                .tick(world.state, mob)
+            LookControl.tick(mob)
+            return
+        }
+        Navigation.tick(world.state, mob)
+        MoveControl.tick(world.state, mob, context.speed)
+        LookControl.tick(mob)
     }
 
     /** Whether somebody is stood close enough to a cart to shove it. parity: two boxes touching. */
@@ -1860,9 +2682,41 @@ public class BasaltServer(
         val fromY = entity.y
         val fromZ = entity.z
         val hit = Projectiles.tick(world.state, entity, kind)
+        // parity: `AbstractHurtingProjectile.onHit`: a fireball goes off where it lands, whether
+        // that is a block or somebody's face.
+        if (kind == Projectiles.FIREBALL || kind == Projectiles.SMALL_FIREBALL) {
+            val target = targetAlong(watchers, living, entity, fromX, fromY, fromZ)
+            if (hit == null && target == null) return
+            entity.removed = true
+            if (kind == Projectiles.FIREBALL) {
+                blowUp(world, watchers, entity.x, entity.y, entity.z, entity.explosionPower)
+                return
+            }
+            // parity: a small fireball burns whoever it hits for five seconds and takes five off.
+            val (mob, player) = target ?: return
+            if (mob != null) {
+                mob.fireTicks = SMALL_FIREBALL_FIRE_TICKS
+                val result = EntityCombat.hurt(mob, SMALL_FIREBALL_DAMAGE, fromX, fromZ)
+                if (result.landed) announceEntityHit(watchers, mob, DamageTypes.ON_FIRE, entity.entityId, result.died)
+            }
+            player?.connection?.hurt(
+                SMALL_FIREBALL_DAMAGE,
+                DEATH_ON_FIRE,
+                DamageTypes.ON_FIRE,
+                DamageSource(entity.entityId, fromX, fromZ),
+            )
+            return
+        }
         if (kind == Projectiles.ENDER_PEARL) {
             val target = targetAlong(watchers, living, entity, fromX, fromY, fromZ)
             if (hit != null || target != null) landEnderPearl(world, watchers, entity)
+            return
+        }
+        if (kind == Projectiles.SPLASH_POTION) {
+            val target = targetAlong(watchers, living, entity, fromX, fromY, fromZ)
+            if (hit == null && target == null) return
+            entity.removed = true
+            splashPotion(watchers, entity)
             return
         }
         if (kind.sticks && hitEntityAlong(watchers, living, entity, fromX, fromY, fromZ)) return
@@ -1871,6 +2725,38 @@ public class BasaltServer(
             announceRedstone(world, watchers, change)
         }
         if (!kind.sticks) entity.removed = true
+    }
+
+    /**
+     * What a bottle leaves where it broke.
+     *
+     * parity: `ThrownSplashPotion.applySplash`: four blocks of reach, and the further away you are
+     * the less of the effect you get, down to nothing at the edge.
+     */
+    private fun splashPotion(
+        watchers: List<PlayerSession>,
+        bottle: org.basaltmc.server.runtime.entity.ServerEntity,
+    ) {
+        val effect = bottle.potionEffect ?: return
+        for (player in watchers) {
+            val dx = player.x - bottle.x
+            val dy = player.y - bottle.y
+            val dz = player.z - bottle.z
+            val distanceSquared = dx * dx + dy * dy + dz * dz
+            if (distanceSquared > SPLASH_RANGE * SPLASH_RANGE) continue
+            val share = 1.0 - sqrt(distanceSquared) / SPLASH_RANGE
+            val ticks = (SPLASH_DURATION * share).toInt()
+            if (ticks <= 0) continue
+            player.connection.addEffect(Identifier.vanilla(effect), ticks, 0)
+        }
+        sendEffects(
+            watchers,
+            floor(bottle.x).toInt(),
+            floor(bottle.y).toInt(),
+            floor(bottle.z).toInt(),
+            Blocks.AIR.stateId,
+            listOf(BlockEffect.Sound(SOUND_SPLASH, SoundSource.NEUTRAL, 1f, 1f)),
+        )
     }
 
     /**
@@ -1989,7 +2875,8 @@ public class BasaltServer(
                 return true
             }
             arrow.removed = true
-            arrow.ownerId?.let { mob.targetId = it }
+            arrow.ownerId?.let { mob.hurtBy = it }
+            mob.panicTicks = PANIC_TICKS
             announceEntityHit(watchers, mob, DamageTypes.ARROW, arrow.entityId, result.died)
             return true
         }
@@ -2693,6 +3580,93 @@ public class BasaltServer(
         /** parity: `death.attack.arrow`, and `AbstractArrow`'s own two points of damage. */
         const val DEATH_ARROW = "arrow"
         const val ARROW_BASE_DAMAGE = 2.0
+
+        /** parity: `PanicGoal`, which runs for as long as the last hit is remembered. */
+        const val PANIC_TICKS = 40
+
+        /** parity: `canSeeSky`, which here is the full fifteen of sky light above the mob. */
+        const val SKY_LIGHT_MAX = 15
+
+        /** parity: `Creeper.explosionRadius`, and the two sounds its fuse and a bow make. */
+        const val CREEPER_EXPLOSION_POWER = 3f
+        const val SOUND_CREEPER_PRIMED = "entity.creeper.primed"
+        const val SOUND_ENDERMAN_TELEPORT = "entity.enderman.teleport"
+        const val SOUND_FIREBALL_SHOOT = "entity.ghast.shoot"
+        const val SOUND_WITCH_THROW = "entity.witch.throw"
+        const val SOUND_FANGS = "entity.evoker.prepare_attack"
+        const val SOUND_SPLASH = "entity.splash_potion.break"
+        const val SOUND_RAID_HORN = "event.raid.horn"
+
+        /** parity: the horn is heard sixty-four blocks away, at sixty-four blocks of volume. */
+        const val RAID_HORN_RANGE_SQUARED = 4096.0
+        const val RAID_HORN_VOLUME = 64f
+        const val RAID_BAR_KEY = "event.minecraft.raid"
+
+        /** parity: `NUM_SPAWN_ATTEMPTS` and the ring `findRandomSpawnPos` looks along. */
+        const val RAID_SPAWN_ATTEMPTS = 20
+        const val RAID_SPAWN_MIN = 24.0
+        const val RAID_SPAWN_MAX = 32.0
+        const val RAID_SPAWN_LIFT = 12
+        const val RAID_SPAWN_DROP = 24
+
+        /** parity: `BadOmenMobEffect`, whose raid omen lasts thirty seconds. */
+        const val RAID_OMEN_TICKS = 600
+
+        /** How often a bad omen looks for a village, and what counts as one. */
+        const val VILLAGE_CHECK_INTERVAL = 20
+        const val VILLAGE_RADIUS = 16
+        const val VILLAGE_HEIGHT = 4
+        const val VILLAGE_BEDS = 3
+
+        /** parity: `applySplash`, four blocks across and twenty seconds at the centre. */
+        const val SPLASH_RANGE = 4.0
+        const val SPLASH_DURATION = 400.0
+
+        /** parity: `SpellcasterIllager`'s own spell byte, and the pose it puts the model in. */
+        const val SPELL_INDEX = 17
+        const val SPELL_CASTING = 1
+        const val SPELL_NONE = 0
+
+        /** parity: `Witch.performRangedAttack`, thrown at 0.75 with eight degrees of spread. */
+        const val POTION_POWER = 0.75f
+        const val POTION_SPREAD = 8f
+        const val POTION_ARC = 0.2
+        const val POTION_THROW_SHARE = 0.5
+
+        /** parity: `EvokerAttackSpellGoal`, sixteen fangs walking out at six damage each. */
+        const val FANG_STEPS = 16
+        const val FANG_START = 1.5
+        const val FANG_SPACING = 1.0
+        const val FANG_HIT_RANGE = 1.0
+        const val FANG_DAMAGE = 6f
+        const val FANG_PARTICLES = 4
+        const val FANG_PARTICLE_LIFT = 0.5
+
+        val VEX_TYPE: Identifier = Identifier.vanilla("vex")
+
+        /** parity: `Ghast.DATA_IS_CHARGING`, `Blaze`'s own flags byte and `Guardian`'s beam target. */
+        const val GHAST_CHARGING_INDEX = 16
+        const val BLAZE_CHARGED_INDEX = 16
+        const val BLAZE_CHARGED_FLAG = 1
+        const val GUARDIAN_BEAM_INDEX = 17
+
+        /** parity: `Ghast.getExplosionPower`, and the speed a fireball is thrown at. */
+        const val GHAST_EXPLOSION_POWER = 1f
+        const val FIREBALL_POWER = 0.5f
+        const val SMALL_FIREBALL_SPREAD = 4f
+        const val FIREBALL_EYE_SHARE = 0.5
+
+        /** parity: `SmallFireball.onHitEntity`, five points and five seconds of burning. */
+        const val SMALL_FIREBALL_DAMAGE = 5f
+        const val SMALL_FIREBALL_FIRE_TICKS = 100
+        const val DEATH_ON_FIRE = "onFire"
+        const val SOUND_SKELETON_SHOOT = "entity.skeleton.shoot"
+
+        /** parity: `performRangedAttack`: from the eyes, aimed a third up the target, at 1.6. */
+        const val ARROW_EYE_SHARE = 0.85
+        const val ARROW_AIM_SHARE = 0.3333333333333333
+        const val ARROW_ARC = 0.2
+        const val ARROW_POWER = 1.6f
 
         /** parity: `AbstractArrow.onHitEntity`'s own `scale(0.2)` when the hit did not land. */
         const val ARROW_BOUNCE = 0.2

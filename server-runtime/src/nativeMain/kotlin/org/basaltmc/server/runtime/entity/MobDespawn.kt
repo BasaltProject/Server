@@ -25,6 +25,9 @@ public object MobDespawn {
         random: BasaltRandom,
     ): Boolean {
         if (mob.persistent) return false
+        // parity: `removeWhenFarAway` answers false for the mobs that live in the misc category, a
+        // villager and an iron golem among them, so a village does not empty when you walk away.
+        if (category == MobCategory.MISC) return false
         val distance = nearestDistance ?: return false
         val distanceSquared = distance * distance
         val despawn = category.despawnDistance.toDouble() * category.despawnDistance

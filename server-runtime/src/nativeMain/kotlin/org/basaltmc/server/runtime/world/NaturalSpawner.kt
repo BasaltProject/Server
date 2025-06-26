@@ -64,7 +64,11 @@ public object NaturalSpawner {
         val localZ = random.nextInt(16)
         val height = chunk.heightAt(localX, localZ, Chunk.HeightmapType.MOTION_BLOCKING)
         if (height <= chunk.verticalBounds.minY) return emptyList()
-        val startY = random.nextInt(height + 1)
+        // parity: `getRandomPosWithin` picks between the world's floor and the surface, and the floor
+        // is below zero: taking the height as a bound crashed on every world whose surface is
+        // negative, which is every superflat one.
+        val minY = chunk.verticalBounds.minY
+        val startY = minY + random.nextInt(height - minY + 1)
         val startX = (chunkX shl 4) + localX
         val startZ = (chunkZ shl 4) + localZ
 
@@ -89,7 +93,7 @@ public object NaturalSpawner {
                 if (chosen == null) {
                     val biome = biomeAt(world, x, startY, z) ?: return requests
                     chosen = pick(entriesFor(biome), random) ?: return requests
-                    pack = chosen.minCount + random.nextInt(1 + chosen.maxCount - chosen.minCount)
+                    pack = chosen.minCount + random.nextInt((1 + chosen.maxCount - chosen.minCount).coerceAtLeast(1))
                 }
                 if (!canSpawnAt(world, category, x, startY, z, random)) continue
                 requests +=

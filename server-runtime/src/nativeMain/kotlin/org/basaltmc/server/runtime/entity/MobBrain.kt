@@ -139,20 +139,62 @@ public object MobBrain {
         world: WorldState,
         mob: ServerEntity,
         random: BasaltRandom,
+        range: Int = STROLL_RANGE,
+        height: Int = STROLL_HEIGHT,
     ): DoubleArray? {
         var best: DoubleArray? = null
         var bestWeight = Double.NEGATIVE_INFINITY
         repeat(CANDIDATES) {
-            val x = floor(mob.x).toInt() + random.nextInt(2 * STROLL_RANGE + 1) - STROLL_RANGE
-            val y = floor(mob.y).toInt() + random.nextInt(2 * STROLL_HEIGHT + 1) - STROLL_HEIGHT
-            val z = floor(mob.z).toInt() + random.nextInt(2 * STROLL_RANGE + 1) - STROLL_RANGE
-            val weight = walkTargetValue(world, x, y, z)
+            val x = floor(mob.x).toInt() + random.nextInt(2 * range + 1) - range
+            val y = floor(mob.y).toInt() + random.nextInt(2 * height + 1) - height
+            val z = floor(mob.z).toInt() + random.nextInt(2 * range + 1) - range
+            // parity: `LandRandomPos.movePosUpOutOfSolid`, which lifts a spot out of the ground
+            // rather than throwing it away: on real terrain nearly every raw guess is inside a hill.
+            val standing = groundAt(world, x, y, z) ?: return@repeat
+            val weight = walkTargetValue(world, standing[0], standing[1], standing[2])
             if (weight <= bestWeight) return@repeat
             bestWeight = weight
-            best = doubleArrayOf(x + 0.5, y.toDouble(), z + 0.5)
+            best = doubleArrayOf(standing[0] + 0.5, standing[1].toDouble(), standing[2] + 0.5)
         }
         return best
     }
+
+    /**
+     * The spot a mob would stand on at these coordinates: out of the ground if it is inside it, and
+     * down onto it if it is over it.
+     *
+     * parity: `RandomPos.moveUpOutOfSolid` and the drop `WalkNodeEvaluator` allows underneath.
+     */
+    private fun groundAt(
+        world: WorldState,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): IntArray? {
+        var top = y
+        while (top <= y + LIFT_LIMIT && !isPassable(world, x, top, z)) top++
+        if (top > y + LIFT_LIMIT) return null
+        var standing = top
+        var dropped = 0
+        while (dropped < DROP_LIMIT && isPassable(world, x, standing - 1, z)) {
+            standing--
+            dropped++
+        }
+        val below = world.getBlockState(x, standing - 1, z) ?: return null
+        if (BlockShapes.isEmptyShape(below)) return null
+        return intArrayOf(x, standing, z)
+    }
+
+    private fun isPassable(
+        world: WorldState,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Boolean = BlockShapes.isEmptyShape(world.getBlockState(x, y, z) ?: return false)
+
+    /** parity: how far vanilla lifts a spot out of a hill, and how far a mob will step down to one. */
+    private const val LIFT_LIMIT = 6
+    private const val DROP_LIMIT = 4
 
     /**
      * parity: `PathfinderMob.getWalkTargetValue`, which is zero for anything that will do; here it

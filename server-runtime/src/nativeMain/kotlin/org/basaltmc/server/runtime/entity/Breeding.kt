@@ -58,6 +58,9 @@ public object Breeding {
             "hoglin" to setOf("crimson_fungus"),
         )
 
+    /** What this animal eats, for the goal that follows whoever is holding it. */
+    public fun foodFor(type: Identifier): Set<String> = FOOD[type.path].orEmpty()
+
     /** Whether this animal eats this, which is what puts it in love. */
     public fun isFood(
         type: Identifier,
