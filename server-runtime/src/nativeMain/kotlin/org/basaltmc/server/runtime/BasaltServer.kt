@@ -102,6 +102,7 @@ import org.basaltmc.server.runtime.entity.RaidManager
 import org.basaltmc.server.runtime.entity.RaidStatus
 import org.basaltmc.server.runtime.entity.RaidWaves
 import org.basaltmc.server.runtime.entity.SunBurn
+import org.basaltmc.server.runtime.entity.Wardens
 import org.basaltmc.server.runtime.entity.ai.LookControl
 import org.basaltmc.server.runtime.entity.ai.MobActions
 import org.basaltmc.server.runtime.entity.ai.MobContext
@@ -1445,7 +1446,41 @@ public class BasaltServer(
                         ClientboundBlockUpdatePacket(pos, change[3]).write(it)
                     }
                 }
+                // parity: `Level.setBlock` from the fluid tick updates the neighbours like any other
+                // block change. Without it, water that washed a snow layer away left the grass under
+                // it wearing its white top for ever, since nothing ever asked it to look again.
+                notifyAround(world, watchers, pos)
             }
+        }
+    }
+
+    /** The neighbour update any block written by the world itself owes the blocks around it. */
+    private fun notifyAround(
+        world: LoadedWorld,
+        watchers: List<PlayerSession>,
+        pos: BlockPos,
+    ) {
+        NeighbourUpdates.afterChange(
+            world,
+            pos.x,
+            pos.y,
+            pos.z,
+            onReshaped = { stateId, x, y, z ->
+                for (player in watchers) {
+                    player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                        ClientboundBlockUpdatePacket(BlockPos(x, y, z), stateId).write(it)
+                    }
+                }
+            },
+            reshapeSelf = false,
+        ) { stateId, x, y, z ->
+            val at = BlockPos(x, y, z)
+            for (player in watchers) {
+                player.connection.sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                    ClientboundBlockUpdatePacket(at, Blocks.AIR.stateId).write(it)
+                }
+            }
+            dropWashedAwayBlock(world, at, stateId)
         }
     }
 
@@ -1570,8 +1605,14 @@ public class BasaltServer(
                 ?.let { scheduled += it }
             RedstoneComponents.tick(world, position[0], position[1], position[2])?.let { moved ->
                 scheduled += moved
-                scheduled += Redstone.settle(world, moved.x, moved.y, moved.z)
+                val settled = Redstone.settle(world, moved.x, moved.y, moved.z)
+                scheduled += settled
                 RedstoneComponents.scheduleAround(world, moved.x, moved.y, moved.z)
+                // parity: `Level.updateNeighborsAt` after the component wrote its new state, which is
+                // what lights the lamp on a repeater's output side: without it only the dust moved,
+                // and everything a component feeds directly stayed as it was.
+                scheduled += RedstoneReactors.update(world, moved.x, moved.y, moved.z)
+                for (change in settled) scheduled += RedstoneReactors.update(world, change.x, change.y, change.z)
             }
             ScheduledBlocks.frogspawn(world, position[0], position[1], position[2], scheduled)
             org.basaltmc.server.runtime.world.Geysers
@@ -1665,10 +1706,28 @@ public class BasaltServer(
             val block = pack(floor(player.x).toInt(), floor(player.y).toInt(), floor(player.z).toInt())
             if (lastFootstep[player.entityId] == block) continue
             lastFootstep[player.entityId] = block
+            // parity: the warden's own `VibrationUser`, which hears a step sixteen blocks away and
+            // gets angrier at whoever took it. Sneaking makes no vibration, so it hears nothing.
+            if (!player.sneaking) hearFootstep(world, player)
             if (!world.state.hasSculkSensorNear(player.x, player.y, player.z, Vibrations.RANGE)) continue
             Vibrations.emit(world, "step", player.x, player.y, player.z, changes)
         }
         for (change in changes) announceRedstone(world, watchers, change)
+    }
+
+    /** parity: `Warden.increaseAngerAt` from a vibration: a step it hears is worth thirty-five. */
+    private fun hearFootstep(
+        world: LoadedWorld,
+        player: PlayerSession,
+    ) {
+        for (entity in world.state.entities()) {
+            if (entity.removed || !Wardens.isWarden(entity.type)) continue
+            val dx = entity.x - player.x
+            val dy = entity.y - player.y
+            val dz = entity.z - player.z
+            if (dx * dx + dy * dy + dz * dz > Wardens.HEARING_RANGE * Wardens.HEARING_RANGE) continue
+            Wardens.anger(entity, player.entityId, Wardens.HEARD)
+        }
     }
 
     /**
@@ -1823,9 +1882,17 @@ public class BasaltServer(
         change: org.basaltmc.server.runtime.world.BlockChange,
     ) {
         announceBlock(watchers, change)
-        for (settled in Redstone.settle(world, change.x, change.y, change.z)) announceBlock(watchers, settled)
+        val settled = Redstone.settle(world, change.x, change.y, change.z)
+        for (moved in settled) announceBlock(watchers, moved)
         for (reacted in RedstoneReactors.update(world, change.x, change.y, change.z)) {
             announceBlock(watchers, reacted)
+        }
+        // parity: every piece of dust that moved tells its own neighbours, so a lamp at the end of
+        // the line lights rather than waiting for something to touch it.
+        for (moved in settled) {
+            for (reacted in RedstoneReactors.update(world, moved.x, moved.y, moved.z)) {
+                announceBlock(watchers, reacted)
+            }
         }
         RedstoneComponents.scheduleAround(world, change.x, change.y, change.z)
     }
@@ -2073,6 +2140,10 @@ public class BasaltServer(
                 entity.idleTicks++
                 entity.tickCount++
                 EntityCombat.tick(entity)
+                if (Wardens.isWarden(entity.type)) {
+                    Wardens.tick(entity)
+                    if (entity.touchCooldown > 0) entity.touchCooldown--
+                }
                 if (entity.panicTicks > 0) entity.panicTicks--
                 tickFire(world, watchers, entity, random)
                 tickMobAi(world, entity, views, living, random)
@@ -3158,6 +3229,9 @@ public class BasaltServer(
                 org.basaltmc.server.runtime.world
                     .BlockChange(change.x, change.y, change.z, change.stateId),
             )
+            // parity: `setBlock` again: what a random tick changed reshapes what is around it, which
+            // is how the grass under a snow layer that melted stops wearing snow.
+            notifyAround(world, watchers, BlockPos(change.x, change.y, change.z))
         }
     }
 

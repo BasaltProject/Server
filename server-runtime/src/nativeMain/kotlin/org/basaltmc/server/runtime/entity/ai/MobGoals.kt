@@ -115,7 +115,17 @@ public object MobGoals {
                 selector.add(8, RandomLookAroundGoal())
                 selector.add(1, HurtByTargetGoal())
             }
-            "wither_skeleton", "piglin_brute", "hoglin", "zoglin", "vindicator", "ravager", "warden" -> {
+            "warden" -> {
+                // parity: `Warden.registerGoals` has no target goal at all: the anger it has heard
+                // is what decides who it walks to, and there is nobody until it has heard somebody.
+                selector.add(0, FloatGoal())
+                selector.add(4, MeleeAttackGoal(1.0))
+                selector.add(7, RandomStrollGoal(1.0))
+                selector.add(8, LookAtPlayerGoal(LOOK_FAR))
+                selector.add(8, RandomLookAroundGoal())
+                selector.add(1, AngerTargetGoal())
+            }
+            "wither_skeleton", "piglin_brute", "hoglin", "zoglin", "vindicator", "ravager" -> {
                 selector.add(0, FloatGoal())
                 selector.add(3, PathfindToRaidGoal(RAID_SPEED))
                 selector.add(4, MeleeAttackGoal(1.0))

@@ -570,7 +570,7 @@ public class WorldState(
      *
      * parity: `ItemEntity.tick`: gravity, the move against the real block shapes, air drag, the
      * friction of the block underneath and the half-damped bounce on landing, over the 6000-tick
-     * lifetime. Fluids and merging with a neighbouring stack are documented gaps.
+     * lifetime, and the merge with a neighbouring stack. Floating on a fluid is a documented gap.
      *
      * Deliberately does no I/O and takes no other lock: it runs on the tick thread, which must
      * never touch a socket (see [org.basaltmc.server.runtime.TickLoop]).

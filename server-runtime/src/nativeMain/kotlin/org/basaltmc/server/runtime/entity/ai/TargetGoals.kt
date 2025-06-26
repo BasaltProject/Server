@@ -235,3 +235,40 @@ public fun targetOf(mob: MobContext): TargetView? {
     if (entity.removed) return null
     return TargetView(null, entity, entity.x, entity.y, entity.z, entity.width, entity.height)
 }
+
+/**
+ * What a warden goes after: whoever it is angriest at, and nobody else.
+ *
+ * parity: `WardenAi`'s anger, not a target goal at all in vanilla. The point is the same either
+ * way: a warden that has not heard you does not know you are there, however close you stand.
+ */
+public class AngerTargetGoal : Goal() {
+    override val flags: Set<GoalFlag> = setOf(GoalFlag.TARGET)
+
+    override fun canUse(mob: MobContext): Boolean = suspect(mob) != null
+
+    override fun canContinueToUse(mob: MobContext): Boolean = suspect(mob) != null
+
+    override fun start(mob: MobContext) {
+        mob.mob.targetId = suspect(mob)
+    }
+
+    override fun stop(mob: MobContext) {
+        mob.mob.targetId = null
+    }
+
+    /** Whoever it is angriest at can change while it is already after somebody. */
+    override fun tick(mob: MobContext) {
+        mob.mob.targetId = suspect(mob)
+    }
+
+    private fun suspect(mob: MobContext): Int? {
+        val angriest =
+            org.basaltmc.server.runtime.entity.Wardens
+                .target(mob.mob) ?: return null
+        // It has to still be here and still be worth hitting: a creative or spectating player is
+        // neither, and a suspect who logged out or died is nobody to walk towards.
+        mob.playerById(angriest)?.let { return if (it.targetable) angriest else null }
+        return angriest.takeIf { mob.entityById(it) != null }
+    }
+}

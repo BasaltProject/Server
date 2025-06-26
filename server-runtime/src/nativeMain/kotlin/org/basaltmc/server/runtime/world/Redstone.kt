@@ -480,6 +480,13 @@ public object Redstone {
             }
             queue = next
         }
+        // parity: `RedStoneWireBlock.updatePowerStrength`, which tells the neighbours of every piece
+        // of dust that moved, not only of the block that started it. Without this a repeater more
+        // than two blocks from the lever never heard that the dust in front of it had changed, and
+        // sat there until something broke it.
+        for (change in changes.values) {
+            RedstoneComponents.scheduleAround(world, change.x, change.y, change.z)
+        }
         return changes.values.toList()
     }
 

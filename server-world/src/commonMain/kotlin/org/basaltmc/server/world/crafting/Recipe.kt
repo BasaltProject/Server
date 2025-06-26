@@ -5,9 +5,9 @@ import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
 
 /**
- * A recipe: the two ingredient-based crafting-table types, the four cooking ones and the
- * stonecutter's. Smithing and the special (dye, firework, banner duplicate...) types are a
- * documented gap, see [RecipeJson].
+ * A recipe: the two ingredient-based crafting-table types, the four cooking ones, the
+ * stonecutter's, the two smithing ones and the ten special ones (dye, firework, banner
+ * duplicate...), whose rule is code because their ingredients are the file's.
  */
 public sealed class Recipe {
     public abstract val group: String
