@@ -36,6 +36,7 @@ import org.basaltmc.server.runtime.entity.ai.Navigation
 import org.basaltmc.server.runtime.item.ItemComponentCodecs
 import org.basaltmc.server.runtime.item.ItemDamageEffects
 import org.basaltmc.server.runtime.item.ItemWear
+import org.basaltmc.server.runtime.net.SessionOutbox
 import org.basaltmc.server.runtime.placeholder.PlaceholderSlots
 import org.basaltmc.server.runtime.player.Combat
 import org.basaltmc.server.runtime.player.Difficulty
@@ -376,6 +377,12 @@ public class ClientSession(
     private val consoleLang: LangTable
         get() = commands?.environment?.lang ?: LangTable.EMPTY
     private val sendMutex = NativeMutex()
+
+    /**
+     * What is waiting to go out. Open from the moment this connection has its own outbound thread:
+     * from then on nobody else touches the socket, so the tick thread never parks on a slow client.
+     */
+    private val outbox = SessionOutbox()
     private val incoming = ByteBuffer()
     private var state = ProtocolState.HANDSHAKE
     private var lastPacketId = -1
@@ -609,6 +616,8 @@ public class ClientSession(
      */
     private fun startOutboundLoop() {
         if (streaming.compareAndSet(0, 1)) {
+            // From here on this thread owns the socket: everything else queues.
+            outbox.open()
             NativeThread.start {
                 while (streaming.value == 1) {
                     runCatching {
@@ -632,6 +641,7 @@ public class ClientSession(
                             if (openBlock != null && openBlockSize == FURNACE_SLOTS) syncOpenContainer()
                         }
                         sendKeepAliveIfDue()
+                        timings.of("player.flush").time { flushOutbox() }
                     }
                     sleepMillis(OUTBOUND_INTERVAL_MILLIS)
                 }
@@ -652,6 +662,10 @@ public class ClientSession(
                     incoming.writeBytes(readChunk, length = read)
                 }
                 drainFrames()
+                // Whatever answering those frames queued goes out now: this is a thread of this
+                // connection, so it may write, and waiting for the outbound loop would add its
+                // whole interval to every reply.
+                if (outbox.isOpen) flushOutbox()
             }
         } catch (e: SocketException) {
             // A connection dropping is normal, not a failure worth surfacing: a server-list ping
@@ -667,6 +681,9 @@ public class ClientSession(
         } finally {
             streaming.value = 0
             leavePlayIfPresent()
+            // Whatever the leaving player's own thread had queued for others is already theirs; what
+            // was queued for this socket has nowhere to go.
+            outbox.close()
             connection.close()
         }
     }
@@ -6885,6 +6902,11 @@ public class ClientSession(
 
     internal fun disconnect(reason: Component) {
         sendCompressed(PlayDisconnectPacket.ID) { PlayDisconnectPacket(reason).write(it) }
+        // Everything queued has to be on the wire before the socket goes, or the client is left
+        // guessing why it was dropped. This is the one place that writes from whichever thread
+        // asked for the kick, and it is worth the wait: there is nothing after it.
+        flushOutbox()
+        outbox.close()
         connection.close()
     }
 
@@ -6926,15 +6948,43 @@ public class ClientSession(
      * the send mutex means nobody grows it mid-write.
      */
     private fun writeToSocket(frame: ByteBuffer) {
+        // Once this connection has its own outbound thread, every frame goes through the outbox and
+        // that thread is the only writer. Before then (login and configuration) there is no other
+        // thread to hand it to, so it goes straight out.
+        if (outbox.isOpen) {
+            outbox.offer(frame.toByteArray())
+            return
+        }
+        sendMutex.withLock { writeFrame(frame.toByteArray()) }
+    }
+
+    /** One frame onto the wire, ciphered in send order. Only ever called with [sendMutex] held. */
+    private fun writeFrame(frame: ByteArray) {
+        val cipher = encryptCipher
+        if (cipher != null) {
+            connection.write(cipher.update(frame, encrypting = true))
+        } else {
+            connection.write(frame, 0, frame.size)
+        }
+    }
+
+    /**
+     * Writes everything the outbox has, on this connection's own thread.
+     *
+     * parity of intent with vanilla's own outbound queue: a client that stops draining delays only
+     * itself, and past the outbox's limit it is disconnected rather than left growing a queue
+     * nobody will ever read.
+     */
+    private fun flushOutbox() {
+        if (outbox.hasOverflowed) {
+            logger.debug { "Disconnecting a client that stopped draining its socket." }
+            connection.close()
+            return
+        }
+        // Taking and writing under the same lock, because two flushers that took their frames first
+        // and queued for the socket afterwards would write them in whichever order they woke up.
         sendMutex.withLock {
-            val cipher = encryptCipher
-            frame.withReadable { array, offset, length ->
-                if (cipher != null) {
-                    connection.write(cipher.update(array, offset, length, encrypting = true))
-                } else {
-                    connection.write(array, offset, length)
-                }
-            }
+            for (frame in outbox.drain()) writeFrame(frame)
         }
     }
 
