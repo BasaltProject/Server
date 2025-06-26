@@ -47,9 +47,10 @@ public object RedstoneComponents {
         y: Int,
         z: Int,
     ) {
-        schedule(world, x, y, z)
-        for (face in BlockFace.entries) {
-            schedule(world, x + face.stepX, y + face.stepY, z + face.stepZ)
+        // The same reach the dust settles over: a torch sitting on the far side of the block a
+        // lever is attached to is two steps away, and it has to hear about the lever.
+        for (position in Redstone.reachOf(world, x, y, z)) {
+            schedule(world, position[0], position[1], position[2])
         }
     }
 

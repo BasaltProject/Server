@@ -172,6 +172,10 @@ public object NeighbourUpdates {
         // A column is more than one block, so it reports through the caller rather than as one state.
         ScheduledBlocks.bubbleColumn(world, x, y, z, bubbles)
         NoteBlocks.retune(world, x, y, z, stateId)?.let { return it }
+        // parity: `SnowyBlock.updateShape`, the white top grass wears while snow sits on it.
+        SnowyBlocks.updated(world, x, y, z)?.let { snowy ->
+            if (world.state.setBlockState(x, y, z, snowy)) return snowy
+        }
         // parity: `RedStoneWireBlock.updateShape`, which is what draws a line of dust as a line.
         RedstoneWire.reshape(world, x, y, z, stateId)?.let { return it }
         Reshapes.of(world, x, y, z, stateId)?.let { return it }

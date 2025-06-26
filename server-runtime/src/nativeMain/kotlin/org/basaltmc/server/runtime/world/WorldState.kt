@@ -404,6 +404,9 @@ public class WorldState(
         public var resting: Boolean = false
             internal set
 
+        /** Set when a merge changed the count, so whoever can see it is told the new stack. */
+        public var countChanged: Boolean = false
+
         public val canBePickedUp: Boolean get() = pickupDelay <= 0
     }
 
@@ -580,8 +583,50 @@ public class WorldState(
                 }
                 if (!item.resting) moveItem(item)
             }
+            // parity: `ItemEntity.mergeWithNeighbours`, asked every other tick while an item is
+            // moving and every two seconds once it has settled. Without it a broken tree leaves six
+            // stacks of one log on the floor where vanilla leaves one.
+            val absorbed = HashSet<Int>()
+            for (item in droppedItems.toList()) {
+                if (item.entityId in absorbed) continue
+                val interval = if (item.resting) MERGE_RESTING_INTERVAL else MERGE_MOVING_INTERVAL
+                if (item.age % interval != 0) continue
+                mergeWithNeighbours(item, despawned, absorbed)
+            }
             despawned
         }
+
+    /**
+     * Pours whatever is close enough into [item], and marks what it emptied as gone.
+     *
+     * parity: `ItemEntity.tryToMerge`: same item, same components, and the two counts have to fit
+     * in one stack. Called with [mutex] already held.
+     */
+    private fun mergeWithNeighbours(
+        item: DroppedItem,
+        despawned: MutableList<Int>,
+        absorbed: MutableSet<Int>,
+    ) {
+        if (item.count >= MAX_STACK) return
+        val iterator = droppedItems.iterator()
+        while (iterator.hasNext()) {
+            val other = iterator.next()
+            if (other === item || other.item != item.item || other.count <= 0) continue
+            if (!sameComponents(other.components, item.components)) continue
+            if (item.count + other.count > MAX_STACK) continue
+            if (abs(other.x - item.x) > MERGE_RANGE || abs(other.z - item.z) > MERGE_RANGE) continue
+            if (abs(other.y - item.y) > MERGE_HEIGHT) continue
+            item.count += other.count
+            item.countChanged = true
+            // parity: the merged stack keeps the younger age and the longer pickup delay.
+            item.age = minOf(item.age, other.age)
+            item.pickupDelay = maxOf(item.pickupDelay, other.pickupDelay)
+            despawned += other.entityId
+            absorbed += other.entityId
+            iterator.remove()
+            if (item.count >= MAX_STACK) return
+        }
+    }
 
     /** Integrates one item for one tick. Called with [mutex] already held. */
     private fun moveItem(item: DroppedItem) {
@@ -629,6 +674,12 @@ public class WorldState(
         }
     }
 
+    /** Two stacks only merge when they carry the same extras, which for now means neither carries any. */
+    private fun sameComponents(
+        a: NbtCompound,
+        b: NbtCompound,
+    ): Boolean = a.keys.isEmpty() && b.keys.isEmpty()
+
     /** parity: `getBlockPosBelowThatAffectsMyMovement`, the block whose friction an item feels. */
     private fun blockUnder(item: DroppedItem): Int =
         getBlockState(
@@ -660,6 +711,15 @@ public class WorldState(
         private const val GRAVITY = 0.04
         private const val AIR_DRAG = 0.98
         private const val BOUNCE_DAMPING = -0.5
+
+        /** parity: `mergeWithNeighbours`' own box, half a block out sideways and none at all up. */
+        private const val MERGE_RANGE = 0.5
+        private const val MERGE_HEIGHT = 0.25
+        private const val MERGE_MOVING_INTERVAL = 2
+        private const val MERGE_RESTING_INTERVAL = 40
+
+        /** The stack this build fills, the same one the inventory works in. */
+        private const val MAX_STACK = 64
 
         /** parity: `EntityType.ITEM`'s own box, a quarter of a block each way. */
         private const val ITEM_WIDTH = 0.25

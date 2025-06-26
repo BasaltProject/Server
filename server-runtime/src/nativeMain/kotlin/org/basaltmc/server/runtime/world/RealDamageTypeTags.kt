@@ -78,6 +78,9 @@ public object DamageTypes {
     /** parity: `DamageTypes.MOB_ATTACK`, what a mob that walked up to you deals. */
     public val MOB_ATTACK: Identifier = Identifier.vanilla("mob_attack")
 
+    /** parity: `DamageTypes.ENDER_PEARL`, the five points a pearl costs whoever threw it. */
+    public val ENDER_PEARL: Identifier = Identifier.vanilla("ender_pearl")
+
     /** parity: `DamageTypes.ARROW`, which blames whoever shot it. */
     public val ARROW: Identifier = Identifier.vanilla("arrow")
 }

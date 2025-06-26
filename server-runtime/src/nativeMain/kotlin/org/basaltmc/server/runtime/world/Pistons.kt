@@ -9,6 +9,8 @@ import org.basaltmc.server.registry.PushReaction
 import org.basaltmc.server.world.ChunkBlockEntity
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
+import org.basaltmc.wire.protocol.play.SoundSource
+import kotlin.random.Random
 
 /**
  * What a piston can move, and what happens when it does.
@@ -275,6 +277,15 @@ public object Pistons {
     private const val EXTEND = 0
     private const val CONTRACT = 1
 
+    private const val EXTEND_SOUND = "block.piston.extend"
+    private const val CONTRACT_SOUND = "block.piston.contract"
+    private const val SOUND_VOLUME = 0.5f
+    private const val EXTEND_PITCH_SPREAD = 0.25f
+    private const val CONTRACT_PITCH_SPREAD = 0.15f
+    private const val BASE_PITCH = 0.6f
+
+    private fun pitch(spread: Float): Float = Random.nextFloat() * spread + BASE_PITCH
+
     /**
      * parity: `PistonBaseBlock.checkIfExtend`: a piston extends when it is powered from anywhere but
      * its own face, and pulls back when that power goes.
@@ -306,13 +317,21 @@ public object Pistons {
         }
         // parity: `PistonBaseBlock.checkIfExtend`: 0 to push out, 1 to pull back, and the face it
         // moves along as the second byte.
+        // parity: `PistonBaseBlock.triggerEvent`, whose sound goes with the event, at half volume
+        // and a pitch rolled between 0.6 and 0.85 going out, 0.6 and 0.75 coming back.
+        val sound =
+            if (powered) {
+                BlockEffect.Sound(EXTEND_SOUND, SoundSource.BLOCKS, SOUND_VOLUME, pitch(EXTEND_PITCH_SPREAD))
+            } else {
+                BlockEffect.Sound(CONTRACT_SOUND, SoundSource.BLOCKS, SOUND_VOLUME, pitch(CONTRACT_PITCH_SPREAD))
+            }
         effects +=
             BlockChange(
                 x,
                 y,
                 z,
                 stateId,
-                listOf(BlockEffect.Event(b0 = if (powered) EXTEND else CONTRACT, b1 = direction.ordinal)),
+                listOf(BlockEffect.Event(b0 = if (powered) EXTEND else CONTRACT, b1 = direction.ordinal), sound),
             )
         world.state.scheduleBlockTick(x, y, z, PISTON, MOVE_TICKS)
     }

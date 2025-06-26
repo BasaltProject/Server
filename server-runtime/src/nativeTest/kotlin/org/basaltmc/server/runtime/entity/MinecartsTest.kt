@@ -64,7 +64,8 @@ class MinecartsTest {
 
         assertTrue(cart.x > 5.5, "it should have rolled east: ${cart.x}")
         assertEquals(8.5, cart.z, 1e-9, "and stayed on the rail")
-        assertEquals(65.0, cart.y, 1e-9)
+        // parity: `getPos`, which sits the cart a sixteenth of a block above the rail it rides.
+        assertEquals(65.0625, cart.y, 1e-9)
         assertTrue(cart.velocityX < 0.3, "and slowed down: ${cart.velocityX}")
     }
 
@@ -177,5 +178,50 @@ class MinecartsTest {
 
         assertTrue(abs(cart.x - 8.5) < 0.6, "it should have turned the corner: ${cart.x}, ${cart.z}")
         assertTrue(cart.z > 8.5, "and gone south: ${cart.z}")
+    }
+
+    @Test
+    fun aRiderLeaningOnAKeyGetsAStoppedCartGoing() {
+        val world = world()
+        railLine(world, 2, 14)
+        val cart = cart(world)
+        // Yaw -90 looks along positive X, which is where the rail runs.
+        val intent = Minecarts.intentOf(forward = true, back = false, left = false, right = false, yaw = -90f)
+        assertTrue(Minecarts.moveAlongTrack(world, cart, intent[0], intent[1], ridden = true))
+        assertTrue(cart.velocityX > 0.0, "pushed the way the rider is looking")
+    }
+
+    @Test
+    fun nobodyLeaningOnAnythingLeavesTheCartStill() {
+        val world = world()
+        railLine(world, 2, 14)
+        val cart = cart(world)
+        assertTrue(Minecarts.moveAlongTrack(world, cart))
+        assertEquals(0.0, cart.velocityX, 1e-9)
+    }
+
+    @Test
+    fun theKeysTurnWithTheRider() {
+        // Yaw zero looks along positive Z, so forward is exactly that.
+        val ahead = Minecarts.intentOf(forward = true, back = false, left = false, right = false, yaw = 0f)
+        assertEquals(0.0, ahead[0], 1e-9)
+        assertEquals(1.0, ahead[1], 1e-9)
+        val back = Minecarts.intentOf(forward = false, back = true, left = false, right = false, yaw = 0f)
+        assertEquals(-1.0, back[1], 1e-9)
+    }
+
+    @Test
+    fun walkingIntoACartShovesIt() {
+        val cart = cart(world())
+        Minecarts.pushedBy(cart, fromX = cart.x + 0.5, fromZ = cart.z)
+        assertTrue(cart.velocityX < 0.0, "pushed away from whoever walked in")
+    }
+
+    @Test
+    fun aCartPushedFromExactlyWhereItStandsDoesNotMove() {
+        val cart = cart(world())
+        Minecarts.pushedBy(cart, fromX = cart.x, fromZ = cart.z)
+        assertEquals(0.0, cart.velocityX, 1e-9)
+        assertEquals(0.0, cart.velocityZ, 1e-9)
     }
 }
