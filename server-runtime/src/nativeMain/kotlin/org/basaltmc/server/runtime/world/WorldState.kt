@@ -97,6 +97,9 @@ public class WorldState(
      */
     public fun dirtyChunks(): List<Chunk> = snapshot().filter { it.isDirty }
 
+    /** Loaded chunks carrying entities from the last save, which have to be rewritten when they move. */
+    public fun chunksWithStashedEntities(): List<Chunk> = snapshot().filter { it.savedEntities().isNotEmpty() }
+
     /** Every loaded chunk [shouldKeep] rejects. Filtered outside the lock, for the reason [dirtyChunks] gives. */
     public fun evictionCandidates(shouldKeep: (chunkX: Int, chunkZ: Int) -> Boolean): List<Chunk> =
         snapshot().filter { !shouldKeep(it.chunkX, it.chunkZ) }
@@ -154,6 +157,7 @@ public class WorldState(
             } else {
                 chunksByPos[key] = generated
                 loadedChunks = snapshotOf(chunksByPos)
+                pendingEntities += generated.takeSavedEntities()
                 // The neighbours were lit without this chunk, so their light let the sky in through
                 // where it now stands. parity: vanilla relights a chunk's neighbourhood on load.
                 for (offsetZ in -1..1) {
@@ -422,6 +426,56 @@ public class WorldState(
 
     /** Everything `/summon` put here, alive or just removed and not yet forgotten by clients. */
     public fun entities(): List<ServerEntity> = mutex.withLock { entities.values.toList() }
+
+    /** The live entities standing in this chunk, which is what gets written beside its blocks. */
+    public fun entitiesIn(
+        chunkX: Int,
+        chunkZ: Int,
+    ): List<ServerEntity> =
+        mutex.withLock {
+            entities.values.filter {
+                !it.removed && floor(it.x).toInt() shr 4 == chunkX && floor(it.z).toInt() shr 4 == chunkZ
+            }
+        }
+
+    /** Which chunks hold entities, so a save knows to write them even when no block moved. */
+    public fun chunksWithEntities(): Set<Pair<Int, Int>> =
+        mutex.withLock {
+            entities.values
+                .filter { !it.removed }
+                .mapTo(mutableSetOf()) { floor(it.x).toInt() shr 4 to (floor(it.z).toInt() shr 4) }
+        }
+
+    /** Forgets the entities in this chunk: they are on disk now, and the chunk is going. */
+    public fun forgetEntitiesIn(
+        chunkX: Int,
+        chunkZ: Int,
+    ) {
+        mutex.withLock {
+            entities.values
+                .filter { floor(it.x).toInt() shr 4 == chunkX && floor(it.z).toInt() shr 4 == chunkZ }
+                .forEach { entities.remove(it.entityId) }
+        }
+    }
+
+    /**
+     * The entities a chunk brought back from disk, waiting for the tick loop to give them ids.
+     *
+     * They cannot be spawned where the chunk is loaded: that happens on a generation thread, and an
+     * entity id belongs to the server. parity: vanilla defers the same work to the entity manager.
+     */
+    private val pendingEntities = mutableListOf<NbtCompound>()
+
+    public fun takePendingEntities(): List<NbtCompound> =
+        mutex.withLock {
+            if (pendingEntities.isEmpty()) {
+                emptyList()
+            } else {
+                val taken = pendingEntities.toList()
+                pendingEntities.clear()
+                taken
+            }
+        }
 
     public fun entity(entityId: Int): ServerEntity? = mutex.withLock { entities[entityId] }
 

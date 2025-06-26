@@ -4,6 +4,7 @@ import org.basaltmc.server.runtime.config.WorldDeclaration
 import org.basaltmc.server.runtime.config.WorldDimension
 import org.basaltmc.server.runtime.config.WorldSettings
 import org.basaltmc.server.runtime.config.WorldType
+import org.basaltmc.server.runtime.entity.EntityNbt
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.FlatWorldGenerator
 import org.basaltmc.server.world.LeafDistances
@@ -306,9 +307,24 @@ public class LoadedWorld(
             }
     }
 
+    /**
+     * Puts the entities standing in each chunk into it, so they go out with its blocks.
+     *
+     * parity: vanilla saves entities with the chunk they are in (in its own region folder since
+     * 1.17). Without this a mob only existed for as long as the process did.
+     */
+    private fun stashEntities(chunks: List<Chunk>) {
+        for (chunk in chunks) {
+            val entities = state.entitiesIn(chunk.chunkX, chunk.chunkZ)
+            if (entities.isEmpty() && chunk.savedEntities().isEmpty()) continue
+            chunk.setSavedEntities(entities.filter { !it.removed }.map { EntityNbt.encode(it) })
+        }
+    }
+
     @OptIn(ExperimentalTime::class)
     public fun save(chunks: List<Chunk>) {
         if (chunks.isEmpty()) return
+        stashEntities(chunks)
         val startedAt = TimeSource.Monotonic.markNow()
         val written =
             timings.of("world.save").time {
@@ -329,7 +345,20 @@ public class LoadedWorld(
     }
 
     public fun saveDirty() {
-        save(state.dirtyChunks())
+        // A mob walking across a chunk nothing else touched still has to be written down, so the
+        // chunks holding entities join whatever the blocks made dirty.
+        val chunks = state.dirtyChunks().toMutableList()
+        val already = chunks.mapTo(mutableSetOf()) { it.chunkX to it.chunkZ }
+        // A chunk that carried a mob last time has to be written again once it walks away, or the
+        // old copy on disk comes back beside the one that moved.
+        for (chunk in state.chunksWithStashedEntities()) {
+            if (already.add(chunk.chunkX to chunk.chunkZ)) chunks += chunk
+        }
+        for (position in state.chunksWithEntities()) {
+            if (!already.add(position)) continue
+            state.chunkIfLoaded(position.first, position.second)?.let { chunks += it }
+        }
+        save(chunks)
         portals.save(worldRoot)
     }
 
@@ -357,8 +386,13 @@ public class LoadedWorld(
             playerPositions.any { (x, z) -> abs(chunkX - x) <= retainRadius && abs(chunkZ - z) <= retainRadius }
         }
         if (candidates.isEmpty()) return 0
-        save(candidates.filter { it.isDirty })
-        return state.evictClean(candidates)
+        // Entities go to disk with the chunk they stand in, and then out of memory with it: leaving
+        // them behind would spawn a second copy when the chunk came back.
+        val withEntities = candidates.filter { state.entitiesIn(it.chunkX, it.chunkZ).isNotEmpty() }
+        save(candidates.filter { it.isDirty } + withEntities.filter { !it.isDirty })
+        val evicted = state.evictClean(candidates)
+        for (chunk in withEntities) state.forgetEntitiesIn(chunk.chunkX, chunk.chunkZ)
+        return evicted
     }
 
     public fun stopGenerating(drainTimeoutMillis: Long) {
