@@ -599,6 +599,9 @@ public class ClientSession(
     private var lastKeepAlive: TimeSource.Monotonic.ValueTimeMark = TimeSource.Monotonic.markNow()
     private val streaming = AtomicInt(0)
 
+    /** Whether this player's turn is already waiting on the owner, so it is not asked for twice. */
+    private val tickTaskPending = AtomicInt(0)
+
     // Until the client has told us: enough to fill a view distance in a few seconds, far below the
     // rate the server can produce at. Guessing high is what floods a client that then stops
     // draining its socket at all.
@@ -621,24 +624,39 @@ public class ClientSession(
             NativeThread.start {
                 while (streaming.value == 1) {
                     runCatching {
-                        // A tick's worth of allowance, capped so a client that has been idle
-                        // cannot then be handed an enormous burst all at once.
-                        sendBudget = minOf(sendBudget + desiredChunksPerTick, MAX_BURST_CHUNKS)
-                        val allowed = sendBudget.toInt()
-                        if (allowed > 0) {
-                            timings.of("player.chunks").time { sendBudget -= flushReadyChunks(allowed).toFloat() }
-                        }
-                        timings.of("player.tick").time { tickPlayer() }
-                        timings.of("player.players").time { syncPlayers() }
-                        timings.of("player.posture").time { syncPosture() }
-                        timings.of("player.items").time { syncItemEntities() }
-                        timings.of("player.entities").time { syncSummonedEntities() }
-                        timings.of("player.generated_entities").time { syncGeneratedEntities() }
-                        timings.of("player.ui").time { tickUi() }
-                        // The two bars of an open cooker, on this thread like everything else that
-                        // writes to this socket.
-                        timings.of("player.container").time {
-                            if (openBlock != null && openBlockSize == FURNACE_SLOTS) syncOpenContainer()
+                        // The player's own turn, on the owner of the world they are in: hunger, the
+                        // items they walk over and everything they see of the world are that
+                        // owner's state, not this thread's. What they produce is a packet, and a
+                        // packet is queued rather than written, so the owner never waits on a
+                        // socket. A turn still running is not asked for a second one.
+                        if (tickTaskPending.compareAndSet(0, 1)) {
+                            onOwner {
+                                try {
+                                    // A tick's worth of chunk allowance, capped so a client that has
+                                    // been idle cannot then be handed an enormous burst at once.
+                                    // Reading and serializing a chunk is the world's business, so it
+                                    // happens here; writing the bytes is still the socket's thread.
+                                    sendBudget = minOf(sendBudget + desiredChunksPerTick, MAX_BURST_CHUNKS)
+                                    val allowed = sendBudget.toInt()
+                                    if (allowed > 0) {
+                                        timings.of("player.chunks").time {
+                                            sendBudget -= flushReadyChunks(allowed).toFloat()
+                                        }
+                                    }
+                                    timings.of("player.tick").time { tickPlayer() }
+                                    timings.of("player.players").time { syncPlayers() }
+                                    timings.of("player.posture").time { syncPosture() }
+                                    timings.of("player.items").time { syncItemEntities() }
+                                    timings.of("player.entities").time { syncSummonedEntities() }
+                                    timings.of("player.generated_entities").time { syncGeneratedEntities() }
+                                    timings.of("player.ui").time { tickUi() }
+                                    timings.of("player.container").time {
+                                        if (openBlock != null && openBlockSize == FURNACE_SLOTS) syncOpenContainer()
+                                    }
+                                } finally {
+                                    tickTaskPending.value = 0
+                                }
+                            }
                         }
                         sendKeepAliveIfDue()
                         timings.of("player.flush").time { flushOutbox() }
@@ -717,8 +735,37 @@ public class ClientSession(
             ProtocolState.STATUS -> handleStatus(packetId, body)
             ProtocolState.LOGIN -> handleLogin(packetId, body)
             ProtocolState.CONFIGURATION -> handleConfiguration(packetId, body)
-            ProtocolState.PLAY -> handlePlay(packetId, body)
+            // parity: `PacketUtils.ensureRunningOnSameThread`, which is what vanilla does with every
+            // play packet: the network thread reads it and the server thread runs it. Here that is
+            // the world's owner, so everything a packet touches is touched by whoever owns it.
+            ProtocolState.PLAY ->
+                onOwner {
+                    try {
+                        handlePlay(packetId, body)
+                    } catch (e: Exception) {
+                        // A decoder that runs off the end of a frame costs this connection and
+                        // nothing else, exactly as it did when it ran on the read thread: the world
+                        // it was running on carries every other player.
+                        logger.debug { "Dropping a connection whose packet 0x${packetId.toString(16)} failed: $e" }
+                        connection.close()
+                    }
+                }
         }
+    }
+
+    /**
+     * Runs [work] on the owner of the world this player is in, or here when there is none yet.
+     *
+     * The fallback is not a loophole: before the join finishes there is no world to own anything,
+     * and after it there always is.
+     */
+    private inline fun onOwner(crossinline work: () -> Unit) {
+        val owner = currentWorld?.owner
+        if (owner == null) {
+            work()
+            return
+        }
+        owner.submit { work() }
     }
 
     private fun handleHandshake(

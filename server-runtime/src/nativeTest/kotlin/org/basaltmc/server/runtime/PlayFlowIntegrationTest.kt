@@ -28,6 +28,7 @@ import org.basaltmc.wire.protocol.play.ClientboundPlayerAbilitiesPacket
 import org.basaltmc.wire.protocol.play.CommandsPacket
 import org.basaltmc.wire.protocol.play.ContainerSetContentPacket
 import org.basaltmc.wire.protocol.play.EntityEventPacket
+import org.basaltmc.wire.protocol.play.EntityPositionSyncPacket
 import org.basaltmc.wire.protocol.play.EntityTeleportPacket
 import org.basaltmc.wire.protocol.play.ForgetLevelChunkPacket
 import org.basaltmc.wire.protocol.play.GameEventPacket
@@ -119,18 +120,15 @@ class PlayFlowIntegrationTest {
         assertEquals(LoginCompressionPacket.ID, compressionBody.readVarInt())
         val threshold = LoginCompressionPacket.read(compressionBody).threshold
 
-        val finishedBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(LoginFinishedPacket.ID, finishedBody.readVarInt())
+        val finishedBody = joinFrame(connection, incoming, LoginFinishedPacket.ID)
 
         sendCompressed(connection, LoginAcknowledgedPacket.ID, threshold) { }
 
         // parity: Configuration opens with the brand, which is the name F3 shows for the server.
-        val brandBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(BrandPacket.ID, brandBody.readVarInt())
+        val brandBody = joinFrame(connection, incoming, BrandPacket.ID)
         assertEquals("Basalt ${BuildInfo.MINECRAFT_VERSION}", BrandPacket.read(brandBody).brand)
 
-        val selectKnownPacksBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(SelectKnownPacksPacket.CLIENTBOUND_ID, selectKnownPacksBody.readVarInt())
+        val selectKnownPacksBody = joinFrame(connection, incoming, SelectKnownPacksPacket.CLIENTBOUND_ID)
 
         sendCompressed(connection, SelectKnownPacksPacket.SERVERBOUND_ID, threshold) {
             SelectKnownPacksPacket(emptyList()).write(it)
@@ -139,8 +137,7 @@ class PlayFlowIntegrationTest {
         val receivedRegistries = mutableListOf<String>()
         var dimensionTypeEntries = emptyList<String>()
         repeat(registryCount) {
-            val registryBody = readFrame(connection, incoming, compressionEnabled = true)
-            assertEquals(RegistryDataPacket.ID, registryBody.readVarInt())
+            val registryBody = joinFrame(connection, incoming, RegistryDataPacket.ID)
             val registry = RegistryDataPacket.read(registryBody)
             receivedRegistries += registry.registryId
             if (registry.registryId == "minecraft:dimension_type") {
@@ -168,79 +165,64 @@ class PlayFlowIntegrationTest {
             dimensionTypeEntries,
         )
 
-        val tagsBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(TagsPacket.ID, tagsBody.readVarInt())
+        val tagsBody = joinFrame(connection, incoming, TagsPacket.ID)
         TagsPacket.read(tagsBody)
 
-        val finishConfigBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(FinishConfigurationPacket.ID, finishConfigBody.readVarInt())
+        val finishConfigBody = joinFrame(connection, incoming, FinishConfigurationPacket.ID)
 
         sendCompressed(connection, FinishConfigurationPacket.ID, threshold) { }
 
-        val loginPlayBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(LoginPlayPacket.ID, loginPlayBody.readVarInt())
+        val loginPlayBody = joinFrame(connection, incoming, LoginPlayPacket.ID)
         val loginPlay = LoginPlayPacket.read(loginPlayBody)
         assertEquals(0, loginPlay.spawnInfo.dimension)
         assertEquals("minecraft:overworld", loginPlay.spawnInfo.dimensionName)
 
-        val abilitiesBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(ClientboundPlayerAbilitiesPacket.ID, abilitiesBody.readVarInt())
+        val abilitiesBody = joinFrame(connection, incoming, ClientboundPlayerAbilitiesPacket.ID)
         ClientboundPlayerAbilitiesPacket.read(abilitiesBody)
 
         // parity: `PlayerList.placeNewPlayer` sends the recipes between the abilities and the
         // permission level. The stonecutter's buttons are drawn from them, client side.
-        val recipesBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(UpdateRecipesPacket.ID, recipesBody.readVarInt())
+        val recipesBody = joinFrame(connection, incoming, UpdateRecipesPacket.ID)
 
         // parity: the permission level goes right before the tree, and the client needs it to allow
         // selectors in its own parser.
-        val permissionBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(EntityEventPacket.ID, permissionBody.readVarInt())
+        val permissionBody = joinFrame(connection, incoming, EntityEventPacket.ID)
         val permission = EntityEventPacket.read(permissionBody)
         assertTrue(
             permission.eventId.toInt() in
                 EntityEventPacket.PERMISSION_LEVEL_BASE..(EntityEventPacket.PERMISSION_LEVEL_BASE + 4),
         )
 
-        val commandsBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(CommandsPacket.ID, commandsBody.readVarInt())
+        val commandsBody = joinFrame(connection, incoming, CommandsPacket.ID)
         val commandTree = CommandsPacket.read(commandsBody)
         // Everyone gets at least the commands that need no permission at all.
         assertTrue(commandTree.nodes.any { it.name == "help" })
         assertTrue(commandTree.nodes.any { it.name == "me" })
 
-        val chunkCacheCenterBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(SetChunkCacheCenterPacket.ID, chunkCacheCenterBody.readVarInt())
+        val chunkCacheCenterBody = joinFrame(connection, incoming, SetChunkCacheCenterPacket.ID)
         SetChunkCacheCenterPacket.read(chunkCacheCenterBody)
 
-        val chunkCacheRadiusBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(SetChunkCacheRadiusPacket.ID, chunkCacheRadiusBody.readVarInt())
+        val chunkCacheRadiusBody = joinFrame(connection, incoming, SetChunkCacheRadiusPacket.ID)
         SetChunkCacheRadiusPacket.read(chunkCacheRadiusBody)
 
-        val simulationDistanceBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(SetSimulationDistancePacket.ID, simulationDistanceBody.readVarInt())
+        val simulationDistanceBody = joinFrame(connection, incoming, SetSimulationDistancePacket.ID)
         SetSimulationDistancePacket.read(simulationDistanceBody)
 
         // The one clock update the join itself sends, so this asserts its position rather than
         // catching one of the periodic ones.
-        val setTimeBody = readFrame(connection, incoming, compressionEnabled = true, skipClockUpdates = false)
-        assertEquals(SetTimePacket.ID, setTimeBody.readVarInt())
+        val setTimeBody = joinFrame(connection, incoming, SetTimePacket.ID, skipClockUpdates = false)
 
-        val spawnPositionBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(SpawnPositionPacket.ID, spawnPositionBody.readVarInt())
+        val spawnPositionBody = joinFrame(connection, incoming, SpawnPositionPacket.ID)
 
-        val playerPositionBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(PlayerPositionPacket.ID, playerPositionBody.readVarInt())
+        val playerPositionBody = joinFrame(connection, incoming, PlayerPositionPacket.ID)
 
-        val playerInfoBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(PlayerInfoUpdatePacket.ID, playerInfoBody.readVarInt())
+        val playerInfoBody = joinFrame(connection, incoming, PlayerInfoUpdatePacket.ID)
         val playerInfo = PlayerInfoUpdatePacket.read(playerInfoBody)
         assertTrue(playerInfo.entries.any { it.name == name })
 
         // A client draws its *own* skin layers from the synced metadata too, so the player's own
         // entity gets the layer mask before the HUD packets.
-        val ownSkinBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(SetEntityDataPacket.ID, ownSkinBody.readVarInt())
+        val ownSkinBody = joinFrame(connection, incoming, SetEntityDataPacket.ID)
         assertEquals(
             SetEntityDataPacket.PLAYER_SKIN_PARTS_INDEX,
             SetEntityDataPacket
@@ -250,47 +232,38 @@ class PlayFlowIntegrationTest {
                 .index,
         )
 
-        val healthBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(SetHealthPacket.ID, healthBody.readVarInt())
+        val healthBody = joinFrame(connection, incoming, SetHealthPacket.ID)
         assertEquals(20f, SetHealthPacket.read(healthBody).health)
 
-        val experienceBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(SetExperiencePacket.ID, experienceBody.readVarInt())
+        val experienceBody = joinFrame(connection, incoming, SetExperiencePacket.ID)
         SetExperiencePacket.read(experienceBody)
 
         // parity: `PlayerList.placeNewPlayer` sends the inventory here, after the player list and
         // the HUD state, not among the chunk-radius packets earlier. This sequence is the parity
         // claim, so a new packet belongs in it at the position vanilla puts it.
-        val inventoryBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(ContainerSetContentPacket.ID, inventoryBody.readVarInt())
+        val inventoryBody = joinFrame(connection, incoming, ContainerSetContentPacket.ID)
         val inventory = ContainerSetContentPacket.read(inventoryBody)
         // Container 0 is `InventoryMenu`, 46 slots, not the 41 this server stores: see
         // [PlayerInventory.MENU_SLOTS] for what a real client does when the count disagrees.
         assertEquals(PlayerInventory.MENU_SLOTS, inventory.items.size)
         assertTrue(inventory.items.all { it == null })
 
-        val heldSlotBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(SetHeldSlotPacket.ID, heldSlotBody.readVarInt())
+        val heldSlotBody = joinFrame(connection, incoming, SetHeldSlotPacket.ID)
         assertEquals(0, SetHeldSlotPacket.read(heldSlotBody).slot)
 
-        val gameEventBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(GameEventPacket.ID, gameEventBody.readVarInt())
+        val gameEventBody = joinFrame(connection, incoming, GameEventPacket.ID)
         assertEquals(GameEventPacket.LEVEL_CHUNKS_LOAD_START, GameEventPacket.read(gameEventBody).event)
 
-        val chunkBatchStartBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(ChunkBatchStartPacket.ID, chunkBatchStartBody.readVarInt())
+        val chunkBatchStartBody = joinFrame(connection, incoming, ChunkBatchStartPacket.ID)
 
         repeat(chunkCount) {
-            val chunkBody = readFrame(connection, incoming, compressionEnabled = true)
-            assertEquals(MapChunkPacket.ID, chunkBody.readVarInt())
+            val chunkBody = joinFrame(connection, incoming, MapChunkPacket.ID)
             MapChunkPacket.read(chunkBody)
-            val lightBody = readFrame(connection, incoming, compressionEnabled = true)
-            assertEquals(UpdateLightPacket.ID, lightBody.readVarInt())
+            val lightBody = joinFrame(connection, incoming, UpdateLightPacket.ID)
             UpdateLightPacket.read(lightBody)
         }
 
-        val chunkBatchFinishedBody = readFrame(connection, incoming, compressionEnabled = true)
-        assertEquals(ChunkBatchFinishedPacket.ID, chunkBatchFinishedBody.readVarInt())
+        val chunkBatchFinishedBody = joinFrame(connection, incoming, ChunkBatchFinishedPacket.ID)
         assertEquals(chunkCount, ChunkBatchFinishedPacket.read(chunkBatchFinishedBody).batchSize)
         sendCompressed(connection, ChunkBatchReceivedPacket.ID, threshold) { it.writeFloat(16f) }
 
@@ -612,3 +585,37 @@ class PlayFlowIntegrationTest {
 
 /** `ServerboundPlayerInputPacket`'s id, which this server no-ops but every real client sends constantly. */
 private const val SERVERBOUND_PLAYER_INPUT_ID = 0x2b
+
+/**
+ * The next packet of the join sequence, skipping the entity syncs that go out on the outbound
+ * thread's own timer.
+ *
+ * The order this sequence asserts is the join's own, which is the parity claim. What an entity is
+ * doing meanwhile lands wherever the tick puts it, and a real client reads it whenever it arrives:
+ * asserting a global order made the test pass or fail on how fast the machine was.
+ */
+private fun joinFrame(
+    connection: TcpConnection,
+    incoming: ByteBuffer,
+    expected: Int,
+    skipClockUpdates: Boolean = true,
+): ByteBuffer {
+    repeat(JOIN_FRAME_LIMIT) {
+        val body = readFrame(connection, incoming, compressionEnabled = true, skipClockUpdates = skipClockUpdates)
+        val id = body.readVarInt()
+        if (id in ENTITY_SYNC_PACKETS) return@repeat
+        assertEquals(expected, id, "the join sequence arrived out of order")
+        return body
+    }
+    error("no packet with id $expected arrived in the join sequence")
+}
+
+/** What the outbound loop sends about entities while the join is still going out. */
+private val ENTITY_SYNC_PACKETS =
+    setOf(
+        EntityTeleportPacket.ID,
+        RotateHeadPacket.ID,
+        EntityPositionSyncPacket.ID,
+    )
+
+private const val JOIN_FRAME_LIMIT = 200

@@ -75,7 +75,15 @@ public object ConsoleReader {
                 println("No server is running, so '$command' was not run.")
                 continue
             }
-            dispatcher.execute(ConsoleCommandSource(lang = dispatcher.environment.lang), command)
+            // A command from the console reaches the world, so it runs on whoever owns it rather
+            // than on this thread. With nothing loaded there is nobody to ask, and it runs here.
+            val source = ConsoleCommandSource(lang = dispatcher.environment.lang)
+            val owner = dispatcher.environment.worlds[dispatcher.environment.defaultWorldName]?.owner
+            if (owner == null) {
+                dispatcher.execute(source, command)
+            } else {
+                owner.submit { dispatcher.execute(source, command) }
+            }
         }
     }
 

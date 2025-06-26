@@ -7,6 +7,7 @@ import org.basaltmc.server.runtime.entity.Aabb
 import org.basaltmc.server.runtime.entity.CubeMobs
 import org.basaltmc.server.runtime.entity.EntityCollision
 import org.basaltmc.server.runtime.entity.ServerEntity
+import org.basaltmc.server.runtime.sched.Owner
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.server.world.ChunkScheduledTick
@@ -38,6 +39,20 @@ public class WorldState(
     private val loadOrGenerate: (chunkX: Int, chunkZ: Int) -> Chunk = NoiseWorldGenerator::generate,
 ) {
     private val mutex = NativeMutex()
+
+    /**
+     * Who owns this state, once somebody does.
+     *
+     * Set by [LoadedWorld]; null for the bare `WorldState` a test builds, which is single threaded
+     * by construction. What it buys is the check in [mine]: with one region an access from the
+     * wrong thread works by luck, and luck is what stops working the day regions are turned on.
+     */
+    public var owner: Owner? = null
+
+    /** Refuses an access from anywhere but the owner, and only while [Ownership.strict] is on. */
+    private fun mine(what: String) {
+        owner?.check(what)
+    }
 
     // Keyed by packed coordinates, not by `Pair`. A Pair key allocates an object and boxes both
     // ints on *every* lookup, and these are the most called methods in the server: the login path
@@ -190,13 +205,16 @@ public class WorldState(
         y: Int,
         z: Int,
         stateId: Int,
-    ): Boolean =
-        mutex.withLock {
-            val chunk = chunksByPos[key(x shr 4, z shr 4)] ?: return@withLock false
-            chunk.setBlockStateId(x and 15, y, z and 15, stateId)
-            rememberSculkSensor(x, y, z, stateId)
-            true
-        }
+    ): Boolean {
+        mine("A block")
+        // No lock: the owner is the only writer of blocks, and the chunk it writes into is found in
+        // the same lock-free snapshot a read uses. What the lock still guards is the *set* of
+        // chunks, which the generation pool adds to from its own threads.
+        val chunk = loadedChunks.get(key(x shr 4, z shr 4)) ?: return false
+        chunk.setBlockStateId(x and 15, y, z and 15, stateId)
+        rememberSculkSensor(x, y, z, stateId)
+        return true
+    }
 
     /**
      * Where the sculk sensors are, so a walking player does not have to search for them.
@@ -265,6 +283,7 @@ public class WorldState(
         type: Identifier,
         delay: Int,
     ) {
+        mine("A scheduled fluid tick")
         mutex.withLock {
             val chunk = chunksByPos[key(x shr 4, z shr 4)] ?: return@withLock
             if (y < chunk.verticalBounds.minY || y > chunk.verticalBounds.maxY) return@withLock
@@ -280,6 +299,7 @@ public class WorldState(
         type: Identifier,
         delay: Int,
     ) {
+        mine("A scheduled tick")
         mutex.withLock {
             val chunk = chunksByPos[key(x shr 4, z shr 4)] ?: return@withLock
             if (y < chunk.verticalBounds.minY || y > chunk.verticalBounds.maxY) return@withLock
@@ -417,6 +437,7 @@ public class WorldState(
     /** Adds a newly spawned (or re-added, for a partial pickup) dropped item to this world. */
     public fun spawnItem(dropped: DroppedItem): DroppedItem =
         mutex.withLock {
+            mine("A dropped item")
             droppedItems.add(dropped)
             dropped
         }
@@ -488,6 +509,7 @@ public class WorldState(
 
     public fun spawnEntity(entity: ServerEntity): ServerEntity =
         mutex.withLock {
+            mine("An entity")
             // parity: `finalizeSpawn`, of which the only part this build has is a cube's size: its
             // speed, health and damage all come from it.
             CubeMobs.applySize(entity)
@@ -561,6 +583,7 @@ public class WorldState(
     /** Removes and returns the dropped item with this entity id, or `null` if it is already gone (picked up, despawned). */
     public fun removeItem(entityId: Int): DroppedItem? =
         mutex.withLock {
+            mine("A dropped item")
             val index = droppedItems.indexOfFirst { it.entityId == entityId }
             if (index < 0) null else droppedItems.removeAt(index)
         }

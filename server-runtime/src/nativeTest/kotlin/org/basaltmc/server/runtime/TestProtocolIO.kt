@@ -13,6 +13,7 @@ import org.basaltmc.server.runtime.config.WorldSettings
 import org.basaltmc.server.runtime.config.WorldType
 import org.basaltmc.server.runtime.config.WorldsConfig
 import org.basaltmc.server.runtime.config.testServerList
+import org.basaltmc.server.runtime.sched.Ownership
 import org.basaltmc.server.runtime.ui.UiConfigs
 import org.basaltmc.wire.auth.Cfb8Cipher
 import org.basaltmc.wire.auth.OnlineMode
@@ -64,6 +65,9 @@ internal fun startTestServer(
     /** A second, empty world, for a test about what crossing between two of them does. */
     withSecondWorld: Boolean = false,
 ): Int {
+    // Ownership is enforced under test even with a single region: an access from the wrong thread
+    // works by luck here, and luck is what stops working the day regions are turned on.
+    Ownership.strict = true
     for (port in candidatePorts(preferredPort)) {
         val config =
             BasaltConfig(
