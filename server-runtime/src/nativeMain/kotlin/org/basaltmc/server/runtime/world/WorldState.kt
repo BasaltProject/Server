@@ -23,8 +23,18 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
- * Shared view over the loaded chunks, with one coarse lock over both block writes and the chunk
- * set: sessions run a thread each. Per-region locking waits on the scheduler ADR.
+ * Shared view over the loaded chunks.
+ *
+ * **Who may touch what.** The owner ([owner]) writes blocks, entities and items, and does it
+ * without any lock: it is the only writer, and it finds its chunk in the same lock-free snapshot a
+ * read uses. What is left of the lock guards the *set* of chunks and the collections against the
+ * two threads that are deliberately not the owner: the periodic save and the unload sweep, both of
+ * which are slow I/O and cannot run inside a tick. A generation worker no longer takes it at all:
+ * it generates detached and hands the result over with [installLater].
+ *
+ * The remaining hole is that saving encodes a chunk's contents while the owner may be writing
+ * blocks into it. Closing it means copying what is dirty on the owner and encoding the copy off
+ * thread, which is not done yet.
  *
  * [getOrGenerateChunk] releases [mutex] around [loadOrGenerate], which can take over a second and
  * would freeze every other player behind the slowest chunk. Racing threads both generate and one
@@ -163,17 +173,44 @@ public class WorldState(
         chunkX: Int,
         chunkZ: Int,
     ): Chunk {
+        loadedChunks.get(key(chunkX, chunkZ))?.let { return it }
+        val generated = generateDetached(chunkX, chunkZ) ?: return getOrGenerateChunk(chunkX, chunkZ)
+        return install(generated)
+    }
+
+    /**
+     * Reads or generates one chunk without putting it anywhere.
+     *
+     * The expensive half, and the half that touches nothing shared: a generation worker runs this
+     * on its own thread and then hands the result to the owner with [installLater]. Answers null
+     * when the chunk turned up in the meantime, so the caller reads it instead.
+     */
+    public fun generateDetached(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk? {
+        if (loadedChunks.containsKey(key(chunkX, chunkZ))) return null
+        return loadOrGenerate(chunkX, chunkZ)
+    }
+
+    /**
+     * Puts a generated chunk into the world. The owner's job, because the set of chunks is its
+     * state; answers whichever chunk ends up in the world, which is the one already there if two
+     * workers raced on the same position.
+     */
+    public fun install(chunk: Chunk): Chunk {
+        mine("The set of chunks")
+        val chunkX = chunk.chunkX
+        val chunkZ = chunk.chunkZ
         val key = key(chunkX, chunkZ)
-        mutex.withLock { chunksByPos[key] }?.let { return it }
-        val generated = loadOrGenerate(chunkX, chunkZ)
         return mutex.withLock {
             val existing = chunksByPos[key]
             if (existing != null) {
                 existing
             } else {
-                chunksByPos[key] = generated
+                chunksByPos[key] = chunk
                 loadedChunks = snapshotOf(chunksByPos)
-                pendingEntities += generated.takeSavedEntities()
+                pendingEntities += chunk.takeSavedEntities()
                 // The neighbours were lit without this chunk, so their light let the sky in through
                 // where it now stands. parity: vanilla relights a chunk's neighbourhood on load.
                 for (offsetZ in -1..1) {
@@ -182,9 +219,19 @@ public class WorldState(
                         chunksByPos[key(chunkX + offsetX, chunkZ + offsetZ)]?.invalidateLight()
                     }
                 }
-                generated
+                chunk
             }
         }
+    }
+
+    /** Hands [chunk] to the owner to install, or installs it here when nobody owns this world. */
+    public fun installLater(chunk: Chunk) {
+        val owner = owner
+        if (owner == null) {
+            install(chunk)
+            return
+        }
+        owner.submit { install(chunk) }
     }
 
     public fun getBlockState(

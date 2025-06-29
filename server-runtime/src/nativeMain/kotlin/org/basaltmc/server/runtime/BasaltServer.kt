@@ -890,7 +890,15 @@ public class BasaltServer(
             // threads left for it *before* the tick is what makes their work part of this tick
             // rather than of an unpredictable one.
             if (!world.owner.isCurrent) world.owner.bindToCurrentThread()
-            world.owner.runPending { logger.error(it) { "A task for world '${world.name}' failed" } }
+            val onTaskFailure = { failure: Throwable ->
+                logger.error(failure) { "A task for world '${world.name}' failed" }
+            }
+            // A turn is: what came due, then what was waiting, then the world's own work, and last
+            // what asked to run at the end of it. Everything below this line is that third part.
+            timings.of("tick.tasks").time {
+                world.owner.advanceTick()
+                world.owner.runPending(onTaskFailure)
+            }
             runCatching { world.state.tickItems() }
                 .onFailure { logger.error(it) { "Item tick failed in world '${world.name}'" } }
             runCatching { tickTime(world) }
@@ -927,6 +935,8 @@ public class BasaltServer(
                 .onFailure { logger.error(it) { "Raid tick failed in world '${world.name}'" } }
             runCatching { tickSleep(world) }
                 .onFailure { logger.error(it) { "Sleep tick failed in world '${world.name}'" } }
+            // The end of the turn: what has to see everything it did, rather than see it a tick late.
+            timings.of("tick.tasks_end").time { world.owner.runEndOfTick(onTaskFailure) }
         }
         shutdownIfSignalled()
     }
@@ -3517,6 +3527,9 @@ public class BasaltServer(
         for (world in worlds.values) {
             world.saveDirty()
             world.flushRegions()
+            // Nothing else runs in this world: what was still queued is cancelled rather than run
+            // against a world that is already written out, and its handles say so.
+            world.closeOwner()
         }
         // The players were saved before being disconnected, above. This is the checkpoint that
         // leaves players.db as one self-contained file.

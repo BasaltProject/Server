@@ -57,6 +57,24 @@ public class LoadedWorld(
     public val owner: Owner = Owner(declaration.name)
 
     /**
+     * Who owns the block at these coordinates.
+     *
+     * One world is one region today, so it is always [owner]. The signature is the point: code that
+     * asks this instead of assuming keeps working when a world is several regions, and the answer
+     * must not be kept from one turn to the next, because a region can merge into another between
+     * two of them.
+     */
+    public fun ownerOf(
+        @Suppress("UNUSED_PARAMETER") x: Int,
+        @Suppress("UNUSED_PARAMETER") z: Int,
+    ): Owner = owner
+
+    /** Who owns an entity: the region it is standing in, which today is the whole world. */
+    public fun ownerOf(
+        @Suppress("UNUSED_PARAMETER") entity: org.basaltmc.server.runtime.entity.ServerEntity,
+    ): Owner = owner
+
+    /**
      * What the client calls this world: a `ResourceKey<Level>`, not a dimension type.
      *
      * The distinction is what makes travelling between worlds work at all. The dimension type is
@@ -409,6 +427,20 @@ public class LoadedWorld(
     public fun stopGenerating(drainTimeoutMillis: Long) {
         generationQueue.stop()
         generationQueue.awaitIdle(drainTimeoutMillis)
+        // Whatever the workers handed over on their way out still belongs in the world, so it is
+        // run rather than dropped: a chunk installed here is one the save below writes out.
+        owner.runPending { logger.error(it) { "A task for world '$name' failed while stopping" } }
+    }
+
+    /**
+     * Nothing else runs here. What was queued is cancelled rather than run, which is what a caller
+     * that has to know asks its handle about.
+     *
+     * parity of intent with a region going away in Folia: work aimed at it does not silently move
+     * somewhere else, it is told it is not happening.
+     */
+    public fun closeOwner() {
+        owner.close()
     }
 
     public fun flushRegions() {
