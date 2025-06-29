@@ -64,8 +64,7 @@ public class LoadedWorld(
      *
      * The tick thread claims it on its first turn, and from then on anybody else reaches it with
      * [org.basaltmc.server.runtime.sched.Owner.submit] rather than by touching it. One world, one
-     * region, one owner today; one owner per region when regions are turned on, with the
-     * same rule.
+     * region, one owner today; one owner per region once the world is split, with the same rule.
      */
     public val owner: Owner get() = region.owner
 

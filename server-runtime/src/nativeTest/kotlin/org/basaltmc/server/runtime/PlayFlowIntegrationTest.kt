@@ -403,7 +403,7 @@ class PlayFlowIntegrationTest {
         assertEquals(10.0, aliceTeleport.x)
         assertEquals(10.0, aliceTeleport.z)
 
-        // "ve a otro jugador moverse": Alice moves again, Bob must see a fresh teleport for her.
+        // Seeing another player move: Alice moves again, and Bob gets a fresh teleport for her.
         // (8.5, 8.5) -> (20.0, 20.0) crosses from chunk (0,0) into chunk (1,1): the view square
         // (radius 3) re-centers, so Alice's own connection also streams the resulting delta before
         // anything else, exercising ChunkTracker's real wiring, not just its standalone unit tests.

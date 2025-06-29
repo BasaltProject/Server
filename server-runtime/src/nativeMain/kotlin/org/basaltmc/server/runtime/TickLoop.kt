@@ -10,8 +10,7 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.TimeSource
 
 /**
- * A 20 TPS heartbeat on its own thread. Global scheduling only; there is no
- * world/entity tick to run yet (no redstone, no mob AI).
+ * A 20 TPS heartbeat on its own thread, which is what drives every world's turn.
  *
  * It deliberately touches **no sockets**. Sockets here are blocking, so writing to a client that
  * has stopped keeping up parks whichever thread is doing the writing until that one client drains.

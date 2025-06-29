@@ -88,8 +88,8 @@ class RegionSchedulerTest {
 
         assertTrue(scheduler.regional)
         assertEquals(4, scheduler.threads)
-        // Asking for regions does not make them: splitting a world is etapa 4, so there is still
-        // one, and that is what the flag being on means today.
+        // Asking for regions does not make them: what splits a world is the chunks it has
+        // loaded, so with none of them this is still one region.
         assertEquals(1, scheduler.regionsOf("world").size)
     }
 }

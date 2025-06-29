@@ -205,9 +205,13 @@ public object GroundPlantPatchDecoration {
             "red_terracotta",
             "black_terracotta",
         )
-    private val DEAD_BUSH_STATE_ID = Blocks.REGISTRY.byIdentifier(Identifier.vanilla("dead_bush"))!!.stateId
-    private val SHORT_DRY_GRASS_STATE_ID = Blocks.REGISTRY.byIdentifier(Identifier.vanilla("short_dry_grass"))!!.stateId
-    private val TALL_DRY_GRASS_STATE_ID = Blocks.REGISTRY.byIdentifier(Identifier.vanilla("tall_dry_grass"))!!.stateId
+
+    private fun stateId(path: String): Int =
+        Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
+
+    private val DEAD_BUSH_STATE_ID = stateId("dead_bush")
+    private val SHORT_DRY_GRASS_STATE_ID = stateId("short_dry_grass")
+    private val TALL_DRY_GRASS_STATE_ID = stateId("tall_dry_grass")
     private val SPECS =
         listOf(
             PatchSpec(

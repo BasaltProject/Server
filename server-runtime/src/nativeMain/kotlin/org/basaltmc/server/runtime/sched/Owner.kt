@@ -30,19 +30,11 @@ private class ScheduledTask(
  * One thread and the state it owns.
  *
  * parity of model with `RegionizedServer`: everything mutable belongs to exactly one owner, and
- * whoever is not that owner asks by [submit] instead of touching it. With one region there is one
- * world owner and one global owner; with several there is one per region. The rule is the same
- * either way, which is the point: code written against it does not change when regions are turned
- * on.
+ * whoever is not that owner asks by [submit] instead of touching it.
  *
- * **What a task may do.** Read and write whatever this owner owns, and hand work to another owner.
- * What it must not do is wait for another owner to answer: two owners waiting on each other is a
- * deadlock, and with one region "the other owner" is itself. The one place that pumps its own queue
- * while waiting is the chunk generation await, which is documented where it happens and exists
- * because the workers hand their chunks back here.
- *
- * **What a task adds belongs to the next turn**, not to this one: [runPending] takes the queue as
- * it stands and runs that, which is what keeps a tick bounded when a task submits another.
+ * A task may read and write what this owner owns and hand work to another owner. What it must not
+ * do is wait for another owner's answer: that is a deadlock, and with one region the other owner is
+ * itself. What a task adds is run on the next turn, which is what keeps a turn bounded.
  */
 public class Owner(
     /** What it owns, for the message a strict-mode failure prints. */

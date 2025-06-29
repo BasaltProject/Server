@@ -32,8 +32,8 @@ import org.basaltmc.wire.text.resolvePlainText
  *
  * This is the "no `Server.getInstance()`" rule in practice: a command gets the player list, the
  * operator list and the few server-wide facts it needs through this object, so the same dispatcher
- * runs unchanged against a test fixture. It also keeps the door open for the regional scheduler
- * later, since nothing here assumes a single global tick.
+ * runs unchanged against a test fixture. Nothing here assumes a single tick thread either, which
+ * is what lets a command run on whichever owner holds what it touches.
  */
 public class CommandEnvironment(
     public val players: PlayerRegistry,

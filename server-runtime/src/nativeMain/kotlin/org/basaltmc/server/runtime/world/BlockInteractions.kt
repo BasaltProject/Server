@@ -27,9 +27,8 @@ public class BlockRelease(
  * Opening a door, flipping a lever, pushing a button or a trapdoor: what a hand changes on its own.
  *
  * parity: `DoorBlock`, `TrapDoorBlock`, `FenceGateBlock`, `LeverBlock` and `ButtonBlock`'s
- * `useWithoutItem`, which cycle one property and play a sound. What is not here is what happens
- * afterwards: nothing carries the redstone signal a lever or a button makes, because there is no
- * redstone yet.
+ * `useWithoutItem`, which cycle one property and play a sound. What the signal does afterwards is
+ * the redstone code's, not this one's.
  */
 public object BlockInteractions {
     /** parity: `BlockSetType.canOpenByHand`, which is false for exactly one family. */

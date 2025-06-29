@@ -176,8 +176,12 @@ public object GrassPatchDecoration {
             "mycelium",
             "farmland",
         )
-    private val SHORT_GRASS_STATE_ID = Blocks.REGISTRY.byIdentifier(Identifier.vanilla("short_grass"))!!.stateId
-    private val FERN_STATE_ID = Blocks.REGISTRY.byIdentifier(Identifier.vanilla("fern"))!!.stateId
+
+    private fun stateId(path: String): Int =
+        Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
+
+    private val SHORT_GRASS_STATE_ID = stateId("short_grass")
+    private val FERN_STATE_ID = stateId("fern")
     private val SPECS =
         listOf(
             GrassSpec(

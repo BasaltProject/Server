@@ -8,9 +8,8 @@ import org.basaltmc.wire.io.sleepMillis
  * A set of chunks that tick together, and the owner that ticks them.
  *
  * With the world in one piece there is one region per world and it owns every chunk of it. When
- * [RegionScheduler] starts splitting worlds there will be several, and this is
- * the type that gains a chunk set, a split and a merge. Nothing above it changes: the callers
- * already ask [RegionScheduler.regionFor] rather than assuming.
+ * a world is split there are several, each with its own chunks. Nothing above this changes when
+ * that happens: the callers already ask [RegionScheduler.regionFor] rather than assuming.
  */
 public class Region internal constructor(
     /** Unique for the life of the process, so a log line can name which one did something. */
@@ -57,8 +56,8 @@ public class Region internal constructor(
  *
  * parity of model with `TickRegions`: how many regions there are is not a setting, it is a
  * consequence of where the players are; what the operator sets is whether the world is split at all
- * and how many threads tick regions at once. Today [regional] is off by default and every
- * world is one region, which is the vanilla order of tick.
+ * and how many threads tick regions at once. With [regional] off every world is one region, which is
+ * the vanilla order of tick.
  *
  * There is also one owner that belongs to nobody's region: the hour, the weather, the world border
  * and everything else that is global by nature. It is not "region zero" with a special case, it is

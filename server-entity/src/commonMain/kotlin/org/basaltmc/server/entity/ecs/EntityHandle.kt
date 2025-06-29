@@ -1,11 +1,9 @@
 package org.basaltmc.server.entity.ecs
 
 /**
- * A lightweight object-oriented view over one entity: the shape a future plugin binding (or any
- * other object-style consumer) would see, sitting on top of the struct-of-arrays storage
- * everything else here uses internally (the "fachada orientada a objetos" this project's own
- * roadmap calls for over the ECS prototype). Owns no state itself beyond a `(World, EntityId)`
- * pair, so creating one is free and there is nothing to keep in sync.
+ * A lightweight object view over one entity: the shape a plugin binding sees, sitting on top of the
+ * struct-of-arrays storage everything here uses internally. Owns no state beyond a
+ * `(World, EntityId)` pair, so creating one is free and there is nothing to keep in sync.
  */
 public class EntityHandle(
     public val world: World,

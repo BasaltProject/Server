@@ -176,6 +176,11 @@ public object TallGrassDecoration {
     private const val SAVANNA_INDEX = 8
     private const val PLAIN_INDEX = 26
     private const val VEGETAL_DECORATION_STEP = 9
-    private val TALL_GRASS_LOWER_STATE_ID = Blocks.REGISTRY.byIdentifier(Identifier.vanilla("tall_grass"))!!.stateId
-    private val TALL_GRASS_UPPER_STATE_ID = Blocks.upperDoublePlantStateId(TALL_GRASS_LOWER_STATE_ID)!!
+
+    private fun stateId(path: String): Int =
+        Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
+
+    private val TALL_GRASS_LOWER_STATE_ID = stateId("tall_grass")
+    private val TALL_GRASS_UPPER_STATE_ID =
+        Blocks.upperDoublePlantStateId(TALL_GRASS_LOWER_STATE_ID) ?: error("tall_grass has no upper half")
 }
