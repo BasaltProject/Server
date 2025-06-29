@@ -143,6 +143,7 @@ public class LoadedWorld(
     public val state: WorldState =
         WorldState(emptyList(), loadOrGenerate = ::loadOrGenerateChunk).also {
             it.owner = owner
+            it.installOwner = scheduler.global
             it.regionCount = { regionScheduler.regionsOf(declaration.name).size.coerceAtLeast(1) }
         }
 

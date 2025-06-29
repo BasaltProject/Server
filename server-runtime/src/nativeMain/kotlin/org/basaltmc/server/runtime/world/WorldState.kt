@@ -169,7 +169,10 @@ public class WorldState(
                     removed++
                 }
             }
-            if (removed > 0) loadedChunks = snapshotOf(chunksByPos)
+            if (removed > 0) {
+                loadedChunks = snapshotOf(chunksByPos)
+                chunkVersion.addAndGet(1)
+            }
             removed
         }
 
@@ -178,6 +181,17 @@ public class WorldState(
      * rather than about its contents: the region scheduler works out what touches what from this.
      */
     public fun loadedChunkKeys(): List<Long> = mutex.withLock { chunksByPos.keys.toList() }
+
+    /**
+     * Bumped whenever a chunk arrives or goes.
+     *
+     * What the region scheduler asks before working out the regions again: the shape of a world
+     * only changes when its chunks do, and walking every loaded chunk on a tick where none of them
+     * moved was pure cost.
+     */
+    public val chunkSetVersion: Long get() = chunkVersion.value
+
+    private val chunkVersion = kotlin.concurrent.AtomicLong(0)
 
     /** Whether this chunk is already in memory, without generating it: what the queue and the send path poll. */
     public fun isLoaded(
@@ -222,7 +236,7 @@ public class WorldState(
      * workers raced on the same position.
      */
     public fun install(chunk: Chunk): Chunk {
-        mine("The set of chunks")
+        if (installOwner == null) mine("The set of chunks")
         val chunkX = chunk.chunkX
         val chunkZ = chunk.chunkZ
         val key = key(chunkX, chunkZ)
@@ -233,6 +247,7 @@ public class WorldState(
             } else {
                 chunksByPos[key] = chunk
                 loadedChunks = snapshotOf(chunksByPos)
+                chunkVersion.addAndGet(1)
                 pendingEntities += chunk.takeSavedEntities()
                 // The neighbours were lit without this chunk, so their light let the sky in through
                 // where it now stands. parity: vanilla relights a chunk's neighbourhood on load.
@@ -247,14 +262,25 @@ public class WorldState(
         }
     }
 
-    /** Hands [chunk] to the owner to install, or installs it here when nobody owns this world. */
+    /**
+     * Who installs the chunks the generation pool produces.
+     *
+     * The global owner rather than a region's: a chunk that has just been generated belongs to no
+     * region yet (the split that decides is worked out from the chunks that *are* loaded), so
+     * handing it to one of them meant every install in the world piling onto whichever region was
+     * first. With a hundred regions that one region never finished its turn and the barrier waited
+     * on it, which read as the server freezing.
+     */
+    public var installOwner: Owner? = null
+
+    /** Hands [chunk] over to be installed, or installs it here when nobody owns this world. */
     public fun installLater(chunk: Chunk) {
-        val owner = owner
-        if (owner == null) {
+        val target = installOwner ?: owner
+        if (target == null) {
             install(chunk)
             return
         }
-        owner.submit { install(chunk) }
+        target.submit { install(chunk) }
     }
 
     public fun getBlockState(

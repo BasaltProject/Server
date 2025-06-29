@@ -258,7 +258,10 @@ private class RegionWorkers(
                     } catch (e: Throwable) {
                         failure(e)
                     }
-                    finished.value = finished.value + 1
+                    // Atomic, not read-add-write: two workers finishing at the same time lost an
+                    // increment, the barrier never saw the count it was waiting for, and every tick
+                    // took the whole timeout. That is what a five-second tick looked like.
+                    finished.addAndGet(1)
                 }
             }
         }
@@ -300,6 +303,15 @@ private class RegionWorkers(
             sleepMillis(1)
             waited++
         }
+        if (finished.value < regions.size) {
+            // Never expected: a region that does not finish holds up every other one, so it is
+            // worth a line saying how many did rather than a tick that is silently five seconds long.
+            onFailure(
+                IllegalStateException(
+                    "A turn timed out: ${finished.value} of ${regions.size} region(s) finished",
+                ),
+            )
+        }
         mutex.withLock {
             turn = emptyList()
             claimed = 0
@@ -314,6 +326,11 @@ private class RegionWorkers(
 
     private companion object {
         const val IDLE_MILLIS = 1L
-        const val TURN_LIMIT_MILLIS = 5000
+
+        /**
+         * The barrier is a safety net, not a deadline: a turn that takes this long has already gone
+         * wrong, and waiting a little longer is better than carrying on with half a tick.
+         */
+        const val TURN_LIMIT_MILLIS = 30_000
     }
 }
