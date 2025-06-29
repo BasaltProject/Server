@@ -199,6 +199,39 @@ public class Owner(
         }
     }
 
+    /**
+     * Hands everything still waiting here to [other], in order, and leaves this one empty.
+     *
+     * What a merge does with the work already queued: it moves rather than being dropped, because
+     * the caller asked for it against a piece of the world that still exists, only under a new
+     * owner. A split cannot do the same, since a closure does not say which side it belongs to, so
+     * the survivor keeps it (see `RegionScheduler`).
+     */
+    public fun drainInto(other: Owner) {
+        val moved =
+            mutex.withLock {
+                val taken = ArrayList<ScheduledTask>(incoming.size + atEnd.size + delayed.size)
+                taken.addAll(incoming)
+                taken.addAll(atEnd)
+                taken.addAll(delayed)
+                incoming.clear()
+                atEnd.clear()
+                delayed.clear()
+                taken
+            }
+        if (moved.isEmpty()) return
+        other.adopt(moved)
+    }
+
+    private fun adopt(tasks: List<ScheduledTask>) {
+        mutex.withLock {
+            for (task in tasks) {
+                if (task.handle.isCancelled) continue
+                if (task.dueInTicks > 0) delayed.add(task) else incoming.addLast(task)
+            }
+        }
+    }
+
     /** Throws when the caller is not the owner and strict mode is on. See [Ownership]. */
     public fun check(what: String) {
         if (!Ownership.strict || !isClaimed || isCurrent) return
@@ -223,6 +256,10 @@ public class Owner(
         take: () -> ArrayDeque<ScheduledTask>,
         onFailure: (Throwable) -> Unit,
     ): Int {
+        // Only the owning thread runs the queue. Two threads draining the same owner swap the two
+        // buffers past each other and end up iterating one that the other is filling, which is a
+        // corrupted queue and a packet handled twice. It is a bug in the caller, so it says so.
+        check(!isClaimed || isCurrent) { "'$name' was drained from a thread that does not own it" }
         val taken = mutex.withLock { take() }
         if (taken.isEmpty()) return 0
         var ran = 0

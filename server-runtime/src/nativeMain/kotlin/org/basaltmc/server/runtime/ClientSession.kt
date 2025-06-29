@@ -763,12 +763,29 @@ public class ClientSession(
      * and after it there always is.
      */
     private inline fun onOwner(crossinline work: () -> Unit) {
-        val owner = currentWorld?.owner
-        if (owner == null) {
+        val world = currentWorld
+        if (world == null) {
             work()
             return
         }
-        owner.submit { work() }
+        (regionOwner ?: world.owner).submit { work() }
+    }
+
+    /**
+     * Which owner this player's packets go to, changed only between turns.
+     *
+     * A player who walks across a border does not change owner mid-tick: two regions can be
+     * ticking at once, and handing the session over while one of them is inside it would mean two
+     * threads in the same player. [handOverToRegionOf] is called from the global phase, where no
+     * region is running, which is the safe point for it.
+     */
+    private var regionOwner: org.basaltmc.server.runtime.sched.Owner? = null
+
+    /** parity of intent with Folia handing a player to the region they walked into. */
+    internal fun handOverToRegionOf(world: LoadedWorld) {
+        val session = playerSession ?: return
+        if (session.worldName != world.name) return
+        regionOwner = world.ownerOf(session.x.toInt(), session.z.toInt())
     }
 
     private fun handleHandshake(

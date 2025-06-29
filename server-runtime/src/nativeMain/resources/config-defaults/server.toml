@@ -33,6 +33,19 @@ whitelist = false
 # so leave it off unless you are measuring.
 generation-metrics = false
 
+# NO VANILLA. With this on, a world is split into regions that tick independently:
+# two of them stop having a fixed order of tick between each other, and what crosses
+# a border is deferred a tick. It only pays off when the players are spread out; a
+# hundred of them in the same town are one region either way.
+#
+# Splitting itself is not built yet, so today this only says which mode you asked
+# for: every world is still one region.
+regional = false
+
+# How many regions tick at once, with regional = true. "auto" works it out from the
+# cores available. Ignored while regional is off, where there is one region a world.
+region-threads = "auto"
+
 [plugins]
 # Reserved for BSMod loader settings.
 

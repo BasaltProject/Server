@@ -121,6 +121,8 @@ import org.basaltmc.server.runtime.player.Difficulty
 import org.basaltmc.server.runtime.player.PlayerRegistry
 import org.basaltmc.server.runtime.player.PlayerSession
 import org.basaltmc.server.runtime.registry.VanillaRegistryData
+import org.basaltmc.server.runtime.sched.Region
+import org.basaltmc.server.runtime.sched.RegionScheduler
 import org.basaltmc.server.runtime.scoreboard.Scoreboard
 import org.basaltmc.server.runtime.scoreboard.Teams
 import org.basaltmc.server.runtime.timings.ReportSources
@@ -430,6 +432,16 @@ public class BasaltServer(
         }
 
     /**
+     * Who hands out regions and owns what belongs to no region.
+     *
+     * One per server, shared by every world: with `regional` off each world is one region and they
+     * take turns on this thread, which is the order of tick vanilla has. Turning it on is what
+     * splits a world, and that is not implemented yet.
+     */
+    private val regionScheduler: RegionScheduler =
+        RegionScheduler(regional = config.regional, threads = config.regionThreads)
+
+    /**
      * Every world `worlds.toml` declares, each with its own chunks, region files, generation
      * workers, settings and seed. Keyed by name, which is what a player's stored row refers to.
      */
@@ -459,6 +471,7 @@ public class BasaltServer(
                     // act on the same villages the world already has.
                     villageGenerator = generators?.villages ?: villageGenerator,
                     normalGenerator = generators?.generate,
+                    scheduler = regionScheduler,
                 )
         }
 
@@ -884,59 +897,87 @@ public class BasaltServer(
             runCatching { functionRunner.run(commands, consoleSource, id) }
                 .onFailure { logger.error(it) { "Scheduled function '$id' failed" } }
         }
+        // What the world has loaded decides what its regions are, and it is worked out here, at the
+        // tick boundary, before any of them starts: a chunk changing hands mid-tick is the one
+        // thing this model cannot survive. With regions off it does nothing.
         for (world in worlds.values) {
-            // The tick thread owns every world's state. Claiming it here rather than at startup
-            // keeps it true even if the loop ever moves to another thread, and running what other
-            // threads left for it *before* the tick is what makes their work part of this tick
-            // rather than of an unpredictable one.
-            if (!world.owner.isCurrent) world.owner.bindToCurrentThread()
+            regionScheduler.repartition(world.name, world.state.loadedChunkKeys()) { merged, split ->
+                logger.debug { "World '${world.name}': $merged region(s) merged, $split split" }
+            }
+        }
+        // Where each player's packets go is decided here, between turns: no region is running, so
+        // handing a session that walked across a border to its new owner cannot land two threads
+        // inside the same player.
+        for (player in playerRegistry.snapshot()) {
+            val world = worlds[player.worldName] ?: continue
+            player.connection.handOverToRegionOf(world)
+        }
+        // Every turn goes through the scheduler, in both modes: the global owner first and then
+        // each region. With the world in one piece that is one region per world, ticked in the
+        // order the worlds were loaded, which is the order this loop walked them in before.
+        regionScheduler.tick(
+            onFailure = { failure ->
+                logger.error(failure) { "A tick task failed: ${failure.stackTraceToString().take(600)}" }
+            },
+        ) { region ->
+            val world = worlds[region.worldName] ?: return@tick
             val onTaskFailure = { failure: Throwable ->
                 logger.error(failure) { "A task for world '${world.name}' failed" }
             }
             // A turn is: what came due, then what was waiting, then the world's own work, and last
             // what asked to run at the end of it. Everything below this line is that third part.
+            // This region's own queue, not the world's: once a world is split there are several,
+            // and running the first region's queue from every region's thread was two threads in
+            // the same queue at once.
             timings.of("tick.tasks").time {
-                world.owner.advanceTick()
-                world.owner.runPending(onTaskFailure)
+                region.owner.advanceTick()
+                region.owner.runPending(onTaskFailure)
             }
-            runCatching { world.state.tickItems() }
+            // What belongs to a piece of the map is done by whoever owns that piece; what belongs
+            // to the world as a whole (its clock, its weather, its players) runs once, in the
+            // world's first region. With one region the two are the same thing.
+            runCatching { world.state.tickItems(region) }
                 .onFailure { logger.error(it) { "Item tick failed in world '${world.name}'" } }
-            runCatching { tickTime(world) }
-                .onFailure { logger.error(it) { "Time tick failed in world '${world.name}'" } }
-            runCatching { tickBorderDamage(world) }
-                .onFailure { logger.error(it) { "Border damage failed in world '${world.name}'" } }
-            runCatching { tickPortals(world) }
-                .onFailure { logger.error(it) { "Portal tick failed in world '${world.name}'" } }
-            runCatching { tickSubmersion(world) }
-                .onFailure { logger.error(it) { "Drowning tick failed in world '${world.name}'" } }
-            runCatching { tickFluids(world) }
+            if (region.isPrimary) {
+                runCatching { tickTime(world) }
+                    .onFailure { logger.error(it) { "Time tick failed in world '${world.name}'" } }
+                runCatching { tickBorderDamage(world) }
+                    .onFailure { logger.error(it) { "Border damage failed in world '${world.name}'" } }
+                runCatching { tickPortals(world) }
+                    .onFailure { logger.error(it) { "Portal tick failed in world '${world.name}'" } }
+                runCatching { tickSubmersion(world) }
+                    .onFailure { logger.error(it) { "Drowning tick failed in world '${world.name}'" } }
+                runCatching { tickFootsteps(world) }
+                    .onFailure { logger.error(it) { "Footstep tick failed in world '${world.name}'" } }
+            }
+            runCatching { tickFluids(world, region) }
                 .onFailure { logger.error(it) { "Fluid tick failed in world '${world.name}'" } }
-            runCatching { tickRandomBlocks(world) }
+            runCatching { tickRandomBlocks(world, region) }
                 .onFailure { logger.error(it) { "Random block tick failed in world '${world.name}'" } }
-            runCatching { tickPressurePlates(world) }
+            runCatching { tickPressurePlates(world, region) }
                 .onFailure { logger.error(it) { "Pressure plate tick failed in world '${world.name}'" } }
-            runCatching { tickTripwires(world) }
+            runCatching { tickTripwires(world, region) }
                 .onFailure { logger.error(it) { "Tripwire tick failed in world '${world.name}'" } }
-            runCatching { tickFootsteps(world) }
-                .onFailure { logger.error(it) { "Footstep tick failed in world '${world.name}'" } }
-            runCatching { tickScheduledBlocks(world) }
+            runCatching { tickScheduledBlocks(world, region) }
                 .onFailure { logger.error(it) { "Scheduled block tick failed in world '${world.name}'" } }
-            runCatching { tickBlockEntities(world) }
+            runCatching { tickBlockEntities(world, region) }
                 .onFailure { logger.error(it) { "Block entity tick failed in world '${world.name}'" } }
-            runCatching { tickFallingBlocks(world) }
+            runCatching { tickFallingBlocks(world, region) }
                 .onFailure { logger.error(it) { "Falling block tick failed in world '${world.name}'" } }
-            runCatching { tickEntities(world) }
+            runCatching { tickEntities(world, region) }
                 .onFailure { logger.error(it) { "Entity tick failed in world '${world.name}'" } }
-            runCatching { tickSpawning(world) }
+            runCatching { tickSpawning(world, region) }
                 .onFailure { logger.error(it) { "Mob spawning failed in world '${world.name}'" } }
-            runCatching { tickEffects(world) }
-                .onFailure { logger.error(it) { "Effect tick failed in world '${world.name}'" } }
-            runCatching { tickRaids(world) }
-                .onFailure { logger.error(it) { "Raid tick failed in world '${world.name}'" } }
-            runCatching { tickSleep(world) }
-                .onFailure { logger.error(it) { "Sleep tick failed in world '${world.name}'" } }
+            if (region.isPrimary) {
+                runCatching { tickEffects(world) }
+                    .onFailure { logger.error(it) { "Effect tick failed in world '${world.name}'" } }
+                runCatching { tickRaids(world) }
+                    .onFailure { logger.error(it) { "Raid tick failed in world '${world.name}'" } }
+                runCatching { tickSleep(world) }
+                    .onFailure { logger.error(it) { "Sleep tick failed in world '${world.name}'" } }
+            }
             // The end of the turn: what has to see everything it did, rather than see it a tick late.
-            timings.of("tick.tasks_end").time { world.owner.runEndOfTick(onTaskFailure) }
+            timings.of("tick.tasks_end").time { region.owner.runEndOfTick(onTaskFailure) }
         }
         shutdownIfSignalled()
     }
@@ -1449,11 +1490,15 @@ public class BasaltServer(
      * parity: `ServerLevel.tickFluid`, driven by the same per-chunk queue vanilla persists. A tick
      * is scheduled by whatever changed a block next to a fluid, so a settled ocean costs nothing.
      */
-    private fun tickFluids(world: LoadedWorld) {
+    private fun tickFluids(
+        world: LoadedWorld,
+        region: Region,
+    ) {
         val due = world.state.dueFluidTicks()
         if (due.isEmpty()) return
         val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
         for (position in due) {
+            if (!region.owns(position[0] shr 4, position[2] shr 4)) continue
             for (change in FluidFlow.tick(world, position[0], position[1], position[2])) {
                 val pos = BlockPos(change[0], change[1], change[2])
                 dropWashedAwayBlock(world, pos, change[4])
@@ -1504,11 +1549,15 @@ public class BasaltServer(
      * Runs the block ticks that have come due: buttons letting themselves back up, redstone
      * components spending their delay, pistons landing, plates coming back up.
      */
-    private fun tickScheduledBlocks(world: LoadedWorld) {
+    private fun tickScheduledBlocks(
+        world: LoadedWorld,
+        region: Region,
+    ) {
         val due = world.state.dueBlockTicks()
         if (due.isEmpty()) return
         val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
         for (position in due) {
+            if (!region.owns(position[0] shr 4, position[2] shr 4)) continue
             // Fire acts on its own clock, and keeps asking for the next turn as it goes.
             if (Fires.isFire(world.state.getBlockState(position[0], position[1], position[2]) ?: 0)) {
                 for (change in Fires.tick(
@@ -1689,11 +1738,15 @@ public class BasaltServer(
      * the players are walked once a tick instead, which reaches the same state on the same tick: a
      * plate is pressed while somebody is on it and books its own turn to come back up.
      */
-    private fun tickPressurePlates(world: LoadedWorld) {
+    private fun tickPressurePlates(
+        world: LoadedWorld,
+        region: Region,
+    ) {
         val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
         if (watchers.isEmpty()) return
         for (player in watchers) {
             if (player.gamemode == Gamemode.SPECTATOR) continue
+            if (!region.ownsPosition(player.x, player.z)) continue
             val x = floor(player.x).toInt()
             val z = floor(player.z).toInt()
             val y = PressurePlates.blockUnder(player.y)
@@ -1752,15 +1805,22 @@ public class BasaltServer(
      * parity: `TripWireBlock.entityInside`, which is a collision in vanilla and a walk over the
      * players and dropped items here. What it powers is the hook at the end of the string.
      */
-    private fun tickTripwires(world: LoadedWorld) {
+    private fun tickTripwires(
+        world: LoadedWorld,
+        region: Region,
+    ) {
         val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
         val changes = mutableListOf<org.basaltmc.server.runtime.world.BlockChange>()
         val crossed = HashSet<Long>()
         for (player in watchers) {
             if (player.gamemode == Gamemode.SPECTATOR) continue
+            if (!region.ownsPosition(player.x, player.z)) continue
             crossingsOf(world, player.x, player.y, player.z, crossed)
         }
-        for (item in world.state.items()) crossingsOf(world, item.x, item.y, item.z, crossed)
+        for (item in world.state.items()) {
+            if (!region.ownsPosition(item.x, item.z)) continue
+            crossingsOf(world, item.x, item.y, item.z, crossed)
+        }
         for (packed in crossed) {
             Tripwires.press(
                 world,
@@ -1950,11 +2010,14 @@ public class BasaltServer(
      * category that scales with how much of the world is being simulated. `doMobSpawning` turns the
      * whole thing off, as it does in vanilla.
      */
-    private fun tickSpawning(world: LoadedWorld) {
+    private fun tickSpawning(
+        world: LoadedWorld,
+        region: Region,
+    ) {
         if (!world.gameRules[GameRuleRegistry.SPAWN_MOBS]) return
         val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
         if (watchers.isEmpty()) return
-        val chunks = simulatedChunks(world)
+        val chunks = simulatedChunks(world, region)
         if (chunks.isEmpty()) return
 
         val alive = world.state.entities().filter { !it.removed }
@@ -2007,7 +2070,10 @@ public class BasaltServer(
      * parity: `ServerLevel.tickNonPassenger`, one turn per entity per tick, in the order they were
      * spawned. What each one does is its own class's `tick`.
      */
-    private fun tickEntities(world: LoadedWorld) {
+    private fun tickEntities(
+        world: LoadedWorld,
+        region: Region,
+    ) {
         val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
         // parity: `TntBlock.explode`, which spawns the entity as the block goes. It is done here
         // because the block half runs wherever a neighbour changed, which may be a client's thread.
@@ -2093,6 +2159,10 @@ public class BasaltServer(
         val random = LegacyRandom(Random.nextLong())
         for (entity in living) {
             if (entity.removed) continue
+            // An entity is ticked by whoever owns the ground it is standing on. It may walk out of
+            // this region during its own turn: that is fine, the next tick asks again, and the
+            // repartition that could change the answer only happens between ticks.
+            if (!region.ownsPosition(entity.x, entity.z)) continue
             if (entity.type == PrimedTnt.TYPE) {
                 if (!PrimedTnt.tick(world.state, entity)) continue
                 entity.removed = true
@@ -3203,8 +3273,14 @@ public class BasaltServer(
     /** parity: `Mth.nextDouble(random, -0.25, 0.25)`, the quarter block a popped stack lands within. */
     private fun jitter(): Double = Random.nextDouble() * 2 * POP_JITTER - POP_JITTER
 
-    private fun tickFallingBlocks(world: LoadedWorld) {
-        val falling = world.state.entities().filter { !it.removed && it.type == FallingBlocks.ENTITY_TYPE }
+    private fun tickFallingBlocks(
+        world: LoadedWorld,
+        region: Region,
+    ) {
+        val falling =
+            world.state.entities().filter {
+                !it.removed && it.type == FallingBlocks.ENTITY_TYPE && region.ownsPosition(it.x, it.z)
+            }
         if (falling.isEmpty()) return
         val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
         for (entity in falling) {
@@ -3224,10 +3300,13 @@ public class BasaltServer(
      * parity: `ServerLevel.tickChunk`, which only runs over the chunks a player is near. Whoever is
      * in the world decides that here too, so an empty world sits still rather than growing on.
      */
-    private fun tickRandomBlocks(world: LoadedWorld) {
+    private fun tickRandomBlocks(
+        world: LoadedWorld,
+        region: Region,
+    ) {
         val speed = world.gameRules[GameRuleRegistry.RANDOM_TICK_SPEED]
         if (speed <= 0) return
-        val chunks = simulatedChunks(world)
+        val chunks = simulatedChunks(world, region)
         if (chunks.isEmpty()) return
         val changes =
             randomTicks.tick(world, chunks, speed, LegacyRandom(Random.nextLong())) {
@@ -3256,8 +3335,11 @@ public class BasaltServer(
      *
      * parity: `ServerLevel.tickBlockEntities`, over the same chunks a random tick visits.
      */
-    private fun tickBlockEntities(world: LoadedWorld) {
-        val chunks = simulatedChunks(world)
+    private fun tickBlockEntities(
+        world: LoadedWorld,
+        region: Region,
+    ) {
+        val chunks = simulatedChunks(world, region)
         if (chunks.isEmpty()) return
         val changes =
             BlockEntityTicks.tick(
@@ -3298,7 +3380,10 @@ public class BasaltServer(
      * distance. This build has no setting of its own for it yet, so it follows the view distance up
      * to vanilla's own default and no further.
      */
-    private fun simulatedChunks(world: LoadedWorld): List<IntArray> {
+    private fun simulatedChunks(
+        world: LoadedWorld,
+        region: Region? = null,
+    ): List<IntArray> {
         val radius = minOf(world.settings.viewDistance, VANILLA_SIMULATION_DISTANCE)
         val seen = HashSet<Long>()
         val chunks = mutableListOf<IntArray>()
@@ -3308,6 +3393,8 @@ public class BasaltServer(
             val centreZ = player.z.toInt() shr 4
             for (x in centreX - radius..centreX + radius) {
                 for (z in centreZ - radius..centreZ + radius) {
+                    // A chunk is simulated by whoever owns it, so two regions never tick the same one.
+                    if (region != null && !region.owns(x, z)) continue
                     if (seen.add((x.toLong() shl 32) or (z.toLong() and 0xFFFFFFFFL))) chunks += intArrayOf(x, z)
                 }
             }
@@ -3529,8 +3616,10 @@ public class BasaltServer(
             world.flushRegions()
             // Nothing else runs in this world: what was still queued is cancelled rather than run
             // against a world that is already written out, and its handles say so.
-            world.closeOwner()
         }
+        // Nothing else runs anywhere: what was queued is cancelled rather than run against a world
+        // that is already written out.
+        regionScheduler.close()
         // The players were saved before being disconnected, above. This is the checkpoint that
         // leaves players.db as one self-contained file.
         runCatching { playerStore.close() }.onFailure { logger.error(it) { "Failed to close players.db" } }
@@ -3558,6 +3647,15 @@ public class BasaltServer(
         // to find out. It also creates the file, so the layout is complete before anyone connects.
         logger.info { "Player database ready: ${playerStore.players.count()} player(s) known." }
         val listener = TcpListener.bind(config.port).also { this.listener = it }
+        // Said once at startup, because it changes the order of tick and an operator reading a bug
+        // report has to know which mode produced it.
+        if (regionScheduler.regional) {
+            logger.warn {
+                "Regions are on, which is NOT VANILLA: two of them have no fixed order of tick " +
+                    "between each other, and what crosses a border is deferred a tick. " +
+                    "Ticking them at once uses ${regionScheduler.threads} thread(s)."
+            }
+        }
         tickLoop.start()
         val elapsedSeconds = (Clock.System.now() - startedAt).inWholeMilliseconds / 1000.0
         logger.info {

@@ -34,6 +34,7 @@ class TaskApiTest {
         owner.schedule(delayTicks = 2) { ran++ }
 
         owner.advanceTick()
+        owner.bindToCurrentThread()
         assertEquals(0, owner.runPending(), "two turns still to wait")
         owner.advanceTick()
         assertEquals(0, owner.runPending(), "one to go")
@@ -49,6 +50,7 @@ class TaskApiTest {
 
         owner.schedule(delayTicks = 0) { ran = true }
         owner.advanceTick()
+        owner.bindToCurrentThread()
         owner.runPending()
 
         assertTrue(ran)
@@ -61,6 +63,8 @@ class TaskApiTest {
 
         owner.submit { order += "start" }
         owner.scheduleAtEnd { order += "end" }
+
+        owner.bindToCurrentThread()
 
         owner.runPending()
         assertEquals(listOf("start"), order, "the end of the turn has not come yet")
@@ -75,6 +79,7 @@ class TaskApiTest {
 
         val handle = owner.submit { ran = true }
         handle.cancel()
+        owner.bindToCurrentThread()
         owner.runPending()
 
         assertFalse(ran)
@@ -105,6 +110,7 @@ class TaskApiTest {
         assertTrue(delayed.isCancelled)
         assertTrue(owner.submit { ran = true }.isCancelled, "and nothing new is taken")
         owner.advanceTick()
+        owner.bindToCurrentThread()
         owner.runPending()
         owner.runEndOfTick()
         assertFalse(ran)
@@ -118,6 +124,7 @@ class TaskApiTest {
 
         repeat(3) {
             owner.submit { ran++ }
+            owner.bindToCurrentThread()
             owner.runPending()
         }
 

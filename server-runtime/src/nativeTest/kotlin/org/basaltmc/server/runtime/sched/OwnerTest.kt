@@ -63,22 +63,32 @@ class OwnerTest {
     }
 
     @Test
-    fun whatATaskAddsBelongsToTheNextTurn() {
+    fun aTaskThatHandsWorkToItsOwnOwnerDoesItThereAndThen() {
         val owner = Owner("world")
-        val other = Owner("another world")
-        other.bindToCurrentThread()
-        // Owned by a thread that is not this one, so submitting queues rather than running here.
-        NativeThread.start { owner.bindToCurrentThread() }
-        var waited = 0
-        while (!owner.isClaimed && waited < WAIT_LIMIT_MILLIS) {
-            sleepMillis(5)
-            waited += 5
+        owner.bindToCurrentThread()
+        val order = mutableListOf<String>()
+
+        owner.submit {
+            order += "outer"
+            owner.submit { order += "inner" }
+            order += "after"
         }
 
-        owner.submit { owner.submit { } }
+        assertEquals(listOf("outer", "inner", "after"), order, "a chain of gameplay does not queue behind itself")
+    }
 
-        assertEquals(1, owner.runPending(), "one task ran")
-        assertEquals(1, owner.pending, "and what it added waits for the next turn")
+    @Test
+    fun whatATaskDelaysBelongsToALaterTurn() {
+        val owner = Owner("world")
+        owner.bindToCurrentThread()
+        var ran = false
+
+        owner.submit { owner.schedule(delayTicks = 0) { ran = true } }
+
+        assertFalse(ran, "asking for a delay is asking for another turn")
+        owner.advanceTick()
+        owner.runPending()
+        assertTrue(ran)
     }
 
     @Test
