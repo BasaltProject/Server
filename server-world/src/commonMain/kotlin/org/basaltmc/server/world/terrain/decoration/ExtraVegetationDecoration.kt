@@ -24,6 +24,12 @@ public object ExtraVegetationDecoration {
             placeNearWaterFireflies(chunk, random, outerCount = 2, noLeavesHeightmap = true)
         }
 
+    /** Shared near-water firefly tail after pumpkin and sugar cane got independent seeds. */
+    public val FIREFLY_NEAR_WATER: BiomeVegetalDecoration =
+        BiomeVegetalDecoration { chunk, random ->
+            placeNearWaterFireflies(chunk, random, outerCount = 2, noLeavesHeightmap = true)
+        }
+
     public val NEAR_WATER: BiomeVegetalDecoration =
         BiomeVegetalDecoration { chunk, random ->
             placeSugarCane(chunk, random, rarity = 6)
@@ -43,6 +49,12 @@ public object ExtraVegetationDecoration {
             placeCactus(chunk, random, rarity = 6)
         }
 
+    /** Desert sugar-cane tail after pumpkin and cactus moved to independent feature seeds. */
+    public val DESERT_WITHOUT_PUMPKIN_OR_CACTUS: BiomeVegetalDecoration =
+        BiomeVegetalDecoration { chunk, random ->
+            placeSugarCane(chunk, random, rarity = null)
+        }
+
     public val BADLANDS: BiomeVegetalDecoration =
         BiomeVegetalDecoration { chunk, random ->
             placeSugarCane(chunk, random, rarity = 5)
@@ -58,6 +70,13 @@ public object ExtraVegetationDecoration {
             placeNearWaterFireflies(chunk, random, outerCount = 2, noLeavesHeightmap = true)
         }
 
+    /** Badlands sugar-cane/firefly tail after pumpkin and cactus got independent feature seeds. */
+    public val BADLANDS_WITHOUT_PUMPKIN_OR_CACTUS: BiomeVegetalDecoration =
+        BiomeVegetalDecoration { chunk, random ->
+            placeSugarCane(chunk, random, rarity = 5)
+            placeNearWaterFireflies(chunk, random, outerCount = 2, noLeavesHeightmap = true)
+        }
+
     public val SWAMP: BiomeVegetalDecoration =
         BiomeVegetalDecoration { chunk, random ->
             placeSugarCane(chunk, random, rarity = 3)
@@ -69,6 +88,13 @@ public object ExtraVegetationDecoration {
     public val SWAMP_WITHOUT_PUMPKIN: BiomeVegetalDecoration =
         BiomeVegetalDecoration { chunk, random ->
             placeSugarCane(chunk, random, rarity = 3)
+            placeGeneralFireflies(chunk, random, rarity = 8)
+            placeNearWaterFireflies(chunk, random, outerCount = 3, noLeavesHeightmap = false)
+        }
+
+    /** Both swamp firefly features after pumpkin and sugar cane moved to independent seeds. */
+    public val SWAMP_FIREFLIES: BiomeVegetalDecoration =
+        BiomeVegetalDecoration { chunk, random ->
             placeGeneralFireflies(chunk, random, rarity = 8)
             placeNearWaterFireflies(chunk, random, outerCount = 3, noLeavesHeightmap = false)
         }

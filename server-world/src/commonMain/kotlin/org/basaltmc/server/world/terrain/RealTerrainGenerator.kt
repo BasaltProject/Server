@@ -14,22 +14,26 @@ import org.basaltmc.server.world.terrain.decoration.BambooDecoration
 import org.basaltmc.server.world.terrain.decoration.BerryPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.BiomeDecoration
 import org.basaltmc.server.world.terrain.decoration.BushPatchDecoration
+import org.basaltmc.server.world.terrain.decoration.CactusPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.CaveLocalModificationDecoration
 import org.basaltmc.server.world.terrain.decoration.CaveSpeleothemDecoration
 import org.basaltmc.server.world.terrain.decoration.DesertWellDecoration
 import org.basaltmc.server.world.terrain.decoration.DoublePlantPatchDecoration
+import org.basaltmc.server.world.terrain.decoration.FireflyBushPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.ForestRockDecoration
 import org.basaltmc.server.world.terrain.decoration.FrozenOceanDecoration
 import org.basaltmc.server.world.terrain.decoration.GlowLichenDecoration
 import org.basaltmc.server.world.terrain.decoration.GrassPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.GroundPlantPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.IceSpikesDecoration
+import org.basaltmc.server.world.terrain.decoration.LeafLitterPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.MelonPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.MushroomPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.OverworldOreDecoration
 import org.basaltmc.server.world.terrain.decoration.OverworldSpringDecoration
 import org.basaltmc.server.world.terrain.decoration.PumpkinPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.SculkDecoration
+import org.basaltmc.server.world.terrain.decoration.SugarCanePatchDecoration
 import org.basaltmc.server.world.terrain.decoration.SurfaceFreezingDecoration
 import org.basaltmc.server.world.terrain.decoration.TallGrassDecoration
 import org.basaltmc.server.world.terrain.decoration.WaterlilyPatchDecoration
@@ -153,7 +157,11 @@ public object RealTerrainGenerator {
             MelonPatchDecoration.decorate(chunk, seed, chunkEnvironment)
             BerryPatchDecoration.decorate(chunk, seed, chunkEnvironment)
             BushPatchDecoration.decorate(chunk, seed, chunkEnvironment)
+            LeafLitterPatchDecoration.decorate(chunk, seed, chunkEnvironment)
+            SugarCanePatchDecoration.decorate(chunk, seed, chunkEnvironment)
             PumpkinPatchDecoration.decorate(chunk, seed, chunkEnvironment)
+            CactusPatchDecoration.decorate(chunk, seed, chunkEnvironment)
+            FireflyBushPatchDecoration.decorate(chunk, seed, chunkEnvironment)
             GrassPatchDecoration.decorate(chunk, seed, chunkEnvironment)
             GroundPlantPatchDecoration.decorate(chunk, seed, chunkEnvironment)
             MushroomPatchDecoration.decorate(chunk, seed, chunkEnvironment)
