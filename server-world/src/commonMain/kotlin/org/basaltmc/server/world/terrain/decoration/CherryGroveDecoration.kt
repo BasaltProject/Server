@@ -23,6 +23,9 @@ public object CherryGroveDecoration : BiomeVegetalDecoration {
         TreeDecoration.single(TreeConfigs.CHERRY_BEES_005, 10, 0.1f, 1).decorate(chunk, random)
     }
 
+    /** Petal-only tail used after [TreePatchDecoration] owns `trees_cherry`. */
+    public val FLOWERS_ONLY: BiomeVegetalDecoration = BiomeVegetalDecoration(::placePinkPetals)
+
     // parity: placed_feature/flower_cherry.json + configured_feature/flower_cherry.json
     // (SIMPLE_BLOCK over a WeightedStateProvider of the 16 pink_petals states).
 

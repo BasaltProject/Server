@@ -41,6 +41,21 @@ public object ForestFloorDecoration {
             wildflowerFeature(),
         )
 
+    internal fun placeWildflowersAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+        count: Int,
+    ) {
+        val feature = wildflowerFeature()
+        placeFrom(
+            chunk,
+            random,
+            origin,
+            listOf(CountPlacement(count), RandomOffsetPlacement(xzSpread = 6, ySpread = 2), AirTargetFilter()),
+        ) { position -> feature.place(chunk, random, position) }
+    }
+
     /** `patch_leaf_litter`: two 32-candidate patches restricted to grass block. */
     public val LEAF_LITTER: BiomeVegetalDecoration =
         placed(

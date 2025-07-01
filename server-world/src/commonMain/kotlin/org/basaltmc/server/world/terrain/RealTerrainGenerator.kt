@@ -21,6 +21,7 @@ import org.basaltmc.server.world.terrain.decoration.CaveSpeleothemDecoration
 import org.basaltmc.server.world.terrain.decoration.DesertWellDecoration
 import org.basaltmc.server.world.terrain.decoration.DoublePlantPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.FireflyBushPatchDecoration
+import org.basaltmc.server.world.terrain.decoration.FlowerPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.ForestRockDecoration
 import org.basaltmc.server.world.terrain.decoration.FrozenOceanDecoration
 import org.basaltmc.server.world.terrain.decoration.GlowLichenDecoration
@@ -32,11 +33,13 @@ import org.basaltmc.server.world.terrain.decoration.MelonPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.MushroomPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.OverworldOreDecoration
 import org.basaltmc.server.world.terrain.decoration.OverworldSpringDecoration
+import org.basaltmc.server.world.terrain.decoration.PaleMossDecoration
 import org.basaltmc.server.world.terrain.decoration.PumpkinPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.SculkDecoration
 import org.basaltmc.server.world.terrain.decoration.SugarCanePatchDecoration
 import org.basaltmc.server.world.terrain.decoration.SurfaceFreezingDecoration
 import org.basaltmc.server.world.terrain.decoration.TallGrassDecoration
+import org.basaltmc.server.world.terrain.decoration.TreePatchDecoration
 import org.basaltmc.server.world.terrain.decoration.VinePatchDecoration
 import org.basaltmc.server.world.terrain.decoration.WaterlilyPatchDecoration
 import org.basaltmc.server.world.terrain.surface.SurfaceBuilder
@@ -169,6 +172,9 @@ public object RealTerrainGenerator {
             GroundPlantPatchDecoration.decorate(chunk, seed, chunkEnvironment)
             MushroomPatchDecoration.decorate(chunk, seed, chunkEnvironment)
             WaterlilyPatchDecoration.decorate(chunk, seed, chunkEnvironment)
+            TreePatchDecoration.decorate(chunk, seed, chunkEnvironment)
+            PaleMossDecoration.decorate(chunk, seed, chunkEnvironment)
+            FlowerPatchDecoration.decorate(chunk, seed, chunkEnvironment)
             val decorationRandom = WorldgenRandom(XoroshiroRandom(seed))
             decorationRandom.setDecorationSeed(seed, chunkX * 16, chunkZ * 16)
             val centerY = heightmap[8 + 8 * 16]

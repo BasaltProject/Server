@@ -28,6 +28,23 @@ public object FlowerForestDecoration : BiomeVegetalDecoration {
         placeFlowers(chunk, random)
     }
 
+    /** Flower-only tail used after [TreePatchDecoration] has independently seeded the tree feature. */
+    public val FLOWERS_ONLY: BiomeVegetalDecoration = BiomeVegetalDecoration(::placeFlowers)
+
+    internal fun placeAt(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        origin: DecorationPos,
+    ) {
+        val feature = SimpleBlockFeature({ _, pos -> flowerAt(pos.x, pos.y, pos.z) })
+        placeFrom(
+            chunk,
+            random,
+            origin,
+            listOf(CountPlacement(96), RandomOffsetPlacement(xzSpread = 6, ySpread = 2), AirTargetFilter()),
+        ) { position -> feature.place(chunk, random, position) }
+    }
+
     // parity: VegetationFeatures.TREES_FLOWER_FOREST, VegetationPlacements.treePlacement(countExtra(6, 0.1, 1)).
     private val TREES: BiomeVegetalDecoration =
         TreeDecoration.candidateSequenceCountExtra(

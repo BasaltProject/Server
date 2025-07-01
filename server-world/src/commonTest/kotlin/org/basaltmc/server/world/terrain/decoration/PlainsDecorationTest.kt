@@ -67,7 +67,7 @@ class PlainsDecorationTest {
     }
 
     @Test
-    fun placesFlowersSomewhereAcrossSeveralChunks() {
+    fun flowerPatchPlacesOnASelectedRaritySeed() {
         val flowerIds =
             setOf(
                 "dandelion",
@@ -81,17 +81,23 @@ class PlainsDecorationTest {
                 "white_tulip",
             ).map(::blockId)
                 .toSet()
+        // At the origin the official noise threshold selects four outer attempts. Pick a seed
+        // whose rarity filter accepts at least one instead of relying on a tiny fixed sample that
+        // can legitimately reject every 1/32 attempt.
+        val seed =
+            (0L..10_000L).first { candidate ->
+                val random = WorldgenRandom(XoroshiroRandom(candidate))
+                (0 until 4).any { random.nextFloat() < 1.0f / 32.0f }
+            }
+        val chunk = flatGrassChunk(0, 0)
+        PlainsDecoration.FLOWERS.decorate(chunk, WorldgenRandom(XoroshiroRandom(seed)))
         var found = false
-        for (cx in 0 until 6) {
-            val chunk = flatGrassChunk(cx, 0)
-            PlainsDecoration.decorate(chunk, WorldgenRandom(XoroshiroRandom(cx.toLong() * 7919L)))
-            for (x in 0 until 16) {
-                for (z in 0 until 16) {
-                    if (chunk.getBlockStateId(x, 65, z) in flowerIds) found = true
-                }
+        for (x in 0 until 16) {
+            for (z in 0 until 16) {
+                if (chunk.getBlockStateId(x, 65, z) in flowerIds) found = true
             }
         }
-        assertTrue(found, "expected a flower to appear somewhere across 6 sampled chunks")
+        assertTrue(found, "expected the selected rarity seed to place at least one flower")
     }
 
     @Test

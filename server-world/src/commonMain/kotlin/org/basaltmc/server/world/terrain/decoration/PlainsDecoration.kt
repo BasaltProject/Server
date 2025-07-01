@@ -92,7 +92,7 @@ public object PlainsDecoration : BiomeVegetalDecoration {
                 chunk,
                 random,
                 listOf(
-                    NoiseThresholdCountPlacement(-0.8, belowNoise = 4, aboveNoise = 15),
+                    NoiseThresholdCountPlacement(-0.8, belowNoise = 15, aboveNoise = 4),
                     RarityFilter(32),
                     InSquarePlacement,
                     HeightmapPlacement,
