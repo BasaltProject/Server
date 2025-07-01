@@ -95,6 +95,32 @@ class HugeMushroomFeatureTest {
         assertEquals(stemBlock, Blocks.byStateId(chunk.getBlockStateId(8, 1, 8))?.block)
     }
 
+    @Test
+    fun capCrossingChunkEdgeKeepsWorldCoordinates() {
+        val chunk = chunkWithMycelium(0)
+        assertTrue(
+            HugeMushroomFeature.place(
+                chunk,
+                WorldgenRandom(XoroshiroRandom(5L)),
+                15,
+                1,
+                8,
+                HugeMushroomFeature.Kind.BROWN,
+            ),
+        )
+
+        val externalWrites = chunk.takeGeneratedBlockWrites()
+        assertTrue(externalWrites.any { it.x >= 16 }, "expected the cap to continue into the east chunk")
+        for (x in 0..2) {
+            for (y in 1..16) {
+                for (z in 0 until 16) {
+                    val block = Blocks.byStateId(chunk.getBlockStateId(x, y, z))?.block
+                    assertTrue(block != brownCapBlock, "cap wrapped to local ($x,$y,$z)")
+                }
+            }
+        }
+    }
+
     private fun chunkWithMycelium(groundY: Int): Chunk {
         val chunk = Chunk(0, 0)
         for (x in 0 until 16) {

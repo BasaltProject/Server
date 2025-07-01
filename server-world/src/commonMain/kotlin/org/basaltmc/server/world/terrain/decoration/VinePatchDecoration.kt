@@ -12,6 +12,13 @@ import org.basaltmc.wire.common.Identifier
 
 /** Exact step-9 placement for the shared jungle `vines` feature. */
 public object VinePatchDecoration {
+    internal fun placeCaveAt(
+        chunk: Chunk,
+        position: DecorationPos,
+    ) {
+        placeAt(PatchRegion(chunk, null, null), position)
+    }
+
     public fun decorate(
         chunk: Chunk,
         seed: Long,

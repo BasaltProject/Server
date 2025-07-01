@@ -125,13 +125,15 @@ public class Chunk(
 
     /**
      * Writes a world-coordinate decoration position. Local writes land immediately; external ones
-     * retain their true coordinates until the runtime installs their target chunk.
+     * retain their true coordinates until the runtime installs their target chunk. Most features
+     * expect unknown external air; water-replacing features can pass their observed expectation.
      */
     public fun setDecorationBlockStateId(
         worldX: Int,
         y: Int,
         worldZ: Int,
         stateId: Int,
+        expectedExternalStateId: Int = Blocks.AIR.stateId,
     ) {
         if (y !in verticalBounds.minY..verticalBounds.maxY) return
         if (worldX shr 4 == chunkX && worldZ shr 4 == chunkZ) {
@@ -147,7 +149,7 @@ public class Chunk(
                 worldX,
                 y,
                 worldZ,
-                previous?.expectedStateId ?: oldStateId,
+                previous?.expectedStateId ?: expectedExternalStateId,
                 stateId,
             )
         blockWriteObserver?.invoke(worldX - chunkX * 16, y, worldZ - chunkZ * 16, oldStateId, stateId)

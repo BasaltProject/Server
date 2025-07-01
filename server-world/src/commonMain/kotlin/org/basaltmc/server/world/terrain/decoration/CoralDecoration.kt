@@ -1,9 +1,11 @@
 package org.basaltmc.server.world.terrain.decoration
 
 import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
+import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
 import org.basaltmc.wire.common.Identifier
 
 /**
@@ -11,6 +13,45 @@ import org.basaltmc.wire.common.Identifier
  * waterlogged coral states, wall-fan facing, and sea-pickle count.
  */
 public object CoralDecoration : BiomeVegetalDecoration {
+    public fun decorate(
+        chunk: Chunk,
+        seed: Long,
+        environment: SurfaceRuleEnvironment,
+    ) {
+        decorateFeature(chunk, seed, environment, null)
+    }
+
+    internal fun decorateFeature(
+        chunk: Chunk,
+        seed: Long,
+        environment: SurfaceRuleEnvironment,
+        placementObserver: ((DecorationPos) -> Unit)?,
+    ) {
+        val random = WorldgenRandom(XoroshiroRandom(seed))
+        val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
+        random.setFeatureSeed(decorationSeed, WARM_OCEAN_VEGETATION_INDEX, VEGETAL_DECORATION_STEP)
+        val context = PlacementContext(chunk)
+        var positions: Sequence<DecorationPos> =
+            sequenceOf(DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16))
+        positions =
+            positions.flatMap {
+                NoiseBasedCountPlacement(noiseToCountRatio = 20, noiseFactor = 400.0)
+                    .getPositions(context, random, it)
+            }
+        positions = positions.flatMap { InSquarePlacement.getPositions(context, random, it) }
+        positions =
+            positions.flatMap {
+                HeightmapPlacement(Chunk.HeightmapType.OCEAN_FLOOR).getPositions(context, random, it)
+            }
+        positions.forEach { origin ->
+            if (environment.biomeAt(origin.x, origin.y, origin.z).substringAfter(':') != "warm_ocean") {
+                return@forEach
+            }
+            placementObserver?.invoke(origin)
+            placeAt(chunk, random, origin)
+        }
+    }
+
     override fun decorate(
         chunk: Chunk,
         random: WorldgenRandom,
@@ -225,13 +266,17 @@ public object CoralDecoration : BiomeVegetalDecoration {
 
     private fun DecorationPos.inWorld(): Boolean = y in WorldHeight.MIN_Y..WorldHeight.MAX_Y
 
-    private fun Chunk.blockAt(pos: DecorationPos): Int = getBlockStateId(pos.x and 15, pos.y, pos.z and 15)
+    private fun Chunk.blockAt(pos: DecorationPos): Int {
+        val stateId = getDecorationBlockStateId(pos.x, pos.y, pos.z)
+        val outsideSourceChunk = pos.x shr 4 != chunkX || pos.z shr 4 != chunkZ
+        return if (outsideSourceChunk && stateId == Blocks.AIR.stateId) Blocks.WATER.stateId else stateId
+    }
 
     private fun Chunk.setBlock(
         pos: DecorationPos,
         stateId: Int,
     ) {
-        setBlockStateId(pos.x and 15, pos.y, pos.z and 15, stateId)
+        setDecorationBlockStateId(pos.x, pos.y, pos.z, stateId, expectedExternalStateId = Blocks.WATER.stateId)
     }
 
     private data class Direction(
@@ -271,6 +316,9 @@ public object CoralDecoration : BiomeVegetalDecoration {
         blockStates("tube", "brain", "bubble", "fire", "horn", suffix = "_coral") +
             blockStates("tube", "brain", "bubble", "fire", "horn", suffix = "_coral_fan")
     private val WALL_CORALS = blockStates("tube", "brain", "bubble", "fire", "horn", suffix = "_coral_wall_fan")
+
+    internal const val WARM_OCEAN_VEGETATION_INDEX: Int = 96
+    private const val VEGETAL_DECORATION_STEP = 9
 
     private fun blockStates(
         vararg names: String,
