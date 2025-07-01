@@ -10,6 +10,7 @@ import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.server.world.densityfunction.DensityCache
 import org.basaltmc.server.world.densityfunction.Marker
 import org.basaltmc.server.world.terrain.carver.OverworldCarvers
+import org.basaltmc.server.world.terrain.decoration.AquaticPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.BambooDecoration
 import org.basaltmc.server.world.terrain.decoration.BerryPatchDecoration
 import org.basaltmc.server.world.terrain.decoration.BiomeDecoration
@@ -36,6 +37,7 @@ import org.basaltmc.server.world.terrain.decoration.SculkDecoration
 import org.basaltmc.server.world.terrain.decoration.SugarCanePatchDecoration
 import org.basaltmc.server.world.terrain.decoration.SurfaceFreezingDecoration
 import org.basaltmc.server.world.terrain.decoration.TallGrassDecoration
+import org.basaltmc.server.world.terrain.decoration.VinePatchDecoration
 import org.basaltmc.server.world.terrain.decoration.WaterlilyPatchDecoration
 import org.basaltmc.server.world.terrain.surface.SurfaceBuilder
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleData
@@ -154,14 +156,15 @@ public object RealTerrainGenerator {
             BambooDecoration.decorate(chunk, seed, chunkEnvironment)
             TallGrassDecoration.decorate(chunk, seed, chunkEnvironment)
             DoublePlantPatchDecoration.decorate(chunk, seed, chunkEnvironment)
-            MelonPatchDecoration.decorate(chunk, seed, chunkEnvironment)
-            BerryPatchDecoration.decorate(chunk, seed, chunkEnvironment)
             BushPatchDecoration.decorate(chunk, seed, chunkEnvironment)
             LeafLitterPatchDecoration.decorate(chunk, seed, chunkEnvironment)
             SugarCanePatchDecoration.decorate(chunk, seed, chunkEnvironment)
             PumpkinPatchDecoration.decorate(chunk, seed, chunkEnvironment)
             CactusPatchDecoration.decorate(chunk, seed, chunkEnvironment)
             FireflyBushPatchDecoration.decorate(chunk, seed, chunkEnvironment)
+            VinePatchDecoration.decorate(chunk, seed, chunkEnvironment)
+            MelonPatchDecoration.decorate(chunk, seed, chunkEnvironment)
+            BerryPatchDecoration.decorate(chunk, seed, chunkEnvironment)
             GrassPatchDecoration.decorate(chunk, seed, chunkEnvironment)
             GroundPlantPatchDecoration.decorate(chunk, seed, chunkEnvironment)
             MushroomPatchDecoration.decorate(chunk, seed, chunkEnvironment)
@@ -171,6 +174,7 @@ public object RealTerrainGenerator {
             val centerY = heightmap[8 + 8 * 16]
             val biomeId = Identifier.parse(chunkEnvironment.biomeAt(chunkX * 16 + 8, centerY, chunkZ * 16 + 8))
             BiomeDecoration.forBiome(biomeId)?.decorate(chunk, decorationRandom)
+            AquaticPatchDecoration.decorate(chunk, seed, chunkEnvironment)
         }
         GenerationMetrics.measure(GenerationMetrics.Phase.SURFACE_FREEZE) {
             SurfaceFreezingDecoration.decorate(chunk, chunkEnvironment)
