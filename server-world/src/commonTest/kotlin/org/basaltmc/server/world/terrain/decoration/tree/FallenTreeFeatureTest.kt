@@ -93,6 +93,32 @@ class FallenTreeFeatureTest {
         assertTrue(placed > 0)
     }
 
+    @Test
+    fun fallenLogsCrossTheBorderInsteadOfWrapping() {
+        var foundExternalLog = false
+        for (seed in 0L..64L) {
+            val chunk = flatChunk()
+            for (x in 16..30) chunk.setDecorationBlockStateId(x, 62, 8, Blocks.GRASS_BLOCK.stateId)
+            FallenTreeFeature.place(
+                chunk,
+                WorldgenRandom(XoroshiroRandom(seed)),
+                15,
+                63,
+                8,
+                FallenTreeConfigs.SUPER_BIRCH,
+            )
+            val sidewaysBirch =
+                setOf(FallenTreeConfigs.SUPER_BIRCH.logStateId - 1, FallenTreeConfigs.SUPER_BIRCH.logStateId + 1)
+            val writes = chunk.takeGeneratedBlockWrites()
+            if (writes.any { it.x >= 16 && it.stateId in sidewaysBirch }) {
+                foundExternalLog = true
+                for (y in 63..66) assertTrue(chunk.getBlockStateId(0, y, 8) !in sidewaysBirch)
+                break
+            }
+        }
+        assertTrue(foundExternalLog, "expected a fallen birch directed east across the border")
+    }
+
     private fun flatChunk(): Chunk {
         val chunk = Chunk(0, 0)
         for (x in 0 until 16) {

@@ -3,7 +3,6 @@ package org.basaltmc.server.world.terrain.decoration.tree
 import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
-import org.basaltmc.server.world.ChunkBlockEntity
 import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.server.world.terrain.decoration.DecorationPos
 import org.basaltmc.server.world.terrain.decoration.IntProvider
@@ -25,9 +24,9 @@ import kotlin.math.sqrt
  * // parity: net.minecraft.world.level.levelgen.feature.TreeFeature and every trunk placer,
  * foliage placer and `FeatureSize` the Overworld trees drive, decompiled from the jar.
  *
- * Coordinates are world block coordinates, as [DecorationPos] has them; only [Chunk] access masks
- * X/Z to `and 15`, so a canopy reaching the next chunk wraps back into this one instead of
- * spilling over. Every decoration feature here does that until cross-chunk writes exist.
+ * Coordinates are world block coordinates, as [DecorationPos] has them. Writes outside the source
+ * chunk remain at their true world position through [Chunk.setDecorationBlockStateId] and are
+ * delivered when the runtime installs the target chunk.
  */
 public data class FoliageAttachment(
     val x: Int,
@@ -115,7 +114,7 @@ public sealed class TrunkPlacer(
         z: Int,
     ) {
         if (y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return
-        val stateId = chunk.getBlockStateId(x and 15, y, z and 15)
+        val stateId = chunk.getDecorationBlockStateId(x, y, z)
         val path = Blocks.byStateId(stateId)?.block?.path
         if (path !in CANNOT_REPLACE_BELOW_TREE_TRUNK_PATHS) setBlock(chunk, x, y, z, Blocks.DIRT.stateId)
     }
@@ -145,7 +144,7 @@ public sealed class TrunkPlacer(
         z: Int,
     ): Boolean {
         if (y < WorldHeight.MIN_Y || y > WorldHeight.MAX_Y) return false
-        val stateId = chunk.getBlockStateId(x and 15, y, z and 15)
+        val stateId = chunk.getDecorationBlockStateId(x, y, z)
         return Blocks.isAir(stateId) || stateId in leafStateIds
     }
 
@@ -947,7 +946,7 @@ public class MangroveRootPlacer(
         z: Int,
     ): Boolean {
         if (y < WorldHeight.MIN_Y || y > WorldHeight.MAX_Y) return false
-        val id = chunk.getBlockStateId(x and 15, y, z and 15)
+        val id = chunk.getDecorationBlockStateId(x, y, z)
         return Blocks.isAir(id) || id in canGrowThroughIds
     }
 
@@ -959,18 +958,18 @@ public class MangroveRootPlacer(
         z: Int,
     ) {
         if (y < WorldHeight.MIN_Y || y > WorldHeight.MAX_Y) return
-        val current = chunk.getBlockStateId(x and 15, y, z and 15)
+        val current = chunk.getDecorationBlockStateId(x, y, z)
         // parity: MangroveRootPlacer.placeRoot: mud/muddy roots become muddy_mangrove_roots
         // regardless of canPlaceRoot; everything else goes through the real RootPlacer.placeRoot.
         if (current == mudStateId || current == muddyMangroveRootsStateId) {
-            chunk.setBlockStateId(x and 15, y, z and 15, muddyMangroveRootsStateId)
+            chunk.setDecorationBlockStateId(x, y, z, muddyMangroveRootsStateId)
         } else if (canPlaceRoot(chunk, x, y, z)) {
-            chunk.setBlockStateId(x and 15, y, z and 15, mangroveRootsStateId)
+            chunk.setDecorationBlockStateId(x, y, z, mangroveRootsStateId)
             if (random.nextFloat() < ABOVE_ROOT_CHANCE &&
                 y + 1 <= WorldHeight.MAX_Y &&
-                Blocks.isAir(chunk.getBlockStateId(x and 15, y + 1, z and 15))
+                Blocks.isAir(chunk.getDecorationBlockStateId(x, y + 1, z))
             ) {
-                chunk.setBlockStateId(x and 15, y + 1, z and 15, mossCarpetStateId)
+                chunk.setDecorationBlockStateId(x, y + 1, z, mossCarpetStateId)
             }
         }
     }
@@ -1118,7 +1117,7 @@ public sealed class FoliagePlacer(
             while (offsetAlongEdge < currentRadius + offset) {
                 val leavesAbove =
                     posY + 1 in WorldHeight.MIN_Y..WorldHeight.MAX_Y &&
-                        chunk.getBlockStateId(posX and 15, posY + 1, posZ and 15) == foliageStateId
+                        chunk.getDecorationBlockStateId(posX, posY + 1, posZ) == foliageStateId
                 if (leavesAbove &&
                     tryPlaceExtension(
                         chunk,
@@ -2039,15 +2038,15 @@ public object TreeFeature {
             if (!isInside(pos) || !filled.add(pos)) continue
 
             if (smallestDistance != 0) {
-                val currentStateId = chunk.getBlockStateId(pos.x and 15, pos.y, pos.z and 15)
+                val currentStateId = chunk.getDecorationBlockStateId(pos.x, pos.y, pos.z)
                 val updatedStateId = Blocks.withLeafDistance(currentStateId, smallestDistance) ?: continue
-                chunk.setBlockStateId(pos.x and 15, pos.y, pos.z and 15, updatedStateId)
+                chunk.setDecorationBlockStateId(pos.x, pos.y, pos.z, updatedStateId)
             }
 
             for ((dx, dy, dz) in BLOCK_NEIGHBOURS) {
                 val neighbor = BlockPos(pos.x + dx, pos.y + dy, pos.z + dz)
                 if (!isInside(neighbor) || neighbor in filled) continue
-                val stateId = chunk.getBlockStateId(neighbor.x and 15, neighbor.y, neighbor.z and 15)
+                val stateId = chunk.getDecorationBlockStateId(neighbor.x, neighbor.y, neighbor.z)
                 val currentDistance = Blocks.leafDistance(stateId) ?: continue
                 val newDistance = min(currentDistance, smallestDistance + 1)
                 if (newDistance < 7) {
@@ -2196,7 +2195,7 @@ public object TreeFeature {
                     val y = position.y + dy
                     y in WorldHeight.MIN_Y..WorldHeight.MAX_Y &&
                         Blocks
-                            .byStateId(chunk.getBlockStateId((position.x + dx) and 15, y, (position.z + dz) and 15))
+                            .byStateId(chunk.getDecorationBlockStateId(position.x + dx, y, position.z + dz))
                             ?.block
                             ?.path
                             ?.let(LOG_BLOCK_PATHS::contains) == true
@@ -2270,11 +2269,11 @@ public object TreeFeature {
             ) {
                 return@repeat
             }
-            val aboveStateId = chunk.getBlockStateId(x and 15, aboveY, z and 15)
+            val aboveStateId = chunk.getDecorationBlockStateId(x, aboveY, z)
             if (!Blocks.isAir(aboveStateId) && !Blocks.isVineState(aboveStateId)) return@repeat
-            val supportStateId = chunk.getBlockStateId(x and 15, y, z and 15)
+            val supportStateId = chunk.getDecorationBlockStateId(x, y, z)
             if (!isSolidRender(supportStateId)) return@repeat
-            if (chunk.heightAt(x and 15, z and 15, Chunk.HeightmapType.MOTION_BLOCKING_NO_LEAVES) >
+            if (decorationHeightAt(chunk, x, z, Chunk.HeightmapType.MOTION_BLOCKING_NO_LEAVES) >
                 aboveY
             ) {
                 return@repeat
@@ -2323,8 +2322,13 @@ public object TreeFeature {
         }
         val data = NbtCompound()
         data["bees"] = NbtList(NbtType.COMPOUND, bees)
-        chunk.setBlockEntity(
-            ChunkBlockEntity(hive.x and 15, hive.y, hive.z and 15, Identifier.vanilla("beehive"), data),
+        chunk.setDecorationBlockEntity(
+            hive.x,
+            hive.y,
+            hive.z,
+            southEmptyBeeNestStateId,
+            Identifier.vanilla("beehive"),
+            data,
         )
     }
 
@@ -2395,9 +2399,9 @@ public object TreeFeature {
         for (dy in 2 downTo -3) {
             val cursorY = y + dy
             if (cursorY !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) continue
-            val stateId = chunk.getBlockStateId(x and 15, cursorY, z and 15)
+            val stateId = chunk.getDecorationBlockStateId(x, cursorY, z)
             if (stateId in beneathTreePodzolReplaceable) {
-                chunk.setBlockStateId(x and 15, cursorY, z and 15, Blocks.PODZOL.stateId)
+                chunk.setDecorationBlockStateId(x, cursorY, z, Blocks.PODZOL.stateId)
                 return
             }
             if (!Blocks.isAir(stateId) && dy < 0) return
@@ -2424,7 +2428,7 @@ public object TreeFeature {
         z: Int,
     ): Boolean =
         y in WorldHeight.MIN_Y..WorldHeight.MAX_Y &&
-            Blocks.isAir(chunk.getBlockStateId(x and 15, y, z and 15))
+            Blocks.isAir(chunk.getDecorationBlockStateId(x, y, z))
 
     private data class BlockPos(
         val x: Int,
@@ -2675,7 +2679,7 @@ private fun isValidTreePos(
     z: Int,
 ): Boolean {
     if (y < WorldHeight.MIN_Y || y > WorldHeight.MAX_Y) return false
-    return Blocks.isAir(chunk.getBlockStateId(x and 15, y, z and 15))
+    return Blocks.isAir(chunk.getDecorationBlockStateId(x, y, z))
 }
 
 private fun setBlock(
@@ -2686,7 +2690,7 @@ private fun setBlock(
     stateId: Int,
 ) {
     if (y < WorldHeight.MIN_Y || y > WorldHeight.MAX_Y) return
-    chunk.setBlockStateId(x and 15, y, z and 15, stateId)
+    chunk.setDecorationBlockStateId(x, y, z, stateId)
 }
 
 private fun tryPlaceLeaf(
@@ -2697,11 +2701,26 @@ private fun tryPlaceLeaf(
     z: Int,
 ): Boolean {
     if (y < WorldHeight.MIN_Y || y > WorldHeight.MAX_Y) return false
-    if (Blocks.isAir(chunk.getBlockStateId(x and 15, y, z and 15))) {
-        chunk.setBlockStateId(x and 15, y, z and 15, foliageStateId)
+    if (Blocks.isAir(chunk.getDecorationBlockStateId(x, y, z))) {
+        chunk.setDecorationBlockStateId(x, y, z, foliageStateId)
         return true
     }
     return false
+}
+
+private fun decorationHeightAt(
+    chunk: Chunk,
+    worldX: Int,
+    worldZ: Int,
+    type: Chunk.HeightmapType,
+): Int {
+    if (worldX shr 4 == chunk.chunkX && worldZ shr 4 == chunk.chunkZ) {
+        return chunk.heightAt(worldX and 15, worldZ and 15, type)
+    }
+    for (y in chunk.verticalBounds.maxY downTo chunk.verticalBounds.minY) {
+        if (type.matches(chunk.getDecorationBlockStateId(worldX, y, worldZ))) return y + 1
+    }
+    return chunk.verticalBounds.minY
 }
 
 // parity: real Direction.Plane.HORIZONTAL faces order (NORTH, EAST, SOUTH, WEST); index 0-3 of a

@@ -28,8 +28,11 @@ class MeadowFlowerDecorationTest {
     fun rareMeadowTreeSelectorPlacesFancyOakOrSuperBirch() {
         val chunk = flatGrassChunk()
         MeadowDecoration.TREES.decorate(chunk, WorldgenRandom(XoroshiroRandom(seedPassingTreeRarity())))
-        assertTrue(countAll(chunk, treeLogStates) > 0)
-        assertTrue(countAll(chunk, treeLeafStates) > 0)
+        val external = chunk.takeGeneratedBlockWrites()
+        assertTrue(countAll(chunk, treeLogStates) > 0 || external.any { it.stateId in treeLogStates })
+        assertTrue(
+            countAllMatching(chunk, Blocks::isLeavesState) > 0 || external.any { Blocks.isLeavesState(it.stateId) },
+        )
     }
 
     @Test
@@ -91,6 +94,19 @@ class MeadowFlowerDecorationTest {
         return result
     }
 
+    private fun countAllMatching(
+        chunk: Chunk,
+        matches: (Int) -> Boolean,
+    ): Int {
+        var result = 0
+        for (x in 0 until 16) {
+            for (z in 0 until 16) {
+                for (y in 63..90) if (matches(chunk.getBlockStateId(x, y, z))) result++
+            }
+        }
+        return result
+    }
+
     private fun seedPassingTreeRarity(): Long =
         (0L..10_000L).first { seed -> WorldgenRandom(XoroshiroRandom(seed)).nextFloat() < 0.01f }
 
@@ -103,5 +119,4 @@ class MeadowFlowerDecorationTest {
             .toSet()
     private val oakLogStateId = stateId("oak_log")
     private val treeLogStates = setOf(oakLogStateId - 1, oakLogStateId, oakLogStateId + 1, stateId("birch_log"))
-    private val treeLeafStates = setOf(stateId("oak_leaves"), stateId("birch_leaves"))
 }

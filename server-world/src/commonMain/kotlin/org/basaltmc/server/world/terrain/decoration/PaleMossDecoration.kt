@@ -45,10 +45,10 @@ public object PaleMossDecoration : BiomeVegetalDecoration {
                 if (corner || edgeOnly && random.nextFloat() > EXTRA_EDGE_COLUMN_CHANCE) continue
 
                 val ground = findGround(chunk, origin.x + dx, origin.y, origin.z + dz) ?: continue
-                val previous = chunk.getBlockStateId(ground.x and 15, ground.y, ground.z and 15)
+                val previous = chunk.getDecorationBlockStateId(ground.x, ground.y, ground.z)
                 if (previous != paleMossBlockStateId && previous !in mossReplaceableStateIds) continue
                 if (previous != paleMossBlockStateId) {
-                    chunk.setBlockStateId(ground.x and 15, ground.y, ground.z and 15, paleMossBlockStateId)
+                    chunk.setDecorationBlockStateId(ground.x, ground.y, ground.z, paleMossBlockStateId)
                 }
                 surface += ground
             }
@@ -80,7 +80,7 @@ public object PaleMossDecoration : BiomeVegetalDecoration {
         }
         val belowY = y - 1
         if (!isAir(chunk, x, y, z) || belowY < WorldHeight.MIN_Y) return null
-        val below = chunk.getBlockStateId(x and 15, belowY, z and 15)
+        val below = chunk.getDecorationBlockStateId(x, belowY, z)
         if (!Chunk.HeightmapType.OCEAN_FLOOR.matches(below)) return null
         return DecorationPos(x, belowY, z)
     }
@@ -117,7 +117,7 @@ public object PaleMossDecoration : BiomeVegetalDecoration {
         z: Int,
     ): Boolean =
         y in WorldHeight.MIN_Y..WorldHeight.MAX_Y &&
-            Blocks.isAir(chunk.getBlockStateId(x and 15, y, z and 15))
+            Blocks.isAir(chunk.getDecorationBlockStateId(x, y, z))
 
     /** HashMap bucket iteration used by vanilla's HashSet<BlockPos>. */
     private fun javaHashSetOrder(positions: List<DecorationPos>): Sequence<DecorationPos> {

@@ -43,6 +43,43 @@ class TreeFeatureTest {
     }
 
     @Test
+    fun canopyCrossingAChunkBorderKeepsItsWorldCoordinates() {
+        val chunk = chunkWithFlatGround(0)
+        assertTrue(TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(42L)), 15, 1, 8, TreeConfigs.OAK))
+
+        val writes = chunk.takeGeneratedBlockWrites()
+        assertTrue(writes.isNotEmpty(), "expected the edge canopy to spill into the eastern chunk")
+        assertTrue(writes.all { it.x shr 4 != chunk.chunkX || it.z shr 4 != chunk.chunkZ })
+        assertTrue(writes.any { isLeavesOf(it.stateId, oakLeavesState) })
+        for (y in 1..20) {
+            assertTrue(
+                org.basaltmc.server.registry.Blocks
+                    .isAir(chunk.getBlockStateId(0, y, 8)),
+                "a world-x 16 leaf wrapped into local x=0 at y=$y",
+            )
+        }
+    }
+
+    @Test
+    fun leaningTrunksCrossTheBorderInsteadOfTeleportingToTheOppositeEdge() {
+        var externalLogs = emptyList<org.basaltmc.server.world.ChunkGeneratedBlockWrite>()
+        for (seed in 0L..64L) {
+            val chunk = chunkWithFlatGround(0)
+            if (!TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(seed)), 15, 1, 8, TreeConfigs.ACACIA)) continue
+            val writes = chunk.takeGeneratedBlockWrites()
+            externalLogs = writes.filter { it.stateId in acaciaLogState - 1..acaciaLogState + 1 }
+            if (externalLogs.isNotEmpty()) {
+                for (y in 1..20) {
+                    assertTrue(chunk.getBlockStateId(0, y, 8) !in acaciaLogState - 1..acaciaLogState + 1)
+                }
+                break
+            }
+        }
+        assertTrue(externalLogs.isNotEmpty(), "expected an acacia seed whose leaning trunk crosses east")
+        assertTrue(externalLogs.all { it.x >= 16 })
+    }
+
+    @Test
     fun oakAppliesTheDefaultBelowTrunkDirtProvider() {
         val grass = chunkWithFlatGround(0)
         assertTrue(TreeFeature.place(grass, WorldgenRandom(XoroshiroRandom(42L)), 8, 1, 8, TreeConfigs.OAK))
@@ -548,6 +585,12 @@ class TreeFeatureTest {
                 .byIdentifier(
                     org.basaltmc.wire.common.Identifier
                         .vanilla("spruce_log"),
+                )?.stateId ?: error("unknown block")
+        val acaciaLogState =
+            org.basaltmc.server.registry.Blocks.REGISTRY
+                .byIdentifier(
+                    org.basaltmc.wire.common.Identifier
+                        .vanilla("acacia_log"),
                 )?.stateId ?: error("unknown block")
         val spruceLeavesState =
             org.basaltmc.server.registry.Blocks.REGISTRY

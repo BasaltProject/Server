@@ -5,6 +5,25 @@ import org.basaltmc.server.registry.Blocks
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
 
+/** A generated decoration write whose target lies outside the chunk that produced it. */
+public data class ChunkGeneratedBlockWrite(
+    public val x: Int,
+    public val y: Int,
+    public val z: Int,
+    public val expectedStateId: Int,
+    public val stateId: Int,
+)
+
+/** A generated block entity whose target lies outside the chunk that produced it. */
+public data class ChunkGeneratedBlockEntityWrite(
+    public val x: Int,
+    public val y: Int,
+    public val z: Int,
+    public val expectedStateId: Int,
+    public val type: Identifier,
+    public val data: NbtCompound,
+)
+
 /** A 16-wide column of blocks at ([chunkX], [chunkZ]) in chunk coordinates. */
 public class Chunk(
     public val chunkX: Int,
@@ -23,6 +42,9 @@ public class Chunk(
     private var savedEntitiesBacking: List<NbtCompound> = emptyList()
     private val scheduledBlockTicksBacking = mutableListOf<ChunkScheduledTick>()
     private val scheduledFluidTicksBacking = mutableListOf<ChunkScheduledTick>()
+    private val generatedExternalBlockWrites = LinkedHashMap<GeneratedWorldPos, ChunkGeneratedBlockWrite>()
+    private val generatedExternalBlockEntityWrites =
+        LinkedHashMap<GeneratedWorldPos, ChunkGeneratedBlockEntityWrite>()
     private var blockWriteObserver: ((Int, Int, Int, Int, Int) -> Unit)? = null
 
     public val sectionCount: Int get() = sections.size
@@ -81,6 +103,92 @@ public class Chunk(
                 observer(x, y, z, oldStateId, stateId)
             }
         }
+    }
+
+    /**
+     * Reads a world-coordinate position while a decoration is being generated. Positions outside
+     * this chunk see earlier writes from the same feature instead of wrapping through `and 15`.
+     * Unknown neighbour terrain is air; [ChunkGeneratedBlockWrite.expectedStateId] prevents the
+     * deferred write from replacing a real non-air block when its target chunk is installed.
+     */
+    public fun getDecorationBlockStateId(
+        worldX: Int,
+        y: Int,
+        worldZ: Int,
+    ): Int {
+        if (y !in verticalBounds.minY..verticalBounds.maxY) return Blocks.AIR.stateId
+        if (worldX shr 4 == chunkX && worldZ shr 4 == chunkZ) {
+            return getBlockStateId(worldX and 15, y, worldZ and 15)
+        }
+        return generatedExternalBlockWrites[GeneratedWorldPos(worldX, y, worldZ)]?.stateId ?: Blocks.AIR.stateId
+    }
+
+    /**
+     * Writes a world-coordinate decoration position. Local writes land immediately; external ones
+     * retain their true coordinates until the runtime installs their target chunk.
+     */
+    public fun setDecorationBlockStateId(
+        worldX: Int,
+        y: Int,
+        worldZ: Int,
+        stateId: Int,
+    ) {
+        if (y !in verticalBounds.minY..verticalBounds.maxY) return
+        if (worldX shr 4 == chunkX && worldZ shr 4 == chunkZ) {
+            setBlockStateId(worldX and 15, y, worldZ and 15, stateId)
+            return
+        }
+        val position = GeneratedWorldPos(worldX, y, worldZ)
+        val previous = generatedExternalBlockWrites[position]
+        val oldStateId = previous?.stateId ?: Blocks.AIR.stateId
+        if (oldStateId == stateId) return
+        generatedExternalBlockWrites[position] =
+            ChunkGeneratedBlockWrite(
+                worldX,
+                y,
+                worldZ,
+                previous?.expectedStateId ?: oldStateId,
+                stateId,
+            )
+        blockWriteObserver?.invoke(worldX - chunkX * 16, y, worldZ - chunkZ * 16, oldStateId, stateId)
+    }
+
+    /** Hands deferred cross-chunk decoration writes to the runtime exactly once. */
+    public fun takeGeneratedBlockWrites(): List<ChunkGeneratedBlockWrite> {
+        if (generatedExternalBlockWrites.isEmpty()) return emptyList()
+        val writes = generatedExternalBlockWrites.values.toList()
+        generatedExternalBlockWrites.clear()
+        return writes
+    }
+
+    /**
+     * Keeps a decoration's block entity beside an external block until the target chunk arrives.
+     * [expectedStateId] is the block the feature just placed, so a rejected block write cannot
+     * leave an orphaned block entity in real neighbour terrain.
+     */
+    public fun setDecorationBlockEntity(
+        worldX: Int,
+        y: Int,
+        worldZ: Int,
+        expectedStateId: Int,
+        type: Identifier,
+        data: NbtCompound,
+    ) {
+        if (y !in verticalBounds.minY..verticalBounds.maxY) return
+        if (worldX shr 4 == chunkX && worldZ shr 4 == chunkZ) {
+            setBlockEntity(ChunkBlockEntity(worldX and 15, y, worldZ and 15, type, data))
+            return
+        }
+        generatedExternalBlockEntityWrites[GeneratedWorldPos(worldX, y, worldZ)] =
+            ChunkGeneratedBlockEntityWrite(worldX, y, worldZ, expectedStateId, type, data)
+    }
+
+    /** Hands deferred cross-chunk decoration block entities to the runtime exactly once. */
+    public fun takeGeneratedBlockEntityWrites(): List<ChunkGeneratedBlockEntityWrite> {
+        if (generatedExternalBlockEntityWrites.isEmpty()) return emptyList()
+        val writes = generatedExternalBlockEntityWrites.values.toList()
+        generatedExternalBlockEntityWrites.clear()
+        return writes
     }
 
     /**
@@ -264,6 +372,12 @@ public class Chunk(
             isDirty = true
         }
     }
+
+    private data class GeneratedWorldPos(
+        val x: Int,
+        val y: Int,
+        val z: Int,
+    )
 
     /** Synchronously records changed block writes without allocating on the normal write path. */
     internal fun <T> observeBlockWrites(
