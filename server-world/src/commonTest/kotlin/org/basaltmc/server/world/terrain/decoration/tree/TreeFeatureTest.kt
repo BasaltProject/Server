@@ -405,17 +405,28 @@ class TreeFeatureTest {
 
         var logs = 0
         var leaves = 0
+        var horizontalLogs = 0
         for (x in 0 until 16) {
             for (y in 1..24) {
                 for (z in 0 until 16) {
                     val id = chunk.getBlockStateId(x, y, z)
-                    if (id == cherryLogState) logs++
+                    val state =
+                        org.basaltmc.server.registry.Blocks
+                            .byStateId(id)
+                    if (state?.block ==
+                        org.basaltmc.wire.common.Identifier
+                            .vanilla("cherry_log")
+                    ) {
+                        logs++
+                        if (state.properties["axis"] in setOf("x", "z")) horizontalLogs++
+                    }
                     if (isLeavesOf(id, cherryLeavesState)) leaves++
                 }
             }
         }
         // baseHeight 7 plus at least one side branch: well above a plain straight trunk's 7 logs.
         assertTrue(logs >= 8, "expected at least 8 cherry logs (trunk plus a branch), got $logs")
+        assertTrue(horizontalLogs > 0, "expected cherry's lateral branch logs to carry their horizontal axis")
         assertTrue(leaves > 0, "expected at least one cherry leaves block")
     }
 
