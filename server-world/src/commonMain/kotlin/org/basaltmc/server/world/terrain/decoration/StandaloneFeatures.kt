@@ -65,12 +65,12 @@ public object StandaloneFeatures {
             "end_gateway_return" -> placeGateway(chunk, origin)
             "lake_lava_surface", "lake_lava_underground" ->
                 placeLake(chunk, random, origin, fill = lavaStateId, barrier = state("stone"))
-            "cave_vines" -> placeHangingColumn(chunk, random, origin, state("cave_vines"), state("cave_vines_plant"))
+            "cave_vines" -> CaveVineColumnFeature.place(chunk, random, origin)
             "classic_vines_cave_feature" -> placeVines(chunk, origin)
-            "lush_caves_vegetation", "lush_caves_ceiling_vegetation" ->
-                placeVegetationPatch(chunk, random, origin, state("moss_block"))
-            "lush_caves_clay" -> placeVegetationPatch(chunk, random, origin, state("clay"))
-            "rooted_azalea_tree" -> placeRootedAzalea(chunk, random, origin)
+            "lush_caves_vegetation" -> LushVegetationPatchFeature.placeFloorMoss(chunk, random, origin)
+            "lush_caves_ceiling_vegetation" -> LushVegetationPatchFeature.placeCeilingMoss(chunk, random, origin)
+            "lush_caves_clay" -> LushVegetationPatchFeature.placeClay(chunk, random, origin)
+            "rooted_azalea_tree" -> RootedAzaleaFeature.place(chunk, random, origin)
             else -> false
         }
 
@@ -269,56 +269,6 @@ public object StandaloneFeatures {
         return false
     }
 
-    /** parity: `VegetationPatchFeature`, narrowed to its floor: a disc of ground blocks under the origin. */
-    private fun placeVegetationPatch(
-        chunk: Chunk,
-        random: WorldgenRandom,
-        origin: DecorationPos,
-        ground: Int,
-    ): Boolean {
-        val radius = 2 + random.nextInt(4)
-        var placed = false
-        for (dx in -radius..radius) {
-            for (dz in -radius..radius) {
-                if (dx * dx + dz * dz > radius * radius) continue
-                val position = DecorationPos(origin.x + dx, origin.y, origin.z + dz)
-                if (!isSolid(chunk, position)) continue
-                set(chunk, position, ground)
-                placed = true
-            }
-        }
-        return placed
-    }
-
-    /** parity: `RootSystemFeature`, narrowed to the roots and the tree it grows above. */
-    private fun placeRootedAzalea(
-        chunk: Chunk,
-        random: WorldgenRandom,
-        origin: DecorationPos,
-    ): Boolean {
-        val rooted = state("rooted_dirt")
-        var height = 0
-        while (height < ROOT_HEIGHT) {
-            val position = origin.copy(y = origin.y + height)
-            if (position.y > WorldHeight.MAX_Y) break
-            if (!isSolid(chunk, position)) break
-            set(chunk, position, rooted)
-            height++
-        }
-        if (height == 0) return false
-        val top = origin.copy(y = origin.y + height)
-        // parity: the azalea tree grows from the top of the roots, which is what the root system is for.
-        return PlacedFeatures[Identifier.vanilla("azalea_tree")]
-            ?.let {
-                it.place(chunk, random, top.x and 15, top.y, top.z and 15)
-                true
-            }
-            ?: run {
-                set(chunk, top, state("azalea_leaves"))
-                true
-            }
-    }
-
     private fun sidesAndBelow(origin: DecorationPos): List<DecorationPos> =
         listOf(
             origin.copy(x = origin.x - 1),
@@ -380,5 +330,4 @@ public object StandaloneFeatures {
     private const val PLATFORM_RADIUS = 16
     private const val LAKE_FLATTENING = 2
     private const val VINE_MAX_LENGTH = 8
-    private const val ROOT_HEIGHT = 4
 }

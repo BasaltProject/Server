@@ -124,7 +124,9 @@ public sealed class TrunkPlacer(
         x: Int,
         y: Int,
         z: Int,
-    ): Boolean = isValidTreePos(chunk, x, y, z)
+    ): Boolean =
+        isValidTreePos(chunk, x, y, z) ||
+            TreeFeature.isLogState(chunk.getDecorationBlockStateId(x, y, z))
 
     /** // parity: TrunkPlacer.placeLogIfFree. */
     protected fun placeLogIfFree(
@@ -202,6 +204,52 @@ public class StraightTrunkPlacer(
         placeBelowTrunkBlock(chunk, originX, originY - 1, originZ)
         for (y in 0 until treeHeight) placeLog(chunk, originX, originY + y, originZ, trunkStateId)
         return listOf(FoliageAttachment(originX, originY + treeHeight, originZ, 0, false))
+    }
+}
+
+/** // parity: BendingTrunkPlacer, used by the azalea tree grown by RootSystemFeature. */
+public class BendingTrunkPlacer(
+    baseHeight: Int,
+    heightRandA: Int,
+    heightRandB: Int,
+    private val minHeightForLeaves: Int,
+    private val bendLength: IntProvider,
+    private val belowTrunkStateId: Int,
+) : TrunkPlacer(baseHeight, heightRandA, heightRandB) {
+    override fun placeTrunk(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        treeHeight: Int,
+        originX: Int,
+        originY: Int,
+        originZ: Int,
+        trunkStateId: Int,
+    ): List<FoliageAttachment> {
+        val direction = HORIZONTAL_DIRECTIONS[random.nextInt(HORIZONTAL_DIRECTIONS.size)]
+        val logHeight = treeHeight - 1
+        var x = originX
+        var y = originY
+        var z = originZ
+        setBlock(chunk, x, y - 1, z, belowTrunkStateId)
+        val attachments = mutableListOf<FoliageAttachment>()
+
+        for (level in 0..logHeight) {
+            if (level + 1 >= logHeight + random.nextInt(2)) {
+                x += direction.first
+                z += direction.second
+            }
+            placeLog(chunk, x, y, z, trunkStateId)
+            if (level >= minHeightForLeaves) attachments += FoliageAttachment(x, y, z, 0)
+            y++
+        }
+
+        repeat(bendLength.sample(random) + 1) {
+            placeLog(chunk, x, y, z, trunkStateId)
+            attachments += FoliageAttachment(x, y, z, 0)
+            x += direction.first
+            z += direction.second
+        }
+        return attachments
     }
 }
 
@@ -1724,6 +1772,56 @@ public class RandomSpreadFoliagePlacer(
     ): Boolean = false
 }
 
+/** RandomSpreadFoliagePlacer with the azalea tree's 3:1 weighted foliage provider. */
+public class WeightedRandomSpreadFoliagePlacer(
+    radius: IntProvider,
+    offset: IntProvider,
+    private val foliageHeightProvider: IntProvider,
+    private val leafPlacementAttempts: Int,
+    private val weightedStates: List<Pair<Int, Int>>,
+) : FoliagePlacer(radius, offset) {
+    private val totalWeight = weightedStates.sumOf(Pair<Int, Int>::second)
+
+    override fun foliageHeight(
+        random: WorldgenRandom,
+        treeHeight: Int,
+    ): Int = foliageHeightProvider.sample(random)
+
+    override fun createFoliage(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        foliageStateId: Int,
+        attachment: FoliageAttachment,
+        foliageHeight: Int,
+        leafRadius: Int,
+        offset: Int,
+    ) {
+        repeat(leafPlacementAttempts) {
+            val x = attachment.x + random.nextInt(leafRadius) - random.nextInt(leafRadius)
+            val y = attachment.y + random.nextInt(foliageHeight) - random.nextInt(foliageHeight)
+            val z = attachment.z + random.nextInt(leafRadius) - random.nextInt(leafRadius)
+            if (!canPlaceLeaf(chunk, x, y, z)) return@repeat
+            var roll = random.nextInt(totalWeight)
+            val stateId =
+                weightedStates
+                    .first { (_, weight) ->
+                        roll -= weight
+                        roll < 0
+                    }.first
+            tryPlaceLeaf(chunk, stateId, x, y, z)
+        }
+    }
+
+    override fun shouldSkipLocation(
+        random: WorldgenRandom,
+        dx: Int,
+        y: Int,
+        dz: Int,
+        currentRadius: Int,
+        doubleTrunk: Boolean,
+    ): Boolean = false
+}
+
 /** // parity: CherryFoliagePlacer: a wide layered canopy with random holes and hanging leaves below the two bottom rows. */
 public class CherryFoliagePlacer(
     radius: IntProvider,
@@ -1864,6 +1962,8 @@ public sealed interface TreeDecoratorConfiguration {
 
 /** // parity: TreeFeature.place/doPlace/getMaxFreeTreeHeight, narrowed per this file's own KDoc. */
 public object TreeFeature {
+    internal fun isLogState(stateId: Int): Boolean = Blocks.byStateId(stateId)?.block?.path in LOG_BLOCK_PATHS
+
     public fun place(
         chunk: Chunk,
         random: WorldgenRandom,
@@ -2679,7 +2779,8 @@ private fun isValidTreePos(
     z: Int,
 ): Boolean {
     if (y < WorldHeight.MIN_Y || y > WorldHeight.MAX_Y) return false
-    return Blocks.isAir(chunk.getDecorationBlockStateId(x, y, z))
+    val stateId = chunk.getDecorationBlockStateId(x, y, z)
+    return Blocks.isAir(stateId) || Blocks.byStateId(stateId)?.block?.path in REPLACEABLE_BY_TREES_PATHS
 }
 
 private fun setBlock(
@@ -2700,12 +2801,31 @@ private fun tryPlaceLeaf(
     y: Int,
     z: Int,
 ): Boolean {
-    if (y < WorldHeight.MIN_Y || y > WorldHeight.MAX_Y) return false
-    if (Blocks.isAir(chunk.getDecorationBlockStateId(x, y, z))) {
-        chunk.setDecorationBlockStateId(x, y, z, foliageStateId)
+    if (canPlaceLeaf(chunk, x, y, z)) {
+        val current = chunk.getDecorationBlockStateId(x, y, z)
+        val selected = Blocks.byStateId(foliageStateId)
+        val placedStateId =
+            if (selected?.properties?.containsKey("waterlogged") == true && Blocks.hasWaterFluid(current)) {
+                Blocks.stateIdOf(selected.block, selected.properties + ("waterlogged" to "true")) ?: foliageStateId
+            } else {
+                foliageStateId
+            }
+        chunk.setDecorationBlockStateId(x, y, z, placedStateId)
         return true
     }
     return false
+}
+
+private fun canPlaceLeaf(
+    chunk: Chunk,
+    x: Int,
+    y: Int,
+    z: Int,
+): Boolean {
+    if (y < WorldHeight.MIN_Y || y > WorldHeight.MAX_Y) return false
+    val stateId = chunk.getDecorationBlockStateId(x, y, z)
+    if (Blocks.byStateId(stateId)?.properties?.get("persistent") == "true") return false
+    return isValidTreePos(chunk, x, y, z)
 }
 
 private fun decorationHeightAt(
@@ -2726,3 +2846,61 @@ private fun decorationHeightAt(
 // parity: real Direction.Plane.HORIZONTAL faces order (NORTH, EAST, SOUTH, WEST); index 0-3 of a
 // single nextInt(4) draw, matching Util.getRandom(faces, random).
 private val HORIZONTAL_DIRECTIONS = arrayOf(0 to -1, 1 to 0, 0 to 1, -1 to 0)
+
+// parity: minecraft:replaceable_by_trees, flattened from its leaf/flower tags.
+private val REPLACEABLE_BY_TREES_PATHS =
+    setOf(
+        "jungle_leaves",
+        "oak_leaves",
+        "spruce_leaves",
+        "pale_oak_leaves",
+        "dark_oak_leaves",
+        "acacia_leaves",
+        "birch_leaves",
+        "azalea_leaves",
+        "flowering_azalea_leaves",
+        "mangrove_leaves",
+        "cherry_leaves",
+        "dandelion",
+        "open_eyeblossom",
+        "poppy",
+        "blue_orchid",
+        "allium",
+        "azure_bluet",
+        "red_tulip",
+        "orange_tulip",
+        "white_tulip",
+        "pink_tulip",
+        "oxeye_daisy",
+        "cornflower",
+        "lily_of_the_valley",
+        "wither_rose",
+        "torchflower",
+        "closed_eyeblossom",
+        "golden_dandelion",
+        "pale_moss_carpet",
+        "short_grass",
+        "fern",
+        "dead_bush",
+        "vine",
+        "glow_lichen",
+        "sunflower",
+        "lilac",
+        "rose_bush",
+        "peony",
+        "tall_grass",
+        "large_fern",
+        "hanging_roots",
+        "pitcher_plant",
+        "water",
+        "seagrass",
+        "tall_seagrass",
+        "bush",
+        "firefly_bush",
+        "warped_roots",
+        "nether_sprouts",
+        "crimson_roots",
+        "leaf_litter",
+        "short_dry_grass",
+        "tall_dry_grass",
+    )

@@ -43,6 +43,21 @@ class TreeFeatureTest {
     }
 
     @Test
+    fun treePreflightAndTrunkReplaceVegetationFromTheVanillaTag() {
+        val chunk = chunkWithFlatGround(0)
+        val shortGrass =
+            org.basaltmc.server.registry.Blocks.REGISTRY
+                .byIdentifier(
+                    org.basaltmc.wire.common.Identifier
+                        .vanilla("short_grass"),
+                )?.stateId ?: error("unknown short_grass")
+        chunk.setBlockStateId(8, 1, 8, shortGrass)
+
+        assertTrue(TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(42L)), 8, 1, 8, TreeConfigs.OAK))
+        assertEquals(oakLogState, chunk.getBlockStateId(8, 1, 8))
+    }
+
+    @Test
     fun canopyCrossingAChunkBorderKeepsItsWorldCoordinates() {
         val chunk = chunkWithFlatGround(0)
         assertTrue(TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(42L)), 15, 1, 8, TreeConfigs.OAK))
