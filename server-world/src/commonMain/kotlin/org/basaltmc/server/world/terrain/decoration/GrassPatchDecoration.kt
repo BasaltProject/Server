@@ -17,14 +17,26 @@ public object GrassPatchDecoration {
         externalBlockState: ((x: Int, y: Int, z: Int) -> Int?)? = null,
         blockWriteObserver: ((x: Int, y: Int, z: Int, stateId: Int) -> Unit)? = null,
     ) {
+        for (spec in SPECS) {
+            decorateFeature(spec.index, chunk, seed, environment, externalBlockState, blockWriteObserver)
+        }
+    }
+
+    internal fun decorateFeature(
+        index: Int,
+        chunk: Chunk,
+        seed: Long,
+        environment: SurfaceRuleEnvironment,
+        externalBlockState: ((x: Int, y: Int, z: Int) -> Int?)? = null,
+        blockWriteObserver: ((x: Int, y: Int, z: Int, stateId: Int) -> Unit)? = null,
+    ) {
+        val spec = SPECS.singleOrNull { it.index == index } ?: error("unknown grass vegetal index $index")
         val random = WorldgenRandom(XoroshiroRandom(seed))
         val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
         val context = PlacementContext(chunk)
         val region = GrassRegion(chunk, externalBlockState, blockWriteObserver)
-        for (spec in SPECS) {
-            random.setFeatureSeed(decorationSeed, spec.index, VEGETAL_DECORATION_STEP)
-            place(context, region, random, environment, spec)
-        }
+        random.setFeatureSeed(decorationSeed, spec.index, VEGETAL_DECORATION_STEP)
+        place(context, region, random, environment, spec)
     }
 
     private fun place(

@@ -25,13 +25,27 @@ public object BambooDecoration {
         externalBlockState: ((x: Int, y: Int, z: Int) -> Int?)? = null,
         blockWriteObserver: ((x: Int, y: Int, z: Int, stateId: Int) -> Unit)? = null,
     ) {
+        decorateFeature(BAMBOO_INDEX, chunk, seed, environment, externalBlockState, blockWriteObserver)
+        decorateFeature(BAMBOO_LIGHT_INDEX, chunk, seed, environment, externalBlockState, blockWriteObserver)
+    }
+
+    internal fun decorateFeature(
+        index: Int,
+        chunk: Chunk,
+        seed: Long,
+        environment: SurfaceRuleEnvironment,
+        externalBlockState: ((x: Int, y: Int, z: Int) -> Int?)? = null,
+        blockWriteObserver: ((x: Int, y: Int, z: Int, stateId: Int) -> Unit)? = null,
+    ) {
         val random = WorldgenRandom(XoroshiroRandom(seed))
         val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
         val region = BambooRegion(chunk, externalBlockState, blockWriteObserver)
-        random.setFeatureSeed(decorationSeed, BAMBOO_INDEX, VEGETAL_DECORATION_STEP)
-        decorateFeature(chunk, region, random, DENSE_MODIFIERS, 0.2f, environment, "bamboo_jungle")
-        random.setFeatureSeed(decorationSeed, BAMBOO_LIGHT_INDEX, VEGETAL_DECORATION_STEP)
-        decorateFeature(chunk, region, random, LIGHT_MODIFIERS, 0.0f, environment, "jungle")
+        random.setFeatureSeed(decorationSeed, index, VEGETAL_DECORATION_STEP)
+        when (index) {
+            BAMBOO_INDEX -> decorateFeature(chunk, region, random, DENSE_MODIFIERS, 0.2f, environment, "bamboo_jungle")
+            BAMBOO_LIGHT_INDEX -> decorateFeature(chunk, region, random, LIGHT_MODIFIERS, 0.0f, environment, "jungle")
+            else -> error("unknown bamboo vegetal index $index")
+        }
     }
 
     public val LIGHT: BiomeVegetalDecoration =
