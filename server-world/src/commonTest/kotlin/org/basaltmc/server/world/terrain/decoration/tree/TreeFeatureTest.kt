@@ -456,6 +456,70 @@ class TreeFeatureTest {
     }
 
     @Test
+    fun mangroveRootsAndLeavesKeepWaterAtFloodedPositions() {
+        val chunk = chunkWithFlatGround(0)
+        for (x in 3..13) {
+            for (z in 3..13) {
+                for (y in 1..20) chunk.setBlockStateId(x, y, z, org.basaltmc.server.registry.Blocks.WATER.stateId)
+            }
+        }
+
+        assertTrue(TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(11L)), 8, 1, 8, TreeConfigs.MANGROVE))
+
+        var waterloggedRoots = 0
+        var waterloggedLeaves = 0
+        for (x in 0 until 16) {
+            for (y in 1..20) {
+                for (z in 0 until 16) {
+                    val state =
+                        org.basaltmc.server.registry.Blocks
+                            .byStateId(
+                                chunk.getBlockStateId(x, y, z),
+                            ) ?: continue
+                    if (state.block.path == "mangrove_roots" && state.properties["waterlogged"] == "true") {
+                        waterloggedRoots++
+                    }
+                    if (state.block.path == "mangrove_leaves" && state.properties["waterlogged"] == "true") {
+                        waterloggedLeaves++
+                    }
+                }
+            }
+        }
+        assertTrue(waterloggedRoots > 0, "expected submerged mangrove roots to retain water")
+        assertTrue(waterloggedLeaves > 0, "expected submerged mangrove leaves to retain water")
+    }
+
+    @Test
+    fun mangroveTrunkGrowsThroughItsConfiguredBlockTag() {
+        val chunk = chunkWithFlatGround(0)
+        val mossCarpet =
+            org.basaltmc.server.registry.Blocks.REGISTRY
+                .byIdentifier(
+                    org.basaltmc.wire.common.Identifier
+                        .vanilla("moss_carpet"),
+                )?.stateId ?: error("unknown moss_carpet")
+        chunk.setBlockStateId(8, 1, 8, mossCarpet)
+        val base = TreeConfigs.MANGROVE
+        val rootless =
+            TreeConfiguration(
+                base.trunkStateId,
+                base.trunkPlacer,
+                base.foliageStateId,
+                base.foliagePlacer,
+                base.minimumSize,
+            )
+
+        assertTrue(TreeFeature.place(chunk, WorldgenRandom(XoroshiroRandom(11L)), 8, 1, 8, rootless))
+        assertEquals(
+            "mangrove_log",
+            org.basaltmc.server.registry.Blocks
+                .byStateId(chunk.getBlockStateId(8, 1, 8))
+                ?.block
+                ?.path,
+        )
+    }
+
+    @Test
     fun mangroveCanHangAgedPropagulesFromLeaves() {
         var propaguleState: Int? = null
         for (seed in 0L..255L) {
