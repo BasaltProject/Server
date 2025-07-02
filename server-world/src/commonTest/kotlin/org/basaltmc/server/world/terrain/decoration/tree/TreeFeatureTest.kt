@@ -431,6 +431,46 @@ class TreeFeatureTest {
     }
 
     @Test
+    fun cherryHangingLeavesOnlyExtendLeavesSetByTheCurrentTree() {
+        val chunk = chunkWithFlatGround(0)
+        val originX = 8
+        val originY = 10
+        val originZ = 8
+        chunk.setBlockStateId(originX + 3, originY - 1, originZ + 2, cherryLeavesState)
+        val placer =
+            CherryFoliagePlacer(
+                org.basaltmc.server.world.terrain.decoration.IntProvider
+                    .of(4),
+                org.basaltmc.server.world.terrain.decoration.IntProvider
+                    .of(0),
+                org.basaltmc.server.world.terrain.decoration.IntProvider
+                    .of(5),
+                1.0f,
+                1.0f,
+                1.0f,
+                1.0f,
+            )
+        val foliagePositions = mutableSetOf<Triple<Int, Int, Int>>()
+
+        placer.createFoliage(
+            chunk,
+            WorldgenRandom(XoroshiroRandom(7L)),
+            cherryLeavesState,
+            FoliageAttachment(originX, originY, originZ, 0, false),
+            5,
+            4,
+            0,
+            foliagePositions,
+        )
+
+        assertTrue(
+            org.basaltmc.server.registry.Blocks
+                .isAir(chunk.getBlockStateId(originX + 3, originY - 2, originZ + 2)),
+            "an unrelated old canopy leaf must not sprout a new hanging extension",
+        )
+    }
+
+    @Test
     fun mangrovePlacesLogsAndScatteredLeaves() {
         val chunk = chunkWithFlatGround(0)
         val random = WorldgenRandom(XoroshiroRandom(11L))

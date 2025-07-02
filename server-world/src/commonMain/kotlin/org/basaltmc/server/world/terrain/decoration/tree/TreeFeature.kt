@@ -1125,6 +1125,7 @@ public sealed class FoliagePlacer(
         foliageHeight: Int,
         leafRadius: Int,
         offset: Int,
+        foliagePositions: MutableSet<Triple<Int, Int, Int>>,
     )
 
     protected abstract fun shouldSkipLocation(
@@ -1162,22 +1163,26 @@ public sealed class FoliagePlacer(
         currentRadius: Int,
         y: Int,
         doubleTrunk: Boolean,
+        foliagePositions: MutableSet<Triple<Int, Int, Int>>? = null,
     ) {
         val extra = if (doubleTrunk) 1 else 0
         for (dx in -currentRadius..currentRadius + extra) {
             for (dz in -currentRadius..currentRadius + extra) {
                 if (!shouldSkipLocationSigned(random, dx, y, dz, currentRadius, doubleTrunk)) {
-                    tryPlaceLeaf(chunk, foliageStateId, originX + dx, originY + y, originZ + dz)
+                    val x = originX + dx
+                    val leafY = originY + y
+                    val z = originZ + dz
+                    if (tryPlaceLeaf(chunk, foliageStateId, x, leafY, z)) {
+                        foliagePositions?.add(Triple(x, leafY, z))
+                    }
                 }
             }
         }
     }
 
     /**
-     * // parity: FoliagePlacer.placeLeavesRowWithHangingLeavesBelow. The real `foliageSetter.isSet`
-     * ("did this foliage placement set a leaf here") is approximated by "the chunk holds
-     * [foliageStateId] here": identical within one tree, marginally wider where two trees' canopies
-     * touch (a previous tree's leaves also count).
+     * // parity: FoliagePlacer.placeLeavesRowWithHangingLeavesBelow. [foliagePositions] is the real
+     * tree-scoped `foliageSetter.isSet`: existing leaves from an earlier tree do not qualify.
      */
     protected fun placeLeavesRowWithHangingLeavesBelow(
         chunk: Chunk,
@@ -1191,8 +1196,20 @@ public sealed class FoliagePlacer(
         doubleTrunk: Boolean,
         hangingLeavesChance: Float,
         hangingLeavesExtensionChance: Float,
+        foliagePositions: MutableSet<Triple<Int, Int, Int>>,
     ) {
-        placeLeavesRow(chunk, random, foliageStateId, originX, originY, originZ, currentRadius, y, doubleTrunk)
+        placeLeavesRow(
+            chunk,
+            random,
+            foliageStateId,
+            originX,
+            originY,
+            originZ,
+            currentRadius,
+            y,
+            doubleTrunk,
+            foliagePositions,
+        )
         val offset = if (doubleTrunk) 1 else 0
         val logY = originY - 1
         // parity: real Direction.Plane.HORIZONTAL faces order (NORTH, EAST, SOUTH, WEST) with each
@@ -1212,7 +1229,7 @@ public sealed class FoliagePlacer(
             while (offsetAlongEdge < currentRadius + offset) {
                 val leavesAbove =
                     posY + 1 in WorldHeight.MIN_Y..WorldHeight.MAX_Y &&
-                        chunk.getDecorationBlockStateId(posX, posY + 1, posZ) == foliageStateId
+                        Triple(posX, posY + 1, posZ) in foliagePositions
                 if (leavesAbove &&
                     tryPlaceExtension(
                         chunk,
@@ -1225,6 +1242,7 @@ public sealed class FoliagePlacer(
                         posX,
                         posY,
                         posZ,
+                        foliagePositions,
                     )
                 ) {
                     tryPlaceExtension(
@@ -1238,6 +1256,7 @@ public sealed class FoliagePlacer(
                         posX,
                         posY - 1,
                         posZ,
+                        foliagePositions,
                     )
                 }
                 offsetAlongEdge++
@@ -1259,10 +1278,13 @@ public sealed class FoliagePlacer(
         x: Int,
         y: Int,
         z: Int,
+        foliagePositions: MutableSet<Triple<Int, Int, Int>>,
     ): Boolean {
         if (abs(x - logX) + abs(y - logY) + abs(z - logZ) >= 7) return false
         if (random.nextFloat() > chance) return false
-        return tryPlaceLeaf(chunk, foliageStateId, x, y, z)
+        if (!tryPlaceLeaf(chunk, foliageStateId, x, y, z)) return false
+        foliagePositions += Triple(x, y, z)
+        return true
     }
 }
 
@@ -1285,6 +1307,7 @@ public class BlobFoliagePlacer(
         foliageHeight: Int,
         leafRadius: Int,
         offset: Int,
+        foliagePositions: MutableSet<Triple<Int, Int, Int>>,
     ) {
         var yo = offset
         while (yo >= offset - foliageHeight) {
@@ -1333,6 +1356,7 @@ public class BushFoliagePlacer(
         foliageHeight: Int,
         leafRadius: Int,
         offset: Int,
+        foliagePositions: MutableSet<Triple<Int, Int, Int>>,
     ) {
         for (y in offset downTo offset - foliageHeight) {
             val currentRadius = leafRadius + attachment.radiusOffset - 1 - y
@@ -1379,6 +1403,7 @@ public class MegaJungleFoliagePlacer(
         foliageHeight: Int,
         leafRadius: Int,
         offset: Int,
+        foliagePositions: MutableSet<Triple<Int, Int, Int>>,
     ) {
         val leafHeight = if (attachment.doubleTrunk) foliageHeight else 1 + random.nextInt(2)
         for (y in offset downTo offset - leafHeight) {
@@ -1426,6 +1451,7 @@ public class FancyFoliagePlacer(
         foliageHeight: Int,
         leafRadius: Int,
         offset: Int,
+        foliagePositions: MutableSet<Triple<Int, Int, Int>>,
     ) {
         for (y in offset downTo offset - foliageHeight) {
             val currentRadius = leafRadius + if (y != offset && y != offset - foliageHeight) 1 else 0
@@ -1471,6 +1497,7 @@ public class AcaciaFoliagePlacer(
         foliageHeight: Int,
         leafRadius: Int,
         offset: Int,
+        foliagePositions: MutableSet<Triple<Int, Int, Int>>,
     ) {
         val fx = attachment.x
         val fy = attachment.y + offset
@@ -1546,6 +1573,7 @@ public class SpruceFoliagePlacer(
         foliageHeight: Int,
         leafRadius: Int,
         offset: Int,
+        foliagePositions: MutableSet<Triple<Int, Int, Int>>,
     ) {
         var currentRadius = random.nextInt(2)
         var maxRadius = 1
@@ -1608,6 +1636,7 @@ public class PineFoliagePlacer(
         foliageHeight: Int,
         leafRadius: Int,
         offset: Int,
+        foliagePositions: MutableSet<Triple<Int, Int, Int>>,
     ) {
         var currentRadius = 0
         var yo = offset
@@ -1660,6 +1689,7 @@ public class DarkOakFoliagePlacer(
         foliageHeight: Int,
         leafRadius: Int,
         offset: Int,
+        foliagePositions: MutableSet<Triple<Int, Int, Int>>,
     ) {
         val fx = attachment.x
         val fy = attachment.y + offset
@@ -1738,6 +1768,7 @@ public class MegaPineFoliagePlacer(
         foliageHeight: Int,
         leafRadius: Int,
         offset: Int,
+        foliagePositions: MutableSet<Triple<Int, Int, Int>>,
     ) {
         var prevRadius = 0
         val topY = attachment.y + offset
@@ -1800,6 +1831,7 @@ public class RandomSpreadFoliagePlacer(
         foliageHeight: Int,
         leafRadius: Int,
         offset: Int,
+        foliagePositions: MutableSet<Triple<Int, Int, Int>>,
     ) {
         repeat(leafPlacementAttempts) {
             val dx = random.nextInt(leafRadius) - random.nextInt(leafRadius)
@@ -1842,6 +1874,7 @@ public class WeightedRandomSpreadFoliagePlacer(
         foliageHeight: Int,
         leafRadius: Int,
         offset: Int,
+        foliagePositions: MutableSet<Triple<Int, Int, Int>>,
     ) {
         repeat(leafPlacementAttempts) {
             val x = attachment.x + random.nextInt(leafRadius) - random.nextInt(leafRadius)
@@ -1892,16 +1925,39 @@ public class CherryFoliagePlacer(
         foliageHeight: Int,
         leafRadius: Int,
         offset: Int,
+        foliagePositions: MutableSet<Triple<Int, Int, Int>>,
     ) {
         val doubleTrunk = attachment.doubleTrunk
         val fx = attachment.x
         val fy = attachment.y + offset
         val fz = attachment.z
         val currentRadius = leafRadius + attachment.radiusOffset - 1
-        placeLeavesRow(chunk, random, foliageStateId, fx, fy, fz, currentRadius - 2, foliageHeight - 3, doubleTrunk)
-        placeLeavesRow(chunk, random, foliageStateId, fx, fy, fz, currentRadius - 1, foliageHeight - 4, doubleTrunk)
+        placeLeavesRow(
+            chunk,
+            random,
+            foliageStateId,
+            fx,
+            fy,
+            fz,
+            currentRadius - 2,
+            foliageHeight - 3,
+            doubleTrunk,
+            foliagePositions,
+        )
+        placeLeavesRow(
+            chunk,
+            random,
+            foliageStateId,
+            fx,
+            fy,
+            fz,
+            currentRadius - 1,
+            foliageHeight - 4,
+            doubleTrunk,
+            foliagePositions,
+        )
         for (y in foliageHeight - 5 downTo 0) {
-            placeLeavesRow(chunk, random, foliageStateId, fx, fy, fz, currentRadius, y, doubleTrunk)
+            placeLeavesRow(chunk, random, foliageStateId, fx, fy, fz, currentRadius, y, doubleTrunk, foliagePositions)
         }
         placeLeavesRowWithHangingLeavesBelow(
             chunk,
@@ -1915,6 +1971,7 @@ public class CherryFoliagePlacer(
             doubleTrunk,
             hangingLeavesChance,
             hangingLeavesExtensionChance,
+            foliagePositions,
         )
         placeLeavesRowWithHangingLeavesBelow(
             chunk,
@@ -1928,6 +1985,7 @@ public class CherryFoliagePlacer(
             doubleTrunk,
             hangingLeavesChance,
             hangingLeavesExtensionChance,
+            foliagePositions,
         )
     }
 
@@ -2092,6 +2150,7 @@ public object TreeFeature {
                 config.trunkStateId,
             )
         val offset = config.foliagePlacer.offset(random)
+        val foliagePositions = mutableSetOf<Triple<Int, Int, Int>>()
         recorder?.phase = PlacementPhase.LEAF
         for (attachment in attachments) {
             config.foliagePlacer.createFoliage(
@@ -2102,6 +2161,7 @@ public object TreeFeature {
                 foliageHeight,
                 leafRadius,
                 offset,
+                foliagePositions,
             )
         }
         return true
