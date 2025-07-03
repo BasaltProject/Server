@@ -1,7 +1,10 @@
 package org.basaltmc.server.world.terrain.decoration
 
+import org.basaltmc.server.random.BasaltRandom
 import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
+import org.basaltmc.server.registry.BlockFace
+import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
@@ -25,6 +28,7 @@ public object PaleMossDecoration : BiomeVegetalDecoration {
         placementObserver: ((DecorationPos) -> Unit)?,
     ) {
         val random = WorldgenRandom(XoroshiroRandom(seed))
+        val worldgenRegionRandom = worldgenRegionRandom(seed, chunk)
         val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
         random.setFeatureSeed(decorationSeed, PALE_MOSS_PATCH_INDEX, VEGETAL_DECORATION_STEP)
         val context = PlacementContext(chunk)
@@ -45,7 +49,7 @@ public object PaleMossDecoration : BiomeVegetalDecoration {
                 return@forEach
             }
             placementObserver?.invoke(origin)
-            placePatchAt(chunk, random, origin)
+            placePatchAt(chunk, random, origin, worldgenRegionRandom)
         }
     }
 
@@ -72,6 +76,7 @@ public object PaleMossDecoration : BiomeVegetalDecoration {
         chunk: Chunk,
         random: WorldgenRandom,
         origin: DecorationPos,
+        mossyCarpetRandom: BasaltRandom = random,
     ) {
         // VegetationPatchFeature adds one to each configured UniformInt(2..4) sample.
         val xRadius = 3 + random.nextInt(3)
@@ -88,7 +93,8 @@ public object PaleMossDecoration : BiomeVegetalDecoration {
 
                 val ground = findGround(chunk, origin.x + dx, origin.y, origin.z + dz) ?: continue
                 val previous = chunk.getDecorationBlockStateId(ground.x, ground.y, ground.z)
-                if (previous != paleMossBlockStateId && previous !in mossReplaceableStateIds) continue
+                val previousPath = Blocks.byStateId(previous)?.block?.path
+                if (previousPath !in MOSS_REPLACEABLE_PATHS) continue
                 if (previous != paleMossBlockStateId) {
                     chunk.setDecorationBlockStateId(ground.x, ground.y, ground.z, paleMossBlockStateId)
                 }
@@ -97,7 +103,9 @@ public object PaleMossDecoration : BiomeVegetalDecoration {
         }
 
         for (ground in javaHashSetOrder(surface)) {
-            if (random.nextFloat() < VEGETATION_CHANCE) placeVegetation(chunk, random, ground)
+            if (random.nextFloat() < VEGETATION_CHANCE) {
+                placeVegetation(chunk, random, mossyCarpetRandom, ground)
+            }
         }
     }
 
@@ -123,7 +131,7 @@ public object PaleMossDecoration : BiomeVegetalDecoration {
         val belowY = y - 1
         if (!isAir(chunk, x, y, z) || belowY < WorldHeight.MIN_Y) return null
         val below = chunk.getDecorationBlockStateId(x, belowY, z)
-        if (!Chunk.HeightmapType.OCEAN_FLOOR.matches(below)) return null
+        if (!BlockShapes.isFaceSturdy(below, BlockFace.UP)) return null
         return DecorationPos(x, belowY, z)
     }
 
@@ -133,12 +141,13 @@ public object PaleMossDecoration : BiomeVegetalDecoration {
         random: WorldgenRandom,
         origin: DecorationPos,
     ) {
-        placeVegetation(chunk, random, origin)
+        placeVegetation(chunk, random, random, origin)
     }
 
     private fun placeVegetation(
         chunk: Chunk,
         random: WorldgenRandom,
+        mossyCarpetRandom: BasaltRandom,
         ground: DecorationPos,
     ) {
         val roll = random.nextInt(60)
@@ -149,8 +158,19 @@ public object PaleMossDecoration : BiomeVegetalDecoration {
                 else -> tallGrassStateId
             }
         SimpleBlockFeature({ _, _ -> stateId }, isDoublePlant = stateId == tallGrassStateId)
-            .place(chunk, random, ground.copy(y = ground.y + 1))
+            .place(chunk, random, ground.copy(y = ground.y + 1), mossyCarpetRandom)
     }
+
+    /** parity: `WorldGenRegion.random`, positioned at the center chunk's minimum block corner. */
+    private fun worldgenRegionRandom(
+        seed: Long,
+        chunk: Chunk,
+    ): BasaltRandom =
+        XoroshiroRandom(seed)
+            .forkPositional()
+            .fromHashOf("minecraft:worldgen_region_random")
+            .forkPositional()
+            .at(chunk.chunkX * 16, 0, chunk.chunkZ * 16)
 
     private fun isAir(
         chunk: Chunk,
@@ -190,7 +210,7 @@ public object PaleMossDecoration : BiomeVegetalDecoration {
     private val paleMossCarpetStateId = stateId("pale_moss_carpet")
     private val shortGrassStateId = stateId("short_grass")
     private val tallGrassStateId = stateId("tall_grass")
-    private val mossReplaceableStateIds =
+    private val MOSS_REPLACEABLE_PATHS =
         setOf(
             "stone",
             "granite",
@@ -210,5 +230,5 @@ public object PaleMossDecoration : BiomeVegetalDecoration {
             "grass_block",
             "podzol",
             "mycelium",
-        ).map(::stateId).toSet()
+        )
 }
