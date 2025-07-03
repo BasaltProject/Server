@@ -24,6 +24,17 @@ public data class ChunkGeneratedBlockEntityWrite(
     public val data: NbtCompound,
 )
 
+/** A generated scheduled block tick whose target lies outside its source chunk. */
+public data class ChunkGeneratedBlockTick(
+    public val x: Int,
+    public val y: Int,
+    public val z: Int,
+    public val expectedStateId: Int,
+    public val type: Identifier,
+    public val delay: Int,
+    public val priority: Int = 0,
+)
+
 /** A 16-wide column of blocks at ([chunkX], [chunkZ]) in chunk coordinates. */
 public class Chunk(
     public val chunkX: Int,
@@ -45,6 +56,7 @@ public class Chunk(
     private val generatedExternalBlockWrites = LinkedHashMap<GeneratedWorldPos, ChunkGeneratedBlockWrite>()
     private val generatedExternalBlockEntityWrites =
         LinkedHashMap<GeneratedWorldPos, ChunkGeneratedBlockEntityWrite>()
+    private val generatedExternalBlockTicks = LinkedHashMap<GeneratedWorldPos, ChunkGeneratedBlockTick>()
     private var blockWriteObserver: ((Int, Int, Int, Int, Int) -> Unit)? = null
 
     public val sectionCount: Int get() = sections.size
@@ -191,6 +203,35 @@ public class Chunk(
         val writes = generatedExternalBlockEntityWrites.values.toList()
         generatedExternalBlockEntityWrites.clear()
         return writes
+    }
+
+    /** Schedules a generated block's tick locally or keeps it beside an external block write. */
+    public fun scheduleDecorationBlockTick(
+        worldX: Int,
+        y: Int,
+        worldZ: Int,
+        expectedStateId: Int,
+        type: Identifier,
+        delay: Int,
+        priority: Int = 0,
+    ) {
+        if (y !in verticalBounds.minY..verticalBounds.maxY) return
+        if (worldX shr 4 == chunkX && worldZ shr 4 == chunkZ) {
+            if (getBlockStateId(worldX and 15, y, worldZ and 15) == expectedStateId) {
+                scheduleBlockTick(ChunkScheduledTick(type, worldX and 15, y, worldZ and 15, delay, priority))
+            }
+            return
+        }
+        generatedExternalBlockTicks[GeneratedWorldPos(worldX, y, worldZ)] =
+            ChunkGeneratedBlockTick(worldX, y, worldZ, expectedStateId, type, delay, priority)
+    }
+
+    /** Hands deferred cross-chunk decoration ticks to the runtime exactly once. */
+    public fun takeGeneratedBlockTicks(): List<ChunkGeneratedBlockTick> {
+        if (generatedExternalBlockTicks.isEmpty()) return emptyList()
+        val ticks = generatedExternalBlockTicks.values.toList()
+        generatedExternalBlockTicks.clear()
+        return ticks
     }
 
     /**

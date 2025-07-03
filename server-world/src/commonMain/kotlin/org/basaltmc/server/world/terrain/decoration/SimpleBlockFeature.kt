@@ -20,6 +20,7 @@ import org.basaltmc.wire.common.Identifier
 public class SimpleBlockFeature(
     private val toPlace: (random: WorldgenRandom, origin: DecorationPos) -> Int,
     private val isDoublePlant: Boolean = false,
+    private val scheduleTick: Boolean = false,
 ) {
     public fun place(
         chunk: Chunk,
@@ -47,13 +48,25 @@ public class SimpleBlockFeature(
 
         if (Blocks.byStateId(stateId)?.block == PALE_MOSS_CARPET_ID) {
             placePaleMossCarpet(chunk, mossyCarpetRandom, origin)
-            return true
+        } else {
+            chunk.setDecorationBlockStateId(origin.x, origin.y, origin.z, stateId)
+            if (isDoublePlant) {
+                val upperStateId =
+                    Blocks.upperDoublePlantStateId(stateId) ?: error("state $stateId is not a lower double plant")
+                chunk.setDecorationBlockStateId(origin.x, origin.y + 1, origin.z, upperStateId)
+            }
         }
-        chunk.setDecorationBlockStateId(origin.x, origin.y, origin.z, stateId)
-        if (isDoublePlant) {
-            val upperStateId =
-                Blocks.upperDoublePlantStateId(stateId) ?: error("state $stateId is not a lower double plant")
-            chunk.setDecorationBlockStateId(origin.x, origin.y + 1, origin.z, upperStateId)
+        if (scheduleTick) {
+            val placedStateId = chunk.getDecorationBlockStateId(origin.x, origin.y, origin.z)
+            val block = Blocks.byStateId(placedStateId)?.block ?: return true
+            chunk.scheduleDecorationBlockTick(
+                origin.x,
+                origin.y,
+                origin.z,
+                expectedStateId = placedStateId,
+                type = block,
+                delay = 1,
+            )
         }
         return true
     }

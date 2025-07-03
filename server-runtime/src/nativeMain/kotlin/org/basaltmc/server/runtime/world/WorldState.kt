@@ -12,6 +12,7 @@ import org.basaltmc.server.runtime.sched.Region
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkBlockEntity
 import org.basaltmc.server.world.ChunkGeneratedBlockEntityWrite
+import org.basaltmc.server.world.ChunkGeneratedBlockTick
 import org.basaltmc.server.world.ChunkGeneratedBlockWrite
 import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.server.world.ChunkScheduledTick
@@ -98,6 +99,7 @@ public class WorldState(
     private val generatedEntitiesByKey = mutableMapOf<GeneratedEntityKey, GeneratedWorldEntity>()
     private val pendingGeneratedBlockWrites = HashMap<Long, MutableList<ChunkGeneratedBlockWrite>>()
     private val pendingGeneratedBlockEntityWrites = HashMap<Long, MutableList<ChunkGeneratedBlockEntityWrite>>()
+    private val pendingGeneratedBlockTicks = HashMap<Long, MutableList<ChunkGeneratedBlockTick>>()
 
     init {
         // Tests and embedders may seed a world with detached generated chunks. Production starts
@@ -105,8 +107,10 @@ public class WorldState(
         for (chunk in initialChunks) {
             applyPendingGeneratedBlockWrites(chunk)
             applyPendingGeneratedBlockEntityWrites(chunk)
+            applyPendingGeneratedBlockTicks(chunk)
             deliverGeneratedBlockWrites(chunk.takeGeneratedBlockWrites())
             deliverGeneratedBlockEntityWrites(chunk.takeGeneratedBlockEntityWrites())
+            deliverGeneratedBlockTicks(chunk.takeGeneratedBlockTicks())
         }
         loadedChunks = snapshotOf(chunksByPos)
     }
@@ -256,8 +260,10 @@ public class WorldState(
                 chunksByPos[key] = chunk
                 applyPendingGeneratedBlockWrites(chunk)
                 applyPendingGeneratedBlockEntityWrites(chunk)
+                applyPendingGeneratedBlockTicks(chunk)
                 deliverGeneratedBlockWrites(chunk.takeGeneratedBlockWrites())
                 deliverGeneratedBlockEntityWrites(chunk.takeGeneratedBlockEntityWrites())
+                deliverGeneratedBlockTicks(chunk.takeGeneratedBlockTicks())
                 loadedChunks = snapshotOf(chunksByPos)
                 chunkVersion.addAndGet(1)
                 pendingEntities += chunk.takeSavedEntities()
@@ -334,6 +340,36 @@ public class WorldState(
         val localZ = write.z and 15
         if (chunk.getBlockStateId(localX, write.y, localZ) != write.expectedStateId) return
         chunk.setBlockEntity(ChunkBlockEntity(localX, write.y, localZ, write.type, write.data))
+    }
+
+    private fun deliverGeneratedBlockTicks(ticks: List<ChunkGeneratedBlockTick>) {
+        for (tick in ticks) {
+            val targetKey = key(tick.x shr 4, tick.z shr 4)
+            val target = chunksByPos[targetKey]
+            if (target == null) {
+                pendingGeneratedBlockTicks.getOrPut(targetKey, ::mutableListOf) += tick
+            } else {
+                applyGeneratedBlockTick(target, tick)
+            }
+        }
+    }
+
+    private fun applyPendingGeneratedBlockTicks(chunk: Chunk) {
+        val ticks = pendingGeneratedBlockTicks.remove(key(chunk.chunkX, chunk.chunkZ)) ?: return
+        for (tick in ticks) applyGeneratedBlockTick(chunk, tick)
+    }
+
+    private fun applyGeneratedBlockTick(
+        chunk: Chunk,
+        tick: ChunkGeneratedBlockTick,
+    ) {
+        if (tick.y !in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) return
+        val localX = tick.x and 15
+        val localZ = tick.z and 15
+        if (chunk.getBlockStateId(localX, tick.y, localZ) != tick.expectedStateId) return
+        chunk.scheduleBlockTick(
+            ChunkScheduledTick(tick.type, localX, tick.y, localZ, tick.delay, tick.priority),
+        )
     }
 
     /**

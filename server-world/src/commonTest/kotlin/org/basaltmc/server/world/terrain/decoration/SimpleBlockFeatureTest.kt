@@ -124,6 +124,26 @@ class SimpleBlockFeatureTest {
         assertEquals(expectedFeatureRandom.nextLong(), featureRandom.nextLong())
     }
 
+    @Test
+    fun scheduledSimpleBlockKeepsItsTickAcrossTheChunkBorder() {
+        val chunk = Chunk(0, 0)
+        val flowerStateId = stateId("closed_eyeblossom")
+        chunk.setDecorationBlockStateId(16, 39, 4, Blocks.GRASS_BLOCK.stateId)
+
+        assertTrue(
+            SimpleBlockFeature({ _, _ -> flowerStateId }, scheduleTick = true)
+                .place(chunk, WorldgenRandom(XoroshiroRandom(1L)), DecorationPos(16, 40, 4)),
+        )
+
+        val tick = chunk.takeGeneratedBlockTicks().single()
+        assertEquals(16, tick.x)
+        assertEquals(40, tick.y)
+        assertEquals(4, tick.z)
+        assertEquals(flowerStateId, tick.expectedStateId)
+        assertEquals("closed_eyeblossom", tick.type.path)
+        assertEquals(1, tick.delay)
+    }
+
     private fun stateId(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId
             ?: error("missing $path")

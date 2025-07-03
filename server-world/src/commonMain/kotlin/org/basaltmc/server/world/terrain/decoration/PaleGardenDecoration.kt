@@ -6,8 +6,8 @@ import org.basaltmc.server.world.Chunk
 import org.basaltmc.wire.common.Identifier
 
 /**
- * Closed-eyeblossom placed features used only by the pale garden. The configured features request
- * `schedule_tick=true`; placement is present now, while scheduling awaits the block-tick engine.
+ * Closed-eyeblossom placed features used only by the pale garden. Both configured features request
+ * `schedule_tick=true`, so each accepted flower schedules its own one-tick block update.
  */
 public object PaleGardenDecoration {
     private val closedEyeblossomStateId =
@@ -43,7 +43,7 @@ public object PaleGardenDecoration {
         random: WorldgenRandom,
         origin: DecorationPos,
     ) {
-        val feature = SimpleBlockFeature({ _, _ -> closedEyeblossomStateId })
+        val feature = SimpleBlockFeature({ _, _ -> closedEyeblossomStateId }, scheduleTick = true)
         placeFrom(
             chunk,
             random,
@@ -57,13 +57,13 @@ public object PaleGardenDecoration {
         random: WorldgenRandom,
         origin: DecorationPos,
     ) {
-        SimpleBlockFeature({ _, _ -> closedEyeblossomStateId }).place(chunk, random, origin)
+        SimpleBlockFeature({ _, _ -> closedEyeblossomStateId }, scheduleTick = true).place(chunk, random, origin)
     }
 
     private fun placed(modifiers: List<PlacementModifier>): BiomeVegetalDecoration =
         BiomeVegetalDecoration { chunk, random ->
             val context = PlacementContext(chunk)
-            val feature = SimpleBlockFeature({ _, _ -> closedEyeblossomStateId })
+            val feature = SimpleBlockFeature({ _, _ -> closedEyeblossomStateId }, scheduleTick = true)
             var positions: Sequence<DecorationPos> = sequenceOf(DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16))
             for (modifier in modifiers) positions = positions.flatMap { modifier.getPositions(context, random, it) }
             positions.forEach { feature.place(chunk, random, it) }

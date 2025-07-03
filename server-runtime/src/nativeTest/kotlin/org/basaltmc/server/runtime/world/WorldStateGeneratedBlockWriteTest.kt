@@ -80,4 +80,33 @@ class WorldStateGeneratedBlockWriteTest {
 
         assertEquals(Blocks.OAK_LOG.stateId, target.getBlockStateId(0, 70, 3))
     }
+
+    @Test
+    fun deferredDecorationCarriesItsScheduledTickOnlyWithTheAcceptedBlock() {
+        val flower = Identifier.vanilla("closed_eyeblossom")
+        val flowerStateId = Blocks.REGISTRY.byIdentifier(flower)?.stateId ?: error("missing closed eyeblossom")
+        val world = WorldState(emptyList())
+        val source = Chunk(0, 0)
+        source.setDecorationBlockStateId(16, 70, 3, flowerStateId)
+        source.scheduleDecorationBlockTick(16, 70, 3, flowerStateId, flower, delay = 1)
+        world.install(source)
+
+        val target = world.install(Chunk(1, 0))
+
+        assertEquals(flowerStateId, target.getBlockStateId(0, 70, 3))
+        assertEquals(1, target.scheduledBlockTicks().single().delay)
+        assertEquals(flower, target.scheduledBlockTicks().single().type)
+
+        val blockedWorld = WorldState(emptyList())
+        val blockedSource = Chunk(0, 0)
+        blockedSource.setDecorationBlockStateId(16, 70, 3, flowerStateId)
+        blockedSource.scheduleDecorationBlockTick(16, 70, 3, flowerStateId, flower, delay = 1)
+        blockedWorld.install(blockedSource)
+        val blockedTarget = Chunk(1, 0).also { it.setBlockStateId(0, 70, 3, Blocks.STONE.stateId) }
+
+        blockedWorld.install(blockedTarget)
+
+        assertEquals(Blocks.STONE.stateId, blockedTarget.getBlockStateId(0, 70, 3))
+        assertEquals(emptyList(), blockedTarget.scheduledBlockTicks())
+    }
 }
