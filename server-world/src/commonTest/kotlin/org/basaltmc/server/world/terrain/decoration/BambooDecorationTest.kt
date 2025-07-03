@@ -90,6 +90,24 @@ class BambooDecorationTest {
         assertTrue(states.any { it == Blocks.PODZOL.stateId })
     }
 
+    @Test
+    fun snowyGrassSupportsBambooAndItsPodzolDisk() {
+        val chunk = Chunk(0, 0)
+        val origin = DecorationPos(8, 40, 8)
+        chunk.setBlockStateId(origin.x, origin.y - 1, origin.z, Blocks.GRASS_BLOCK.stateId - 1)
+        val seed =
+            (0L..1000L).first { candidate ->
+                val random = WorldgenRandom(XoroshiroRandom(candidate))
+                random.nextInt(12)
+                random.nextFloat() < 0.2f
+            }
+
+        BambooDecoration.placeAt(chunk, WorldgenRandom(XoroshiroRandom(seed)), origin, "bamboo")
+
+        assertEquals(Blocks.PODZOL.stateId, chunk.getBlockStateId(origin.x, origin.y - 1, origin.z))
+        assertEquals(Blocks.BAMBOO.block, Blocks.byStateId(chunk.getBlockStateId(origin.x, origin.y, origin.z))?.block)
+    }
+
     private fun flatChunk(): Chunk =
         Chunk(0, 0).also { chunk ->
             for (z in 0 until 16) {

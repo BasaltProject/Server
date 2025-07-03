@@ -105,9 +105,17 @@ public object GrassPatchDecoration {
                     origin.z + random.nextInt(8) - random.nextInt(8),
                 )
             if (target.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y || !Blocks.isAir(region.get(target))) return@repeat
-            if (spec.rejectPodzol && region.get(target.down()) == Blocks.PODZOL.stateId) return@repeat
+            if (spec.rejectPodzol &&
+                Blocks.byStateId(region.get(target.down()))?.block == Blocks.PODZOL.block
+            ) {
+                return@repeat
+            }
             val stateId = spec.provider.state(random)
-            if (target.y == WorldHeight.MIN_Y || region.get(target.down()) !in SUPPORTS_VEGETATION) return@repeat
+            if (target.y == WorldHeight.MIN_Y ||
+                Blocks.byStateId(region.get(target.down()))?.block?.path !in SUPPORTS_VEGETATION
+            ) {
+                return@repeat
+            }
             region.set(target, stateId)
         }
     }
@@ -168,14 +176,8 @@ public object GrassPatchDecoration {
         val rejectPodzol: Boolean = false,
     )
 
-    private fun states(vararg names: String): Set<Int> =
-        names
-            .map { name ->
-                Blocks.REGISTRY.byIdentifier(Identifier.vanilla(name))?.stateId ?: error("unknown block '$name'")
-            }.toSet()
-
     private val SUPPORTS_VEGETATION =
-        states(
+        setOf(
             "dirt",
             "coarse_dirt",
             "rooted_dirt",

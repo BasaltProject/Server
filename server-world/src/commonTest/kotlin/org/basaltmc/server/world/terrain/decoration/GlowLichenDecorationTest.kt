@@ -72,6 +72,53 @@ class GlowLichenDecorationTest {
         assertTrue(waterlogged > 0)
     }
 
+    @Test
+    fun existingLichenIsNotAValidFeatureOrigin() {
+        val chunk = Chunk(0, 0)
+        val origin = DecorationPos(8, 40, 8)
+        val initialState = stateId("glow_lichen")
+        chunk.setBlockStateId(origin.x, origin.y, origin.z, initialState)
+        chunk.setBlockStateId(origin.x + 1, origin.y, origin.z, Blocks.STONE.stateId)
+
+        val placed =
+            GlowLichenDecoration.placeAt(
+                chunk,
+                WorldgenRandom(XoroshiroRandom(1234L)),
+                origin,
+            )
+
+        assertEquals(false, placed)
+        assertEquals(initialState, chunk.getBlockStateId(origin.x, origin.y, origin.z))
+    }
+
+    @Test
+    fun spreadingRequiresAFullSupportOrCollisionFace() {
+        val origin = DecorationPos(8, 40, 8)
+        for (seed in 0L until 256L) {
+            val withoutSlab = lichenSpreadChunk(origin, withSlab = false)
+            val withSlab = lichenSpreadChunk(origin, withSlab = true)
+
+            GlowLichenDecoration.placeAt(withoutSlab, WorldgenRandom(XoroshiroRandom(seed)), origin)
+            GlowLichenDecoration.placeAt(withSlab, WorldgenRandom(XoroshiroRandom(seed)), origin)
+
+            assertEquals(
+                withoutSlab.getBlockStateId(origin.x, origin.y, origin.z),
+                withSlab.getBlockStateId(origin.x, origin.y, origin.z),
+                "seed $seed",
+            )
+        }
+    }
+
+    private fun lichenSpreadChunk(
+        origin: DecorationPos,
+        withSlab: Boolean,
+    ): Chunk =
+        Chunk(0, 0).also { chunk ->
+            chunk.setBlockStateId(origin.x, origin.y + 1, origin.z, Blocks.STONE.stateId)
+            chunk.setBlockStateId(origin.x + 1, origin.y + 1, origin.z, Blocks.STONE.stateId)
+            if (withSlab) chunk.setBlockStateId(origin.x + 1, origin.y, origin.z, stateId("stone_slab"))
+        }
+
     private fun layeredCave(water: Boolean): Chunk {
         val chunk = Chunk(0, 0)
         for (x in 0 until 16) {

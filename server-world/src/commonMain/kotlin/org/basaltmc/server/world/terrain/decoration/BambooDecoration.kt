@@ -6,7 +6,6 @@ import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
-import org.basaltmc.wire.common.Identifier
 
 /** // parity: BambooFeature and the bamboo/bamboo_light placed features. */
 public object BambooDecoration {
@@ -138,7 +137,9 @@ public object BambooDecoration {
                     if (dx * dx + dz * dz <= radius * radius) {
                         val surfaceY = region.worldSurfaceHeight(x, z) - 1
                         val surface = DecorationPos(x, surfaceY, z)
-                        if (surface.inWorld() && region.get(surface)?.let { it in PODZOL_REPLACEABLE } == true) {
+                        if (surface.inWorld() &&
+                            region.get(surface)?.let { Blocks.byStateId(it)?.block?.path in PODZOL_REPLACEABLE } == true
+                        ) {
                             region.set(surface, Blocks.PODZOL.stateId)
                         }
                     }
@@ -166,7 +167,7 @@ public object BambooDecoration {
     ): Boolean =
         origin.y > WorldHeight.MIN_Y &&
             region.get(origin.down())?.let { stateId ->
-                stateId in SUPPORTS_BAMBOO || Blocks.byStateId(stateId)?.block == Blocks.BAMBOO.block
+                Blocks.byStateId(stateId)?.block?.path in SUPPORTS_BAMBOO
             } == true
 
     private fun DecorationPos.inWorld(): Boolean = y in WorldHeight.MIN_Y..WorldHeight.MAX_Y
@@ -247,7 +248,7 @@ public object BambooDecoration {
     }
 
     private val PODZOL_REPLACEABLE =
-        states(
+        setOf(
             "dirt",
             "coarse_dirt",
             "rooted_dirt",
@@ -262,7 +263,7 @@ public object BambooDecoration {
 
     private val SUPPORTS_BAMBOO =
         PODZOL_REPLACEABLE +
-            states(
+            setOf(
                 "sand",
                 "red_sand",
                 "suspicious_sand",
@@ -271,12 +272,6 @@ public object BambooDecoration {
                 "gravel",
                 "suspicious_gravel",
             )
-
-    private fun states(vararg names: String): Set<Int> =
-        names
-            .map { name ->
-                Blocks.REGISTRY.byIdentifier(Identifier.vanilla(name))?.stateId ?: error("unknown block '$name'")
-            }.toSet()
 
     private const val BAMBOO_INDEX = 2
     private const val BAMBOO_LIGHT_INDEX = 6

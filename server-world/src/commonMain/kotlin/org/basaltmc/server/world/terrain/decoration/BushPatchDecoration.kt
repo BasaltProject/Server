@@ -57,7 +57,7 @@ public object BushPatchDecoration {
                 )
             if (target.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y || !Blocks.isAir(region.get(target))) return@repeat
             if (target.y == WorldHeight.MIN_Y ||
-                region.get(target.copy(y = target.y - 1)) !in SUPPORTS_VEGETATION
+                Blocks.byStateId(region.get(target.copy(y = target.y - 1)))?.block?.path !in SUPPORTS_VEGETATION
             ) {
                 return@repeat
             }
@@ -101,17 +101,17 @@ public object BushPatchDecoration {
     private val BUSH_STATE_ID = stateId("bush")
     private val SUPPORTS_VEGETATION =
         setOf(
-            stateId("dirt"),
-            stateId("coarse_dirt"),
-            stateId("rooted_dirt"),
-            stateId("mud"),
-            stateId("muddy_mangrove_roots"),
-            stateId("moss_block"),
-            stateId("pale_moss_block"),
-            stateId("grass_block"),
-            stateId("podzol"),
-            stateId("mycelium"),
-            stateId("farmland"),
+            "dirt",
+            "coarse_dirt",
+            "rooted_dirt",
+            "mud",
+            "muddy_mangrove_roots",
+            "moss_block",
+            "pale_moss_block",
+            "grass_block",
+            "podzol",
+            "mycelium",
+            "farmland",
         )
     private val BIOMES =
         setOf(

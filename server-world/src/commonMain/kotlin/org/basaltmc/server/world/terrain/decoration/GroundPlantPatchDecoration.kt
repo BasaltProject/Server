@@ -106,7 +106,11 @@ public object GroundPlantPatchDecoration {
             )
         if (target.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y || !Blocks.isAir(region.get(target))) return
         val stateId = spec.provider.state(random)
-        if (target.y == WorldHeight.MIN_Y || region.get(target.down()) !in SUPPORTS_DRY_VEGETATION) return
+        if (target.y == WorldHeight.MIN_Y ||
+            Blocks.byStateId(region.get(target.down()))?.block?.path !in SUPPORTS_DRY_VEGETATION
+        ) {
+            return
+        }
         region.set(target, stateId)
     }
 
@@ -165,14 +169,8 @@ public object GroundPlantPatchDecoration {
         val heightmap: Chunk.HeightmapType = Chunk.HeightmapType.WORLD_SURFACE,
     )
 
-    private fun states(vararg names: String): Set<Int> =
-        names
-            .map { name ->
-                Blocks.REGISTRY.byIdentifier(Identifier.vanilla(name))?.stateId ?: error("unknown block '$name'")
-            }.toSet()
-
     private val SUPPORTS_DRY_VEGETATION =
-        states(
+        setOf(
             "dirt",
             "coarse_dirt",
             "rooted_dirt",

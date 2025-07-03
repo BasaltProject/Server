@@ -106,7 +106,7 @@ public object TallGrassDecoration {
                 return@repeat
             }
             if (!Blocks.isAir(region.get(target.up()))) return@repeat
-            if (region.get(target.down()) !in SUPPORTS_VEGETATION) return@repeat
+            if (Blocks.byStateId(region.get(target.down()))?.block?.path !in SUPPORTS_VEGETATION) return@repeat
             region.set(target, TALL_GRASS_LOWER_STATE_ID)
             region.set(target.up(), TALL_GRASS_UPPER_STATE_ID)
         }
@@ -152,14 +152,8 @@ public object TallGrassDecoration {
         }
     }
 
-    private fun states(vararg names: String): Set<Int> =
-        names
-            .map { name ->
-                Blocks.REGISTRY.byIdentifier(Identifier.vanilla(name))?.stateId ?: error("unknown block '$name'")
-            }.toSet()
-
     private val SUPPORTS_VEGETATION =
-        states(
+        setOf(
             "dirt",
             "coarse_dirt",
             "rooted_dirt",
