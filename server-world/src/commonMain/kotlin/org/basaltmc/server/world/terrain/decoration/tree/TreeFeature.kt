@@ -2,6 +2,7 @@ package org.basaltmc.server.world.terrain.decoration.tree
 
 import org.basaltmc.server.random.BasaltRandom
 import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
@@ -2067,6 +2068,14 @@ public sealed interface TreeDecoratorConfiguration {
 public object TreeFeature {
     internal fun isLogState(stateId: Int): Boolean = Blocks.byStateId(stateId)?.block?.path in LOG_BLOCK_PATHS
 
+    /** // parity: TreeFeature.validTreePos and the complete replaceable_by_trees tag below. */
+    internal fun validTreePos(
+        chunk: Chunk,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Boolean = isValidTreePos(chunk, x, y, z)
+
     public fun place(
         chunk: Chunk,
         random: WorldgenRandom,
@@ -2501,7 +2510,7 @@ public object TreeFeature {
             val aboveStateId = chunk.getDecorationBlockStateId(x, aboveY, z)
             if (!Blocks.isAir(aboveStateId) && !Blocks.isVineState(aboveStateId)) return@repeat
             val supportStateId = chunk.getDecorationBlockStateId(x, y, z)
-            if (!isSolidRender(supportStateId)) return@repeat
+            if (!BlockShapes.isSolidRender(supportStateId)) return@repeat
             if (decorationHeightAt(chunk, x, z, Chunk.HeightmapType.MOTION_BLOCKING_NO_LEAVES) >
                 aboveY
             ) {
@@ -2569,12 +2578,6 @@ public object TreeFeature {
                     context.roots
             else -> context.roots
         }
-
-    private fun isSolidRender(stateId: Int): Boolean {
-        if (!Chunk.HeightmapType.OCEAN_FLOOR.matches(stateId)) return false
-        val path = Blocks.byStateId(stateId)?.block?.path ?: return false
-        return !path.endsWith("_leaves") && path !in NON_SOLID_RENDER_BLOCK_PATHS
-    }
 
     private fun <T> shuffle(
         values: MutableList<T>,
@@ -2805,33 +2808,6 @@ public object TreeFeature {
         ) + 6
     private val BEEHIVE_SPAWN_DIRECTIONS = listOf(1 to 0, 0 to 1, -1 to 0)
     private val LEAF_LITTER_FACING_STATE_OFFSETS = intArrayOf(0, 12, 4, 8)
-    private val NON_SOLID_RENDER_BLOCK_PATHS: Set<String> =
-        setOf(
-            "snow",
-            "cactus",
-            "cactus_flower",
-            "sugar_cane",
-            "bamboo",
-            "bamboo_sapling",
-            "pointed_dripstone",
-            "lily_pad",
-            "brown_mushroom",
-            "red_mushroom",
-            "fern",
-            "large_fern",
-            "dead_bush",
-            "sweet_berry_bush",
-            "firefly_bush",
-            "wildflowers",
-            "pink_petals",
-            "pale_moss_carpet",
-            "closed_eyeblossom",
-            "open_eyeblossom",
-            "sunflower",
-            "lilac",
-            "rose_bush",
-            "peony",
-        )
 
     // parity: BlockTags.LOGS, expanded from the 26.2 server data pack.
     private val LOG_BLOCK_PATHS: Set<String> =

@@ -1,5 +1,6 @@
 package org.basaltmc.server.world
 
+import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.wire.common.Identifier
@@ -583,80 +584,20 @@ public class Chunk(
         private fun matchesUncached(stateId: Int): Boolean =
             when (this) {
                 WORLD_SURFACE -> !Blocks.isAir(stateId)
-                OCEAN_FLOOR ->
-                    !Blocks.isAir(stateId) &&
-                        stateId != Blocks.WATER.stateId &&
-                        !isNonColliding(stateId)
-                MOTION_BLOCKING ->
-                    Blocks.hasFluid(stateId) ||
-                        (!Blocks.isAir(stateId) && !isNonColliding(stateId))
+                OCEAN_FLOOR -> BlockShapes.blocksMotion(stateId)
+                MOTION_BLOCKING -> BlockShapes.blocksMotion(stateId) || Blocks.hasFluid(stateId)
                 MOTION_BLOCKING_NO_LEAVES ->
                     !Blocks.isLeavesState(stateId) &&
-                        (
-                            Blocks.hasFluid(stateId) ||
-                                (!Blocks.isAir(stateId) && !isNonColliding(stateId))
-                        )
+                        (BlockShapes.blocksMotion(stateId) || Blocks.hasFluid(stateId))
             }
 
         private companion object {
-            fun isNonColliding(stateId: Int): Boolean =
-                stateId in NON_COLLIDING_STATE_IDS ||
-                    Blocks.isGlowLichenState(stateId) ||
-                    Blocks.isVineState(stateId) ||
-                    Blocks.isCocoaState(stateId) ||
-                    Blocks.isPaleHangingMossState(stateId) ||
-                    Blocks.isMangrovePropaguleState(stateId) ||
-                    Blocks.isLeafLitterState(stateId) ||
-                    Blocks.isDoublePlantState(stateId) ||
-                    Blocks.isWildflowersState(stateId) ||
-                    Blocks.isPinkPetalsState(stateId) ||
-                    Blocks.isKelpState(stateId) ||
-                    Blocks.isSeaPickleState(stateId) ||
-                    Blocks.isCoralPlantState(stateId)
-
-            val NON_COLLIDING_STATE_IDS: Set<Int> =
-                listOf(
-                    "short_grass",
-                    "tall_grass",
-                    "bush",
-                    "dandelion",
-                    "poppy",
-                    "azure_bluet",
-                    "oxeye_daisy",
-                    "cornflower",
-                    "orange_tulip",
-                    "red_tulip",
-                    "pink_tulip",
-                    "white_tulip",
-                    "seagrass",
-                    "tall_seagrass",
-                    "kelp",
-                    "kelp_plant",
-                    "sea_pickle",
-                    "tube_coral",
-                    "brain_coral",
-                    "bubble_coral",
-                    "fire_coral",
-                    "horn_coral",
-                    "tube_coral_fan",
-                    "brain_coral_fan",
-                    "bubble_coral_fan",
-                    "fire_coral_fan",
-                    "horn_coral_fan",
-                    "tube_coral_wall_fan",
-                    "brain_coral_wall_fan",
-                    "bubble_coral_wall_fan",
-                    "fire_coral_wall_fan",
-                    "horn_coral_wall_fan",
-                ).mapNotNull { Blocks.REGISTRY.byIdentifier(Identifier.vanilla(it))?.stateId }.toSet()
-
             // The bound the tables were actually sized with, so a state id past it (nothing
             // registers derived states after startup today, but nothing enforces that either)
             // falls back to the uncached path instead of reading off the end.
             val TABLE_SIZE: Int = Blocks.stateCount
 
-            // Declared last: reads NON_COLLIDING_STATE_IDS and TABLE_SIZE, and companion properties
-            // initialize in declaration order.
+            // Declared last because companion properties initialize in declaration order.
             val TABLES: Array<BooleanArray> =
                 Array(entries.size) { type -> BooleanArray(TABLE_SIZE) { entries[type].matchesUncached(it) } }
         }

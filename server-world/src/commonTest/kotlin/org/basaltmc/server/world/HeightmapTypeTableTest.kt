@@ -1,8 +1,12 @@
 package org.basaltmc.server.world
 
+import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.wire.common.Identifier
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /**
  * The precomputed per-state table [Chunk.HeightmapType.matches] reads has to answer exactly what
@@ -23,82 +27,25 @@ class HeightmapTypeTableTest {
         }
         // Keeps the unused-chunk warning honest: heightAt is the only caller that matters.
         assertEquals(WorldHeight.MIN_Y, chunk.heightAt(0, 0, Chunk.HeightmapType.WORLD_SURFACE))
+        assertFalse(Chunk.HeightmapType.OCEAN_FLOOR.matches(state("oak_sapling")))
+        assertFalse(Chunk.HeightmapType.OCEAN_FLOOR.matches(Blocks.WATER.stateId + 1))
+        assertTrue(Chunk.HeightmapType.MOTION_BLOCKING.matches(Blocks.WATER.stateId + 1))
     }
 
     private fun expectedMatch(
         type: Chunk.HeightmapType,
         stateId: Int,
-    ): Boolean {
-        val nonColliding = isNonColliding(stateId)
-        return when (type) {
+    ): Boolean =
+        when (type) {
             Chunk.HeightmapType.WORLD_SURFACE -> !Blocks.isAir(stateId)
-            Chunk.HeightmapType.OCEAN_FLOOR ->
-                !Blocks.isAir(stateId) && stateId != Blocks.WATER.stateId && !nonColliding
-            Chunk.HeightmapType.MOTION_BLOCKING ->
-                Blocks.hasFluid(stateId) || (!Blocks.isAir(stateId) && !nonColliding)
+            Chunk.HeightmapType.OCEAN_FLOOR -> BlockShapes.blocksMotion(stateId)
+            Chunk.HeightmapType.MOTION_BLOCKING -> BlockShapes.blocksMotion(stateId) || Blocks.hasFluid(stateId)
             Chunk.HeightmapType.MOTION_BLOCKING_NO_LEAVES ->
                 !Blocks.isLeavesState(stateId) &&
-                    (Blocks.hasFluid(stateId) || (!Blocks.isAir(stateId) && !nonColliding))
+                    (BlockShapes.blocksMotion(stateId) || Blocks.hasFluid(stateId))
         }
-    }
 
-    private fun isNonColliding(stateId: Int): Boolean =
-        Blocks.isGlowLichenState(stateId) ||
-            Blocks.isVineState(stateId) ||
-            Blocks.isCocoaState(stateId) ||
-            Blocks.isPaleHangingMossState(stateId) ||
-            Blocks.isMangrovePropaguleState(stateId) ||
-            Blocks.isLeafLitterState(stateId) ||
-            Blocks.isDoublePlantState(stateId) ||
-            Blocks.isWildflowersState(stateId) ||
-            Blocks.isPinkPetalsState(stateId) ||
-            Blocks.isKelpState(stateId) ||
-            Blocks.isSeaPickleState(stateId) ||
-            Blocks.isCoralPlantState(stateId) ||
-            NON_COLLIDING_NAMES.any {
-                Blocks.REGISTRY
-                    .byIdentifier(
-                        org.basaltmc.wire.common.Identifier
-                            .vanilla(it),
-                    )?.stateId ==
-                    stateId
-            }
-
-    private companion object {
-        val NON_COLLIDING_NAMES =
-            listOf(
-                "short_grass",
-                "tall_grass",
-                "bush",
-                "dandelion",
-                "poppy",
-                "azure_bluet",
-                "oxeye_daisy",
-                "cornflower",
-                "orange_tulip",
-                "red_tulip",
-                "pink_tulip",
-                "white_tulip",
-                "seagrass",
-                "tall_seagrass",
-                "kelp",
-                "kelp_plant",
-                "sea_pickle",
-                "tube_coral",
-                "brain_coral",
-                "bubble_coral",
-                "fire_coral",
-                "horn_coral",
-                "tube_coral_fan",
-                "brain_coral_fan",
-                "bubble_coral_fan",
-                "fire_coral_fan",
-                "horn_coral_fan",
-                "tube_coral_wall_fan",
-                "brain_coral_wall_fan",
-                "bubble_coral_wall_fan",
-                "fire_coral_wall_fan",
-                "horn_coral_wall_fan",
-            )
-    }
+    private fun state(path: String): Int =
+        Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId
+            ?: error("unknown block '$path'")
 }

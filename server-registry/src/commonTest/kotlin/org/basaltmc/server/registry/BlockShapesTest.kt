@@ -22,7 +22,16 @@ class BlockShapesTest {
     fun glassFillsItsCubeWithoutStoppingLight() {
         val glass = state("glass")
         assertTrue(BlockShapes.isFullCube(glass))
+        assertFalse(BlockShapes.isSolidRender(glass))
         assertEquals(0, BlockShapes.dampening(glass))
+    }
+
+    @Test
+    fun occludingCubesRenderSolid() {
+        assertTrue(BlockShapes.isSolidRender(state("stone")))
+        assertTrue(BlockShapes.isSolidRender(state("dirt")))
+        assertFalse(BlockShapes.isSolidRender(state("oak_leaves")))
+        assertFalse(BlockShapes.isSolidRender(state("stone_slab")))
     }
 
     @Test

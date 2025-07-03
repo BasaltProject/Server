@@ -120,7 +120,7 @@ public object LushCaveVegetationDecoration {
 
         fun matches(stateId: Int): Boolean =
             when (this) {
-                SOLID -> Chunk.HeightmapType.OCEAN_FLOOR.matches(stateId)
+                SOLID -> BlockShapes.isSolidState(stateId)
                 STURDY_DOWN -> BlockShapes.isFaceSturdy(stateId, BlockFace.DOWN)
             }
     }
