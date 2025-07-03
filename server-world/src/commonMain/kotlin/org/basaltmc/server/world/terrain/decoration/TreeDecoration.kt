@@ -1,5 +1,6 @@
 package org.basaltmc.server.world.terrain.decoration
 
+import org.basaltmc.server.random.BasaltRandom
 import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.terrain.decoration.tree.FallenTreeConfigs
@@ -25,6 +26,7 @@ public object TreeDecoration {
             chunk: Chunk,
             random: WorldgenRandom,
             position: DecorationPos,
+            mossyCarpetRandom: BasaltRandom,
         )
     }
 
@@ -33,8 +35,9 @@ public object TreeDecoration {
             chunk,
             random,
             position,
+            mossyCarpetRandom,
             ->
-            TreeFeature.place(chunk, random, position.x, position.y, position.z, config)
+            TreeFeature.place(chunk, random, position.x, position.y, position.z, config, mossyCarpetRandom)
         }
 
     public fun fallen(config: FallenTreeConfiguration): Candidate =
@@ -42,6 +45,7 @@ public object TreeDecoration {
             chunk,
             random,
             position,
+            _,
             ->
             FallenTreeFeature.place(chunk, random, position.x, position.y, position.z, config)
         }
@@ -51,6 +55,7 @@ public object TreeDecoration {
             chunk,
             random,
             position,
+            _,
             ->
             HugeMushroomFeature.place(chunk, random, position.x, position.y, position.z, kind)
         }
@@ -79,7 +84,7 @@ public object TreeDecoration {
             positions.flatMap {
                 HeightmapPlacement(Chunk.HeightmapType.OCEAN_FLOOR).getPositions(context, random, it)
             }
-        positions.forEach { pos -> pick(random)?.place(chunk, random, pos) }
+        positions.forEach { pos -> pick(random)?.place(chunk, random, pos, random) }
     }
 
     public fun single(
@@ -366,9 +371,10 @@ public object TreeDecoration {
         random: WorldgenRandom,
         origin: DecorationPos,
         placedFeature: String,
+        mossyCarpetRandom: BasaltRandom = random,
     ): Boolean {
         val selector = SELECTORS[placedFeature] ?: return false
-        pickSequence(random, selector.entries, selector.default)?.place(chunk, random, origin)
+        pickSequence(random, selector.entries, selector.default)?.place(chunk, random, origin, mossyCarpetRandom)
         return true
     }
 

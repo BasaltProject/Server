@@ -1,5 +1,6 @@
 package org.basaltmc.server.world.terrain.decoration.tree
 
+import org.basaltmc.server.random.BasaltRandom
 import org.basaltmc.server.random.BitRandom
 import org.basaltmc.server.random.PositionalRandomFactory
 import org.basaltmc.server.random.WorldgenRandom
@@ -7,6 +8,7 @@ import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.terrain.decoration.IntProvider
 import org.basaltmc.server.world.terrain.decoration.TreeDecoration
+import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -414,8 +416,37 @@ class TreeFeatureTest {
     }
 
     @Test
+    fun paleOakGroundCarpetsUseTheLevelRandomStream() {
+        var levelRandomCalls = 0
+        for (seed in 0L..255L) {
+            val chunk = chunkWithFlatGround(0)
+            for (x in 11 until 16) {
+                for (z in 0 until 16) chunk.setBlockStateId(x, 1, z, org.basaltmc.server.registry.Blocks.STONE.stateId)
+            }
+            val levelRandom = CountingRandom(XoroshiroRandom(seed xor 0x5EEDL))
+            if (!TreeFeature.place(
+                    chunk,
+                    WorldgenRandom(XoroshiroRandom(seed)),
+                    7,
+                    1,
+                    7,
+                    TreeConfigs.PALE_OAK,
+                    levelRandom,
+                )
+            ) {
+                continue
+            }
+            levelRandomCalls += levelRandom.booleanCalls
+            if (levelRandomCalls > 0) break
+        }
+
+        assertTrue(levelRandomCalls > 0, "expected nested MossyCarpetBlock placement to consume level random")
+    }
+
+    @Test
     fun creakingPaleOakCanReplaceASurroundedLogWithANaturalDormantHeart() {
         var hearts = 0
+        var heartChunk: Chunk? = null
         for (seed in 0L..255L) {
             val chunk = chunkWithFlatGround(0)
             assertTrue(
@@ -426,9 +457,45 @@ class TreeFeatureTest {
                     for (y in 1..20) if (chunk.getBlockStateId(x, y, z) == naturalDormantCreakingHeartState) hearts++
                 }
             }
-            if (hearts > 0) break
+            if (hearts > 0) {
+                heartChunk = chunk
+                break
+            }
         }
         assertTrue(hearts > 0, "expected at least one generated dark-oak shape to contain a valid heart position")
+        assertEquals(
+            Identifier.vanilla("creaking_heart"),
+            heartChunk
+                ?.blockEntities()
+                ?.single()
+                ?.type,
+        )
+    }
+
+    @Test
+    fun creakingHeartBlockEntityKeepsItsWorldPositionAcrossAChunkBorder() {
+        var externalHearts = emptyList<org.basaltmc.server.world.ChunkGeneratedBlockEntityWrite>()
+        for (seed in 0L..255L) {
+            val chunk = chunkWithFlatGround(0)
+            if (!TreeFeature.place(
+                    chunk,
+                    WorldgenRandom(XoroshiroRandom(seed)),
+                    15,
+                    1,
+                    7,
+                    TreeConfigs.PALE_OAK_CREAKING,
+                )
+            ) {
+                continue
+            }
+            externalHearts = chunk.takeGeneratedBlockEntityWrites()
+            if (externalHearts.isNotEmpty()) break
+        }
+
+        val heart = externalHearts.single()
+        assertTrue(heart.x >= 16)
+        assertEquals(naturalDormantCreakingHeartState, heart.expectedStateId)
+        assertEquals(Identifier.vanilla("creaking_heart"), heart.type)
     }
 
     @Test
@@ -847,6 +914,17 @@ class TreeFeatureTest {
     ): Boolean = stateId in defaultStateId - 27..defaultStateId
 
     private companion object {
+        private class CountingRandom(
+            private val delegate: BasaltRandom,
+        ) : BasaltRandom by delegate {
+            var booleanCalls: Int = 0
+
+            override fun nextBoolean(): Boolean {
+                booleanCalls++
+                return delegate.nextBoolean()
+            }
+        }
+
         private class ScriptedBitRandom(
             vararg values: Int,
         ) : BitRandom {
