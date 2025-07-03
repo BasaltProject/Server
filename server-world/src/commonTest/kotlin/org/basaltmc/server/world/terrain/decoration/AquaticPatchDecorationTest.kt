@@ -7,6 +7,7 @@ import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class AquaticPatchDecorationTest {
     @Test
@@ -25,6 +26,11 @@ class AquaticPatchDecorationTest {
 
             assertEquals(case.writes, trace.writes, "${case.name} writes")
             assertEquals(case.traceHash, trace.hash, "${case.name} trace")
+            val external = chunk.takeGeneratedBlockWrites()
+            assertTrue(
+                external.all { it.expectedStateId == Blocks.WATER.stateId },
+                "${case.name} expected source water",
+            )
             val vector = vector(chunk)
             assertContentEquals(case.counts, vector.counts, "${case.name} counts")
             assertEquals(case.categoryHash, vector.categoryHash, "${case.name} category hash")

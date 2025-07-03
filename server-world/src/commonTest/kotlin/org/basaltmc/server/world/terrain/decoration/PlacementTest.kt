@@ -6,6 +6,7 @@ import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkHeight
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class PlacementTest {
@@ -22,5 +23,21 @@ class PlacementTest {
                 DecorationPos(3, 200, 4),
             ),
         )
+    }
+
+    @Test
+    fun externalDecorationWritesKeepTheFirstObservedDeliveryGuard() {
+        val chunk = Chunk(0, 0)
+        val position = DecorationPos(16, 40, 4)
+        val featureView = HashMap<DecorationPos, Int>()
+        val neighbourState = { _: Int, _: Int, _: Int -> Blocks.GRASS_BLOCK.stateId }
+
+        setExternalDecorationBlockStateId(chunk, featureView, neighbourState, position, Blocks.PODZOL.stateId)
+        setExternalDecorationBlockStateId(chunk, featureView, neighbourState, position, Blocks.BAMBOO.stateId)
+
+        assertEquals(Blocks.BAMBOO.stateId, featureView[position])
+        val write = chunk.takeGeneratedBlockWrites().single()
+        assertEquals(Blocks.GRASS_BLOCK.stateId, write.expectedStateId)
+        assertEquals(Blocks.BAMBOO.stateId, write.stateId)
     }
 }

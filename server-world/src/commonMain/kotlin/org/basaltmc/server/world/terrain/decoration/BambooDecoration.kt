@@ -206,7 +206,7 @@ public object BambooDecoration {
                     localWorldSurfaceHeights[column] = position.y + 1
                 }
             } else {
-                externalWrites[position] = stateId
+                setExternalDecorationBlockStateId(chunk, externalWrites, externalBlockState, position, stateId)
                 val column = position.x to position.z
                 val currentHeight =
                     externalWorldSurfaceHeights[column] ?: scanExternalWorldSurface(position.x, position.z)

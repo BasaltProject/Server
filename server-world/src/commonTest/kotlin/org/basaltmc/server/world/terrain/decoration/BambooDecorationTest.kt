@@ -34,6 +34,8 @@ class BambooDecorationTest {
 
         assertEquals(637, writes)
         assertEquals(-6031861822473765261L, traceHash)
+        val external = chunk.takeGeneratedBlockWrites()
+        assertTrue(external.isNotEmpty())
         val vector = vector(chunk)
         assertContentEquals(intArrayOf(26624, 185, 71, 70948, 476), vector.counts)
         assertEquals(-7585828635518356498L, vector.categoryHash)

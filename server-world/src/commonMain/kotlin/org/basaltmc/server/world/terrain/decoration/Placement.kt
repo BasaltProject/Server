@@ -14,6 +14,31 @@ public data class DecorationPos(
     val z: Int,
 )
 
+/**
+ * Records an accepted write outside [chunk] both in the feature-local view and in the chunk's
+ * deferred cross-chunk pipeline. The first state observed in the neighbouring terrain is kept as
+ * the delivery guard, while later writes to the same position may continue building on each other.
+ */
+internal fun setExternalDecorationBlockStateId(
+    chunk: Chunk,
+    externalWrites: MutableMap<DecorationPos, Int>,
+    externalBlockState: ((x: Int, y: Int, z: Int) -> Int?)?,
+    position: DecorationPos,
+    stateId: Int,
+) {
+    val expectedStateId =
+        externalWrites[position] ?: externalBlockState?.invoke(position.x, position.y, position.z)
+            ?: Blocks.AIR.stateId
+    externalWrites[position] = stateId
+    chunk.setDecorationBlockStateId(
+        position.x,
+        position.y,
+        position.z,
+        stateId,
+        expectedExternalStateId = expectedStateId,
+    )
+}
+
 /** // parity: net.minecraft.world.level.levelgen.placement.PlacementContext, narrowed to chunk heightmaps. */
 public class PlacementContext(
     public val chunk: Chunk,

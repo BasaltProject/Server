@@ -25,7 +25,7 @@ public object WaterlilyPatchDecoration {
         repeat(4) {
             val x = chunk.chunkX * 16 + random.nextInt(16)
             val z = chunk.chunkZ * 16 + random.nextInt(16)
-            val y = context.height(x and 15, z and 15, Chunk.HeightmapType.MOTION_BLOCKING)
+            val y = context.height(x and 15, z and 15, Chunk.HeightmapType.WORLD_SURFACE)
             if (environment.biomeAt(x, y, z).substringAfter(':') !in BIOMES) return@repeat
             val origin = DecorationPos(x, y, z)
             repeat(10) {
@@ -87,6 +87,7 @@ public object WaterlilyPatchDecoration {
                 chunk.setBlockStateId(position.x and 15, position.y, position.z and 15, stateId)
             } else {
                 externalWrites[position] = stateId
+                chunk.setDecorationBlockStateId(position.x, position.y, position.z, stateId)
             }
             blockWriteObserver?.invoke(position.x, position.y, position.z, stateId)
         }
