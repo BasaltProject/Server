@@ -37,6 +37,9 @@ public data class FoliageAttachment(
 )
 
 public sealed interface FeatureSize {
+    public val minClippedHeight: Int?
+        get() = null
+
     public fun getSizeAtHeight(
         treeHeight: Int,
         yo: Int,
@@ -48,6 +51,7 @@ public class FeatureSizeTwoLayers(
     private val limit: Int,
     private val lowerSize: Int,
     private val upperSize: Int,
+    override val minClippedHeight: Int? = null,
 ) : FeatureSize {
     override fun getSizeAtHeight(
         treeHeight: Int,
@@ -155,7 +159,7 @@ public sealed class TrunkPlacer(
     ): Boolean {
         if (y < WorldHeight.MIN_Y || y > WorldHeight.MAX_Y) return false
         val stateId = chunk.getDecorationBlockStateId(x, y, z)
-        return Blocks.isAir(stateId) || stateId in leafStateIds
+        return Blocks.isAir(stateId) || Blocks.byStateId(stateId)?.block?.path in leafBlockPaths
     }
 
     private companion object {
@@ -170,8 +174,8 @@ public sealed class TrunkPlacer(
                 "pale_moss_block",
                 "podzol",
             )
-        val leafStateIds: Set<Int> by lazy {
-            listOf(
+        val leafBlockPaths: Set<String> =
+            setOf(
                 "oak_leaves",
                 "birch_leaves",
                 "spruce_leaves",
@@ -183,14 +187,7 @@ public sealed class TrunkPlacer(
                 "cherry_leaves",
                 "azalea_leaves",
                 "flowering_azalea_leaves",
-            ).mapNotNull {
-                Blocks.REGISTRY
-                    .byIdentifier(
-                        org.basaltmc.wire.common.Identifier
-                            .vanilla(it),
-                    )?.stateId
-            }.toSet()
-        }
+            )
     }
 }
 
@@ -505,9 +502,9 @@ public class ForkingTrunkPlacer(
                     tx += branchDirection.first
                     tz += branchDirection.second
                     if (placeLog(chunk, tx, yy, tz, trunkStateId)) ey = yy + 1
-                    branchSteps--
                 }
                 yo++
+                branchSteps--
             }
             if (ey != Int.MIN_VALUE) attachments.add(FoliageAttachment(tx, ey, tz, 0, false))
         }
@@ -1051,7 +1048,7 @@ public class MangroveRootPlacer(
         val current = chunk.getDecorationBlockStateId(x, y, z)
         // parity: MangroveRootPlacer.placeRoot: mud/muddy roots become muddy_mangrove_roots
         // regardless of canPlaceRoot; everything else goes through the real RootPlacer.placeRoot.
-        if (current == mudStateId || current == muddyMangroveRootsStateId) {
+        if (Blocks.byStateId(current)?.block?.path in muddyRootsInPaths) {
             chunk.setDecorationBlockStateId(x, y, z, potentiallyWaterlogged(muddyMangroveRootsStateId, current))
         } else if (canPlaceRoot(chunk, x, y, z)) {
             chunk.setDecorationBlockStateId(x, y, z, potentiallyWaterlogged(mangroveRootsStateId, current))
@@ -1092,7 +1089,6 @@ public class MangroveRootPlacer(
                 )?.stateId
                 ?: error("unknown block '$name'")
 
-        val mudStateId = state("mud")
         val muddyMangroveRootsStateId = state("muddy_mangrove_roots")
         val mangroveRootsStateId = state("mangrove_roots")
         val mossCarpetStateId = state("moss_carpet")
@@ -1100,6 +1096,7 @@ public class MangroveRootPlacer(
         // parity: block tag mangrove_roots_can_grow_through.
         val canGrowThroughPaths: Set<String> =
             setOf("mud", "muddy_mangrove_roots", "mangrove_roots", "moss_carpet", "vine", "mangrove_propagule", "snow")
+        val muddyRootsInPaths: Set<String> = setOf("mud", "muddy_mangrove_roots")
     }
 }
 
@@ -2089,7 +2086,12 @@ public object TreeFeature {
         if (minY < WorldHeight.MIN_Y + 1 || maxY > WorldHeight.MAX_Y + 1) return false
 
         val clippedTreeHeight = maxFreeTreeHeight(chunk, treeHeight, originX, trunkOriginY, originZ, config)
-        if (clippedTreeHeight < treeHeight) return false
+        val minClippedHeight = config.minimumSize.minClippedHeight
+        if (clippedTreeHeight < treeHeight &&
+            (minClippedHeight == null || clippedTreeHeight < minClippedHeight)
+        ) {
+            return false
+        }
         val recorder = TreePlacementRecorder(chunk)
         val generated =
             chunk.observeBlockWrites(recorder::record) {
@@ -2607,7 +2609,7 @@ public object TreeFeature {
             val cursorY = y + dy
             if (cursorY !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) continue
             val stateId = chunk.getDecorationBlockStateId(x, cursorY, z)
-            if (stateId in beneathTreePodzolReplaceable) {
+            if (Blocks.byStateId(stateId)?.block?.path in beneathTreePodzolReplaceablePaths) {
                 chunk.setDecorationBlockStateId(x, cursorY, z, Blocks.PODZOL.stateId)
                 return
             }
@@ -2697,8 +2699,8 @@ public object TreeFeature {
             javaHashSetOrder(positions.toList()).toList().sortedBy(BlockPos::y)
     }
 
-    private val beneathTreePodzolReplaceable: Set<Int> =
-        listOf(
+    private val beneathTreePodzolReplaceablePaths: Set<String> =
+        setOf(
             "dirt",
             "coarse_dirt",
             "rooted_dirt",
@@ -2709,13 +2711,7 @@ public object TreeFeature {
             "grass_block",
             "podzol",
             "mycelium",
-        ).mapNotNull {
-            Blocks.REGISTRY
-                .byIdentifier(
-                    org.basaltmc.wire.common.Identifier
-                        .vanilla(it),
-                )?.stateId
-        }.toSet()
+        )
 
     private val TRUNK_VINES =
         listOf(
@@ -2912,7 +2908,7 @@ private fun tryPlaceLeaf(
         val current = chunk.getDecorationBlockStateId(x, y, z)
         val selected = Blocks.byStateId(foliageStateId)
         val placedStateId =
-            if (selected?.properties?.containsKey("waterlogged") == true && Blocks.hasWaterFluid(current)) {
+            if (selected?.properties?.containsKey("waterlogged") == true && hasSourceWaterFluid(current)) {
                 Blocks.stateIdOf(selected.block, selected.properties + ("waterlogged" to "true")) ?: foliageStateId
             } else {
                 foliageStateId
@@ -2922,6 +2918,10 @@ private fun tryPlaceLeaf(
     }
     return false
 }
+
+/** // parity: FluidState.isSourceOfType(WATER), unlike RootPlacer's any-water-fluid check. */
+private fun hasSourceWaterFluid(stateId: Int): Boolean =
+    Blocks.hasWaterFluid(stateId) && stateId !in Blocks.WATER.stateId + 1..Blocks.WATER.stateId + 15
 
 private fun canPlaceLeaf(
     chunk: Chunk,

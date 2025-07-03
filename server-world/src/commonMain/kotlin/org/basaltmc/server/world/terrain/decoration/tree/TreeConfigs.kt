@@ -101,7 +101,7 @@ public object TreeConfigs {
             FancyTrunkPlacer(3, 11, 0),
             OAK_LEAVES,
             FancyFoliagePlacer(IntProvider.of(2), IntProvider.of(4), 4),
-            FeatureSizeTwoLayers(0, 0, 0),
+            FeatureSizeTwoLayers(0, 0, 0, minClippedHeight = 4),
         )
 
     // parity: TreeFeatures.createJungleTree/createStraightBlobTree(JUNGLE_LOG, JUNGLE_LEAVES, 4, 8, 0, 2).
