@@ -1,6 +1,7 @@
 package org.basaltmc.server.assets
 
 import org.basaltmc.wire.io.FileIO
+import org.basaltmc.wire.io.ZipReader
 import org.basaltmc.wire.text.LangTable
 
 /**

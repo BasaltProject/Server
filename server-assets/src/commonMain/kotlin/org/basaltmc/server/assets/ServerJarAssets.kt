@@ -3,6 +3,7 @@ package org.basaltmc.server.assets
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.common.logging.Logger
 import org.basaltmc.wire.io.FileIO
+import org.basaltmc.wire.io.ZipReader
 
 /**
  * The official server's `data/minecraft/...` entries and its language files, unpacked into
