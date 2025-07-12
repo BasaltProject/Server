@@ -1,0 +1,43 @@
+-- What plugins keep about players, one namespace each.
+--
+-- Its own table rather than columns on `player`, and keyed by the plugin's id: a plugin can only
+-- ever see rows with its own id in them, so two of them cannot read or overwrite each other by
+-- accident, and neither can touch the columns the server itself depends on. Uninstalling a plugin
+-- leaves its rows here on purpose (reinstalling it tomorrow has to find them), which is what the
+-- orphan warning at startup is about.
+CREATE TABLE plugin_data (
+    plugin TEXT NOT NULL,
+    uuid TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    PRIMARY KEY (plugin, uuid, key)
+);
+
+CREATE INDEX plugin_data_by_plugin ON plugin_data(plugin);
+
+selectValue:
+SELECT value FROM plugin_data WHERE plugin = ? AND uuid = ? AND key = ?;
+
+selectAllOf:
+SELECT key, value FROM plugin_data WHERE plugin = ? AND uuid = ?;
+
+setValue:
+INSERT OR REPLACE INTO plugin_data(plugin, uuid, key, value) VALUES (?, ?, ?, ?);
+
+deleteValue:
+DELETE FROM plugin_data WHERE plugin = ? AND uuid = ? AND key = ?;
+
+-- The top ten of something, which is the query a JSON file cannot answer.
+selectTop:
+SELECT uuid, value FROM plugin_data
+WHERE plugin = ? AND key = ?
+ORDER BY CAST(value AS REAL) DESC
+LIMIT ?;
+
+-- Which plugins have data here, for the orphan check at startup.
+selectPlugins:
+SELECT plugin, COUNT(*) AS rows FROM plugin_data GROUP BY plugin;
+
+-- What `/plugins purge` removes, and nothing else does.
+deletePlugin:
+DELETE FROM plugin_data WHERE plugin = ?;
