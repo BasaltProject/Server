@@ -137,10 +137,15 @@ public object EndVegetalDecoration {
             stateId: Int,
         ) {
             if (position.y !in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) return
+            val expectedStateId = stateAt(position)
             outsideWrites[position] = stateId
-            if (position.x.floorDiv(16) == chunk.chunkX && position.z.floorDiv(16) == chunk.chunkZ) {
-                chunk.setBlockStateId(position.x and 15, position.y, position.z and 15, stateId)
-            }
+            chunk.setDecorationBlockStateId(
+                position.x,
+                position.y,
+                position.z,
+                stateId,
+                expectedExternalStateId = expectedStateId,
+            )
         }
 
         private fun stateAt(position: EndPos): Int {

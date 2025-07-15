@@ -142,12 +142,12 @@ public object NetherVegetalDecoration {
         z: Int,
     ) {
         if (!isSpringRock(chunk, x, y + 1, z) || !isSpringRock(chunk, x, y - 1, z)) return
-        val current = stateAt(chunk, x, y, z) ?: return
+        val current = terrainStateAt(chunk, x, y, z) ?: return
         if (!Blocks.isAir(current) && !isSpringRock(chunk, x, y, z)) return
         var rocks = 0
         var holes = 0
         for ((offsetX, offsetY, offsetZ) in SPRING_NEIGHBOURS) {
-            val state = stateAt(chunk, x + offsetX, y + offsetY, z + offsetZ)
+            val state = terrainStateAt(chunk, x + offsetX, y + offsetY, z + offsetZ)
             if (state != null && blockPath(state) in OVERWORLD_SPRING_ROCKS) rocks++
             if (state != null && Blocks.isAir(state)) holes++
         }
@@ -596,9 +596,9 @@ public object NetherVegetalDecoration {
         x: Int,
         y: Int,
         z: Int,
-    ): Boolean = blockPathAt(chunk, x, y, z) in OVERWORLD_SPRING_ROCKS
+    ): Boolean = terrainStateAt(chunk, x, y, z)?.let(::blockPath) in OVERWORLD_SPRING_ROCKS
 
-    private fun stateAt(
+    private fun terrainStateAt(
         chunk: Chunk,
         x: Int,
         y: Int,
@@ -606,6 +606,18 @@ public object NetherVegetalDecoration {
     ): Int? =
         if (isInChunk(chunk, x, z) && y in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) {
             chunk.getBlockStateId(x and 15, y, z and 15)
+        } else {
+            null
+        }
+
+    private fun stateAt(
+        chunk: Chunk,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Int? =
+        if (y in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) {
+            chunk.getDecorationBlockStateId(x, y, z)
         } else {
             null
         }
@@ -633,8 +645,8 @@ public object NetherVegetalDecoration {
         z: Int,
         stateId: Int,
     ) {
-        if (isInChunk(chunk, x, z) && y in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) {
-            chunk.setBlockStateId(x and 15, y, z and 15, stateId)
+        if (y in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) {
+            chunk.setDecorationBlockStateId(x, y, z, stateId)
         }
     }
 

@@ -1,5 +1,7 @@
 package org.basaltmc.server.world.terrain.decoration.nether
 
+import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkHeight
@@ -100,6 +102,50 @@ class NetherVegetalDecorationTest {
         assertTrue(count(weeping, "weeping_vines_plant") > 0)
         assertTrue(hasAgedState(twisting, "twisting_vines"))
         assertTrue(hasAgedState(weeping, "weeping_vines"))
+    }
+
+    @Test
+    fun hugeFungusCrossingChunkEdgeKeepsWorldCoordinates() {
+        val chunk = floorChunk("crimson_nylium")
+
+        assertTrue(
+            NetherVegetalDecoration.placeAt(
+                chunk,
+                WorldgenRandom(XoroshiroRandom(0L)),
+                15,
+                41,
+                8,
+                "crimson_fungi",
+            ),
+        )
+
+        val external = chunk.takeGeneratedBlockWrites()
+        assertTrue(external.any { it.x >= 16 }, "expected the fungus hat to continue into the east chunk")
+        assertTrue(external.all { it.expectedStateId == Blocks.AIR.stateId })
+    }
+
+    @Test
+    fun lavaSpringDoesNotTreatUnknownNeighbourTerrainAsAir() {
+        val chunk = Chunk(0, 0, ChunkHeight.NETHER)
+        val y = 64
+        chunk.setBlockStateId(15, y + 1, 8, Blocks.STONE.stateId)
+        chunk.setBlockStateId(15, y - 1, 8, Blocks.STONE.stateId)
+        chunk.setBlockStateId(14, y, 8, Blocks.STONE.stateId)
+        chunk.setBlockStateId(15, y, 7, Blocks.STONE.stateId)
+        chunk.setBlockStateId(15, y, 9, Blocks.STONE.stateId)
+
+        assertTrue(
+            NetherVegetalDecoration.placeAt(
+                chunk,
+                WorldgenRandom(XoroshiroRandom(0L)),
+                15,
+                y,
+                8,
+                "spring_lava_nether",
+            ),
+        )
+
+        assertEquals(Blocks.AIR.stateId, chunk.getBlockStateId(15, y, 8))
     }
 
     private fun generatedChunk(

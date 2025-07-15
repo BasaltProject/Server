@@ -1,5 +1,7 @@
 package org.basaltmc.server.world.terrain.decoration.end
 
+import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkHeight
@@ -9,6 +11,7 @@ import org.basaltmc.server.world.terrain.EndNoiseRouter
 import org.basaltmc.server.world.terrain.TheEndBiomeSource
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class EndVegetalDecorationTest {
     @Test
@@ -55,6 +58,26 @@ class EndVegetalDecorationTest {
         EndVegetalDecoration.decorate(chunk, 0L, router, TheEndBiomeSource(router.erosion))
 
         assertEquals(0, count(chunk, "chorus_plant") + count(chunk, "chorus_flower"))
+    }
+
+    @Test
+    fun chorusPlantCrossingChunkEdgeKeepsWorldCoordinates() {
+        val router = EndNoiseRouter(ConstantDensity(-1.0), ConstantDensity(-1.0))
+        val chunk = flatEndStoneChunk(0, 0)
+        assertTrue(
+            EndVegetalDecoration.placeAt(
+                chunk,
+                WorldgenRandom(XoroshiroRandom(0L)),
+                router,
+                15,
+                65,
+                8,
+            ),
+        )
+        val crossingWrites = chunk.takeGeneratedBlockWrites()
+
+        assertTrue(crossingWrites.any { it.x >= 16 }, "expected chorus to continue into the east chunk")
+        assertTrue(crossingWrites.all { it.expectedStateId == Blocks.AIR.stateId })
     }
 
     private fun flatEndStoneChunk(
