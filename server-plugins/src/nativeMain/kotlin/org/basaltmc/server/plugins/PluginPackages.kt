@@ -71,7 +71,12 @@ public class PluginLoadException(
  * guessing which one the operator meant is how a server ends up running last week's code.
  */
 public fun discoverPackages(directory: String): List<PluginPackage> {
-    if (!FileIO.directoryExists(directory)) return emptyList()
+    if (!FileIO.directoryExists(directory)) {
+        // Made even when empty: an operator who sees no folder concludes the server has no plugins,
+        // and the folder is the whole instruction for how to install one.
+        FileIO.createDirectories(directory)
+        return emptyList()
+    }
     val found = mutableListOf<PluginPackage>()
     for (name in FileIO.list(directory).sorted()) {
         val path = "$directory/$name"

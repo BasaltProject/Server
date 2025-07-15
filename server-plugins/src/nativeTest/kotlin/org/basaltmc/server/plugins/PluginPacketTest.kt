@@ -16,7 +16,11 @@ import kotlin.test.assertTrue
 class PluginPacketTest {
     private val root = "build/test-data/packets-${nextId()}"
     private val services = TestServices(root)
-    private val host = PluginHost(services)
+    private val host =
+        PluginHost(services).also {
+            // The operator said yes, which is the case these tests are about.
+            it.allowed = { setOf(PluginPermission.PACKETS) }
+        }
     private val casey = TestPlayer("Casey").also { services.players.list += it }
 
     @AfterTest

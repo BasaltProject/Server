@@ -47,6 +47,15 @@ public data class BasaltConfig(
     public val pluginInstructionsPerTurn: Long = 250_000,
     /** The most memory one plugin's own objects may take. */
     public val pluginMemoryBytes: Long = 32L * 1024 * 1024,
+    /**
+     * What each plugin is allowed beyond its own sandbox, by id.
+     *
+     * Empty for almost every server: only `packets`, `network` and `commands` are asked for here,
+     * and a plugin that wants one and is not listed loads without it and says so.
+     */
+    public val pluginAllowances: Map<String, Set<String>> = emptyMap(),
+    /** Whether orphaned plugin data is reported at startup: `warn` or `quiet`. */
+    public val orphanData: String = "warn",
     /** How many copies of each plugin run. One on a server; more is a development switch. */
     public val pluginLanes: Int = 1,
 ) {
@@ -146,6 +155,13 @@ public data class BasaltConfig(
                     (plugins?.intOrNull("memory-mb") ?: (DEFAULT.pluginMemoryBytes / 1024 / 1024))
                         .coerceAtLeast(1L) * 1024 * 1024,
                 pluginLanes = (plugins?.intOrNull("test-lanes") ?: 1L).toInt().coerceAtLeast(1),
+                pluginAllowances =
+                    plugins
+                        ?.tableOrNull("allow")
+                        ?.let { allow ->
+                            allow.keys().associateWith { id -> allow.stringListOrNull(id).orEmpty().toSet() }
+                        }.orEmpty(),
+                orphanData = plugins?.stringOrNull("orphan-data") ?: DEFAULT.orphanData,
             )
         }
 

@@ -48,6 +48,9 @@ public interface PluginCommands {
         spec: PluginCommandSpec,
         run: (PluginCommandCall) -> Unit,
     ): PluginHandle
+
+    /** Runs one as the console, for a plugin the operator granted `commands`. Answers whether it ran. */
+    public fun runAsConsole(command: String): Boolean
 }
 
 /**
@@ -98,6 +101,17 @@ public interface PluginStorage {
         key: String,
         limit: Int,
     ): List<Pair<String, String>>
+
+    /**
+     * Which plugins have rows here and how many, for the orphan check at startup.
+     *
+     * Not part of what a plugin can call: this is the server looking at its own database, and it
+     * names every plugin, which is exactly what no plugin may see.
+     */
+    public fun namespaces(): Map<String, Long> = emptyMap()
+
+    /** Deletes everything one plugin kept. Only `/plugins purge` calls this, and only when asked. */
+    public fun purge(pluginId: String): Long = 0
 }
 
 /** Everything the host borrows from the server. The server implements it; the host never reaches back. */

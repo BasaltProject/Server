@@ -119,6 +119,15 @@ public class PluginHost(
     public val packets: PluginPacketRegistry =
         PluginPacketRegistry { plugin, fn, packet -> deliverPacket(plugin, fn, packet) }
 
+    /**
+     * What the operator has allowed each plugin beyond its own sandbox.
+     *
+     * Asked for in the manifest and granted here, never the other way around: a plugin cannot talk
+     * its way into one at runtime, and one it asked for and did not get is said once at load rather
+     * than failing later in a way that reads like a bug.
+     */
+    public var allowed: (String) -> Set<PluginPermission> = { emptySet() }
+
     /** Who is listening on which channel, by channel name. */
     private val channels = LinkedHashMap<String, MutableList<Announcement>>()
 
@@ -246,6 +255,61 @@ public class PluginHost(
     }
 
     /**
+     * Whoever is inside a plugin right now, and since when.
+     *
+     * Written by the thread that runs plugins and read by the watchdog on another, which is why it
+     * is two atomics and not a data class: nobody has to see them agree.
+     */
+    private val runningPlugin = kotlin.concurrent.AtomicReference<String?>(null)
+    private val runningSince = kotlin.concurrent.AtomicLong(0)
+
+    /** Marked once, so the two threads are reading the same rising number. */
+    private val clock =
+        kotlin.time.TimeSource.Monotonic
+            .markNow()
+
+    /**
+     * Where a plugin's time is recorded, so `/timings` names it beside the server's own work.
+     *
+     * A plugin that costs a millisecond a tick should be as visible as the chunk loader, and by the
+     * plugin's own id: that is the whole difference between "the server is laggy" and "arena is".
+     */
+    public var timings: org.basaltmc.wire.common.timings.Timings? = null
+
+    private fun nowMillis(): Long = clock.elapsedNow().inWholeMilliseconds
+
+    /** Marks a plugin as the one running, for as long as [body] takes. */
+    internal fun <T> watched(
+        plugin: LoadedPlugin,
+        body: () -> T,
+    ): T {
+        runningPlugin.value = plugin.manifest.id
+        runningSince.value = nowMillis()
+        val startedAt = clock.elapsedNow().inWholeNanoseconds
+        return try {
+            body()
+        } finally {
+            runningPlugin.value = null
+        }
+    }
+
+    /**
+     * Cuts off a plugin that has been inside the server for longer than [limitMillis].
+     *
+     * The instruction ceiling catches one spinning in Lua; this catches one stuck in something the
+     * host is doing for it, which the counter never sees. Answers who was cut off, so the caller
+     * can say it out loud: a plugin cannot lag the server without the server naming it.
+     */
+    public fun interruptIfStuck(limitMillis: Long): String? {
+        val who = runningPlugin.value ?: return null
+        if (nowMillis() - runningSince.value < limitMillis) return null
+        runningPlugin.value = null
+        plugins[who]?.log?.error { "was still inside the server after ${limitMillis}ms and was cut off" }
+        interruptAll()
+        return who
+    }
+
+    /**
      * Stops whatever plugin code is running right now.
      *
      * Meant for a watchdog on another thread: the instruction ceiling catches a plugin spinning in
@@ -280,6 +344,20 @@ public class PluginHost(
                 return false
             }
         val plugin = LoadedPlugin(manifest, pkg, log, config, folderPath, files)
+
+        // Said once, at load, and not at the first call: a plugin that asked for something it did
+        // not get should be visible to the operator before it misbehaves, and the plugin itself
+        // simply does not get the global.
+        val granted = allowed(manifest.id)
+        val missing = manifest.capabilities.asks() - granted
+        if (missing.isNotEmpty()) {
+            log.warn {
+                "${manifest.id} asks for ${missing.joinToString(", ") { it.permissionName }} and the " +
+                    "operator has not granted it. Add ${manifest.id} = " +
+                    "[${missing.joinToString(", ") { "\"${it.permissionName}\"" }}] under [plugins.allow] " +
+                    "in config/server.toml to allow it."
+            }
+        }
 
         // Compiled once and bound into each lane: a prototype is finished code and shared safely,
         // and it is the compile that costs, not the libraries.
@@ -336,6 +414,30 @@ public class PluginHost(
             sources = { name -> moduleSource(plugin, name) },
             printLine = { line -> plugin.log.info { line } },
         )
+
+    /**
+     * The data of plugins that are no longer installed.
+     *
+     * Deleting it would be losing somebody's work because a folder was moved for an afternoon, so
+     * this only reports. Reinstalling the plugin tomorrow has to give it all back intact.
+     */
+    public fun orphanedData(): Map<String, Long> {
+        val installed = plugins.keys
+        return services.storage.namespaces().filterKeys { it !in installed }
+    }
+
+    /**
+     * Deletes what one uninstalled plugin kept, and answers how many rows went.
+     *
+     * Refuses while the plugin is loaded, because purging under a running plugin is deleting what it
+     * is still using. Null is that refusal.
+     */
+    public fun purge(pluginId: String): Long? {
+        if (pluginId in plugins) return null
+        val rows = services.storage.purge(pluginId)
+        log.warn { "purged $rows row(s) of '$pluginId'" }
+        return rows
+    }
 
     /**
      * Where `require` looks: this plugin's own `src/`, then another plugin's exported modules.
@@ -485,10 +587,13 @@ public class PluginHost(
             return
         }
         instance.deciderDepth++
+        val startedAt = clock.elapsedNow().inWholeNanoseconds
         try {
             enter(plugin, instance, handler, "on ${event.type.name}", Lua.varargs(view))
         } finally {
             instance.deciderDepth--
+            runningPlugin.value = null
+            timings?.of("plugin.${plugin.manifest.id}")?.record(clock.elapsedNow().inWholeNanoseconds - startedAt)
         }
     }
 
@@ -662,6 +767,9 @@ public class PluginHost(
         if (plugin.disabled) return
         instance.sandbox.refill()
         instance.deciderDepth++
+        runningPlugin.value = plugin.manifest.id
+        runningSince.value = nowMillis()
+        val startedAt = clock.elapsedNow().inWholeNanoseconds
         try {
             val event = Lua.table()
             event.set("player", playerObject(player, services.storage, plugin.manifest.id, plugin.text))
@@ -677,6 +785,8 @@ public class PluginHost(
             )
         } finally {
             instance.deciderDepth--
+            runningPlugin.value = null
+            timings?.of("plugin.${plugin.manifest.id}")?.record(clock.elapsedNow().inWholeNanoseconds - startedAt)
         }
     }
 
@@ -752,6 +862,9 @@ public class PluginHost(
         if (plugin.disabled) return
         instance.sandbox.refill()
         instance.deciderDepth++
+        runningPlugin.value = plugin.manifest.id
+        runningSince.value = nowMillis()
+        val startedAt = clock.elapsedNow().inWholeNanoseconds
         try {
             fn.call(PluginPacketView(packet, services.players, this, plugin).table)
             plugin.strikes = 0
@@ -764,6 +877,8 @@ public class PluginHost(
             )
         } finally {
             instance.deciderDepth--
+            runningPlugin.value = null
+            timings?.of("plugin.${plugin.manifest.id}")?.record(clock.elapsedNow().inWholeNanoseconds - startedAt)
         }
     }
 
@@ -791,6 +906,9 @@ public class PluginHost(
         if (plugin.disabled) return null
         instance.sandbox.refill()
         instance.deciderDepth++
+        runningPlugin.value = plugin.manifest.id
+        runningSince.value = nowMillis()
+        val startedAt = clock.elapsedNow().inWholeNanoseconds
         return try {
             val argument =
                 player?.let { playerObject(it, services.storage, plugin.manifest.id, plugin.text) } ?: Lua.NIL
@@ -807,6 +925,8 @@ public class PluginHost(
             null
         } finally {
             instance.deciderDepth--
+            runningPlugin.value = null
+            timings?.of("plugin.${plugin.manifest.id}")?.record(clock.elapsedNow().inWholeNanoseconds - startedAt)
         }
     }
 
@@ -887,6 +1007,10 @@ public class PluginHost(
         val copied = PluginValues.arguments(args)
         instance.sandbox.refill()
         instance.deciderDepth++
+        // The work is the provider's, so it is the provider the watchdog would name.
+        runningPlugin.value = provider.manifest.id
+        runningSince.value = nowMillis()
+        val startedAt = clock.elapsedNow().inWholeNanoseconds
         return try {
             val inside = copied.map { PluginValues.into(it, this, provider) }
             val answered =
@@ -908,6 +1032,10 @@ public class PluginHost(
             throw net.blueva.luak.LuaError("the service failed inside ${provider.manifest.id}: ${e.message}")
         } finally {
             instance.deciderDepth--
+            runningPlugin.value = null
+            timings
+                ?.of("plugin.${provider.manifest.id}")
+                ?.record(clock.elapsedNow().inWholeNanoseconds - startedAt)
         }
     }
 

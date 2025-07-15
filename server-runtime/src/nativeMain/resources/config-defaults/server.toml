@@ -47,32 +47,30 @@ regional = false
 region-threads = "auto"
 
 [plugins]
-# Whether the plugins folder is looked at at all. Off is off: nothing is loaded and
-# nothing is compiled.
+# Whether the plugins folder is looked at. Off means nothing is loaded or compiled.
 enabled = true
 
-# What one plugin may run in a single turn, in Lua instructions.
-#
-# It is refilled every time the server enters the plugin, so this is not a budget for
-# the whole tick: it is the most one handler, one command or one timer may run before
-# the server takes its turn back. Going over it is an ordinary Lua error with the
-# plugin's own line in it, and the server carries on.
-#
-# The default is measured rather than guessed: this interpreter runs roughly 18,500
-# instructions a millisecond, so 250,000 is about 13ms, a quarter of a tick.
+# What one plugin may run in a single turn, in Lua instructions. Refilled on every entry,
+# so it caps one handler and not the whole tick. Measured: 250,000 is about 13ms here.
 instructions-per-turn = 250000
 
 # The most memory one plugin's own objects may take, in megabytes.
 memory-mb = 32
 
-# How many copies of each plugin run at once.
-#
-# One is what a server runs, and what you want. More is a development switch: with
-# two, a plugin that quietly assumed there was only one of it starts failing here, on
-# your machine, instead of on somebody's server the day they turn regions on. Each
-# copy has its own variables, its own timers and its own everything except what it
-# deliberately shares.
+# How many copies of each plugin run at once. One is what a server wants; more is a
+# development switch that makes a plugin assuming there is only one of it fail here.
 test-lanes = 1
+
+# The data of a plugin that is no longer installed: "warn" names it at every startup,
+# "quiet" stops asking. Nothing is ever deleted on its own: /plugins purge does that.
+orphan-data = "warn"
+
+# What each plugin may reach beyond its own sandbox: "packets" sees everyone's chat,
+# "network" talks past the client, "commands" runs as the console. A plugin that asks for
+# one and is not listed here loads without it and says so. Entries go below the header.
+[plugins.allow]
+# arena = ["packets"]
+# lobby = ["network", "commands"]
 
 [logging]
 # One of: trace, debug, info, warn, error.

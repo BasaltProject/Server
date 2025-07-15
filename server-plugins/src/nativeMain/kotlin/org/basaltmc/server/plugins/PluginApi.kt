@@ -46,9 +46,21 @@ internal object PluginApi {
         globals.set("data", dataTable(plugin))
         globals.set("emit", emit(host))
         globals.set("menu", menu(host, plugin))
-        globals.set("channel", channel(host, plugin))
-        // Only where the manifest asked for it: watching packets is watching everyone's chat.
-        if (plugin.manifest.capabilities.packets) globals.set("packet", packets(host, plugin))
+        // Asked for in the manifest and granted by the operator. Missing either way, the global is
+        // not there at all: a plugin cannot test for one and talk its way around it.
+        val granted = host.allowed(plugin.manifest.id)
+        if (plugin.manifest.capabilities.packets && PluginPermission.PACKETS in granted) {
+            globals.set("packet", packets(host, plugin))
+        }
+        if (plugin.manifest.capabilities.network
+                .isNotEmpty() &&
+            PluginPermission.NETWORK in granted
+        ) {
+            globals.set("channel", channel(host, plugin))
+        }
+        if (plugin.manifest.capabilities.commands && PluginPermission.COMMANDS in granted) {
+            globals.set("run", runCommand(host, plugin))
+        }
         for (surface in PluginSurface.entries) {
             globals.set(surface.surfaceName, claim(host, plugin, surface))
         }
@@ -272,13 +284,11 @@ internal object PluginApi {
     /**
      * `on(event, [opts], fn)` and `watch(event, [opts], fn)`.
      *
-     * The two lifecycle names stay on `on`, because they are about this plugin rather than about
-     * something that happened in the world, and there is nothing to cancel or to watch.
+     * The two lifecycle names stay on `on`: they are about this plugin, not about the world.
      *
-     * `opts` is a table and everything in it is optional: `priority` (first, early, normal, late,
-     * last), `cancelled = true` to be told about events another handler already stopped, and any
-     * other key is a filter on a field of the event. That last one is what saves every handler in
-     * the world from opening with the same `if`.
+     * Everything in `opts` is optional: `priority`, `cancelled = true` to be told about events
+     * another handler stopped, and any other key filters on a field of the event, which is what
+     * saves every handler from opening with the same `if`.
      */
     private fun listener(
         host: PluginHost,
@@ -403,6 +413,7 @@ internal object PluginApi {
         plugin: LoadedPlugin,
     ): LuaTable {
         val clicked = { fn: LuaValue, uuid: String -> host.npcClicked(plugin, fn, uuid) }
+        val resolve = { written: String -> plugin.text.resolve(written, Lua.NIL) }
         // `worlds.create{ name = "arena", dimension = "overworld", type = "flat", seed = 1 }`.
         val make =
             HostFunction("worlds.create") { args ->
@@ -417,7 +428,7 @@ internal object PluginApi {
                         options.field("dimension").takeIf { it.isstring() }?.tojstring() ?: "overworld",
                         options.field("type").takeIf { it.isstring() }?.tojstring() ?: "normal",
                         if (seed.isnumber()) seed.tolong() else null,
-                    )?.let { worldObject(it, clicked) } ?: Lua.NIL
+                    )?.let { worldObject(it, clicked, resolve) } ?: Lua.NIL
             }
         val table = Lua.table()
         table.set("create", make)
@@ -428,7 +439,7 @@ internal object PluginApi {
                 for ((index, world) in host.services.worlds
                     .all()
                     .withIndex()) {
-                    out.set(index + 1, worldObject(world, clicked))
+                    out.set(index + 1, worldObject(world, clicked, resolve))
                 }
                 out
             },
@@ -438,14 +449,14 @@ internal object PluginApi {
             HostFunction("worlds.by_name") { args ->
                 host.services.worlds
                     .byName(args.checkjstring(1))
-                    ?.let { worldObject(it, clicked) } ?: Lua.NIL
+                    ?.let { worldObject(it, clicked, resolve) } ?: Lua.NIL
             },
         )
         table.set(
             "default",
             HostFunction("worlds.default") {
                 host.services.worlds.default
-                    ?.let { worldObject(it, clicked) } ?: Lua.NIL
+                    ?.let { worldObject(it, clicked, resolve) } ?: Lua.NIL
             },
         )
         return table
@@ -542,7 +553,7 @@ internal object PluginApi {
             Lua.NIL
         }
 
-    /** A string, or a function that gives one back per player. */
+    /** A string, or a function that gives one back per player. `@key` works here like anywhere. */
     private fun textOf(
         host: PluginHost,
         plugin: LoadedPlugin,
@@ -552,9 +563,12 @@ internal object PluginApi {
     ): String? =
         when {
             value.isfunction() ->
-                host.ask(plugin, value, player, "${surface.surfaceName} title")?.takeIf { it.isstring() }?.tojstring()
+                host
+                    .ask(plugin, value, player, "${surface.surfaceName} title")
+                    ?.takeIf { it.isstring() }
+                    ?.let { plugin.text.resolve(it.tojstring(), Lua.NIL) }
 
-            value.isstring() -> value.tojstring()
+            value.isstring() -> plugin.text.resolve(value.tojstring(), Lua.NIL)
             else -> null
         }
 
@@ -573,7 +587,9 @@ internal object PluginApi {
             } ?: return null
         if (!table.istable()) return null
         val out = mutableListOf<String>()
-        for (index in 1..table.length()) out += (table.get(index) ?: Lua.NIL).tojstring()
+        for (index in 1..table.length()) {
+            out += plugin.text.resolve((table.get(index) ?: Lua.NIL).tojstring(), Lua.NIL)
+        }
         return out
     }
 
@@ -703,6 +719,22 @@ internal object PluginApi {
         )
         return table
     }
+
+    /**
+     * `run("say hello")`: one command, as the console would.
+     *
+     * As the console and never as a player, so a plugin cannot borrow somebody's permissions by
+     * running something in their name.
+     */
+    private fun runCommand(
+        host: PluginHost,
+        plugin: LoadedPlugin,
+    ): LuaValue =
+        HostFunction("run") { args ->
+            val command = args.checkjstring(1)
+            plugin.log.info { "ran /$command" }
+            Lua.of(host.services.commands.runAsConsole(command))
+        }
 
     /** `menu{ title = ..., rows = 3 }`: a window with buttons in it, and no slot arithmetic. */
     private fun menu(
