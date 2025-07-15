@@ -1,0 +1,4 @@
+title = "<dark_gray>Warps"
+visits = "<gray>Visited {count} times"
+missing = "<red>That world is not loaded"
+went = "<green>Off to {name}"

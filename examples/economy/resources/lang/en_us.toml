@@ -1,0 +1,5 @@
+balance = "<gold>You have {amount} coins"
+paid = "<green>Paid {amount} to {who}"
+received = "<green>{who} paid you {amount}"
+poor = "<red>You only have {amount} coins"
+missing = "<red>Nobody called {who} is online"

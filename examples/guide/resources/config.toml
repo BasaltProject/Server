@@ -1,0 +1,23 @@
+# One table per guide standing somewhere. The world is the default one when empty.
+[guide.welcome]
+name = "<yellow>Guide"
+world = ""
+x = 8.5
+y = 65.0
+z = 8.5
+yaw = 180.0
+says = "welcome"
+
+[guide.builder]
+name = "<aqua>Builder"
+world = ""
+x = 12.5
+y = 65.0
+z = 8.5
+yaw = 180.0
+says = "building"
+
+# A skin is the two strings a profile property carries. Empty draws the default one.
+[skin]
+texture = ""
+signature = ""

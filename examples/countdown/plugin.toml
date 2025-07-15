@@ -1,0 +1,5 @@
+id = "countdown"
+name = "Countdown"
+version = "1.0.0"
+authors = ["Basalt"]
+api = 1
