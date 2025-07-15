@@ -1,8 +1,0 @@
-id = "shopkeeper"
-name = "Shopkeeper"
-version = "1.0.0"
-authors = ["Basalt"]
-api = 1
-
-[soft-depends]
-economy = "*"

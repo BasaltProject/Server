@@ -1,3 +1,0 @@
-joined = "<yellow>{who} joined the game"
-lost = "<gray>{who} fell"
-won = "<gold>{who} wins!"

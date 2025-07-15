@@ -18,9 +18,11 @@ import org.basaltmc.wire.protocol.play.ContainerSetContentPacket
 import org.basaltmc.wire.protocol.play.CustomPayloadPacket
 import org.basaltmc.wire.protocol.play.Direction
 import org.basaltmc.wire.protocol.play.OpenScreenPacket
+import org.basaltmc.wire.protocol.play.PlayerInfoUpdatePacket
 import org.basaltmc.wire.protocol.play.ServerboundContainerClickPacket
 import org.basaltmc.wire.protocol.play.ServerboundPlayerActionPacket
 import org.basaltmc.wire.protocol.play.SetObjectivePacket
+import org.basaltmc.wire.protocol.play.SetPlayerTeamPacket
 import org.basaltmc.wire.protocol.play.SetScorePacket
 import org.basaltmc.wire.protocol.play.SystemChatPacket
 import org.basaltmc.wire.protocol.play.UpdateAttributesPacket
@@ -447,6 +449,57 @@ class PluginEventIntegrationTest {
         connection.close()
     }
 
+    /**
+     * An NPC arrives nameless, on the team that hides a name tag, and wearing a real skin.
+     *
+     * All three are things that only show up on a client, so this reads them off the socket: the
+     * team packet has to name the same profile the entity travels under, or the tag is drawn anyway,
+     * which is exactly the bug this test exists for.
+     */
+    @Test
+    fun anNpcArrivesWithNoNameTagAndTheSkinItWasGiven() {
+        val name = "Robin"
+        val port = startTestServer(preferredPort = 26637, plugins = mapOf("greeter" to GREETER))
+
+        val connection = TcpConnection.connect("127.0.0.1", port)
+        val incoming = ByteBuffer()
+        val threshold = loginToPlay(connection, incoming, name).threshold
+
+        drainUntil(connection, incoming, ContainerSetContentPacket.ID)
+        ChunkBatchFinishedPacket.read(drainUntil(connection, incoming, ChunkBatchFinishedPacket.ID))
+        sendCompressed(connection, ChunkBatchReceivedPacket.ID, threshold) { it.writeFloat(16f) }
+
+        sendCompressed(connection, ChatMessagePacket.ID, threshold) { buffer ->
+            buffer.writeProtocolString("make")
+            buffer.writeLong(0L)
+            buffer.writeLong(0L)
+            buffer.writeBoolean(false)
+            buffer.writeVarInt(0)
+            buffer.writeBytes(ByteArray(3))
+            buffer.writeByte(0.toByte())
+        }
+        assertEquals("made", nextChatContaining(connection, incoming, "made"))
+
+        // The team comes first, and its member is the profile the entity is about to arrive under.
+        val team = SetPlayerTeamPacket.read(drainUntil(connection, incoming, SetPlayerTeamPacket.ID))
+        val joined =
+            if (team.members.isEmpty()) {
+                SetPlayerTeamPacket.read(drainUntil(connection, incoming, SetPlayerTeamPacket.ID))
+            } else {
+                team
+            }
+        val hidden = joined.members.single()
+        assertTrue(hidden.startsWith("npc_"), "the team joined by the wrong name: $hidden")
+
+        val info = PlayerInfoUpdatePacket.read(drainUntil(connection, incoming, PlayerInfoUpdatePacket.ID))
+        val entry = info.entries.single()
+        assertEquals(hidden, entry.name, "the tag is only hidden for the name the team knows")
+        assertTrue(!entry.listed, "an NPC does not belong in the tab list")
+        assertEquals("copied-texture", entry.properties.single { it.name == "textures" }.value)
+
+        connection.close()
+    }
+
     /** Reads block updates until one is about [pos]: the world sends its own while this runs. */
     private fun blockUpdateArrivesAt(
         connection: TcpConnection,
@@ -549,6 +602,17 @@ class PluginEventIntegrationTest {
             """.trimIndent()
 
         const val ATTRIBUTE_LOOKAHEAD = 4
+
+        val GREETER =
+            """
+            on("player.chat", function(e)
+                local p = e.player
+                local bob = worlds.by_name(p.world):npc{ name = "<gold>Bob", pos = p.pos:offset(2, 0, 0) }
+                bob:skin("copied-texture", "signed")
+                p:send("made")
+                e:cancel()
+            end)
+            """.trimIndent()
 
         const val CHAT_LOOKAHEAD = 3
         const val BLOCK_LOOKAHEAD = 8

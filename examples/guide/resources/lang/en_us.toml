@@ -1,4 +1,0 @@
-welcome = "<yellow>Welcome, {name}. Type /warps to get around."
-building = "<aqua>Claim a chunk with /claim before you build."
-hidden = "<gray>The guides will leave you alone now."
-shown = "<gray>The guides are back."

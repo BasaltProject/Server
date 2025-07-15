@@ -334,6 +334,8 @@ internal class LoadedWorldRef(
     /** Where an NPC goes when a plugin makes one. Null before there is a server to put it in. */
     private val npcs: NpcRegistry? = null,
     private val nextEntityId: (() -> Int)? = null,
+    /** Who is connected, for an NPC that wants to wear somebody's skin. */
+    private val players: () -> List<PlayerSession> = { emptyList() },
 ) : PluginWorldRef {
     override val name: String get() = world.name
     override val time: Long get() = world.clock.totalTicks
@@ -411,14 +413,16 @@ internal class LoadedWorldRef(
                 uuid =
                     kotlin.uuid.Uuid
                         .random(),
-                name = name,
+                // Nameless on purpose: what is read over its head is the display made below.
+                name = "",
                 world = world.name,
                 x = x,
                 y = y,
                 z = z,
             )
         registry.add(npc, onClick)
-        return NpcHandle(npc, registry)
+        val label = name.takeIf { it.isNotEmpty() }?.let { hologram(it, x, y + NpcHandle.LABEL_HEIGHT, z) }
+        return NpcHandle(npc, registry, ::texturesOf, label)
     }
 
     override fun hologram(
@@ -431,6 +435,14 @@ internal class LoadedWorldRef(
         spawned.displayText = text
         return HologramRef(world, spawned)
     }
+
+    /** The textures of a connected player, which is where an NPC's face comes from. */
+    private fun texturesOf(playerName: String): Pair<String, String?>? =
+        players()
+            .firstOrNull { it.name.equals(playerName, ignoreCase = true) }
+            ?.profileProperties
+            ?.firstOrNull { it.name == "textures" }
+            ?.let { it.value to it.signature }
 
     private companion object {
         val TEXT_DISPLAY = Identifier.vanilla("text_display")
@@ -468,8 +480,9 @@ internal class LoadedWorlds(
     private val make: (String, WorldDimension, WorldType, Long?) -> LoadedWorld? = { _, _, _, _ -> null },
     private val npcs: NpcRegistry? = null,
     private val nextEntityId: (() -> Int)? = null,
+    private val players: () -> List<PlayerSession> = { emptyList() },
 ) : PluginWorlds {
-    private fun refFor(world: LoadedWorld) = LoadedWorldRef(world, spawnMob, npcs, nextEntityId)
+    private fun refFor(world: LoadedWorld) = LoadedWorldRef(world, spawnMob, npcs, nextEntityId, players)
 
     override fun all(): List<PluginWorldRef> = worlds().values.map(::refFor)
 
@@ -581,6 +594,20 @@ internal class DatabasePluginStorage(
             ?.pluginData
             ?.top(pluginId, key, limit)
             .orEmpty()
+
+    override fun namespaces(): Map<String, Long> =
+        store()
+            ?.takeIf { it.isOpen }
+            ?.pluginData
+            ?.namespaces()
+            .orEmpty()
+
+    override fun purge(pluginId: String): Long {
+        val data = store()?.takeIf { it.isOpen }?.pluginData ?: return 0
+        val rows = data.namespaces()[pluginId] ?: return 0
+        data.purge(pluginId)
+        return rows
+    }
 }
 
 /**

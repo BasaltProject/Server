@@ -1,5 +1,0 @@
-bar = "<yellow>Starting in {seconds}s"
-tick = "<yellow>{n}"
-go = "<green><bold>GO"
-go_subtitle = "<gray>good luck"
-already = "<red>A countdown is already running"

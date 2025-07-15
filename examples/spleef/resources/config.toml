@@ -1,7 +1,0 @@
-[arena]
-world = "world"
-x = 0.5
-y = 70.0
-z = 0.5
-floor_y = 64
-prize = 50

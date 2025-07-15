@@ -1,5 +1,0 @@
-protected = "<red>This land belongs to {who}"
-taken = "<red>Already claimed by {who}"
-claimed = "<green>This chunk is yours"
-unclaimed = "<gray>No longer yours"
-not_yours = "<red>That is not your claim"
