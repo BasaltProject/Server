@@ -1,5 +1,6 @@
 package org.basaltmc.server.world.terrain.decoration
 
+import org.basaltmc.server.registry.BlockFace
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
@@ -8,6 +9,7 @@ import org.basaltmc.wire.common.Identifier
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class OverworldOreDecorationTest {
@@ -298,6 +300,24 @@ class OverworldOreDecorationTest {
         assertTrue(
             (0 until 16).any { z -> (0 until 16).any { x -> chunk.getBlockStateId(x, 40, z) == stateId("clay") } },
         )
+    }
+
+    @Test
+    fun underwaterMagmaUsesTheCoveredOcclusionFace() {
+        val bottom = stateId("stone_slab")
+        val top = bottom - 2
+
+        assertTrue(OverworldOreDecoration.hasFullMagmaCover(bottom, BlockFace.DOWN))
+        assertFalse(OverworldOreDecoration.hasFullMagmaCover(bottom, BlockFace.UP))
+        assertFalse(OverworldOreDecoration.hasFullMagmaCover(top, BlockFace.DOWN))
+        assertTrue(OverworldOreDecoration.hasFullMagmaCover(top, BlockFace.UP))
+    }
+
+    @Test
+    fun grassDiskUsesTheSolidPredicateAbove() {
+        assertEquals(Blocks.GRASS_BLOCK.stateId, OverworldOreDecoration.grassDiskStateForAbove(Blocks.AIR.stateId))
+        assertEquals(Blocks.DIRT.stateId, OverworldOreDecoration.grassDiskStateForAbove(stateId("cobweb")))
+        assertEquals(Blocks.DIRT.stateId, OverworldOreDecoration.grassDiskStateForAbove(Blocks.WATER.stateId + 1))
     }
 
     @Test

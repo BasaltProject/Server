@@ -44,6 +44,17 @@ class BlockShapesTest {
     }
 
     @Test
+    fun slabFaceOcclusionDependsOnItsHalf() {
+        val bottom = state("stone_slab")
+        val top = bottom - 2
+
+        assertTrue(BlockShapes.isFaceOcclusionFull(bottom, BlockFace.DOWN))
+        assertFalse(BlockShapes.isFaceOcclusionFull(bottom, BlockFace.UP))
+        assertFalse(BlockShapes.isFaceOcclusionFull(top, BlockFace.DOWN))
+        assertTrue(BlockShapes.isFaceOcclusionFull(top, BlockFace.UP))
+    }
+
+    @Test
     fun aTorchHasNoShapeAtAll() {
         val torch = state("torch")
         assertTrue(BlockShapes.isEmptyShape(torch))
