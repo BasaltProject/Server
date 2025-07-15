@@ -1,6 +1,11 @@
 package org.basaltmc.server.runtime
 
+import org.basaltmc.server.plugins.PluginEventBus
+import org.basaltmc.server.plugins.PluginEventTypes
+import org.basaltmc.server.plugins.PluginPacketBus
+import org.basaltmc.server.plugins.PluginSurfaceContent
 import org.basaltmc.server.random.LegacyRandom
+import org.basaltmc.server.registry.AttributeIds
 import org.basaltmc.server.registry.BlockEntityTypes
 import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
@@ -47,6 +52,9 @@ import org.basaltmc.server.runtime.player.PlayerInventory
 import org.basaltmc.server.runtime.player.PlayerPersistence
 import org.basaltmc.server.runtime.player.PlayerRegistry
 import org.basaltmc.server.runtime.player.PlayerSession
+import org.basaltmc.server.runtime.plugins.NpcRegistry
+import org.basaltmc.server.runtime.plugins.PacketNames
+import org.basaltmc.server.runtime.plugins.emit
 import org.basaltmc.server.runtime.registry.VanillaBiomes
 import org.basaltmc.server.runtime.registry.VanillaRegistryData
 import org.basaltmc.server.runtime.registry.VanillaTagData
@@ -151,6 +159,7 @@ import org.basaltmc.wire.io.sleepMillis
 import org.basaltmc.wire.nbt.NbtCompound
 import org.basaltmc.wire.protocol.PacketFraming
 import org.basaltmc.wire.protocol.ProtocolState
+import org.basaltmc.wire.protocol.VarInt
 import org.basaltmc.wire.protocol.configuration.BrandPacket
 import org.basaltmc.wire.protocol.configuration.ClientInformationPacket
 import org.basaltmc.wire.protocol.configuration.FinishConfigurationPacket
@@ -204,6 +213,7 @@ import org.basaltmc.wire.protocol.play.ContainerSetContentPacket
 import org.basaltmc.wire.protocol.play.ContainerSetDataPacket
 import org.basaltmc.wire.protocol.play.ContainerSetSlotPacket
 import org.basaltmc.wire.protocol.play.CooldownPacket
+import org.basaltmc.wire.protocol.play.CustomPayloadPacket
 import org.basaltmc.wire.protocol.play.DamageEventPacket
 import org.basaltmc.wire.protocol.play.Direction
 import org.basaltmc.wire.protocol.play.EntityEventPacket
@@ -286,7 +296,9 @@ import org.basaltmc.wire.protocol.status.StatusRequestPacket
 import org.basaltmc.wire.protocol.status.StatusResponsePacket
 import org.basaltmc.wire.protocol.writeVarInt
 import org.basaltmc.wire.text.Component
+import org.basaltmc.wire.text.ComponentNbt
 import org.basaltmc.wire.text.LangTable
+import org.basaltmc.wire.text.MiniMessage
 import org.basaltmc.wire.text.TextColor
 import org.basaltmc.wire.text.resolvePlainText
 import kotlin.concurrent.AtomicInt
@@ -370,6 +382,27 @@ public class ClientSession(
     private val timelineTags: RealTimelineTags? = null,
     private val damageTypeTags: RealDamageTypeTags? = null,
     private val entityTypeTags: RealEntityTypeTags? = null,
+    /** Where plugin events go. Null when there are no plugins, which costs a null check. */
+    private val pluginEvents: PluginEventBus? = null,
+    /**
+     * Whichever plugin is drawing this player's sidebar, asked by uuid.
+     *
+     * Two lambdas rather than the registry itself: this class has no business knowing what a plugin
+     * is, and the cheap question (is anybody holding it) has to stay separate from the expensive one
+     * (what do they want drawn), which runs their code.
+     */
+    private val pluginHoldsSidebar: ((String) -> Boolean)? = null,
+    // Only the second one runs plugin code, and only when a redraw is due.
+    private val pluginSidebar: ((String) -> PluginSurfaceContent?)? = null,
+    private val pluginHoldsBossBar: (() -> Boolean)? = null,
+    private val pluginBossBar: ((String) -> PluginSurfaceContent?)? = null,
+    /** Where a payload on a plugin's channel goes, and the cheap question of whether anybody wants it. */
+    private val pluginChannel: ((String, String, ByteArray) -> Unit)? = null,
+    private val pluginListensOn: ((String) -> Boolean)? = null,
+    /** The NPCs a plugin put in the world, drawn by this connection like any other player. */
+    private val npcs: NpcRegistry? = null,
+    /** Who is watching packets. Null when nothing is, which is the usual case and costs one check. */
+    private val pluginPackets: PluginPacketBus? = null,
 ) {
     private val logger = Logger("Session")
 
@@ -417,7 +450,19 @@ public class ClientSession(
      * This player's tab list, scoreboard and boss bar. Ticked from the outbound loop below, because
      * everything it does writes to this socket and the shared tick thread must never do that.
      */
-    private val playerUi = PlayerUi(ui, placeholders, ::sendPlayPacket)
+    private val playerUi =
+        PlayerUi(
+            ui,
+            placeholders,
+            ::sendPlayPacket,
+            pluginHoldsSidebar = {
+                val me = playerSession
+                me != null && pluginHoldsSidebar?.invoke(me.uuid.toString()) == true
+            },
+            pluginSidebar = { playerSession?.let { pluginSidebar?.invoke(it.uuid.toString()) } },
+            pluginHoldsBossBar = { pluginHoldsBossBar?.invoke() == true },
+            pluginBossBar = { playerSession?.let { pluginBossBar?.invoke(it.uuid.toString()) } },
+        )
     private var uiTick = 0L
 
     // Vanilla's optimistic-locking counter for container changes: bumped on every window write so
@@ -495,6 +540,15 @@ public class ClientSession(
     private var openEnderChest: Boolean = false
 
     /**
+     * The window a plugin drew, if one is open: its contents and where a click goes.
+     *
+     * Not a container. Nothing in it can be taken, because a menu is a row of buttons; a plugin that
+     * wants somewhere to put things wants a chest, which the world already has.
+     */
+    private var pluginMenu: Array<StoredItemStack?>? = null
+    private var pluginMenuClick: ((Int) -> Unit)? = null
+
+    /**
      * The other half of an open double chest, whose slots follow the first half's.
      *
      * parity: `ChestBlock.DOUBLE_INVENTORY_COMBINER` over a `CompoundContainer`: two block entities,
@@ -561,6 +615,9 @@ public class ClientSession(
     /** Summoned entities this client has been told about, so each is spawned once. */
     private val trackedEntities = HashSet<Int>()
 
+    /** NPCs this client has been told about, and which version of each: a change re-draws it. */
+    private val trackedNpcs = HashMap<Int, Int>()
+
     /** Where each of them was last reported, so a mob standing still costs nothing. */
     private val lastEntityPositions = HashMap<Int, DoubleArray>()
 
@@ -575,6 +632,9 @@ public class ClientSession(
      */
     private var lastSharedFlags = 0
     private var lastPose = Pose.STANDING
+
+    /** What the client was last told its level was, so a change is a change rather than a resend. */
+    private var lastSyncedLevel: Int = -1
 
     /** What each of them was last seen holding and wearing, so only changes go on the wire. */
     private val trackedEquipment = HashMap<Int, List<StoredItemStack?>>()
@@ -648,6 +708,7 @@ public class ClientSession(
                                     }
                                     timings.of("player.tick").time { tickPlayer() }
                                     timings.of("player.players").time { syncPlayers() }
+                                    timings.of("player.npcs").time { syncNpcs() }
                                     timings.of("player.posture").time { syncPosture() }
                                     timings.of("player.items").time { syncItemEntities() }
                                     timings.of("player.entities").time { syncSummonedEntities() }
@@ -733,6 +794,7 @@ public class ClientSession(
         packetId: Int,
         body: ByteBuffer,
     ) {
+        if (!interceptIncoming(packetId, body)) return
         when (state) {
             ProtocolState.HANDSHAKE -> handleHandshake(packetId, body)
             ProtocolState.STATUS -> handleStatus(packetId, body)
@@ -837,6 +899,20 @@ public class ClientSession(
 
     private fun handleLoginStart(body: ByteBuffer) {
         val loginStart = LoginStartPacket.read(body)
+        // The one gate before a player exists at all: a plugin that says no here means they never
+        // join, and what it says is what they read on the disconnect screen.
+        val login =
+            pluginEvents.emit(PluginEventTypes.PLAYER_LOGIN) { event ->
+                event.set(0, loginStart.name)
+                event.set(1, loginStart.profileId.toString())
+                event.set(2, connection.remoteAddress)
+            }
+        if (login?.cancelled == true) {
+            val reason = login.cancelMessage ?: "<red>You may not join this server"
+            sendUncompressed(LoginDisconnectPacket.ID) { LoginDisconnectPacket(MiniMessage.parse(reason)).write(it) }
+            connection.close()
+            return
+        }
         val online = onlineMode
         if (online == null) {
             finishLogin(OfflineUuid.forUsername(loginStart.name), loginStart.name, emptyList())
@@ -1304,6 +1380,11 @@ public class ClientSession(
         session.profileProperties = pendingProfile?.properties.orEmpty()
         session.skinParts = pendingSkinParts
         logger.info { "${session.name} joined the game" }
+        pluginEvents.emit(PluginEventTypes.PLAYER_JOIN) { event ->
+            event.set(0, session.name)
+            event.set(1, session.uuid.toString())
+            event.set(2, currentWorld?.name)
+        }
 
         sendCompressed(PlayerInfoUpdatePacket.ID) {
             PlayerInfoUpdatePacket
@@ -1613,8 +1694,15 @@ public class ClientSession(
                 val command = PlayerCommandPacket.read(body)
                 when (command.action) {
                     PlayerCommandPacket.Action.STOP_SLEEPING -> wakeUp()
-                    PlayerCommandPacket.Action.START_SPRINTING -> playerSession?.sprinting = true
-                    PlayerCommandPacket.Action.STOP_SPRINTING -> playerSession?.sprinting = false
+                    PlayerCommandPacket.Action.START_SPRINTING -> {
+                        playerEvent(PluginEventTypes.PLAYER_SPRINT) { event -> event.set(3, true) }
+                        playerSession?.sprinting = true
+                    }
+
+                    PlayerCommandPacket.Action.STOP_SPRINTING -> {
+                        playerEvent(PluginEventTypes.PLAYER_SPRINT) { event -> event.set(3, false) }
+                        playerSession?.sprinting = false
+                    }
                     else -> Unit
                 }
             }
@@ -1625,6 +1713,11 @@ public class ClientSession(
             ServerboundSetCarriedItemPacket.ID -> {
                 val slot = ServerboundSetCarriedItemPacket.read(body).slot
                 if (slot in 0 until ServerboundSetCarriedItemPacket.HOTBAR_SIZE) {
+                    val was = playerSession?.inventory?.heldSlot
+                    playerEvent(PluginEventTypes.PLAYER_ITEM_HELD) { event ->
+                        event.set(3, slot)
+                        event.set(4, was)
+                    }
                     playerSession?.inventory?.heldSlot = slot
                     syncHeldAttributes()
                 }
@@ -1632,8 +1725,12 @@ public class ClientSession(
             ServerboundSetCreativeModeSlotPacket.ID ->
                 handleSetCreativeModeSlot(ServerboundSetCreativeModeSlotPacket.read(body))
             ServerboundContainerClickPacket.ID -> handleContainerClick(ServerboundContainerClickPacket.read(body))
+            CustomPayloadPacket.SERVERBOUND_ID -> handleCustomPayload(body)
             ContainerClosePacket.SERVERBOUND_ID -> {
                 ContainerClosePacket.read(body)
+                playerEvent(PluginEventTypes.INVENTORY_CLOSE) { event ->
+                    event.set(3, if (openMenu.containerId == 0) "player" else "container")
+                }
                 playerSession?.let(::closeOpenMenu)
             }
             InteractPacket.ID -> handleInteract(InteractPacket.read(body))
@@ -1690,6 +1787,10 @@ public class ClientSession(
                 val inputs = body.readByte().toInt()
                 val session = playerSession
                 if (session != null) {
+                    val nowSneaking = (inputs and SNEAK_INPUT_FLAG) != 0
+                    if (nowSneaking != session.sneaking) {
+                        playerEvent(PluginEventTypes.PLAYER_SNEAK) { event -> event.set(3, nowSneaking) }
+                    }
                     session.sneaking = (inputs and SNEAK_INPUT_FLAG) != 0
                     session.inputForward = (inputs and FORWARD_INPUT_FLAG) != 0
                     session.inputBack = (inputs and BACK_INPUT_FLAG) != 0
@@ -1830,6 +1931,30 @@ public class ClientSession(
         }
 
         val broken = world.getBlockState(action.pos.x, action.pos.y, action.pos.z)
+        // The question a protection plugin answers, asked where the server would have gone ahead.
+        // Cancelling puts the block back on the digger's screen: the client broke it locally the
+        // moment it started, so saying nothing would leave a hole only they can see.
+        val breakEvent =
+            pluginEvents.emit(PluginEventTypes.BLOCK_BREAK) { event ->
+                event.set(0, playerSession?.name)
+                event.set(1, playerSession?.uuid?.toString())
+                event.set(2, currentWorld?.name)
+                event.set(3, action.pos.x)
+                event.set(4, action.pos.y)
+                event.set(5, action.pos.z)
+                event.set(6, broken?.let { BlockStateDefinitions.blockOf(it) })
+            }
+        if (breakEvent?.cancelled == true) {
+            sendCompressed(ClientboundBlockChangedAckPacket.ID) {
+                ClientboundBlockChangedAckPacket(action.sequence).write(it)
+            }
+            sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                ClientboundBlockUpdatePacket(action.pos, broken ?: 0).write(it)
+            }
+            breakEvent.cancelMessage?.let { message -> sendPluginNotice(message) }
+            stopDigging()
+            return
+        }
         // parity: `ShulkerBoxBlock.getDrops`, read before the block goes: breaking it takes the
         // block entity with it, and the contents have to travel in the item.
         val carried =
@@ -1915,6 +2040,13 @@ public class ClientSession(
                 damageEffects.process(stack, amount, random)
             }
         if (worn == held) return
+        val wearing =
+            playerEvent(PluginEventTypes.PLAYER_ITEM_DAMAGE) { event ->
+                event.set(3, held.id)
+                event.set(4, cost)
+                event.set(5, worn == null)
+            }
+        if (wearing?.cancelled == true) return
         session.inventory[heldSlot] = worn
         sendInventorySlot(heldSlot)
     }
@@ -2100,6 +2232,17 @@ public class ClientSession(
         val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
         val held = session.inventory[heldSlot] ?: return
         val dropCount = if (all) held.count else 1
+        val dropped =
+            playerEvent(PluginEventTypes.PLAYER_ITEM_DROP) { event ->
+                event.set(3, held.id)
+                event.set(4, dropCount)
+            }
+        if (dropped?.cancelled == true) {
+            dropped.cancelMessage?.let { sendPluginNotice(it) }
+            // The client has already taken it out of its own hand.
+            sendInventorySlot(heldSlot)
+            return
+        }
         val remaining = held.count - dropCount
         session.inventory[heldSlot] = if (remaining <= 0) null else held.copy(count = remaining)
         sendInventorySlot(heldSlot)
@@ -2158,7 +2301,22 @@ public class ClientSession(
         val chunk = world.state.chunkIfLoaded(pos.x shr 4, pos.z shr 4) ?: return
         val existing = chunk.blockEntityAt(pos.x and 15, pos.y, pos.z and 15)
         if (existing != null && Signs.isWaxed(existing.data)) return
-        val data = Signs.withText(existing?.data ?: Signs.emptyData(), update.isFrontText, update.lines)
+        var lines = update.lines
+        val signed =
+            playerEvent(PluginEventTypes.PLAYER_SIGN_CHANGE) { event ->
+                event.set(3, pos.x)
+                event.set(4, pos.y)
+                event.set(5, pos.z)
+                for (line in 0 until 4) event.set(6 + line, lines.getOrNull(line).orEmpty())
+            }
+        if (signed != null) {
+            if (signed.cancelled) {
+                signed.cancelMessage?.let { sendPluginNotice(it) }
+                return
+            }
+            lines = List(4) { line -> (signed.get(6 + line) as? String).orEmpty() }
+        }
+        val data = Signs.withText(existing?.data ?: Signs.emptyData(), update.isFrontText, lines)
         chunk.setBlockEntity(Signs.blockEntity(pos.x and 15, pos.y, pos.z and 15, type, data))
         val typeId = BlockEntityTypes.idOf(type) ?: return
         for (player in playersInSameWorld()) {
@@ -2180,7 +2338,19 @@ public class ClientSession(
         y: Double,
         z: Double,
         power: Float,
+        cause: String = "explosion",
     ) {
+        val stopped =
+            pluginEvents.emit(PluginEventTypes.BLOCK_EXPLODE) { event ->
+                event.set(0, world.name)
+                event.set(1, x)
+                event.set(2, y)
+                event.set(3, z)
+                event.set(4, power.toDouble())
+                event.set(5, cause)
+                event.set(6, playerSession?.entityId)
+            }
+        if (stopped?.cancelled == true) return
         val broken = Explosions.explode(world, x, y, z, power, LegacyRandom(Random.nextLong()))
         for (block in broken) {
             val at = BlockPos(block.x, block.y, block.z)
@@ -2323,6 +2493,17 @@ public class ClientSession(
     ) {
         if (count <= 0) return
         if (Items.REGISTRY.byIdentifier(item) == null) return
+        val spawning =
+            pluginEvents.emit(PluginEventTypes.ITEM_SPAWN) { event ->
+                event.set(0, currentWorld?.name)
+                event.set(1, x)
+                event.set(2, y)
+                event.set(3, z)
+                event.set(4, item.toString())
+                event.set(5, count)
+                event.set(6, "drop")
+            }
+        if (spawning?.cancelled == true) return
         val entityId = playerRegistry?.allocateEntityId() ?: return
         // Only put into the world here. Telling anyone about it is [syncItemEntities]'s job, on
         // each connection's own thread: broadcasting from here reached whoever happened to be
@@ -2354,8 +2535,21 @@ public class ClientSession(
      */
     private fun syncSummonedEntities() {
         val session = playerSession ?: return
+        val me = session.uuid.toString()
         for (entity in world.entities()) {
             if (entity.removed) continue
+            // An entity somebody else can see and this player cannot: taken away if they were
+            // already shown it, and skipped if they were not.
+            val visible = entity.visibleTo?.contains(me) ?: true
+            if (!visible) {
+                if (trackedEntities.remove(entity.entityId)) {
+                    lastEntityPositions.remove(entity.entityId)
+                    sendPlayPacket(RemoveEntitiesPacket.ID) {
+                        RemoveEntitiesPacket(listOf(entity.entityId)).write(it)
+                    }
+                }
+                continue
+            }
             if (trackedEntities.add(entity.entityId)) {
                 if (Taming.isTamable(entity.type) && Taming.flagsOf(entity) != 0) {
                     sendPlayPacket(SetEntityDataPacket.ID) {
@@ -2388,6 +2582,7 @@ public class ClientSession(
                         velocityZ = entity.velocityZ,
                     ).write(it)
                 }
+                entity.displayText?.let { text -> sendDisplayText(entity.entityId, text) }
                 continue
             }
             // parity: `ServerEntity.sendChanges`, which sends nothing at all for an entity that has
@@ -2431,6 +2626,25 @@ public class ClientSession(
         for (entityId in gone) lastEntityPositions.remove(entityId)
         if (gone.isNotEmpty()) {
             sendPlayPacket(RemoveEntitiesPacket.ID) { RemoveEntitiesPacket(gone).write(it) }
+        }
+    }
+
+    /**
+     * The text on a `text_display`, which is metadata 23 and a component.
+     *
+     * parity: `Display.TextDisplay.DATA_TEXT_ID`, whose index is Entity's eight fields plus
+     * Display's fifteen. Getting that number by counting is exactly why it is written down here
+     * once instead of at each call.
+     */
+    private fun sendDisplayText(
+        entityId: Int,
+        text: String,
+    ) {
+        sendPlayPacket(SetEntityDataPacket.ID) {
+            SetEntityDataPacket(
+                entityId,
+                listOf(SetEntityDataPacket.Entry.Text(TEXT_DISPLAY_TEXT_INDEX, MiniMessage.parse(text))),
+            ).write(it)
         }
     }
 
@@ -2483,6 +2697,72 @@ public class ClientSession(
         if (gone.isEmpty()) return
         trackedPlayers.removeAll(gone.toSet())
         for (entityId in gone) trackedEquipment.remove(entityId)
+        sendPlayPacket(RemoveEntitiesPacket.ID) { RemoveEntitiesPacket(gone).write(it) }
+    }
+
+    /**
+     * Draws the NPCs a plugin made, the same way [syncPlayers] draws real ones.
+     *
+     * Same shape on purpose: an NPC is a player entity, so it needs the tab-list entry first (that
+     * is where the skin lives) and the entity second. `listed = false` keeps it out of the tab list
+     * while still giving the client the profile it needs to draw a face.
+     */
+    private fun syncNpcs() {
+        val session = playerSession ?: return
+        val registry = npcs ?: return
+        val me = session.uuid.toString()
+        val here =
+            registry.all().filter { it.world == session.worldName && (it.visibleTo?.contains(me) ?: true) }
+        for (npc in here) {
+            val known = trackedNpcs[npc.entityId]
+            if (known == npc.version) continue
+            if (known != null) {
+                // Something a client was already told changed: taken away and drawn again, which is
+                // what the profile requires anyway since a skin cannot be changed in place.
+                sendPlayPacket(RemoveEntitiesPacket.ID) { RemoveEntitiesPacket(listOf(npc.entityId)).write(it) }
+            }
+            trackedNpcs[npc.entityId] = npc.version
+            val properties =
+                npc.skinTexture?.let { texture ->
+                    listOf(GameProfileProperty("textures", texture, npc.skinSignature))
+                } ?: emptyList()
+            sendPlayPacket(PlayerInfoUpdatePacket.ID) { buffer ->
+                PlayerInfoUpdatePacket
+                    .initializing(
+                        listOf(
+                            PlayerInfoEntry(
+                                npc.uuid,
+                                npc.name,
+                                listed = false,
+                                gamemode = Gamemode.SURVIVAL,
+                                properties = properties,
+                            ),
+                        ),
+                    ).write(buffer)
+            }
+            sendPlayPacket(SpawnEntityPacket.ID) { buffer ->
+                SpawnEntityPacket(
+                    entityId = npc.entityId,
+                    uuid = npc.uuid,
+                    entityType = SpawnEntityPacket.PLAYER_ENTITY_TYPE,
+                    x = npc.x,
+                    y = npc.y,
+                    z = npc.z,
+                    pitch = npc.pitch,
+                    yaw = npc.yaw,
+                    headYaw = npc.yaw,
+                ).write(buffer)
+            }
+            sendPlayPacket(RotateHeadPacket.ID) { RotateHeadPacket(npc.entityId, npc.yaw).write(it) }
+            // Every layer of the skin on, or an NPC is drawn without its jacket and hat.
+            sendPlayPacket(SetEntityDataPacket.ID) { buffer ->
+                SetEntityDataPacket.skinParts(npc.entityId, PlayerSession.ALL_SKIN_PARTS).write(buffer)
+            }
+        }
+        val visible = here.map { it.entityId }.toSet()
+        val gone = trackedNpcs.keys.filterNot { it in visible }
+        if (gone.isEmpty()) return
+        for (entityId in gone) trackedNpcs.remove(entityId)
         sendPlayPacket(RemoveEntitiesPacket.ID) { RemoveEntitiesPacket(gone).write(it) }
     }
 
@@ -2668,6 +2948,17 @@ public class ClientSession(
             // parity: a player's own toss cannot be picked straight back up (`ItemEntity.pickupDelay`).
             if (!candidate.canBePickedUp) continue
             val removed = world.removeItem(candidate.entityId) ?: continue
+            val picking =
+                playerEvent(PluginEventTypes.PLAYER_ITEM_PICKUP) { event ->
+                    event.set(3, removed.item.toString())
+                    event.set(4, removed.count)
+                    event.set(5, removed.entityId)
+                }
+            if (picking?.cancelled == true) {
+                // Put it back exactly as it was: the client has not been told anything yet.
+                world.spawnItem(removed)
+                continue
+            }
             val leftover =
                 session.inventory.add(
                     StoredItemStack(removed.item.toString(), removed.count, removed.components),
@@ -2724,6 +3015,29 @@ public class ClientSession(
         if (session.gamemode == Gamemode.SPECTATOR || session.gamemode == Gamemode.ADVENTURE) return ack()
 
         val hit = useItemOn.blockHit
+        // Asked before the click does anything at all: opening a chest, using a door and placing a
+        // block are all this one event, which is why it carries what was clicked and what was held.
+        val heldStack = session.inventory[PlayerInventory.HOTBAR_START + session.inventory.heldSlot]
+        val clickedState = world.getBlockState(hit.pos.x, hit.pos.y, hit.pos.z)
+        val interaction =
+            playerEvent(PluginEventTypes.PLAYER_INTERACT) { event ->
+                event.set(3, "right_click_block")
+                event.set(4, hit.pos.x)
+                event.set(5, hit.pos.y)
+                event.set(6, hit.pos.z)
+                event.set(7, clickedState?.let { BlockStateDefinitions.blockOf(it) })
+                event.set(8, heldStack?.id)
+                event.set(9, "main")
+            }
+        if (interaction?.cancelled == true) {
+            interaction.cancelMessage?.let { sendPluginNotice(it) }
+            // The client predicted whatever it was about to do: put the block and the hand back.
+            sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                ClientboundBlockUpdatePacket(hit.pos, clickedState ?: 0).write(it)
+            }
+            sendInventory()
+            return ack()
+        }
         // parity: `ServerPlayerGameMode.useItemOn` runs the block's own use before it considers the
         // item as something to place, and sneaking overrides that and places instead.
         if (!session.sneaking) {
@@ -2942,6 +3256,30 @@ public class ClientSession(
             val room = world.getBlockState(second.x, second.y, second.z)
             if (room == null || !BlockShapes.isReplaceable(room)) return ack()
         }
+        // Asked once the server has decided the block would go down: a plugin that says no is
+        // answering the same question the game just answered yes to, and the client is told to put
+        // its own prediction back.
+        val placeEvent =
+            pluginEvents.emit(PluginEventTypes.BLOCK_PLACE) { event ->
+                event.set(0, playerSession?.name)
+                event.set(1, playerSession?.uuid?.toString())
+                event.set(2, currentWorld?.name)
+                event.set(3, placeAt.x)
+                event.set(4, placeAt.y)
+                event.set(5, placeAt.z)
+                event.set(6, BlockStateDefinitions.blockOf(blockStateId))
+            }
+        if (placeEvent?.cancelled == true) {
+            ack()
+            sendPlayPacket(ClientboundBlockUpdatePacket.ID) {
+                ClientboundBlockUpdatePacket(placeAt, world.getBlockState(placeAt.x, placeAt.y, placeAt.z) ?: 0)
+                    .write(it)
+            }
+            // The client took the item out of its own hand when it predicted the placement.
+            sendInventory()
+            placeEvent.cancelMessage?.let { message -> sendPluginNotice(message) }
+            return
+        }
         val changed = world.setBlockState(placeAt.x, placeAt.y, placeAt.z, blockStateId)
         ack()
         if (!changed) return
@@ -3047,6 +3385,19 @@ public class ClientSession(
         if (throwEnderPearl(session, item, heldSlot)) return
         if (!Buckets.isBucket(item)) return
 
+        val bucketing =
+            playerEvent(PluginEventTypes.PLAYER_BUCKET) { event ->
+                event.set(3, session.x.toInt())
+                event.set(4, session.y.toInt())
+                event.set(5, session.z.toInt())
+                event.set(6, item.toString())
+                event.set(7, item.path == "bucket")
+            }
+        if (bucketing?.cancelled == true) {
+            bucketing.cancelMessage?.let { sendPluginNotice(it) }
+            sendInventory()
+            return
+        }
         val result =
             Buckets.use(
                 world = world,
@@ -3076,6 +3427,11 @@ public class ClientSession(
      * applied to the next one.
      */
     private fun openCraftingTable(session: PlayerSession) {
+        val opening = playerEvent(PluginEventTypes.INVENTORY_OPEN) { event -> event.set(3, "crafting") }
+        if (opening?.cancelled == true) {
+            opening.cancelMessage?.let { sendPluginNotice(it) }
+            return
+        }
         returnCraftingGrid(session)
         nextContainerId = if (nextContainerId >= MAX_CONTAINER_ID) FIRST_BLOCK_CONTAINER_ID else nextContainerId + 1
         openMenu = Menu.craftingTable(nextContainerId)
@@ -3101,6 +3457,17 @@ public class ClientSession(
         pos: BlockPos,
         cooker: String,
     ) {
+        val opening =
+            playerEvent(PluginEventTypes.INVENTORY_OPEN) { event ->
+                event.set(3, cooker)
+                event.set(4, pos.x)
+                event.set(5, pos.y)
+                event.set(6, pos.z)
+            }
+        if (opening?.cancelled == true) {
+            opening.cancelMessage?.let { sendPluginNotice(it) }
+            return
+        }
         returnCraftingGrid(session)
         nextContainerId = if (nextContainerId >= MAX_CONTAINER_ID) FIRST_BLOCK_CONTAINER_ID else nextContainerId + 1
         openMenu = Menu.furnace(nextContainerId)
@@ -3392,6 +3759,20 @@ public class ClientSession(
             return true
         }
         if (item == null || !Taming.tamedBy(entity.type, item)) return false
+        // Not through playerEvent: this is an entity event that happens to have somebody doing it,
+        // so the entity is first and the player comes after the world.
+        val taming =
+            pluginEvents.emit(PluginEventTypes.ENTITY_TAME) { event ->
+                event.set(0, entity.entityId)
+                event.set(1, entity.type.toString())
+                event.set(2, currentWorld?.name)
+                event.set(3, session.name)
+                event.set(4, session.uuid.toString())
+            }
+        if (taming?.cancelled == true) {
+            taming.cancelMessage?.let { sendPluginNotice(it) }
+            return true
+        }
         if (session.gamemode != Gamemode.CREATIVE) {
             session.inventory[heldSlot] = if (held.count <= 1) null else held.copy(count = held.count - 1)
             sendInventorySlot(heldSlot)
@@ -3427,6 +3808,16 @@ public class ClientSession(
         vehicle: ServerEntity,
     ) {
         if (session.vehicleId != null) return
+        val mounting =
+            pluginEvents.emit(PluginEventTypes.ENTITY_MOUNT) { event ->
+                event.set(0, vehicle.entityId)
+                event.set(1, vehicle.type.toString())
+                event.set(2, currentWorld?.name)
+                event.set(3, session.name)
+                event.set(4, session.uuid.toString())
+                event.set(5, true)
+            }
+        if (mounting?.cancelled == true) return
         session.vehicleId = vehicle.entityId
         vehicle.passengerIds += session.entityId
         broadcastPassengers(vehicle)
@@ -3500,7 +3891,17 @@ public class ClientSession(
         if (knockbackAttack) {
             broadcastSound(SOUND_ATTACK_KNOCKBACK, session.x, session.y, session.z, SoundSource.PLAYERS)
         }
-        val result = EntityCombat.hurt(target, damage, session.x, session.z)
+        val result =
+            EntityCombat.hurt(
+                target,
+                damage,
+                session.x,
+                session.z,
+                events = pluginEvents,
+                worldName = currentWorld?.name,
+                cause = "attack",
+                attackerName = session.name,
+            )
         if (!result.landed) {
             broadcastSound(SOUND_ATTACK_NO_DAMAGE, session.x, session.y, session.z, SoundSource.PLAYERS)
             return
@@ -3580,7 +3981,17 @@ public class ClientSession(
             val dx = nearby.x - session.x
             val dz = nearby.z - session.z
             if (dx * dx + dz * dz >= SWEEP_PLAYER_RANGE) continue
-            val result = EntityCombat.hurt(nearby, damage, session.x, session.z)
+            val result =
+                EntityCombat.hurt(
+                    nearby,
+                    damage,
+                    session.x,
+                    session.z,
+                    events = pluginEvents,
+                    worldName = currentWorld?.name,
+                    cause = "sweep",
+                    attackerName = session.name,
+                )
             if (!result.landed) continue
             broadcastDamageEvent(nearby, DamageTypes.PLAYER_ATTACK, session.entityId)
             broadcastMotion(nearby)
@@ -3655,9 +4066,22 @@ public class ClientSession(
     private fun handleInteract(interact: InteractPacket) {
         val session = playerSession ?: return
         if (session.gamemode == Gamemode.SPECTATOR) return
+        // An NPC is not in the world's entity table, so it is answered before anything looks there.
+        if (npcs?.clicked(interact.entityId, session.uuid.toString()) == true) return
         val world = currentWorld ?: return
         val entity = world.state.entity(interact.entityId) ?: return
         if (entity.removed) return
+        val interacted =
+            playerEvent(PluginEventTypes.PLAYER_INTERACT_ENTITY) { event ->
+                event.set(3, entity.entityId)
+                event.set(4, entity.type.toString())
+                event.set(5, "interact")
+                event.set(6, if (interact.hand == 1) "off" else "main")
+            }
+        if (interacted?.cancelled == true) {
+            interacted.cancelMessage?.let { sendPluginNotice(it) }
+            return
+        }
         // parity: `Villager.mobInteract` opens its trades whatever is in the player's hand.
         if (entity.type == Villagers.TYPE) {
             openTrades(entity)
@@ -3746,6 +4170,83 @@ public class ClientSession(
             }
         logger.debug { "Sending ${options.size} stonecutter recipe(s)." }
         sendCompressed(UpdateRecipesPacket.ID) { UpdateRecipesPacket(options).write(it) }
+    }
+
+    /**
+     * Opens a window a plugin drew, [rows] rows of nine with [items] in it.
+     *
+     * Built on the same [Menu] a chest uses, so clicks arrive through the same path and the player's
+     * own inventory keeps its usual place at the bottom. What is different is behind the slots:
+     * there is no block, the contents are this array, and no click ever moves any of it.
+     */
+    internal fun openPluginMenu(
+        title: String,
+        rows: Int,
+        items: Map<Int, org.basaltmc.server.plugins.PluginItem>,
+        onClick: (Int) -> Unit,
+    ) {
+        val session = playerSession ?: return
+        returnCraftingGrid(session)
+        nextContainerId = if (nextContainerId >= MAX_CONTAINER_ID) FIRST_BLOCK_CONTAINER_ID else nextContainerId + 1
+        openMenu = Menu.rows(nextContainerId, rows)
+        openBlock = null
+        openBlockSecond = null
+        openEnderChest = false
+        openStonecutter = false
+        openSmithing = false
+        openBlockSize = rows * Menu.COLUMNS
+        openBlockData = IntArray(4) { -1 }
+        pluginMenu = arrayOfNulls(rows * Menu.COLUMNS)
+        pluginMenuClick = onClick
+        fillPluginMenu(items)
+        sendCompressed(OpenScreenPacket.ID) {
+            OpenScreenPacket(
+                containerId = openMenu.containerId,
+                // `minecraft:generic_9x1` through `9x6` are consecutive from zero.
+                menuType = rows - 1,
+                title = MiniMessage.parse(title),
+            ).write(it)
+        }
+        sendInventory()
+    }
+
+    /**
+     * Shuts whatever window is open, telling the client too.
+     *
+     * The client is told because this closing did not start there: a plugin decided, or was
+     * unloaded, and a window nobody takes down stays on the screen doing nothing.
+     */
+    internal fun closeOpenMenu() {
+        val session = playerSession ?: return
+        if (openMenu.containerId == 0) return
+        sendPlayPacket(ContainerClosePacket.CLIENTBOUND_ID) {
+            ContainerClosePacket(openMenu.containerId).write(it)
+        }
+        closeOpenMenu(session)
+    }
+
+    /** Puts new contents in the open menu and redraws it. */
+    internal fun refreshPluginMenu(items: Map<Int, org.basaltmc.server.plugins.PluginItem>) {
+        if (pluginMenu == null) return
+        fillPluginMenu(items)
+        sendInventory()
+    }
+
+    private fun fillPluginMenu(items: Map<Int, org.basaltmc.server.plugins.PluginItem>) {
+        val slots = pluginMenu ?: return
+        slots.fill(null)
+        for ((slot, item) in items) {
+            if (slot !in slots.indices) continue
+            slots[slot] = pluginMenuStack(item)
+        }
+    }
+
+    private fun pluginMenuStack(item: org.basaltmc.server.plugins.PluginItem): StoredItemStack {
+        val components = NbtCompound()
+        // The name is MiniMessage on the plugin's side and a component on the wire, so it is parsed
+        // here rather than stored as the tags a client would show literally.
+        item.name?.let { components[ItemComponentCodecs.CUSTOM_NAME] = ComponentNbt.serialize(MiniMessage.parse(it)) }
+        return StoredItemStack(item.id, item.count.coerceAtLeast(1), components)
     }
 
     /**
@@ -4022,6 +4523,23 @@ public class ClientSession(
      * the cost comes out of the inventory, the result goes in, and the offer's own use is counted.
      */
     private fun selectTrade(index: Int) {
+        val trading =
+            playerEvent(PluginEventTypes.INVENTORY_TRADE) { event ->
+                event.set(3, openMenu.containerId)
+                event.set(4, index)
+                event.set(
+                    5,
+                    openOffers
+                        ?.getOrNull(index)
+                        ?.result
+                        ?.item
+                        ?.toString(),
+                )
+            }
+        if (trading?.cancelled == true) {
+            trading.cancelMessage?.let { sendPluginNotice(it) }
+            return
+        }
         val session = playerSession ?: return
         val offers = openOffers ?: return
         val offer = offers.getOrNull(index) ?: return
@@ -4364,6 +4882,7 @@ public class ClientSession(
         if (openStonecutter) {
             return if (index == Menu.STONECUTTER_INPUT) stonecutterInput else stonecutterResult
         }
+        pluginMenu?.let { return it.getOrNull(index) }
         if (openEnderChest) return playerSession?.enderChest?.getOrNull(index)
         val (position, local) = halfFor(index) ?: return null
         val entity = blockEntityAt(position) ?: return null
@@ -4542,6 +5061,8 @@ public class ClientSession(
         openBlock = null
         openBlockSecond = null
         openEnderChest = false
+        pluginMenu = null
+        pluginMenuClick = null
         // parity: `SmithingMenu.removed`, which hands the three inputs back.
         if (openSmithing) {
             for (slot in listOf(Menu.SMITHING_TEMPLATE, Menu.SMITHING_BASE, Menu.SMITHING_ADDITION)) {
@@ -4771,6 +5292,32 @@ public class ClientSession(
     private fun handleContainerClick(packet: ServerboundContainerClickPacket) {
         val session = playerSession ?: return
         if (packet.containerId != openMenu.containerId) return sendInventory()
+        val clicked =
+            playerEvent(PluginEventTypes.INVENTORY_CLICK) { event ->
+                event.set(3, packet.slot)
+                event.set(4, packet.button)
+                event.set(5, packet.mode.name.lowercase())
+                // What is in the slot the click is about, when it is one this build models.
+                event.set(
+                    6,
+                    (openMenu.slotAt(packet.slot) as? MenuSlot.Inventory)?.let { session.inventory[it.index]?.id },
+                )
+            }
+        if (clicked?.cancelled == true) {
+            clicked.cancelMessage?.let { sendPluginNotice(it) }
+            // The client moved the item on its own screen the moment it clicked.
+            sendInventory()
+            return
+        }
+
+        // A plugin's window: the click is a button press, so nothing moves and the plugin is told
+        // which of *its* slots was meant, never the player's own.
+        val menu = pluginMenu
+        if (menu != null) {
+            (openMenu.slotAt(packet.slot) as? MenuSlot.Block)?.let { pluginMenuClick?.invoke(it.index) }
+            sendInventory()
+            return
+        }
 
         when (packet.mode) {
             ServerboundContainerClickPacket.Mode.PICKUP -> {
@@ -5171,6 +5718,17 @@ public class ClientSession(
         val block = Blocks.byStateId(stateId) ?: return
         // parity: `Block.asItem`, which is not the block's own name for dust, crops or cocoa.
         val item = Items.REGISTRY.byIdentifier(ItemBlocks.itemOf(block.block)) ?: return
+        val picking =
+            playerEvent(PluginEventTypes.PLAYER_PICK_ITEM) { event ->
+                event.set(3, packet.pos.x)
+                event.set(4, packet.pos.y)
+                event.set(5, packet.pos.z)
+                event.set(6, item.id.toString())
+            }
+        if (picking?.cancelled == true) {
+            picking.cancelMessage?.let { sendPluginNotice(it) }
+            return
+        }
         pickItem(session, item.id.toString())
     }
 
@@ -5253,6 +5811,13 @@ public class ClientSession(
 
     /** A system message to every player on the server, whatever world they are in. */
     private fun broadcastToEveryone(message: Component) {
+        val broadcast =
+            pluginEvents.emit(PluginEventTypes.SERVER_BROADCAST) { event ->
+                event.set(0, message.resolvePlainText(consoleLang))
+            }
+        if (broadcast?.cancelled == true) return
+        @Suppress("NAME_SHADOWING")
+        val message = (broadcast?.get("message") as? String)?.let { MiniMessage.parse(it) } ?: message
         for (player in playerRegistry?.snapshot().orEmpty()) {
             player.connection.sendPlayPacket(SystemChatPacket.ID) {
                 SystemChatPacket(message, isActionBar = false).write(it)
@@ -5290,6 +5855,39 @@ public class ClientSession(
             session.yaw = yaw
             session.pitch = pitch
             return
+        }
+        // Only on a real move: a client sends its position every tick whether it moved or not, and
+        // waking a handler for standing still is what makes this event expensive in Bukkit.
+        if (x != session.x || y != session.y || z != session.z) {
+            val moved =
+                playerEvent(PluginEventTypes.PLAYER_MOVE) { event ->
+                    event.set(3, session.x)
+                    event.set(4, session.y)
+                    event.set(5, session.z)
+                    event.set(6, x)
+                    event.set(7, y)
+                    event.set(8, z)
+                }
+            if (moved?.cancelled == true) {
+                moved.cancelMessage?.let { sendPluginNotice(it) }
+                // Put them back where they were, which is what the client is told rather than
+                // asked: it has already drawn the step it took.
+                sendCompressed(PlayerPositionPacket.ID) {
+                    PlayerPositionPacket(
+                        0,
+                        session.x,
+                        session.y,
+                        session.z,
+                        0.0,
+                        0.0,
+                        0.0,
+                        yaw,
+                        pitch,
+                        relativeFlags = 0,
+                    ).write(it)
+                }
+                return
+            }
         }
         val feet = world.getBlockState(floor(x).toInt(), floor(y).toInt(), floor(z).toInt())
         val inWater = feet != null && Fluids.of(feet) == Submersion.WATER
@@ -5488,6 +6086,38 @@ public class ClientSession(
     }
 
     /**
+     * Fires a player event, filling in the three fields every one of them starts with.
+     *
+     * Inline, so a type nobody listens to costs the same null check as anywhere else: the values
+     * after these three are only worked out inside [fill], which never runs without a listener.
+     */
+    private inline fun playerEvent(
+        type: org.basaltmc.server.plugins.PluginEventType,
+        fill: (org.basaltmc.server.plugins.PluginEvent) -> Unit,
+    ): org.basaltmc.server.plugins.PluginEvent? {
+        val session = playerSession ?: return null
+        return pluginEvents.emit(type) { event ->
+            event.set(0, session.name)
+            event.set(1, session.uuid.toString())
+            event.set(2, currentWorld?.name)
+            fill(event)
+        }
+    }
+
+    /** Tells this player why a plugin stopped what they were doing. MiniMessage, like all plugin text. */
+    private fun sendPluginNotice(message: String) {
+        sendPluginText(MiniMessage.parse(message), actionBar = false)
+    }
+
+    /** What a plugin writes to this player, in chat or on the action bar. */
+    internal fun sendPluginText(
+        text: Component,
+        actionBar: Boolean,
+    ) {
+        sendPlayPacket(SystemChatPacket.ID) { SystemChatPacket(text, isActionBar = actionBar).write(it) }
+    }
+
+    /**
      * Relays a chat message to everyone and writes it to the console.
      *
      * The console line is `<Name> message`, which is what vanilla logs: `MinecraftServer
@@ -5497,7 +6127,14 @@ public class ClientSession(
      */
     private fun broadcastChat(message: String) {
         val session = playerSession ?: return
-        val text = Component.text("<${session.name}> $message", TextColor.WHITE)
+        val event =
+            playerEvent(PluginEventTypes.PLAYER_CHAT) { event -> event.set(3, message) }
+        if (event?.cancelled == true) {
+            event.cancelMessage?.let { sendPluginNotice(it) }
+            return
+        }
+        val spoken = (event?.get("message") as? String) ?: message
+        val text = Component.text("<${session.name}> $spoken", TextColor.WHITE)
         logger.info { text.resolvePlainText(consoleLang) }
         for (player in playerRegistry?.snapshot().orEmpty()) {
             player.connection.sendPlayPacket(
@@ -5527,6 +6164,14 @@ public class ClientSession(
     private fun runCommand(command: String) {
         val session = playerSession ?: return
         val dispatcher = commands ?: return
+        val event =
+            playerEvent(PluginEventTypes.PLAYER_COMMAND) { event -> event.set(3, command) }
+        if (event?.cancelled == true) {
+            event.cancelMessage?.let { sendPluginNotice(it) }
+            return
+        }
+        @Suppress("NAME_SHADOWING")
+        val command = (event?.get("command") as? String) ?: command
         logger.info { "${session.name} issued server command: /$command" }
         dispatcher.execute(PlayerCommandSource(session, dispatcher.environment.groups), command)
     }
@@ -5570,6 +6215,13 @@ public class ClientSession(
         amplifier: Int,
     ) {
         val session = playerSession ?: return
+        val given =
+            playerEvent(PluginEventTypes.PLAYER_EFFECT) { event ->
+                event.set(3, effect.toString())
+                event.set(4, amplifier)
+                event.set(5, durationTicks)
+            }
+        if (given?.cancelled == true) return
         val active = ActiveEffect(effect = effect, amplifier = amplifier, remainingTicks = durationTicks)
         session.effects[effect] = active
         sendEffect(active)
@@ -5613,8 +6265,19 @@ public class ClientSession(
         val session = playerSession ?: return
         val held = session.inventory[PlayerInventory.HOTBAR_START + session.inventory.heldSlot]
         val snapshots = EnchantmentAttributes.snapshotsFor(held) { enchantments?.definitionOf(it) }
+        // Whatever a plugin set goes out beside them, and wins where both name the same attribute:
+        // the base a plugin chose is the base, and the enchantments are modifiers on top.
+        val fromPlugins =
+            session.attributeBases.mapNotNull { (name, base) ->
+                AttributeIds.protocolId(name)?.let { id ->
+                    UpdateAttributesPacket.AttributeSnapshot(attribute = id, base = base)
+                }
+            }
+        val all =
+            snapshots.filterNot { snapshot -> fromPlugins.any { it.attribute == snapshot.attribute } } +
+                fromPlugins
         sendPlayPacket(UpdateAttributesPacket.ID) {
-            UpdateAttributesPacket(session.entityId, snapshots).write(it)
+            UpdateAttributesPacket(session.entityId, all).write(it)
         }
     }
 
@@ -5638,8 +6301,14 @@ public class ClientSession(
 
     /** Redraws whatever is due. Failures are swallowed: decoration must never drop a connection. */
     private fun tickUi() {
-        if (!ui().anyEnabled) return
         val session = playerSession ?: return
+        // A plugin holding a surface is reason enough to draw, even with all four files switched off.
+        if (!ui().anyEnabled &&
+            pluginHoldsSidebar?.invoke(session.uuid.toString()) != true &&
+            pluginHoldsBossBar?.invoke() != true
+        ) {
+            return
+        }
         val context = PlaceholderContext.EMPTY.with(PlaceholderSlots.PLAYER, session)
         runCatching { playerUi.tick(uiTick++, context) }
             .onFailure { logger.debug { "UI update failed for ${session.name}: ${it.message}" } }
@@ -5674,12 +6343,31 @@ public class ClientSession(
         session.food.tick(
             difficulty = difficulty,
             health = session.health,
-            maxHealth = PlayerSession.MAX_HEALTH,
-            heal = { amount -> session.health = minOf(session.health + amount, PlayerSession.MAX_HEALTH) },
+            maxHealth = session.maxHealth,
+            heal = { amount -> session.health = minOf(session.health + amount, session.maxHealth) },
             hurt = { amount -> hurt(amount, DEATH_STARVE, DamageTypes.STARVE) },
         )
         // Only when something actually moved: `set_health` every tick is 20 packets a second per
         // player for a bar that changes a few times a minute.
+        if (session.food.foodLevel != foodBefore) {
+            val change =
+                playerEvent(PluginEventTypes.PLAYER_FOOD_CHANGE) { event ->
+                    event.set(3, session.food.foodLevel)
+                    event.set(4, foodBefore)
+                }
+            if (change != null) {
+                val wanted =
+                    if (change.cancelled) {
+                        foodBefore
+                    } else {
+                        (
+                            (change.get("food") as? Long)?.toInt()
+                                ?: session.food.foodLevel
+                        )
+                    }
+                if (wanted != session.food.foodLevel) session.food.set(wanted, session.food.saturationLevel)
+            }
+        }
         if (session.health != healthBefore ||
             session.food.foodLevel != foodBefore ||
             session.food.saturationLevel != saturationBefore
@@ -5717,6 +6405,21 @@ public class ClientSession(
     ) {
         val session = playerSession ?: return
         if (session.dead || session.invulnerable) return
+        // A player is an entity too, so it is the same event; what changes is that the choke point
+        // for a player is here rather than in EntityCombat.
+        var amount = amount
+        if (pluginEvents != null && pluginEvents.listening(PluginEventTypes.ENTITY_DAMAGE)) {
+            val event = pluginEvents.event(PluginEventTypes.ENTITY_DAMAGE)
+            event.set(0, session.entityId)
+            event.set(1, "minecraft:player")
+            event.set(2, currentWorld?.name)
+            event.set(3, damageType?.path ?: deathMessageId)
+            event.set(4, amount.toDouble())
+            event.set(5, source?.entityId?.toString())
+            if (!pluginEvents.fire(event)) return
+            amount = ((event.get("amount") as? Double) ?: amount.toDouble()).toFloat()
+            if (amount <= 0f) return
+        }
         // parity: `LivingEntity.hurt`'s cooldown: inside the half second after a hit, only a bigger
         // one lands, and only by the difference. It is what stops lava and burning stacking.
         var incoming = amount
@@ -5785,9 +6488,22 @@ public class ClientSession(
 
     /** parity: `LivingEntity.heal`, capped at the maximum and reported like any other change. */
     internal fun heal(amount: Float) {
+        val healing =
+            playerSession?.let { session ->
+                pluginEvents.emit(PluginEventTypes.ENTITY_HEAL) { event ->
+                    event.set(0, session.entityId)
+                    event.set(1, "minecraft:player")
+                    event.set(2, currentWorld?.name)
+                    event.set(3, amount.toDouble())
+                    event.set(4, "regen")
+                }
+            }
+        if (healing?.cancelled == true) return
+        @Suppress("NAME_SHADOWING")
+        val amount = ((healing?.get("amount") as? Double) ?: amount.toDouble()).toFloat()
         val session = playerSession ?: return
         if (session.dead) return
-        val healed = minOf(session.health + amount, PlayerSession.MAX_HEALTH)
+        val healed = minOf(session.health + amount, session.maxHealth)
         if (healed == session.health) return
         session.health = healed
         syncHealth()
@@ -5807,6 +6523,17 @@ public class ClientSession(
      * learns it died and keeps playing.
      */
     private fun die(deathMessageId: String) {
+        playerSession?.let { session ->
+            pluginEvents.emit(PluginEventTypes.PLAYER_DEATH) { event ->
+                event.set(0, session.name)
+                event.set(1, session.uuid.toString())
+                event.set(2, currentWorld?.name)
+                event.set(3, session.x)
+                event.set(4, session.y)
+                event.set(5, session.z)
+                event.set(6, deathMessageId)
+            }
+        }
         val session = playerSession ?: return
         session.dead = true
         session.health = 0f
@@ -5847,6 +6574,14 @@ public class ClientSession(
         session.x = spawnX
         session.y = spawnY
         session.z = spawnZ
+        pluginEvents.emit(PluginEventTypes.PLAYER_RESPAWN) { event ->
+            event.set(0, session.name)
+            event.set(1, session.uuid.toString())
+            event.set(2, respawnWorld.name)
+            event.set(3, spawnX)
+            event.set(4, spawnY)
+            event.set(5, spawnZ)
+        }
 
         sendCompressed(RespawnPacket.ID) { RespawnPacket(spawnInfo(session.gamemode), dataToKeep = 0).write(it) }
         sendCompressed(PlayerPositionPacket.ID) {
@@ -5907,6 +6642,15 @@ public class ClientSession(
      */
     internal fun setGamemode(mode: Gamemode) {
         val session = playerSession ?: return
+        val change =
+            playerEvent(PluginEventTypes.PLAYER_GAMEMODE_CHANGE) { event ->
+                event.set(3, mode.name.lowercase())
+                event.set(4, session.gamemode.name.lowercase())
+            }
+        if (change?.cancelled == true) {
+            change.cancelMessage?.let { sendPluginNotice(it) }
+            return
+        }
         session.gamemode = mode
         if (!session.mayFly) session.flying = false
         if (mode == Gamemode.SPECTATOR) session.flying = true
@@ -5943,6 +6687,15 @@ public class ClientSession(
         z: Double,
     ): Boolean {
         val session = playerSession ?: return false
+        val from = currentWorld?.name
+        if (from != target.name) {
+            pluginEvents.emit(PluginEventTypes.PLAYER_WORLD_CHANGE) { event ->
+                event.set(0, session.name)
+                event.set(1, session.uuid.toString())
+                event.set(2, target.name)
+                event.set(3, from)
+            }
+        }
         val previous = currentWorld
         if (previous == null || previous.name == target.name) return false
 
@@ -5986,7 +6739,24 @@ public class ClientSession(
         z: Double,
         yaw: Float,
         pitch: Float,
+        /** What asked for it, for a plugin that treats a command differently from a portal. */
+        cause: String = "command",
     ) {
+        val session = playerSession
+        val teleport =
+            playerEvent(PluginEventTypes.PLAYER_TELEPORT) { event ->
+                event.set(3, session?.x)
+                event.set(4, session?.y)
+                event.set(5, session?.z)
+                event.set(6, x)
+                event.set(7, y)
+                event.set(8, z)
+                event.set(9, cause)
+            }
+        if (teleport?.cancelled == true) {
+            teleport.cancelMessage?.let { sendPluginNotice(it) }
+            return
+        }
         sendCompressed(PlayerPositionPacket.ID) {
             PlayerPositionPacket(0, x, y, z, 0.0, 0.0, 0.0, yaw, pitch, relativeFlags = 0).write(it)
         }
@@ -6070,6 +6840,12 @@ public class ClientSession(
         // the second one meant a held button never finished a single one. parity: vanilla starts the
         // use once because its `useItemOn` never falls through to `use` on the same packet.
         if (eatingSlot == slot) return true
+        val eating = playerEvent(PluginEventTypes.PLAYER_ITEM_CONSUME) { event -> event.set(3, item.toString()) }
+        if (eating?.cancelled == true) {
+            eating.cancelMessage?.let { sendPluginNotice(it) }
+            sendInventory()
+            return false
+        }
         if (!food.canAlwaysEat && session.food.foodLevel >= FoodData.MAX_FOOD) {
             // parity: `ServerPlayerGameMode.useItem` sends the whole inventory back whenever the use
             // never started. Without it a client that had already predicted the mouthful kept the
@@ -6130,6 +6906,15 @@ public class ClientSession(
         val world = currentWorld ?: return
         val entityId = playerRegistry?.allocateEntityId() ?: return
         val protocolType = EntityTypes[Projectiles.ARROW.type]?.protocolId ?: return
+        val shooting =
+            pluginEvents.emit(PluginEventTypes.ENTITY_SHOOT) { event ->
+                event.set(0, session.entityId)
+                event.set(1, "minecraft:player")
+                event.set(2, currentWorld?.name)
+                event.set(3, Projectiles.ARROW.type.toString())
+                event.set(4, power.toDouble())
+            }
+        if (shooting?.cancelled == true) return
 
         val pitch = session.pitch * PI.toFloat() / HALF_CIRCLE
         val yaw = session.yaw * PI.toFloat() / HALF_CIRCLE
@@ -6401,6 +7186,17 @@ public class ClientSession(
     private fun startDigging(pos: BlockPos) {
         val session = playerSession ?: return
         if (session.gamemode != Gamemode.SURVIVAL && session.gamemode != Gamemode.ADVENTURE) return
+        val digging =
+            playerEvent(PluginEventTypes.BLOCK_DAMAGE) { event ->
+                event.set(3, pos.x)
+                event.set(4, pos.y)
+                event.set(5, pos.z)
+                event.set(6, world.getBlockState(pos.x, pos.y, pos.z)?.let { BlockStateDefinitions.blockOf(it) })
+            }
+        if (digging?.cancelled == true) {
+            digging.cancelMessage?.let { sendPluginNotice(it) }
+            return
+        }
         diggingAt = pos
         diggingTicks = 0
         diggingStage = -1
@@ -6571,7 +7367,7 @@ public class ClientSession(
             sendActionBar(Component.translatable("block.minecraft.bed.not_valid"))
             // parity: `BedBlock.useWithoutItem`, which does not merely refuse: it takes the bed out
             // and sets off an explosion of five where it stood.
-            blowUp(world, head.x + 0.5, head.y + 0.5, head.z + 0.5, Explosions.BED_POWER)
+            blowUp(world, head.x + 0.5, head.y + 0.5, head.z + 0.5, Explosions.BED_POWER, "bed")
             return
         }
         // parity: `ServerPlayer.startSleepInBed` sets the spawn point once the bed is reachable and
@@ -6589,6 +7385,17 @@ public class ClientSession(
 
         world.state.setBlockState(head.x, head.y, head.z, Beds.withOccupied(headState, occupied = true))
         broadcastBlockUpdate(head, Beds.withOccupied(headState, occupied = true))
+        val sleeping =
+            playerEvent(PluginEventTypes.PLAYER_BED) { event ->
+                event.set(3, head.x)
+                event.set(4, head.y)
+                event.set(5, head.z)
+                event.set(6, true)
+            }
+        if (sleeping?.cancelled == true) {
+            sleeping.cancelMessage?.let { sendPluginNotice(it) }
+            return
+        }
         session.sleepingBed = Triple(head.x, head.y, head.z)
         session.sleepTicks = 0
         val packet = SetEntityDataPacket.sleeping(session.entityId, head)
@@ -6663,6 +7470,17 @@ public class ClientSession(
         stopEating()
         val heldSlot = PlayerInventory.HOTBAR_START + session.inventory.heldSlot
         val held = session.inventory[heldSlot]
+        val swap =
+            playerEvent(PluginEventTypes.PLAYER_SWAP_HANDS) { event ->
+                event.set(3, held?.id)
+                event.set(4, session.inventory[PlayerInventory.OFFHAND_SLOT]?.id)
+            }
+        if (swap?.cancelled == true) {
+            swap.cancelMessage?.let { sendPluginNotice(it) }
+            sendInventorySlot(heldSlot)
+            sendInventorySlot(PlayerInventory.OFFHAND_SLOT)
+            return
+        }
         session.inventory[heldSlot] = session.inventory[PlayerInventory.OFFHAND_SLOT]
         session.inventory[PlayerInventory.OFFHAND_SLOT] = held
         sendInventorySlot(heldSlot)
@@ -6825,6 +7643,14 @@ public class ClientSession(
 
     internal fun syncExperience() {
         val session = playerSession ?: return
+        if (session.experience.level != lastSyncedLevel) {
+            val was = lastSyncedLevel
+            lastSyncedLevel = session.experience.level
+            playerEvent(PluginEventTypes.PLAYER_LEVEL_CHANGE) { event ->
+                event.set(3, session.experience.level)
+                event.set(4, was)
+            }
+        }
         sendCompressed(SetExperiencePacket.ID) {
             SetExperiencePacket(
                 session.experience.progress,
@@ -6887,6 +7713,11 @@ public class ClientSession(
         registry.remove(session.uuid)
         progress?.unload(session.uuid.toString())
         logger.info { "${session.name} left the game" }
+        pluginEvents.emit(PluginEventTypes.PLAYER_QUIT) { event ->
+            event.set(0, session.name)
+            event.set(1, session.uuid.toString())
+            event.set(2, currentWorld?.name)
+        }
         // parity: `ServerGamePacketListenerImpl.onDisconnect`, the other half of the pair above.
         broadcastToEveryone(
             Component
@@ -7001,9 +7832,84 @@ public class ClientSession(
         val body = PacketScratch.body
         body.writeVarInt(id)
         writeBody(body)
+        var bytes = body.toByteArray()
+        // The id is in front of the body, and a plugin is shown the packet without it.
+        val idBytes = VarInt.sizeOf(id)
+        bytes = interceptOutgoing(id, bytes, idBytes) ?: return
         val frame = PacketScratch.frame
-        PacketFraming.writeCompressed(frame, body.toByteArray(), compressionThreshold, Zlib::compress)
+        PacketFraming.writeCompressed(frame, bytes, compressionThreshold, Zlib::compress)
         writeToSocket(frame)
+    }
+
+    /**
+     * A message from the client on a named channel.
+     *
+     * Read only when somebody is listening on that name: a modded client chatters on channels this
+     * server has no opinion about, and decoding all of it to throw it away would be a cost every
+     * server pays for the few that use one.
+     */
+    private fun handleCustomPayload(body: ByteBuffer) {
+        val deliver = pluginChannel ?: return
+        val packet = CustomPayloadPacket.read(body)
+        if (pluginListensOn?.invoke(packet.channel) != true) return
+        val session = playerSession ?: return
+        deliver(packet.channel, session.uuid.toString(), packet.data)
+    }
+
+    /**
+     * Shows an incoming packet to whoever is watching it, and answers whether to handle it.
+     *
+     * The bytes are read without consuming them, so a listener seeing a packet costs a copy and the
+     * server still decodes it exactly as it would have. Replacing them puts the new body in the same
+     * buffer, which is what makes changing one on the way in possible at all before the fields
+     * themselves are named.
+     */
+    private fun interceptIncoming(
+        packetId: Int,
+        body: ByteBuffer,
+    ): Boolean {
+        val bus = pluginPackets ?: return true
+        val name = PacketNames.of(state, serverbound = true, id = packetId)
+        if (!bus.listening(name)) return true
+        val session = playerSession
+        val packet = bus.packet()
+        packet.name = name
+        packet.serverbound = true
+        packet.playerName = session?.name.orEmpty()
+        packet.playerUuid = session?.uuid?.toString().orEmpty()
+        packet.bytes = body.toByteArray()
+        if (!bus.fire(packet)) return false
+        packet.replacement?.let {
+            body.clear()
+            body.writeBytes(it)
+        }
+        return true
+    }
+
+    /**
+     * Shows an outgoing packet to whoever is watching it, and answers with what to send.
+     *
+     * Null means a plugin cancelled it. The first line is the whole performance story: with nobody
+     * listening to that name this is one map lookup and the bytes are never copied.
+     */
+    private fun interceptOutgoing(
+        id: Int,
+        bytes: ByteArray,
+        idBytes: Int,
+    ): ByteArray? {
+        val bus = pluginPackets ?: return bytes
+        val name = PacketNames.of(state, serverbound = false, id = id)
+        if (!bus.listening(name)) return bytes
+        val session = playerSession
+        val packet = bus.packet()
+        packet.name = name
+        packet.serverbound = false
+        packet.playerName = session?.name.orEmpty()
+        packet.playerUuid = session?.uuid?.toString().orEmpty()
+        packet.bytes = bytes.copyOfRange(idBytes, bytes.size)
+        if (!bus.fire(packet)) return null
+        val replaced = packet.replacement ?: return bytes
+        return bytes.copyOfRange(0, idBytes) + replaced
     }
 
     /**
@@ -7069,6 +7975,11 @@ public class ClientSession(
     private companion object {
         /** The one enchantment that changes how fast a block comes apart. */
         val EFFICIENCY = Identifier.vanilla("efficiency")
+
+        /**
+         * `Display.TextDisplay.DATA_TEXT_ID`: Entity's eight synched fields, then Display's fifteen.
+         */
+        const val TEXT_DISPLAY_TEXT_INDEX = 23
 
         // How far past the view distance to generate ahead of a moving player, in chunks.
         const val PREFETCH_MARGIN_CHUNKS = 2

@@ -1,5 +1,6 @@
 package org.basaltmc.server.runtime.command.commands
 
+import org.basaltmc.server.plugins.PluginEventTypes
 import org.basaltmc.server.runtime.command.BoolArgument
 import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandContext
@@ -7,9 +8,11 @@ import org.basaltmc.server.runtime.command.CommandNodeBuilder
 import org.basaltmc.server.runtime.command.IntegerArgument
 import org.basaltmc.server.runtime.command.PermissionLevel
 import org.basaltmc.server.runtime.command.world
+import org.basaltmc.server.runtime.plugins.emit
 import org.basaltmc.server.runtime.world.GameRule
 import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.wire.text.Component
+import org.basaltmc.wire.text.MiniMessage
 
 /**
  * parity: `GameRuleCommand`. One literal per rule, each optionally taking a value, exactly as
@@ -55,7 +58,26 @@ public class GameRuleCommand : Command(name = "gamerule", permissionLevel = Perm
         rule: GameRule<*>,
         value: String,
     ): Int {
-        context.world().gameRules.set(rule, value)
+        val world = context.world()
+        val change =
+            context.environment.pluginEvents.emit(PluginEventTypes.WORLD_GAME_RULE_CHANGE) { event ->
+                event.set(0, world.name)
+                event.set(1, rule.id)
+                event.set(2, value)
+                event.set(
+                    3,
+                    when (rule) {
+                        is GameRule.Bool -> world.gameRules[rule].toString()
+                        is GameRule.Integer -> world.gameRules[rule].toString()
+                    },
+                )
+                event.set(4, context.source.name)
+            }
+        if (change?.cancelled == true) {
+            change.cancelMessage?.let { context.source.sendSystemMessage(MiniMessage.parse(it)) }
+            return 0
+        }
+        world.gameRules.set(rule, value)
         context.success(
             Component.translatable("commands.gamerule.set", Component.text(rule.id), Component.text(value)),
             broadcastToAdmins = true,

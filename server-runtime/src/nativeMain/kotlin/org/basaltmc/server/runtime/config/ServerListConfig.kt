@@ -3,6 +3,7 @@ package org.basaltmc.server.runtime.config
 import org.basaltmc.wire.common.logging.Logger
 import org.basaltmc.wire.common.placeholder.PlaceholderContext
 import org.basaltmc.wire.common.placeholder.PlaceholderRegistry
+import org.basaltmc.wire.common.toml.TomlValue
 
 /**
  * What the server knows about whoever is pinging. All of it comes from the handshake or the socket.

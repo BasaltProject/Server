@@ -1,5 +1,6 @@
 package org.basaltmc.server.runtime.ui
 
+import org.basaltmc.server.plugins.PluginSurfaceContent
 import org.basaltmc.server.runtime.config.BossBarConfig
 import org.basaltmc.server.runtime.config.OnceReporter
 import org.basaltmc.server.runtime.config.ScoreboardConfig
@@ -52,6 +53,12 @@ public class PlayerUi(
     private val send: (packetId: Int, write: (org.basaltmc.wire.io.ByteBuffer) -> Unit) -> Unit,
     private val logger: Logger = Logger("Ui"),
     private val reporter: OnceReporter = OnceReporter(),
+    /** Whether a plugin is holding the sidebar for this player. Cheap: no plugin code runs. */
+    private val pluginHoldsSidebar: () -> Boolean = { false },
+    /** What that plugin wants drawn. Runs its code, so it is only called when a redraw is due. */
+    private val pluginSidebar: () -> PluginSurfaceContent? = { null },
+    private val pluginHoldsBossBar: () -> Boolean = { false },
+    private val pluginBossBar: () -> PluginSurfaceContent? = { null },
 ) {
     private var lastTabList: Pair<String, String>? = null
     private var lastScoreboardTitle: String? = null
@@ -74,8 +81,27 @@ public class PlayerUi(
         context: PlaceholderContext,
     ) {
         if (due(tick, configs().tabList.enabled, configs().tabList.updateIntervalTicks)) updateTabList(context)
-        if (due(tick, configs().scoreboard.enabled, configs().scoreboard.updateIntervalTicks)) updateScoreboard(context)
-        if (due(tick, configs().bossBar.enabled, configs().bossBar.updateIntervalTicks)) updateBossBar(context)
+        // A plugin holding the sidebar turns it on even where the operator's file left it off:
+        // installing a plugin that draws one should not also mean editing scoreboard.toml.
+        val boardOn = configs().scoreboard.enabled || pluginHoldsSidebar()
+        val boardEvery =
+            if (configs().scoreboard.enabled) configs().scoreboard.updateIntervalTicks else PLUGIN_SIDEBAR_INTERVAL
+        if (due(tick, boardOn, boardEvery)) updateScoreboard(context)
+        val barOn = configs().bossBar.enabled || pluginHoldsBossBar()
+        val barEvery =
+            if (configs().bossBar.enabled) configs().bossBar.updateIntervalTicks else PLUGIN_SIDEBAR_INTERVAL
+        if (due(tick, barOn, barEvery)) updateBossBar(context)
+    }
+
+    /** Takes the sidebar down and leaves the rest alone. */
+    private fun clearScoreboard() {
+        if (!scoreboardShown) return
+        send(SetObjectivePacket.ID) {
+            SetObjectivePacket(OBJECTIVE, SetObjectivePacket.METHOD_REMOVE).write(it)
+        }
+        scoreboardShown = false
+        lastScoreboardLines = emptyList()
+        lastScoreboardTitle = null
     }
 
     /** Takes down anything this player was shown. Called when they leave or change worlds. */
@@ -131,6 +157,19 @@ public class PlayerUi(
     }
 
     private fun updateScoreboard(context: PlaceholderContext) {
+        val fromPlugin = pluginSidebar()
+        if (fromPlugin != null) {
+            drawScoreboard(
+                substitute(fromPlugin.title, context),
+                fromPlugin.lines.take(ScoreboardConfig.MAX_LINES).map { substitute(it, context) },
+            )
+            return
+        }
+        if (!configs().scoreboard.enabled) {
+            // The plugin that was drawing it let go and the operator never wanted one.
+            clearScoreboard()
+            return
+        }
         val profile =
             configs()
                 .scoreboard.profiles
@@ -143,13 +182,19 @@ public class PlayerUi(
                     "scoreboard",
                 ).inheriting(configs().scoreboard.defaultProfile)
 
-        val title = substitute(profile.title.orEmpty(), context)
-        val lines =
+        drawScoreboard(
+            substitute(profile.title.orEmpty(), context),
             profile.lines
                 .orEmpty()
                 .take(ScoreboardConfig.MAX_LINES)
-                .map { substitute(it, context) }
+                .map { substitute(it, context) },
+        )
+    }
 
+    private fun drawScoreboard(
+        title: String,
+        lines: List<String>,
+    ) {
         if (!scoreboardShown) {
             send(SetObjectivePacket.ID) {
                 SetObjectivePacket(
@@ -193,6 +238,25 @@ public class PlayerUi(
     }
 
     private fun updateBossBar(context: PlaceholderContext) {
+        val fromPlugin = pluginBossBar()
+        if (fromPlugin != null) {
+            // A bar has a title and one number, so the plugin's first line is its progress: the
+            // surfaces all carry the same shape and each one reads what it needs from it.
+            drawBossBar(
+                substitute(fromPlugin.title, context),
+                fromPlugin.lines
+                    .firstOrNull()
+                    ?.toFloatOrNull()
+                    ?.coerceIn(0f, 1f) ?: 1f,
+                BossBarColor.WHITE,
+                BossBarOverlay.PROGRESS,
+            )
+            return
+        }
+        if (!configs().bossBar.enabled) {
+            clearBossBar()
+            return
+        }
         val profile =
             configs()
                 .bossBar.profiles
@@ -205,11 +269,29 @@ public class PlayerUi(
                     "boss bar",
                 ).inheriting(configs().bossBar.defaultProfile)
 
-        val text = substitute(profile.text.orEmpty(), context)
-        val progress = progressOf(profile.progress, context)
-        val color = profile.color ?: BossBarColor.WHITE
-        val overlay = profile.overlay ?: BossBarOverlay.PROGRESS
+        drawBossBar(
+            substitute(profile.text.orEmpty(), context),
+            progressOf(profile.progress, context),
+            profile.color ?: BossBarColor.WHITE,
+            profile.overlay ?: BossBarOverlay.PROGRESS,
+        )
+    }
 
+    private fun clearBossBar() {
+        val id = bossBarId ?: return
+        send(BossEventPacket.ID) { BossEventPacket(id, BossEventPacket.Operation.Remove).write(it) }
+        bossBarId = null
+        lastBossText = null
+        lastBossProgress = null
+        lastBossStyle = null
+    }
+
+    private fun drawBossBar(
+        text: String,
+        progress: Float,
+        color: BossBarColor,
+        overlay: BossBarOverlay,
+    ) {
         val id = bossBarId
         if (id == null) {
             val fresh = Uuid.random()
@@ -288,5 +370,8 @@ public class PlayerUi(
     private companion object {
         /** One objective per player connection; the name only has to be unique within that client. */
         const val OBJECTIVE = "basalt"
+
+        /** How often a plugin's sidebar is redrawn where the operator's own file is switched off. */
+        const val PLUGIN_SIDEBAR_INTERVAL = 20
     }
 }

@@ -5,6 +5,8 @@ import org.basaltmc.wire.common.placeholder.ConditionResult
 import org.basaltmc.wire.common.placeholder.PlaceholderCondition
 import org.basaltmc.wire.common.placeholder.PlaceholderContext
 import org.basaltmc.wire.common.placeholder.PlaceholderRegistry
+import org.basaltmc.wire.common.toml.TomlFormatException
+import org.basaltmc.wire.common.toml.TomlValue
 import kotlin.concurrent.AtomicReference
 
 /**

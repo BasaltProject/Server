@@ -1,6 +1,7 @@
 package org.basaltmc.server.runtime.config
 
 import org.basaltmc.wire.common.logging.Logger
+import org.basaltmc.wire.common.toml.TomlFormatException
 
 /**
  * One permission rule: a dotted name, possibly ending in `*`, granting or denying.

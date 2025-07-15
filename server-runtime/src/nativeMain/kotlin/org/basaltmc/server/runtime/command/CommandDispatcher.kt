@@ -318,6 +318,17 @@ public class CommandDispatcher(
         return node
     }
 
+    /**
+     * Takes a node back out of the tree.
+     *
+     * For what is registered while the server runs and can go away again, which today means a
+     * plugin's commands: unloading one has to leave the tree as it was, aliases included.
+     */
+    public fun unregister(node: LiteralNode) {
+        root.children.remove(node)
+        root.children.removeAll { it.redirect === node }
+    }
+
     /** Registers [name] as an alias that redirects onto [target], the way vanilla declares `/tp` and `/xp`. */
     public fun registerAlias(
         name: String,

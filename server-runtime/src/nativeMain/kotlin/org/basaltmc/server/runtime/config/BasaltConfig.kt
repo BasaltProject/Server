@@ -2,6 +2,7 @@ package org.basaltmc.server.runtime.config
 
 import org.basaltmc.wire.common.logging.LogLevel
 import org.basaltmc.wire.common.logging.Logger
+import org.basaltmc.wire.common.toml.TomlValue
 import org.basaltmc.wire.io.FileIO
 
 /** When the console gets ANSI colour. [AUTO] means "only when stdout is a terminal". */
@@ -40,6 +41,14 @@ public data class BasaltConfig(
     public val regional: Boolean = false,
     /** How many regions tick at once with [regional] on. Zero means "one per pair of cores". */
     public val regionThreads: Int = 0,
+    /** Whether the plugins folder is looked at. Off means it is not even read. */
+    public val pluginsEnabled: Boolean = true,
+    /** What one plugin may run in a single turn, refilled on every entry. See `[plugins]`. */
+    public val pluginInstructionsPerTurn: Long = 250_000,
+    /** The most memory one plugin's own objects may take. */
+    public val pluginMemoryBytes: Long = 32L * 1024 * 1024,
+    /** How many copies of each plugin run. One on a server; more is a development switch. */
+    public val pluginLanes: Int = 1,
 ) {
     public companion object {
         private val DEFAULT =
@@ -56,6 +65,10 @@ public data class BasaltConfig(
                 generationMetrics = false,
                 regional = false,
                 regionThreads = 0,
+                pluginsEnabled = true,
+                pluginInstructionsPerTurn = 250_000,
+                pluginMemoryBytes = 32L * 1024 * 1024,
+                pluginLanes = 1,
             )
 
         /** The file this configuration lives in, inside [ConfigDirectory]. */
@@ -107,6 +120,7 @@ public data class BasaltConfig(
             val server = root.tableOrNull("server")
             val logging = root.tableOrNull("logging")
             val performance = root.tableOrNull("performance")
+            val plugins = root.tableOrNull("plugins")
             return BasaltConfig(
                 port = server?.intOrNull("port")?.toInt() ?: DEFAULT.port,
                 maxPlayers = server?.intOrNull("max-players")?.toInt() ?: DEFAULT.maxPlayers,
@@ -121,6 +135,17 @@ public data class BasaltConfig(
                     performance?.boolOrNull("generation-metrics") ?: DEFAULT.generationMetrics,
                 regional = performance?.boolOrNull("regional") ?: DEFAULT.regional,
                 regionThreads = regionThreadsOf(performance?.stringOrNull("region-threads")),
+                pluginsEnabled = plugins?.boolOrNull("enabled") ?: DEFAULT.pluginsEnabled,
+                // Floored rather than taken as written: a budget of five instructions or a
+                // megabyte of nothing stops every plugin on the server, and reads as "plugins are
+                // broken" rather than as the typo it is.
+                pluginInstructionsPerTurn =
+                    (plugins?.intOrNull("instructions-per-turn") ?: DEFAULT.pluginInstructionsPerTurn)
+                        .coerceAtLeast(1_000L),
+                pluginMemoryBytes =
+                    (plugins?.intOrNull("memory-mb") ?: (DEFAULT.pluginMemoryBytes / 1024 / 1024))
+                        .coerceAtLeast(1L) * 1024 * 1024,
+                pluginLanes = (plugins?.intOrNull("test-lanes") ?: 1L).toInt().coerceAtLeast(1),
             )
         }
 

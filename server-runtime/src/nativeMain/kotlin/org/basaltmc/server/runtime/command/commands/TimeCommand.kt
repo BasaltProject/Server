@@ -1,5 +1,6 @@
 package org.basaltmc.server.runtime.command.commands
 
+import org.basaltmc.server.plugins.PluginEventTypes
 import org.basaltmc.server.runtime.command.Command
 import org.basaltmc.server.runtime.command.CommandContext
 import org.basaltmc.server.runtime.command.CommandNodeBuilder
@@ -11,10 +12,12 @@ import org.basaltmc.server.runtime.command.ResourceLocationArgument
 import org.basaltmc.server.runtime.command.TimeArgument
 import org.basaltmc.server.runtime.command.world
 import org.basaltmc.server.runtime.config.WorldDimension
+import org.basaltmc.server.runtime.plugins.emit
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.WorldClock
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.text.Component
+import org.basaltmc.wire.text.MiniMessage
 
 /**
  * parity: `TimeCommand` as 26.2 rewrote it: clocks, not "day time".
@@ -157,6 +160,17 @@ public class TimeCommand : Command(name = "time", permissionLevel = PermissionLe
         named: Boolean,
     ): Int {
         val (world, clockName) = clockOf(context, named)
+        val skip =
+            context.environment.pluginEvents.emit(PluginEventTypes.WORLD_TIME_SKIP) { event ->
+                event.set(0, world.name)
+                event.set(1, ticks)
+                event.set(2, world.clock.totalTicks)
+                event.set(3, "command")
+            }
+        if (skip?.cancelled == true) {
+            skip.cancelMessage?.let { context.source.sendSystemMessage(MiniMessage.parse(it)) }
+            return 0
+        }
         world.clock.setTotalTicks(ticks)
         context.environment.syncTime(world)
         context.success(

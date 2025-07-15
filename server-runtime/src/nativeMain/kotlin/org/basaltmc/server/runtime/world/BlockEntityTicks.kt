@@ -1,5 +1,7 @@
 package org.basaltmc.server.runtime.world
 
+import org.basaltmc.server.plugins.PluginEventBus
+import org.basaltmc.server.plugins.PluginEventTypes
 import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.world.crafting.Recipe
 import org.basaltmc.server.world.loot.ItemStack
@@ -43,6 +45,8 @@ public object BlockEntityTicks {
         chunks: List<IntArray>,
         recipeFor: (Recipe.Cooker, ItemStack) -> Recipe.Cooking?,
         onDropped: (Dropped) -> Unit = {},
+        /** Where plugin events go. Null, or nobody listening, costs a comparison per machine. */
+        events: PluginEventBus? = null,
     ): List<Changed> {
         val changes = mutableListOf<Changed>()
         // parity: `DaylightDetectorBlock`'s own ticker, which looks once every twenty ticks.
@@ -67,6 +71,15 @@ public object BlockEntityTicks {
                 val z0 = (position[1] shl 4) + entity.localZ
                 // parity: `HopperBlockEntity.pushItemsTick`, one move per turn and then a rest.
                 if (entity.type.path == "hopper") {
+                    if (events != null && events.listening(PluginEventTypes.INVENTORY_MOVE_ITEM)) {
+                        val event = events.event(PluginEventTypes.INVENTORY_MOVE_ITEM)
+                        event.set(0, world.name)
+                        event.set(1, x0)
+                        event.set(2, entity.y)
+                        event.set(3, z0)
+                        event.set(4, "hopper")
+                        if (!events.fire(event)) continue
+                    }
                     if (Hoppers.tick(world, x0, entity.y, z0)) chunk.markDirty()
                     continue
                 }
@@ -108,6 +121,29 @@ public object BlockEntityTicks {
                 val x = (position[0] shl 4) + entity.localX
                 val z = (position[1] shl 4) + entity.localZ
                 val state = Furnaces.read(entity.data)
+                if (events != null && events.listening(PluginEventTypes.INVENTORY_SMELT)) {
+                    val event = events.event(PluginEventTypes.INVENTORY_SMELT)
+                    event.set(0, world.name)
+                    event.set(1, x)
+                    event.set(2, entity.y)
+                    event.set(3, z)
+                    event.set(4, cooker.name.lowercase())
+                    event.set(
+                        5,
+                        state.items
+                            .getOrNull(0)
+                            ?.item
+                            ?.toString(),
+                    )
+                    event.set(
+                        6,
+                        state.items
+                            .getOrNull(2)
+                            ?.item
+                            ?.toString(),
+                    )
+                    if (!events.fire(event)) continue
+                }
                 if (!Furnaces.tick(state, { stack -> recipeFor(cooker, stack) })) continue
                 Furnaces.write(state, entity.data)
                 chunk.markDirty()

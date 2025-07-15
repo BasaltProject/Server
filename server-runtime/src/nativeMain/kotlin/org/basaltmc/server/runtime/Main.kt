@@ -11,7 +11,6 @@ import org.basaltmc.server.runtime.config.BasaltConfig
 import org.basaltmc.server.runtime.config.ColorMode
 import org.basaltmc.server.runtime.config.LiveConfigs
 import org.basaltmc.server.runtime.config.ServerListConfig
-import org.basaltmc.server.runtime.config.TomlFormatException
 import org.basaltmc.server.runtime.config.WorldsConfig
 import org.basaltmc.server.runtime.world.VanillaWorldGeneratorFactory
 import org.basaltmc.server.storage.PlayerDatabaseSchemaException
@@ -20,6 +19,7 @@ import org.basaltmc.wire.auth.OnlineMode
 import org.basaltmc.wire.auth.SessionKeyPair
 import org.basaltmc.wire.common.logging.LogOutput
 import org.basaltmc.wire.common.logging.Logger
+import org.basaltmc.wire.common.toml.TomlFormatException
 import org.basaltmc.wire.io.LogFile
 import org.basaltmc.wire.io.ShutdownSignal
 import org.basaltmc.wire.io.SocketException
