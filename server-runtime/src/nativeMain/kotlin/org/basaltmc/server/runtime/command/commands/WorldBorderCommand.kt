@@ -116,9 +116,9 @@ public class WorldBorderCommand : Command(name = "worldborder", permissionLevel 
         }
         val old = border.targetSize
         if (timeTicks > 0) {
-            val millis = timeTicks.toLong() * MILLIS_PER_TICK
-            border.moveSize(newSize, millis)
-            broadcast(context, world) { SetBorderLerpSizePacket(old, newSize, millis) }
+            val ticks = timeTicks.toLong()
+            border.moveSize(newSize, ticks)
+            broadcast(context, world) { SetBorderLerpSizePacket(old, newSize, ticks) }
             context.success(
                 Component.translatable(
                     if (newSize > old) "commands.worldborder.set.grow" else "commands.worldborder.set.shrink",
@@ -273,7 +273,6 @@ public class WorldBorderCommand : Command(name = "worldborder", permissionLevel 
     private companion object {
         const val MIN_SIZE = 1.0
         const val MAX_SIZE = WorldBorder.MAX_SIZE
-        const val MILLIS_PER_TICK = 50L
         const val TICKS_PER_SECOND = 20
     }
 }
