@@ -4,6 +4,7 @@ import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.WorldMetadata
 import org.basaltmc.wire.common.logging.LogLevel
 import org.basaltmc.wire.common.logging.Logger
+import org.basaltmc.wire.common.toml.TomlFormatException
 import org.basaltmc.wire.io.FileIO
 import kotlin.test.Test
 import kotlin.test.assertEquals
