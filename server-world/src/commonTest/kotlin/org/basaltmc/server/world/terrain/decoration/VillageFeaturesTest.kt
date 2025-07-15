@@ -6,6 +6,8 @@ import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.wire.common.Identifier
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class VillageFeaturesTest {
@@ -40,6 +42,40 @@ class VillageFeaturesTest {
         assertTrue((0 until 16).any { x -> (0 until 16).any { z -> chunk.getBlockStateId(x, 64, z) in flowers } })
     }
 
+    @Test
+    fun blockPilesRequireASturdyTopFace() {
+        val dirtPath = state("dirt_path")
+        val random = WorldgenRandom(XoroshiroRandom(1L))
+        val topSlab = state("stone_slab", mapOf("type" to "top", "waterlogged" to "false"))
+        val bottomSlab = state("stone_slab", mapOf("type" to "bottom", "waterlogged" to "false"))
+
+        assertTrue(VillageFeatures.mayPlacePileOn(topSlab, dirtPath, random))
+        assertFalse(VillageFeatures.mayPlacePileOn(bottomSlab, dirtPath, random))
+        assertFalse(VillageFeatures.mayPlacePileOn(state("torch"), dirtPath, random))
+    }
+
+    @Test
+    fun hayPileDrawsEveryPlacedBlocksAxis() {
+        val chunk = flatChunk()
+
+        VillageFeatures.place("minecraft:pile_hay", chunk, 8, 64, 8, WorldgenRandom(XoroshiroRandom(5L)))
+
+        val hayAxes =
+            listOf("x", "y", "z").map { axis -> state("hay_block", mapOf("axis" to axis)) }.toSet()
+        val placedStates =
+            buildSet {
+                for (x in 0 until 16) {
+                    for (y in 64..65) {
+                        for (z in 0 until 16) {
+                            val stateId = chunk.getBlockStateId(x, y, z)
+                            if (stateId in hayAxes) add(stateId)
+                        }
+                    }
+                }
+            }
+        assertEquals(hayAxes, placedStates)
+    }
+
     private fun flatChunk(): Chunk =
         Chunk(0, 0).apply {
             for (x in 0 until 16) {
@@ -49,4 +85,9 @@ class VillageFeaturesTest {
 
     private fun state(name: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(name))?.stateId ?: error("unknown block '$name'")
+
+    private fun state(
+        name: String,
+        properties: Map<String, String>,
+    ): Int = Blocks.stateIdOf(Identifier.vanilla(name), properties) ?: error("unknown state '$name$properties'")
 }
