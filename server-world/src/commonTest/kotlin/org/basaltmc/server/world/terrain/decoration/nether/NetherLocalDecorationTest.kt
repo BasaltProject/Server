@@ -1,5 +1,7 @@
 package org.basaltmc.server.world.terrain.decoration.nether
 
+import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkHeight
@@ -26,6 +28,25 @@ class NetherLocalDecorationTest {
         assertContentEquals(states(first), states(second))
         assertTrue(count(first, "basalt") > 0)
         assertEquals(0, count(wastes, "basalt"))
+    }
+
+    @Test
+    fun basaltPillarCrossingChunkEdgeKeepsWorldCoordinates() {
+        val chunk = Chunk(0, 0, ChunkHeight.NETHER)
+        chunk.setBlockStateId(15, 65, 8, Blocks.NETHERRACK.stateId)
+        chunk.setBlockStateId(15, 60, 8, Blocks.NETHERRACK.stateId)
+
+        NetherLocalDecoration.placeAt(
+            chunk,
+            WorldgenRandom(XoroshiroRandom(0L)),
+            15,
+            64,
+            8,
+        )
+
+        val external = chunk.takeGeneratedBlockWrites()
+        assertTrue(external.any { it.x >= 16 }, "expected the pillar hang-off to continue into the east chunk")
+        assertTrue(external.all { it.expectedStateId == Blocks.AIR.stateId })
     }
 
     private fun layeredChunk(): Chunk =

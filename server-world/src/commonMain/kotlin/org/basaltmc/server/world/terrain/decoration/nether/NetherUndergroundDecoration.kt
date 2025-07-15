@@ -238,15 +238,15 @@ public object NetherUndergroundDecoration {
         z: Int,
         spring: Spring,
     ) {
-        if (!spring.isValid(blockPathAt(chunk, x, y + 1, z))) return
-        if (spring.requiresBlockBelow && !spring.isValid(blockPathAt(chunk, x, y - 1, z))) return
-        val current = stateAt(chunk, x, y, z) ?: return
-        if (!Blocks.isAir(current) && !spring.isValid(blockPathAt(chunk, x, y, z))) return
+        if (!spring.isValid(terrainBlockPathAt(chunk, x, y + 1, z))) return
+        if (spring.requiresBlockBelow && !spring.isValid(terrainBlockPathAt(chunk, x, y - 1, z))) return
+        val current = terrainStateAt(chunk, x, y, z) ?: return
+        if (!Blocks.isAir(current) && !spring.isValid(terrainBlockPathAt(chunk, x, y, z))) return
 
         var rockCount = 0
         var holeCount = 0
         for ((offsetX, offsetY, offsetZ) in SPRING_NEIGHBOURS) {
-            val neighbour = stateAt(chunk, x + offsetX, y + offsetY, z + offsetZ)
+            val neighbour = terrainStateAt(chunk, x + offsetX, y + offsetY, z + offsetZ)
             if (spring.isValid(neighbour?.let(::blockPath))) rockCount++
             if (neighbour != null && Blocks.isAir(neighbour)) holeCount++
         }
@@ -388,11 +388,30 @@ public object NetherUndergroundDecoration {
         y: Int,
         z: Int,
     ): Int? =
+        if (y in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) {
+            chunk.getDecorationBlockStateId(x, y, z)
+        } else {
+            null
+        }
+
+    private fun terrainStateAt(
+        chunk: Chunk,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Int? =
         if (isInChunk(chunk, x, z) && y in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) {
             chunk.getBlockStateId(x and 15, y, z and 15)
         } else {
             null
         }
+
+    private fun terrainBlockPathAt(
+        chunk: Chunk,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): String? = terrainStateAt(chunk, x, y, z)?.let(::blockPath)
 
     private fun blockPathAt(
         chunk: Chunk,
@@ -417,8 +436,8 @@ public object NetherUndergroundDecoration {
         z: Int,
         stateId: Int,
     ) {
-        if (isInChunk(chunk, x, z) && y in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) {
-            chunk.setBlockStateId(x and 15, y, z and 15, stateId)
+        if (y in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) {
+            chunk.setDecorationBlockStateId(x, y, z, stateId)
         }
     }
 

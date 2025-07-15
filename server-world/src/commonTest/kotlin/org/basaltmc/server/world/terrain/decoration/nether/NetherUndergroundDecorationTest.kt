@@ -1,5 +1,7 @@
 package org.basaltmc.server.world.terrain.decoration.nether
 
+import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkHeight
@@ -52,6 +54,51 @@ class NetherUndergroundDecorationTest {
         assertTrue(count(wastes, "lava") > 0)
         assertEquals(0, count(deltaSkipped, "lava"))
         assertTrue(count(delta, "lava") > 0)
+    }
+
+    @Test
+    fun glowstoneBlobCrossingChunkEdgeKeepsWorldCoordinates() {
+        val chunk = Chunk(0, 0, ChunkHeight.NETHER)
+        chunk.setBlockStateId(15, 65, 8, Blocks.NETHERRACK.stateId)
+
+        assertTrue(
+            NetherUndergroundDecoration.placeAt(
+                chunk,
+                WorldgenRandom(XoroshiroRandom(0L)),
+                15,
+                64,
+                8,
+                "glowstone",
+            ),
+        )
+
+        val external = chunk.takeGeneratedBlockWrites()
+        assertTrue(external.any { it.x >= 16 }, "expected the glowstone blob to continue into the east chunk")
+        assertTrue(external.all { it.expectedStateId == Blocks.AIR.stateId })
+    }
+
+    @Test
+    fun openSpringDoesNotTreatUnknownNeighbourTerrainAsAir() {
+        val chunk = Chunk(0, 0, ChunkHeight.NETHER)
+        val y = 64
+        chunk.setBlockStateId(15, y + 1, 8, Blocks.NETHERRACK.stateId)
+        chunk.setBlockStateId(15, y - 1, 8, Blocks.NETHERRACK.stateId)
+        chunk.setBlockStateId(14, y, 8, Blocks.NETHERRACK.stateId)
+        chunk.setBlockStateId(15, y, 7, Blocks.NETHERRACK.stateId)
+        chunk.setBlockStateId(15, y, 9, Blocks.NETHERRACK.stateId)
+
+        assertTrue(
+            NetherUndergroundDecoration.placeAt(
+                chunk,
+                WorldgenRandom(XoroshiroRandom(0L)),
+                15,
+                y,
+                8,
+                "spring_open",
+            ),
+        )
+
+        assertEquals(Blocks.AIR.stateId, chunk.getBlockStateId(15, y, 8))
     }
 
     private fun layeredChunk(blockPath: String): Chunk {
