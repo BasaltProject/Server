@@ -278,7 +278,7 @@ public class AirTargetFilter(
         val bounds = context.chunk.verticalBounds
         if (origin.y !in bounds.minY..bounds.maxY) return false
         if (!Blocks.isAir(
-                context.chunk.getBlockStateId(origin.x and 15, origin.y, origin.z and 15),
+                context.chunk.getDecorationBlockStateId(origin.x, origin.y, origin.z),
             )
         ) {
             return false
@@ -286,11 +286,7 @@ public class AirTargetFilter(
         if (alsoCheckAbove) {
             if (origin.y + 1 > bounds.maxY) return false
             if (!Blocks.isAir(
-                    context.chunk.getBlockStateId(
-                        origin.x and 15,
-                        origin.y + 1,
-                        origin.z and 15,
-                    ),
+                    context.chunk.getDecorationBlockStateId(origin.x, origin.y + 1, origin.z),
                 )
             ) {
                 return false

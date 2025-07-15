@@ -22,6 +22,18 @@ class VillageFeaturesTest {
     }
 
     @Test
+    fun everyVillageTreeAppliesItsSaplingSurvivalFilter() {
+        for (feature in listOf("acacia", "oak", "spruce", "pine")) {
+            val chunk = flatChunk(Blocks.STONE.stateId)
+
+            VillageFeatures.place("minecraft:$feature", chunk, 8, 64, 8, WorldgenRandom(XoroshiroRandom(3L)))
+
+            assertEquals(Blocks.STONE.stateId, chunk.getBlockStateId(8, 63, 8), feature)
+            assertTrue((64..80).all { y -> Blocks.isAir(chunk.getBlockStateId(8, y, 8)) }, feature)
+        }
+    }
+
+    @Test
     fun flowerPlainFeaturePoolElementRunsItsCountAndOffsetPipeline() {
         val chunk = flatChunk()
 
@@ -55,6 +67,17 @@ class VillageFeaturesTest {
     }
 
     @Test
+    fun blockPilesDoNotWrapAcrossTheChunkBorder() {
+        val chunk = flatChunk()
+        val pileStates = setOf(state("packed_ice"), state("blue_ice"))
+
+        VillageFeatures.place("minecraft:pile_ice", chunk, 15, 64, 8, WorldgenRandom(XoroshiroRandom(2L)))
+
+        assertTrue((0..2).all { x -> (64..65).all { y -> chunk.getBlockStateId(x, y, 8) !in pileStates } })
+        assertTrue((12..15).any { x -> (64..65).any { y -> chunk.getBlockStateId(x, y, 8) in pileStates } })
+    }
+
+    @Test
     fun hayPileDrawsEveryPlacedBlocksAxis() {
         val chunk = flatChunk()
 
@@ -76,10 +99,53 @@ class VillageFeaturesTest {
         assertEquals(hayAxes, placedStates)
     }
 
-    private fun flatChunk(): Chunk =
+    @Test
+    fun berryPatchMatchesSnowyGrassAndPlacesMatureBushes() {
+        val snowyGrass = state("grass_block", mapOf("snowy" to "true"))
+        val chunk = flatChunk(snowyGrass)
+
+        VillageFeatures.place("minecraft:patch_berry_bush", chunk, 8, 64, 8, WorldgenRandom(XoroshiroRandom(7L)))
+
+        val mature = state("sweet_berry_bush", mapOf("age" to "3"))
+        val allBerryStates = (0..3).map { age -> state("sweet_berry_bush", mapOf("age" to age.toString())) }.toSet()
+        val placed =
+            buildList {
+                for (x in 0 until 16) {
+                    for (y in 61..67) {
+                        for (z in 0 until 16) {
+                            chunk.getBlockStateId(x, y, z).takeIf { it in allBerryStates }?.let(::add)
+                        }
+                    }
+                }
+            }
+        assertTrue(placed.isNotEmpty())
+        assertTrue(placed.all { it == mature })
+    }
+
+    @Test
+    fun cactusPlacementFilterUsesItsFullSurvivalRuleWithoutWrapping() {
+        val chunk = Chunk(0, 0)
+        chunk.setBlockStateId(8, 63, 8, state("sand"))
+        chunk.setBlockStateId(9, 64, 8, Blocks.STONE.stateId)
+        chunk.setBlockStateId(0, 63, 8, state("sand"))
+        val waterloggedAbove = Chunk(0, 0)
+        waterloggedAbove.setBlockStateId(8, 63, 8, state("sand"))
+        waterloggedAbove.setBlockStateId(
+            8,
+            65,
+            8,
+            state("stone_slab", mapOf("type" to "bottom", "waterlogged" to "true")),
+        )
+
+        assertFalse(CactusFeature.canPlace(chunk, DecorationPos(8, 64, 8)))
+        assertFalse(CactusFeature.canPlace(chunk, DecorationPos(16, 64, 8)))
+        assertFalse(CactusFeature.canPlace(waterloggedAbove, DecorationPos(8, 64, 8)))
+    }
+
+    private fun flatChunk(surfaceStateId: Int = Blocks.GRASS_BLOCK.stateId): Chunk =
         Chunk(0, 0).apply {
             for (x in 0 until 16) {
-                for (z in 0 until 16) setBlockStateId(x, 63, z, Blocks.GRASS_BLOCK.stateId)
+                for (z in 0 until 16) setBlockStateId(x, 63, z, surfaceStateId)
             }
         }
 

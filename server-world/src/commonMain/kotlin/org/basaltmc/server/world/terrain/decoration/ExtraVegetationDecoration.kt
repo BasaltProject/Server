@@ -189,7 +189,13 @@ public object ExtraVegetationDecoration {
         val origin = inSquareAtHeight(chunk, random, Chunk.HeightmapType.MOTION_BLOCKING)
         repeat(10) {
             val pos = triangleOffset(origin, random, 7, 3)
-            if (isAir(chunk, pos) && canCactusSurvive(chunk, pos)) CactusFeature.place(chunk, random, pos)
+            if (isAir(chunk, pos) && canCactusSurvive(chunk, pos)) {
+                CactusFeature.place(
+                    chunk,
+                    random,
+                    pos.copy(x = chunk.chunkX * 16 + pos.x, z = chunk.chunkZ * 16 + pos.z),
+                )
+            }
         }
     }
 

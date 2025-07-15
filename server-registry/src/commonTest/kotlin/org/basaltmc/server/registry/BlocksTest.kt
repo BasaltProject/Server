@@ -17,6 +17,17 @@ class BlocksTest {
     }
 
     @Test
+    fun everyGeneratedWaterloggedStateExposesWaterFluid() {
+        val slab = Identifier.vanilla("stone_slab")
+        val wet = requireNotNull(Blocks.stateIdOf(slab, mapOf("type" to "bottom", "waterlogged" to "true")))
+        val dry = requireNotNull(Blocks.stateIdOf(slab, mapOf("type" to "bottom", "waterlogged" to "false")))
+
+        assertTrue(Blocks.hasWaterFluid(wet))
+        assertTrue(Blocks.hasFluid(wet))
+        assertFalse(Blocks.hasWaterFluid(dry))
+    }
+
+    @Test
     fun ruinedPortalStatesResolveFromOfficialProperties() {
         assertEquals(
             22313,

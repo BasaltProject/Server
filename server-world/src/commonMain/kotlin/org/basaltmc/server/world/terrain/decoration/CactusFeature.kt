@@ -1,6 +1,7 @@
 package org.basaltmc.server.world.terrain.decoration
 
 import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
@@ -22,13 +23,31 @@ public object CactusFeature {
     ): Boolean {
         if (origin.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return false
         val region = ChunkCactusRegion(chunk)
-        if (!Blocks.isAir(region.get(origin))) return false
-        if (origin.y - 1 < WorldHeight.MIN_Y ||
-            Blocks.isAir(region.get(origin.copy(y = origin.y - 1)))
+        if (!canPlace(region, origin)) return false
+        return placeColumn(region, random, origin)
+    }
+
+    internal fun canPlace(
+        chunk: Chunk,
+        origin: DecorationPos,
+    ): Boolean = canPlace(ChunkCactusRegion(chunk), origin)
+
+    /** // parity: CactusBlock.canSurvive, used by the placed feature's would_survive filter. */
+    private fun canPlace(
+        region: CactusFeatureRegion,
+        origin: DecorationPos,
+    ): Boolean {
+        if (origin.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y || !Blocks.isAir(region.get(origin))) return false
+        for ((dx, dz) in HORIZONTAL_OFFSETS) {
+            val neighbour = region.get(origin.copy(x = origin.x + dx, z = origin.z + dz))
+            if (BlockShapes.isSolidState(neighbour) || neighbour in LAVA_STATE_IDS) return false
+        }
+        if (origin.y == WorldHeight.MIN_Y ||
+            Blocks.byStateId(region.get(origin.copy(y = origin.y - 1)))?.block?.path !in CACTUS_SUPPORT
         ) {
             return false
         }
-        return placeColumn(region, random, origin)
+        return !Blocks.hasFluid(region.get(origin.copy(y = origin.y + 1)))
     }
 
     internal fun placeColumn(
@@ -77,7 +96,7 @@ public object CactusFeature {
     ) : CactusFeatureRegion {
         override fun get(position: DecorationPos): Int =
             if (position.y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
-                chunk.getBlockStateId(position.x and 15, position.y, position.z and 15)
+                chunk.getDecorationBlockStateId(position.x, position.y, position.z)
             } else {
                 Blocks.AIR.stateId
             }
@@ -87,10 +106,14 @@ public object CactusFeature {
             stateId: Int,
         ) {
             if (position.y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
-                chunk.setBlockStateId(position.x and 15, position.y, position.z and 15, stateId)
+                chunk.setDecorationBlockStateId(position.x, position.y, position.z, stateId)
             }
         }
     }
+
+    private val CACTUS_SUPPORT = setOf("cactus", "sand", "red_sand", "suspicious_sand")
+    private val LAVA_STATE_IDS = Blocks.LAVA.stateId..Blocks.LAVA.stateId + 15
+    private val HORIZONTAL_OFFSETS = listOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)
 
     private val cactusStateId =
         Blocks.REGISTRY
