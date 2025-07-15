@@ -2020,6 +2020,7 @@ public class TreeConfiguration(
     public val minimumSize: FeatureSize,
     public val rootPlacer: MangroveRootPlacer? = null,
     public val decorators: List<TreeDecoratorConfiguration> = emptyList(),
+    public val ignoreVines: Boolean = false,
 )
 
 public sealed interface TreeDecoratorConfiguration {
@@ -2702,10 +2703,9 @@ public object TreeFeature {
             x: Int,
             y: Int,
             z: Int,
-            oldStateId: Int,
-            newStateId: Int,
+            _oldStateId: Int,
+            _newStateId: Int,
         ) {
-            if (oldStateId == newStateId) return
             val position = BlockPos(chunk.chunkX * 16 + x, y, chunk.chunkZ * 16 + z)
             when (phase) {
                 PlacementPhase.ROOT -> roots += position
@@ -2863,7 +2863,12 @@ public object TreeFeature {
             val r = config.minimumSize.getSizeAtHeight(maxTreeHeight, y)
             for (x in -r..r) {
                 for (z in -r..r) {
-                    if (!config.trunkPlacer.isFree(chunk, originX + x, originY + y, originZ + z)) return y - 2
+                    val stateId = chunk.getDecorationBlockStateId(originX + x, originY + y, originZ + z)
+                    val blockedByTreeShape = !config.trunkPlacer.isFree(chunk, originX + x, originY + y, originZ + z)
+                    val blockedByVine = !config.ignoreVines && Blocks.isVineState(stateId)
+                    if (blockedByTreeShape || blockedByVine) {
+                        return y - 2
+                    }
                 }
             }
         }

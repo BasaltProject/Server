@@ -113,8 +113,8 @@ public class Chunk(
                 isDirty = true
                 updateHeights(x, y, z, stateId)
                 if (changesBlock(oldStateId, stateId)) blockEntitiesByPosition.remove(blockEntityKey(x, y, z))
-                observer(x, y, z, oldStateId, stateId)
             }
+            observer(x, y, z, oldStateId, stateId)
         }
     }
 
@@ -156,7 +156,10 @@ public class Chunk(
         val position = GeneratedWorldPos(worldX, y, worldZ)
         val previous = generatedExternalBlockWrites[position]
         val oldStateId = previous?.stateId ?: Blocks.AIR.stateId
-        if (oldStateId == stateId) return
+        if (oldStateId == stateId) {
+            blockWriteObserver?.invoke(worldX - chunkX * 16, y, worldZ - chunkZ * 16, oldStateId, stateId)
+            return
+        }
         generatedExternalBlockWrites[position] =
             ChunkGeneratedBlockWrite(
                 worldX,
@@ -423,7 +426,7 @@ public class Chunk(
         val z: Int,
     )
 
-    /** Synchronously records changed block writes without allocating on the normal write path. */
+    /** Synchronously records block placement attempts without allocating on the normal write path. */
     internal fun <T> observeBlockWrites(
         observer: (x: Int, y: Int, z: Int, oldStateId: Int, newStateId: Int) -> Unit,
         action: () -> T,

@@ -45,6 +45,7 @@ public object TreeConfigs {
             OAK_LEAVES,
             BlobFoliagePlacer(IntProvider.of(2), IntProvider.of(0), 3),
             FeatureSizeTwoLayers(1, 0, 1),
+            ignoreVines = true,
         )
 
     // parity: configured_feature/azalea_tree.
@@ -82,6 +83,7 @@ public object TreeConfigs {
             BIRCH_LEAVES,
             BlobFoliagePlacer(IntProvider.of(2), IntProvider.of(0), 3),
             FeatureSizeTwoLayers(1, 0, 1),
+            ignoreVines = true,
         )
 
     // parity: TreeFeatures.createSuperBirch/createStraightBlobTree(BIRCH_LOG, BIRCH_LEAVES, 5, 2, 6, 2).
@@ -92,6 +94,7 @@ public object TreeConfigs {
             BIRCH_LEAVES,
             BlobFoliagePlacer(IntProvider.of(2), IntProvider.of(0), 3),
             FeatureSizeTwoLayers(1, 0, 1),
+            ignoreVines = true,
         )
 
     // parity: TreeFeatures.FANCY_OAK registration.
@@ -102,6 +105,7 @@ public object TreeConfigs {
             OAK_LEAVES,
             FancyFoliagePlacer(IntProvider.of(2), IntProvider.of(4), 4),
             FeatureSizeTwoLayers(0, 0, 0, minClippedHeight = 4),
+            ignoreVines = true,
         )
 
     // parity: TreeFeatures.createJungleTree/createStraightBlobTree(JUNGLE_LOG, JUNGLE_LEAVES, 4, 8, 0, 2).
@@ -118,6 +122,7 @@ public object TreeConfigs {
                     TreeDecoratorConfiguration.TrunkVines,
                     TreeDecoratorConfiguration.LeafVines(0.25f),
                 ),
+            ignoreVines = true,
         )
 
     // parity: TreeFeatures.JUNGLE_BUSH registration.
@@ -153,6 +158,7 @@ public object TreeConfigs {
             SPRUCE_LEAVES,
             SpruceFoliagePlacer(IntProvider.uniform(2, 3), IntProvider.uniform(0, 2), IntProvider.uniform(1, 2)),
             FeatureSizeTwoLayers(2, 0, 2),
+            ignoreVines = true,
         )
 
     // parity: TreeFeatures.PINE registration.
@@ -163,6 +169,7 @@ public object TreeConfigs {
             SPRUCE_LEAVES,
             PineFoliagePlacer(IntProvider.of(1), IntProvider.of(1), IntProvider.uniform(3, 4)),
             FeatureSizeTwoLayers(2, 0, 2),
+            ignoreVines = true,
         )
 
     // parity: TreeFeatures.ACACIA registration.
@@ -173,6 +180,7 @@ public object TreeConfigs {
             ACACIA_LEAVES,
             AcaciaFoliagePlacer(IntProvider.of(2), IntProvider.of(0)),
             FeatureSizeTwoLayers(1, 0, 2),
+            ignoreVines = true,
         )
 
     // parity: TreeFeatures.createDarkOak/DarkOakTrunkPlacer(6, 2, 1)/DarkOakFoliagePlacer(0, 0)/ThreeLayersFeatureSize(1, 1, 0, 1, 2).
@@ -183,6 +191,7 @@ public object TreeConfigs {
             DARK_OAK_LEAVES,
             DarkOakFoliagePlacer(IntProvider.of(0), IntProvider.of(0)),
             FeatureSizeThreeLayers(1, 1, 0, 1, 2),
+            ignoreVines = true,
         )
 
     // parity: TreeFeatures.PALE_OAK registration: same DarkOakTrunkPlacer/DarkOakFoliagePlacer shape, pale_oak blocks.
@@ -194,6 +203,7 @@ public object TreeConfigs {
             DarkOakFoliagePlacer(IntProvider.of(0), IntProvider.of(0)),
             FeatureSizeThreeLayers(1, 1, 0, 1, 2),
             decorators = listOf(TreeDecoratorConfiguration.PaleMoss(0.15f, 0.4f, 0.8f)),
+            ignoreVines = true,
         )
 
     // parity: TreeFeatures.PALE_OAK_CREAKING, pale moss followed by a guaranteed heart attempt.
@@ -209,6 +219,7 @@ public object TreeConfigs {
                     TreeDecoratorConfiguration.PaleMoss(0.15f, 0.4f, 0.8f),
                     TreeDecoratorConfiguration.CreakingHeart(1.0f),
                 ),
+            ignoreVines = true,
         )
 
     // parity: TreeFeatures.MEGA_SPRUCE registration.
@@ -249,6 +260,7 @@ public object TreeConfigs {
                     TreeDecoratorConfiguration.MangrovePropagules(0.14f, 1, 0, 2),
                     TreeDecoratorConfiguration.Beehive(0.01f),
                 ),
+            ignoreVines = true,
         )
 
     // parity: TreeFeatures.TALL_MANGROVE registration (trunk_offset_y uniform(3, 7)).
@@ -266,6 +278,7 @@ public object TreeConfigs {
                     TreeDecoratorConfiguration.MangrovePropagules(0.14f, 1, 0, 2),
                     TreeDecoratorConfiguration.Beehive(0.01f),
                 ),
+            ignoreVines = true,
         )
 
     // parity: TreeFeatures.cherry (CHERRY registration). branchCount is the real WeightedListInt
@@ -293,6 +306,7 @@ public object TreeConfigs {
                 0.33333334f,
             ),
             FeatureSizeTwoLayers(1, 0, 2),
+            ignoreVines = true,
         )
 
     private val LEAF_LITTER_DECORATORS =
@@ -345,5 +359,6 @@ public object TreeConfigs {
             base.minimumSize,
             base.rootPlacer,
             decorators,
+            base.ignoreVines,
         )
 }
