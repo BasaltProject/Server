@@ -156,6 +156,12 @@ import org.basaltmc.wire.io.SocketException
 import org.basaltmc.wire.io.TcpConnection
 import org.basaltmc.wire.io.Zlib
 import org.basaltmc.wire.io.sleepMillis
+import org.basaltmc.wire.multiversion.ProtocolChain
+import org.basaltmc.wire.multiversion.ProtocolGate
+import org.basaltmc.wire.multiversion.ProtocolVerdict
+import org.basaltmc.wire.multiversion.ProtocolVersions
+import org.basaltmc.wire.multiversion.UnknownProtocolPolicy
+import org.basaltmc.wire.multiversion.java.JavaTranslators
 import org.basaltmc.wire.nbt.NbtCompound
 import org.basaltmc.wire.protocol.PacketFraming
 import org.basaltmc.wire.protocol.ProtocolState
@@ -235,6 +241,7 @@ import org.basaltmc.wire.protocol.play.MapChunkPacket
 import org.basaltmc.wire.protocol.play.MerchantCost
 import org.basaltmc.wire.protocol.play.MerchantOffer
 import org.basaltmc.wire.protocol.play.MerchantOffersPacket
+import org.basaltmc.wire.protocol.play.NameTagVisibility
 import org.basaltmc.wire.protocol.play.OpenScreenPacket
 import org.basaltmc.wire.protocol.play.OpenSignEditorPacket
 import org.basaltmc.wire.protocol.play.PlayDisconnectPacket
@@ -272,6 +279,7 @@ import org.basaltmc.wire.protocol.play.SetExperiencePacket
 import org.basaltmc.wire.protocol.play.SetHealthPacket
 import org.basaltmc.wire.protocol.play.SetHeldSlotPacket
 import org.basaltmc.wire.protocol.play.SetPassengersPacket
+import org.basaltmc.wire.protocol.play.SetPlayerTeamPacket
 import org.basaltmc.wire.protocol.play.SetSimulationDistancePacket
 import org.basaltmc.wire.protocol.play.SetTimePacket
 import org.basaltmc.wire.protocol.play.SignUpdatePacket
@@ -403,6 +411,13 @@ public class ClientSession(
     private val npcs: NpcRegistry? = null,
     /** Who is watching packets. Null when nothing is, which is the usual case and costs one check. */
     private val pluginPackets: PluginPacketBus? = null,
+    /** Which clients may in. The default is the native version and nothing else. */
+    private val protocolGate: ProtocolGate =
+        ProtocolGate(
+            setOf(ProtocolVersions.NATIVE),
+            UnknownProtocolPolicy.WARN,
+            UnknownProtocolPolicy.REFUSE,
+        ),
 ) {
     private val logger = Logger("Session")
 
@@ -422,6 +437,17 @@ public class ClientSession(
 
     /** Kept because the status response is built from it, several packets after it arrives. */
     private var handshake: HandshakePacket? = null
+
+    /** What the door said about this client's version, decided the moment it named one. */
+    private var verdict: ProtocolVerdict = ProtocolVerdict.Native
+
+    /**
+     * The chain of translators this client needs, or null when it speaks what the server speaks.
+     *
+     * Null is the case that must cost nothing: a native client goes through one null check per
+     * packet and everything else works exactly as it did before any of this existed.
+     */
+    private var translation: ProtocolChain? = null
 
     /** How an enchanted stack resolves its ids, or null when no enchantment registry went out. */
     internal val enchantmentIds: ((Identifier) -> Int?)?
@@ -618,6 +644,12 @@ public class ClientSession(
     /** NPCs this client has been told about, and which version of each: a change re-draws it. */
     private val trackedNpcs = HashMap<Int, Int>()
 
+    /** Whether this client has been told about the team that hides a name tag. */
+    private var namelessTeamMade = false
+
+    /** Where each NPC's head was last pointed for this client, so a still head costs nothing. */
+    private val lastNpcLook = HashMap<Int, Pair<Float, Float>>()
+
     /** Where each of them was last reported, so a mob standing still costs nothing. */
     private val lastEntityPositions = HashMap<Int, DoubleArray>()
 
@@ -787,7 +819,17 @@ public class ClientSession(
         // Remembered, not passed around: the only reader is the failure path in [run], and knowing
         // which packet a decoder died on is the difference between a one-line fix and a hunt.
         lastPacketId = packetId
-        timings.of("network.packet").time { handleFrameBody(packetId, body) }
+        val chain = translation
+        if (chain == null) {
+            timings.of("network.packet").time { handleFrameBody(packetId, body) }
+            return
+        }
+        // An older client's packet is brought up to what this server reads before anything here
+        // looks at it, so nothing past this line knows there is more than one version.
+        chain.serverbound(state, packetId, body.readBytes(body.readableBytes)) { id, bytes ->
+            lastPacketId = id
+            timings.of("network.packet").time { handleFrameBody(id, ByteBuffer.wrap(bytes)) }
+        }
     }
 
     private fun handleFrameBody(
@@ -857,6 +899,8 @@ public class ClientSession(
         if (packetId != HandshakePacket.ID) return
         val packet = HandshakePacket.read(body)
         handshake = packet
+        verdict = protocolGate.verdictFor(packet.protocolVersion)
+        translation = JavaTranslators.chainFor(packet.protocolVersion)
         state =
             when (packet.intent) {
                 ClientIntent.STATUS -> ProtocolState.STATUS
@@ -871,13 +915,9 @@ public class ClientSession(
     ) {
         when (packetId) {
             StatusRequestPacket.ID -> {
-                val status =
-                    statusProvider(
-                        handshake?.protocolVersion ?: 0,
-                        handshake?.hostName.orEmpty(),
-                        connection.remoteAddress,
-                    )
-                sendUncompressed(StatusResponsePacket.ID) { StatusResponsePacket(status).write(it) }
+                val protocol = handshake?.protocolVersion ?: 0
+                val status = statusProvider(protocol, handshake?.hostName.orEmpty(), connection.remoteAddress)
+                sendUncompressed(StatusResponsePacket.ID) { StatusResponsePacket(pingedAs(status, protocol)).write(it) }
             }
             PingRequestPacket.ID -> {
                 val ping = PingRequestPacket.read(body)
@@ -897,8 +937,40 @@ public class ClientSession(
         }
     }
 
+    /**
+     * The version reported to whoever is pinging: theirs when they may in, ours when they may not.
+     *
+     * A client compares this number with its own and paints the entry red when they differ, so
+     * echoing an accepted client's own number is what stops a server that would let them play from
+     * looking broken in their list. Refusing one keeps our number, which is the honest hint.
+     */
+    private fun pingedAs(
+        status: org.basaltmc.wire.protocol.status.ServerStatusPayload,
+        protocol: Int,
+    ): org.basaltmc.wire.protocol.status.ServerStatusPayload {
+        val version = status.version ?: return status
+        if (protocol == version.protocol || verdict is ProtocolVerdict.Refused) return status
+        return status.copy(version = version.copy(protocol = protocol))
+    }
+
     private fun handleLoginStart(body: ByteBuffer) {
         val loginStart = LoginStartPacket.read(body)
+        val refusal = verdict as? ProtocolVerdict.Refused
+        if (refusal != null) {
+            refuseLogin(loginStart.name, refusal)
+            return
+        }
+        (verdict as? ProtocolVerdict.Unknown)?.let { unknown ->
+            if (unknown.warn) {
+                logger.warn {
+                    "${loginStart.name} is on ${ProtocolVersions.describe(unknown.protocol)}, which this build " +
+                        "does not know. Letting them in untranslated; anything may happen."
+                }
+            }
+        }
+        (verdict as? ProtocolVerdict.Translated)?.let { translated ->
+            logger.info { "${loginStart.name} is on ${translated.version}, translated to 26.2." }
+        }
         // The one gate before a player exists at all: a plugin that says no here means they never
         // join, and what it says is what they read on the disconnect screen.
         val login =
@@ -925,6 +997,31 @@ public class ClientSession(
         sendUncompressed(HelloPacket.ID) {
             HelloPacket("", online.keyPair.publicKeyDer, nonce, shouldAuthenticate = true).write(it)
         }
+    }
+
+    /** Turns a client away at the door, telling them what is wrong in words they can act on. */
+    private fun refuseLogin(
+        name: String,
+        refusal: ProtocolVerdict.Refused,
+    ) {
+        val protocol = refusal.protocol
+        val message =
+            when (refusal.reason) {
+                ProtocolVerdict.Refused.Reason.TOO_OLD ->
+                    "<red>Your version is too old for this server.</red>\n<gray>It runs Minecraft " +
+                        "${BuildInfo.MINECRAFT_VERSION}."
+                ProtocolVerdict.Refused.Reason.TOO_NEW, ProtocolVerdict.Refused.Reason.NOT_TRANSLATED ->
+                    "<red>This server does not accept your version.</red>\n<gray>It runs Minecraft " +
+                        "${BuildInfo.MINECRAFT_VERSION}."
+                ProtocolVerdict.Refused.Reason.SNAPSHOT ->
+                    "<red>This server does not accept snapshots.</red>\n<gray>It runs Minecraft " +
+                        "${BuildInfo.MINECRAFT_VERSION}."
+            }
+        logger.info {
+            "Refused $name on ${ProtocolVersions.describe(protocol)}: ${refusal.reason.name.lowercase()}."
+        }
+        sendUncompressed(LoginDisconnectPacket.ID) { LoginDisconnectPacket(MiniMessage.parse(message)).write(it) }
+        connection.close()
     }
 
     private fun handleKey(body: ByteBuffer) {
@@ -975,6 +1072,11 @@ public class ClientSession(
         pendingProfile = profile
         val sessionId = OfflineUuid.forUsername("session:$name")
         sendCompressed(LoginFinishedPacket.ID) { LoginFinishedPacket(profile, sessionId).write(it) }
+        // Before 1.20.2 there is no configuration phase and nothing to acknowledge: the client is
+        // already in play. The server still walks its own configuration, whose packets the
+        // translation turns into the one thing that client does read, but it walks it by itself
+        // rather than waiting to be told to.
+        if (handshakeProtocol < ProtocolVersions.V1_20_2) enterConfiguration()
     }
 
     /** Why this login may not proceed, or null when it may. */
@@ -1010,6 +1112,13 @@ public class ClientSession(
         // default for a server with no datapacks of its own, though tested live against a real
         // 26.2 client and confirmed this alone does not fill in registries Basalt never sends
         // (cat_variant, wolf_variant, and the rest a real client still requires non-empty).
+        // A client older than 1.20.5 has no such packet and would never answer, so it is not
+        // asked: the registries go out straight away rather than waiting for a reply that cannot
+        // come.
+        if (handshakeProtocol < ProtocolVersions.V1_20_5) {
+            sendRegistriesThenFinish()
+            return
+        }
         sendCompressed(SelectKnownPacksPacket.CLIENTBOUND_ID) {
             SelectKnownPacksPacket(listOf(KnownPack("minecraft", "core", "26.2"))).write(it)
         }
@@ -1177,6 +1286,9 @@ public class ClientSession(
             ).write(it)
         }
         sendCompressed(FinishConfigurationPacket.ID) { }
+        // Same again at the other end of it: a client with no configuration phase will not answer
+        // that this one is over.
+        if (handshakeProtocol < ProtocolVersions.V1_20_2) enterPlay()
     }
 
     /**
@@ -2630,6 +2742,16 @@ public class ClientSession(
     }
 
     /**
+     * The profile name an NPC travels under, which nobody ever reads.
+     *
+     * A player entity must have one, and it must be a plain string of sixteen characters, so it
+     * cannot be the name a plugin wrote: that is the display floating above. This is a made-up name
+     * whose only job is to be the handle the hiding team joins by, so it has to be unique and it has
+     * to be exactly what the team is told.
+     */
+    private fun npcProfileName(entityId: Int): String = "npc_$entityId".take(PROFILE_NAME_LIMIT)
+
+    /**
      * The text on a `text_display`, which is metadata 23 and a component.
      *
      * parity: `Display.TextDisplay.DATA_TEXT_ID`, whose index is Entity's eight fields plus
@@ -2643,7 +2765,12 @@ public class ClientSession(
         sendPlayPacket(SetEntityDataPacket.ID) {
             SetEntityDataPacket(
                 entityId,
-                listOf(SetEntityDataPacket.Entry.Text(TEXT_DISPLAY_TEXT_INDEX, MiniMessage.parse(text))),
+                listOf(
+                    SetEntityDataPacket.Entry.Text(TEXT_DISPLAY_TEXT_INDEX, MiniMessage.parse(text)),
+                    // Turned to face whoever is reading it. A display left as it spawned is drawn
+                    // flat in the world, so from the other side it reads backwards.
+                    SetEntityDataPacket.Entry.Bytes(DISPLAY_BILLBOARD_INDEX, BILLBOARD_CENTER),
+                ),
             ).write(it)
         }
     }
@@ -2700,6 +2827,66 @@ public class ClientSession(
         sendPlayPacket(RemoveEntitiesPacket.ID) { RemoveEntitiesPacket(gone).write(it) }
     }
 
+    /** Whether the head moved enough to be worth a packet: a degree of jitter is not. */
+    private fun lookedAt(
+        entityId: Int,
+        yaw: Float,
+        pitch: Float,
+    ): Boolean {
+        val last = lastNpcLook[entityId]
+        if (last != null && abs(last.first - yaw) < LOOK_STEP && abs(last.second - pitch) < LOOK_STEP) return false
+        lastNpcLook[entityId] = yaw to pitch
+        return true
+    }
+
+    /**
+     * Puts one name on the team whose name tags are never drawn.
+     *
+     * A player entity always has a tag over its head, even with an empty profile name, which is the
+     * faint mark left above an NPC. There is no flag for it: a team with `never` is how vanilla
+     * itself hides one, so that is what this does. The team is made once and everybody joins it.
+     */
+    private fun hideNameTagOf(member: String) {
+        if (!namelessTeamMade) {
+            namelessTeamMade = true
+            sendPlayPacket(SetPlayerTeamPacket.ID) {
+                SetPlayerTeamPacket(
+                    teamName = NAMELESS_TEAM,
+                    method = SetPlayerTeamPacket.METHOD_ADD,
+                    parameters =
+                        SetPlayerTeamPacket.Parameters(
+                            displayName = Component.text(NAMELESS_TEAM),
+                            nameTagVisibility = NameTagVisibility.NEVER,
+                        ),
+                ).write(it)
+            }
+        }
+        sendPlayPacket(SetPlayerTeamPacket.ID) {
+            SetPlayerTeamPacket(
+                teamName = NAMELESS_TEAM,
+                method = SetPlayerTeamPacket.METHOD_JOIN,
+                members = listOf(member),
+            ).write(it)
+        }
+    }
+
+    /**
+     * Forgets everything this client was told to draw, because a respawn makes it forget too.
+     *
+     * parity: the client throws away every entity when it changes dimension or respawns, so a
+     * server that still believes it sent them never sends them again. That is a hologram that was
+     * there before you died and is not there after.
+     */
+    private fun forgetEverythingDrawn() {
+        trackedEntities.clear()
+        trackedPlayers.clear()
+        trackedNpcs.clear()
+        namelessTeamMade = false
+        lastNpcLook.clear()
+        trackedEquipment.clear()
+        lastEntityPositions.clear()
+    }
+
     /**
      * Draws the NPCs a plugin made, the same way [syncPlayers] draws real ones.
      *
@@ -2722,6 +2909,9 @@ public class ClientSession(
                 sendPlayPacket(RemoveEntitiesPacket.ID) { RemoveEntitiesPacket(listOf(npc.entityId)).write(it) }
             }
             trackedNpcs[npc.entityId] = npc.version
+            // Before the entity: the tag is hidden by the team this name belongs to, and a tag
+            // drawn before the team arrives flashes on screen.
+            hideNameTagOf(npcProfileName(npc.entityId))
             val properties =
                 npc.skinTexture?.let { texture ->
                     listOf(GameProfileProperty("textures", texture, npc.skinSignature))
@@ -2732,7 +2922,7 @@ public class ClientSession(
                         listOf(
                             PlayerInfoEntry(
                                 npc.uuid,
-                                npc.name,
+                                npcProfileName(npc.entityId),
                                 listed = false,
                                 gamemode = Gamemode.SURVIVAL,
                                 properties = properties,
@@ -2759,6 +2949,25 @@ public class ClientSession(
                 SetEntityDataPacket.skinParts(npc.entityId, PlayerSession.ALL_SKIN_PARTS).write(buffer)
             }
         }
+        // Heads turn toward whoever is looking, which is per connection: each player sees the NPC
+        // looking at them, and none of it is state the server has to keep.
+        for (npc in here) {
+            if (!npc.looksAtPlayers) continue
+            val dx: Double = session.x - npc.x
+            // Eyes to eyes, so a tall NPC does not stare at your feet.
+            val dy: Double = session.y - npc.y
+            val dz: Double = session.z - npc.z
+            val flat: Double = dx * dx + dz * dz
+            if (flat > NPC_LOOK_RANGE * NPC_LOOK_RANGE) continue
+            val yaw = (atan2(dz, dx) * RADIANS_TO_DEGREES - 90.0).toFloat()
+            val pitch = (-atan2(dy, sqrt(flat)) * RADIANS_TO_DEGREES).toFloat()
+            if (!lookedAt(npc.entityId, yaw, pitch)) continue
+            sendPlayPacket(RotateHeadPacket.ID) { RotateHeadPacket(npc.entityId, yaw).write(it) }
+            sendPlayPacket(EntityTeleportPacket.ID) {
+                EntityTeleportPacket(npc.entityId, npc.x, npc.y, npc.z, yaw, pitch, onGround = true).write(it)
+            }
+        }
+
         val visible = here.map { it.entityId }.toSet()
         val gone = trackedNpcs.keys.filterNot { it in visible }
         if (gone.isEmpty()) return
@@ -4067,7 +4276,14 @@ public class ClientSession(
         val session = playerSession ?: return
         if (session.gamemode == Gamemode.SPECTATOR) return
         // An NPC is not in the world's entity table, so it is answered before anything looks there.
-        if (npcs?.clicked(interact.entityId, session.uuid.toString()) == true) return
+        // Only the main hand: an empty-handed right click sends one packet per hand, so answering
+        // both is how one click becomes two.
+        if (interact.hand == InteractPacket.MAIN_HAND &&
+            npcs?.clicked(interact.entityId, session.uuid.toString()) == true
+        ) {
+            return
+        }
+        if (npcs?.of(interact.entityId) != null) return
         val world = currentWorld ?: return
         val entity = world.state.entity(interact.entityId) ?: return
         if (entity.removed) return
@@ -6583,6 +6799,7 @@ public class ClientSession(
             event.set(5, spawnZ)
         }
 
+        forgetEverythingDrawn()
         sendCompressed(RespawnPacket.ID) { RespawnPacket(spawnInfo(session.gamemode), dataToKeep = 0).write(it) }
         sendCompressed(PlayerPositionPacket.ID) {
             PlayerPositionPacket(
@@ -6705,6 +6922,7 @@ public class ClientSession(
         session.y = y
         session.z = z
 
+        forgetEverythingDrawn()
         sendCompressed(RespawnPacket.ID) {
             RespawnPacket(spawnInfo(session.gamemode), dataToKeep = RespawnPacket.KEEP_ALL_DATA).write(it)
         }
@@ -7836,9 +8054,38 @@ public class ClientSession(
         // The id is in front of the body, and a plugin is shown the packet without it.
         val idBytes = VarInt.sizeOf(id)
         bytes = interceptOutgoing(id, bytes, idBytes) ?: return
+        val chain = translation
+        if (chain != null) {
+            // After the plugins on purpose: a plugin's packet API is this server's version, so it
+            // sees and edits the 26.2 shape and the translation happens on the way out of here.
+            sendTranslated(chain, id, bytes.copyOfRange(idBytes, bytes.size))
+            return
+        }
         val frame = PacketScratch.frame
         PacketFraming.writeCompressed(frame, bytes, compressionThreshold, Zlib::compress)
         writeToSocket(frame)
+    }
+
+    /**
+     * Frames whatever the chain turned one packet into, one packet at a time.
+     *
+     * Its own buffers rather than the shared scratch: a link may answer with more than one packet,
+     * and reusing the scratch would have the second overwrite the first before it is on the wire.
+     * A translated client pays for that; a native one never reaches this method.
+     */
+    private fun sendTranslated(
+        chain: ProtocolChain,
+        id: Int,
+        body: ByteArray,
+    ) {
+        chain.clientbound(state, id, body) { translatedId, translatedBody ->
+            val whole = ByteBuffer()
+            whole.writeVarInt(translatedId)
+            whole.writeBytes(translatedBody)
+            val frame = ByteBuffer()
+            PacketFraming.writeCompressed(frame, whole.toByteArray(), compressionThreshold, Zlib::compress)
+            writeToSocket(frame)
+        }
     }
 
     /**
@@ -7980,6 +8227,20 @@ public class ClientSession(
          * `Display.TextDisplay.DATA_TEXT_ID`: Entity's eight synched fields, then Display's fifteen.
          */
         const val TEXT_DISPLAY_TEXT_INDEX = 23
+
+        /** parity: what a game profile's name may be, which is what the name over a head is. */
+        const val PROFILE_NAME_LIMIT = 16
+
+        /** parity: `Display.DATA_BILLBOARD_RENDER_CONSTRAINTS_ID`, and its `CENTER`. */
+        const val DISPLAY_BILLBOARD_INDEX = 15
+        const val BILLBOARD_CENTER: Byte = 3
+
+        /** The team whose members have no name over their head, which is how an NPC is nameless. */
+        const val NAMELESS_TEAM = "basalt_nameless"
+
+        /** How far an NPC notices somebody, and the smallest turn worth a packet. */
+        const val NPC_LOOK_RANGE = 10.0
+        const val LOOK_STEP = 2f
 
         // How far past the view distance to generate ahead of a moving player, in chunks.
         const val PREFETCH_MARGIN_CHUNKS = 2

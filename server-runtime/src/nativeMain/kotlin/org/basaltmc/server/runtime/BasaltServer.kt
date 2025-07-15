@@ -4,6 +4,7 @@ import org.basaltmc.server.assets.ServerJarAssets
 import org.basaltmc.server.lua.LuaLimits
 import org.basaltmc.server.plugins.PluginEventTypes
 import org.basaltmc.server.plugins.PluginHost
+import org.basaltmc.server.plugins.PluginPermission
 import org.basaltmc.server.plugins.PluginSurface
 import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.registry.BlockShapes
@@ -78,11 +79,14 @@ import org.basaltmc.server.runtime.command.commands.TimingsCommand
 import org.basaltmc.server.runtime.command.commands.TransferCommand
 import org.basaltmc.server.runtime.command.commands.TriggerCommand
 import org.basaltmc.server.runtime.command.commands.UnpublishCommand
+import org.basaltmc.server.runtime.command.commands.VersionCommand
 import org.basaltmc.server.runtime.command.commands.WaypointCommand
 import org.basaltmc.server.runtime.command.commands.WhitelistCommand
 import org.basaltmc.server.runtime.command.commands.WorldBorderCommand
 import org.basaltmc.server.runtime.command.registerVanillaCommands
+import org.basaltmc.server.runtime.config.BackwardsSelection
 import org.basaltmc.server.runtime.config.BasaltConfig
+import org.basaltmc.server.runtime.config.CompatibilityConfig
 import org.basaltmc.server.runtime.config.LiveConfigs
 import org.basaltmc.server.runtime.config.WorldDeclaration
 import org.basaltmc.server.runtime.config.WorldDimension
@@ -224,6 +228,9 @@ import org.basaltmc.wire.io.NativeThread
 import org.basaltmc.wire.io.ShutdownSignal
 import org.basaltmc.wire.io.TcpListener
 import org.basaltmc.wire.io.sleepMillis
+import org.basaltmc.wire.multiversion.ProtocolVersions
+import org.basaltmc.wire.multiversion.UnknownProtocolPolicy
+import org.basaltmc.wire.multiversion.java.JavaTranslators
 import org.basaltmc.wire.protocol.play.AnimatePacket
 import org.basaltmc.wire.protocol.play.BlockEventPacket
 import org.basaltmc.wire.protocol.play.BlockPos
@@ -285,6 +292,16 @@ public class BasaltServer(
     /** Where block-break drops are read from (see [RealLootTables]); `null` in tests that never break a block in survival. */
     private val serverJar: ServerJarAssets? = null,
     private val worldsConfig: WorldsConfig,
+    /**
+     * Which client versions may in. Read once: it decides what a connection is before there is a
+     * player, so it is not one of the files `/reload` swaps.
+     */
+    private val compatibility: CompatibilityConfig =
+        CompatibilityConfig(
+            BackwardsSelection.All,
+            UnknownProtocolPolicy.REFUSE,
+            UnknownProtocolPolicy.REFUSE,
+        ),
     /** Where `plugins/` is. The working directory on a real server; under `build/` in a test. */
     private val pluginsRoot: String = ".",
     /**
@@ -299,11 +316,14 @@ public class BasaltServer(
      * read, and warned about, twice.
      */
     defaultWorldMetadata: WorldMetadata? = null,
-    playersDatabasePath: String = PLAYERS_DATABASE,
+    private val playersDatabasePath: String = PLAYERS_DATABASE,
     private val worldsRoot: String = WORLDS_ROOT,
 ) {
     private val logger = Logger("Server")
     private val playerRegistry = PlayerRegistry()
+
+    /** Built once from the configuration and what this build can translate. */
+    private val protocolGate = compatibility.gate(JavaTranslators.supported, logger)
 
     /** Player-shaped entities a plugin made, drawn by every connection that may see them. */
     private val npcs = NpcRegistry()
@@ -520,14 +540,11 @@ public class BasaltServer(
     /**
      * Makes a world that was not in `worlds.toml`, the way a plugin asks for one.
      *
-     * It is a world like any other: its own folder, its own `settings.toml` inheriting the defaults,
-     * its own `level.nbt` with the seed it was given. Answers null if the name is taken or unusable,
-     * because a world that half exists is worse than one that does not.
+     * A world like any other: its own folder, `settings.toml` and seed. Null if the name is taken
+     * or unusable, because a world that half exists is worse than none.
      *
-     * Unlike the worlds in `worlds.toml`, its spawn area is **not** generated up front. Those are
-     * built before the server is listening and nobody is waiting; this one is built inside a tick,
-     * and forty-nine chunks of generation there is a freeze every player would feel. The chunks come
-     * as somebody goes there, which is what happens everywhere else in the world anyway.
+     * Its spawn is not generated up front, unlike the declared ones: this runs inside a tick, and
+     * forty-nine chunks there is a freeze every player would feel.
      */
     internal fun createWorld(
         name: String,
@@ -750,6 +767,7 @@ public class BasaltServer(
         ).also(::registerVanillaCommands)
             .also { it.register(ReloadCommand(live, ::onConfigsReloaded, functions::reload)) }
             .also { it.register(RestartCommand(::requestRestart)) }
+            .also { it.register(VersionCommand { protocolGate.supported }) }
             .also { it.register(BossBarCommand(bossBars)) }
             .also { it.register(ScoreboardCommand(scoreboard)) }
             .also { it.register(TriggerCommand(scoreboard)) }
@@ -859,6 +877,7 @@ public class BasaltServer(
             owner = regionScheduler.global,
             dispatcher = commands,
             currentTick = { tickLoop.ticksRun },
+            console = { consoleSource },
             root = pluginsRoot,
             players = pluginPlayers,
             worlds =
@@ -869,6 +888,7 @@ public class BasaltServer(
                     make = { name, dimension, type, seed -> createWorld(name, dimension, type, seed) },
                     npcs = npcs,
                     nextEntityId = { playerRegistry.allocateEntityId() },
+                    players = { playerRegistry.snapshot() },
                 ),
             placeholders = pluginPlaceholders,
             storage = DatabasePluginStorage { playerStore },
@@ -899,7 +919,7 @@ public class BasaltServer(
                     memoryBytes = config.pluginMemoryBytes,
                 ),
         ).also { host ->
-            commands.register(PluginsCommand(host))
+            commands.register(PluginsCommand(host) { playersDatabasePath })
             // A decider answers where the question was asked, so it may only run on the owner
             // plugins live on. With regions off that is every owner, because they all take turns on
             // this one thread; with regions on and more than one thread it is not, and the host says
@@ -907,6 +927,13 @@ public class BasaltServer(
             // Unclaimed counts as ours, by the owner's own rule: before the first tick nothing else
             // is running, and that is when the worlds announce themselves.
             host.onPluginThread = { regionScheduler.global.isCurrent || !regionScheduler.global.isClaimed }
+            host.timings = timings
+            host.allowed = { id ->
+                config.pluginAllowances[id]
+                    .orEmpty()
+                    .mapNotNull(PluginPermission::of)
+                    .toSet()
+            }
         }
 
     /**
@@ -1213,6 +1240,40 @@ public class BasaltServer(
             )
         world.state.spawnEntity(entity)
         return entity
+    }
+
+    /**
+     * Watches for a plugin that went into the server and did not come back.
+     *
+     * The instruction ceiling stops one spinning in Lua on its own. This is for the other half: a
+     * plugin stuck inside something the host is doing for it, which no counter sees. Its own thread,
+     * because a watchdog that runs on the thread it is watching is not a watchdog.
+     */
+    private fun startPluginWatchdog() {
+        NativeThread.start {
+            while (accepting.value == 1) {
+                sleepMillis(PLUGIN_WATCHDOG_INTERVAL_MILLIS)
+                plugins.interruptIfStuck(PLUGIN_STUCK_MILLIS)
+            }
+        }
+    }
+
+    /**
+     * Names the plugins that left data behind, once, at startup.
+     *
+     * Nothing is deleted: a plugin taken out for an afternoon has to find its data when it comes
+     * back. The operator is told it is there and how to get rid of it, and can turn the reminder
+     * off with `orphan-data = "quiet"`.
+     */
+    private fun reportOrphanedPluginData() {
+        if (config.orphanData != "warn") return
+        val orphans = plugins.orphanedData()
+        if (orphans.isEmpty()) return
+        logger.warn {
+            "Data is here for ${orphans.size} plugin(s) that are not installed: " +
+                orphans.entries.sortedByDescending { it.value }.joinToString(", ") { "${it.key} (${it.value} rows)" } +
+                ". Nothing was deleted. /plugins orphans lists them, /plugins purge <id> removes one."
+        }
     }
 
     /** One raid manager per world, made the first time anything asks for one. */
@@ -4025,6 +4086,8 @@ public class BasaltServer(
         // come up and the first to go down, so it never races the tick thread over its own state.
         if (config.pluginsEnabled) {
             plugins.loadAll()
+            reportOrphanedPluginData()
+            startPluginWatchdog()
         } else {
             logger.info { "Plugins are off in server.toml." }
         }
@@ -4060,6 +4123,17 @@ public class BasaltServer(
         logger.info {
             "Done (${elapsedSeconds}s)! Listening on port ${config.port} " +
                 "(${if (onlineMode != null) "online" else "offline"}-mode)."
+        }
+        val translated = protocolGate.supported - ProtocolVersions.NATIVE
+        if (translated.isNotEmpty()) {
+            // The range and the count, not the list: forty eight of them is a wall of text nobody
+            // reads, and `/version` prints the whole thing for whoever wants it.
+            val oldest = translated.min()
+            logger.info {
+                "Also accepting ${translated.size} older client versions, " +
+                    "${ProtocolVersions.describe(oldest)} to ${ProtocolVersions.describe(translated.max())} " +
+                    "(protocols $oldest to ${translated.max()})."
+            }
         }
         while (accepting.value == 1) {
             val connection = runCatching { listener.accept() }.getOrNull() ?: break
@@ -4097,6 +4171,7 @@ public class BasaltServer(
                     entityTypeTags = entityTags,
                     pluginEvents = plugins.events,
                     pluginPackets = plugins.packets,
+                    protocolGate = protocolGate,
                     npcs = npcs,
                     pluginChannel = { channel, uuid, bytes -> plugins.channelMessage(channel, uuid, bytes) },
                     pluginListensOn = { channel -> plugins.listeningOnChannel(channel) },
@@ -4158,6 +4233,12 @@ public class BasaltServer(
         // (confirmed directly by reading the saved region files back). 3 keeps startup bounded
         // while staying in the range a real client behaves normally at.
         const val SPAWN_RADIUS_CHUNKS = 3
+
+        /** How often the watchdog looks, and how long a plugin may be inside the server. */
+        const val PLUGIN_WATCHDOG_INTERVAL_MILLIS = 250L
+
+        /** Five ticks. Long enough that no honest handler reaches it, short enough to be felt once. */
+        const val PLUGIN_STUCK_MILLIS = 250L
 
         /** What a world may be called: it becomes a folder name and a row in every player's file. */
         val WORLD_NAME_SHAPE = Regex("[a-zA-Z0-9_-]{1,64}")
