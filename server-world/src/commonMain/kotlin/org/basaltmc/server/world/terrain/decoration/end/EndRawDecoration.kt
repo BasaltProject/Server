@@ -71,9 +71,8 @@ public object EndRawDecoration {
         y: Int,
         z: Int,
     ) {
-        if (x.floorDiv(16) != chunk.chunkX || z.floorDiv(16) != chunk.chunkZ) return
         if (y !in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) return
-        chunk.setBlockStateId(x and 15, y, z and 15, Blocks.END_STONE.stateId)
+        chunk.setDecorationBlockStateId(x, y, z, Blocks.END_STONE.stateId)
     }
 
     private const val RAW_GENERATION_STEP = 0

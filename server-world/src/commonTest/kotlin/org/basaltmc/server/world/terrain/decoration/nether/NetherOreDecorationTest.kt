@@ -1,5 +1,7 @@
 package org.basaltmc.server.world.terrain.decoration.nether
 
+import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkHeight
@@ -28,6 +30,26 @@ class NetherOreDecorationTest {
         assertTrue(count(first, "nether_gold_ore") > 0)
         assertTrue(count(first, "nether_quartz_ore") > 0)
         assertEquals(0, count(first, "soul_sand"))
+    }
+
+    @Test
+    fun netherrackVeinCrossingChunkEdgeKeepsWorldCoordinates() {
+        val chunk = solidChunk()
+
+        assertTrue(
+            NetherOreDecoration.placeAt(
+                chunk,
+                WorldgenRandom(XoroshiroRandom(0L)),
+                15,
+                64,
+                8,
+                "ore_quartz_nether",
+            ),
+        )
+
+        val external = chunk.takeGeneratedBlockWrites()
+        assertTrue(external.any { it.x >= 16 }, "expected the quartz vein to continue into the east chunk")
+        assertTrue(external.all { it.expectedStateId == Blocks.NETHERRACK.stateId })
     }
 
     private fun solidChunk(): Chunk =
