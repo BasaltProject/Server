@@ -2123,6 +2123,7 @@ public object TreeFeature {
             }
         if (!generated) return false
         val decoratorContext = recorder.context()
+        if (decoratorContext.logs.isEmpty() && decoratorContext.leaves.isEmpty()) return false
         if (config.decorators.isNotEmpty()) {
             recorder.phase = PlacementPhase.DECORATION
             chunk.observeBlockWrites(recorder::record) {
@@ -2165,10 +2166,10 @@ public object TreeFeature {
                 originZ,
                 config.trunkStateId,
             )
-        val offset = config.foliagePlacer.offset(random)
         val foliagePositions = mutableSetOf<Triple<Int, Int, Int>>()
         recorder?.phase = PlacementPhase.LEAF
         for (attachment in attachments) {
+            val offset = config.foliagePlacer.offset(random)
             config.foliagePlacer.createFoliage(
                 chunk,
                 random,
