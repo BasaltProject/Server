@@ -222,14 +222,14 @@ internal object IcebergFeature {
         if (!Blocks.isAir(stateId) &&
             stateId != Blocks.SNOW_BLOCK.stateId &&
             stateId != Blocks.ICE.stateId &&
-            stateId != Blocks.WATER.stateId
+            !isFrozenWater(stateId)
         ) {
             return
         }
         val randomness = !ellipse || random.nextDouble() > 0.05
         val divisor = if (ellipse) 3 else 2
         if (snowOnTop &&
-            stateId != Blocks.WATER.stateId &&
+            !isFrozenWater(stateId) &&
             heightDifference.toDouble() <= random.nextInt(maxOf(1, height / divisor)) + height * 0.6 &&
             randomness
         ) {

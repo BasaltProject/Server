@@ -73,7 +73,7 @@ public object GlowLichenDecoration : BiomeVegetalDecoration {
         val oldState = region.get(origin) ?: return false
         // MultifaceGrowthFeature's origin gate is narrower than its search-target gate: an
         // existing lichen may be traversed during the directional search, but cannot be the origin.
-        if (!Blocks.isAir(oldState) && oldState != Blocks.WATER.stateId) return false
+        if (!Blocks.isAir(oldState) && !isWaterBlock(oldState)) return false
 
         val directions = VALID_DIRECTIONS.shuffled(random)
         if (placeOnFirstSupport(region, random, origin, oldState, directions)) return true
@@ -144,8 +144,8 @@ public object GlowLichenDecoration : BiomeVegetalDecoration {
         var bits =
             when {
                 Blocks.isGlowLichenState(oldState) -> oldState - firstGlowLichenStateId
-                oldState == Blocks.WATER.stateId -> ALL_FACE_FALSE_BITS
-                Blocks.isAir(oldState) -> ALL_FACE_FALSE_BITS or WATERLOGGED_FALSE_BIT
+                hasSourceWaterFluid(oldState) -> ALL_FACE_FALSE_BITS
+                Blocks.isAir(oldState) || isWaterBlock(oldState) -> ALL_FACE_FALSE_BITS or WATERLOGGED_FALSE_BIT
                 else -> return null
             }
         if (bits and direction.falseBit == 0) return null
@@ -159,7 +159,12 @@ public object GlowLichenDecoration : BiomeVegetalDecoration {
     ): Boolean = Blocks.isGlowLichenState(stateId) && (stateId - firstGlowLichenStateId) and direction.falseBit == 0
 
     private fun isAirWaterOrLichen(stateId: Int): Boolean =
-        Blocks.isAir(stateId) || stateId == Blocks.WATER.stateId || Blocks.isGlowLichenState(stateId)
+        Blocks.isAir(stateId) || isWaterBlock(stateId) || Blocks.isGlowLichenState(stateId)
+
+    private fun isWaterBlock(stateId: Int): Boolean = Blocks.byStateId(stateId)?.block?.path == "water"
+
+    private fun hasSourceWaterFluid(stateId: Int): Boolean =
+        Blocks.hasWaterFluid(stateId) && stateId !in Blocks.WATER.stateId + 1..Blocks.WATER.stateId + 15
 
     private class GlowLichenRegion(
         private val chunk: Chunk,
