@@ -70,7 +70,10 @@ internal object LushVegetationPatchFeature {
             when (config.vegetation) {
                 Vegetation.CAVE_VINE -> CaveVineColumnFeature.place(chunk, random, vegetationOrigin, inMoss = true)
                 Vegetation.MOSS -> placeMossVegetation(chunk, random, vegetationOrigin)
-                Vegetation.DRIPLEAF -> placeDripleaf(chunk, random, vegetationOrigin, config.waterlogged)
+                Vegetation.DRIPLEAF -> {
+                    val placed = placeDripleafAt(chunk, random, vegetationOrigin)
+                    if (config.waterlogged && placed) waterlogPlacedVegetation(chunk, vegetationOrigin)
+                }
             }
         }
         return surface.isNotEmpty()
@@ -157,19 +160,18 @@ internal object LushVegetationPatchFeature {
             .place(chunk, random, origin)
     }
 
-    private fun placeDripleaf(
+    internal fun placeDripleafAt(
         chunk: Chunk,
         random: WorldgenRandom,
         origin: DecorationPos,
-        waterlogged: Boolean,
-    ) {
+    ): Boolean {
         val selected = random.nextInt(5)
-        if (selected == 0) {
+        return if (selected == 0) {
             val facing = FACING_NAMES[random.nextInt(FACING_NAMES.size)]
-            placeSmallDripleaf(chunk, origin, facing, waterlogged)
+            placeSmallDripleaf(chunk, origin, facing)
         } else {
             val facing = BIG_DRIPLEAF_FACING_NAMES[selected - 1]
-            placeBigDripleaf(chunk, random, origin, facing, waterlogged)
+            placeBigDripleaf(chunk, random, origin, facing)
         }
     }
 
@@ -177,19 +179,18 @@ internal object LushVegetationPatchFeature {
         chunk: Chunk,
         origin: DecorationPos,
         facing: String,
-        waterlogged: Boolean,
-    ) {
-        val canReplaceLower = canReplaceWithDripleaf(blockAt(chunk, origin))
-        val upperIsAir = Blocks.isAir(blockAt(chunk, origin.copy(y = origin.y + 1)))
-        if (!canReplaceLower || !upperIsAir) return
-        val lower =
-            Blocks.stateIdOf(
-                Identifier.vanilla("small_dripleaf"),
-                mapOf("facing" to facing, "half" to "lower", "waterlogged" to waterlogged.toString()),
-            ) ?: return
-        val upper = Blocks.upperDoublePlantStateId(lower) ?: return
+    ): Boolean {
+        val current = blockAt(chunk, origin)
+        val below = blockAt(chunk, origin.copy(y = origin.y - 1))
+        if (!smallDripleafSurvives(current, below)) return false
+        val upperOrigin = origin.copy(y = origin.y + 1)
+        val upperCurrent = blockAt(chunk, upperOrigin)
+        if (!Blocks.isAir(upperCurrent)) return false
+        val lower = smallDripleafState(facing, "lower", Blocks.hasWaterFluid(current))
+        val upper = smallDripleafState(facing, "upper", Blocks.hasWaterFluid(upperCurrent))
         set(chunk, origin, lower)
-        set(chunk, origin.copy(y = origin.y + 1), upper)
+        set(chunk, upperOrigin, upper)
+        return true
     }
 
     private fun placeBigDripleaf(
@@ -197,8 +198,7 @@ internal object LushVegetationPatchFeature {
         random: WorldgenRandom,
         origin: DecorationPos,
         facing: String,
-        waterlogged: Boolean,
-    ) {
+    ): Boolean {
         var stemHeight = if (random.nextInt(3) < 2) random.nextInt(5) else 0
         var tipHeight = 1
         val totalHeight = stemHeight + tipHeight
@@ -219,33 +219,62 @@ internal object LushVegetationPatchFeature {
 
         var position = origin
         repeat(stemHeight) {
-            set(chunk, position, bigDripleafStemState(facing, waterlogged && position == origin))
+            set(chunk, position, bigDripleafStemState(facing))
             position = position.copy(y = position.y + 1)
         }
         repeat(tipHeight) {
-            set(chunk, position, bigDripleafState(facing, waterlogged && position == origin))
+            set(chunk, position, bigDripleafState(facing))
             position = position.copy(y = position.y + 1)
         }
+        return true
     }
 
-    private fun canReplaceWithDripleaf(stateId: Int): Boolean = Blocks.isAir(stateId) || stateId == Blocks.WATER.stateId
+    private fun waterlogPlacedVegetation(
+        chunk: Chunk,
+        origin: DecorationPos,
+    ) {
+        val stateId = blockAt(chunk, origin)
+        val state = Blocks.byStateId(stateId) ?: return
+        if (state.properties["waterlogged"] != "false") return
+        val waterlogged = Blocks.stateIdOf(state.block, state.properties + ("waterlogged" to "true")) ?: return
+        set(chunk, origin, waterlogged)
+    }
 
-    private fun bigDripleafStemState(
+    private fun smallDripleafSurvives(
+        currentStateId: Int,
+        belowStateId: Int,
+    ): Boolean {
+        val belowPath = Blocks.byStateId(belowStateId)?.block?.path
+        return belowPath in SUPPORTS_SMALL_DRIPLEAF_PATHS ||
+            (hasSourceWaterFluid(currentStateId) && belowPath in SUPPORTS_VEGETATION_PATHS)
+    }
+
+    private fun smallDripleafState(
         facing: String,
+        half: String,
         waterlogged: Boolean,
     ): Int =
+        Blocks.stateIdOf(
+            Identifier.vanilla("small_dripleaf"),
+            mapOf("facing" to facing, "half" to half, "waterlogged" to waterlogged.toString()),
+        ) ?: error("unknown small_dripleaf state")
+
+    private fun hasSourceWaterFluid(stateId: Int): Boolean =
+        Blocks.hasWaterFluid(stateId) && stateId !in Blocks.WATER.stateId + 1..Blocks.WATER.stateId + 15
+
+    private fun canReplaceWithDripleaf(stateId: Int): Boolean =
+        Blocks.isAir(stateId) || Blocks.byStateId(stateId)?.block?.path == "water"
+
+    private fun bigDripleafStemState(facing: String): Int =
         Blocks.stateIdOf(
             Identifier.vanilla("big_dripleaf_stem"),
-            mapOf("facing" to facing, "waterlogged" to waterlogged.toString()),
+            mapOf("facing" to facing, "waterlogged" to "false"),
         ) ?: error("unknown big_dripleaf_stem state")
 
-    private fun bigDripleafState(
-        facing: String,
-        waterlogged: Boolean,
-    ): Int =
+    private fun bigDripleafState(facing: String): Int =
         Blocks.stateIdOf(
             Identifier.vanilla("big_dripleaf"),
-            mapOf("facing" to facing, "tilt" to "none", "waterlogged" to waterlogged.toString()),
+            mapOf("facing" to facing, "tilt" to "none", "waterlogged" to "false"),
         ) ?: error("unknown big_dripleaf state")
 
     private fun blockAt(
@@ -352,6 +381,21 @@ internal object LushVegetationPatchFeature {
             .map(::ExposureDirection)
     private val FACING_NAMES = listOf("east", "west", "north", "south")
     private val BIG_DRIPLEAF_FACING_NAMES = listOf("east", "west", "south", "north")
+    private val SUPPORTS_SMALL_DRIPLEAF_PATHS = setOf("clay", "moss_block")
+    private val SUPPORTS_VEGETATION_PATHS =
+        setOf(
+            "dirt",
+            "coarse_dirt",
+            "rooted_dirt",
+            "mud",
+            "muddy_mangrove_roots",
+            "moss_block",
+            "pale_moss_block",
+            "grass_block",
+            "podzol",
+            "mycelium",
+            "farmland",
+        )
     private val FLOWERING_AZALEA_STATE_ID = state("flowering_azalea")
     private val AZALEA_STATE_ID = state("azalea")
     private val MOSS_CARPET_STATE_ID = state("moss_carpet")

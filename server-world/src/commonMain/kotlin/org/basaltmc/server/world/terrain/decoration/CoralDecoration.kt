@@ -217,8 +217,8 @@ public object CoralDecoration : BiomeVegetalDecoration {
         if (!pos.inWorld() || !pos.up().inWorld()) return false
         val target = chunk.blockAt(pos)
         if (
-            (target != Blocks.WATER.stateId && !Blocks.isCoralPlantState(target)) ||
-            chunk.blockAt(pos.up()) != Blocks.WATER.stateId
+            (!isWaterBlock(target) && !isCoralTarget(target)) ||
+            !isWaterBlock(chunk.blockAt(pos.up()))
         ) {
             return false
         }
@@ -233,7 +233,7 @@ public object CoralDecoration : BiomeVegetalDecoration {
         for (direction in HORIZONTAL_DIRECTIONS) {
             if (random.nextFloat() < 0.2f) {
                 val side = pos.move(direction)
-                if (chunk.blockAt(side) == Blocks.WATER.stateId) {
+                if (isWaterBlock(chunk.blockAt(side))) {
                     val wallCoralStateId = WALL_CORALS[random.nextInt(WALL_CORALS.size)]
                     chunk.setBlock(
                         side,
@@ -245,6 +245,10 @@ public object CoralDecoration : BiomeVegetalDecoration {
         }
         return true
     }
+
+    private fun isWaterBlock(stateId: Int): Boolean = Blocks.byStateId(stateId)?.block?.path == "water"
+
+    private fun isCoralTarget(stateId: Int): Boolean = Blocks.byStateId(stateId)?.block?.path in CORAL_TARGET_PATHS
 
     private fun shuffled(
         values: MutableList<Direction>,
@@ -311,11 +315,14 @@ public object CoralDecoration : BiomeVegetalDecoration {
             Direction(-1, 0, 0),
         )
 
+    private val CORAL_NAMES = listOf("tube", "brain", "bubble", "fire", "horn")
     private val CORAL_BLOCKS = blockStates("tube", "brain", "bubble", "fire", "horn", suffix = "_coral_block")
     private val CORALS =
         blockStates("tube", "brain", "bubble", "fire", "horn", suffix = "_coral") +
             blockStates("tube", "brain", "bubble", "fire", "horn", suffix = "_coral_fan")
     private val WALL_CORALS = blockStates("tube", "brain", "bubble", "fire", "horn", suffix = "_coral_wall_fan")
+    private val CORAL_TARGET_PATHS =
+        CORAL_NAMES.flatMap { name -> listOf("${name}_coral", "${name}_coral_fan") }.toSet()
 
     internal const val WARM_OCEAN_VEGETATION_INDEX: Int = 96
     private const val VEGETAL_DECORATION_STEP = 9
