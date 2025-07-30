@@ -1,9 +1,12 @@
 package org.basaltmc.server.world.terrain.decoration
 
+import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
+import org.basaltmc.wire.common.Identifier
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -74,6 +77,41 @@ class TreePatchDecorationTest {
         assertTrue(stoneOrigins.isEmpty())
     }
 
+    @Test
+    fun nestedSelectorSaplingPredicatesRejectStone() {
+        val stone = flatChunk(Blocks.STONE.stateId)
+        val grass = flatChunk()
+        val origin = DecorationPos(8, 41, 8)
+
+        TreeDecoration.placeAt(stone, WorldgenRandom(XoroshiroRandom(0L)), origin, "trees_jungle")
+        TreeDecoration.placeAt(grass, WorldgenRandom(XoroshiroRandom(0L)), origin, "trees_jungle")
+
+        assertEquals(0, countTreeBlocks(stone))
+        assertTrue(countTreeBlocks(grass) > 0)
+    }
+
+    @Test
+    fun groveTreesRequireSnowAndScanAbovePowderSnow() {
+        val grass = flatChunk()
+        val snow = flatChunk(stateId("snow_block"))
+        val powder = flatChunk(stateId("snow_block"))
+        powder.setBlockStateId(8, 41, 8, stateId("powder_snow"))
+        powder.setBlockStateId(8, 42, 8, stateId("powder_snow"))
+        val tooDeep = flatChunk(stateId("snow_block"))
+        for (y in 41..49) tooDeep.setBlockStateId(8, y, 8, stateId("powder_snow"))
+        val origin = DecorationPos(8, 41, 8)
+
+        TreeDecoration.placeAt(grass, WorldgenRandom(XoroshiroRandom(0L)), origin, "trees_grove")
+        TreeDecoration.placeAt(snow, WorldgenRandom(XoroshiroRandom(0L)), origin, "trees_grove")
+        TreeDecoration.placeAt(powder, WorldgenRandom(XoroshiroRandom(0L)), origin, "trees_grove")
+        TreeDecoration.placeAt(tooDeep, WorldgenRandom(XoroshiroRandom(0L)), origin, "trees_grove")
+
+        assertEquals(0, countTreeBlocks(grass))
+        assertTrue(countTreeBlocks(snow) > 0)
+        assertTrue(treeBlockYs(powder).any { it >= 43 })
+        assertEquals(0, countTreeBlocks(tooDeep))
+    }
+
     private fun flatChunk(surfaceStateId: Int = Blocks.GRASS_BLOCK.stateId): Chunk =
         Chunk(0, 0).also { chunk ->
             for (z in 0 until 16) {
@@ -85,6 +123,26 @@ class TreePatchDecorationTest {
 
     private fun spec(name: String): TreePatchDecoration.FeatureSpec =
         TreePatchDecoration.featureSpecs().single { it.name == name }
+
+    private fun countTreeBlocks(chunk: Chunk): Int = treeBlockYs(chunk).size
+
+    private fun treeBlockYs(chunk: Chunk): List<Int> =
+        buildList {
+            for (z in 0 until 16) {
+                for (x in 0 until 16) {
+                    for (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
+                        val path = Blocks.byStateId(chunk.getBlockStateId(x, y, z))?.block?.path ?: continue
+                        if (path.endsWith("_log") || path.endsWith("_leaves")) add(y)
+                    }
+                }
+            }
+        }
+
+    private fun stateId(path: String): Int =
+        Blocks.REGISTRY
+            .byIdentifier(Identifier.vanilla(path))
+            ?.stateId
+            ?: error("unknown block '$path'")
 
     private fun splitEnvironment(
         splitX: Int,

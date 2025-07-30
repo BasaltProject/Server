@@ -74,7 +74,8 @@ public object BiomeDecoration {
             Identifier.vanilla("windswept_gravelly_hills") to noVegetalDecoration,
             // parity: OverworldBiomes.windsweptHills(moreTrees=true)/addMountainForestTrees: TREES_WINDSWEPT_FOREST, same species mix.
             Identifier.vanilla("windswept_forest") to noVegetalDecoration,
-            // parity: OverworldBiomes.grove/addGroveTrees: TREES_GROVE, 33.3% pine else spruce (real "on snow" placement filter dropped).
+            // parity: OverworldBiomes.grove/addGroveTrees: TREES_GROVE, 33.3% pine else spruce;
+            // both nested candidates retain their upward powder-snow scan and on-snow filter.
             Identifier.vanilla("grove") to noVegetalDecoration,
             // parity: peaks have no vegetal features; snowy slopes adds only patch_pumpkin later.
             // Explicit empty bases keep their earlier shared disk stage reachable through forBiome.

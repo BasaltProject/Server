@@ -36,10 +36,25 @@ public object BambooVegetationDecoration : BiomeVegetalDecoration {
         context: PlacementContext,
     ) {
         when {
-            random.nextFloat() < 0.05f -> placeTree(chunk, random, position, TreeConfigs.FANCY_OAK)
-            random.nextFloat() < 0.15f -> placeTree(chunk, random, position, TreeConfigs.JUNGLE_BUSH)
-            random.nextFloat() < 0.7f -> placeTree(chunk, random, position, TreeConfigs.MEGA_JUNGLE)
+            random.nextFloat() < 0.05f ->
+                placeCheckedTree(chunk, random, position, TreeConfigs.FANCY_OAK, "oak_sapling")
+            random.nextFloat() < 0.15f ->
+                placeCheckedTree(chunk, random, position, TreeConfigs.JUNGLE_BUSH, "oak_sapling")
+            random.nextFloat() < 0.7f ->
+                placeCheckedTree(chunk, random, position, TreeConfigs.MEGA_JUNGLE, "jungle_sapling")
             else -> JungleGrassDecoration.placePatchAt(chunk, random, position, context)
+        }
+    }
+
+    private fun placeCheckedTree(
+        chunk: Chunk,
+        random: WorldgenRandom,
+        position: DecorationPos,
+        config: org.basaltmc.server.world.terrain.decoration.tree.TreeConfiguration,
+        sapling: String,
+    ) {
+        if (TreeDecoration.survivesPlacementPredicate(chunk, position, sapling)) {
+            placeTree(chunk, random, position, config)
         }
     }
 

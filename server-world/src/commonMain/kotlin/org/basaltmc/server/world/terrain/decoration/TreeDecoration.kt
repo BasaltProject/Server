@@ -2,13 +2,17 @@ package org.basaltmc.server.world.terrain.decoration
 
 import org.basaltmc.server.random.BasaltRandom
 import org.basaltmc.server.random.WorldgenRandom
+import org.basaltmc.server.registry.BlockSupport
+import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
+import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.server.world.terrain.decoration.tree.FallenTreeConfigs
 import org.basaltmc.server.world.terrain.decoration.tree.FallenTreeConfiguration
 import org.basaltmc.server.world.terrain.decoration.tree.FallenTreeFeature
 import org.basaltmc.server.world.terrain.decoration.tree.TreeConfigs
 import org.basaltmc.server.world.terrain.decoration.tree.TreeConfiguration
 import org.basaltmc.server.world.terrain.decoration.tree.TreeFeature
+import org.basaltmc.wire.common.Identifier
 
 /**
  * Real per-biome tree placement, ported from the real jar's own decompiled
@@ -59,6 +63,84 @@ public object TreeDecoration {
             ->
             HugeMushroomFeature.place(chunk, random, position.x, position.y, position.z, kind)
         }
+
+    private fun checked(
+        candidate: Candidate,
+        sapling: String,
+    ): Candidate =
+        Candidate { chunk, random, position, mossyCarpetRandom ->
+            if (survivesPlacementPredicate(chunk, position, sapling)) {
+                candidate.place(chunk, random, position, mossyCarpetRandom)
+            }
+        }
+
+    private fun checkedTree(
+        config: TreeConfiguration,
+        sapling: String,
+    ): Candidate = checked(tree(config), sapling)
+
+    private fun checkedFallen(
+        config: FallenTreeConfiguration,
+        sapling: String,
+    ): Candidate = checked(fallen(config), sapling)
+
+    private fun onSnow(config: TreeConfiguration): Candidate {
+        val candidate = tree(config)
+        return Candidate { chunk, random, position, mossyCarpetRandom ->
+            grovePosition(chunk, position)?.let { candidate.place(chunk, random, it, mossyCarpetRandom) }
+        }
+    }
+
+    /** Exact `would_survive` predicate shared by outer tree placements and nested selector entries. */
+    internal fun survivesPlacementPredicate(
+        chunk: Chunk,
+        position: DecorationPos,
+        sapling: String?,
+    ): Boolean {
+        if (sapling == null) return true
+        if (position.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return false
+        val stateId =
+            Blocks.REGISTRY.byIdentifier(Identifier.vanilla(sapling))?.stateId
+                ?: error("unknown sapling '$sapling'")
+
+        fun get(
+            dx: Int,
+            dy: Int,
+            dz: Int,
+        ): Int = chunk.getDecorationBlockStateId(position.x + dx, position.y + dy, position.z + dz)
+
+        return BlockSupport.canSurvive(
+            stateId,
+            down = get(0, -1, 0),
+            up = get(0, 1, 0),
+            north = get(0, 0, -1),
+            south = get(0, 0, 1),
+            west = get(-1, 0, 0),
+            east = get(1, 0, 0),
+        )
+    }
+
+    /** Nested `pine_on_snow`/`spruce_on_snow`: scan upward through at most eight powder-snow blocks. */
+    private fun grovePosition(
+        chunk: Chunk,
+        origin: DecorationPos,
+    ): DecorationPos? {
+        var position = origin
+        var steps = 0
+        while (steps < GROVE_SCAN_STEPS && blockPath(chunk, position) == "powder_snow") {
+            if (position.y == WorldHeight.MAX_Y) return null
+            position = position.copy(y = position.y + 1)
+            steps++
+        }
+        if (blockPath(chunk, position) == "powder_snow") return null
+        val below = position.copy(y = position.y - 1)
+        return position.takeIf { blockPath(chunk, below) in GROVE_SUPPORT_PATHS }
+    }
+
+    private fun blockPath(
+        chunk: Chunk,
+        position: DecorationPos,
+    ): String? = Blocks.byStateId(chunk.getDecorationBlockStateId(position.x, position.y, position.z))?.block?.path
 
     /** // parity: `trees_water`, weighted count 0x9/1x1 and fancy oak 10% before oak fallback. */
     public val WATER: BiomeVegetalDecoration =
@@ -239,117 +321,148 @@ public object TreeDecoration {
             "trees_birch_and_oak_leaf_litter" to
                 Selector(
                     listOf(
-                        0.0025f to fallen(FallenTreeConfigs.BIRCH),
-                        0.2f to tree(TreeConfigs.BIRCH_BEES_0002_LEAF_LITTER),
-                        0.1f to tree(TreeConfigs.FANCY_OAK_BEES_0002_LEAF_LITTER),
-                        0.0125f to fallen(FallenTreeConfigs.OAK),
+                        0.0025f to checkedFallen(FallenTreeConfigs.BIRCH, "birch_sapling"),
+                        0.2f to checkedTree(TreeConfigs.BIRCH_BEES_0002_LEAF_LITTER, "birch_sapling"),
+                        0.1f to checkedTree(TreeConfigs.FANCY_OAK_BEES_0002_LEAF_LITTER, "oak_sapling"),
+                        0.0125f to checkedFallen(FallenTreeConfigs.OAK, "oak_sapling"),
                     ),
-                    tree(TreeConfigs.OAK_BEES_0002_LEAF_LITTER),
+                    checkedTree(TreeConfigs.OAK_BEES_0002_LEAF_LITTER, "oak_sapling"),
                 ),
             "trees_birch" to
-                Selector(listOf(0.0125f to fallen(FallenTreeConfigs.BIRCH)), tree(TreeConfigs.BIRCH_BEES_0002)),
+                Selector(
+                    listOf(0.0125f to checkedFallen(FallenTreeConfigs.BIRCH, "birch_sapling")),
+                    checkedTree(TreeConfigs.BIRCH_BEES_0002, "birch_sapling"),
+                ),
             "birch_tall" to
                 Selector(
                     listOf(
-                        0.00625f to fallen(FallenTreeConfigs.SUPER_BIRCH),
-                        0.5f to tree(TreeConfigs.SUPER_BIRCH_BEES_0002),
-                        0.0125f to fallen(FallenTreeConfigs.BIRCH),
+                        0.00625f to checkedFallen(FallenTreeConfigs.SUPER_BIRCH, "birch_sapling"),
+                        0.5f to checkedTree(TreeConfigs.SUPER_BIRCH_BEES_0002, "birch_sapling"),
+                        0.0125f to checkedFallen(FallenTreeConfigs.BIRCH, "birch_sapling"),
                     ),
-                    tree(TreeConfigs.BIRCH_BEES_0002),
+                    checkedTree(TreeConfigs.BIRCH_BEES_0002, "birch_sapling"),
                 ),
             "trees_taiga" to
                 Selector(
-                    listOf(0.33333334f to tree(TreeConfigs.PINE), 0.0125f to fallen(FallenTreeConfigs.SPRUCE)),
-                    tree(TreeConfigs.SPRUCE),
+                    listOf(
+                        0.33333334f to checkedTree(TreeConfigs.PINE, "spruce_sapling"),
+                        0.0125f to checkedFallen(FallenTreeConfigs.SPRUCE, "spruce_sapling"),
+                    ),
+                    checkedTree(TreeConfigs.SPRUCE, "spruce_sapling"),
                 ),
             "trees_snowy" to
-                Selector(listOf(0.0125f to fallen(FallenTreeConfigs.SPRUCE)), tree(TreeConfigs.SPRUCE)),
+                Selector(
+                    listOf(0.0125f to checkedFallen(FallenTreeConfigs.SPRUCE, "spruce_sapling")),
+                    checkedTree(TreeConfigs.SPRUCE, "spruce_sapling"),
+                ),
             "trees_old_growth_spruce_taiga" to
                 Selector(
                     listOf(
-                        0.33333334f to tree(TreeConfigs.MEGA_SPRUCE),
-                        0.33333334f to tree(TreeConfigs.PINE),
-                        0.0125f to fallen(FallenTreeConfigs.SPRUCE),
+                        0.33333334f to checkedTree(TreeConfigs.MEGA_SPRUCE, "spruce_sapling"),
+                        0.33333334f to checkedTree(TreeConfigs.PINE, "spruce_sapling"),
+                        0.0125f to checkedFallen(FallenTreeConfigs.SPRUCE, "spruce_sapling"),
                     ),
-                    tree(TreeConfigs.SPRUCE),
+                    checkedTree(TreeConfigs.SPRUCE, "spruce_sapling"),
                 ),
             "trees_old_growth_pine_taiga" to
                 Selector(
                     listOf(
-                        0.025641026f to tree(TreeConfigs.MEGA_SPRUCE),
-                        0.30769232f to tree(TreeConfigs.MEGA_PINE),
-                        0.33333334f to tree(TreeConfigs.PINE),
-                        0.0125f to fallen(FallenTreeConfigs.SPRUCE),
+                        0.025641026f to checkedTree(TreeConfigs.MEGA_SPRUCE, "spruce_sapling"),
+                        0.30769232f to checkedTree(TreeConfigs.MEGA_PINE, "spruce_sapling"),
+                        0.33333334f to checkedTree(TreeConfigs.PINE, "spruce_sapling"),
+                        0.0125f to checkedFallen(FallenTreeConfigs.SPRUCE, "spruce_sapling"),
                     ),
-                    tree(TreeConfigs.SPRUCE),
+                    checkedTree(TreeConfigs.SPRUCE, "spruce_sapling"),
                 ),
             "trees_savanna" to
                 Selector(
-                    listOf(0.8f to tree(TreeConfigs.ACACIA), 0.0125f to fallen(FallenTreeConfigs.OAK)),
-                    tree(TreeConfigs.OAK),
+                    listOf(
+                        0.8f to checkedTree(TreeConfigs.ACACIA, "acacia_sapling"),
+                        0.0125f to checkedFallen(FallenTreeConfigs.OAK, "oak_sapling"),
+                    ),
+                    checkedTree(TreeConfigs.OAK, "oak_sapling"),
                 ),
             "trees_windswept_savanna" to
                 Selector(
-                    listOf(0.8f to tree(TreeConfigs.ACACIA), 0.0125f to fallen(FallenTreeConfigs.OAK)),
-                    tree(TreeConfigs.OAK),
+                    listOf(
+                        0.8f to checkedTree(TreeConfigs.ACACIA, "acacia_sapling"),
+                        0.0125f to checkedFallen(FallenTreeConfigs.OAK, "oak_sapling"),
+                    ),
+                    checkedTree(TreeConfigs.OAK, "oak_sapling"),
                 ),
             "trees_jungle" to
                 Selector(
                     listOf(
-                        0.1f to tree(TreeConfigs.FANCY_OAK),
-                        0.5f to tree(TreeConfigs.JUNGLE_BUSH),
-                        0.33333334f to tree(TreeConfigs.MEGA_JUNGLE),
-                        0.0125f to fallen(FallenTreeConfigs.JUNGLE),
+                        0.1f to checkedTree(TreeConfigs.FANCY_OAK, "oak_sapling"),
+                        0.5f to checkedTree(TreeConfigs.JUNGLE_BUSH, "oak_sapling"),
+                        0.33333334f to checkedTree(TreeConfigs.MEGA_JUNGLE, "jungle_sapling"),
+                        0.0125f to checkedFallen(FallenTreeConfigs.JUNGLE, "jungle_sapling"),
                     ),
-                    tree(TreeConfigs.JUNGLE_TREE),
+                    checkedTree(TreeConfigs.JUNGLE_TREE, "jungle_sapling"),
                 ),
             "trees_sparse_jungle" to
                 Selector(
                     listOf(
-                        0.1f to tree(TreeConfigs.FANCY_OAK),
-                        0.5f to tree(TreeConfigs.JUNGLE_BUSH),
-                        0.0125f to fallen(FallenTreeConfigs.JUNGLE),
+                        0.1f to checkedTree(TreeConfigs.FANCY_OAK, "oak_sapling"),
+                        0.5f to checkedTree(TreeConfigs.JUNGLE_BUSH, "oak_sapling"),
+                        0.0125f to checkedFallen(FallenTreeConfigs.JUNGLE, "jungle_sapling"),
                     ),
-                    tree(TreeConfigs.JUNGLE_TREE),
+                    checkedTree(TreeConfigs.JUNGLE_TREE, "jungle_sapling"),
                 ),
             "trees_windswept_hills" to windsweptSelector(),
             "trees_windswept_forest" to windsweptSelector(),
-            "trees_grove" to Selector(listOf(0.33333334f to tree(TreeConfigs.PINE)), tree(TreeConfigs.SPRUCE)),
+            "trees_grove" to Selector(listOf(0.33333334f to onSnow(TreeConfigs.PINE)), onSnow(TreeConfigs.SPRUCE)),
             "trees_badlands" to
-                Selector(listOf(0.0125f to fallen(FallenTreeConfigs.OAK)), tree(TreeConfigs.OAK_LEAF_LITTER)),
+                Selector(
+                    listOf(0.0125f to checkedFallen(FallenTreeConfigs.OAK, "oak_sapling")),
+                    checkedTree(TreeConfigs.OAK_LEAF_LITTER, "oak_sapling"),
+                ),
             "trees_meadow" to
-                Selector(listOf(0.5f to tree(TreeConfigs.FANCY_OAK_BEES)), tree(TreeConfigs.SUPER_BIRCH_BEES)),
-            "trees_water" to Selector(listOf(0.1f to tree(TreeConfigs.FANCY_OAK)), tree(TreeConfigs.OAK)),
+                Selector(
+                    listOf(0.5f to checkedTree(TreeConfigs.FANCY_OAK_BEES, "oak_sapling")),
+                    checkedTree(TreeConfigs.SUPER_BIRCH_BEES, "birch_sapling"),
+                ),
+            "trees_water" to
+                Selector(
+                    listOf(0.1f to checkedTree(TreeConfigs.FANCY_OAK, "oak_sapling")),
+                    checkedTree(TreeConfigs.OAK, "oak_sapling"),
+                ),
             "trees_flower_forest" to
                 Selector(
                     listOf(
-                        0.0025f to fallen(FallenTreeConfigs.BIRCH),
-                        0.2f to tree(TreeConfigs.BIRCH_BEES_002),
-                        0.1f to tree(TreeConfigs.FANCY_OAK_BEES_002),
+                        0.0025f to checkedFallen(FallenTreeConfigs.BIRCH, "birch_sapling"),
+                        0.2f to checkedTree(TreeConfigs.BIRCH_BEES_002, "birch_sapling"),
+                        0.1f to checkedTree(TreeConfigs.FANCY_OAK_BEES_002, "oak_sapling"),
                     ),
-                    tree(TreeConfigs.OAK_BEES_002),
+                    checkedTree(TreeConfigs.OAK_BEES_002, "oak_sapling"),
                 ),
             "trees_mangrove" to
-                Selector(listOf(0.85f to tree(TreeConfigs.TALL_MANGROVE)), tree(TreeConfigs.MANGROVE)),
+                Selector(
+                    listOf(0.85f to checkedTree(TreeConfigs.TALL_MANGROVE, "mangrove_propagule")),
+                    checkedTree(TreeConfigs.MANGROVE, "mangrove_propagule"),
+                ),
             "trees_cherry" to Selector(emptyList(), tree(TreeConfigs.CHERRY_BEES_005)),
             "trees_swamp" to Selector(emptyList(), tree(TreeConfigs.SWAMP_OAK)),
             "pale_garden_vegetation" to
                 Selector(
-                    listOf(0.1f to tree(TreeConfigs.PALE_OAK_CREAKING), 0.9f to tree(TreeConfigs.PALE_OAK)),
-                    tree(TreeConfigs.PALE_OAK),
+                    listOf(
+                        0.1f to checkedTree(TreeConfigs.PALE_OAK_CREAKING, "pale_oak_sapling"),
+                        0.9f to checkedTree(TreeConfigs.PALE_OAK, "pale_oak_sapling"),
+                    ),
+                    checkedTree(TreeConfigs.PALE_OAK, "pale_oak_sapling"),
                 ),
             "dark_forest_vegetation" to
                 Selector(
                     listOf(
                         0.025f to hugeMushroom(HugeMushroomFeature.Kind.BROWN),
                         0.05f to hugeMushroom(HugeMushroomFeature.Kind.RED),
-                        0.6666667f to tree(TreeConfigs.DARK_OAK_LEAF_LITTER),
-                        0.0025f to fallen(FallenTreeConfigs.BIRCH),
-                        0.2f to tree(TreeConfigs.BIRCH_LEAF_LITTER),
-                        0.0125f to fallen(FallenTreeConfigs.OAK),
-                        0.1f to tree(TreeConfigs.FANCY_OAK_LEAF_LITTER),
+                        0.6666667f to checkedTree(TreeConfigs.DARK_OAK_LEAF_LITTER, "dark_oak_sapling"),
+                        0.0025f to checkedFallen(FallenTreeConfigs.BIRCH, "birch_sapling"),
+                        0.2f to checkedTree(TreeConfigs.BIRCH_LEAF_LITTER, "birch_sapling"),
+                        0.0125f to checkedFallen(FallenTreeConfigs.OAK, "oak_sapling"),
+                        0.1f to checkedTree(TreeConfigs.FANCY_OAK_LEAF_LITTER, "oak_sapling"),
                     ),
-                    tree(TreeConfigs.OAK_LEAF_LITTER),
+                    checkedTree(TreeConfigs.OAK_LEAF_LITTER, "oak_sapling"),
                 ),
         )
 
@@ -357,12 +470,12 @@ public object TreeDecoration {
     private fun windsweptSelector(): Selector =
         Selector(
             listOf(
-                0.008325f to fallen(FallenTreeConfigs.SPRUCE),
-                0.666f to tree(TreeConfigs.SPRUCE),
-                0.1f to tree(TreeConfigs.FANCY_OAK),
-                0.0125f to fallen(FallenTreeConfigs.OAK),
+                0.008325f to checkedFallen(FallenTreeConfigs.SPRUCE, "spruce_sapling"),
+                0.666f to checkedTree(TreeConfigs.SPRUCE, "spruce_sapling"),
+                0.1f to checkedTree(TreeConfigs.FANCY_OAK, "oak_sapling"),
+                0.0125f to checkedFallen(FallenTreeConfigs.OAK, "oak_sapling"),
             ),
-            tree(TreeConfigs.OAK),
+            checkedTree(TreeConfigs.OAK, "oak_sapling"),
         )
 
     /** One roll of [placedFeature]'s selector, placed at [origin]: what `/place feature` runs. */
@@ -404,4 +517,7 @@ public object TreeDecoration {
         for ((chance, candidate) in entries) if (random.nextFloat() < chance) return candidate
         return default
     }
+
+    private val GROVE_SUPPORT_PATHS = setOf("snow_block", "powder_snow")
+    private const val GROVE_SCAN_STEPS = 8
 }
