@@ -13,9 +13,10 @@ import org.basaltmc.wire.common.Identifier
  * // parity: net.minecraft.world.level.levelgen.feature.SimpleBlockFeature. Places a single block
  * at [origin] if it "can survive" there. Real vanilla's `BlockState.canSurvive` dispatches to each
  * block's own placement rule. Overworld vegetation dispatches to `supports_vegetation`, dry
- * vegetation to `supports_dry_vegetation`, and leaf litter to its sturdy-upper-face rule; other
- * block families retain the generic solid-ground fallback. For [isDoublePlant] blocks, the block
- * above must also be air, matching the feature's special placement of both halves at once.
+ * vegetation to `supports_dry_vegetation`, lily pads to water/ice support, mushrooms to their
+ * solid-render support, and leaf litter to its sturdy-upper-face rule; block families without a
+ * custom rule retain the generic solid-ground fallback. For [isDoublePlant] blocks, the block above
+ * must also be air, matching the feature's special placement of both halves at once.
  */
 public class SimpleBlockFeature(
     private val toPlace: (random: WorldgenRandom, origin: DecorationPos) -> Int,
@@ -79,6 +80,9 @@ public class SimpleBlockFeature(
         val belowPath = Blocks.byStateId(belowStateId)?.block?.path
         return when {
             path == "pale_moss_carpet" -> !Blocks.isAir(belowStateId)
+            path == "lily_pad" -> Blocks.hasWaterFluid(belowStateId) || belowPath in SUPPORTS_LILY_PAD_PATHS
+            path == "brown_mushroom" || path == "red_mushroom" ->
+                belowPath in OVERRIDES_MUSHROOM_LIGHT_PATHS || BlockShapes.isSolidRender(belowStateId)
             path in DRY_VEGETATION_PATHS -> belowPath in SUPPORTS_DRY_VEGETATION_PATHS
             path in VEGETATION_PATHS -> belowPath in SUPPORTS_VEGETATION_PATHS
             path == "leaf_litter" -> BlockShapes.isFaceSturdy(belowStateId, BlockFace.UP)
@@ -259,6 +263,8 @@ public class SimpleBlockFeature(
                 "wildflowers",
             )
         val DRY_VEGETATION_PATHS = setOf("dead_bush", "short_dry_grass", "tall_dry_grass")
+        val SUPPORTS_LILY_PAD_PATHS = setOf("ice", "frosted_ice")
+        val OVERRIDES_MUSHROOM_LIGHT_PATHS = setOf("mycelium", "podzol", "crimson_nylium", "warped_nylium")
         val SUPPORTS_VEGETATION_PATHS =
             setOf(
                 "dirt",

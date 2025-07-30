@@ -58,6 +58,41 @@ class SimpleBlockFeatureTest {
     }
 
     @Test
+    fun lilyPadsRequireWaterOrIceSupport() {
+        val feature = SimpleBlockFeature({ _, _ -> stateId("lily_pad") })
+        val random = WorldgenRandom(XoroshiroRandom(1L))
+        val water = Chunk(0, 0).also { it.setBlockStateId(8, 39, 8, Blocks.WATER.stateId) }
+        val ice = Chunk(0, 0).also { it.setBlockStateId(8, 39, 8, stateId("ice")) }
+        val dirt = Chunk(0, 0).also { it.setBlockStateId(8, 39, 8, Blocks.DIRT.stateId) }
+
+        assertTrue(feature.place(water, random, DecorationPos(8, 40, 8)))
+        assertTrue(feature.place(ice, random, DecorationPos(8, 40, 8)))
+        assertEquals(false, feature.place(dirt, random, DecorationPos(8, 40, 8)))
+    }
+
+    @Test
+    fun mushroomsRequireSolidRenderSupportDuringWorldgen() {
+        val feature = SimpleBlockFeature({ _, _ -> stateId("brown_mushroom") })
+        val random = WorldgenRandom(XoroshiroRandom(1L))
+        val stone = Chunk(0, 0).also { it.setBlockStateId(8, 39, 8, Blocks.STONE.stateId) }
+        val bottomSlab =
+            Chunk(0, 0).also {
+                it.setBlockStateId(
+                    8,
+                    39,
+                    8,
+                    Blocks.stateIdOf(
+                        Identifier.vanilla("stone_slab"),
+                        mapOf("type" to "bottom", "waterlogged" to "false"),
+                    ) ?: error("missing bottom stone slab"),
+                )
+            }
+
+        assertTrue(feature.place(stone, random, DecorationPos(8, 40, 8)))
+        assertEquals(false, feature.place(bottomSlab, random, DecorationPos(8, 40, 8)))
+    }
+
+    @Test
     fun paleMossCarpetBuildsTheExactTwoLayerWallState() {
         val paleMossCarpet = stateId("pale_moss_carpet")
         var result: Chunk? = null
