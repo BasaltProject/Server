@@ -280,7 +280,7 @@ public object CaveSpeleothemDecoration {
     ): Boolean {
         val stateId = region.get(floor) ?: return false
         val blockPath = Blocks.byStateId(stateId)?.block?.path
-        if (stateId == Blocks.WATER.stateId ||
+        if (isWaterBlock(stateId) ||
             stateId == config.speleothem.baseStateId ||
             blockPath == config.speleothem.pointPath
         ) {
@@ -559,7 +559,7 @@ public object CaveSpeleothemDecoration {
 
         fun isEmptyOrWater(position: DecorationPos): Boolean {
             val stateId = get(position) ?: return false
-            return Blocks.isAir(stateId) || stateId == Blocks.WATER.stateId
+            return Blocks.isAir(stateId) || isWaterBlock(stateId)
         }
 
         fun isSolid(position: DecorationPos): Boolean {
@@ -569,7 +569,7 @@ public object CaveSpeleothemDecoration {
 
         fun isNeitherEmptyNorWater(position: DecorationPos): Boolean {
             val stateId = get(position) ?: return false
-            return !Blocks.isAir(stateId) && stateId != Blocks.WATER.stateId
+            return !Blocks.isAir(stateId) && !isWaterBlock(stateId)
         }
 
         fun isLava(position: DecorationPos): Boolean = get(position)?.let(Blocks::byStateId)?.block?.path == "lava"
@@ -606,6 +606,9 @@ public object CaveSpeleothemDecoration {
         )
     private val HORIZONTAL_DIRECTIONS = listOf(DIRECTIONS[2], DIRECTIONS[5], DIRECTIONS[3], DIRECTIONS[4])
     private val BASE_STONE_OVERWORLD = setOf("stone", "granite", "diorite", "andesite", "tuff", "deepslate")
+
+    private fun isWaterBlock(stateId: Int): Boolean = Blocks.byStateId(stateId)?.block?.path == "water"
+
     private val POINTED_FEATURES =
         listOf(
             SpeleothemConfig(

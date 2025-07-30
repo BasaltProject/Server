@@ -1,5 +1,6 @@
 package org.basaltmc.server.world.terrain.decoration
 
+import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
@@ -8,6 +9,7 @@ import org.basaltmc.wire.common.Identifier
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class CaveSpeleothemDecorationTest {
     @Test
@@ -126,6 +128,22 @@ class CaveSpeleothemDecorationTest {
             externalBlockState = { x, y, z -> patternState(x, y, z, sulfur = true) },
         )
         assertContentEquals(intArrayOf(26520, 13416, 53504, 4864, 0), vector(sulfur, SULFUR_PATHS).counts)
+    }
+
+    @Test
+    fun clusterTreatsEveryStateOfTheWaterBlockAsEmptyWater() {
+        val chunk = Chunk(0, 0)
+        val origin = DecorationPos(8, 50, 8)
+        chunk.setBlockStateId(origin.x, origin.y, origin.z, Blocks.WATER.stateId + 1)
+
+        assertTrue(
+            CaveSpeleothemDecoration.placeAt(
+                chunk,
+                XoroshiroRandom(0L),
+                origin,
+                "dripstone_cluster",
+            ),
+        )
     }
 
     private fun patternedChunk(sulfur: Boolean): Chunk =

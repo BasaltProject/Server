@@ -54,19 +54,48 @@ class AquaticPatchDecorationTest {
         assertEquals(0, trace.writes)
     }
 
-    private fun oceanChunk(chunkX: Int = 0): Chunk =
+    @Test
+    fun aquaticFeaturesAcceptEveryStateOfTheWaterBlock() {
+        val cases =
+            listOf(
+                Triple("seagrass_swamp", "swamp", 0),
+                Triple("sea_pickle", "warm_ocean", 0),
+                Triple("kelp_cold", "ocean", -38),
+            )
+        for ((name, biome, chunkX) in cases) {
+            val chunk = oceanChunk(chunkX, FLOWING_WATER_STATE_ID)
+            val trace = Trace()
+            AquaticPatchDecoration.decorateFeature(
+                chunk,
+                if (name == "sea_pickle") 35L else 1234L,
+                environment(biome),
+                name,
+                externalBlockState = { _, y, _ -> oceanState(y, FLOWING_WATER_STATE_ID) },
+                blockWriteObserver = trace::write,
+            )
+            assertTrue(trace.writes > 0, "$name rejected flowing water")
+        }
+    }
+
+    private fun oceanChunk(
+        chunkX: Int = 0,
+        waterStateId: Int = Blocks.WATER.stateId,
+    ): Chunk =
         Chunk(chunkX, 0).also { chunk ->
             for (z in 0 until 16) {
                 for (x in 0 until 16) {
-                    for (y in WorldHeight.MIN_Y..55) chunk.setBlockStateId(x, y, z, oceanState(y))
+                    for (y in WorldHeight.MIN_Y..55) chunk.setBlockStateId(x, y, z, oceanState(y, waterStateId))
                 }
             }
         }
 
-    private fun oceanState(y: Int): Int =
+    private fun oceanState(
+        y: Int,
+        waterStateId: Int = Blocks.WATER.stateId,
+    ): Int =
         when {
             y < 40 -> Blocks.STONE.stateId
-            y <= 55 -> Blocks.WATER.stateId
+            y <= 55 -> waterStateId
             else -> Blocks.AIR.stateId
         }
 
@@ -181,6 +210,7 @@ class AquaticPatchDecorationTest {
     )
 
     private companion object {
+        val FLOWING_WATER_STATE_ID = Blocks.WATER.stateId + 1
         val CASES =
             listOf(
                 Case(
