@@ -305,7 +305,7 @@ public object NetherSurfaceStructuresDecoration {
         z: Int,
     ): Boolean {
         val state = stateAt(chunk, x, y, z) ?: return false
-        return Blocks.isAir(state) || state == Blocks.LAVA.stateId && y <= NETHER_SEA_LEVEL
+        return Blocks.isAir(state) || blockPath(state) == "lava" && y <= NETHER_SEA_LEVEL
     }
 
     private fun isEmpty(stateId: Int): Boolean {
