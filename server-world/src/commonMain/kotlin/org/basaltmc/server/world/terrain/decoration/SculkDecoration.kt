@@ -118,7 +118,7 @@ public object SculkDecoration {
         random: BasaltRandom,
         origin: DecorationPos,
     ): Boolean {
-        if (!region.isAirOrWater(origin)) return false
+        if (!region.isAirOrWaterBlock(origin)) return false
         val searchDirections = VALID_DIRECTIONS.toMutableList().also { shuffle(it, random) }
         if (placeGrowthIfPossible(region, random, origin, searchDirections)) return true
 
@@ -131,7 +131,7 @@ public object SculkDecoration {
             // its 20 iterations, so a failed immutable attempt has the same result twenty times.
             val position = origin.offset(searchDirection.x, searchDirection.y, searchDirection.z)
             val stateId = region.get(position) ?: continue
-            if (!region.isAirOrWater(stateId) && !region.isSculkVein(stateId)) continue
+            if (!region.isAirOrWaterBlock(stateId) && !region.isSculkVein(stateId)) continue
             if (placeGrowthIfPossible(region, random, position, placementDirections)) return true
         }
         return false
@@ -256,7 +256,7 @@ public object SculkDecoration {
         } else if (facings == null) {
             spreadAll(region, stateId, position, sameSpaceOnly = true) > 0
         } else if (facings.isNotEmpty()) {
-            region.isAirOrWater(stateId) && regrowVein(region, position, stateId, facings)
+            region.isAirOrWaterFluid(stateId) && regrowVein(region, position, stateId, facings)
         } else {
             spreadAll(region, stateId, position, sameSpaceOnly = false) > 0
         }
@@ -268,9 +268,7 @@ public object SculkDecoration {
         facings: List<Direction>,
     ): Boolean {
         var newStateId =
-            if (existingStateId ==
-                Blocks.WATER.stateId
-            ) {
+            if (hasSourceSculkWater(existingStateId)) {
                 SCULK_VEIN_WATERLOGGED_STATE_ID
             } else {
                 SCULK_VEIN_STATE_ID
@@ -344,7 +342,7 @@ public object SculkDecoration {
         if (!isCloseToOrigin && canPlaceGrowth(region, cursor.position)) {
             if (random.nextInt(50) < charge) {
                 val growthPosition = cursor.position.offset(0, 1, 0)
-                val waterlogged = region.get(growthPosition) == Blocks.WATER.stateId
+                val waterlogged = region.get(growthPosition)?.let(Blocks::hasFluid) == true
                 val stateId =
                     if (random.nextInt(11) == 0) {
                         if (waterlogged) SCULK_SHRIEKER_WATERLOGGED_STATE_ID else SCULK_SHRIEKER_STATE_ID
@@ -365,7 +363,7 @@ public object SculkDecoration {
         position: DecorationPos,
     ): Boolean {
         val aboveStateId = region.get(position.offset(0, 1, 0)) ?: return false
-        if (!Blocks.isAir(aboveStateId) && aboveStateId != Blocks.WATER.stateId) return false
+        if (!Blocks.isAir(aboveStateId) && !isSculkWaterBlock(aboveStateId)) return false
         var growthCount = 0
         for (z in position.z - 4..position.z + 4) {
             for (y in position.y..position.y + 2) {
@@ -594,9 +592,11 @@ public object SculkDecoration {
 
         fun blockPath(position: DecorationPos): String? = get(position)?.let(Blocks::byStateId)?.block?.path
 
-        fun isAirOrWater(position: DecorationPos): Boolean = get(position)?.let(::isAirOrWater) == true
+        fun isAirOrWaterBlock(position: DecorationPos): Boolean = get(position)?.let(::isAirOrWaterBlock) == true
 
-        fun isAirOrWater(stateId: Int): Boolean = Blocks.isAir(stateId) || stateId == Blocks.WATER.stateId
+        fun isAirOrWaterBlock(stateId: Int): Boolean = Blocks.isAir(stateId) || isSculkWaterBlock(stateId)
+
+        fun isAirOrWaterFluid(stateId: Int): Boolean = Blocks.isAir(stateId) || Blocks.hasWaterFluid(stateId)
 
         fun isSculkVein(stateId: Int): Boolean = Blocks.byStateId(stateId)?.block?.path == "sculk_vein"
 
@@ -610,14 +610,14 @@ public object SculkDecoration {
         fun canSculkSpreadFrom(position: DecorationPos): Boolean {
             val stateId = get(position) ?: return false
             if (behaviour(stateId) != SculkBehaviour.DEFAULT) return true
-            if (!isAirOrWater(stateId)) return false
+            if (!Blocks.isAir(stateId) && stateId != Blocks.WATER.stateId) return false
             return DIRECTIONS.any { direction ->
                 hasFullCollision(position.offset(direction.x, direction.y, direction.z))
             }
         }
 
         fun isReplaceableForVein(stateId: Int): Boolean =
-            Blocks.isAir(stateId) || stateId == Blocks.WATER.stateId || isSculkVein(stateId)
+            Blocks.isAir(stateId) || isSculkWaterBlock(stateId) || isSculkVein(stateId)
 
         fun hasSturdyFace(
             position: DecorationPos,
@@ -649,7 +649,7 @@ public object SculkDecoration {
                     Blocks.byStateId(oldStateId)?.properties?.toMutableMap() ?: return null
                 } else {
                     DIRECTIONS.associateTo(linkedMapOf()) { it.property to "false" }.also {
-                        it["waterlogged"] = (oldStateId == Blocks.WATER.stateId).toString()
+                        it["waterlogged"] = hasSourceSculkWater(oldStateId).toString()
                     }
                 }
             if (properties[direction.property] == "true") return null
@@ -657,6 +657,11 @@ public object SculkDecoration {
             return Blocks.stateIdOf(SCULK_VEIN_ID, properties)
         }
     }
+
+    private fun isSculkWaterBlock(stateId: Int): Boolean = Blocks.byStateId(stateId)?.block?.path == "water"
+
+    private fun hasSourceSculkWater(stateId: Int): Boolean =
+        Blocks.hasWaterFluid(stateId) && stateId !in Blocks.WATER.stateId + 1..Blocks.WATER.stateId + 15
 
     private const val UNDERGROUND_DECORATION_STEP: Int = 7
     private const val SCULK_VEIN_INDEX: Int = 0
