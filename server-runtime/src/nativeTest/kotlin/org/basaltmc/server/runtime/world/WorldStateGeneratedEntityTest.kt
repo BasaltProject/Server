@@ -3,8 +3,10 @@ package org.basaltmc.server.runtime.world
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.wire.common.Identifier
+import org.basaltmc.wire.nbt.NbtCompound
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class WorldStateGeneratedEntityTest {
     @Test
@@ -49,6 +51,40 @@ class WorldStateGeneratedEntityTest {
 
         assertEquals(1, near.size, "a chunk 38 chunks away should not have been walked")
         assertEquals(1, nextId, "an entity outside the radius must not be given an id yet")
+    }
+
+    @Test
+    fun installedStructureMobsAreHandedToTheRuntimeExactlyOnce() {
+        val chunk =
+            Chunk(2, 3).apply {
+                addGeneratedEntity(
+                    ChunkGeneratedEntity(
+                        Identifier.vanilla("villager"),
+                        40.5,
+                        64.0,
+                        56.5,
+                        0f,
+                        0f,
+                        NbtCompound().apply { putString("id", "minecraft:villager") },
+                    ),
+                )
+                addGeneratedEntity(
+                    ChunkGeneratedEntity(Identifier.vanilla("item_frame"), 41.0, 65.0, 57.0, 0f, 0f),
+                )
+                markClean()
+            }
+        val world = WorldState(emptyList())
+
+        world.install(chunk)
+
+        assertEquals(listOf(Identifier.vanilla("villager")), world.takePendingGeneratedEntities().map { it.type })
+        assertTrue(world.takePendingGeneratedEntities().isEmpty(), "a second tick must not materialize a duplicate")
+        assertEquals(
+            listOf(Identifier.vanilla("item_frame")),
+            world.generatedEntities({ 1 }, 2, 3, 0).map { it.descriptor.type },
+            "non-mob structure furniture stays on the immutable presentation path",
+        )
+        assertTrue(chunk.isDirty, "the removed descriptor must be persisted before a chunk reload")
     }
 
     private fun chunkWithCrystal(

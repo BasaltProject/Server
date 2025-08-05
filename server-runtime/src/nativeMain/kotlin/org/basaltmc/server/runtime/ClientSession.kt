@@ -2694,6 +2694,25 @@ public class ClientSession(
                         velocityZ = entity.velocityZ,
                     ).write(it)
                 }
+                entity.sourceNbt?.let { data ->
+                    val metadata = generatedEntityMetadata(entity.type.path, data)
+                    if (metadata.isNotEmpty()) {
+                        sendPlayPacket(SetEntityDataPacket.ID) {
+                            SetEntityDataPacket(entity.entityId, metadata).write(it)
+                        }
+                    }
+                    val equipment =
+                        generatedEntityEquipment(data).mapNotNull { slot ->
+                            val item =
+                                Items.REGISTRY.byIdentifier(Identifier.parse(slot.item)) ?: return@mapNotNull null
+                            SetEquipmentPacket.Slot(slot.slot, WireItemStack(item.protocolId, slot.count))
+                        }
+                    if (equipment.isNotEmpty()) {
+                        sendPlayPacket(SetEquipmentPacket.ID) {
+                            SetEquipmentPacket(entity.entityId, equipment).write(it)
+                        }
+                    }
+                }
                 entity.displayText?.let { text -> sendDisplayText(entity.entityId, text) }
                 continue
             }

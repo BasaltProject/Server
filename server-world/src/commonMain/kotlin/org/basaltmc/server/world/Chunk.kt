@@ -357,6 +357,19 @@ public class Chunk(
 
     public fun generatedEntities(): List<ChunkGeneratedEntity> = generatedEntitiesBacking.toList()
 
+    /**
+     * Hands matching generated entities to the runtime once, leaving immutable structure furniture
+     * in the chunk. A generated mob becomes a normal saved entity after this handoff; retaining its
+     * descriptor as well would create a second copy whenever the chunk was loaded again.
+     */
+    public fun takeGeneratedEntitiesMatching(predicate: (ChunkGeneratedEntity) -> Boolean): List<ChunkGeneratedEntity> {
+        val taken = generatedEntitiesBacking.filter(predicate)
+        if (taken.isEmpty()) return emptyList()
+        generatedEntitiesBacking.removeAll(predicate)
+        isDirty = true
+        return taken
+    }
+
     /** How many [generatedEntities] holds, for readers that only want one and not a copy of the list. */
     public val generatedEntityCount: Int get() = generatedEntitiesBacking.size
 

@@ -2417,6 +2417,15 @@ public class BasaltServer(
             val restored = EntityNbt.decode(tag, playerRegistry.allocateEntityId(), protocol) ?: continue
             world.state.spawnEntity(restored)
         }
+        // Structure templates are generated off-thread and cannot allocate runtime ids there. A
+        // mob descriptor becomes the same live ServerEntity as a spawn egg here, so it receives AI,
+        // movement, persistence and ordinary client synchronization instead of remaining scenery.
+        for (descriptor in world.state.takePendingGeneratedEntities()) {
+            val protocol = EntityTypes[descriptor.type]?.protocolId ?: continue
+            val generated =
+                EntityNbt.decodeGenerated(descriptor, playerRegistry.allocateEntityId(), protocol) ?: continue
+            world.state.spawnEntity(generated)
+        }
         // parity: `Entity.die`, which drops the entity's own loot table where it stood. Whatever was
         // killed since the last tick is dealt with here, once, before anything else moves.
         for (dead in world.state.entities().filter { it.killed }) {
@@ -2546,10 +2555,12 @@ public class BasaltServer(
                 }
                 if (entity.panicTicks > 0) entity.panicTicks--
                 tickFire(world, watchers, entity, random)
-                tickMobAi(world, entity, views, living, random)
-                // parity: `Animal.aiStep` and `BreedGoal`, which is where a calf comes from.
-                val partner = Breeding.tick(entity, living)
-                if (partner != null) breed(world, entity, partner)
+                if (!entity.noAi) {
+                    tickMobAi(world, entity, views, living, random)
+                    // parity: `Animal.aiStep` and `BreedGoal`, which is where a calf comes from.
+                    val partner = Breeding.tick(entity, living)
+                    if (partner != null) breed(world, entity, partner)
+                }
                 // parity: `Mob.checkDespawn`, which vanilla runs on the same tick as the AI.
                 val category = MobCategory.byName(Mobs.categoryOf(entity.type)) ?: MobCategory.MISC
                 val nearest = watchers.minOfOrNull { MobBrain.distanceTo(entity, it.x, it.y, it.z) }

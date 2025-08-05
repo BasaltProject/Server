@@ -1,12 +1,18 @@
 package org.basaltmc.server.runtime.entity
 
+import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.wire.common.Identifier
+import org.basaltmc.wire.nbt.NbtByte
 import org.basaltmc.wire.nbt.NbtCompound
 import org.basaltmc.wire.nbt.NbtDouble
 import org.basaltmc.wire.nbt.NbtFloat
+import org.basaltmc.wire.nbt.NbtInt
 import org.basaltmc.wire.nbt.NbtList
+import org.basaltmc.wire.nbt.NbtLong
+import org.basaltmc.wire.nbt.NbtShort
 import org.basaltmc.wire.nbt.NbtString
 import org.basaltmc.wire.nbt.NbtType
+import org.basaltmc.wire.nbt.deepCopy
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -20,7 +26,7 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalUuidApi::class)
 public object EntityNbt {
     public fun encode(entity: ServerEntity): NbtCompound {
-        val tag = NbtCompound()
+        val tag = entity.sourceNbt?.deepCopy() ?: NbtCompound()
         tag["id"] = NbtString(entity.type.toString())
         tag["UUID"] = NbtString(entity.uuid.toString())
         tag["Pos"] = doubles(entity.x, entity.y, entity.z)
@@ -31,11 +37,20 @@ public object EntityNbt {
         tag["Fuse"] = NbtDouble(entity.fuse.toDouble())
         tag["Size"] = NbtDouble(entity.cubeSize.toDouble())
         tag["PersistenceRequired"] = NbtDouble(if (entity.persistent) 1.0 else 0.0)
+        tag.putBoolean("NoAI", entity.noAi)
         tag["LoveTicks"] = NbtDouble(entity.loveTicks.toDouble())
         tag["BreedCooldown"] = NbtDouble(entity.breedCooldown.toDouble())
         tag["VillagerProfession"] = NbtString(entity.profession)
         tag["VillagerLevel"] = NbtDouble(entity.villagerLevel.toDouble())
         tag["VillagerExperience"] = NbtDouble(entity.villagerExperience.toDouble())
+        if (entity.type.path == "villager" || entity.type.path == "zombie_villager") {
+            val villagerData = tag.getCompound("VillagerData")
+            if (villagerData.getString("type").isEmpty()) villagerData.putString("type", "minecraft:plains")
+            villagerData.putString("profession", "minecraft:${entity.profession}")
+            villagerData.putInt("level", entity.villagerLevel)
+            tag["VillagerData"] = villagerData
+            tag.putInt("Xp", entity.villagerExperience)
+        }
         entity.owner?.let { tag["Owner"] = NbtString(it) }
         tag["Sitting"] = NbtDouble(if (entity.sitting) 1.0 else 0.0)
         entity.customName?.let { tag["CustomName"] = NbtString(it) }
@@ -76,24 +91,61 @@ public object EntityNbt {
             entity.velocityY = it[1].value
             entity.velocityZ = it[2].value
         }
-        entity.health = tag.getDouble("Health").takeIf { it > 0.0 } ?: entity.health
-        entity.age = tag.getDouble("Age").toInt()
-        entity.fuse = tag.getDouble("Fuse").toInt()
-        entity.cubeSize = tag.getDouble("Size").toInt().coerceAtLeast(1)
-        entity.persistent = tag.getDouble("PersistenceRequired") != 0.0
-        entity.loveTicks = tag.getDouble("LoveTicks").toInt()
-        entity.breedCooldown = tag.getDouble("BreedCooldown").toInt()
+        entity.health = tag.numericDouble("Health").takeIf { it > 0.0 } ?: entity.health
+        entity.age = tag.numericInt("Age")
+        entity.fuse = tag.numericInt("Fuse")
+        entity.cubeSize = tag.numericInt("Size").coerceAtLeast(1)
+        entity.persistent = tag.numericBoolean("PersistenceRequired")
+        entity.noAi = tag.numericBoolean("NoAI")
+        entity.loveTicks = tag.numericInt("LoveTicks")
+        entity.breedCooldown = tag.numericInt("BreedCooldown")
         tag.getString("VillagerProfession").takeIf { it.isNotEmpty() }?.let { entity.profession = it }
-        entity.villagerLevel = tag.getDouble("VillagerLevel").toInt().coerceAtLeast(1)
-        entity.villagerExperience = tag.getDouble("VillagerExperience").toInt()
+        entity.villagerLevel = tag.numericInt("VillagerLevel").coerceAtLeast(1)
+        entity.villagerExperience = tag.numericInt("VillagerExperience")
+        val villagerData = tag.getCompound("VillagerData")
+        villagerData.getString("profession").takeIf { it.isNotEmpty() }?.let {
+            entity.profession = it.substringAfter(':')
+        }
+        if (villagerData.size > 0) entity.villagerLevel = villagerData.getInt("level", 1).coerceAtLeast(1)
+        if ("Xp" in tag) entity.villagerExperience = tag.getInt("Xp")
         tag.getString("Owner").takeIf { it.isNotEmpty() }?.let { entity.owner = it }
-        entity.sitting = tag.getDouble("Sitting") != 0.0
+        entity.sitting = tag.numericBoolean("Sitting")
         tag.getString("CustomName").takeIf { it.isNotEmpty() }?.let { entity.customName = it }
         (tag["Tags"] as? NbtList)?.filterIsInstance<NbtString>()?.forEach { entity.tags += it.value }
+        entity.sourceNbt = tag.deepCopy()
         return entity
+    }
+
+    /** Materializes one transformed structure entity through the same decoder used on chunk load. */
+    public fun decodeGenerated(
+        descriptor: ChunkGeneratedEntity,
+        entityId: Int,
+        protocolType: Int,
+    ): ServerEntity? {
+        val tag = descriptor.data.deepCopy()
+        tag.putString("id", descriptor.type.toString())
+        tag["Pos"] = doubles(descriptor.x, descriptor.y, descriptor.z)
+        tag["Rotation"] = floats(descriptor.yaw, descriptor.pitch)
+        return decode(tag, entityId, protocolType)
     }
 
     private fun doubles(vararg values: Double): NbtList = NbtList(NbtType.DOUBLE, values.map { NbtDouble(it) })
 
     private fun floats(vararg values: Float): NbtList = NbtList(NbtType.FLOAT, values.map { NbtFloat(it) })
+
+    /** Vanilla uses byte/int/float tags while this server's older saves used doubles for the same fields. */
+    private fun NbtCompound.numericDouble(key: String): Double =
+        when (val value = this[key]) {
+            is NbtByte -> value.value.toDouble()
+            is NbtShort -> value.value.toDouble()
+            is NbtInt -> value.value.toDouble()
+            is NbtLong -> value.value.toDouble()
+            is NbtFloat -> value.value.toDouble()
+            is NbtDouble -> value.value
+            else -> 0.0
+        }
+
+    private fun NbtCompound.numericInt(key: String): Int = numericDouble(key).toInt()
+
+    private fun NbtCompound.numericBoolean(key: String): Boolean = numericDouble(key) != 0.0
 }
