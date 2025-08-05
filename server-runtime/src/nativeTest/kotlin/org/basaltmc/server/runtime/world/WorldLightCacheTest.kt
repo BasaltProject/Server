@@ -1,5 +1,6 @@
 package org.basaltmc.server.runtime.world
 
+import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.runtime.config.WorldDeclaration
 import org.basaltmc.server.runtime.config.WorldDimension
 import org.basaltmc.server.runtime.config.WorldSettings
@@ -54,5 +55,20 @@ class WorldLightCacheTest {
         world.state.getOrGenerateChunk(1, 0)
 
         assertNull(chunk.cachedSkyLight(), "the next query has to see the chunk that just arrived")
+    }
+
+    @Test
+    fun changingABlockInvalidatesTheCachedLightOfItsNeighbourhood() {
+        val chunk = world.state.getOrGenerateChunk(0, 0)
+        val neighbour = world.state.getOrGenerateChunk(1, 0)
+        WorldLight.rawBrightness(world, 8, 70, 8)
+        WorldLight.rawBrightness(world, 24, 70, 8)
+        assertNotNull(chunk.cachedSkyLight())
+        assertNotNull(neighbour.cachedSkyLight())
+
+        world.state.setBlockState(8, 71, 8, Blocks.STONE.stateId)
+
+        assertNull(chunk.cachedSkyLight(), "the changed chunk must be relit")
+        assertNull(neighbour.cachedSkyLight(), "light can cross the border, so its neighbour must be relit too")
     }
 }

@@ -433,7 +433,17 @@ public class WorldState(
         // the same lock-free snapshot a read uses. What the lock still guards is the *set* of
         // chunks, which the generation pool adds to from its own threads.
         val chunk = loadedChunks.get(key(x shr 4, z shr 4)) ?: return false
-        chunk.setBlockStateId(x and 15, y, z and 15, stateId)
+        val changed = chunk.setBlockStateId(x and 15, y, z and 15, stateId)
+        if (changed) {
+            // A skylight opening or a torch reaches across chunk borders. Cached whole-chunk light
+            // is cheaper than incremental light here, but every cached neighbour that could have
+            // read the old block must be discarded together.
+            for (offsetX in -1..1) {
+                for (offsetZ in -1..1) {
+                    loadedChunks.get(key((x shr 4) + offsetX, (z shr 4) + offsetZ))?.invalidateLight()
+                }
+            }
+        }
         rememberSculkSensor(x, y, z, stateId)
         return true
     }
