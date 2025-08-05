@@ -47,6 +47,26 @@ class WorldStateGeneratedBlockWriteTest {
     }
 
     @Test
+    fun deferredTemplateWriteDeliberatelyReplacesRealTargetTerrain() {
+        val world = WorldState(emptyList())
+        val source = Chunk(0, 0)
+        source.setDecorationBlockStateId(
+            16,
+            70,
+            3,
+            Blocks.OAK_LOG.stateId,
+            replaceAnyExternalState = true,
+        )
+        world.install(source)
+        val target = Chunk(1, 0)
+        target.setBlockStateId(0, 70, 3, Blocks.STONE.stateId)
+
+        world.install(target)
+
+        assertEquals(Blocks.OAK_LOG.stateId, target.getBlockStateId(0, 70, 3))
+    }
+
+    @Test
     fun deferredDecorationCarriesItsBlockEntityToTheTarget() {
         val world = WorldState(emptyList())
         val source = Chunk(0, 0)

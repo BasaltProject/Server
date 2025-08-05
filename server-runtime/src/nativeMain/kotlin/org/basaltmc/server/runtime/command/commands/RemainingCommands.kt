@@ -3,6 +3,7 @@ package org.basaltmc.server.runtime.command.commands
 import org.basaltmc.server.assets.ServerJarAssets
 import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
+import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.runtime.command.BlockCoordinates
 import org.basaltmc.server.runtime.command.BlockPosArgument
 import org.basaltmc.server.runtime.command.BoolArgument
@@ -357,8 +358,8 @@ public class PlaceCommand(
         if (placement != null) {
             placement.place(chunk, random, x and 15, y, z and 15)
         } else {
-            // The five features that need more than a chunk: the End's own, the fossils, the freeze
-            // pass. A world that cannot supply what they ask for says so rather than half-placing one.
+            // Features that need more than a chunk: the End's own, fossils, the freeze pass and
+            // template-backed sulfur roots. Refuse instead of half-placing one without its context.
             val ran =
                 checkNotNull(contextual).place(
                     chunk,
@@ -370,6 +371,13 @@ public class PlaceCommand(
                         seed = world.metadata.seed,
                         surface = world.surfaceEnvironment,
                         templates = { templateId -> templates[templateId] },
+                        blockStateAt = { blockX, blockY, blockZ ->
+                            world.state
+                                .chunkIfLoaded(blockX shr 4, blockZ shr 4)
+                                ?.takeIf { blockY in it.verticalBounds.minY..it.verticalBounds.maxY }
+                                ?.getBlockStateId(blockX and 15, blockY, blockZ and 15)
+                                ?: Blocks.AIR.stateId
+                        },
                     ),
                 )
             if (!ran) {

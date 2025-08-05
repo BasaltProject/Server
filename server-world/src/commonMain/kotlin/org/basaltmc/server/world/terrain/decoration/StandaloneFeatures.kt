@@ -31,7 +31,6 @@ public object StandaloneFeatures {
             "spring_closed",
             "spring_closed_double",
             "sulfur_pool",
-            "rooted_sulfur_spring",
             "monster_room",
             "monster_room_deep",
             "end_platform",
@@ -66,7 +65,6 @@ public object StandaloneFeatures {
                     holeCount = 0,
                 )
             "sulfur_pool" -> placeSulfurPool(chunk, random, origin)
-            "rooted_sulfur_spring" -> placeSpring(chunk, origin, "stone", lavaStateId, rockCount = 4, holeCount = 1)
             "monster_room", "monster_room_deep" -> placeMonsterRoom(chunk, random, origin)
             "end_platform" -> placeEndPlatform(chunk, origin)
             "void_start_platform" -> placeVoidPlatform(chunk, origin)
