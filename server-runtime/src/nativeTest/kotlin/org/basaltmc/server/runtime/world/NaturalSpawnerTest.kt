@@ -144,6 +144,47 @@ class NaturalSpawnerTest {
         )
     }
 
+    @Test
+    fun specializedAnimalsUseTheirOwnGroundTags() {
+        world.state.setBlockState(2, 70, 2, state("mycelium"))
+        world.state.setBlockState(3, 70, 2, state("red_sand"))
+        world.state.setBlockState(4, 70, 2, Blocks.STONE.stateId)
+
+        assertTrue(
+            NaturalSpawner.canSpawnAt(
+                world,
+                Identifier.vanilla("mooshroom"),
+                MobCategory.CREATURE,
+                2,
+                71,
+                2,
+                LegacyRandom(1),
+            ),
+        )
+        assertTrue(
+            NaturalSpawner.canSpawnAt(
+                world,
+                Identifier.vanilla("camel"),
+                MobCategory.CREATURE,
+                3,
+                71,
+                2,
+                LegacyRandom(1),
+            ),
+        )
+        assertFalse(
+            NaturalSpawner.canSpawnAt(
+                world,
+                Identifier.vanilla("camel"),
+                MobCategory.CREATURE,
+                4,
+                71,
+                2,
+                LegacyRandom(1),
+            ),
+        )
+    }
+
     /** parity: `Monster.isDarkEnoughToSpawn`, which is why a lit room stays empty. */
     @Test
     fun aMonsterNeedsTheDark() {

@@ -171,6 +171,8 @@ import org.basaltmc.server.runtime.world.Jukeboxes
 import org.basaltmc.server.runtime.world.Lecterns
 import org.basaltmc.server.runtime.world.Lightning
 import org.basaltmc.server.runtime.world.LoadedWorld
+import org.basaltmc.server.runtime.world.LocalMobCaps
+import org.basaltmc.server.runtime.world.MobCapPlayer
 import org.basaltmc.server.runtime.world.MobEffects
 import org.basaltmc.server.runtime.world.NaturalSpawner
 import org.basaltmc.server.runtime.world.NeighbourUpdates
@@ -200,6 +202,7 @@ import org.basaltmc.server.runtime.world.Redstone
 import org.basaltmc.server.runtime.world.RedstoneComponents
 import org.basaltmc.server.runtime.world.RedstoneReactors
 import org.basaltmc.server.runtime.world.ScheduledBlocks
+import org.basaltmc.server.runtime.world.SpawnPotential
 import org.basaltmc.server.runtime.world.StructureTemplates
 import org.basaltmc.server.runtime.world.Submersion
 import org.basaltmc.server.runtime.world.Tripwires
@@ -2326,20 +2329,41 @@ public class BasaltServer(
         world: LoadedWorld,
         region: Region,
     ) {
+        // Global and local caps are one world-wide snapshot. Running this independently in every
+        // region made the first distant player consume the cap of every other one.
+        if (!region.isPrimary) return
         if (!world.gameRules[GameRuleRegistry.SPAWN_MOBS]) return
-        val watchers = playerRegistry.snapshot().filter { it.worldName == world.name }
+        val watchers =
+            playerRegistry.snapshot().filter {
+                it.worldName == world.name && it.gamemode != Gamemode.SPECTATOR
+            }
         if (watchers.isEmpty()) return
-        val chunks = simulatedChunks(world, region)
+        val localCaps = LocalMobCaps(watchers.map { MobCapPlayer(it.entityId, it.x, it.z) })
+        val chunks = simulatedChunks(world).filter { localCaps.isSpawnCandidate(it[0], it[1]) }
         if (chunks.isEmpty()) return
 
         val alive = world.state.entities().filter { !it.removed && !it.persistent }
         val random = LegacyRandom(Random.nextLong())
         val categories = NaturalSpawner.categoriesFor(world.difficulty, world.gameTime)
-        val caps = categories.associateWith { NaturalSpawner.capFor(it, chunks.size) }
+        val cappedCategories = MobCategory.entries.filter { it != MobCategory.MISC }
+        val caps = cappedCategories.associateWith { NaturalSpawner.capFor(it, chunks.size) }
         val counts =
-            categories.associateWithTo(mutableMapOf()) { category ->
+            cappedCategories.associateWithTo(mutableMapOf()) { category ->
                 alive.count { Mobs.categoryOf(it.type) == category.categoryName }
             }
+        val spawnPotential = SpawnPotential()
+        for (entity in alive) {
+            val blockX = floor(entity.x).toInt()
+            val blockY = floor(entity.y).toInt()
+            val blockZ = floor(entity.z).toInt()
+            val cost =
+                NaturalSpawner.biomeAt(world, blockX, blockY, blockZ)?.let { biome ->
+                    biomeSpawns.costFor(biome, entity.type)
+                }
+            if (cost != null) spawnPotential.add(blockX, blockY, blockZ, cost.charge)
+            val category = MobCategory.byName(Mobs.categoryOf(entity.type)) ?: continue
+            localCaps.add(category, blockX shr 4, blockZ shr 4)
+        }
         val shuffled = chunks.toMutableList()
         for (index in shuffled.lastIndex downTo 1) {
             val swap = random.nextInt(index + 1)
@@ -2352,29 +2376,45 @@ public class BasaltServer(
             for (category in categories) {
                 val cap = caps.getValue(category)
                 if (counts.getValue(category) >= cap) continue
-                val requests =
-                    NaturalSpawner.spawnForChunk(
-                        world,
-                        chunk[0],
-                        chunk[1],
-                        category,
-                        entriesFor = { biome -> biomeSpawns.listFor(biome, category.categoryName) },
-                        playerDistanceSquared = { x, y, z ->
-                            watchers.minOfOrNull { player ->
-                                val dx = player.x - x
-                                val dy = player.y - y
-                                val dz = player.z - z
-                                dx * dx + dy * dy + dz * dz
+                if (!localCaps.canSpawn(category, chunk[0], chunk[1])) continue
+                NaturalSpawner.spawnForChunk(
+                    world,
+                    chunk[0],
+                    chunk[1],
+                    category,
+                    entriesFor = { biome -> biomeSpawns.listFor(biome, category.categoryName) },
+                    playerDistanceSquared = { x, y, z ->
+                        watchers.minOfOrNull { player ->
+                            val dx = player.x - x
+                            val dy = player.y - y
+                            val dz = player.z - z
+                            dx * dx + dy * dy + dz * dz
+                        }
+                    },
+                    random = random,
+                    requestAccepted = { request ->
+                        val blockX = floor(request.x).toInt()
+                        val blockY = floor(request.y).toInt()
+                        val blockZ = floor(request.z).toInt()
+                        val cost =
+                            NaturalSpawner.biomeAt(world, blockX, blockY, blockZ)?.let { biome ->
+                                biomeSpawns.costFor(biome, request.type)
                             }
-                        },
-                        random = random,
-                    )
-                for (request in requests) {
-                    if (counts.getValue(category) >= cap) break
-                    if (spawnMob(world, request.type, request.x, request.y, request.z, request.yaw) != null) {
-                        counts[category] = counts.getValue(category) + 1
-                    }
-                }
+                        if (cost != null && !spawnPotential.allows(blockX, blockY, blockZ, cost)) {
+                            false
+                        } else if (
+                            spawnMob(world, request.type, request.x, request.y, request.z, request.yaw) == null
+                        ) {
+                            false
+                        } else {
+                            if (cost != null) spawnPotential.add(blockX, blockY, blockZ, cost.charge)
+                            val actualCategory = MobCategory.byName(Mobs.categoryOf(request.type)) ?: category
+                            counts[actualCategory] = counts.getValue(actualCategory) + 1
+                            localCaps.add(actualCategory, blockX shr 4, blockZ shr 4)
+                            true
+                        }
+                    },
+                )
             }
         }
     }
