@@ -35,6 +35,11 @@ class RealBiomeSpawnsTest {
 
         assertEquals(1, parsed["monster"]?.size)
         assertTrue(parsed["axolotls"].orEmpty().isEmpty(), "an empty list is still a list")
+        assertEquals(0.1f, RealBiomeSpawns.creatureProbabilityForTest(SAMPLE))
+        assertEquals(
+            0.03f,
+            RealBiomeSpawns.creatureProbabilityForTest("""{"creature_spawn_probability":0.03,"spawners":{}}"""),
+        )
     }
 
     private companion object {
