@@ -1,6 +1,7 @@
 package org.basaltmc.server.runtime.world
 
 import org.basaltmc.server.random.BasaltRandom
+import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.registry.Biomes
 import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
@@ -17,6 +18,8 @@ public class SpawnRequest(
     public val y: Double,
     public val z: Double,
     public val yaw: Float,
+    /** Accepted members already finalized in this one pack; zero means the pack's first mob. */
+    public val groupIndex: Int = 0,
 )
 
 /**
@@ -124,7 +127,14 @@ public object NaturalSpawner {
                 }
                 if (!canSpawnAt(world, chosen.type, category, x, startY, z, random)) continue
                 val request =
-                    SpawnRequest(chosen.type, centreX, startY.toDouble(), centreZ, random.nextFloat() * 360f)
+                    SpawnRequest(
+                        chosen.type,
+                        centreX,
+                        startY.toDouble(),
+                        centreZ,
+                        random.nextFloat() * 360f,
+                        groupIndex = spawned,
+                    )
                 if (requestAccepted != null && !requestAccepted(request)) continue
                 requests += request
                 spawned++
@@ -194,6 +204,7 @@ public object NaturalSpawner {
                 random.nextInt(3) != 0
         }
         if (typePath == "bat") return canSpawnBat(world, ground, x, y, z, random)
+        if (typePath == "slime") return canSpawnSlime(world, x, y, z, random)
 
         return when (category) {
             // parity: `Monster.isDarkEnoughToSpawn`: the sky has to be dark where it stands, and the
@@ -256,6 +267,49 @@ public object NaturalSpawner {
         if (random.nextBoolean()) return false
         if (WorldLight.rawBrightness(world, x, y, z) > random.nextInt(4)) return false
         return BlockStateDefinitions.blockOf(ground)?.path in BAT_GROUND
+    }
+
+    /** parity: 26.2 `Slime.checkSlimeSpawnRules`, including its moon timeline and slime chunks. */
+    private fun canSpawnSlime(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        random: BasaltRandom,
+    ): Boolean {
+        if (world.difficulty == "peaceful") return false
+        val surfaceBiome = biomeAt(world, x, y, z)?.path in SURFACE_SLIME_BIOMES
+        if (surfaceBiome && y > 50 && y < 70) {
+            if (
+                random.nextFloat() < surfaceSlimeChance(world.clock.totalTicks) &&
+                WorldLight.rawBrightness(world, x, y, z, DaylightDetectors.skyDarken(world)) <= random.nextInt(8)
+            ) {
+                return true
+            }
+        }
+        val slimeChunk = isSlimeChunk(world.metadata.seed, x shr 4, z shr 4)
+        return random.nextInt(10) == 0 && slimeChunk && y < 40
+    }
+
+    /** parity: the constant eight-keyframe `timeline/moon` gameplay track. */
+    internal fun surfaceSlimeChance(clockTicks: Long): Float {
+        val wrapped = ((clockTicks % MOON_PERIOD_TICKS) + MOON_PERIOD_TICKS) % MOON_PERIOD_TICKS
+        val phase = (wrapped / DAY_TICKS).toInt()
+        return kotlin.math.abs(4 - phase) * 0.125f
+    }
+
+    /** parity: `WorldgenRandom.seedSlimeChunk`, including Java's intentional Int overflow. */
+    internal fun isSlimeChunk(
+        worldSeed: Long,
+        chunkX: Int,
+        chunkZ: Int,
+    ): Boolean {
+        val xSquare = chunkX * chunkX * 4_987_142
+        val xLinear = chunkX * 5_947_611
+        val zSquare = (chunkZ * chunkZ).toLong() * 4_392_871L
+        val zLinear = chunkZ * 389_711
+        val seed = (worldSeed + xSquare + xLinear + zSquare + zLinear) xor SLIME_CHUNK_SALT
+        return LegacyRandom(seed).nextInt(10) == 0
     }
 
     /** parity: `SpawnPlacementTypes.IN_WATER` plus the common water-animal predicates. */
@@ -413,4 +467,10 @@ public object NaturalSpawner {
 
     private val MONSTERS_IGNORING_LIGHT =
         setOf("blaze", "breeze", "ghast", "hoglin", "magma_cube", "piglin", "sulfur_cube", "zoglin", "zombified_piglin")
+
+    private val SURFACE_SLIME_BIOMES = setOf("swamp", "mangrove_swamp")
+
+    private const val DAY_TICKS = 24_000L
+    private const val MOON_PERIOD_TICKS = DAY_TICKS * 8L
+    private const val SLIME_CHUNK_SALT = 987_234_911L
 }

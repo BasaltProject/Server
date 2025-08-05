@@ -76,7 +76,7 @@ public object DaylightDetectors {
      * parity: `Level.updateSkyBrightness`, which is what makes a detector read zero at night rather
      * than the fifteen the sky light itself still says.
      */
-    private fun skyDarken(world: LoadedWorld): Int {
+    internal fun skyDarken(world: LoadedWorld): Int {
         val rain = if (world.weather.raining) RAIN_SHARE else 1.0
         val thunder = if (world.weather.thundering) RAIN_SHARE else 1.0
         val curve = 0.5 + 2.0 * cos(timeOfDay(world) * 2.0 * PI).coerceIn(-0.25, 0.25)

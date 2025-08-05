@@ -43,6 +43,15 @@ public object WorldLight {
         z: Int,
     ): Int = maxOf(level(world, x, y, z, sky = false), level(world, x, y, z, sky = true))
 
+    /** parity: `LevelLightEngine.getRawBrightness(pos, skyDampen)`. */
+    public fun rawBrightness(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+        skyDampen: Int,
+    ): Int = maxOf(level(world, x, y, z, sky = false), level(world, x, y, z, sky = true) - skyDampen)
+
     private fun level(
         world: LoadedWorld,
         x: Int,

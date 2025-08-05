@@ -136,14 +136,17 @@ class ChunkNbtTest {
     @Test
     fun basicMetadataRoundTrips() {
         val chunk = Chunk(-42, 17)
+        chunk.increaseInhabitedTime(123_456L)
         val tag = ChunkNbt.write(chunk)
         assertEquals(-42, tag.getInt("xPos"))
         assertEquals(17, tag.getInt("zPos"))
         assertEquals("minecraft:full", tag.getString("Status"))
+        assertEquals(123_456L, tag.getLong("InhabitedTime"))
 
         val read = ChunkNbt.read(tag)
         assertEquals(-42, read.chunkX)
         assertEquals(17, read.chunkZ)
+        assertEquals(123_456L, read.inhabitedTime)
     }
 
     @Test

@@ -250,4 +250,72 @@ class NaturalSpawnerTest {
             ),
         )
     }
+
+    @Test
+    fun slimeChunksAndTheMoonTrackMatchTheOfficialVectors() {
+        assertFalse(NaturalSpawner.isSlimeChunk(worldSeed = 0L, chunkX = 0, chunkZ = 0))
+        assertTrue(NaturalSpawner.isSlimeChunk(worldSeed = 0L, chunkX = -8, chunkZ = 0))
+        assertTrue(NaturalSpawner.isSlimeChunk(worldSeed = 1234L, chunkX = -20, chunkZ = -14))
+        assertFalse(NaturalSpawner.isSlimeChunk(worldSeed = 1234L, chunkX = 12, chunkZ = -34))
+
+        assertEquals(0.5f, NaturalSpawner.surfaceSlimeChance(0L))
+        assertEquals(0.375f, NaturalSpawner.surfaceSlimeChance(24_000L))
+        assertEquals(0.0f, NaturalSpawner.surfaceSlimeChance(96_000L))
+        assertEquals(0.375f, NaturalSpawner.surfaceSlimeChance(168_000L))
+        assertEquals(0.5f, NaturalSpawner.surfaceSlimeChance(192_000L))
+    }
+
+    @Test
+    fun slimesUseSwampMoonlightOrTheSeededUndergroundChunkInsteadOfMonsterDarkness() {
+        val chunk = assertNotNull(world.state.chunkIfLoaded(0, 0))
+        val swampId = assertNotNull(Biomes.REGISTRY.idOf(Biomes.SWAMP.id))
+        chunk.setBiomeId(2, (60 - chunk.verticalBounds.minY) shr 2, 2, swampId)
+        world.state.setBlockState(8, 59, 8, Blocks.STONE.stateId)
+        for (x in 0..15) {
+            for (z in 0..15) world.state.setBlockState(x, 63, z, Blocks.STONE.stateId)
+        }
+
+        assertTrue(
+            NaturalSpawner.canSpawnAt(
+                world,
+                Identifier.vanilla("slime"),
+                MobCategory.MONSTER,
+                8,
+                60,
+                8,
+                LegacyRandom(4096L),
+            ),
+            "full-moon swamp roll 4096 is below 0.5 and its brightness roll is seven",
+        )
+
+        val slimeChunkX = -8
+        val undergroundX = (slimeChunkX shl 4) + 8
+        world.state.getOrGenerateChunk(slimeChunkX, 0)
+        world.state.setBlockState(undergroundX, 19, 8, Blocks.STONE.stateId)
+        assertTrue(
+            NaturalSpawner.canSpawnAt(
+                world,
+                Identifier.vanilla("slime"),
+                MobCategory.MONSTER,
+                undergroundX,
+                20,
+                8,
+                LegacyRandom(0L),
+            ),
+            "seed zero chunk -8,0 is a slime chunk and random seed zero rolls nextInt(10)=0",
+        )
+        world.state.setBlockState(2, 19, 2, Blocks.STONE.stateId)
+        assertFalse(
+            NaturalSpawner.canSpawnAt(
+                world,
+                Identifier.vanilla("slime"),
+                MobCategory.MONSTER,
+                2,
+                20,
+                2,
+                LegacyRandom(0L),
+            ),
+            "the same underground roll outside a slime chunk must fail",
+        )
+    }
 }

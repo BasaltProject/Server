@@ -54,6 +54,24 @@ class EntityNbtTest {
     }
 
     @Test
+    fun cubeSizeUsesVanillasMinusOneNbtAndReturnsAsTheLiveSize() {
+        val slime =
+            ServerEntity(
+                entityId = 8,
+                uuid = Uuid.random(),
+                type = Identifier.vanilla("slime"),
+                protocolType = 1,
+                x = 0.5,
+                y = 32.0,
+                z = 0.5,
+            ).also { it.cubeSize = 4 }
+
+        val tag = EntityNbt.encode(slime)
+        assertEquals(3, tag.getInt("Size"))
+        assertEquals(4, assertNotNull(EntityNbt.decode(tag, entityId = 9, protocolType = 1)).cubeSize)
+    }
+
+    @Test
     fun aVillagerKeepsItsTrade() {
         val villager = zombie()
         villager.profession = "librarian"

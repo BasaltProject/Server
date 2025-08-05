@@ -17,7 +17,9 @@ public object CubeMobs {
     /** parity: the size `/summon` gives one, which is the smallest. */
     public const val DEFAULT_SIZE: Int = 1
 
-    public fun isCube(type: Identifier): Boolean = type.path in CUBES
+    public fun isCube(type: Identifier): Boolean = isCube(type.path)
+
+    public fun isCube(typePath: String): Boolean = typePath in CUBES
 
     /** Gives a cube the attributes its size implies. Anything else is left alone. */
     public fun applySize(
