@@ -2442,6 +2442,8 @@ public class BasaltServer(
                                         request.groupIndex,
                                         random,
                                         specialMultiplier,
+                                        group = request.group,
+                                        biome = request.biome,
                                     )
                                 },
                             ) == null

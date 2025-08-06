@@ -5,8 +5,10 @@ import org.basaltmc.server.registry.BlockFace
 import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.EntityTypeShapes
+import org.basaltmc.server.runtime.registry.VanillaBiomes
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkGeneratedEntity
+import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
 
 /**
@@ -35,6 +37,7 @@ public object OriginalMobSpawner {
             val startX = x
             val startZ = z
             var groupSize = 0
+            val group = MobSpawnGroupData()
             repeat(count) {
                 var success = false
                 var attempts = 0
@@ -49,7 +52,14 @@ public object OriginalMobSpawner {
                     if (canSpawnAt(chunk, entry.type.path, blockX, y, blockZ)) {
                         val yaw = random.nextFloat() * 360f
                         val data = NbtCompound()
-                        MobSpawnFinalization.writeGenerated(data, entry.type, groupSize, random)
+                        MobSpawnFinalization.writeGenerated(
+                            data,
+                            entry.type,
+                            groupSize,
+                            random,
+                            group = group,
+                            biome = biomeAt(chunk, blockX, y, blockZ),
+                        )
                         chunk.addGeneratedEntity(
                             ChunkGeneratedEntity(
                                 type = entry.type,
@@ -146,6 +156,20 @@ public object OriginalMobSpawner {
     private fun isAir(stateId: Int): Boolean = BlockStateDefinitions.blockOf(stateId)?.path == "air"
 
     private fun isLava(stateId: Int): Boolean = BlockStateDefinitions.blockOf(stateId)?.path == "lava"
+
+    private fun biomeAt(
+        chunk: Chunk,
+        worldX: Int,
+        y: Int,
+        worldZ: Int,
+    ): Identifier? {
+        val quartY = ((y - chunk.verticalBounds.minY) shr 2).coerceIn(0, chunk.verticalBounds.height / 4 - 1)
+        val biomeId = chunk.getBiomeId((worldX and 15) shr 2, quartY, (worldZ and 15) shr 2)
+        return VanillaBiomes.ALL
+            .getOrNull(biomeId)
+            ?.path
+            ?.let(Identifier::vanilla)
+    }
 
     private const val POSITION_ATTEMPTS = 4
     private const val PACK_SPREAD = 5

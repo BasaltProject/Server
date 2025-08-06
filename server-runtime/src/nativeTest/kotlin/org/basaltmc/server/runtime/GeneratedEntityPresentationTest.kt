@@ -121,6 +121,32 @@ class GeneratedEntityPresentationTest {
     }
 
     @Test
+    fun materializesPrimitiveNaturalAnimalVariants() {
+        assertEquals(
+            listOf(SetEntityDataPacket.Entry.Ints(18, 5)),
+            generatedEntityMetadata("rabbit", NbtCompound().apply { putInt("RabbitType", 5) }),
+        )
+        assertEquals(
+            listOf(SetEntityDataPacket.Entry.Ints(20, 2), SetEntityDataPacket.Entry.Ints(21, 3)),
+            generatedEntityMetadata(
+                "llama",
+                NbtCompound().apply {
+                    putInt("Strength", 2)
+                    putInt("Variant", 3)
+                },
+            ),
+        )
+        assertEquals(
+            listOf(SetEntityDataPacket.Entry.Ints(20, 4)),
+            generatedEntityMetadata("parrot", NbtCompound().apply { putInt("Variant", 4) }),
+        )
+        assertEquals(
+            listOf(SetEntityDataPacket.Entry.Ints(17, 2)),
+            generatedEntityMetadata("salmon", NbtCompound().apply { putString("type", "large") }),
+        )
+    }
+
+    @Test
     fun liveBabiesAndCubeSizesSendInitialAndBoundaryMetadata() {
         val slime = ServerEntity(1, Uuid.random(), Identifier.vanilla("slime"), 1, 0.0, 64.0, 0.0)
         slime.age = -24_000
