@@ -92,7 +92,8 @@ public object MobCombat {
     ): Target? {
         if (random.nextInt(TARGET_INTERVAL) != 0) return null
         if (needsDarkness(mob.type) && light >= SPIDER_LIGHT) return null
-        val range = EntityAttributes.baseValue(mob.type, EntityAttributes.FOLLOW_RANGE) ?: return null
+        if (EntityAttributes.baseValue(mob.type, EntityAttributes.FOLLOW_RANGE) == null) return null
+        val range = mob.attributeWithModifiers("minecraft:${EntityAttributes.FOLLOW_RANGE}")
         var best: Target? = null
         var bestDistance = range * range
         for (target in targets) {

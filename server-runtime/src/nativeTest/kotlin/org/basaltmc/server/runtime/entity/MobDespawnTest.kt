@@ -2,6 +2,7 @@ package org.basaltmc.server.runtime.entity
 
 import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.wire.common.Identifier
+import org.basaltmc.wire.nbt.NbtCompound
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -60,6 +61,41 @@ class MobDespawnTest {
         zombie.persistent = true
 
         assertFalse(MobDespawn.shouldDespawn(zombie, MobCategory.MONSTER, 1000.0, LegacyRandom(1)))
+    }
+
+    @Test
+    fun customPersistenceStateAlsoStaysOutOfDespawn() {
+        val passenger = mob().also { it.vehicleId = 99 }
+        val bucketFish =
+            mob("cod").also {
+                it.sourceNbt = NbtCompound().apply { putBoolean("FromBucket", true) }
+            }
+        val carryingEnderman =
+            mob("enderman").also {
+                it.sourceNbt =
+                    NbtCompound().apply {
+                        putCompound("carriedBlockState", NbtCompound().apply { putString("Name", "minecraft:dirt") })
+                    }
+            }
+        val equippedSulfurCube =
+            mob("sulfur_cube").also {
+                val body =
+                    NbtCompound().apply {
+                        putString("id", "minecraft:golden_sword")
+                        putInt("count", 1)
+                    }
+                it.sourceNbt =
+                    NbtCompound().apply {
+                        putCompound("equipment", NbtCompound().apply { putCompound("body", body) })
+                    }
+            }
+
+        for (entity in listOf(passenger, bucketFish, carryingEnderman, equippedSulfurCube)) {
+            entity.idleTicks = 900
+            assertTrue(MobPersistence.keeps(entity))
+            assertFalse(MobDespawn.shouldDespawn(entity, MobCategory.MONSTER, 1000.0, LegacyRandom(1)))
+            assertEquals(0, entity.idleTicks)
+        }
     }
 
     /** With nobody in the world at all, nothing despawns. */

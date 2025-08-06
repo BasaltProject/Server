@@ -24,7 +24,10 @@ public object MobDespawn {
         nearestDistance: Double?,
         random: BasaltRandom,
     ): Boolean {
-        if (mob.persistent) return false
+        if (MobPersistence.keeps(mob)) {
+            mob.idleTicks = 0
+            return false
+        }
         // parity: `removeWhenFarAway` answers false for the mobs that live in the misc category, a
         // villager and an iron golem among them, so a village does not empty when you walk away.
         if (category == MobCategory.MISC) return false

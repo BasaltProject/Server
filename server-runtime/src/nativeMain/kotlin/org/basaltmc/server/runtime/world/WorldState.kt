@@ -758,8 +758,7 @@ public class WorldState(
     public fun spawnEntity(entity: ServerEntity): ServerEntity =
         mutex.withLock {
             mine("An entity")
-            // parity: `finalizeSpawn`, of which the only part this build has is a cube's size: its
-            // speed, health and damage all come from it.
+            // A cube's speed, health and damage all derive from the size chosen by finalizeSpawn.
             CubeMobs.applySize(entity)
             entities[entity.entityId] = entity
             entity
