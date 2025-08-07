@@ -127,6 +127,69 @@ class MobSpawnFinalizationTest {
     }
 
     @Test
+    fun axolotlPackKeepsItsTwoCommonVariantsAndForcesLaterBabies() {
+        val group = MobSpawnGroupData()
+        val first = MobSpawnFinalization.stateFor(Identifier.vanilla("axolotl"), 0, LegacyRandom(1L), 0f, group)
+        assertEquals(2, group.variant)
+        assertEquals(0, group.secondaryVariant)
+        assertEquals(2, first.typeData.getInt("Variant"))
+
+        val second = MobSpawnFinalization.stateFor(Identifier.vanilla("axolotl"), 1, LegacyRandom(2L), 0f, group)
+        assertEquals(0, second.typeData.getInt("Variant"), "later members select only from the stored pair")
+        assertEquals(0, second.age)
+
+        val third = MobSpawnFinalization.stateFor(Identifier.vanilla("axolotl"), 2, LegacyRandom(2L), 0f, group)
+        assertEquals(AgeableMobs.BABY_START_AGE, third.age)
+    }
+
+    @Test
+    fun foxPackKeepsBiomeVariantAndRollsMouthEquipmentBeforeSuper() {
+        val group = MobSpawnGroupData()
+        val first =
+            MobSpawnFinalization.stateFor(
+                Identifier.vanilla("fox"),
+                0,
+                LegacyRandom(4097L),
+                0f,
+                group,
+                Identifier.vanilla("snowy_taiga"),
+            )
+        assertEquals("snow", first.typeData.getString("Type"))
+        assertEquals(
+            "minecraft:egg",
+            first.typeData
+                .getCompound("equipment")
+                .getCompound("mainhand")
+                .getString("id"),
+        )
+
+        val later =
+            MobSpawnFinalization.stateFor(
+                Identifier.vanilla("fox"),
+                2,
+                LegacyRandom(0L),
+                0f,
+                group,
+                Identifier.vanilla("plains"),
+            )
+        assertEquals("snow", later.typeData.getString("Type"), "the first fox determines the whole pack")
+        assertEquals(AgeableMobs.BABY_START_AGE, later.age)
+    }
+
+    @Test
+    fun pandaGenesApplyOnlyTheirExpressedAttributeOverride() {
+        val weak = MobSpawnFinalization.stateFor(Identifier.vanilla("panda"), 0, LegacyRandom(6531L), 0f)
+        assertEquals("weak", weak.typeData.getString("MainGene"))
+        assertEquals("weak", weak.typeData.getString("HiddenGene"))
+        assertEquals(10.0, weak.attributeBases["minecraft:max_health"])
+
+        val lazy = MobSpawnFinalization.stateFor(Identifier.vanilla("panda"), 0, LegacyRandom(4608L), 0f)
+        assertEquals("lazy", lazy.typeData.getString("MainGene"))
+        assertEquals("brown", lazy.typeData.getString("HiddenGene"))
+        assertEquals(0.07000000029802322, lazy.attributeBases["minecraft:movement_speed"])
+    }
+
+    @Test
     fun caveSpiderOverrideSkipsMobFinalizerAndItsRandomDraws() {
         val random = LegacyRandom(7L)
         val untouched = LegacyRandom(7L)

@@ -39,7 +39,15 @@ internal fun generatedEntityMetadata(
 
         when (type) {
             "armor_stand" -> addArmorStandMetadata(data)
+            "axolotl" ->
+                data.getInt("Variant").takeIf { it != 0 }?.let {
+                    add(SetEntityDataPacket.Entry.Ints(17, it))
+                }
             "cat" -> addCatMetadata(data)
+            "fox" ->
+                if (data.getString("Type") == "snow") {
+                    add(SetEntityDataPacket.Entry.Ints(19, 1))
+                }
             "horse" ->
                 data.getInt("Variant").takeIf { it != 0 }?.let {
                     add(SetEntityDataPacket.Entry.Ints(19, it))
@@ -56,6 +64,14 @@ internal fun generatedEntityMetadata(
                 data.getInt("Variant").takeIf { it != 0 }?.let {
                     add(SetEntityDataPacket.Entry.Ints(20, it))
                 }
+            "panda" -> {
+                PANDA_GENE_IDS[data.getString("MainGene")]?.takeIf { it != 0 }?.let {
+                    add(SetEntityDataPacket.Entry.Bytes(19, it.toByte()))
+                }
+                PANDA_GENE_IDS[data.getString("HiddenGene")]?.takeIf { it != 0 }?.let {
+                    add(SetEntityDataPacket.Entry.Bytes(20, it.toByte()))
+                }
+            }
             "rabbit" ->
                 data.getInt("RabbitType").takeIf { it != 0 }?.let {
                     add(SetEntityDataPacket.Entry.Ints(18, it))
@@ -238,3 +254,13 @@ private val VILLAGER_PROFESSION_IDS =
 
 private const val SALMON_MEDIUM = 1
 private val SALMON_VARIANTS = mapOf("small" to 0, "medium" to SALMON_MEDIUM, "large" to 2)
+private val PANDA_GENE_IDS =
+    mapOf(
+        "normal" to 0,
+        "lazy" to 1,
+        "worried" to 2,
+        "playful" to 3,
+        "brown" to 4,
+        "weak" to 5,
+        "aggressive" to 6,
+    )

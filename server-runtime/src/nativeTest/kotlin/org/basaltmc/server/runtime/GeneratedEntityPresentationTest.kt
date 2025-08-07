@@ -123,6 +123,14 @@ class GeneratedEntityPresentationTest {
     @Test
     fun materializesPrimitiveNaturalAnimalVariants() {
         assertEquals(
+            listOf(SetEntityDataPacket.Entry.Ints(17, 3)),
+            generatedEntityMetadata("axolotl", NbtCompound().apply { putInt("Variant", 3) }),
+        )
+        assertEquals(
+            listOf(SetEntityDataPacket.Entry.Ints(19, 1)),
+            generatedEntityMetadata("fox", NbtCompound().apply { putString("Type", "snow") }),
+        )
+        assertEquals(
             listOf(SetEntityDataPacket.Entry.Ints(18, 5)),
             generatedEntityMetadata("rabbit", NbtCompound().apply { putInt("RabbitType", 5) }),
         )
@@ -139,6 +147,16 @@ class GeneratedEntityPresentationTest {
         assertEquals(
             listOf(SetEntityDataPacket.Entry.Ints(20, 4)),
             generatedEntityMetadata("parrot", NbtCompound().apply { putInt("Variant", 4) }),
+        )
+        assertEquals(
+            listOf(SetEntityDataPacket.Entry.Bytes(19, 5), SetEntityDataPacket.Entry.Bytes(20, 4)),
+            generatedEntityMetadata(
+                "panda",
+                NbtCompound().apply {
+                    putString("MainGene", "weak")
+                    putString("HiddenGene", "brown")
+                },
+            ),
         )
         assertEquals(
             listOf(SetEntityDataPacket.Entry.Ints(17, 2)),
