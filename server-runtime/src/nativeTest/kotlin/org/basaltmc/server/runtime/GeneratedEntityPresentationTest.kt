@@ -131,6 +131,20 @@ class GeneratedEntityPresentationTest {
             generatedEntityMetadata("fox", NbtCompound().apply { putString("Type", "snow") }),
         )
         assertEquals(
+            listOf(
+                SetEntityDataPacket.Entry.Booleans(18, true),
+                SetEntityDataPacket.Entry.Booleans(20, false),
+            ),
+            generatedEntityMetadata(
+                "goat",
+                NbtCompound().apply {
+                    putBoolean("IsScreamingGoat", true)
+                    putBoolean("HasLeftHorn", true)
+                    putBoolean("HasRightHorn", false)
+                },
+            ),
+        )
+        assertEquals(
             listOf(SetEntityDataPacket.Entry.Ints(18, 5)),
             generatedEntityMetadata("rabbit", NbtCompound().apply { putInt("RabbitType", 5) }),
         )
@@ -161,6 +175,70 @@ class GeneratedEntityPresentationTest {
         assertEquals(
             listOf(SetEntityDataPacket.Entry.Ints(17, 2)),
             generatedEntityMetadata("salmon", NbtCompound().apply { putString("type", "large") }),
+        )
+        assertEquals(
+            listOf(SetEntityDataPacket.Entry.Ints(17, 50_660_352)),
+            generatedEntityMetadata("tropical_fish", NbtCompound().apply { putInt("Variant", 50_660_352) }),
+        )
+    }
+
+    @Test
+    fun materializesRegistryBackedNaturalAnimalVariants() {
+        assertEquals(
+            listOf(
+                SetEntityDataPacket.Entry.RegistryId(18, 1, SetEntityDataPacket.RegistryHolder.CHICKEN_VARIANT),
+                SetEntityDataPacket.Entry.RegistryId(19, 1, SetEntityDataPacket.RegistryHolder.CHICKEN_SOUND_VARIANT),
+            ),
+            generatedEntityMetadata(
+                "chicken",
+                NbtCompound().apply {
+                    putString("variant", "minecraft:warm")
+                    putString("sound_variant", "minecraft:picky")
+                },
+            ),
+        )
+        assertEquals(
+            listOf(
+                SetEntityDataPacket.Entry.RegistryId(18, 2, SetEntityDataPacket.RegistryHolder.COW_VARIANT),
+                SetEntityDataPacket.Entry.RegistryId(19, 1, SetEntityDataPacket.RegistryHolder.COW_SOUND_VARIANT),
+            ),
+            generatedEntityMetadata(
+                "cow",
+                NbtCompound().apply {
+                    putString("variant", "minecraft:cold")
+                    putString("sound_variant", "minecraft:moody")
+                },
+            ),
+        )
+        assertEquals(
+            listOf(SetEntityDataPacket.Entry.RegistryId(18, 2, SetEntityDataPacket.RegistryHolder.FROG_VARIANT)),
+            generatedEntityMetadata("frog", NbtCompound().apply { putString("variant", "minecraft:cold") }),
+        )
+        assertEquals(
+            listOf(
+                SetEntityDataPacket.Entry.RegistryId(19, 1, SetEntityDataPacket.RegistryHolder.PIG_VARIANT),
+                SetEntityDataPacket.Entry.RegistryId(20, 2, SetEntityDataPacket.RegistryHolder.PIG_SOUND_VARIANT),
+            ),
+            generatedEntityMetadata(
+                "pig",
+                NbtCompound().apply {
+                    putString("variant", "minecraft:warm")
+                    putString("sound_variant", "minecraft:mini")
+                },
+            ),
+        )
+        assertEquals(
+            listOf(
+                SetEntityDataPacket.Entry.RegistryId(23, 8, SetEntityDataPacket.RegistryHolder.WOLF_VARIANT),
+                SetEntityDataPacket.Entry.RegistryId(24, 6, SetEntityDataPacket.RegistryHolder.WOLF_SOUND_VARIANT),
+            ),
+            generatedEntityMetadata(
+                "wolf",
+                NbtCompound().apply {
+                    putString("variant", "minecraft:striped")
+                    putString("sound_variant", "minecraft:cute")
+                },
+            ),
         )
     }
 
