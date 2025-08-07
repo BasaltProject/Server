@@ -96,18 +96,19 @@ public object MobSpawnFinalization {
             )
         }
         val attributeBases = mutableMapOf<String, Double>()
-        writePreCommonTypeState(type.path, biome?.path, group, random, typeData)
+        val concreteBaby = writePreCommonTypeState(type.path, biome?.path, group, random, typeData)
         writeHorseAttributes(type.path, random, attributeBases)
         writePandaAttributes(type.path, typeData, attributeBases)
         val babyChance = babySpawnChance(type.path)
-        val age =
+        val inheritedBaby =
             when {
-                !AgeableMobs.isAgeable(type) || groupIndex <= 0 -> 0
+                !AgeableMobs.isAgeable(type) || groupIndex <= 0 -> false
                 type.path == "axolotl" || type.path == "fox" ->
-                    if (groupIndex >= FORCED_BABY_GROUP_INDEX) AgeableMobs.BABY_START_AGE else 0
-                babyChance != null && random.nextFloat() <= babyChance -> AgeableMobs.BABY_START_AGE
-                else -> 0
+                    groupIndex >= FORCED_BABY_GROUP_INDEX
+                babyChance != null -> random.nextFloat() <= babyChance
+                else -> false
             }
+        val age = if (concreteBaby || inheritedBaby) AgeableMobs.BABY_START_AGE else 0
         // parity: Mob.finalizeSpawn. RandomSource.triangle consumes two doubles before the
         // left-handed float, even though neither result usually changes what the client draws.
         val followRangeBonus = random.triangle(0.0, FOLLOW_RANGE_BONUS_SPREAD)
@@ -175,7 +176,8 @@ public object MobSpawnFinalization {
         group: MobSpawnGroupData,
         random: BasaltRandom,
         data: NbtCompound,
-    ) {
+    ): Boolean {
+        var concreteBaby = false
         when (type) {
             "axolotl" -> {
                 val first = group.variant ?: random.nextInt(COMMON_AXOLOTL_VARIANTS).also { group.variant = it }
@@ -243,12 +245,19 @@ public object MobSpawnFinalization {
                 val markings = random.nextInt(HORSE_MARKINGS)
                 data.putInt("Variant", variant or (markings shl 8))
             }
+            "hoglin" -> concreteBaby = random.nextFloat() < HOGLIN_BABY_CHANCE
             "llama", "trader_llama" -> {
                 val maxStrength = if (random.nextFloat() < LLAMA_MAX_STRENGTH_CHANCE) 5 else 3
                 data.putInt("Strength", 1 + random.nextInt(maxStrength))
                 val variant = group.variant ?: random.nextInt(LLAMA_VARIANTS).also { group.variant = it }
                 data.putInt("Variant", variant)
             }
+            "nautilus" ->
+                writeBrainMemories(
+                    data,
+                    "minecraft:attack_target_cooldown" to
+                        NAUTILUS_MIN_ATTACK_COOLDOWN + random.nextInt(NAUTILUS_ATTACK_COOLDOWN_RANGE),
+                )
             "parrot" -> data.putInt("Variant", random.nextInt(PARROT_VARIANTS))
             "panda" -> {
                 data.putString("MainGene", pandaGene(random.nextInt(PANDA_GENE_ROLLS)).serializedName)
@@ -292,6 +301,7 @@ public object MobSpawnFinalization {
                 )
             }
         }
+        return concreteBaby
     }
 
     private fun selectTemperatureVariant(
@@ -592,6 +602,9 @@ public object MobSpawnFinalization {
     private const val GOAT_RAM_COOLDOWN_RANGE = 5_401
     private const val GOAT_SCREAMING_CHANCE = 0.02
     private const val GOAT_UNIHORN_CHANCE = 0.1f
+    private const val HOGLIN_BABY_CHANCE = 0.2f
+    private const val NAUTILUS_MIN_ATTACK_COOLDOWN = 2_400
+    private const val NAUTILUS_ATTACK_COOLDOWN_RANGE = 1_201
     private const val TROPICAL_COMMON_CHANCE = 0.9
     private const val TROPICAL_PATTERNS = 12
     private const val TROPICAL_SMALL_PATTERNS = 6
