@@ -2,6 +2,8 @@ package org.basaltmc.server.world.terrain.decoration
 
 import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.registry.hugeMushroomStateId
+import org.basaltmc.server.registry.isLeavesState
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.wire.common.Identifier

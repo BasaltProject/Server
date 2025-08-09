@@ -4,6 +4,7 @@ import org.basaltmc.server.random.BasaltRandom
 import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.registry.hasFluid
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.server.world.terrain.OverworldAquifer

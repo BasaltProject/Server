@@ -1,6 +1,7 @@
 package org.basaltmc.server.world.terrain.surface
 
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.registry.hasFluid
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.server.world.terrain.BiomeTemperature
@@ -8,15 +9,13 @@ import kotlin.math.abs
 import kotlin.math.ceil
 
 /**
- * // parity: net.minecraft.world.level.levelgen.SurfaceSystem.buildSurface (the per-column
+ * // parity: net.minecraft.world.level.levelgen.SurfaceSystem.buildSurface, the per-column
  * top-down traversal plus the eroded-badlands and frozen-ocean extensions.
  *
- * Walks each column top-down from its real generated surface height down to the world floor,
- * tracking `stoneAboveDepth` (resets to 0 on air, increments on solid, mirroring vanilla exactly)
- * and a lookahead-cached `stoneBelowDepth` (distance down to the next non-stone block, the real
- * "how deep is the cave ceiling below me" measure `UNDER_CEILING`-style rules need), then replaces
- * every block that's still exactly [defaultBlockStateId] (real terrain, not bedrock or a block an
- * earlier column iteration already replaced) with whatever the rule tree returns, if anything.
+ * Walks each column top-down, tracking `stoneAboveDepth` (mirrors vanilla exactly) and a
+ * lookahead-cached `stoneBelowDepth` (the "how deep is the cave ceiling below me" measure
+ * `UNDER_CEILING`-style rules need), replacing every block still exactly [defaultBlockStateId]
+ * with whatever the rule tree returns.
  */
 public object SurfaceBuilder {
     /**

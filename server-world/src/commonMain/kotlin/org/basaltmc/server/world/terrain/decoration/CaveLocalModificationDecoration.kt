@@ -5,6 +5,7 @@ import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.registry.hasWaterFluid
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkScheduledTick
 import org.basaltmc.server.world.WorldHeight
