@@ -106,11 +106,14 @@ public class PluginHost(
     private val limits: LuaLimits = LuaLimits(),
     private val strikeLimit: Int = 3,
 ) {
-    private val log = Logger("plugins")
+    internal val log = Logger("plugins")
     private val plugins = LinkedHashMap<String, LoadedPlugin>()
 
     /** Events a plugin made up, by name. Nothing declares them: whoever emits one decides it exists. */
-    private val announcements = LinkedHashMap<String, MutableList<Announcement>>()
+    private val pluginAnnouncements = PluginAnnouncements()
+
+    private val commandDispatch = PluginCommandDispatch(this)
+    private val eventDispatch = PluginEventDispatch(this)
 
     /** What one plugin offers another. See [PluginServiceRegistry] for why it is not a shared table. */
     internal val serviceRegistry: PluginServiceRegistry = PluginServiceRegistry()
@@ -129,7 +132,7 @@ public class PluginHost(
     public var allowed: (String) -> Set<PluginPermission> = { emptySet() }
 
     /** Who is listening on which channel, by channel name. */
-    private val channels = LinkedHashMap<String, MutableList<Announcement>>()
+    private val channelHost = PluginChannelHost()
 
     /** Who is drawing the sidebar, and who is next if they let go. */
     public val surfaces: PluginSurfaceRegistry = PluginSurfaceRegistry { message -> log.warn { message } }
@@ -148,7 +151,6 @@ public class PluginHost(
      * handed to the owner and run later, which is exactly what it is for.
      */
     public var onPluginThread: () -> Boolean = { true }
-    private var warnedAboutThread = false
 
     public val statuses: List<PluginStatus>
         get() =
@@ -254,19 +256,13 @@ public class PluginHost(
         for (id in plugins.keys.toList().asReversed()) unload(id)
     }
 
-    /**
-     * Whoever is inside a plugin right now, and since when.
-     *
-     * Written by the thread that runs plugins and read by the watchdog on another, which is why it
-     * is two atomics and not a data class: nobody has to see them agree.
-     */
-    private val runningPlugin = kotlin.concurrent.AtomicReference<String?>(null)
-    private val runningSince = kotlin.concurrent.AtomicLong(0)
-
     /** Marked once, so the two threads are reading the same rising number. */
-    private val clock =
+    internal val clock =
         kotlin.time.TimeSource.Monotonic
             .markNow()
+
+    /** Who is inside a plugin right now, and the means to cut it off if it stays too long. */
+    internal val watchdog = PluginWatchdog(clock)
 
     /**
      * Where a plugin's time is recorded, so `/timings` names it beside the server's own work.
@@ -276,23 +272,6 @@ public class PluginHost(
      */
     public var timings: org.basaltmc.wire.common.timings.Timings? = null
 
-    private fun nowMillis(): Long = clock.elapsedNow().inWholeMilliseconds
-
-    /** Marks a plugin as the one running, for as long as [body] takes. */
-    internal fun <T> watched(
-        plugin: LoadedPlugin,
-        body: () -> T,
-    ): T {
-        runningPlugin.value = plugin.manifest.id
-        runningSince.value = nowMillis()
-        val startedAt = clock.elapsedNow().inWholeNanoseconds
-        return try {
-            body()
-        } finally {
-            runningPlugin.value = null
-        }
-    }
-
     /**
      * Cuts off a plugin that has been inside the server for longer than [limitMillis].
      *
@@ -300,14 +279,7 @@ public class PluginHost(
      * host is doing for it, which the counter never sees. Answers who was cut off, so the caller
      * can say it out loud: a plugin cannot lag the server without the server naming it.
      */
-    public fun interruptIfStuck(limitMillis: Long): String? {
-        val who = runningPlugin.value ?: return null
-        if (nowMillis() - runningSince.value < limitMillis) return null
-        runningPlugin.value = null
-        plugins[who]?.log?.error { "was still inside the server after ${limitMillis}ms and was cut off" }
-        interruptAll()
-        return who
-    }
+    public fun interruptIfStuck(limitMillis: Long): String? = watchdog.interruptIfStuck(limitMillis, plugins)
 
     /**
      * Stops whatever plugin code is running right now.
@@ -316,7 +288,7 @@ public class PluginHost(
      * Lua, and this catches one stuck in something the host is doing for it.
      */
     public fun interruptAll() {
-        for (plugin in plugins.values) for (instance in plugin.instances) instance.sandbox.interrupt()
+        watchdog.interruptAll(plugins.values)
     }
 
     private fun start(
@@ -511,90 +483,16 @@ public class PluginHost(
         filters: Map<String, Any?>,
         handler: LuaValue,
     ) {
-        var view: PluginEventView? = null
-        var boundTo: PluginEvent? = null
-        val entry =
-            PluginEventHandler(
-                pluginId = plugin.manifest.id,
-                lane = instance.lane,
-                priority = priority,
-                observer = observer,
-                wantsCancelled = wantsCancelled,
-                filters = filters,
-            ) { event ->
-                if (view == null || boundTo !== event) {
-                    boundTo = event
-                    view =
-                        PluginEventView(
-                            event,
-                            { message -> event.cancel(message) },
-                            { key -> objectFor(plugin, event, key) },
-                            { message, arguments -> plugin.text.resolve(message, arguments) },
-                        )
-                }
-                val bound = view
-                if (bound != null) {
-                    bound.bind()
-                    dispatch(plugin, instance, handler, event, bound.table, observer)
-                }
-            }
-        val handle = events.add(entry, type)
-        plugin.registrations.add("${if (observer) "watch" else "on"}(${type.name})") { handle.cancel() }
-    }
-
-    /**
-     * Runs one handler for one fire.
-     *
-     * A decider runs here and now, because the server is waiting for the answer: if this is not the
-     * thread plugins run on, it does not run at all, and the reason is said once rather than every
-     * tick. An observer is handed to the owner instead, which is the whole point of it being one.
-     */
-    private fun dispatch(
-        plugin: LoadedPlugin,
-        instance: PluginInstance,
-        handler: LuaValue,
-        event: PluginEvent,
-        view: LuaValue,
-        observer: Boolean,
-    ) {
-        if (plugin.disabled) return
-        if (observer) {
-            // Copied out, and this is the one place dispatch allocates: an observer runs after the
-            // fact, and by then the shared event has been filled in again by whatever happened
-            // next. A copy per fire is what buys it the right to take its time.
-            val snapshot = PluginEvent(event.type)
-            for (index in event.type.fields.indices) snapshot.set(index, event.get(index))
-            services.tasks.after(0) {
-                val laneView = PluginEventView(snapshot, { }, { key -> objectFor(plugin, snapshot, key) })
-                snapshot.begin()
-                laneView.bind()
-                // Never ended: the copy is nobody else's, so it stays readable across a `wait`
-                // rather than going stale under a handler that was allowed to pause.
-                enter(plugin, instance, handler, "watch ${event.type.name}", Lua.varargs(laneView.table))
-            }
-            return
-        }
-        if (!onPluginThread()) {
-            if (!warnedAboutThread) {
-                warnedAboutThread = true
-                log.warn {
-                    "a ${event.type.name} was fired from a thread plugins do not run on, so no " +
-                        "decider saw it. Either the server is running regions on more than one " +
-                        "thread (the known limit until lanes follow them), or that event is being " +
-                        "fired from the wrong place and it is a bug here"
-                }
-            }
-            return
-        }
-        instance.deciderDepth++
-        val startedAt = clock.elapsedNow().inWholeNanoseconds
-        try {
-            enter(plugin, instance, handler, "on ${event.type.name}", Lua.varargs(view))
-        } finally {
-            instance.deciderDepth--
-            runningPlugin.value = null
-            timings?.of("plugin.${plugin.manifest.id}")?.record(clock.elapsedNow().inWholeNanoseconds - startedAt)
-        }
+        eventDispatch.registerEventHandler(
+            plugin,
+            instance,
+            type,
+            priority,
+            observer,
+            wantsCancelled,
+            filters,
+            handler,
+        )
     }
 
     /** Registers one command once, and remembers which function each lane answers it with. */
@@ -604,93 +502,8 @@ public class PluginHost(
         spec: PluginCommandSpec,
         handler: LuaValue,
     ) {
-        val key = spec.literals.joinToString(" ")
-        val existing = plugin.commands[key]
-        if (existing != null) {
-            existing.handlers[instance.lane] = handler
-            return
-        }
-        val entry = CommandEntry(spec)
-        entry.handlers[instance.lane] = handler
-        plugin.commands[key] = entry
-        val handle =
-            services.commands.register(plugin.manifest.id, spec) { call ->
-                runCommand(plugin, entry, call)
-            }
-        plugin.registrations.add("command /${spec.usage}") {
-            handle.cancel()
-            plugin.commands.remove(key)
-        }
+        commandDispatch.registerCommand(plugin, instance, spec, handler)
     }
-
-    private fun runCommand(
-        plugin: LoadedPlugin,
-        entry: CommandEntry,
-        call: PluginCommandCall,
-    ) {
-        val instance = laneFor(plugin, entry) ?: return
-        val handler = entry.handlers[instance.lane] ?: return
-        val arguments = mutableListOf<LuaValue>(sourceTable(plugin, call))
-        for (argument in entry.spec.arguments) arguments += luaOf(call.argument(argument.name))
-        enter(plugin, instance, handler, "/${entry.spec.name}", Lua.varargs(*arguments.toTypedArray()))
-    }
-
-    /** The lane that answers the next fire of this event type, the same way a command picks one. */
-    internal fun laneForEvent(plugin: LoadedPlugin): PluginInstance? = plugin.instances.firstOrNull()
-
-    /**
-     * Which lane answers this one.
-     *
-     * With one lane there is nothing to decide. With more, they take turns, which is on purpose: a
-     * plugin that assumed one state sees it here, in a test, rather than in production the first
-     * time an operator turns regions on.
-     */
-    private fun laneFor(
-        plugin: LoadedPlugin,
-        entry: CommandEntry,
-    ): PluginInstance? {
-        if (plugin.instances.isEmpty()) return null
-        val lane = entry.nextLane % plugin.instances.size
-        entry.nextLane = lane + 1
-        return plugin.instances.firstOrNull { it.lane == lane } ?: plugin.instances.first()
-    }
-
-    private fun sourceTable(
-        plugin: LoadedPlugin,
-        call: PluginCommandCall,
-    ): LuaValue {
-        val table = Lua.table()
-        table.set("name", call.source)
-        table.set("is_console", Lua.of(call.isConsole))
-        table.set(
-            "send",
-            org.basaltmc.server.lua.HostFunction("send") { args ->
-                // Both `src:send(text)` and `src.send(text)` end up here; the first passes the
-                // table as well, and a plugin should not have to care which it wrote.
-                val first = firstArgument(args)
-                call.reply(plugin.text.resolve(args.tojstring(first), args.arg(first + 1)))
-                Lua.NONE
-            },
-        )
-        return table
-    }
-
-    private fun luaOf(value: Any?): LuaValue =
-        when (value) {
-            null -> Lua.NIL
-            is String -> Lua.of(value)
-            is Long -> Lua.of(value)
-            is Int -> Lua.of(value)
-            is Double -> Lua.of(value)
-            is Boolean -> Lua.of(value)
-            else -> Lua.of(value.toString())
-        }
-
-    /** One plugin waiting on an event another plugin made up. */
-    private class Announcement(
-        val plugin: LoadedPlugin,
-        val fn: LuaValue,
-    )
 
     /**
      * `on("arena:round_start", fn)` for a name no event type has.
@@ -703,13 +516,7 @@ public class PluginHost(
         name: String,
         fn: LuaValue,
     ) {
-        val list = announcements.getOrPut(name) { mutableListOf() }
-        val entry = Announcement(plugin, fn)
-        list += entry
-        plugin.registrations.add("on($name)") {
-            list.remove(entry)
-            if (list.isEmpty()) announcements.remove(name)
-        }
+        pluginAnnouncements.announce(plugin, name, fn)
     }
 
     /**
@@ -722,33 +529,7 @@ public class PluginHost(
     internal fun emit(
         name: String,
         payload: LuaValue,
-    ): Int {
-        val listeners = announcements[name] ?: return 0
-        val copied = PluginValues.out(payload)
-        var reached = 0
-        for (entry in listeners.toList()) {
-            val plugin = entry.plugin
-            if (plugin.disabled) continue
-            val instance = plugin.instances.firstOrNull() ?: continue
-            instance.sandbox.refill()
-            instance.deciderDepth++
-            try {
-                entry.fn.call(PluginValues.into(copied, this, plugin))
-                plugin.strikes = 0
-                reached++
-            } catch (e: net.blueva.luak.LuaError) {
-                report(
-                    plugin,
-                    org.basaltmc.server.lua
-                        .LuaFailure(plugin.manifest.id, e),
-                    name,
-                )
-            } finally {
-                instance.deciderDepth--
-            }
-        }
-        return reached
-    }
+    ): Int = pluginAnnouncements.emit(this, name, payload)
 
     /**
      * Somebody clicked a menu: runs the plugin's handler with who and where.
@@ -767,8 +548,7 @@ public class PluginHost(
         if (plugin.disabled) return
         instance.sandbox.refill()
         instance.deciderDepth++
-        runningPlugin.value = plugin.manifest.id
-        runningSince.value = nowMillis()
+        watchdog.mark(plugin.manifest.id)
         val startedAt = clock.elapsedNow().inWholeNanoseconds
         try {
             val event = Lua.table()
@@ -785,7 +565,7 @@ public class PluginHost(
             )
         } finally {
             instance.deciderDepth--
-            runningPlugin.value = null
+            watchdog.clear()
             timings?.of("plugin.${plugin.manifest.id}")?.record(clock.elapsedNow().inWholeNanoseconds - startedAt)
         }
     }
@@ -796,16 +576,10 @@ public class PluginHost(
         channel: String,
         fn: LuaValue,
     ) {
-        val list = channels.getOrPut(channel) { mutableListOf() }
-        val entry = Announcement(plugin, fn)
-        list += entry
-        plugin.registrations.add("channel($channel)") {
-            list.remove(entry)
-            if (list.isEmpty()) channels.remove(channel)
-        }
+        channelHost.listenOn(plugin, channel, fn)
     }
 
-    public fun listeningOnChannel(channel: String): Boolean = channels.containsKey(channel)
+    public fun listeningOnChannel(channel: String): Boolean = channelHost.listeningOnChannel(channel)
 
     /** A payload arrived: hands the bytes to whoever asked for that channel. */
     public fun channelMessage(
@@ -813,33 +587,7 @@ public class PluginHost(
         playerUuid: String,
         bytes: ByteArray,
     ) {
-        val listeners = channels[channel] ?: return
-        val player = services.players.byUuid(playerUuid)
-        for (entry in listeners.toList()) {
-            val plugin = entry.plugin
-            if (plugin.disabled) continue
-            val instance = plugin.instances.firstOrNull() ?: continue
-            instance.sandbox.refill()
-            instance.deciderDepth++
-            try {
-                val list = Lua.table()
-                for ((index, byte) in bytes.withIndex()) list.set(index + 1, Lua.of(byte.toInt() and 0xff))
-                entry.fn.call(
-                    player?.let { playerObject(it, services.storage, plugin.manifest.id, plugin.text) } ?: Lua.NIL,
-                    list,
-                )
-                plugin.strikes = 0
-            } catch (e: net.blueva.luak.LuaError) {
-                report(
-                    plugin,
-                    org.basaltmc.server.lua
-                        .LuaFailure(plugin.manifest.id, e),
-                    "channel $channel",
-                )
-            } finally {
-                instance.deciderDepth--
-            }
-        }
+        channelHost.channelMessage(this, channel, playerUuid, bytes)
     }
 
     /** Somebody right-clicked an NPC: runs the plugin's handler with the player who did. */
@@ -862,8 +610,7 @@ public class PluginHost(
         if (plugin.disabled) return
         instance.sandbox.refill()
         instance.deciderDepth++
-        runningPlugin.value = plugin.manifest.id
-        runningSince.value = nowMillis()
+        watchdog.mark(plugin.manifest.id)
         val startedAt = clock.elapsedNow().inWholeNanoseconds
         try {
             fn.call(PluginPacketView(packet, services.players, this, plugin).table)
@@ -877,7 +624,7 @@ public class PluginHost(
             )
         } finally {
             instance.deciderDepth--
-            runningPlugin.value = null
+            watchdog.clear()
             timings?.of("plugin.${plugin.manifest.id}")?.record(clock.elapsedNow().inWholeNanoseconds - startedAt)
         }
     }
@@ -906,8 +653,7 @@ public class PluginHost(
         if (plugin.disabled) return null
         instance.sandbox.refill()
         instance.deciderDepth++
-        runningPlugin.value = plugin.manifest.id
-        runningSince.value = nowMillis()
+        watchdog.mark(plugin.manifest.id)
         val startedAt = clock.elapsedNow().inWholeNanoseconds
         return try {
             val argument =
@@ -925,68 +671,10 @@ public class PluginHost(
             null
         } finally {
             instance.deciderDepth--
-            runningPlugin.value = null
+            watchdog.clear()
             timings?.of("plugin.${plugin.manifest.id}")?.record(clock.elapsedNow().inWholeNanoseconds - startedAt)
         }
     }
-
-    /**
-     * `e.player` and `e.entity`: the object behind what the event carries by name and id.
-     *
-     * Null for anything else, which is what tells the view to look at the fields instead. A player
-     * who has left between the fire and the read answers nil rather than a handle to nobody.
-     */
-    private fun objectFor(
-        plugin: LoadedPlugin,
-        event: PluginEvent,
-        key: String,
-    ): LuaValue? =
-        when (key) {
-            "player" ->
-                (
-                    event.get(
-                        "player_name",
-                    ) as? String
-                )?.let { services.players.byName(it) }
-                    ?.let { playerObject(it, services.storage, plugin.manifest.id, plugin.text) }
-            "entity" ->
-                (event.get("entity_id") as? Int)
-                    ?.let { id ->
-                        val world = event.get("world") as? String
-                        val worlds =
-                            if (world !=
-                                null
-                            ) {
-                                listOfNotNull(services.worlds.byName(world))
-                            } else {
-                                services.worlds.all()
-                            }
-                        worlds.firstNotNullOfOrNull { it.entities().firstOrNull { entity -> entity.id == id } }
-                    }?.let { entityObject(it) }
-
-            // Only for the events that carry a place: a chat message has no `pos` and saying so
-            // is better than handing back one made of zeroes.
-            "pos" -> {
-                val world = event.get("world") as? String
-                val x = event.get("x")
-                if (world == null || x == null) {
-                    null
-                } else {
-                    positionObject(world, numberOf(x), numberOf(event.get("y")), numberOf(event.get("z")))
-                }
-            }
-
-            else -> null
-        }
-
-    private fun numberOf(value: Any?): Double =
-        when (value) {
-            is Double -> value
-            is Int -> value.toDouble()
-            is Long -> value.toDouble()
-            is Float -> value.toDouble()
-            else -> 0.0
-        }
 
     internal fun pluginById(id: String): LoadedPlugin? = plugins[id]
 
@@ -1008,8 +696,7 @@ public class PluginHost(
         instance.sandbox.refill()
         instance.deciderDepth++
         // The work is the provider's, so it is the provider the watchdog would name.
-        runningPlugin.value = provider.manifest.id
-        runningSince.value = nowMillis()
+        watchdog.mark(provider.manifest.id)
         val startedAt = clock.elapsedNow().inWholeNanoseconds
         return try {
             val inside = copied.map { PluginValues.into(it, this, provider) }
@@ -1032,7 +719,7 @@ public class PluginHost(
             throw net.blueva.luak.LuaError("the service failed inside ${provider.manifest.id}: ${e.message}")
         } finally {
             instance.deciderDepth--
-            runningPlugin.value = null
+            watchdog.clear()
             timings
                 ?.of("plugin.${provider.manifest.id}")
                 ?.record(clock.elapsedNow().inWholeNanoseconds - startedAt)
@@ -1078,7 +765,7 @@ public class PluginHost(
         }
     }
 
-    private fun report(
+    internal fun report(
         plugin: LoadedPlugin,
         failure: LuaFailure,
         why: String,
