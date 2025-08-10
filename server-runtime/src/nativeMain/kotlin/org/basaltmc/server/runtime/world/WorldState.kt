@@ -1,20 +1,10 @@
 package org.basaltmc.server.runtime.world
 
-import org.basaltmc.server.registry.BlockMovement
-import org.basaltmc.server.registry.BlockStateDefinitions
-import org.basaltmc.server.registry.Blocks
-import org.basaltmc.server.runtime.entity.Aabb
-import org.basaltmc.server.runtime.entity.CubeMobs
-import org.basaltmc.server.runtime.entity.EntityCollision
 import org.basaltmc.server.runtime.entity.Mobs
 import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.server.runtime.sched.Owner
 import org.basaltmc.server.runtime.sched.Region
 import org.basaltmc.server.world.Chunk
-import org.basaltmc.server.world.ChunkBlockEntity
-import org.basaltmc.server.world.ChunkGeneratedBlockEntityWrite
-import org.basaltmc.server.world.ChunkGeneratedBlockTick
-import org.basaltmc.server.world.ChunkGeneratedBlockWrite
 import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.server.world.ChunkScheduledTick
 import org.basaltmc.server.world.NoiseWorldGenerator
@@ -23,22 +13,15 @@ import org.basaltmc.wire.common.collections.Long2ObjectMap
 import org.basaltmc.wire.io.NativeMutex
 import org.basaltmc.wire.nbt.NbtCompound
 import kotlin.concurrent.Volatile
-import kotlin.math.abs
-import kotlin.math.floor
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
- * Shared view over the loaded chunks.
- *
- * The owner writes blocks, entities and items without any lock: it is the only writer, and it finds
- * its chunk in the same lock-free snapshot a read uses. The lock is left for the two threads that
- * are deliberately not the owner, the periodic save and the unload sweep, which are slow I/O.
- *
- * A known hole: saving encodes a chunk while the owner may be writing blocks into it.
- *
- * [loadOrGenerate] must read the region files before generating, or a visited chunk comes back
- * regenerated with the player's edits gone.
+ * Shared view over the loaded chunks. The owner writes without any lock, using the same
+ * lock-free snapshot a read uses; the lock is reserved for the periodic save and the unload
+ * sweep, the two threads that are deliberately not the owner. Known hole: saving can encode a
+ * chunk while the owner is still writing blocks into it. [loadOrGenerate] must read the region
+ * files before generating, or a visited chunk comes back regenerated with the player's edits gone.
  */
 @OptIn(ExperimentalUuidApi::class)
 public class WorldState(
@@ -97,23 +80,29 @@ public class WorldState(
     @Volatile
     private var loadedChunks: Long2ObjectMap<Chunk> = snapshotOf(chunksByPos)
 
-    private val generatedEntitiesByKey = mutableMapOf<GeneratedEntityKey, GeneratedWorldEntity>()
-    private val pendingGeneratedEntities = mutableListOf<ChunkGeneratedEntity>()
-    private val pendingGeneratedBlockWrites = HashMap<Long, MutableList<ChunkGeneratedBlockWrite>>()
-    private val pendingGeneratedBlockEntityWrites = HashMap<Long, MutableList<ChunkGeneratedBlockEntityWrite>>()
-    private val pendingGeneratedBlockTicks = HashMap<Long, MutableList<ChunkGeneratedBlockTick>>()
+    // Every collaborator below shares this same mutex rather than owning one of its own: splitting
+    // lock granularity would change race outcomes between the tick thread and the save/eviction
+    // threads, which is a real behavior change even where it has nothing to do with vanilla parity.
+    private val primedTntQueue = PrimedTntQueue(mutex)
+    private val pendingDecorations = PendingChunkDecorations(mutex)
+    private val sculkSensors = SculkSensorTracker(mutex)
+    private val entityRegistry = EntityRegistry(mutex)
+    private val itemPhysics = DroppedItemPhysics(this, mutex)
 
     init {
         // Tests and embedders may seed a world with detached generated chunks. Production starts
         // empty, but those chunks still deserve the same cross-border handoff as [install].
         for (chunk in initialChunks) {
-            pendingGeneratedEntities += chunk.takeGeneratedEntitiesMatching { Mobs.isMob(it.type) }
-            applyPendingGeneratedBlockWrites(chunk)
-            applyPendingGeneratedBlockEntityWrites(chunk)
-            applyPendingGeneratedBlockTicks(chunk)
-            deliverGeneratedBlockWrites(chunk.takeGeneratedBlockWrites())
-            deliverGeneratedBlockEntityWrites(chunk.takeGeneratedBlockEntityWrites())
-            deliverGeneratedBlockTicks(chunk.takeGeneratedBlockTicks())
+            pendingDecorations.addPendingGeneratedEntities(chunk.takeGeneratedEntitiesMatching { Mobs.isMob(it.type) })
+            pendingDecorations.applyPendingGeneratedBlockWrites(chunk)
+            pendingDecorations.applyPendingGeneratedBlockEntityWrites(chunk)
+            pendingDecorations.applyPendingGeneratedBlockTicks(chunk)
+            pendingDecorations.deliverGeneratedBlockWrites(chunk.takeGeneratedBlockWrites(), chunksByPos::get)
+            pendingDecorations.deliverGeneratedBlockEntityWrites(
+                chunk.takeGeneratedBlockEntityWrites(),
+                chunksByPos::get,
+            )
+            pendingDecorations.deliverGeneratedBlockTicks(chunk.takeGeneratedBlockTicks(), chunksByPos::get)
         }
         loadedChunks = snapshotOf(chunksByPos)
     }
@@ -180,7 +169,7 @@ public class WorldState(
                 if (chunk.isDirty) continue
                 val chunkKey = key(chunk.chunkX, chunk.chunkZ)
                 if (chunksByPos.remove(chunkKey) != null) {
-                    generatedEntitiesByKey.keys.removeAll { it.chunkKey == chunkKey }
+                    pendingDecorations.forgetGeneratedEntities(chunkKey)
                     removed++
                 }
             }
@@ -261,16 +250,21 @@ public class WorldState(
                 existing
             } else {
                 chunksByPos[key] = chunk
-                applyPendingGeneratedBlockWrites(chunk)
-                applyPendingGeneratedBlockEntityWrites(chunk)
-                applyPendingGeneratedBlockTicks(chunk)
-                deliverGeneratedBlockWrites(chunk.takeGeneratedBlockWrites())
-                deliverGeneratedBlockEntityWrites(chunk.takeGeneratedBlockEntityWrites())
-                deliverGeneratedBlockTicks(chunk.takeGeneratedBlockTicks())
+                pendingDecorations.applyPendingGeneratedBlockWrites(chunk)
+                pendingDecorations.applyPendingGeneratedBlockEntityWrites(chunk)
+                pendingDecorations.applyPendingGeneratedBlockTicks(chunk)
+                pendingDecorations.deliverGeneratedBlockWrites(chunk.takeGeneratedBlockWrites(), chunksByPos::get)
+                pendingDecorations.deliverGeneratedBlockEntityWrites(
+                    chunk.takeGeneratedBlockEntityWrites(),
+                    chunksByPos::get,
+                )
+                pendingDecorations.deliverGeneratedBlockTicks(chunk.takeGeneratedBlockTicks(), chunksByPos::get)
                 loadedChunks = snapshotOf(chunksByPos)
                 chunkVersion.addAndGet(1)
-                pendingEntities += chunk.takeSavedEntities()
-                pendingGeneratedEntities += chunk.takeGeneratedEntitiesMatching { Mobs.isMob(it.type) }
+                entityRegistry.addPendingEntities(chunk.takeSavedEntities())
+                pendingDecorations.addPendingGeneratedEntities(
+                    chunk.takeGeneratedEntitiesMatching { Mobs.isMob(it.type) },
+                )
                 // The neighbours were lit without this chunk, so their light let the sky in through
                 // where it now stands. parity: vanilla relights a chunk's neighbourhood on load.
                 for (offsetZ in -1..1) {
@@ -282,98 +276,6 @@ public class WorldState(
                 chunk
             }
         }
-    }
-
-    /**
-     * Delivers decorations that crossed out of their source chunk without ever wrapping them back
-     * into it. A target that has not arrived yet keeps the write until its own install.
-     */
-    private fun deliverGeneratedBlockWrites(writes: List<ChunkGeneratedBlockWrite>) {
-        for (write in writes) {
-            val targetKey = key(write.x shr 4, write.z shr 4)
-            val target = chunksByPos[targetKey]
-            if (target == null) {
-                pendingGeneratedBlockWrites.getOrPut(targetKey, ::mutableListOf) += write
-            } else {
-                applyGeneratedBlockWrite(target, write)
-            }
-        }
-    }
-
-    private fun applyPendingGeneratedBlockWrites(chunk: Chunk) {
-        val writes = pendingGeneratedBlockWrites.remove(key(chunk.chunkX, chunk.chunkZ)) ?: return
-        for (write in writes) applyGeneratedBlockWrite(chunk, write)
-    }
-
-    private fun applyGeneratedBlockWrite(
-        chunk: Chunk,
-        write: ChunkGeneratedBlockWrite,
-    ) {
-        if (write.y !in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) return
-        val localX = write.x and 15
-        val localZ = write.z and 15
-        val current = chunk.getBlockStateId(localX, write.y, localZ)
-        if (write.replaceAnyState || current == write.expectedStateId) {
-            chunk.setBlockStateId(localX, write.y, localZ, write.stateId)
-        }
-    }
-
-    private fun deliverGeneratedBlockEntityWrites(writes: List<ChunkGeneratedBlockEntityWrite>) {
-        for (write in writes) {
-            val targetKey = key(write.x shr 4, write.z shr 4)
-            val target = chunksByPos[targetKey]
-            if (target == null) {
-                pendingGeneratedBlockEntityWrites.getOrPut(targetKey, ::mutableListOf) += write
-            } else {
-                applyGeneratedBlockEntityWrite(target, write)
-            }
-        }
-    }
-
-    private fun applyPendingGeneratedBlockEntityWrites(chunk: Chunk) {
-        val writes = pendingGeneratedBlockEntityWrites.remove(key(chunk.chunkX, chunk.chunkZ)) ?: return
-        for (write in writes) applyGeneratedBlockEntityWrite(chunk, write)
-    }
-
-    private fun applyGeneratedBlockEntityWrite(
-        chunk: Chunk,
-        write: ChunkGeneratedBlockEntityWrite,
-    ) {
-        if (write.y !in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) return
-        val localX = write.x and 15
-        val localZ = write.z and 15
-        if (chunk.getBlockStateId(localX, write.y, localZ) != write.expectedStateId) return
-        chunk.setBlockEntity(ChunkBlockEntity(localX, write.y, localZ, write.type, write.data))
-    }
-
-    private fun deliverGeneratedBlockTicks(ticks: List<ChunkGeneratedBlockTick>) {
-        for (tick in ticks) {
-            val targetKey = key(tick.x shr 4, tick.z shr 4)
-            val target = chunksByPos[targetKey]
-            if (target == null) {
-                pendingGeneratedBlockTicks.getOrPut(targetKey, ::mutableListOf) += tick
-            } else {
-                applyGeneratedBlockTick(target, tick)
-            }
-        }
-    }
-
-    private fun applyPendingGeneratedBlockTicks(chunk: Chunk) {
-        val ticks = pendingGeneratedBlockTicks.remove(key(chunk.chunkX, chunk.chunkZ)) ?: return
-        for (tick in ticks) applyGeneratedBlockTick(chunk, tick)
-    }
-
-    private fun applyGeneratedBlockTick(
-        chunk: Chunk,
-        tick: ChunkGeneratedBlockTick,
-    ) {
-        if (tick.y !in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) return
-        val localX = tick.x and 15
-        val localZ = tick.z and 15
-        if (chunk.getBlockStateId(localX, tick.y, localZ) != tick.expectedStateId) return
-        chunk.scheduleBlockTick(
-            ChunkScheduledTick(tick.type, localX, tick.y, localZ, tick.delay, tick.priority),
-        )
     }
 
     /**
@@ -444,33 +346,8 @@ public class WorldState(
                 }
             }
         }
-        rememberSculkSensor(x, y, z, stateId)
+        sculkSensors.remember(x, y, z, stateId)
         return true
-    }
-
-    /**
-     * Where the sculk sensors are, so a walking player does not have to search for them.
-     *
-     * A vibration from a block event can afford to look around itself; a footstep happens every tick
-     * for every player, and cannot. Kept as blocks are set, which covers everything placed or broken
-     * while the server runs: a sensor that came with the terrain is not in here until something
-     * touches it, so footsteps do not reach the deep dark yet.
-     */
-    private val sculkSensors = mutableSetOf<Long>()
-
-    private fun rememberSculkSensor(
-        x: Int,
-        y: Int,
-        z: Int,
-        stateId: Int,
-    ) {
-        val path = BlockStateDefinitions.blockOf(stateId)?.path
-        val position = blockKey(x, y, z)
-        if (path == "sculk_sensor" || path == "calibrated_sculk_sensor") {
-            sculkSensors += position
-        } else {
-            sculkSensors -= position
-        }
     }
 
     /** Whether any known sensor is within [range] blocks of this point. */
@@ -479,28 +356,7 @@ public class WorldState(
         y: Double,
         z: Double,
         range: Int,
-    ): Boolean {
-        if (sculkSensors.isEmpty()) return false
-        return mutex.withLock {
-            sculkSensors.any { position ->
-                abs(unpackBlockX(position) - x) <= range &&
-                    abs(unpackBlockY(position) - y) <= range &&
-                    abs(unpackBlockZ(position) - z) <= range
-            }
-        }
-    }
-
-    private fun blockKey(
-        x: Int,
-        y: Int,
-        z: Int,
-    ): Long = (x.toLong() and 0x3ffffff shl 38) or (z.toLong() and 0x3ffffff shl 12) or (y.toLong() and 0xfff)
-
-    private fun unpackBlockX(packed: Long): Int = (packed shl 0 shr 38).toInt()
-
-    private fun unpackBlockY(packed: Long): Int = (packed shl 52 shr 52).toInt()
-
-    private fun unpackBlockZ(packed: Long): Int = (packed shl 26 shr 38).toInt()
+    ): Boolean = sculkSensors.hasNear(x, y, z, range)
 
     /**
      * Queues a fluid tick [delay] ticks from now, doing nothing if the chunk is not loaded.
@@ -581,7 +437,7 @@ public class WorldState(
      * Runtime identities for the entities of generated chunks within [radiusChunks] of
      * ([centerChunkX], [centerChunkZ]).
      *
-     * Bounded because this runs once per player per tick holding [mutex], against the lock the
+     * Bounded because this runs once per player per tick holding a lock, against the lock the
      * generation workers need. Walked in coordinate order rather than sorted, so an entity's id
      * still depends only on position; [evictClean] is what forgets them, when the chunk goes.
      */
@@ -591,39 +447,13 @@ public class WorldState(
         centerChunkZ: Int,
         radiusChunks: Int,
     ): List<GeneratedWorldEntity> =
-        mutex.withLock {
-            val result = mutableListOf<GeneratedWorldEntity>()
-            for (chunkX in centerChunkX - radiusChunks..centerChunkX + radiusChunks) {
-                for (chunkZ in centerChunkZ - radiusChunks..centerChunkZ + radiusChunks) {
-                    val chunkKey = key(chunkX, chunkZ)
-                    val chunk = chunksByPos[chunkKey] ?: continue
-                    for (index in 0 until chunk.generatedEntityCount) {
-                        val entityKey = GeneratedEntityKey(chunkKey, index)
-                        result +=
-                            generatedEntitiesByKey.getOrPut(entityKey) {
-                                GeneratedWorldEntity(allocateEntityId(), Uuid.random(), chunk.generatedEntityAt(index))
-                            }
-                    }
-                }
-            }
-            result
-        }
-
-    public data class GeneratedWorldEntity(
-        val entityId: Int,
-        val uuid: Uuid,
-        val descriptor: ChunkGeneratedEntity,
-    )
-
-    private data class GeneratedEntityKey(
-        val chunkKey: Long,
-        val index: Int,
-    )
-
-    // Dropped items in this world. Behind the same lock as blocks: a break spawning one and a
-    // nearby player picking one up are exactly the same kind of race two players editing blocks
-    // are. [tickItems] moves them; connection threads only read the result and put it on the wire.
-    private val droppedItems = mutableListOf<DroppedItem>()
+        pendingDecorations.generatedEntities(
+            allocateEntityId,
+            centerChunkX,
+            centerChunkZ,
+            radiusChunks,
+            chunksByPos::get,
+        )
 
     /**
      * One item lying in (or falling through) the world.
@@ -667,55 +497,34 @@ public class WorldState(
     }
 
     /** Adds a newly spawned (or re-added, for a partial pickup) dropped item to this world. */
-    public fun spawnItem(dropped: DroppedItem): DroppedItem =
-        mutex.withLock {
-            mine("A dropped item")
-            droppedItems.add(dropped)
-            dropped
-        }
+    public fun spawnItem(dropped: DroppedItem): DroppedItem {
+        mine("A dropped item")
+        return itemPhysics.spawnItem(dropped)
+    }
 
     /** Every dropped item in this world, as a snapshot safe to iterate outside the lock. */
-    public fun items(): List<DroppedItem> = mutex.withLock { droppedItems.toList() }
+    public fun items(): List<DroppedItem> = itemPhysics.items()
 
     // --- Summoned entities ---
 
-    /** Reused by [moveItem] so a tick of items allocates nothing. */
-    private val movement = DoubleArray(3)
-
-    private val entities = LinkedHashMap<Int, ServerEntity>()
-
     /** Everything `/summon` put here, alive or just removed and not yet forgotten by clients. */
-    public fun entities(): List<ServerEntity> = mutex.withLock { entities.values.toList() }
+    public fun entities(): List<ServerEntity> = entityRegistry.entities()
 
     /** The live entities standing in this chunk, which is what gets written beside its blocks. */
     public fun entitiesIn(
         chunkX: Int,
         chunkZ: Int,
-    ): List<ServerEntity> =
-        mutex.withLock {
-            entities.values.filter {
-                !it.removed && floor(it.x).toInt() shr 4 == chunkX && floor(it.z).toInt() shr 4 == chunkZ
-            }
-        }
+    ): List<ServerEntity> = entityRegistry.entitiesIn(chunkX, chunkZ)
 
     /** Which chunks hold entities, so a save knows to write them even when no block moved. */
-    public fun chunksWithEntities(): Set<Pair<Int, Int>> =
-        mutex.withLock {
-            entities.values
-                .filter { !it.removed }
-                .mapTo(mutableSetOf()) { floor(it.x).toInt() shr 4 to (floor(it.z).toInt() shr 4) }
-        }
+    public fun chunksWithEntities(): Set<Pair<Int, Int>> = entityRegistry.chunksWithEntities()
 
     /** Forgets the entities in this chunk: they are on disk now, and the chunk is going. */
     public fun forgetEntitiesIn(
         chunkX: Int,
         chunkZ: Int,
     ) {
-        mutex.withLock {
-            entities.values
-                .filter { floor(it.x).toInt() shr 4 == chunkX && floor(it.z).toInt() shr 4 == chunkZ }
-                .forEach { entities.remove(it.entityId) }
-        }
+        entityRegistry.forgetEntitiesIn(chunkX, chunkZ)
     }
 
     /**
@@ -724,18 +533,7 @@ public class WorldState(
      * They cannot be spawned where the chunk is loaded: that happens on a generation thread, and an
      * entity id belongs to the server. parity: vanilla defers the same work to the entity manager.
      */
-    private val pendingEntities = mutableListOf<NbtCompound>()
-
-    public fun takePendingEntities(): List<NbtCompound> =
-        mutex.withLock {
-            if (pendingEntities.isEmpty()) {
-                emptyList()
-            } else {
-                val taken = pendingEntities.toList()
-                pendingEntities.clear()
-                taken
-            }
-        }
+    public fun takePendingEntities(): List<NbtCompound> = entityRegistry.takePendingEntities()
 
     /**
      * Mobs emitted by structure templates, waiting for the server tick to allocate runtime ids.
@@ -743,34 +541,14 @@ public class WorldState(
      * the live entity saved with the chunk cannot be duplicated on the next load.
      */
     public fun takePendingGeneratedEntities(): List<ChunkGeneratedEntity> =
-        mutex.withLock {
-            if (pendingGeneratedEntities.isEmpty()) {
-                emptyList()
-            } else {
-                val taken = pendingGeneratedEntities.toList()
-                pendingGeneratedEntities.clear()
-                taken
-            }
-        }
+        pendingDecorations.takePendingGeneratedEntities()
 
-    public fun entity(entityId: Int): ServerEntity? = mutex.withLock { entities[entityId] }
+    public fun entity(entityId: Int): ServerEntity? = entityRegistry.entity(entityId)
 
-    public fun spawnEntity(entity: ServerEntity): ServerEntity =
-        mutex.withLock {
-            mine("An entity")
-            // A cube's speed, health and damage all derive from the size chosen by finalizeSpawn.
-            CubeMobs.applySize(entity)
-            entities[entity.entityId] = entity
-            entity
-        }
-
-    /**
-     * The TNT blocks that were lit this tick and still have to become entities.
-     *
-     * The block itself goes the moment the signal reaches it, but only the caller knows how to
-     * allocate an entity id, so what it left behind waits here for one tick at most.
-     */
-    private val primedTnt = mutableListOf<IntArray>()
+    public fun spawnEntity(entity: ServerEntity): ServerEntity {
+        mine("An entity")
+        return entityRegistry.spawnEntity(entity)
+    }
 
     /** parity: `TntBlock.explode`, which spawns the entity where the block stood. */
     public fun primeTnt(
@@ -778,28 +556,14 @@ public class WorldState(
         y: Int,
         z: Int,
     ) {
-        mutex.withLock { primedTnt += intArrayOf(x, y, z) }
+        primedTntQueue.primeTnt(x, y, z)
     }
 
     /** Takes what was lit, leaving the queue empty. */
-    public fun takePrimedTnt(): List<IntArray> =
-        mutex.withLock {
-            if (primedTnt.isEmpty()) {
-                emptyList()
-            } else {
-                val lit = primedTnt.toList()
-                primedTnt.clear()
-                lit
-            }
-        }
+    public fun takePrimedTnt(): List<IntArray> = primedTntQueue.takePrimedTnt()
 
     /** Drops everything marked removed, and returns their ids so clients can be told once. */
-    public fun collectRemovedEntities(): List<Int> =
-        mutex.withLock {
-            val gone = entities.values.filter { it.removed }.map { it.entityId }
-            for (id in gone) entities.remove(id)
-            gone
-        }
+    public fun collectRemovedEntities(): List<Int> = entityRegistry.collectRemovedEntities()
 
     /** A snapshot of every dropped item within [radius] blocks of a point, nearest first. */
     public fun nearbyItems(
@@ -807,33 +571,13 @@ public class WorldState(
         y: Double,
         z: Double,
         radius: Double,
-    ): List<DroppedItem> =
-        mutex.withLock {
-            val radiusSquared = radius * radius
-            droppedItems
-                .filter { squaredDistance(it, x, y, z) <= radiusSquared }
-                .sortedBy { squaredDistance(it, x, y, z) }
-        }
-
-    private fun squaredDistance(
-        item: DroppedItem,
-        x: Double,
-        y: Double,
-        z: Double,
-    ): Double {
-        val dx = item.x - x
-        val dy = item.y - y
-        val dz = item.z - z
-        return dx * dx + dy * dy + dz * dz
-    }
+    ): List<DroppedItem> = itemPhysics.nearbyItems(x, y, z, radius)
 
     /** Removes and returns the dropped item with this entity id, or `null` if it is already gone (picked up, despawned). */
-    public fun removeItem(entityId: Int): DroppedItem? =
-        mutex.withLock {
-            mine("A dropped item")
-            val index = droppedItems.indexOfFirst { it.entityId == entityId }
-            if (index < 0) null else droppedItems.removeAt(index)
-        }
+    public fun removeItem(entityId: Int): DroppedItem? {
+        mine("A dropped item")
+        return itemPhysics.removeItem(entityId)
+    }
 
     /**
      * One tick of item physics for the whole world, returning the entity ids that despawned.
@@ -845,128 +589,7 @@ public class WorldState(
      * Deliberately does no I/O and takes no other lock: it runs on the tick thread, which must
      * never touch a socket (see [org.basaltmc.server.runtime.TickLoop]).
      */
-    public fun tickItems(region: Region? = null): List<Int> =
-        mutex.withLock {
-            val despawned = mutableListOf<Int>()
-            val iterator = droppedItems.iterator()
-            while (iterator.hasNext()) {
-                val item = iterator.next()
-                // An item belongs to whoever owns the ground it is lying on. With the world in one
-                // piece that is everybody, and this is always true.
-                if (region != null && !region.ownsPosition(item.x, item.z)) continue
-                item.age++
-                if (item.pickupDelay > 0) item.pickupDelay--
-                if (item.age >= LIFETIME_TICKS) {
-                    despawned += item.entityId
-                    iterator.remove()
-                    continue
-                }
-                if (!item.resting) moveItem(item)
-            }
-            // parity: `ItemEntity.mergeWithNeighbours`, asked every other tick while an item is
-            // moving and every two seconds once it has settled. Without it a broken tree leaves six
-            // stacks of one log on the floor where vanilla leaves one.
-            val absorbed = HashSet<Int>()
-            for (item in droppedItems.toList()) {
-                if (item.entityId in absorbed) continue
-                val interval = if (item.resting) MERGE_RESTING_INTERVAL else MERGE_MOVING_INTERVAL
-                if (item.age % interval != 0) continue
-                mergeWithNeighbours(item, despawned, absorbed)
-            }
-            despawned
-        }
-
-    /**
-     * Pours whatever is close enough into [item], and marks what it emptied as gone.
-     *
-     * parity: `ItemEntity.tryToMerge`: same item, same components, and the two counts have to fit
-     * in one stack. Called with [mutex] already held.
-     */
-    private fun mergeWithNeighbours(
-        item: DroppedItem,
-        despawned: MutableList<Int>,
-        absorbed: MutableSet<Int>,
-    ) {
-        if (item.count >= MAX_STACK) return
-        val iterator = droppedItems.iterator()
-        while (iterator.hasNext()) {
-            val other = iterator.next()
-            if (other === item || other.item != item.item || other.count <= 0) continue
-            if (!sameComponents(other.components, item.components)) continue
-            if (item.count + other.count > MAX_STACK) continue
-            if (abs(other.x - item.x) > MERGE_RANGE || abs(other.z - item.z) > MERGE_RANGE) continue
-            if (abs(other.y - item.y) > MERGE_HEIGHT) continue
-            item.count += other.count
-            item.countChanged = true
-            // parity: the merged stack keeps the younger age and the longer pickup delay.
-            item.age = minOf(item.age, other.age)
-            item.pickupDelay = maxOf(item.pickupDelay, other.pickupDelay)
-            despawned += other.entityId
-            absorbed += other.entityId
-            iterator.remove()
-            if (item.count >= MAX_STACK) return
-        }
-    }
-
-    /** Integrates one item for one tick. Called with [mutex] already held. */
-    private fun moveItem(item: DroppedItem) {
-        // parity: `ItemEntity.getDefaultGravity`, applied before the move rather than after it.
-        item.velocityY -= GRAVITY
-
-        val box = Aabb.of(item.x, item.y, item.z, ITEM_WIDTH, ITEM_HEIGHT)
-        EntityCollision.collide(this, box, item.velocityX, item.velocityY, item.velocityZ, movement)
-        val movedX = movement[0]
-        val movedY = movement[1]
-        val movedZ = movement[2]
-        item.x += movedX
-        item.y += movedY
-        item.z += movedZ
-
-        // parity: `Entity.restituteMovementAfterCollisions` with no bounce: a stopped axis is zeroed.
-        val onGround = movedY != item.velocityY && item.velocityY < 0.0
-        val bounciness = if (onGround) BlockMovement.bouncinessOf(blockUnder(item)) * ITEM_BOUNCE_SHARE else 0f
-        if (movedX != item.velocityX) item.velocityX = 0.0
-        if (movedZ != item.velocityZ) item.velocityZ = 0.0
-        if (movedY != item.velocityY) {
-            item.velocityY = if (bounciness > 0f) -item.velocityY * bounciness else 0.0
-        }
-
-        // parity: `ItemEntity.tick`'s own drag: the air takes its share every tick, and the block
-        // underneath takes its friction on top of that.
-        var horizontalDrag = AIR_DRAG
-        if (onGround) horizontalDrag *= BlockMovement.frictionOf(blockUnder(item)).toDouble()
-        item.velocityX *= horizontalDrag
-        item.velocityY *= AIR_DRAG
-        item.velocityZ *= AIR_DRAG
-        if (onGround && item.velocityY < 0.0) item.velocityY *= BOUNCE_DAMPING
-
-        // parity: the check that lets vanilla skip a settled item's physics, plus the vertical half
-        // of it. Here it also stops the movement packets, which is what makes a floor covered in
-        // drops free to look at; an item still bouncing off slime is not settled and keeps moving.
-        item.resting =
-            onGround &&
-            item.velocityX * item.velocityX + item.velocityZ * item.velocityZ <= RESTING_SPEED_SQUARED &&
-            abs(item.velocityY) <= RESTING_SPEED
-        if (item.resting) {
-            item.velocityX = 0.0
-            item.velocityY = 0.0
-            item.velocityZ = 0.0
-        }
-    }
-
-    /** Two stacks only merge when they carry the same extras, which for now means neither carries any. */
-    private fun sameComponents(
-        a: NbtCompound,
-        b: NbtCompound,
-    ): Boolean = a.keys.isEmpty() && b.keys.isEmpty()
-
-    /** parity: `getBlockPosBelowThatAffectsMyMovement`, the block whose friction an item feels. */
-    private fun blockUnder(item: DroppedItem): Int =
-        getBlockState(
-            floor(item.x).toInt(),
-            floor(item.y - FRICTION_PROBE_DEPTH).toInt(),
-            floor(item.z).toInt(),
-        ) ?: AIR_STATE_ID
+    public fun tickItems(region: Region? = null): List<Int> = itemPhysics.tickItems(region)
 
     public companion object {
         private fun snapshotOf(chunks: Map<Long, Chunk>): Long2ObjectMap<Chunk> {
@@ -985,40 +608,5 @@ public class WorldState(
 
         /** parity: what a player's own toss gets, so it does not immediately fly back into their inventory. */
         public const val DEFAULT_PICKUP_DELAY: Int = 40
-
-        // parity: `ItemEntity.getDefaultGravity`, `Entity.getAirDrag` and `ItemEntity.tick`'s own
-        // `movement.multiply(1.0, -0.5, 1.0)` on landing.
-        private const val GRAVITY = 0.04
-        private const val AIR_DRAG = 0.98
-        private const val BOUNCE_DAMPING = -0.5
-
-        /** parity: `mergeWithNeighbours`' own box, half a block out sideways and none at all up. */
-        private const val MERGE_RANGE = 0.5
-        private const val MERGE_HEIGHT = 0.25
-        private const val MERGE_MOVING_INTERVAL = 2
-        private const val MERGE_RESTING_INTERVAL = 40
-
-        /** The stack this build fills, the same one the inventory works in. */
-        private const val MAX_STACK = 64
-
-        /** parity: `EntityType.ITEM`'s own box, a quarter of a block each way. */
-        private const val ITEM_WIDTH = 0.25
-        private const val ITEM_HEIGHT = 0.25
-
-        /** parity: `Entity.getBlockBounciness`, which gives anything that is not alive four fifths. */
-        private const val ITEM_BOUNCE_SHARE = 0.8f
-
-        /** parity: `getBlockPosBelowThatAffectsMyMovement`, which looks half a block under the feet. */
-        private const val FRICTION_PROBE_DEPTH = 0.5
-
-        /** parity: the 1.0E-5 horizontal speed under which `ItemEntity.tick` skips its own physics. */
-        private const val RESTING_SPEED_SQUARED = 1.0e-5
-
-        /** And the vertical speed that counts as none, so a bounce is never mistaken for a rest. */
-        private const val RESTING_SPEED = 1.0e-3
-
-        private val AIR_STATE_ID = Blocks.AIR.stateId
-        private val CAVE_AIR_STATE_ID = Blocks.CAVE_AIR.stateId
-        private val VOID_AIR_STATE_ID = Blocks.VOID_AIR.stateId
     }
 }
