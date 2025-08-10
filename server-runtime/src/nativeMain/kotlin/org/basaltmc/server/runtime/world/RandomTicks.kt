@@ -171,30 +171,30 @@ public class RandomTicks {
                 spreadGrass(world, x, y, z, stateId, random, changes)
             block.path == "farmland" -> dryFarmland(world, x, y, z, stateId, changes)
             block.path == "crimson_nylium" || block.path == "warped_nylium" ->
-                BlockGrowth.nylium(world, x, y, z, changes)
+                MiscGrowth.nylium(world, x, y, z, changes)
             block.path == "redstone_ore" || block.path == "deepslate_redstone_ore" ->
-                BlockGrowth.redstoneOre(world, x, y, z, stateId, changes)
-            block.path == "cocoa" -> BlockGrowth.cocoa(world, x, y, z, stateId, random, changes)
-            block.path == "sweet_berry_bush" -> BlockGrowth.sweetBerries(world, x, y, z, stateId, random, changes)
+                MiscGrowth.redstoneOre(world, x, y, z, stateId, changes)
+            block.path == "cocoa" -> CocoaGrowth.cocoa(world, x, y, z, stateId, random, changes)
+            block.path == "sweet_berry_bush" -> MiscGrowth.sweetBerries(world, x, y, z, stateId, random, changes)
             block.path == "brown_mushroom" || block.path == "red_mushroom" ->
-                BlockGrowth.mushroom(world, x, y, z, stateId, random, changes)
+                MushroomGrowth.mushroom(world, x, y, z, stateId, random, changes)
             block.path == "pumpkin_stem" || block.path == "melon_stem" ->
-                BlockGrowth.stem(world, x, y, z, stateId, growthSpeed(world, x, y, z, block), random, changes)
-            block.path == "bamboo" -> BlockGrowth.bamboo(world, x, y, z, stateId, random, changes)
-            block.path == "bamboo_sapling" -> BlockGrowth.bambooSapling(world, x, y, z, random, changes)
+                StemGrowth.stem(world, x, y, z, stateId, growthSpeed(world, x, y, z, block), random, changes)
+            block.path == "bamboo" -> BambooGrowth.bamboo(world, x, y, z, stateId, random, changes)
+            block.path == "bamboo_sapling" -> BambooGrowth.bambooSapling(world, x, y, z, random, changes)
             block.path == "nether_portal" ->
-                allocateEntityId?.let { BlockGrowth.netherPortal(world, x, y, z, random, it) }
-            block.path.endsWith("eyeblossom") -> BlockGrowth.eyeblossom(world, x, y, z, stateId, changes)
+                allocateEntityId?.let { NetherPortalGrowth.netherPortal(world, x, y, z, random, it) }
+            block.path.endsWith("eyeblossom") -> MiscGrowth.eyeblossom(world, x, y, z, stateId, changes)
             block.path == "pointed_dripstone" || block.path == "sulfur_spike" ->
-                BlockGrowth.dripstone(world, x, y, z, stateId, random, changes)
-            block.path == "vine" -> BlockGrowth.vine(world, x, y, z, stateId, random, changes)
-            block.path == "dried_ghast" -> BlockGrowth.driedGhast(world, x, y, z, stateId)
-            block.path == "chorus_flower" -> BlockGrowth.chorusFlower(world, x, y, z, stateId, random, changes)
-            block.path == "budding_amethyst" -> BlockGrowth.buddingAmethyst(world, x, y, z, random, changes)
-            block.path == "turtle_egg" -> BlockGrowth.turtleEgg(world, x, y, z, stateId, random, changes)
-            block.path == "lava" -> BlockGrowth.lava(world, x, y, z, random, changes)
+                DripstoneGrowth.dripstone(world, x, y, z, stateId, random, changes)
+            block.path == "vine" -> VineGrowth.vine(world, x, y, z, stateId, random, changes)
+            block.path == "dried_ghast" -> MiscGrowth.driedGhast(world, x, y, z, stateId)
+            block.path == "chorus_flower" -> ChorusFlowerGrowth.chorusFlower(world, x, y, z, stateId, random, changes)
+            block.path == "budding_amethyst" -> MiscGrowth.buddingAmethyst(world, x, y, z, random, changes)
+            block.path == "turtle_egg" -> MiscGrowth.turtleEgg(world, x, y, z, stateId, random, changes)
+            block.path == "lava" -> LavaGrowth.lava(world, x, y, z, random, changes)
             block.path in CLIMBING_PLANTS ->
-                BlockGrowth.growingPlant(
+                ClimbingPlantGrowth.growingPlant(
                     world,
                     x,
                     y,
@@ -205,7 +205,7 @@ public class RandomTicks {
                     random = random,
                     changes = changes,
                 )
-            Weathering.weathers(block.path) -> BlockGrowth.weather(world, x, y, z, stateId, random, changes)
+            Weathering.weathers(block.path) -> WeatheringGrowth.weather(world, x, y, z, stateId, random, changes)
             block.path == "ice" -> melt(world, x, y, z, stateId, Blocks.WATER.stateId, changes)
             block.path == "snow" -> melt(world, x, y, z, stateId, Blocks.AIR.stateId, changes)
         }
