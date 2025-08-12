@@ -12,6 +12,7 @@ import org.basaltmc.wire.nbt.NbtCompound
 import org.basaltmc.wire.nbt.NbtDouble
 import org.basaltmc.wire.nbt.NbtList
 import org.basaltmc.wire.nbt.NbtType
+import kotlin.math.floor
 
 /** Mutable concrete `SpawnGroupData` shared by accepted members of one natural pack. */
 public class MobSpawnGroupData {
@@ -36,8 +37,21 @@ public object MobSpawnFinalization {
         specialMultiplier: Float,
         group: MobSpawnGroupData = MobSpawnGroupData(),
         biome: Identifier? = null,
+        gameTime: Long = 0L,
     ) {
-        val state = stateFor(entity.type, groupIndex, random, specialMultiplier, group, biome)
+        val state =
+            stateFor(
+                entity.type,
+                groupIndex,
+                random,
+                specialMultiplier,
+                group,
+                biome,
+                floor(entity.x).toInt(),
+                floor(entity.y).toInt(),
+                floor(entity.z).toInt(),
+                gameTime,
+            )
         entity.age = state.age
         entity.attributeValues.putAll(state.attributeBases)
         state.attributeBases[MAX_HEALTH_ATTRIBUTE]?.let { entity.health = minOf(entity.health, it) }
@@ -65,8 +79,24 @@ public object MobSpawnFinalization {
         specialMultiplier: Float = 0f,
         group: MobSpawnGroupData = MobSpawnGroupData(),
         biome: Identifier? = null,
+        blockX: Int = 0,
+        blockY: Int = 0,
+        blockZ: Int = 0,
+        gameTime: Long = 0L,
     ) {
-        val state = stateFor(type, groupIndex, random, specialMultiplier, group, biome)
+        val state =
+            stateFor(
+                type,
+                groupIndex,
+                random,
+                specialMultiplier,
+                group,
+                biome,
+                blockX,
+                blockY,
+                blockZ,
+                gameTime,
+            )
         if (state.age != 0) data.putInt("Age", state.age)
         writeTypeState(data, state)
         writeMobState(data, type, state)
@@ -81,6 +111,10 @@ public object MobSpawnFinalization {
         specialMultiplier: Float,
         group: MobSpawnGroupData = MobSpawnGroupData(),
         biome: Identifier? = null,
+        blockX: Int = 0,
+        blockY: Int = 0,
+        blockZ: Int = 0,
+        gameTime: Long = 0L,
     ): CommonSpawnState {
         val typeData = NbtCompound()
         if (type.path == "cave_spider") {
@@ -96,7 +130,18 @@ public object MobSpawnFinalization {
             )
         }
         val attributeBases = mutableMapOf<String, Double>()
-        val concreteBaby = writePreCommonTypeState(type.path, biome?.path, group, random, typeData)
+        val concreteBaby =
+            writePreCommonTypeState(
+                type.path,
+                biome?.path,
+                group,
+                random,
+                typeData,
+                blockX,
+                blockY,
+                blockZ,
+                gameTime,
+            )
         writeHorseAttributes(type.path, random, attributeBases)
         writePandaAttributes(type.path, typeData, attributeBases)
         val babyChance = babySpawnChance(type.path)
@@ -176,6 +221,10 @@ public object MobSpawnFinalization {
         group: MobSpawnGroupData,
         random: BasaltRandom,
         data: NbtCompound,
+        blockX: Int,
+        blockY: Int,
+        blockZ: Int,
+        gameTime: Long,
     ): Boolean {
         var concreteBaby = false
         when (type) {
@@ -186,6 +235,8 @@ public object MobSpawnFinalization {
                         ?: random.nextInt(COMMON_AXOLOTL_VARIANTS).also { group.secondaryVariant = it }
                 data.putInt("Variant", if (random.nextInt(2) == 0) first else second)
             }
+            // parity: Camel.finalizeSpawn starts every natural camel in the fully standing pose.
+            "camel" -> data.putLong("LastPoseTick", maxOf(0L, gameTime - CAMEL_FULL_STAND_TICKS))
             "chicken" -> {
                 data.putString(
                     "variant",
@@ -290,6 +341,8 @@ public object MobSpawnFinalization {
                 )
             }
             "sheep" -> data.putByte("Color", sheepColor(biome, random).toByte())
+            // parity: Turtle.finalizeSpawn anchors navigation and egg laying to its birth block.
+            "turtle" -> data.putIntArray("home_pos", intArrayOf(blockX, blockY, blockZ))
             "wolf" -> {
                 val variant =
                     group.variant
@@ -588,6 +641,7 @@ public object MobSpawnFinalization {
     private const val HORSE_VARIANTS = 7
     private const val HORSE_MARKINGS = 5
     private const val COMMON_AXOLOTL_VARIANTS = 4
+    private const val CAMEL_FULL_STAND_TICKS = 53L
     private const val FOX_RED = 0
     private const val FOX_SNOW = 1
     private const val FOX_EQUIPMENT_CHANCE = 0.2f
