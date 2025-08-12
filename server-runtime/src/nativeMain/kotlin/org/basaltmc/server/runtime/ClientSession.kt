@@ -23,8 +23,7 @@ import org.basaltmc.server.runtime.player.PlayerRegistry
 import org.basaltmc.server.runtime.player.PlayerSession
 import org.basaltmc.server.runtime.plugins.NpcRegistry
 import org.basaltmc.server.runtime.plugins.emit
-import org.basaltmc.server.runtime.registry.VanillaBiomes
-import org.basaltmc.server.runtime.registry.VanillaRegistryData
+import org.basaltmc.server.runtime.registry.VanillaConfigurationRegistries
 import org.basaltmc.server.runtime.registry.VanillaTagData
 import org.basaltmc.server.runtime.ui.PlayerUi
 import org.basaltmc.server.runtime.ui.UiConfigs
@@ -992,157 +991,8 @@ public class ClientSession(
     }
 
     private fun sendRegistriesThenFinish() {
-        sendCompressed(RegistryDataPacket.ID) {
-            RegistryDataPacket(
-                "minecraft:world_clock",
-                VanillaRegistryData.worldClocks.map { (path, value) -> RegistryEntry("minecraft:$path", value) },
-            ).write(it)
-        }
-        sendCompressed(RegistryDataPacket.ID) {
-            RegistryDataPacket(
-                "minecraft:dimension_type",
-                VanillaRegistryData.dimensionTypes.map { (path, value) ->
-                    RegistryEntry("minecraft:$path", value)
-                },
-            ).write(it)
-        }
-        // The full vanilla set in one packet, in Biomes.REGISTRY order: each entry's
-        // numeric id is its index here, which is what chunk biome palettes then reference.
-        sendCompressed(RegistryDataPacket.ID) {
-            RegistryDataPacket(
-                "minecraft:worldgen/biome",
-                VanillaBiomes.ALL.map { entry ->
-                    RegistryEntry("minecraft:${entry.path}", with(VanillaBiomes) { entry.toNbt() })
-                },
-            ).write(it)
-        }
-        // The registries a real client needs non-empty (see VanillaRegistryData). The entry names
-        // matter, not only their presence: a spawn egg resolves each registry's own `DEFAULT` key,
-        // and a client looking up `minecraft:temperate` in an empty chicken_variant crashes.
-        sendCompressed(RegistryDataPacket.ID) {
-            RegistryDataPacket(
-                "minecraft:wolf_variant",
-                VanillaRegistryData.wolfVariants.map { id ->
-                    RegistryEntry("minecraft:$id", VanillaRegistryData.wolfVariant(id))
-                },
-            ).write(it)
-        }
-        sendCompressed(RegistryDataPacket.ID) {
-            RegistryDataPacket(
-                "minecraft:wolf_sound_variant",
-                VanillaRegistryData.wolfSoundVariants.map { id ->
-                    RegistryEntry("minecraft:$id", VanillaRegistryData.wolfSoundVariant(id))
-                },
-            ).write(it)
-        }
-        sendCompressed(RegistryDataPacket.ID) {
-            RegistryDataPacket(
-                "minecraft:pig_variant",
-                VanillaRegistryData.pigVariants.map { id ->
-                    RegistryEntry("minecraft:$id", VanillaRegistryData.pigVariant(id))
-                },
-            ).write(it)
-        }
-        sendCompressed(RegistryDataPacket.ID) {
-            RegistryDataPacket(
-                "minecraft:pig_sound_variant",
-                VanillaRegistryData.pigSoundVariants.map { id ->
-                    RegistryEntry("minecraft:$id", VanillaRegistryData.pigSoundVariant(id))
-                },
-            ).write(it)
-        }
-        sendCompressed(RegistryDataPacket.ID) {
-            RegistryDataPacket(
-                "minecraft:frog_variant",
-                VanillaRegistryData.frogVariants.map { id ->
-                    RegistryEntry("minecraft:$id", VanillaRegistryData.frogVariant(id))
-                },
-            ).write(it)
-        }
-        // All eleven, not just one: structure cats send their variant id in set_entity_data, and a
-        // registry with fewer entries than the id makes the client drop the connection on decode.
-        // The numeric id of each variant is its index in this packet, which is what
-        // GeneratedEntityPresentation's CAT_VARIANT_IDS must agree with.
-        sendCompressed(RegistryDataPacket.ID) {
-            RegistryDataPacket(
-                "minecraft:cat_variant",
-                VanillaRegistryData.catVariants.map { id ->
-                    RegistryEntry("minecraft:$id", VanillaRegistryData.catVariant(id))
-                },
-            ).write(it)
-        }
-        sendRegistry("minecraft:cat_sound_variant", "minecraft:classic", VanillaRegistryData.catSoundVariant())
-        sendCompressed(RegistryDataPacket.ID) {
-            RegistryDataPacket(
-                "minecraft:cow_sound_variant",
-                VanillaRegistryData.cowSoundVariants.map { id ->
-                    RegistryEntry("minecraft:$id", VanillaRegistryData.cowSoundVariant(id))
-                },
-            ).write(it)
-        }
-        sendCompressed(RegistryDataPacket.ID) {
-            RegistryDataPacket(
-                "minecraft:cow_variant",
-                VanillaRegistryData.cowVariants.map { id ->
-                    RegistryEntry("minecraft:$id", VanillaRegistryData.cowVariant(id))
-                },
-            ).write(it)
-        }
-        sendCompressed(RegistryDataPacket.ID) {
-            RegistryDataPacket(
-                "minecraft:chicken_sound_variant",
-                VanillaRegistryData.chickenSoundVariants.map { id ->
-                    RegistryEntry("minecraft:$id", VanillaRegistryData.chickenSoundVariant(id))
-                },
-            ).write(it)
-        }
-        // egg/blue_egg/brown_egg each reference a distinct chicken variant directly, not just
-        // DEFAULT (confirmed live: minecraft:chicken_variant/minecraft:cold failed after temperate
-        // alone was fixed): see VanillaRegistryData.chickenVariant's KDoc.
-        sendCompressed(RegistryDataPacket.ID) {
-            RegistryDataPacket(
-                "minecraft:chicken_variant",
-                VanillaRegistryData.chickenVariants.map { id ->
-                    RegistryEntry("minecraft:$id", VanillaRegistryData.chickenVariant(id))
-                },
-            ).write(it)
-        }
-        sendRegistry(
-            "minecraft:zombie_nautilus_variant",
-            "minecraft:temperate",
-            VanillaRegistryData.zombieNautilusVariant(),
-        )
-        sendRegistry("minecraft:painting_variant", "minecraft:humble", VanillaRegistryData.paintingVariant())
-        // Not in the 13 "must be non-empty" registries, but several base items (redstone dust,
-        // ingots, gems, resin brick) carry a default trim-material component that resolves a
-        // specific entry by key regardless: confirmed live, a real client failed looking up
-        // minecraft:trim_material/minecraft:redstone while building item data components. All
-        // eleven vanilla items' referenced entries are needed (see VanillaRegistryData.trimMaterial).
-        sendCompressed(RegistryDataPacket.ID) {
-            RegistryDataPacket(
-                "minecraft:trim_material",
-                VanillaRegistryData.trimMaterials.map { (id, color) ->
-                    RegistryEntry("minecraft:$id", VanillaRegistryData.trimMaterial(id, color))
-                },
-            ).write(it)
-        }
-        sendCompressed(RegistryDataPacket.ID) {
-            RegistryDataPacket(
-                "minecraft:damage_type",
-                VanillaRegistryData.damageTypes.map { (id, value) -> RegistryEntry("minecraft:$id", value) },
-            ).write(it)
-        }
-        sendCompressed(RegistryDataPacket.ID) {
-            RegistryDataPacket(
-                "minecraft:jukebox_song",
-                VanillaRegistryData.jukeboxSongs.map { (id, value) -> RegistryEntry("minecraft:$id", value) },
-            ).write(it)
-        }
-        sendCompressed(RegistryDataPacket.ID) {
-            RegistryDataPacket(
-                "minecraft:instrument",
-                VanillaRegistryData.instruments.map { (id, value) -> RegistryEntry("minecraft:$id", value) },
-            ).write(it)
+        for (packet in VanillaConfigurationRegistries.packets()) {
+            sendCompressed(RegistryDataPacket.ID) { packet.write(it) }
         }
         // The rest of `RegistryDataLoader.SYNCHRONIZED_REGISTRIES`, sent empty: a registry that was
         // never sent does not exist client-side, and tags scoped to it stop resolving. Enchantments
@@ -1237,16 +1087,6 @@ public class ClientSession(
                     .mapNotNull { EntityTypes[it]?.protocolId }
             else -> emptyList()
         }
-
-    private fun sendRegistry(
-        registryId: String,
-        entryName: String,
-        value: NbtCompound,
-    ) {
-        sendCompressed(RegistryDataPacket.ID) {
-            RegistryDataPacket(registryId, listOf(RegistryEntry(entryName, value))).write(it)
-        }
-    }
 
     // --- Play ---
 
