@@ -27,6 +27,7 @@ import kotlin.uuid.Uuid
 public object EntityNbt {
     public fun encode(entity: ServerEntity): NbtCompound {
         val tag = entity.sourceNbt?.deepCopy() ?: NbtCompound()
+        tag.remove("Passengers")
         tag["id"] = NbtString(entity.type.toString())
         tag["UUID"] = NbtString(entity.uuid.toString())
         tag["Pos"] = doubles(entity.x, entity.y, entity.z)
@@ -58,6 +59,32 @@ public object EntityNbt {
         entity.customName?.let { tag["CustomName"] = NbtString(it) }
         if (entity.tags.isNotEmpty()) {
             tag["Tags"] = NbtList(NbtType.STRING, entity.tags.map { NbtString(it) })
+        }
+        return tag
+    }
+
+    /** Encodes one vehicle root and all of its riders through vanilla's nested `Passengers` shape. */
+    public fun encodeTree(
+        root: ServerEntity,
+        entityById: (Int) -> ServerEntity?,
+    ): NbtCompound = encodeTree(root, entityById, mutableSetOf())
+
+    private fun encodeTree(
+        entity: ServerEntity,
+        entityById: (Int) -> ServerEntity?,
+        visited: MutableSet<Int>,
+    ): NbtCompound {
+        visited += entity.entityId
+        val tag = encode(entity)
+        val passengers =
+            entity.passengerIds.mapNotNull { passengerId ->
+                val passenger = entityById(passengerId)?.takeIf { !it.removed && visited.add(it.entityId) }
+                passenger?.let { encodeTree(it, entityById, visited) }
+            }
+        if (passengers.isEmpty()) {
+            tag.remove("Passengers")
+        } else {
+            tag["Passengers"] = NbtList(NbtType.COMPOUND, passengers)
         }
         return tag
     }
@@ -133,6 +160,38 @@ public object EntityNbt {
         return entity
     }
 
+    /** Restores one saved vehicle root and its nested passengers, allocating fresh runtime ids. */
+    public fun decodeTree(
+        tag: NbtCompound,
+        allocateEntityId: () -> Int,
+        protocolTypeOf: (Identifier) -> Int?,
+    ): List<ServerEntity> {
+        val entities = mutableListOf<ServerEntity>()
+        decodeTreeNode(tag, null, entities, allocateEntityId, protocolTypeOf)
+        return entities
+    }
+
+    private fun decodeTreeNode(
+        tag: NbtCompound,
+        vehicle: ServerEntity?,
+        entities: MutableList<ServerEntity>,
+        allocateEntityId: () -> Int,
+        protocolTypeOf: (Identifier) -> Int?,
+    ): ServerEntity? {
+        val type = runCatching { Identifier.parse(tag.getString("id")) }.getOrNull() ?: return null
+        val protocolType = protocolTypeOf(type) ?: return null
+        val entity = decode(tag, allocateEntityId(), protocolType) ?: return null
+        if (vehicle != null) {
+            entity.vehicleId = vehicle.entityId
+            vehicle.passengerIds += entity.entityId
+        }
+        entities += entity
+        tag.getList("Passengers")?.filterIsInstance<NbtCompound>()?.forEach { passenger ->
+            decodeTreeNode(passenger, entity, entities, allocateEntityId, protocolTypeOf)
+        }
+        return entity
+    }
+
     /** Materializes one transformed structure entity through the same decoder used on chunk load. */
     public fun decodeGenerated(
         descriptor: ChunkGeneratedEntity,
@@ -144,6 +203,37 @@ public object EntityNbt {
         tag["Pos"] = doubles(descriptor.x, descriptor.y, descriptor.z)
         tag["Rotation"] = floats(descriptor.yaw, descriptor.pitch)
         return decode(tag, entityId, protocolType)
+    }
+
+    /** Materializes one generated vehicle root and its passenger descriptors with fresh runtime ids. */
+    public fun decodeGeneratedTree(
+        descriptor: ChunkGeneratedEntity,
+        allocateEntityId: () -> Int,
+        protocolTypeOf: (Identifier) -> Int?,
+    ): List<ServerEntity> {
+        val entities = mutableListOf<ServerEntity>()
+        decodeGeneratedTreeNode(descriptor, null, entities, allocateEntityId, protocolTypeOf)
+        return entities
+    }
+
+    private fun decodeGeneratedTreeNode(
+        descriptor: ChunkGeneratedEntity,
+        vehicle: ServerEntity?,
+        entities: MutableList<ServerEntity>,
+        allocateEntityId: () -> Int,
+        protocolTypeOf: (Identifier) -> Int?,
+    ): ServerEntity? {
+        val protocolType = protocolTypeOf(descriptor.type) ?: return null
+        val entity = decodeGenerated(descriptor, allocateEntityId(), protocolType) ?: return null
+        if (vehicle != null) {
+            entity.vehicleId = vehicle.entityId
+            vehicle.passengerIds += entity.entityId
+        }
+        entities += entity
+        descriptor.passengers.forEach { passenger ->
+            decodeGeneratedTreeNode(passenger, entity, entities, allocateEntityId, protocolTypeOf)
+        }
+        return entity
     }
 
     private fun doubles(vararg values: Double): NbtList = NbtList(NbtType.DOUBLE, values.map { NbtDouble(it) })

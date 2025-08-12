@@ -363,7 +363,11 @@ public class LoadedWorld(
         for (chunk in chunks) {
             val entities = state.entitiesIn(chunk.chunkX, chunk.chunkZ)
             if (entities.isEmpty() && chunk.savedEntities().isEmpty()) continue
-            chunk.setSavedEntities(entities.filter { !it.removed }.map { EntityNbt.encode(it) })
+            chunk.setSavedEntities(
+                entities
+                    .filter { !it.removed && it.vehicleId == null }
+                    .map { EntityNbt.encodeTree(it, state::entity) },
+            )
         }
     }
 

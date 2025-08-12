@@ -60,6 +60,47 @@ class EntityNbtTest {
     }
 
     @Test
+    fun passengerTreesUseVanillasNestedShapeAndRestoreRuntimeLinks() {
+        val strider =
+            ServerEntity(
+                entityId = 7,
+                uuid = Uuid.random(),
+                type = Identifier.vanilla("strider"),
+                protocolType = 141,
+                x = 8.5,
+                y = 64.0,
+                z = -3.25,
+            )
+        val rider =
+            ServerEntity(
+                entityId = 8,
+                uuid = Uuid.random(),
+                type = Identifier.vanilla("zombified_piglin"),
+                protocolType = 152,
+                x = 8.5,
+                y = 64.0,
+                z = -3.25,
+            )
+        strider.passengerIds += rider.entityId
+        rider.vehicleId = strider.entityId
+
+        val tag = EntityNbt.encodeTree(strider) { id -> if (id == rider.entityId) rider else null }
+        val passengerTag = tag.getList("Passengers")!!.single() as NbtCompound
+        assertEquals("minecraft:zombified_piglin", passengerTag.getString("id"))
+
+        var nextId = 20
+        val restored =
+            EntityNbt.decodeTree(
+                tag,
+                allocateEntityId = { nextId++ },
+                protocolTypeOf = { 151 },
+            )
+        assertEquals(2, restored.size)
+        assertEquals(setOf(21), restored[0].passengerIds)
+        assertEquals(20, restored[1].vehicleId)
+    }
+
+    @Test
     fun cubeSizeUsesVanillasMinusOneNbtAndReturnsAsTheLiveSize() {
         val slime =
             ServerEntity(

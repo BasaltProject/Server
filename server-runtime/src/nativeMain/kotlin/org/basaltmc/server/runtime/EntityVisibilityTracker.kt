@@ -1,6 +1,7 @@
 package org.basaltmc.server.runtime
 
 import org.basaltmc.server.registry.Items
+import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.server.runtime.entity.Taming
 import org.basaltmc.server.runtime.player.PlayerInventory
 import org.basaltmc.server.runtime.player.PlayerSession
@@ -18,6 +19,7 @@ import org.basaltmc.wire.protocol.play.RemoveEntitiesPacket
 import org.basaltmc.wire.protocol.play.RotateHeadPacket
 import org.basaltmc.wire.protocol.play.SetEntityDataPacket
 import org.basaltmc.wire.protocol.play.SetEquipmentPacket
+import org.basaltmc.wire.protocol.play.SetPassengersPacket
 import org.basaltmc.wire.protocol.play.SetPlayerTeamPacket
 import org.basaltmc.wire.protocol.play.SpawnEntityPacket
 import org.basaltmc.wire.protocol.play.WireItemStack
@@ -63,6 +65,9 @@ internal class EntityVisibilityTracker(
     /** Baby/size metadata last sent for each live entity, including transitions while stationary. */
     private val lastRuntimeEntityMetadata = HashMap<Int, RuntimeEntityMetadata>()
 
+    /** Passenger ids last sent for each visible vehicle. */
+    private val lastPassengers = HashMap<Int, List<Int>>()
+
     /** Which other players this client currently has as entities, kept by [syncPlayers]. */
     private val trackedPlayers = HashSet<Int>()
 
@@ -97,7 +102,8 @@ internal class EntityVisibilityTracker(
     internal fun syncSummonedEntities() {
         val session = owner.playerSession ?: return
         val me = session.uuid.toString()
-        for (entity in owner.world.entities()) {
+        val entities = owner.world.entities()
+        for (entity in entities) {
             if (entity.removed) continue
             // An entity somebody else can see and this player cannot: taken away if they were
             // already shown it, and skipped if they were not.
@@ -106,6 +112,7 @@ internal class EntityVisibilityTracker(
                 if (trackedEntities.remove(entity.entityId)) {
                     lastEntityPositions.remove(entity.entityId)
                     lastRuntimeEntityMetadata.remove(entity.entityId)
+                    lastPassengers.remove(entity.entityId)
                     owner.sendPlayPacket(RemoveEntitiesPacket.ID) {
                         RemoveEntitiesPacket(listOf(entity.entityId)).write(it)
                     }
@@ -217,13 +224,50 @@ internal class EntityVisibilityTracker(
                 ).write(it)
             }
         }
+        syncPassengers(entities, me, session.entityId)
         val gone = owner.world.collectRemovedEntities().filter { trackedEntities.remove(it) }
         for (entityId in gone) {
             lastEntityPositions.remove(entityId)
             lastRuntimeEntityMetadata.remove(entityId)
+            lastPassengers.remove(entityId)
         }
         if (gone.isNotEmpty()) {
             owner.sendPlayPacket(RemoveEntitiesPacket.ID) { RemoveEntitiesPacket(gone).write(it) }
+        }
+    }
+
+    private fun syncPassengers(
+        entities: List<ServerEntity>,
+        viewer: String,
+        viewerEntityId: Int,
+    ) {
+        val visibleEntityIds =
+            entities
+                .filter { !it.removed && (it.visibleTo?.contains(viewer) ?: true) }
+                .mapTo(hashSetOf()) { it.entityId }
+        for (vehicle in entities) {
+            if (vehicle.entityId !in trackedEntities || vehicle.entityId !in visibleEntityIds) continue
+            val passengers =
+                vehicle.passengerIds.filter { passengerId ->
+                    passengerId == viewerEntityId ||
+                        passengerId in trackedPlayers ||
+                        (passengerId in trackedEntities && passengerId in visibleEntityIds)
+                }
+            val previous = lastPassengers[vehicle.entityId]
+            if (previous == passengers) continue
+            if (previous != null || passengers.isNotEmpty()) {
+                owner.sendPlayPacket(SetPassengersPacket.ID) {
+                    SetPassengersPacket(vehicle.entityId, passengers).write(it)
+                }
+            }
+            if (passengers.isEmpty()) {
+                lastPassengers.remove(vehicle.entityId)
+            } else {
+                lastPassengers[vehicle.entityId] = passengers
+            }
+        }
+        lastPassengers.keys.removeAll { vehicleId ->
+            vehicleId !in trackedEntities || vehicleId !in visibleEntityIds
         }
     }
 
@@ -401,6 +445,7 @@ internal class EntityVisibilityTracker(
         trackedEquipment.clear()
         lastEntityPositions.clear()
         lastRuntimeEntityMetadata.clear()
+        lastPassengers.clear()
     }
 
     /**

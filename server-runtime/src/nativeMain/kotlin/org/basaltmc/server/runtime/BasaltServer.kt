@@ -829,19 +829,25 @@ public class BasaltServer(
         // The mobs a chunk brought back from disk: they wait for the tick loop because an entity id
         // is the server's to hand out, and a chunk is loaded on a generation thread.
         for (tag in world.state.takePendingEntities()) {
-            val type = runCatching { Identifier.parse(tag.getString("id")) }.getOrNull() ?: continue
-            val protocol = EntityTypes[type]?.protocolId ?: continue
-            val restored = EntityNbt.decode(tag, playerRegistry.allocateEntityId(), protocol) ?: continue
-            world.state.spawnEntity(restored)
+            val restored =
+                EntityNbt.decodeTree(
+                    tag,
+                    playerRegistry::allocateEntityId,
+                    protocolTypeOf = { type -> EntityTypes[type]?.protocolId },
+                )
+            restored.forEach(world.state::spawnEntity)
         }
         // Structure templates are generated off-thread and cannot allocate runtime ids there. A
         // mob descriptor becomes the same live ServerEntity as a spawn egg here, so it receives AI,
         // movement, persistence and ordinary client synchronization instead of remaining scenery.
         for (descriptor in world.state.takePendingGeneratedEntities()) {
-            val protocol = EntityTypes[descriptor.type]?.protocolId ?: continue
             val generated =
-                EntityNbt.decodeGenerated(descriptor, playerRegistry.allocateEntityId(), protocol) ?: continue
-            world.state.spawnEntity(generated)
+                EntityNbt.decodeGeneratedTree(
+                    descriptor,
+                    playerRegistry::allocateEntityId,
+                    protocolTypeOf = { type -> EntityTypes[type]?.protocolId },
+                )
+            generated.forEach(world.state::spawnEntity)
         }
         // parity: `Entity.die`, which drops the entity's own loot table where it stood. Whatever was
         // killed since the last tick is dealt with here, once, before anything else moves.
