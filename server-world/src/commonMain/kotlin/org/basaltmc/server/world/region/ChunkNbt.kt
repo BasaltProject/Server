@@ -114,46 +114,62 @@ public object ChunkNbt {
     private fun encodeGeneratedEntities(chunk: Chunk): NbtList =
         NbtList(
             if (chunk.generatedEntities().isEmpty()) NbtType.END else NbtType.COMPOUND,
-            chunk.generatedEntities().map { entity ->
-                NbtCompound().apply {
-                    putString("id", entity.type.toString())
-                    this["Pos"] =
-                        NbtList(
-                            NbtType.DOUBLE,
-                            listOf(NbtDouble(entity.x), NbtDouble(entity.y), NbtDouble(entity.z)),
-                        )
-                    this["Rotation"] = NbtList(NbtType.FLOAT, listOf(NbtFloat(entity.yaw), NbtFloat(entity.pitch)))
-                    this["BasaltData"] = entity.data.deepCopy()
-                }
-            },
+            chunk.generatedEntities().map(::encodeGeneratedEntity),
         )
+
+    private fun encodeGeneratedEntity(entity: ChunkGeneratedEntity): NbtCompound =
+        NbtCompound().apply {
+            putString("id", entity.type.toString())
+            this["Pos"] =
+                NbtList(
+                    NbtType.DOUBLE,
+                    listOf(NbtDouble(entity.x), NbtDouble(entity.y), NbtDouble(entity.z)),
+                )
+            this["Rotation"] = NbtList(NbtType.FLOAT, listOf(NbtFloat(entity.yaw), NbtFloat(entity.pitch)))
+            this["BasaltData"] = entity.data.deepCopy()
+            if (entity.passengers.isNotEmpty()) {
+                this["Passengers"] = NbtList(NbtType.COMPOUND, entity.passengers.map(::encodeGeneratedEntity))
+            }
+        }
 
     private fun decodeGeneratedEntities(entries: NbtList?): List<ChunkGeneratedEntity> =
         entries?.map { entry ->
-            val tag = entry as? NbtCompound ?: throw ChunkNbtException("generated entity entry is not a compound")
-            val type =
-                tag.getString("id").takeIf(String::isNotEmpty) ?: throw ChunkNbtException("generated entity has no id")
-            val pos = tag.getList("Pos") ?: throw ChunkNbtException("generated entity $type has no Pos")
-            val rotation = tag.getList("Rotation") ?: throw ChunkNbtException("generated entity $type has no Rotation")
-            if (pos.size != 3 ||
-                rotation.size != 2
-            ) {
-                throw ChunkNbtException("generated entity $type has invalid vectors")
-            }
-            ChunkGeneratedEntity(
-                type = Identifier.parse(type),
-                x = (pos[0] as? NbtDouble)?.value ?: throw ChunkNbtException("generated entity $type has invalid Pos"),
-                y = (pos[1] as? NbtDouble)?.value ?: throw ChunkNbtException("generated entity $type has invalid Pos"),
-                z = (pos[2] as? NbtDouble)?.value ?: throw ChunkNbtException("generated entity $type has invalid Pos"),
-                yaw =
-                    (rotation[0] as? NbtFloat)?.value
-                        ?: throw ChunkNbtException("generated entity $type has invalid Rotation"),
-                pitch =
-                    (rotation[1] as? NbtFloat)?.value
-                        ?: throw ChunkNbtException("generated entity $type has invalid Rotation"),
-                data = (tag["BasaltData"] as? NbtCompound)?.deepCopy() ?: NbtCompound(),
+            decodeGeneratedEntity(
+                entry as? NbtCompound ?: throw ChunkNbtException("generated entity entry is not a compound"),
             )
         } ?: emptyList()
+
+    private fun decodeGeneratedEntity(tag: NbtCompound): ChunkGeneratedEntity {
+        val type =
+            tag.getString("id").takeIf(String::isNotEmpty)
+                ?: throw ChunkNbtException("generated entity has no id")
+        val pos = tag.getList("Pos") ?: throw ChunkNbtException("generated entity $type has no Pos")
+        val rotation = tag.getList("Rotation") ?: throw ChunkNbtException("generated entity $type has no Rotation")
+        if (pos.size != 3 || rotation.size != 2) throw ChunkNbtException("generated entity $type has invalid vectors")
+        val passengerTags = tag.getList("Passengers")
+        val passengers =
+            passengerTags
+                ?.map { passenger ->
+                    decodeGeneratedEntity(
+                        passenger as? NbtCompound
+                            ?: throw ChunkNbtException("generated passenger of $type is not a compound"),
+                    )
+                }.orEmpty()
+        return ChunkGeneratedEntity(
+            type = Identifier.parse(type),
+            x = (pos[0] as? NbtDouble)?.value ?: throw ChunkNbtException("generated entity $type has invalid Pos"),
+            y = (pos[1] as? NbtDouble)?.value ?: throw ChunkNbtException("generated entity $type has invalid Pos"),
+            z = (pos[2] as? NbtDouble)?.value ?: throw ChunkNbtException("generated entity $type has invalid Pos"),
+            yaw =
+                (rotation[0] as? NbtFloat)?.value
+                    ?: throw ChunkNbtException("generated entity $type has invalid Rotation"),
+            pitch =
+                (rotation[1] as? NbtFloat)?.value
+                    ?: throw ChunkNbtException("generated entity $type has invalid Rotation"),
+            data = (tag["BasaltData"] as? NbtCompound)?.deepCopy() ?: NbtCompound(),
+            passengers = passengers,
+        )
+    }
 
     private fun encodeTicks(
         chunk: Chunk,

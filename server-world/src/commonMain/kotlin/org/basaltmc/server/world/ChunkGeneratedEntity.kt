@@ -12,4 +12,5 @@ public data class ChunkGeneratedEntity(
     public val yaw: Float,
     public val pitch: Float,
     public val data: NbtCompound = NbtCompound(),
+    public val passengers: List<ChunkGeneratedEntity> = emptyList(),
 )

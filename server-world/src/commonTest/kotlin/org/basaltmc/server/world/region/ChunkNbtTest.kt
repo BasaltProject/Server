@@ -268,26 +268,40 @@ class ChunkNbtTest {
     @Test
     fun generatedEntityDescriptorsRoundTripUntilRuntimeMaterialization() {
         val chunk = Chunk(2, -3)
-        val data = NbtCompound().apply { putString("item", "minecraft:elytra") }
-        val frame =
+        val data = NbtCompound().apply { putString("spawn_reason", "natural") }
+        val passenger =
             ChunkGeneratedEntity(
-                Identifier.vanilla("item_frame"),
+                Identifier.vanilla("zombified_piglin"),
+                40.03125,
+                82.0,
+                -38.5,
+                270.0f,
+                0.0f,
+            )
+        val vehicle =
+            ChunkGeneratedEntity(
+                Identifier.vanilla("strider"),
                 40.03125,
                 81.5,
                 -38.5,
                 270.0f,
                 0.0f,
                 data,
+                listOf(passenger),
             )
-        chunk.addGeneratedEntity(frame)
+        chunk.addGeneratedEntity(vehicle)
 
         val tag = ChunkNbt.write(chunk)
         val written = tag.getList("basalt_generated_entities")!!.single() as NbtCompound
-        assertEquals("minecraft:item_frame", written.getString("id"))
+        assertEquals("minecraft:strider", written.getString("id"))
         assertEquals(3, written.getList("Pos")!!.size)
+        assertEquals(
+            "minecraft:zombified_piglin",
+            (written.getList("Passengers")!!.single() as NbtCompound).getString("id"),
+        )
 
         val read = ChunkNbt.read(tag)
-        assertEquals(listOf(frame), read.generatedEntities())
+        assertEquals(listOf(vehicle), read.generatedEntities())
         assertEquals(data, read.generatedEntities().single().data)
     }
 
