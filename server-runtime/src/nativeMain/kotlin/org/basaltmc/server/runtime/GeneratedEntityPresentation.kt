@@ -20,6 +20,9 @@ internal fun generatedEntityMetadata(
         if (data.getBoolean("Invisible")) sharedFlags = sharedFlags or 0x20
         if (sharedFlags != 0) add(SetEntityDataPacket.Entry.Bytes(0, sharedFlags.toByte()))
         if (data.getBoolean("NoGravity")) add(SetEntityDataPacket.Entry.Booleans(5, true))
+        if ("Air" in data && data.getShort("Air").toInt() != DEFAULT_AIR_SUPPLY) {
+            add(SetEntityDataPacket.Entry.Ints(AIR_SUPPLY_DATA_INDEX, data.getShort("Air").toInt()))
+        }
 
         if ("Health" in data) add(SetEntityDataPacket.Entry.Floats(9, data.getFloat("Health")))
 
@@ -268,12 +271,16 @@ internal fun generatedEntityEquipment(data: NbtCompound): List<GeneratedEquipmen
 
 /** The live synchronized fields this server mutates after an entity has spawned. */
 internal data class RuntimeEntityMetadata(
+    val airSupply: Int,
     val baby: Boolean?,
     val cubeSize: Int?,
 ) {
     /** Initial non-default fields, or every field whose live value changed since [previous]. */
     fun changesFrom(previous: RuntimeEntityMetadata?): List<SetEntityDataPacket.Entry> =
         buildList {
+            if (previous?.airSupply != airSupply && (previous != null || airSupply != DEFAULT_AIR_SUPPLY)) {
+                add(SetEntityDataPacket.Entry.Ints(AIR_SUPPLY_DATA_INDEX, airSupply))
+            }
             if (baby != null && (previous?.baby != baby) && (previous != null || baby)) {
                 add(SetEntityDataPacket.Entry.Booleans(AgeableMobs.BABY_DATA_INDEX, baby))
             }
@@ -289,6 +296,7 @@ internal data class RuntimeEntityMetadata(
 
 internal fun runtimeEntityMetadata(entity: ServerEntity): RuntimeEntityMetadata =
     RuntimeEntityMetadata(
+        airSupply = entity.airSupply,
         baby = (entity.age < 0).takeIf { AgeableMobs.isAgeable(entity.type) },
         cubeSize = entity.cubeSize.takeIf { CubeMobs.isCube(entity.type) },
     )
@@ -296,6 +304,8 @@ internal fun runtimeEntityMetadata(entity: ServerEntity): RuntimeEntityMetadata 
 /** `AbstractCubeMob.ID_SIZE`: two `AgeableMob` fields follow the common index 16. */
 private const val CUBE_SIZE_DATA_INDEX = 18
 private const val MOB_FLAGS_DATA_INDEX = 15
+private const val AIR_SUPPLY_DATA_INDEX = 1
+private const val DEFAULT_AIR_SUPPLY = 300
 
 private val ARMOR_STAND_POSES =
     listOf(

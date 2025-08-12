@@ -122,6 +122,12 @@ public class ServerEntity(
     /** Ticks of fire left on it. parity: `Entity.remainingFireTicks`, which the client draws too. */
     public var fireTicks: Int = 0
 
+    /** parity: `Entity.DATA_AIR_SUPPLY_ID`; dolphins override the normal 300-tick maximum. */
+    public var airSupply: Int = if (type.path == "dolphin") DOLPHIN_MAX_AIR else DEFAULT_MAX_AIR
+
+    /** parity: `Mob.canPickUpLoot`; dolphin enables it in its constructor. */
+    public var canPickUpLoot: Boolean = type.path == "dolphin"
+
     /** How big a slime or a magma cube is. parity: `AbstractCubeMob`'s own size, which is everything. */
     public var cubeSize: Int = 1
 
@@ -310,6 +316,9 @@ public class ServerEntity(
         public const val NO_FUSE: Int = -1
     }
 }
+
+private const val DEFAULT_MAX_AIR = 300
+private const val DOLPHIN_MAX_AIR = 4_800
 
 /** parity: `AttributeModifier.Operation`, whose serialized names are what `/attribute` takes. */
 public enum class AttributeOperation(
