@@ -6,6 +6,7 @@ import org.basaltmc.server.registry.Biomes
 import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.Blocks
+import org.basaltmc.server.registry.hasFluid
 import org.basaltmc.server.registry.isLeavesState
 import org.basaltmc.server.runtime.entity.MobCategory
 import org.basaltmc.server.world.Chunk
@@ -206,6 +207,9 @@ public object NaturalSpawner {
         val feet = world.state.getBlockState(x, y, z) ?: return false
         val head = world.state.getBlockState(x, y + 1, z) ?: return false
         if (!BlockShapes.isEmptyShape(feet) || !BlockShapes.isEmptyShape(head)) return false
+        // parity: `NaturalSpawner.isValidEmptySpawnBlock` rejects any fluid. Water has no collision
+        // shape of its own, so without this every land monster spawns on the ocean floor.
+        if (Blocks.hasFluid(feet) || Blocks.hasFluid(head)) return false
         if (typePath == "ocelot") {
             return y >= world.declaration.dimension.seaLevel &&
                 (BlockStateDefinitions.blockOf(ground)?.path == "grass_block" || Blocks.isLeavesState(ground)) &&
