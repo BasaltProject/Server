@@ -101,6 +101,13 @@ internal data class MobSpawnForest(
     val roots: List<ChunkGeneratedEntity>,
 )
 
+internal enum class MobSpawnReason {
+    NATURAL,
+    CHUNK_GENERATION,
+    STRUCTURE,
+    JOCKEY,
+}
+
 /** Builds the complete generated forest while preserving which descriptor is the requested mob. */
 internal fun writeGeneratedForest(
     data: NbtCompound,
@@ -121,30 +128,28 @@ internal fun writeGeneratedForest(
     entityZ: Double = blockZ + 0.5,
     entityYaw: Float = 0f,
     entityRandom: BasaltRandom = random,
+    reason: MobSpawnReason = MobSpawnReason.NATURAL,
+    entityRandomFactory: () -> BasaltRandom = { entityRandom },
 ): MobSpawnForest {
-    val passengers =
-        MobSpawnFinalization.writeGenerated(
-            data,
-            type,
-            groupIndex,
-            random,
-            specialMultiplier,
-            group,
-            biome,
-            blockX,
-            blockY,
-            blockZ,
-            gameTime,
-            difficulty,
-            equipmentFinalizer,
-            entityX,
-            entityY,
-            entityZ,
-            entityYaw,
-            entityRandom,
-        )
     val builder = MobSpawnForestBuilder()
     val main = builder.create(type, entityX, entityY, entityZ, entityYaw, data = data)
-    passengers.forEach { passenger -> builder.mount(builder.import(passenger), main, force = true) }
+    MobSpawnFinalization.writeGeneratedNode(
+        builder,
+        main,
+        groupIndex,
+        random,
+        specialMultiplier,
+        group,
+        biome,
+        blockX,
+        blockY,
+        blockZ,
+        gameTime,
+        difficulty,
+        equipmentFinalizer ?: spawnEquipmentWithoutAssets(),
+        reason,
+        entityRandom,
+        entityRandomFactory,
+    )
     return builder.freeze(main)
 }

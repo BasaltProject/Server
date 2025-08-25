@@ -75,6 +75,8 @@ public object OriginalMobSpawner {
                                 entityZ = entityZ,
                                 entityYaw = yaw,
                                 entityRandom = LegacyRandom(Random.nextLong()),
+                                reason = MobSpawnReason.CHUNK_GENERATION,
+                                entityRandomFactory = { LegacyRandom(Random.nextLong()) },
                             )
                         forest.roots.forEach(chunk::addGeneratedEntity)
                         added++

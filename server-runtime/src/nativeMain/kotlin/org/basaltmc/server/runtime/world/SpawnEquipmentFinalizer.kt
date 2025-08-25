@@ -43,6 +43,54 @@ public class SpawnEquipmentFinalizer(
         }
     }
 
+    internal fun finalizeZombieEquipmentAfterCommon(
+        data: NbtCompound,
+        type: String,
+        random: BasaltRandom,
+        specialMultiplier: Float,
+        difficulty: String,
+    ) {
+        when (type) {
+            "drowned" -> {
+                if (random.nextFloat() > DROWNED_WEAPON_ROLL) {
+                    val item =
+                        if (random.nextInt(DROWNED_WEAPON_BOUND) <
+                            DROWNED_TRIDENT_RESULTS
+                        ) {
+                            "trident"
+                        } else {
+                            "fishing_rod"
+                        }
+                    setItem(data, "mainhand", item)
+                }
+            }
+            "zombified_piglin" ->
+                setItem(
+                    data,
+                    "mainhand",
+                    if (random.nextInt(ZOMBIFIED_PIGLIN_SPEAR_ODDS) == 0) "golden_spear" else "golden_sword",
+                )
+            else -> {
+                populateArmor(data, random, specialMultiplier, difficulty)
+                val weaponChance = if (difficulty == "hard") HARD_ZOMBIE_WEAPON_CHANCE else ZOMBIE_WEAPON_CHANCE
+                if (random.nextFloat() < weaponChance) {
+                    val item =
+                        when (random.nextInt(ZOMBIE_WEAPON_BOUND)) {
+                            0 -> "iron_sword"
+                            1 -> "iron_spear"
+                            else -> "iron_shovel"
+                        }
+                    setItem(data, "mainhand", item)
+                }
+            }
+        }
+        enchantSlot(data, "mainhand", random, WEAPON_ENCHANT_CHANCE, specialMultiplier)
+        for (slot in ARMOR_ENCHANTMENT_ORDER) {
+            enchantSlot(data, slot, random, ARMOR_ENCHANT_CHANCE, specialMultiplier)
+        }
+        addHalloweenHead(data, random)
+    }
+
     private fun finalizeSkeleton(
         data: NbtCompound,
         type: String,
@@ -111,6 +159,11 @@ public class SpawnEquipmentFinalizer(
         slot: String,
     ): NbtCompound = data.getCompound("equipment").getCompound(slot)
 
+    internal fun itemId(
+        data: NbtCompound,
+        slot: String,
+    ): String? = item(data, slot).getString("id").takeIf(String::isNotEmpty)
+
     internal fun setItem(
         data: NbtCompound,
         slot: String,
@@ -145,6 +198,13 @@ public class SpawnEquipmentFinalizer(
         const val ARMOR_ENCHANT_CHANCE = 0.5f
         const val PICKUP_LOOT_CHANCE = 0.55f
         const val PIGLIN_ARMOR_CHANCE = 0.1f
+        const val ZOMBIE_WEAPON_CHANCE = 0.01f
+        const val HARD_ZOMBIE_WEAPON_CHANCE = 0.05f
+        const val DROWNED_WEAPON_ROLL = 0.9f
+        const val DROWNED_WEAPON_BOUND = 16
+        const val DROWNED_TRIDENT_RESULTS = 10
+        const val ZOMBIE_WEAPON_BOUND = 6
+        const val ZOMBIFIED_PIGLIN_SPEAR_ODDS = 20
         const val HALLOWEEN_HEAD_CHANCE = 0.25f
         const val JACK_O_LANTERN_CHANCE = 0.1f
 

@@ -34,6 +34,8 @@ public class MobSpawnGroupData {
     internal var variant: Int? = null
     internal var secondaryVariant: Int? = null
     internal var spiderEffect: String? = null
+    internal var zombieBaby: Boolean? = null
+    internal var zombieCanSpawnJockey: Boolean = true
 }
 
 /** Minecraft 26.2 spawn finalization, including concrete pre/post layers around shared mob state. */
@@ -97,9 +99,11 @@ public object MobSpawnFinalization {
         }
         writeMobState(data, entity.type, state)
         CubeMobs.applySize(entity, state.cubeSize)
-        return MobJockeyFinalization.afterCommon(
-            data,
-            entity.type,
+        val builder = MobSpawnForestBuilder()
+        val main = builder.create(entity.type, entity.x, entity.y, entity.z, entity.yaw, data = data)
+        MobJockeyFinalization.afterCommon(
+            builder,
+            main,
             groupIndex,
             group,
             random,
@@ -107,12 +111,10 @@ public object MobSpawnFinalization {
             difficulty,
             equipment,
             biome,
-            entity.x,
-            entity.y,
-            entity.z,
-            entity.yaw,
             gameTime,
+            entityRandomFactory = { entityRandom },
         )
+        return builder.freeze(main).main.passengers
     }
 
     /** Writes finalization state into an off-thread generated entity descriptor. */
@@ -136,7 +138,51 @@ public object MobSpawnFinalization {
         entityYaw: Float = 0f,
         entityRandom: BasaltRandom = random,
     ): List<ChunkGeneratedEntity> {
-        val equipment = equipmentFinalizer ?: spawnEquipmentWithoutAssets()
+        val forest =
+            writeGeneratedForest(
+                data,
+                type,
+                groupIndex,
+                random,
+                specialMultiplier,
+                group,
+                biome,
+                blockX,
+                blockY,
+                blockZ,
+                gameTime,
+                difficulty,
+                equipmentFinalizer,
+                entityX,
+                entityY,
+                entityZ,
+                entityYaw,
+                entityRandom,
+            )
+        return forest.main.passengers
+    }
+
+    internal fun writeGeneratedNode(
+        builder: MobSpawnForestBuilder,
+        node: MobSpawnNode,
+        groupIndex: Int,
+        random: BasaltRandom,
+        specialMultiplier: Float,
+        group: MobSpawnGroupData,
+        biome: Identifier?,
+        blockX: Int,
+        blockY: Int,
+        blockZ: Int,
+        gameTime: Long,
+        difficulty: String,
+        equipmentFinalizer: SpawnEquipmentFinalizer,
+        reason: MobSpawnReason,
+        entityRandom: BasaltRandom,
+        entityRandomFactory: () -> BasaltRandom,
+    ) {
+        val data = node.data
+        val type = node.type
+        val equipment = equipmentFinalizer
         val state =
             stateFor(
                 type,
@@ -152,16 +198,31 @@ public object MobSpawnFinalization {
                 difficulty,
                 equipment,
                 entityRandom,
+                reason,
             )
         if (state.age != 0) data.putInt("Age", state.age)
         writeTypeState(data, state)
         writeMobState(data, type, state)
         equipment.finalizeAfterCommon(data, type.path, random, specialMultiplier, difficulty)
+        ZombieSpawnFinalizer.afterCommon(
+            builder,
+            node,
+            group,
+            random,
+            specialMultiplier,
+            difficulty,
+            equipment,
+            biome,
+            gameTime,
+            reason,
+            entityRandom,
+            entityRandomFactory,
+        )
         // parity: AbstractCubeMob saves one less than its live size, so absent/zero means size one.
         if (CubeMobs.isCube(type)) data.putInt("Size", state.cubeSize - 1)
-        return MobJockeyFinalization.afterCommon(
-            data,
-            type,
+        MobJockeyFinalization.afterCommon(
+            builder,
+            node,
             groupIndex,
             group,
             random,
@@ -169,11 +230,8 @@ public object MobSpawnFinalization {
             difficulty,
             equipment,
             biome,
-            entityX,
-            entityY,
-            entityZ,
-            entityYaw,
             gameTime,
+            entityRandomFactory,
         )
     }
 
@@ -191,6 +249,7 @@ public object MobSpawnFinalization {
         difficulty: String = "easy",
         equipmentFinalizer: SpawnEquipmentFinalizer? = null,
         entityRandom: BasaltRandom = random,
+        reason: MobSpawnReason = MobSpawnReason.NATURAL,
     ): CommonSpawnState {
         val typeData = NbtCompound()
         if (type.path == "cave_spider") {
@@ -220,6 +279,7 @@ public object MobSpawnFinalization {
                 specialMultiplier,
                 equipmentFinalizer ?: spawnEquipmentWithoutAssets(),
                 entityRandom,
+                reason,
             )
         MobSpawnAttributes.write(type.path, random, typeData, attributeBases)
         val babyChance = babySpawnChance(type.path)
@@ -311,6 +371,7 @@ public object MobSpawnFinalization {
         specialMultiplier: Float,
         equipmentFinalizer: SpawnEquipmentFinalizer,
         entityRandom: BasaltRandom,
+        reason: MobSpawnReason,
     ): Boolean {
         var concreteBaby = false
         when (type) {
@@ -322,7 +383,7 @@ public object MobSpawnFinalization {
                 data.putInt("Variant", if (random.nextInt(2) == 0) first else second)
             }
             // parity: Camel.finalizeSpawn starts every natural camel in the fully standing pose.
-            "camel" -> data.putLong("LastPoseTick", maxOf(0L, gameTime - CAMEL_FULL_STAND_TICKS))
+            "camel", "camel_husk" -> data.putLong("LastPoseTick", maxOf(0L, gameTime - CAMEL_FULL_STAND_TICKS))
             "chicken" -> {
                 data.putString(
                     "variant",
@@ -408,6 +469,7 @@ public object MobSpawnFinalization {
                         entityRandom,
                         specialMultiplier,
                         equipmentFinalizer,
+                        reason,
                     )
             "panda" -> {
                 data.putString(
@@ -629,43 +691,6 @@ public object MobSpawnFinalization {
             if (modifiers.isNotEmpty()) this["modifiers"] = NbtList(NbtType.COMPOUND, modifiers)
         }
 
-    /**
-     * parity: `DifficultyInstance`, including the moon contribution being capped by the global
-     * time bonus (not by the full 0.75 base scale).
-     */
-    public fun specialMultiplier(
-        difficulty: String,
-        gameTime: Long,
-        inhabitedTime: Long,
-        moonBrightness: Float,
-    ): Float {
-        val difficultyId =
-            when (difficulty) {
-                "peaceful" -> 0
-                "easy" -> 1
-                "normal" -> 2
-                "hard" -> 3
-                else -> 1
-            }
-        if (difficultyId == 0) return 0f
-
-        val globalBonus =
-            ((gameTime.toFloat() - GLOBAL_TIME_OFFSET) / MAX_GLOBAL_TIME)
-                .coerceIn(0f, 1f) * GLOBAL_TIME_WEIGHT
-        var localScale =
-            (inhabitedTime.toFloat() / MAX_LOCAL_TIME).coerceIn(0f, 1f) *
-                if (difficulty == "hard") 1f else 0.75f
-        localScale += (moonBrightness * MOON_WEIGHT).coerceIn(0f, globalBonus)
-        if (difficulty == "easy") localScale *= 0.5f
-
-        val effectiveDifficulty = difficultyId * (BASE_SCALE + globalBonus + localScale)
-        return when {
-            effectiveDifficulty < 2f -> 0f
-            effectiveDifficulty > 4f -> 1f
-            else -> (effectiveDifficulty - 2f) / 2f
-        }
-    }
-
     internal data class CommonSpawnState(
         val age: Int,
         val cubeSize: Int,
@@ -739,10 +764,4 @@ public object MobSpawnFinalization {
     private const val DYE_BROWN = 12
     private const val DYE_BLACK = 15
     private const val MAX_NATURAL_SIZE_SCALE = 2
-    private const val GLOBAL_TIME_OFFSET = 72_000f
-    private const val MAX_GLOBAL_TIME = 1_440_000f
-    private const val MAX_LOCAL_TIME = 3_600_000f
-    private const val BASE_SCALE = 0.75f
-    private const val GLOBAL_TIME_WEIGHT = 0.25f
-    private const val MOON_WEIGHT = 0.25f
 }

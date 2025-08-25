@@ -11,10 +11,11 @@ internal object PiglinSpawnFinalizer {
         entityRandom: BasaltRandom,
         specialMultiplier: Float,
         equipment: SpawnEquipmentFinalizer,
+        reason: MobSpawnReason,
     ): Boolean {
-        val baby = levelRandom.nextFloat() < BABY_CHANCE
+        val baby = reason != MobSpawnReason.STRUCTURE && levelRandom.nextFloat() < BABY_CHANCE
         data.putBoolean("IsBaby", baby)
-        if (!baby) {
+        if (reason != MobSpawnReason.STRUCTURE && !baby) {
             val weapon =
                 if (entityRandom.nextFloat() < CROSSBOW_CHANCE) {
                     "crossbow"

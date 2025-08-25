@@ -16,8 +16,9 @@ import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.LocalMobCaps
 import org.basaltmc.server.runtime.world.MobCapPlayer
-import org.basaltmc.server.runtime.world.MobSpawnFinalization
+import org.basaltmc.server.runtime.world.MobLocalDifficulty
 import org.basaltmc.server.runtime.world.MobSpawnForest
+import org.basaltmc.server.runtime.world.MobSpawnReason
 import org.basaltmc.server.runtime.world.NaturalSpawner
 import org.basaltmc.server.runtime.world.RealBiomeSpawns
 import org.basaltmc.server.runtime.world.SpawnEquipmentFinalizer
@@ -198,7 +199,7 @@ public class NaturalSpawningSystem(
                 0f
             }
         val specialMultiplier =
-            MobSpawnFinalization.specialMultiplier(
+            MobLocalDifficulty.specialMultiplier(
                 world.difficulty,
                 world.gameTime,
                 inhabitedTime,
@@ -224,6 +225,8 @@ public class NaturalSpawningSystem(
                 entityZ = request.z,
                 entityYaw = request.yaw,
                 entityRandom = LegacyRandom(Random.nextLong()),
+                reason = MobSpawnReason.NATURAL,
+                entityRandomFactory = { LegacyRandom(Random.nextLong()) },
             )
         return materializeForest(world, forest)
     }

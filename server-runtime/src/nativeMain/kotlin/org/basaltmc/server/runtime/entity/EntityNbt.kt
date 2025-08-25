@@ -121,7 +121,12 @@ public object EntityNbt {
             entity.velocityZ = it[2].value
         }
         entity.health = tag.numericDouble("Health").takeIf { it > 0.0 } ?: entity.health
-        entity.age = tag.numericInt("Age")
+        entity.age =
+            if (AgeableMobs.usesBooleanBabyFlag(type.path) && tag.numericBoolean("IsBaby")) {
+                AgeableMobs.BABY_START_AGE
+            } else {
+                tag.numericInt("Age")
+            }
         entity.fuse = tag.numericInt("Fuse")
         if ("Air" in tag) entity.airSupply = tag.getShort("Air").toInt()
         entity.cubeSize =

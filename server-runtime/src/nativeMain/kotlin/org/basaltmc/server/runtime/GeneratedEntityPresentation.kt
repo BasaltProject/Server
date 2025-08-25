@@ -33,7 +33,7 @@ internal fun generatedEntityMetadata(
             if (mobFlags != 0) add(SetEntityDataPacket.Entry.Bytes(MOB_FLAGS_DATA_INDEX, mobFlags.toByte()))
         }
 
-        if (hasBabyMetadata(type) && (data.getInt("Age") < 0 || data.getBoolean("IsBaby"))) {
+        if (AgeableMobs.hasBabyMetadata(type) && (data.getInt("Age") < 0 || data.getBoolean("IsBaby"))) {
             add(SetEntityDataPacket.Entry.Booleans(AgeableMobs.BABY_DATA_INDEX, true))
         }
         if (CubeMobs.isCube(type) && data.getInt("Size") != 0) {
@@ -307,7 +307,7 @@ internal data class RuntimeEntityMetadata(
 internal fun runtimeEntityMetadata(entity: ServerEntity): RuntimeEntityMetadata =
     RuntimeEntityMetadata(
         airSupply = entity.airSupply,
-        baby = (entity.age < 0).takeIf { hasBabyMetadata(entity.type.path) },
+        baby = (entity.age < 0).takeIf { AgeableMobs.hasBabyMetadata(entity.type.path) },
         cubeSize = entity.cubeSize.takeIf { CubeMobs.isCube(entity.type) },
     )
 
@@ -316,8 +316,6 @@ private const val CUBE_SIZE_DATA_INDEX = 18
 private const val MOB_FLAGS_DATA_INDEX = 15
 private const val AIR_SUPPLY_DATA_INDEX = 1
 private const val DEFAULT_AIR_SUPPLY = 300
-
-private fun hasBabyMetadata(type: String): Boolean = AgeableMobs.isAgeable(type) || type == "piglin"
 
 private val ARMOR_STAND_POSES =
     listOf(
