@@ -22,6 +22,7 @@ public object MobPersistence {
 
         return when (entity.type.path) {
             in FROM_BUCKET_TYPES -> data?.getBoolean("FromBucket") == true
+            "chicken" -> data?.getBoolean("IsChickenJockey") == true
             "enderman" -> data?.getCompound("carriedBlockState")?.size != 0
             "sulfur_cube" ->
                 data?.getBoolean("from_bucket") == true ||
