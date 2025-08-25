@@ -13,7 +13,6 @@ import org.basaltmc.server.runtime.world.MobSpawnVariantData.COLD_FARM_BIOMES
 import org.basaltmc.server.runtime.world.MobSpawnVariantData.COLD_FROG_BIOMES
 import org.basaltmc.server.runtime.world.MobSpawnVariantData.COW_SOUND_VARIANTS
 import org.basaltmc.server.runtime.world.MobSpawnVariantData.JUNGLE_BIOMES
-import org.basaltmc.server.runtime.world.MobSpawnVariantData.PANDA_GENES_BY_NAME
 import org.basaltmc.server.runtime.world.MobSpawnVariantData.PIG_SOUND_VARIANTS
 import org.basaltmc.server.runtime.world.MobSpawnVariantData.SAVANNA_BIOMES
 import org.basaltmc.server.runtime.world.MobSpawnVariantData.TROPICAL_COMMON_VARIANTS
@@ -57,7 +56,9 @@ public object MobSpawnFinalization {
         gameTime: Long = 0L,
         difficulty: String = "easy",
         equipmentFinalizer: SpawnEquipmentFinalizer? = null,
+        entityRandom: BasaltRandom = random,
     ): List<ChunkGeneratedEntity> {
+        val equipment = equipmentFinalizer ?: spawnEquipmentWithoutAssets()
         val state =
             stateFor(
                 entity.type,
@@ -70,6 +71,9 @@ public object MobSpawnFinalization {
                 floor(entity.y).toInt(),
                 floor(entity.z).toInt(),
                 gameTime,
+                difficulty,
+                equipment,
+                entityRandom,
             )
         entity.age = state.age
         if (entity.type.path == "dolphin") entity.pitch = 0f
@@ -86,7 +90,7 @@ public object MobSpawnFinalization {
         }
         val data = entity.sourceNbt ?: NbtCompound().also { entity.sourceNbt = it }
         writeTypeState(data, state)
-        equipmentFinalizer?.finalizeAfterCommon(data, entity.type.path, random, specialMultiplier, difficulty)
+        equipment.finalizeAfterCommon(data, entity.type.path, random, specialMultiplier, difficulty)
         if ("Air" in state.typeData) entity.airSupply = state.typeData.getShort("Air").toInt()
         if ("CanPickUpLoot" in data) {
             entity.canPickUpLoot = data.getBoolean("CanPickUpLoot")
@@ -101,7 +105,7 @@ public object MobSpawnFinalization {
             random,
             specialMultiplier,
             difficulty,
-            equipmentFinalizer,
+            equipment,
             biome,
             entity.x,
             entity.y,
@@ -130,7 +134,9 @@ public object MobSpawnFinalization {
         entityY: Double = blockY.toDouble(),
         entityZ: Double = blockZ + 0.5,
         entityYaw: Float = 0f,
+        entityRandom: BasaltRandom = random,
     ): List<ChunkGeneratedEntity> {
+        val equipment = equipmentFinalizer ?: spawnEquipmentWithoutAssets()
         val state =
             stateFor(
                 type,
@@ -143,11 +149,14 @@ public object MobSpawnFinalization {
                 blockY,
                 blockZ,
                 gameTime,
+                difficulty,
+                equipment,
+                entityRandom,
             )
         if (state.age != 0) data.putInt("Age", state.age)
         writeTypeState(data, state)
         writeMobState(data, type, state)
-        equipmentFinalizer?.finalizeAfterCommon(data, type.path, random, specialMultiplier, difficulty)
+        equipment.finalizeAfterCommon(data, type.path, random, specialMultiplier, difficulty)
         // parity: AbstractCubeMob saves one less than its live size, so absent/zero means size one.
         if (CubeMobs.isCube(type)) data.putInt("Size", state.cubeSize - 1)
         return MobJockeyFinalization.afterCommon(
@@ -158,7 +167,7 @@ public object MobSpawnFinalization {
             random,
             specialMultiplier,
             difficulty,
-            equipmentFinalizer,
+            equipment,
             biome,
             entityX,
             entityY,
@@ -179,6 +188,9 @@ public object MobSpawnFinalization {
         blockY: Int = 0,
         blockZ: Int = 0,
         gameTime: Long = 0L,
+        difficulty: String = "easy",
+        equipmentFinalizer: SpawnEquipmentFinalizer? = null,
+        entityRandom: BasaltRandom = random,
     ): CommonSpawnState {
         val typeData = NbtCompound()
         if (type.path == "cave_spider") {
@@ -205,9 +217,11 @@ public object MobSpawnFinalization {
                 blockY,
                 blockZ,
                 gameTime,
+                specialMultiplier,
+                equipmentFinalizer ?: spawnEquipmentWithoutAssets(),
+                entityRandom,
             )
-        writeHorseAttributes(type.path, random, attributeBases)
-        writePandaAttributes(type.path, typeData, attributeBases)
+        MobSpawnAttributes.write(type.path, random, typeData, attributeBases)
         val babyChance = babySpawnChance(type.path)
         val inheritedBaby =
             when {
@@ -294,6 +308,9 @@ public object MobSpawnFinalization {
         blockY: Int,
         blockZ: Int,
         gameTime: Long,
+        specialMultiplier: Float,
+        equipmentFinalizer: SpawnEquipmentFinalizer,
+        entityRandom: BasaltRandom,
     ): Boolean {
         var concreteBaby = false
         when (type) {
@@ -383,9 +400,24 @@ public object MobSpawnFinalization {
                         NAUTILUS_MIN_ATTACK_COOLDOWN + random.nextInt(NAUTILUS_ATTACK_COOLDOWN_RANGE),
                 )
             "parrot" -> data.putInt("Variant", random.nextInt(PARROT_VARIANTS))
+            "piglin" ->
+                concreteBaby =
+                    PiglinSpawnFinalizer.finalizeBeforeCommon(
+                        data,
+                        random,
+                        entityRandom,
+                        specialMultiplier,
+                        equipmentFinalizer,
+                    )
             "panda" -> {
-                data.putString("MainGene", pandaGene(random.nextInt(PANDA_GENE_ROLLS)).serializedName)
-                data.putString("HiddenGene", pandaGene(random.nextInt(PANDA_GENE_ROLLS)).serializedName)
+                data.putString(
+                    "MainGene",
+                    MobSpawnAttributes.pandaGene(random.nextInt(PANDA_GENE_ROLLS)).serializedName,
+                )
+                data.putString(
+                    "HiddenGene",
+                    MobSpawnAttributes.pandaGene(random.nextInt(PANDA_GENE_ROLLS)).serializedName,
+                )
             }
             "pig" -> {
                 data.putString(
@@ -510,60 +542,6 @@ public object MobSpawnFinalization {
             }
         data["equipment"] = NbtCompound().apply { this["mainhand"] = stack }
     }
-
-    /** `AbstractHorse.randomizeAttributes`, dispatched through each concrete override. */
-    private fun writeHorseAttributes(
-        type: String,
-        random: BasaltRandom,
-        attributes: MutableMap<String, Double>,
-    ) {
-        when (type) {
-            "horse" -> {
-                attributes[MAX_HEALTH_ATTRIBUTE] = horseMaxHealth(random)
-                attributes[MOVEMENT_SPEED_ATTRIBUTE] = horseSpeed(random)
-                attributes[JUMP_STRENGTH_ATTRIBUTE] = horseJumpStrength(random)
-            }
-            "donkey", "llama", "mule", "trader_llama" ->
-                attributes[MAX_HEALTH_ATTRIBUTE] = horseMaxHealth(random)
-            "skeleton_horse" -> attributes[JUMP_STRENGTH_ATTRIBUTE] = horseJumpStrength(random)
-        }
-    }
-
-    private fun horseMaxHealth(random: BasaltRandom): Double =
-        (HORSE_BASE_HEALTH + random.nextInt(8) + random.nextInt(9)).toDouble()
-
-    private fun horseSpeed(random: BasaltRandom): Double =
-        (0.45f + random.nextDouble() * 0.3 + random.nextDouble() * 0.3 + random.nextDouble() * 0.3) * 0.25
-
-    private fun horseJumpStrength(random: BasaltRandom): Double =
-        0.4f + random.nextDouble() * 0.2 + random.nextDouble() * 0.2 + random.nextDouble() * 0.2
-
-    private fun writePandaAttributes(
-        type: String,
-        data: NbtCompound,
-        attributes: MutableMap<String, Double>,
-    ) {
-        if (type != "panda") return
-        val main = PANDA_GENES_BY_NAME[data.getString("MainGene")] ?: PandaGene.NORMAL
-        val hidden = PANDA_GENES_BY_NAME[data.getString("HiddenGene")] ?: PandaGene.NORMAL
-        val expressed = if (main.recessive && main != hidden) PandaGene.NORMAL else main
-        when (expressed) {
-            PandaGene.WEAK -> attributes[MAX_HEALTH_ATTRIBUTE] = PANDA_WEAK_HEALTH
-            PandaGene.LAZY -> attributes[MOVEMENT_SPEED_ATTRIBUTE] = PANDA_LAZY_SPEED
-            else -> Unit
-        }
-    }
-
-    private fun pandaGene(roll: Int): PandaGene =
-        when (roll) {
-            0 -> PandaGene.LAZY
-            1 -> PandaGene.WORRIED
-            2 -> PandaGene.PLAYFUL
-            4 -> PandaGene.AGGRESSIVE
-            in 0..8 -> PandaGene.WEAK
-            9, 10 -> PandaGene.BROWN
-            else -> PandaGene.NORMAL
-        }
 
     private fun rabbitVariant(
         biome: String?,
@@ -718,9 +696,6 @@ public object MobSpawnFinalization {
     private const val FOLLOW_RANGE_ATTRIBUTE = "minecraft:follow_range"
     private const val RANDOM_SPAWN_BONUS_ID = "minecraft:random_spawn_bonus"
     private const val MAX_HEALTH_ATTRIBUTE = "minecraft:max_health"
-    private const val MOVEMENT_SPEED_ATTRIBUTE = "minecraft:movement_speed"
-    private const val JUMP_STRENGTH_ATTRIBUTE = "minecraft:jump_strength"
-    private const val HORSE_BASE_HEALTH = 15
     private const val HORSE_VARIANTS = 7
     private const val HORSE_MARKINGS = 5
     private const val COMMON_AXOLOTL_VARIANTS = 4
@@ -730,8 +705,6 @@ public object MobSpawnFinalization {
     private const val FOX_SNOW = 1
     private const val FOX_EQUIPMENT_CHANCE = 0.2f
     private const val PANDA_GENE_ROLLS = 16
-    private const val PANDA_WEAK_HEALTH = 10.0
-    private const val PANDA_LAZY_SPEED = 0.07000000029802322
     private const val FROG_MIN_LONG_JUMP_COOLDOWN = 100
     private const val FROG_LONG_JUMP_COOLDOWN_RANGE = 41
     private const val GOAT_MIN_LONG_JUMP_COOLDOWN = 600

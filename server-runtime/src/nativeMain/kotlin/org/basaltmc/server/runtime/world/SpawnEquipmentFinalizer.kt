@@ -26,6 +26,23 @@ public class SpawnEquipmentFinalizer(
         finalizeSkeleton(data, type, random, specialMultiplier, difficulty)
     }
 
+    internal fun finalizePiglinEquipmentBeforeCommon(
+        data: NbtCompound,
+        random: BasaltRandom,
+        specialMultiplier: Float,
+        baby: Boolean,
+    ) {
+        if (!baby) {
+            for ((slot, item) in PIGLIN_ARMOR) {
+                if (random.nextFloat() < PIGLIN_ARMOR_CHANCE) setItem(data, slot, item)
+            }
+        }
+        enchantSlot(data, "mainhand", random, WEAPON_ENCHANT_CHANCE, specialMultiplier)
+        for (slot in ARMOR_ENCHANTMENT_ORDER) {
+            enchantSlot(data, slot, random, ARMOR_ENCHANT_CHANCE, specialMultiplier)
+        }
+    }
+
     private fun finalizeSkeleton(
         data: NbtCompound,
         type: String,
@@ -94,7 +111,7 @@ public class SpawnEquipmentFinalizer(
         slot: String,
     ): NbtCompound = data.getCompound("equipment").getCompound(slot)
 
-    private fun setItem(
+    internal fun setItem(
         data: NbtCompound,
         slot: String,
         item: String,
@@ -127,12 +144,20 @@ public class SpawnEquipmentFinalizer(
         const val WEAPON_ENCHANT_CHANCE = 0.25f
         const val ARMOR_ENCHANT_CHANCE = 0.5f
         const val PICKUP_LOOT_CHANCE = 0.55f
+        const val PIGLIN_ARMOR_CHANCE = 0.1f
         const val HALLOWEEN_HEAD_CHANCE = 0.25f
         const val JACK_O_LANTERN_CHANCE = 0.1f
 
         val ABSTRACT_SKELETON_TYPES = setOf("skeleton", "stray", "bogged", "parched", "wither_skeleton")
         val ARMOR_POPULATION_ORDER = listOf("head", "chest", "legs", "feet")
         val ARMOR_ENCHANTMENT_ORDER = listOf("feet", "legs", "chest", "head")
+        val PIGLIN_ARMOR =
+            listOf(
+                "head" to "golden_helmet",
+                "chest" to "golden_chestplate",
+                "legs" to "golden_leggings",
+                "feet" to "golden_boots",
+            )
         val ARMOR_TIERS =
             listOf(
                 listOf("leather_helmet", "leather_chestplate", "leather_leggings", "leather_boots"),
@@ -144,3 +169,7 @@ public class SpawnEquipmentFinalizer(
             )
     }
 }
+
+private val FALLBACK_SPAWN_EQUIPMENT by lazy { SpawnEquipmentFinalizer(null) }
+
+internal fun spawnEquipmentWithoutAssets(): SpawnEquipmentFinalizer = FALLBACK_SPAWN_EQUIPMENT

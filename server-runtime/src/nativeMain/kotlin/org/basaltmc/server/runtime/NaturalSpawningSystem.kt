@@ -195,6 +195,7 @@ public class NaturalSpawningSystem(
                                                 gameTime = world.gameTime,
                                                 difficulty = world.difficulty,
                                                 equipmentFinalizer = equipmentFinalizer,
+                                                entityRandom = LegacyRandom(Random.nextLong()),
                                             )
                                     },
                                 )

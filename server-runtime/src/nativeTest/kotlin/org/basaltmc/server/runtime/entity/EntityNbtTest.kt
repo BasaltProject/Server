@@ -2,12 +2,14 @@ package org.basaltmc.server.runtime.entity
 
 import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.runtime.EntityRiding
+import org.basaltmc.server.runtime.generatedEntityMetadata
 import org.basaltmc.server.runtime.world.MobSpawnFinalization
 import org.basaltmc.server.runtime.world.MobSpawnGroupData
 import org.basaltmc.server.runtime.world.SpawnEquipmentFinalizer
 import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
+import org.basaltmc.wire.protocol.play.SetEntityDataPacket
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -258,6 +260,75 @@ class EntityNbtTest {
         assertEquals(24.0, restored.health, "the constructor's default 53 health must follow the randomized maximum")
         assertEquals(0.22561408252176893, restored.attribute("minecraft:movement_speed"), 1e-15)
         assertEquals(0.7819374795746402, restored.attribute("minecraft:jump_strength"), 1e-15)
+    }
+
+    @Test
+    fun generatedPiglinsKeepIndependentWeaponRngBrainAndBabyState() {
+        val piglin = Identifier.vanilla("piglin")
+        val adultData = NbtCompound()
+        MobSpawnFinalization.writeGenerated(
+            adultData,
+            piglin,
+            groupIndex = 0,
+            random = LegacyRandom(1L),
+            entityRandom = LegacyRandom(2L),
+        )
+        val adult =
+            assertNotNull(
+                EntityNbt.decodeGenerated(
+                    ChunkGeneratedEntity(piglin, 0.5, 64.0, 0.5, 0f, 0f, adultData),
+                    entityId = 12,
+                    protocolType = 1,
+                ),
+            )
+        assertEquals(0, adult.age)
+        assertEquals(
+            "minecraft:golden_sword",
+            adult.sourceNbt
+                ?.getCompound("equipment")
+                ?.getCompound("mainhand")
+                ?.getString("id"),
+        )
+        assertEquals(
+            "minecraft:golden_boots",
+            adult.sourceNbt
+                ?.getCompound("equipment")
+                ?.getCompound("feet")
+                ?.getString("id"),
+        )
+        assertEquals(
+            1_786L,
+            adult.sourceNbt
+                ?.getCompound("Brain")
+                ?.getCompound("memories")
+                ?.getCompound("minecraft:hunted_recently")
+                ?.getLong("ttl"),
+        )
+
+        val babyData = NbtCompound()
+        MobSpawnFinalization.writeGenerated(
+            babyData,
+            piglin,
+            groupIndex = 0,
+            random = LegacyRandom(4_096L),
+            entityRandom = LegacyRandom(2L),
+        )
+        val baby =
+            assertNotNull(
+                EntityNbt.decodeGenerated(
+                    ChunkGeneratedEntity(piglin, 0.5, 64.0, 0.5, 0f, 0f, babyData),
+                    entityId = 13,
+                    protocolType = 1,
+                ),
+            )
+        assertEquals(AgeableMobs.BABY_START_AGE, baby.age)
+        assertTrue(baby.sourceNbt?.getBoolean("IsBaby") == true)
+        assertEquals(0, baby.sourceNbt?.getCompound("equipment")?.size)
+        assertTrue(
+            generatedEntityMetadata("piglin", babyData).any { entry ->
+                entry is SetEntityDataPacket.Entry.Booleans && entry.index == 16 && entry.value
+            },
+        )
     }
 
     @Test

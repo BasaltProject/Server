@@ -1,6 +1,7 @@
 package org.basaltmc.server.runtime.world
 
 import org.basaltmc.server.random.BasaltRandom
+import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.registry.BlockFace
 import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
@@ -10,6 +11,7 @@ import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
+import kotlin.random.Random
 
 /**
  * Passive packs created by the chunk-generation SPAWN status.
@@ -73,6 +75,7 @@ public object OriginalMobSpawner {
                                 entityY = y.toDouble(),
                                 entityZ = entityZ,
                                 entityYaw = yaw,
+                                entityRandom = LegacyRandom(Random.nextLong()),
                             )
                         chunk.addGeneratedEntity(
                             ChunkGeneratedEntity(
