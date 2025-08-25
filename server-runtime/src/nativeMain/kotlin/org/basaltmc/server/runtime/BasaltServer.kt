@@ -69,6 +69,7 @@ import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.PlayerProgress
 import org.basaltmc.server.runtime.world.RealLootTables
 import org.basaltmc.server.runtime.world.RecipeBook
+import org.basaltmc.server.runtime.world.SpawnEquipmentFinalizer
 import org.basaltmc.server.runtime.world.VanillaWorldGeneratorFactory
 import org.basaltmc.server.runtime.world.Vibrations
 import org.basaltmc.server.runtime.world.WORLDS_ROOT
@@ -120,6 +121,7 @@ public class BasaltServer(
     private val worldGeneratorFactory: VanillaWorldGeneratorFactory? = null,
     /** Where block-break drops are read from (see [RealLootTables]); `null` in tests that never break a block in survival. */
     private val serverJar: ServerJarAssets? = null,
+    private val spawnEquipment: SpawnEquipmentFinalizer = SpawnEquipmentFinalizer(serverJar),
     private val worldsConfig: WorldsConfig,
     /**
      * Which client versions may in. Read once: it decides what a connection is before there is a
@@ -568,7 +570,7 @@ public class BasaltServer(
 
     /** Natural mob spawning, and the one-off spawn a plugin or a raid asks for. See [NaturalSpawningSystem]. */
     private val spawning =
-        NaturalSpawningSystem(playerRegistry, plugins.events, vanillaData.biomeSpawns, chunkSimulation)
+        NaturalSpawningSystem(playerRegistry, plugins.events, vanillaData.biomeSpawns, chunkSimulation, spawnEquipment)
 
     /** Projectiles in flight and what they hit. See [CombatSystem]. */
     private val combat = CombatSystem(plugins.events, broadcaster, explosions)

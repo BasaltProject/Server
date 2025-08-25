@@ -262,6 +262,7 @@ internal data class GeneratedEquipment(
     val slot: SetEquipmentPacket.Type,
     val item: String,
     val count: Int,
+    val components: NbtCompound,
 )
 
 internal fun generatedEntityEquipment(data: NbtCompound): List<GeneratedEquipment> {
@@ -271,7 +272,9 @@ internal fun generatedEntityEquipment(data: NbtCompound): List<GeneratedEquipmen
             val stack = equipment.getCompound(name)
             val item = stack.getString("id")
             val count = stack.getInt("count")
-            if (item.isNotEmpty() && count > 0) add(GeneratedEquipment(slot, item, count))
+            if (item.isNotEmpty() && count > 0) {
+                add(GeneratedEquipment(slot, item, count, stack.getCompound("components")))
+            }
         }
     }
 }

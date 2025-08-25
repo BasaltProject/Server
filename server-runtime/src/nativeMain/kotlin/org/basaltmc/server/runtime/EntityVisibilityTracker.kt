@@ -3,6 +3,7 @@ package org.basaltmc.server.runtime
 import org.basaltmc.server.registry.Items
 import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.server.runtime.entity.Taming
+import org.basaltmc.server.runtime.item.ItemComponentCodecs
 import org.basaltmc.server.runtime.player.PlayerInventory
 import org.basaltmc.server.runtime.player.PlayerSession
 import org.basaltmc.server.storage.StoredItemStack
@@ -168,7 +169,14 @@ internal class EntityVisibilityTracker(
                         generatedEntityEquipment(data).mapNotNull { slot ->
                             val item =
                                 Items.REGISTRY.byIdentifier(Identifier.parse(slot.item)) ?: return@mapNotNull null
-                            SetEquipmentPacket.Slot(slot.slot, WireItemStack(item.protocolId, slot.count))
+                            SetEquipmentPacket.Slot(
+                                slot.slot,
+                                WireItemStack(
+                                    item.protocolId,
+                                    slot.count,
+                                    ItemComponentCodecs.toWire(slot.components, owner.enchantmentIds ?: { null }),
+                                ),
+                            )
                         }
                     if (equipment.isNotEmpty()) {
                         owner.sendPlayPacket(SetEquipmentPacket.ID) {
@@ -683,7 +691,14 @@ internal class EntityVisibilityTracker(
             val equipment =
                 generatedEntityEquipment(descriptor.data).mapNotNull { slot ->
                     val item = Items.REGISTRY.byIdentifier(Identifier.parse(slot.item)) ?: return@mapNotNull null
-                    SetEquipmentPacket.Slot(slot.slot, WireItemStack(item.protocolId, slot.count))
+                    SetEquipmentPacket.Slot(
+                        slot.slot,
+                        WireItemStack(
+                            item.protocolId,
+                            slot.count,
+                            ItemComponentCodecs.toWire(slot.components, owner.enchantmentIds ?: { null }),
+                        ),
+                    )
                 }
             if (equipment.isNotEmpty()) {
                 owner.sendPlayPacket(SetEquipmentPacket.ID) {
