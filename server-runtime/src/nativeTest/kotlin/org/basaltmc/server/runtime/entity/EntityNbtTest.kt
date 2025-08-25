@@ -2,6 +2,8 @@ package org.basaltmc.server.runtime.entity
 
 import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.runtime.world.MobSpawnFinalization
+import org.basaltmc.server.runtime.world.MobSpawnGroupData
+import org.basaltmc.server.runtime.world.SpawnEquipmentFinalizer
 import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
@@ -123,6 +125,82 @@ class EntityNbtTest {
         assertEquals(2, restored.size)
         assertEquals(setOf(21), restored[0].passengerIds)
         assertEquals(20, restored[1].vehicleId)
+    }
+
+    @Test
+    fun generatedSpiderPackRestoresItsFinalizedJockeyAndSharedEffect() {
+        val spider = Identifier.vanilla("spider")
+        val equipment = SpawnEquipmentFinalizer(null)
+        val selected =
+            (0L..100_000L).firstNotNullOfOrNull { seed ->
+                val random = LegacyRandom(seed)
+                val group = MobSpawnGroupData()
+                val data = NbtCompound()
+                val passengers =
+                    MobSpawnFinalization.writeGenerated(
+                        data,
+                        spider,
+                        groupIndex = 0,
+                        random = random,
+                        specialMultiplier = 1f,
+                        group = group,
+                        difficulty = "hard",
+                        equipmentFinalizer = equipment,
+                        blockX = -1,
+                        blockY = 64,
+                        blockZ = -17,
+                        entityX = -0.25,
+                        entityY = 64.0,
+                        entityZ = -16.75,
+                        entityYaw = 45f,
+                    )
+                val effects = data.getList("active_effects")
+                if (passengers.isEmpty() || effects == null || effects.size == 0) {
+                    null
+                } else {
+                    Triple(random, group, ChunkGeneratedEntity(spider, -0.25, 64.0, -16.75, 45f, 0f, data, passengers))
+                }
+            }
+        val (random, group, descriptor) = assertNotNull(selected)
+        val firstEffect =
+            assertNotNull(descriptor.data.getList("active_effects"))
+                .filterIsInstance<NbtCompound>()
+                .single()
+                .getString("id")
+
+        val secondData = NbtCompound()
+        MobSpawnFinalization.writeGenerated(
+            secondData,
+            spider,
+            groupIndex = 1,
+            random = random,
+            specialMultiplier = 1f,
+            group = group,
+            difficulty = "hard",
+            equipmentFinalizer = equipment,
+        )
+        val secondEffect =
+            assertNotNull(secondData.getList("active_effects"))
+                .filterIsInstance<NbtCompound>()
+                .single()
+                .getString("id")
+        assertEquals(firstEffect, secondEffect)
+
+        var nextId = 30
+        val restored = EntityNbt.decodeGeneratedTree(descriptor, { nextId++ }, { 1 })
+        assertEquals(2, restored.size)
+        assertEquals(setOf(31), restored[0].passengerIds)
+        assertEquals(30, restored[1].vehicleId)
+        assertEquals(Identifier.vanilla("skeleton"), restored[1].type)
+        assertEquals(-0.25, restored[1].x)
+        assertEquals(
+            "minecraft:bow",
+            restored[1]
+                .sourceNbt
+                ?.getCompound("equipment")
+                ?.getCompound("mainhand")
+                ?.getString("id"),
+        )
     }
 
     @Test

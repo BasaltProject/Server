@@ -22,6 +22,7 @@ import org.basaltmc.server.runtime.world.MobSpawnVariantData.WARM_FROG_BIOMES
 import org.basaltmc.server.runtime.world.MobSpawnVariantData.WHITE_RABBIT_BIOMES
 import org.basaltmc.server.runtime.world.MobSpawnVariantData.WOLF_SOUND_VARIANTS
 import org.basaltmc.server.runtime.world.MobSpawnVariantData.WOLF_VARIANTS
+import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
 import org.basaltmc.wire.nbt.NbtDouble
@@ -33,6 +34,7 @@ import kotlin.math.floor
 public class MobSpawnGroupData {
     internal var variant: Int? = null
     internal var secondaryVariant: Int? = null
+    internal var spiderEffect: String? = null
 }
 
 /** Minecraft 26.2 spawn finalization, including concrete pre/post layers around shared mob state. */
@@ -55,7 +57,7 @@ public object MobSpawnFinalization {
         gameTime: Long = 0L,
         difficulty: String = "easy",
         equipmentFinalizer: SpawnEquipmentFinalizer? = null,
-    ) {
+    ): List<ChunkGeneratedEntity> {
         val state =
             stateFor(
                 entity.type,
@@ -91,6 +93,22 @@ public object MobSpawnFinalization {
         }
         writeMobState(data, entity.type, state)
         CubeMobs.applySize(entity, state.cubeSize)
+        return MobJockeyFinalization.afterCommon(
+            data,
+            entity.type,
+            groupIndex,
+            group,
+            random,
+            specialMultiplier,
+            difficulty,
+            equipmentFinalizer,
+            biome,
+            entity.x,
+            entity.y,
+            entity.z,
+            entity.yaw,
+            gameTime,
+        )
     }
 
     /** Writes finalization state into an off-thread generated entity descriptor. */
@@ -108,7 +126,11 @@ public object MobSpawnFinalization {
         gameTime: Long = 0L,
         difficulty: String = "easy",
         equipmentFinalizer: SpawnEquipmentFinalizer? = null,
-    ) {
+        entityX: Double = blockX + 0.5,
+        entityY: Double = blockY.toDouble(),
+        entityZ: Double = blockZ + 0.5,
+        entityYaw: Float = 0f,
+    ): List<ChunkGeneratedEntity> {
         val state =
             stateFor(
                 type,
@@ -128,6 +150,22 @@ public object MobSpawnFinalization {
         equipmentFinalizer?.finalizeAfterCommon(data, type.path, random, specialMultiplier, difficulty)
         // parity: AbstractCubeMob saves one less than its live size, so absent/zero means size one.
         if (CubeMobs.isCube(type)) data.putInt("Size", state.cubeSize - 1)
+        return MobJockeyFinalization.afterCommon(
+            data,
+            type,
+            groupIndex,
+            group,
+            random,
+            specialMultiplier,
+            difficulty,
+            equipmentFinalizer,
+            biome,
+            entityX,
+            entityY,
+            entityZ,
+            entityYaw,
+            gameTime,
+        )
     }
 
     internal fun stateFor(

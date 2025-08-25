@@ -4,6 +4,7 @@ import org.basaltmc.server.plugins.PluginEventBus
 import org.basaltmc.server.plugins.PluginEventTypes
 import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.registry.EntityTypes
+import org.basaltmc.server.runtime.entity.EntityNbt
 import org.basaltmc.server.runtime.entity.MobCategory
 import org.basaltmc.server.runtime.entity.MobPersistence
 import org.basaltmc.server.runtime.entity.Mobs
@@ -20,6 +21,7 @@ import org.basaltmc.server.runtime.world.NaturalSpawner
 import org.basaltmc.server.runtime.world.RealBiomeSpawns
 import org.basaltmc.server.runtime.world.SpawnEquipmentFinalizer
 import org.basaltmc.server.runtime.world.SpawnPotential
+import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.protocol.play.Gamemode
 import kotlin.math.floor
@@ -51,16 +53,7 @@ public class NaturalSpawningSystem(
         initialize: ((ServerEntity) -> Unit)? = null,
     ): ServerEntity? {
         val protocolType = EntityTypes[type]?.protocolId ?: return null
-        val spawning =
-            pluginEvents.emit(PluginEventTypes.ENTITY_SPAWN) { event ->
-                event.set(0, type.toString())
-                event.set(1, world.name)
-                event.set(2, x)
-                event.set(3, y)
-                event.set(4, z)
-                event.set(5, reason)
-            }
-        if (spawning?.cancelled == true) return null
+        if (!spawnAllowed(world, type, x, y, z, reason)) return null
         val entity =
             ServerEntity(
                 entityId = playerRegistry.allocateEntityId(),
@@ -163,57 +156,103 @@ public class NaturalSpawningSystem(
                             }
                         if (cost != null && !spawnPotential.allows(blockX, blockY, blockZ, cost)) {
                             false
-                        } else if (
-                            spawnMob(
-                                world,
-                                request.type,
-                                request.x,
-                                request.y,
-                                request.z,
-                                request.yaw,
-                                initialize = { entity ->
-                                    val inhabitedTime =
-                                        world.state
-                                            .chunkIfLoaded(blockX shr 4, blockZ shr 4)
-                                            ?.inhabitedTime ?: 0L
-                                    val moonBrightness =
-                                        if (world.declaration.dimension.hasClock) {
-                                            NaturalSpawner.surfaceSlimeChance(world.clock.totalTicks) * 2f
-                                        } else {
-                                            0f
-                                        }
-                                    val specialMultiplier =
-                                        MobSpawnFinalization.specialMultiplier(
-                                            world.difficulty,
-                                            world.gameTime,
-                                            inhabitedTime,
-                                            moonBrightness,
-                                        )
-                                    MobSpawnFinalization.apply(
-                                        entity,
-                                        request.groupIndex,
-                                        random,
-                                        specialMultiplier,
-                                        group = request.group,
-                                        biome = request.biome,
-                                        gameTime = world.gameTime,
-                                        difficulty = world.difficulty,
-                                        equipmentFinalizer = equipmentFinalizer,
-                                    )
-                                },
-                            ) == null
-                        ) {
-                            false
                         } else {
-                            if (cost != null) spawnPotential.add(blockX, blockY, blockZ, cost.charge)
-                            val actualCategory = MobCategory.byName(Mobs.categoryOf(request.type)) ?: category
-                            counts[actualCategory] = counts.getValue(actualCategory) + 1
-                            localCaps.add(actualCategory, blockX shr 4, blockZ shr 4)
-                            true
+                            var passengers: List<ChunkGeneratedEntity> = emptyList()
+                            val spawned =
+                                spawnMob(
+                                    world,
+                                    request.type,
+                                    request.x,
+                                    request.y,
+                                    request.z,
+                                    request.yaw,
+                                    initialize = { entity ->
+                                        val inhabitedTime =
+                                            world.state
+                                                .chunkIfLoaded(blockX shr 4, blockZ shr 4)
+                                                ?.inhabitedTime ?: 0L
+                                        val moonBrightness =
+                                            if (world.declaration.dimension.hasClock) {
+                                                NaturalSpawner.surfaceSlimeChance(world.clock.totalTicks) * 2f
+                                            } else {
+                                                0f
+                                            }
+                                        val specialMultiplier =
+                                            MobSpawnFinalization.specialMultiplier(
+                                                world.difficulty,
+                                                world.gameTime,
+                                                inhabitedTime,
+                                                moonBrightness,
+                                            )
+                                        passengers =
+                                            MobSpawnFinalization.apply(
+                                                entity,
+                                                request.groupIndex,
+                                                random,
+                                                specialMultiplier,
+                                                group = request.group,
+                                                biome = request.biome,
+                                                gameTime = world.gameTime,
+                                                difficulty = world.difficulty,
+                                                equipmentFinalizer = equipmentFinalizer,
+                                            )
+                                    },
+                                )
+                            if (spawned == null) {
+                                false
+                            } else {
+                                materializePassengers(world, spawned, passengers)
+                                if (cost != null) spawnPotential.add(blockX, blockY, blockZ, cost.charge)
+                                val actualCategory = MobCategory.byName(Mobs.categoryOf(request.type)) ?: category
+                                counts[actualCategory] = counts.getValue(actualCategory) + 1
+                                localCaps.add(actualCategory, blockX shr 4, blockZ shr 4)
+                                true
+                            }
                         }
                     },
                 )
             }
         }
+    }
+
+    private fun materializePassengers(
+        world: LoadedWorld,
+        vehicle: ServerEntity,
+        passengers: List<ChunkGeneratedEntity>,
+    ) {
+        for (descriptor in passengers) {
+            val protocolType = EntityTypes[descriptor.type]?.protocolId ?: continue
+            if (!spawnAllowed(world, descriptor.type, descriptor.x, descriptor.y, descriptor.z, "jockey")) continue
+            val passenger =
+                EntityNbt.decodeGenerated(
+                    descriptor,
+                    playerRegistry.allocateEntityId(),
+                    protocolType,
+                ) ?: continue
+            passenger.vehicleId = vehicle.entityId
+            vehicle.passengerIds += passenger.entityId
+            world.state.spawnEntity(passenger)
+            materializePassengers(world, passenger, descriptor.passengers)
+        }
+    }
+
+    private fun spawnAllowed(
+        world: LoadedWorld,
+        type: Identifier,
+        x: Double,
+        y: Double,
+        z: Double,
+        reason: String,
+    ): Boolean {
+        val event =
+            pluginEvents.emit(PluginEventTypes.ENTITY_SPAWN) { spawning ->
+                spawning.set(0, type.toString())
+                spawning.set(1, world.name)
+                spawning.set(2, x)
+                spawning.set(3, y)
+                spawning.set(4, z)
+                spawning.set(5, reason)
+            }
+        return event?.cancelled != true
     }
 }
