@@ -48,6 +48,67 @@ kotlin {
 }
 
 /**
+ * `./gradlew build` leaves one binary in `build/`, for the machine doing the building and under the
+ * name it would be downloaded with. Release unless `-Pbasalt.debug`.
+ */
+val debugBinary: Boolean = providers.gradleProperty("basalt.debug").map { it != "false" }.getOrElse(false)
+val binaryTarget: String = extra["basaltHostTarget"].toString()
+val binaryLinkTask: String =
+    "link" + (if (debugBinary) "Debug" else "Release") + "Executable" +
+        binaryTarget.replaceFirstChar { it.uppercase() }
+
+// `arm64`/`x64` as the Kotlin/Native target names spell them, and mingw named after what it
+// produces, Windows.
+val binaryPlatform: String =
+    when {
+        binaryTarget.startsWith("macos") -> "macOS"
+        binaryTarget.startsWith("linux") -> "Linux"
+        else -> "Windows"
+    }
+val binaryFileName: String =
+    "BasaltServer-" + project.version + "-" + binaryPlatform + "-" +
+        (if (binaryTarget.endsWith("Arm64")) "arm64" else "x64") +
+        (if (binaryPlatform == "Windows") ".exe" else "")
+
+val linkedBinary = tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinNativeLink>(binaryLinkTask)
+val linkedFile = linkedBinary.flatMap { it.outputFile }
+val copiedBinary = rootProject.layout.buildDirectory.file(binaryFileName)
+
+val basaltBinary =
+    tasks.register("basaltBinary") {
+        group = "build"
+        description = "Links the binary for this host and leaves it in build/, named for the platform it runs on."
+        dependsOn(linkedBinary)
+        inputs.files(linkedBinary)
+        // The file, never the directory: declaring build/ itself an output hands it to Gradle's
+        // stale-output cleanup, which then deletes everything in it that no task produced.
+        outputs.file(copiedBinary)
+        doLast {
+            val target = copiedBinary.get().asFile
+            // .kexe is Kotlin/Native's own extension; on Unix the execute bit is what makes a
+            // file run, so the name loses it and the permission travels.
+            linkedFile.get().copyTo(target, overwrite = true)
+            target.setExecutable(true)
+        }
+    }
+
+tasks.named("assemble") { dependsOn(basaltBinary) }
+
+// Kotlin/Native hangs every link task on `assemble`. Unless the build asked for targets of its
+// own, only the one that ends up in build/ belongs there.
+if (!providers.gradleProperty("basalt.targets").isPresent) {
+    afterEvaluate {
+        tasks.named("assemble") {
+            setDependsOn(
+                dependsOn.filterNot {
+                    it is TaskProvider<*> && it.name.contains("Executable") && it.name != binaryLinkTask
+                },
+            )
+        }
+    }
+}
+
+/**
  * Turns every `.toml` under `src/nativeMain/resources/config-defaults` into one file of constants,
  * so `tab_list.toml` becomes `TAB_LIST_DEFAULT_TOML` and adding a template is adding a file.
  *
