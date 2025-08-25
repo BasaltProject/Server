@@ -429,6 +429,58 @@ class EntityNbtTest {
                 .getCompound("mainhand")
                 .getString("id"),
         )
+
+        val piglinJockey =
+            assertNotNull(
+                (0L..1_000L).firstNotNullOfOrNull { seed ->
+                    forest("strider", seed, biome = "nether_wastes").takeIf { result ->
+                        result.main.passengers
+                            .singleOrNull()
+                            ?.type
+                            ?.path == "zombified_piglin"
+                    }
+                },
+            )
+        val zombifiedPiglin = piglinJockey.main.passengers.single()
+        assertEquals(
+            "minecraft:warped_fungus_on_a_stick",
+            zombifiedPiglin.data
+                .getCompound("equipment")
+                .getCompound("mainhand")
+                .getString("id"),
+        )
+        assertEquals(
+            "minecraft:saddle",
+            piglinJockey.main.data
+                .getCompound("equipment")
+                .getCompound("saddle")
+                .getString("id"),
+        )
+        assertEquals(
+            2f,
+            piglinJockey.main.data
+                .getCompound("drop_chances")
+                .getFloat("saddle"),
+        )
+
+        val babyStriderJockey =
+            assertNotNull(
+                (0L..1_000L).firstNotNullOfOrNull { seed ->
+                    forest("strider", seed, biome = "nether_wastes").takeIf { result ->
+                        result.main.passengers
+                            .singleOrNull()
+                            ?.type
+                            ?.path == "strider"
+                    }
+                },
+            )
+        assertEquals(
+            AgeableMobs.BABY_START_AGE,
+            babyStriderJockey.main.passengers
+                .single()
+                .data
+                .getInt("Age"),
+        )
     }
 
     @Test

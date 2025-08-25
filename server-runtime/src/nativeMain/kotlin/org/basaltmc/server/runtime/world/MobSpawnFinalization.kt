@@ -183,6 +183,17 @@ public object MobSpawnFinalization {
         val data = node.data
         val type = node.type
         val equipment = equipmentFinalizer
+        StriderSpawnFinalizer.beforeCommon(
+            builder,
+            node,
+            random,
+            specialMultiplier,
+            difficulty,
+            equipment,
+            biome,
+            gameTime,
+            entityRandomFactory,
+        )
         val state =
             stateFor(
                 type,

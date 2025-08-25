@@ -124,7 +124,7 @@ internal object ZombieSpawnFinalizer {
     ) {
         if (equipment.itemId(drowned.data, "offhand") == null && random.nextFloat() < NAUTILUS_SHELL_CHANCE) {
             equipment.setItem(drowned.data, "offhand", "nautilus_shell")
-            setGuaranteedDrop(drowned.data, "offhand")
+            equipment.setGuaranteedDrop(drowned.data, "offhand")
         }
         if (reason !in DROWNED_VEHICLE_REASONS ||
             equipment.itemId(drowned.data, "mainhand") != "minecraft:trident" ||
@@ -291,15 +291,6 @@ internal object ZombieSpawnFinalizer {
         )
         data["Health"] = NbtFloat((MAX_HEALTH_BASE * (1.0 + healthBonus)).toFloat())
         data.putBoolean("CanBreakDoors", true)
-    }
-
-    private fun setGuaranteedDrop(
-        data: NbtCompound,
-        slot: String,
-    ) {
-        val chances = data.getCompound("drop_chances")
-        chances[slot] = NbtFloat(2f)
-        data["drop_chances"] = chances
     }
 
     private val ZOMBIE_TYPES = setOf("zombie", "zombie_villager", "husk", "drowned", "zombified_piglin")
