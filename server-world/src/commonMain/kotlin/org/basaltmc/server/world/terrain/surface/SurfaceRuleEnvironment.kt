@@ -11,6 +11,10 @@ import org.basaltmc.server.world.densityfunction.DensityCache
  * `server-runtime` wire in the real, network-sourced implementation.
  */
 public interface SurfaceRuleEnvironment {
+    /** The already SHA-256-obfuscated world seed used by BiomeManager's Voronoi zoom. */
+    public val biomeZoomSeed: Long?
+        get() = null
+
     /** // parity: net.minecraft.world.level.levelgen.SurfaceSystem.getSurfaceDepth. */
     public fun surfaceDepthNoise(
         x: Int,
@@ -75,6 +79,7 @@ public interface SurfaceRuleEnvironment {
         z: Int,
     ): Int
 
+    /** Seed-zoomed block-position biome, matching BiomeManager.getBiome. */
     public fun biomeAt(
         x: Int,
         y: Int,
@@ -92,6 +97,14 @@ public interface SurfaceRuleEnvironment {
         z: Int,
         cache: DensityCache?,
     ): String = biomeAt(x, y, z)
+
+    /** Direct noise-biome lookup in quart coordinates, used for chunk biome palettes. */
+    public fun noiseBiomeAt(
+        quartX: Int,
+        quartY: Int,
+        quartZ: Int,
+        cache: DensityCache? = null,
+    ): String
 
     /** // parity: net.minecraft.world.level.levelgen.SurfaceRules.Context.SteepMaterialCondition. */
     public fun isSteep(

@@ -3,18 +3,18 @@ package org.basaltmc.server.world.terrain.decoration.nether
 import org.basaltmc.server.random.BasaltRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
-import org.basaltmc.server.world.terrain.NetherBiomeSource
+import org.basaltmc.server.world.terrain.NetherBiomeLookup
 
 internal fun NetherVegetalDecoration.placeLavaSprings(
     chunk: Chunk,
     random: BasaltRandom,
-    biomeSource: NetherBiomeSource,
+    biomeSource: NetherBiomeLookup,
 ) {
     repeat(20) {
         val x = chunk.chunkX * 16 + random.nextInt(16)
         val z = chunk.chunkZ * 16 + random.nextInt(16)
         val y = veryBiasedHeight(random)
-        if (biomeSource.biomeAt(x, y, z).id.path in ALL_BIOMES) {
+        if (biomeSource.blockBiomeAt(x, y, z).id.path in ALL_BIOMES) {
             placeLavaSpring(chunk, x, y, z)
         }
     }

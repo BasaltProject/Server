@@ -5,7 +5,7 @@ import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
-import org.basaltmc.server.world.terrain.NetherBiomeSource
+import org.basaltmc.server.world.terrain.NetherBiomeLookup
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.common.Mth
 import kotlin.math.ceil
@@ -18,7 +18,7 @@ public object NetherOreDecoration {
     public fun decorate(
         chunk: Chunk,
         seed: Long,
-        biomeSource: NetherBiomeSource,
+        biomeSource: NetherBiomeLookup,
     ) {
         val random = WorldgenRandom(XoroshiroRandom(seed))
         val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
@@ -32,7 +32,7 @@ public object NetherOreDecoration {
         globalIndex: Int,
         chunk: Chunk,
         random: WorldgenRandom,
-        biomeSource: NetherBiomeSource,
+        biomeSource: NetherBiomeLookup,
     ): Boolean {
         val placed = FEATURES_BY_INDEX[globalIndex] ?: return false
         placed.place(chunk, random, biomeSource)
@@ -42,13 +42,13 @@ public object NetherOreDecoration {
     private fun PlacedOre.place(
         chunk: Chunk,
         random: WorldgenRandom,
-        biomeSource: NetherBiomeSource,
+        biomeSource: NetherBiomeLookup,
     ) {
         repeat(count) {
             val x = chunk.chunkX * 16 + random.nextInt(16)
             val z = chunk.chunkZ * 16 + random.nextInt(16)
             val y = height.sample(random)
-            if (biomeSource.biomeAt(x, y, z).id.path !in biomes) return@repeat
+            if (biomeSource.blockBiomeAt(x, y, z).id.path !in biomes) return@repeat
             when (val configured = feature) {
                 is ConfiguredOre.Vein -> placeVein(chunk, random, x, y, z, configured)
                 is ConfiguredOre.Scattered -> placeScattered(chunk, random, x, y, z, configured)

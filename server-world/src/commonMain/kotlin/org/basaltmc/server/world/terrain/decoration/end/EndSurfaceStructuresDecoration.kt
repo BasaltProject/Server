@@ -67,7 +67,7 @@ public object EndSurfaceStructuresDecoration {
         val surfaceY = source.heightAt(x and 15, z and 15, Chunk.HeightmapType.MOTION_BLOCKING)
         if (surfaceY <= source.verticalBounds.minY) return
         val y = surfaceY + 3 + random.nextInt(7)
-        if (biomeSource.biomeAtQuart(x shr 2, y shr 2, z shr 2) != Biomes.END_HIGHLANDS) return
+        if (biomeSource.blockBiomeAt(x, y, z) != Biomes.END_HIGHLANDS) return
         placeGateway(target, x, y, z)
     }
 

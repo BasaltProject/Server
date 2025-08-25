@@ -16,6 +16,7 @@ public class NetherSurfaceEnvironment(
     private val random: PositionalRandomFactory,
     private val router: NetherNoiseRouter,
     private val biomeSource: NetherBiomeSource,
+    override val biomeZoomSeed: Long,
 ) : SurfaceRuleEnvironment {
     private val noises = RealNoiseParameters(serverJar, random)
 
@@ -80,14 +81,21 @@ public class NetherSurfaceEnvironment(
         x: Int,
         y: Int,
         z: Int,
-    ): String = biomeSource.biomeAt(x, y, z).id.toString()
+    ): String = biomeSource.blockBiomeAt(x, y, z).id.toString()
 
     override fun biomeAt(
         x: Int,
         y: Int,
         z: Int,
         cache: DensityCache?,
-    ): String = biomeSource.biomeAt(x, y, z, cache).id.toString()
+    ): String = biomeSource.blockBiomeAt(x, y, z, cache).id.toString()
+
+    override fun noiseBiomeAt(
+        quartX: Int,
+        quartY: Int,
+        quartZ: Int,
+        cache: DensityCache?,
+    ): String = biomeSource.biomeAtQuart(quartX, quartY, quartZ, cache).id.toString()
 
     override fun isSteep(
         x: Int,

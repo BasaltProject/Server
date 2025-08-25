@@ -19,6 +19,7 @@ import org.basaltmc.server.world.terrain.decoration.OverworldSpringDecoration
 import org.basaltmc.server.world.terrain.decoration.OverworldVegetalDecoration
 import org.basaltmc.server.world.terrain.decoration.SculkDecoration
 import org.basaltmc.server.world.terrain.decoration.SurfaceFreezingDecoration
+import org.basaltmc.server.world.terrain.surface.ChunkBiomeEnvironment
 import org.basaltmc.server.world.terrain.surface.SurfaceBuilder
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleData
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
@@ -105,7 +106,8 @@ public object RealTerrainGenerator {
             }
         }
         val heightmap = chunk.heightmap(Chunk.HeightmapType.OCEAN_FLOOR)
-        val chunkEnvironment = ChunkScopedSurfaceEnvironment(environment, heightmap, cache, chunkX, chunkZ)
+        val chunkEnvironment =
+            ChunkScopedSurfaceEnvironment(ChunkBiomeEnvironment(environment, cache), heightmap, chunkX, chunkZ)
         val surfaceRule = SurfaceRuleData.overworld()
         GenerationMetrics.measure(GenerationMetrics.Phase.SURFACE_RULES) {
             SurfaceBuilder.buildSurface(
@@ -159,10 +161,10 @@ public object RealTerrainGenerator {
             for (quartX in 0 until 4) {
                 for (quartZ in 0 until 4) {
                     val biome =
-                        environment.biomeAt(
-                            chunk.chunkX * 16 + quartX * 4,
-                            blockY,
-                            chunk.chunkZ * 16 + quartZ * 4,
+                        environment.noiseBiomeAt(
+                            chunk.chunkX * 4 + quartX,
+                            blockY shr 2,
+                            chunk.chunkZ * 4 + quartZ,
                         )
                     val id = idByName.getOrPut(biome) { Biomes.REGISTRY.idOf(Identifier.parse(biome)) ?: 0 }
                     chunk.setBiomeId(quartX, quartY, quartZ, id)
@@ -176,35 +178,15 @@ public object RealTerrainGenerator {
  * // parity: SurfaceRules.Context.SteepMaterialCondition clamps its neighbour lookup to the chunk
  * under construction rather than crossing into the next one.
  *
- * [biomeAt] memoizes by quart position, because vanilla's `isBiome` re-samples for every check in
- * a rule sequence and [delegate]'s lookup is a scan over thousands of climate regions. A plain
- * `MutableMap` is safe here only because one instance serves one chunk on one thread and is then
- * discarded, unlike the shared [OverworldBiomeSource].
+ * Biome zoom and raw-quart caching live in [ChunkBiomeEnvironment]. This final wrapper replaces
+ * only the surface height and steepness queries that need the chunk currently under construction.
  */
 private class ChunkScopedSurfaceEnvironment(
     private val delegate: SurfaceRuleEnvironment,
     private val heightmap: IntArray,
-    private val cache: DensityCache,
     private val chunkX: Int,
     private val chunkZ: Int,
 ) : SurfaceRuleEnvironment by delegate {
-    private val biomeCache = HashMap<Long, String>()
-
-    override fun biomeAt(
-        x: Int,
-        y: Int,
-        z: Int,
-    ): String {
-        val key =
-            ((x shr 2).toLong() and 0x1FFFFFL) or
-                (((y shr 2).toLong() and 0xFFFFFL) shl 21) or
-                (((z shr 2).toLong() and 0x1FFFFFL) shl 41)
-        biomeCache[key]?.let { return it }
-        val biome = delegate.biomeAt(x, y, z, cache)
-        biomeCache[key] = biome
-        return biome
-    }
-
     override fun estimatedSurfaceHeight(
         x: Int,
         z: Int,

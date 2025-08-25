@@ -5,7 +5,7 @@ import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
-import org.basaltmc.server.world.terrain.NetherBiomeSource
+import org.basaltmc.server.world.terrain.NetherBiomeLookup
 import org.basaltmc.wire.common.Identifier
 import kotlin.math.abs
 import kotlin.math.min
@@ -15,7 +15,7 @@ public object NetherSurfaceStructuresDecoration {
     public fun decorate(
         chunk: Chunk,
         seed: Long,
-        biomeSource: NetherBiomeSource,
+        biomeSource: NetherBiomeLookup,
     ) {
         val random = WorldgenRandom(XoroshiroRandom(seed))
         val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
@@ -28,7 +28,7 @@ public object NetherSurfaceStructuresDecoration {
     internal fun decorateFeature(
         chunk: Chunk,
         seed: Long,
-        biomeSource: NetherBiomeSource,
+        biomeSource: NetherBiomeLookup,
         globalIndex: Int,
     ) {
         val random = WorldgenRandom(XoroshiroRandom(seed))
@@ -40,7 +40,7 @@ public object NetherSurfaceStructuresDecoration {
     private fun placeFeature(
         chunk: Chunk,
         random: BasaltRandom,
-        biomeSource: NetherBiomeSource,
+        biomeSource: NetherBiomeLookup,
         globalIndex: Int,
     ) {
         val count =
@@ -53,7 +53,7 @@ public object NetherSurfaceStructuresDecoration {
             }
         val origins = positionsOnEveryLayer(chunk, random, count)
         for (origin in origins) {
-            if (biomeSource.biomeAt(origin.x, origin.y, origin.z).id.path != "basalt_deltas") continue
+            if (biomeSource.blockBiomeAt(origin.x, origin.y, origin.z).id.path != "basalt_deltas") continue
             when (globalIndex) {
                 0 -> placeDelta(chunk, random, origin)
                 1 -> placeColumns(chunk, random, origin, ColumnConfig.SMALL)

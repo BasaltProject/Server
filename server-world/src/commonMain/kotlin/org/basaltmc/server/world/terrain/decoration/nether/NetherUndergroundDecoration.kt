@@ -5,7 +5,7 @@ import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
-import org.basaltmc.server.world.terrain.NetherBiomeSource
+import org.basaltmc.server.world.terrain.NetherBiomeLookup
 import org.basaltmc.wire.common.Identifier
 import kotlin.math.abs
 
@@ -14,7 +14,7 @@ public object NetherUndergroundDecoration {
     public fun decorate(
         chunk: Chunk,
         seed: Long,
-        biomeSource: NetherBiomeSource,
+        biomeSource: NetherBiomeLookup,
     ) {
         val random = WorldgenRandom(XoroshiroRandom(seed))
         val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
@@ -28,7 +28,7 @@ public object NetherUndergroundDecoration {
     internal fun decorateFeature(
         chunk: Chunk,
         seed: Long,
-        biomeSource: NetherBiomeSource,
+        biomeSource: NetherBiomeLookup,
         globalIndex: Int,
     ) {
         val random = WorldgenRandom(XoroshiroRandom(seed))
@@ -43,7 +43,7 @@ public object NetherUndergroundDecoration {
         globalIndex: Int,
         chunk: Chunk,
         random: WorldgenRandom,
-        biomeSource: NetherBiomeSource,
+        biomeSource: NetherBiomeLookup,
     ) {
         when (globalIndex) {
             0 -> placeReplaceBlobs(chunk, random, biomeSource, 75, "basalt")
@@ -166,7 +166,7 @@ public object NetherUndergroundDecoration {
     private fun placeReplaceBlobs(
         chunk: Chunk,
         random: BasaltRandom,
-        biomeSource: NetherBiomeSource,
+        biomeSource: NetherBiomeLookup,
         count: Int,
         replacement: String,
     ) {
@@ -216,7 +216,7 @@ public object NetherUndergroundDecoration {
     private fun placeSprings(
         chunk: Chunk,
         random: BasaltRandom,
-        biomeSource: NetherBiomeSource,
+        biomeSource: NetherBiomeLookup,
         count: Int,
         minY: Int,
         maxY: Int,
@@ -258,7 +258,7 @@ public object NetherUndergroundDecoration {
     private fun placeFirePatch(
         chunk: Chunk,
         random: BasaltRandom,
-        biomeSource: NetherBiomeSource,
+        biomeSource: NetherBiomeLookup,
         biomes: Set<String>,
         support: String,
         fire: String,
@@ -282,7 +282,7 @@ public object NetherUndergroundDecoration {
     private fun placeGlowstoneExtra(
         chunk: Chunk,
         random: BasaltRandom,
-        biomeSource: NetherBiomeSource,
+        biomeSource: NetherBiomeLookup,
     ) {
         val count = random.nextInt(random.nextInt(10) + 1)
         placeGlowstone(chunk, random, biomeSource, count, 4, 123)
@@ -291,7 +291,7 @@ public object NetherUndergroundDecoration {
     private fun placeGlowstone(
         chunk: Chunk,
         random: BasaltRandom,
-        biomeSource: NetherBiomeSource,
+        biomeSource: NetherBiomeLookup,
         count: Int,
         minY: Int,
         maxY: Int,
@@ -332,7 +332,7 @@ public object NetherUndergroundDecoration {
     private fun placeCrimsonRootsPatch(
         chunk: Chunk,
         random: BasaltRandom,
-        biomeSource: NetherBiomeSource,
+        biomeSource: NetherBiomeLookup,
     ) {
         val baseX = chunk.chunkX * 16
         val baseZ = chunk.chunkZ * 16
@@ -352,7 +352,7 @@ public object NetherUndergroundDecoration {
     private fun placeMushroomPatch(
         chunk: Chunk,
         random: BasaltRandom,
-        biomeSource: NetherBiomeSource,
+        biomeSource: NetherBiomeLookup,
         mushroom: String,
     ) {
         if (random.nextFloat() >= 0.5f) return
@@ -375,12 +375,12 @@ public object NetherUndergroundDecoration {
         path in MUSHROOM_LIGHT_OVERRIDE || path in MUSHROOM_SOLID_SUPPORT
 
     private fun hasBiome(
-        biomeSource: NetherBiomeSource,
+        biomeSource: NetherBiomeLookup,
         x: Int,
         y: Int,
         z: Int,
         biomes: Set<String>,
-    ): Boolean = biomeSource.biomeAt(x, y, z).id.path in biomes
+    ): Boolean = biomeSource.blockBiomeAt(x, y, z).id.path in biomes
 
     private fun stateAt(
         chunk: Chunk,

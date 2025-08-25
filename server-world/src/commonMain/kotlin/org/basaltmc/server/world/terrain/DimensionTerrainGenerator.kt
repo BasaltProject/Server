@@ -18,6 +18,7 @@ import org.basaltmc.server.world.terrain.decoration.nether.NetherLocalDecoration
 import org.basaltmc.server.world.terrain.decoration.nether.NetherSurfaceStructuresDecoration
 import org.basaltmc.server.world.terrain.decoration.nether.NetherUndergroundDecoration
 import org.basaltmc.server.world.terrain.decoration.nether.NetherVegetalDecoration
+import org.basaltmc.server.world.terrain.surface.ChunkBiomeEnvironment
 import org.basaltmc.server.world.terrain.surface.SurfaceBuilder
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleData
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
@@ -46,11 +47,12 @@ public object DimensionTerrainGenerator {
             fluidLevel = 32,
             chunkX = chunkX,
             chunkZ = chunkZ,
-            surfacePass = { chunk ->
+            surfacePass = { chunk, cache ->
                 if (surfaceEnvironment != null) {
+                    val chunkEnvironment = ChunkBiomeEnvironment(surfaceEnvironment, cache)
                     SurfaceBuilder.buildSurface(
                         chunk,
-                        surfaceEnvironment,
+                        chunkEnvironment,
                         SurfaceRuleData.nether(),
                         Blocks.NETHERRACK.stateId,
                         generationMinY = 0,
@@ -60,13 +62,16 @@ public object DimensionTerrainGenerator {
             },
             carverPass = { chunk -> NetherCaveCarver.carve(chunk, seed) },
             structurePass = { chunk -> structureGenerator?.generateInto(chunk, seed) },
-            decorationPass = { chunk ->
-                NetherLocalDecoration.decorate(chunk, seed, biomeSource)
-                NetherSurfaceStructuresDecoration.decorate(chunk, seed, biomeSource)
-                NetherUndergroundDecoration.decorate(chunk, seed, biomeSource)
-                NetherVegetalDecoration.decorate(chunk, seed, biomeSource)
+            decorationPass = { chunk, cache ->
+                val biomeLookup = biomeSource.cached(cache)
+                NetherLocalDecoration.decorate(chunk, seed, biomeLookup)
+                NetherSurfaceStructuresDecoration.decorate(chunk, seed, biomeLookup)
+                NetherUndergroundDecoration.decorate(chunk, seed, biomeLookup)
+                NetherVegetalDecoration.decorate(chunk, seed, biomeLookup)
             },
-        ) { blockX, blockY, blockZ, cache -> biomeSource.biomeAt(blockX, blockY, blockZ, cache) }
+        ) { blockX, blockY, blockZ, cache ->
+            biomeSource.biomeAtQuart(blockX shr 2, blockY shr 2, blockZ shr 2, cache)
+        }
 
     /** // parity: `noise_settings/end.json` base shape, block default and cell sizes. */
     public fun end(
@@ -90,7 +95,7 @@ public object DimensionTerrainGenerator {
             chunkX = chunkX,
             chunkZ = chunkZ,
             structurePass = { chunk -> structureGenerator?.generateInto(chunk, seed) },
-            decorationPass = { chunk ->
+            decorationPass = { chunk, _ ->
                 EndRawDecoration.decorate(chunk, seed, biomeSource)
                 EndSurfaceStructuresDecoration.decorate(chunk, seed, router, biomeSource)
                 EndVegetalDecoration.decorate(chunk, seed, router, biomeSource)
@@ -110,10 +115,10 @@ public object DimensionTerrainGenerator {
         fluidLevel: Int,
         chunkX: Int,
         chunkZ: Int,
-        surfacePass: (Chunk) -> Unit = {},
+        surfacePass: (Chunk, DensityCache) -> Unit = { _, _ -> },
         carverPass: (Chunk) -> Unit = {},
         structurePass: (Chunk) -> Unit = {},
-        decorationPass: (Chunk) -> Unit = {},
+        decorationPass: (Chunk, DensityCache) -> Unit = { _, _ -> },
         biomeAt: (blockX: Int, blockY: Int, blockZ: Int, cache: DensityCache) -> Biome,
     ): Chunk {
         val chunk = Chunk(chunkX, chunkZ, verticalBounds)
@@ -152,10 +157,10 @@ public object DimensionTerrainGenerator {
                 }
             }
         }
-        GenerationMetrics.measure(GenerationMetrics.Phase.SURFACE_RULES) { surfacePass(chunk) }
+        GenerationMetrics.measure(GenerationMetrics.Phase.SURFACE_RULES) { surfacePass(chunk, cache) }
         GenerationMetrics.measure(GenerationMetrics.Phase.CARVERS) { carverPass(chunk) }
         GenerationMetrics.measure(GenerationMetrics.Phase.STRUCTURES) { structurePass(chunk) }
-        GenerationMetrics.measure(GenerationMetrics.Phase.DECORATION) { decorationPass(chunk) }
+        GenerationMetrics.measure(GenerationMetrics.Phase.DECORATION) { decorationPass(chunk, cache) }
         GenerationMetrics.measure(GenerationMetrics.Phase.BIOME_FILL) {
             for (quartY in 0 until verticalBounds.height / 4) {
                 val blockY = verticalBounds.minY + quartY * 4

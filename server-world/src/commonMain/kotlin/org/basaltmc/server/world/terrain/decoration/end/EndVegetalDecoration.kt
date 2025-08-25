@@ -29,7 +29,7 @@ public object EndVegetalDecoration {
             val x = chunk.chunkX * 16 + random.nextInt(16)
             val z = chunk.chunkZ * 16 + random.nextInt(16)
             val y = chunk.heightAt(x and 15, z and 15, Chunk.HeightmapType.MOTION_BLOCKING)
-            if (biomeSource.biomeAtQuart(x shr 2, y shr 2, z shr 2) != Biomes.END_HIGHLANDS) return@repeat
+            if (biomeSource.blockBiomeAt(x, y, z) != Biomes.END_HIGHLANDS) return@repeat
             val origin = EndPos(x, y, z)
             if (world.isEmpty(origin) && world.pathAt(origin.below()) == "end_stone") {
                 generatePlant(world, origin, random)
