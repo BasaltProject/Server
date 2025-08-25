@@ -2,6 +2,7 @@ package org.basaltmc.server.world.terrain.decoration
 
 import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
+import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
 
@@ -40,37 +41,45 @@ public object TreePatchDecoration {
         specs: List<FeatureSpec>,
         placementObserver: ((name: String, position: DecorationPos) -> Unit)?,
     ) {
-        val random = WorldgenRandom(XoroshiroRandom(seed))
-        val worldgenRegionRandom =
-            XoroshiroRandom(seed)
-                .forkPositional()
-                .fromHashOf("minecraft:worldgen_region_random")
-                .forkPositional()
-                .at(chunk.chunkX * 16, 0, chunk.chunkZ * 16)
-        val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
-        val context = PlacementContext(chunk)
-        val origin = DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16)
-        for (spec in specs) {
-            random.setFeatureSeed(decorationSeed, spec.index, VEGETAL_DECORATION_STEP)
-            var positions = spec.frequency.getPositions(context, random, origin)
-            positions = positions.flatMap { InSquarePlacement.getPositions(context, random, it) }
-            positions =
-                positions.flatMap {
-                    SurfaceWaterDepthFilter(spec.maxWaterDepth).getPositions(context, random, it)
-                }
-            positions =
-                positions.flatMap {
-                    HeightmapPlacement(Chunk.HeightmapType.OCEAN_FLOOR).getPositions(context, random, it)
-                }
-            positions.forEach { position ->
-                val biome = environment.biomeAt(position.x, position.y, position.z).substringAfter(':')
-                if (biome !in spec.biomes) return@forEach
-                if (!TreeDecoration.survivesPlacementPredicate(chunk, position, spec.survivalSapling)) return@forEach
-                placementObserver?.invoke(spec.name, position)
-                if (spec.name == BAMBOO_VEGETATION) {
-                    BambooVegetationDecoration.placeAt(chunk, random, position, context)
-                } else {
-                    TreeDecoration.placeAt(chunk, random, position, spec.name, worldgenRegionRandom)
+        chunk.withExternalDecorationBlockState(
+            reader = { x, y, z ->
+                if (y < environment.estimatedSurfaceHeight(x, z)) Blocks.STONE.stateId else Blocks.AIR.stateId
+            },
+        ) {
+            val random = WorldgenRandom(XoroshiroRandom(seed))
+            val worldgenRegionRandom =
+                XoroshiroRandom(seed)
+                    .forkPositional()
+                    .fromHashOf("minecraft:worldgen_region_random")
+                    .forkPositional()
+                    .at(chunk.chunkX * 16, 0, chunk.chunkZ * 16)
+            val decorationSeed = random.setDecorationSeed(seed, chunk.chunkX * 16, chunk.chunkZ * 16)
+            val context = PlacementContext(chunk)
+            val origin = DecorationPos(chunk.chunkX * 16, 0, chunk.chunkZ * 16)
+            for (spec in specs) {
+                random.setFeatureSeed(decorationSeed, spec.index, VEGETAL_DECORATION_STEP)
+                var positions = spec.frequency.getPositions(context, random, origin)
+                positions = positions.flatMap { InSquarePlacement.getPositions(context, random, it) }
+                positions =
+                    positions.flatMap {
+                        SurfaceWaterDepthFilter(spec.maxWaterDepth).getPositions(context, random, it)
+                    }
+                positions =
+                    positions.flatMap {
+                        HeightmapPlacement(Chunk.HeightmapType.OCEAN_FLOOR).getPositions(context, random, it)
+                    }
+                positions.forEach { position ->
+                    val biome = environment.biomeAt(position.x, position.y, position.z).substringAfter(':')
+                    if (biome !in spec.biomes) return@forEach
+                    if (!TreeDecoration.survivesPlacementPredicate(chunk, position, spec.survivalSapling)) {
+                        return@forEach
+                    }
+                    placementObserver?.invoke(spec.name, position)
+                    if (spec.name == BAMBOO_VEGETATION) {
+                        BambooVegetationDecoration.placeAt(chunk, random, position, context)
+                    } else {
+                        TreeDecoration.placeAt(chunk, random, position, spec.name, worldgenRegionRandom)
+                    }
                 }
             }
         }

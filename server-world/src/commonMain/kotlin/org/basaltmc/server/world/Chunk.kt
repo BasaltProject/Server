@@ -8,6 +8,12 @@ import org.basaltmc.server.registry.isLeavesState
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
 
+/** How a deferred decoration write validates the target chunk after it has generated. */
+public enum class GeneratedBlockWritePolicy {
+    EXACT,
+    TREE,
+}
+
 /** A generated decoration write whose target lies outside the chunk that produced it. */
 public data class ChunkGeneratedBlockWrite(
     public val x: Int,
@@ -17,6 +23,7 @@ public data class ChunkGeneratedBlockWrite(
     public val stateId: Int,
     /** Templates replace every state at their destination; ordinary decorations remain conditional. */
     public val replaceAnyState: Boolean = false,
+    public val policy: GeneratedBlockWritePolicy = GeneratedBlockWritePolicy.EXACT,
 )
 
 /** A generated block entity whose target lies outside the chunk that produced it. */
@@ -63,6 +70,8 @@ public class Chunk(
         LinkedHashMap<GeneratedWorldPos, ChunkGeneratedBlockEntityWrite>()
     private val generatedExternalBlockTicks = LinkedHashMap<GeneratedWorldPos, ChunkGeneratedBlockTick>()
     private var blockWriteObserver: ((Int, Int, Int, Int, Int) -> Unit)? = null
+    private var externalDecorationBlockState: ((x: Int, y: Int, z: Int) -> Int?)? = null
+    private var generatedBlockWritePolicy: GeneratedBlockWritePolicy = GeneratedBlockWritePolicy.EXACT
 
     public val sectionCount: Int get() = sections.size
 
@@ -153,8 +162,8 @@ public class Chunk(
     /**
      * Reads a world-coordinate position while a decoration is being generated. Positions outside
      * this chunk see earlier writes from the same feature instead of wrapping through `and 15`.
-     * Unknown neighbour terrain is air; [ChunkGeneratedBlockWrite.expectedStateId] prevents the
-     * deferred write from replacing a real non-air block when its target chunk is installed.
+     * A scoped feature-stage reader can supply unloaded neighbour terrain; otherwise it is air.
+     * [ChunkGeneratedBlockWrite.expectedStateId] guards the deferred write when its target arrives.
      */
     public fun getDecorationBlockStateId(
         worldX: Int,
@@ -165,7 +174,9 @@ public class Chunk(
         if (worldX shr 4 == chunkX && worldZ shr 4 == chunkZ) {
             return getBlockStateId(worldX and 15, y, worldZ and 15)
         }
-        return generatedExternalBlockWrites[GeneratedWorldPos(worldX, y, worldZ)]?.stateId ?: Blocks.AIR.stateId
+        return generatedExternalBlockWrites[GeneratedWorldPos(worldX, y, worldZ)]?.stateId
+            ?: externalDecorationBlockState?.invoke(worldX, y, worldZ)
+            ?: Blocks.AIR.stateId
     }
 
     /**
@@ -188,7 +199,10 @@ public class Chunk(
         }
         val position = GeneratedWorldPos(worldX, y, worldZ)
         val previous = generatedExternalBlockWrites[position]
-        val oldStateId = previous?.stateId ?: Blocks.AIR.stateId
+        val oldStateId =
+            previous?.stateId
+                ?: externalDecorationBlockState?.invoke(worldX, y, worldZ)
+                ?: expectedExternalStateId
         if (oldStateId == stateId) {
             blockWriteObserver?.invoke(worldX - chunkX * 16, y, worldZ - chunkZ * 16, oldStateId, stateId)
             return
@@ -201,6 +215,7 @@ public class Chunk(
                 previous?.expectedStateId ?: expectedExternalStateId,
                 stateId,
                 previous?.replaceAnyState == true || replaceAnyExternalState,
+                generatedBlockWritePolicy,
             )
         blockWriteObserver?.invoke(worldX - chunkX * 16, y, worldZ - chunkZ * 16, oldStateId, stateId)
     }
@@ -484,6 +499,34 @@ public class Chunk(
             return action()
         } finally {
             blockWriteObserver = null
+        }
+    }
+
+    /** Supplies the undecorated neighbouring terrain while one feature stage crosses a chunk edge. */
+    internal fun <T> withExternalDecorationBlockState(
+        reader: (x: Int, y: Int, z: Int) -> Int?,
+        action: () -> T,
+    ): T {
+        val previous = externalDecorationBlockState
+        externalDecorationBlockState = reader
+        try {
+            return action()
+        } finally {
+            externalDecorationBlockState = previous
+        }
+    }
+
+    /** Marks deferred writes from one configured feature with their delivery replacement rule. */
+    internal fun <T> withGeneratedBlockWritePolicy(
+        policy: GeneratedBlockWritePolicy,
+        action: () -> T,
+    ): T {
+        val previous = generatedBlockWritePolicy
+        generatedBlockWritePolicy = policy
+        try {
+            return action()
+        } finally {
+            generatedBlockWritePolicy = previous
         }
     }
 

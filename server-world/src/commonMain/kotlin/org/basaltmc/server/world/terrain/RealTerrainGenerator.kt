@@ -105,7 +105,7 @@ public object RealTerrainGenerator {
             }
         }
         val heightmap = chunk.heightmap(Chunk.HeightmapType.OCEAN_FLOOR)
-        val chunkEnvironment = ChunkScopedSurfaceEnvironment(environment, heightmap, cache)
+        val chunkEnvironment = ChunkScopedSurfaceEnvironment(environment, heightmap, cache, chunkX, chunkZ)
         val surfaceRule = SurfaceRuleData.overworld()
         GenerationMetrics.measure(GenerationMetrics.Phase.SURFACE_RULES) {
             SurfaceBuilder.buildSurface(
@@ -185,6 +185,8 @@ private class ChunkScopedSurfaceEnvironment(
     private val delegate: SurfaceRuleEnvironment,
     private val heightmap: IntArray,
     private val cache: DensityCache,
+    private val chunkX: Int,
+    private val chunkZ: Int,
 ) : SurfaceRuleEnvironment by delegate {
     private val biomeCache = HashMap<Long, String>()
 
@@ -206,7 +208,12 @@ private class ChunkScopedSurfaceEnvironment(
     override fun estimatedSurfaceHeight(
         x: Int,
         z: Int,
-    ): Int = heightmap[(x and 15) + (z and 15) * 16]
+    ): Int =
+        if (x shr 4 == chunkX && z shr 4 == chunkZ) {
+            heightmap[(x and 15) + (z and 15) * 16]
+        } else {
+            delegate.estimatedSurfaceHeight(x, z)
+        }
 
     override fun isSteep(
         x: Int,
