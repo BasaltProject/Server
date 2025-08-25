@@ -8,7 +8,6 @@ import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.EntityTypeShapes
 import org.basaltmc.server.runtime.registry.VanillaBiomes
 import org.basaltmc.server.world.Chunk
-import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
 import kotlin.random.Random
@@ -57,8 +56,8 @@ public object OriginalMobSpawner {
                     if (canSpawnAt(chunk, entry.type.path, blockX, y, blockZ)) {
                         val yaw = random.nextFloat() * 360f
                         val data = NbtCompound()
-                        val passengers =
-                            MobSpawnFinalization.writeGenerated(
+                        val forest =
+                            writeGeneratedForest(
                                 data,
                                 entry.type,
                                 groupSize,
@@ -77,18 +76,7 @@ public object OriginalMobSpawner {
                                 entityYaw = yaw,
                                 entityRandom = LegacyRandom(Random.nextLong()),
                             )
-                        chunk.addGeneratedEntity(
-                            ChunkGeneratedEntity(
-                                type = entry.type,
-                                x = entityX,
-                                y = y.toDouble(),
-                                z = entityZ,
-                                yaw = yaw,
-                                pitch = 0f,
-                                data = data,
-                                passengers = passengers,
-                            ),
-                        )
+                        forest.roots.forEach(chunk::addGeneratedEntity)
                         added++
                         groupSize++
                         success = true
