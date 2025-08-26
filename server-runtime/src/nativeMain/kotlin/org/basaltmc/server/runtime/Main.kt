@@ -158,7 +158,10 @@ private fun buildServer(attachedToTerminal: Boolean): BasaltServer {
     ServerListConfig.load(legacyMotd = BasaltConfig.legacyMotd(), logger = Logger("Config"))
     val live = LiveConfigs(LiveConfigs.read(logger = Logger("Config")))
     val compatibility = CompatibilityConfig.load(logger = Logger("Config"))
-    val onlineMode = if (config.onlineMode) OnlineMode(SessionKeyPair.generate(), MojangSessionService()) else null
+    // A forwarding proxy has already authenticated everyone, so the session exchange never runs
+    // here: keeping it would cost every player a second login they cannot answer.
+    val authenticates = config.onlineMode && !config.forwarding.enabled
+    val onlineMode = if (authenticates) OnlineMode(SessionKeyPair.generate(), MojangSessionService()) else null
     // Console-only: clients translate for themselves, a log file cannot. Unpacked from the same
     // server.jar as everything else, so this costs no extra download.
     val lang = LangAssets.loadCachedOrEmpty(dataRoot)

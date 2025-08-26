@@ -13,6 +13,7 @@ import org.basaltmc.server.runtime.command.PlayerCommandSource
 import org.basaltmc.server.runtime.command.commands.BossBarRegistry
 import org.basaltmc.server.runtime.entity.DamageSource
 import org.basaltmc.server.runtime.entity.ServerEntity
+import org.basaltmc.server.runtime.net.ProxyLogin
 import org.basaltmc.server.runtime.net.SessionOutbox
 import org.basaltmc.server.runtime.player.Difficulty
 import org.basaltmc.server.runtime.player.FoodData
@@ -60,6 +61,8 @@ import org.basaltmc.wire.auth.MinecraftCrypt
 import org.basaltmc.wire.auth.OfflineUuid
 import org.basaltmc.wire.auth.OnlineMode
 import org.basaltmc.wire.auth.SessionProfileProperty
+import org.basaltmc.wire.auth.forwarding.ForwardingResult
+import org.basaltmc.wire.auth.forwarding.ProxyForwarding
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.common.logging.Logger
 import org.basaltmc.wire.common.placeholder.PlaceholderRegistry
@@ -103,6 +106,8 @@ import org.basaltmc.wire.protocol.login.LoginAcknowledgedPacket
 import org.basaltmc.wire.protocol.login.LoginCompressionPacket
 import org.basaltmc.wire.protocol.login.LoginDisconnectPacket
 import org.basaltmc.wire.protocol.login.LoginFinishedPacket
+import org.basaltmc.wire.protocol.login.LoginPluginRequestPacket
+import org.basaltmc.wire.protocol.login.LoginPluginResponsePacket
 import org.basaltmc.wire.protocol.login.LoginStartPacket
 import org.basaltmc.wire.protocol.play.AcceptTeleportationPacket
 import org.basaltmc.wire.protocol.play.AttackPacket
@@ -201,6 +206,8 @@ public class ClientSession(
     org.basaltmc.wire.protocol.status.ServerStatusPayload,
     private val compressionThreshold: Int = 256,
     private val onlineMode: OnlineMode? = null,
+    /** Which proxy, if any, is speaking for this connection. Disabled means nobody is. */
+    private val forwarding: ProxyForwarding = ProxyForwarding.DISABLED,
     internal val playerRegistry: PlayerRegistry? = null,
     /** Every loaded world, by name: a joining player goes into the one their stored row names. */
     internal val worlds: Map<String, LoadedWorld> = emptyMap(),
@@ -209,8 +216,8 @@ public class ClientSession(
     internal val defaultGamemode: Gamemode = Gamemode.SURVIVAL,
     internal val difficulty: Difficulty = Difficulty.EASY,
     internal val playerStore: PlayerStore? = null,
-    /** Where this connection came from, or null when nothing should be remembered about it. */
-    internal val rememberAddress: String? = null,
+    /** Whether where this connection came from is worth remembering. */
+    private val rememberIp: Boolean = false,
     internal val ui: () -> UiConfigs = { UiConfigs() },
     private val placeholders: PlaceholderRegistry = PlaceholderRegistry(),
     /** Where this connection's share of the server's time is recorded. Off unless `/timings` is on. */
@@ -315,7 +322,18 @@ public class ClientSession(
     // player and for a pending ping.
     internal val handshakeProtocol: Int get() = handshake?.protocolVersion ?: 0
     internal val handshakeHost: String get() = handshake?.hostName.orEmpty()
-    internal val remoteAddress: String? get() = connection.remoteAddress
+
+    /** What the proxy in front of this server says about this connection, if there is one. */
+    private val proxy = ProxyLogin(forwarding, logger)
+
+    /** What reading the handshake host as forwarded data came to, or null when it was not read that way. */
+    private var forwardedHandshake: ForwardingResult? = null
+
+    /** The proxy's word for where the player is when one is forwarding, the socket otherwise. */
+    internal val remoteAddress: String? get() = proxy.login?.address ?: connection.remoteAddress
+
+    /** Where this connection came from, or null when nothing should be remembered about it. */
+    internal val rememberAddress: String? get() = if (rememberIp) remoteAddress else null
 
     // Written once per session rather than on every flush: it only changes when someone logs in.
     internal var addressRecorded = false
@@ -755,7 +773,12 @@ public class ClientSession(
         body: ByteBuffer,
     ) {
         if (packetId != HandshakePacket.ID) return
-        val packet = HandshakePacket.read(body)
+        val packet =
+            if (proxy.readsHandshake) {
+                HandshakePacket.read(body, HandshakePacket.FORWARDED_HOST_LENGTH)
+            } else {
+                HandshakePacket.read(body)
+            }
         handshake = packet
         verdict = protocolGate.verdictFor(packet.protocolVersion)
         translation = JavaTranslators.chainFor(packet.protocolVersion, substitutionLabels)
@@ -765,6 +788,15 @@ public class ClientSession(
                 ClientIntent.LOGIN -> ProtocolState.LOGIN
                 ClientIntent.TRANSFER -> return // not supported yet; drop the connection
             }
+        // Read now, acted on at login: a refusal there is still a disconnect screen rather than a
+        // socket that closes for no stated reason. A ping never carries forwarded data.
+        if (proxy.readsHandshake && packet.intent == ClientIntent.LOGIN) {
+            forwardedHandshake = proxy.readHandshake(packet.hostName)
+            (forwardedHandshake as? ForwardingResult.Accepted)?.let {
+                // The host with the forwarded data stripped back off it, which is what the player typed.
+                handshake = packet.copy(hostName = it.login.host)
+            }
+        }
     }
 
     private fun handleStatus(
@@ -791,6 +823,7 @@ public class ClientSession(
         when (packetId) {
             LoginStartPacket.ID -> handleLoginStart(body)
             KeyPacket.ID -> handleKey(body)
+            LoginPluginResponsePacket.ID -> handleForwardingAnswer(body)
             LoginAcknowledgedPacket.ID -> enterConfiguration()
         }
     }
@@ -829,32 +862,100 @@ public class ClientSession(
         (verdict as? ProtocolVerdict.Translated)?.let { translated ->
             logger.info { "${loginStart.name} is on ${translated.version}, translated to 26.2." }
         }
-        // The one gate before a player exists at all: a plugin that says no here means they never
-        // join, and what it says is what they read on the disconnect screen.
-        val login =
-            pluginEvents.emit(PluginEventTypes.PLAYER_LOGIN) { event ->
-                event.set(0, loginStart.name)
-                event.set(1, loginStart.profileId.toString())
-                event.set(2, connection.remoteAddress)
-            }
-        if (login?.cancelled == true) {
-            val reason = login.cancelMessage ?: "<red>You may not join this server"
-            sendUncompressed(LoginDisconnectPacket.ID) { LoginDisconnectPacket(MiniMessage.parse(reason)).write(it) }
-            connection.close()
+        pendingUsername = loginStart.name
+        // A proxy has already authenticated this player, so the session exchange never happens:
+        // what it says about them is the whole of their identity here.
+        if (proxy.enabled) {
+            startForwardedLogin(loginStart)
             return
         }
+        if (pluginRefusesLogin(loginStart.name, loginStart.profileId.toString())) return
+
         val online = onlineMode
         if (online == null) {
             finishLogin(OfflineUuid.forUsername(loginStart.name), loginStart.name, emptyList())
             return
         }
 
-        pendingUsername = loginStart.name
         val nonce = Random.nextBytes(4)
         challenge = nonce
         sendUncompressed(HelloPacket.ID) {
             HelloPacket("", online.keyPair.publicKeyDer, nonce, shouldAuthenticate = true).write(it)
         }
+    }
+
+    /**
+     * The one gate before a player exists at all: a plugin that says no here means they never join,
+     * and what it says is what they read on the disconnect screen.
+     *
+     * Returns whether it said no, in which case this connection is already closed.
+     */
+    private fun pluginRefusesLogin(
+        name: String,
+        profileId: String,
+    ): Boolean {
+        val login =
+            pluginEvents.emit(PluginEventTypes.PLAYER_LOGIN) { event ->
+                event.set(0, name)
+                event.set(1, profileId)
+                event.set(2, remoteAddress)
+            }
+        if (login?.cancelled != true) return false
+        val reason = login.cancelMessage ?: "<red>You may not join this server"
+        disconnectFromLogin(reason)
+        return true
+    }
+
+    /**
+     * Either finishes the login with what a BungeeCord-family proxy put on the handshake, or asks
+     * a Velocity one for it and waits.
+     */
+    private fun startForwardedLogin(loginStart: LoginStartPacket) {
+        if (proxy.asksTheProxy) {
+            val transactionId = proxy.beginQuery()
+            sendUncompressed(LoginPluginRequestPacket.ID) {
+                LoginPluginRequestPacket(transactionId, proxy.channel, proxy.query()).write(it)
+            }
+            return
+        }
+        val result =
+            forwardedHandshake
+                ?: ForwardingResult.Rejected("the handshake was read before forwarding was configured")
+        proxy.accept(result, loginStart.name, connection.remoteAddress)?.let { refusal ->
+            disconnectFromLogin(refusal)
+            return
+        }
+        val forwarded = proxy.login ?: return
+        if (pluginRefusesLogin(loginStart.name, forwarded.profileId.toString())) return
+        finishLogin(forwarded.profileId, loginStart.name, forwarded.properties)
+    }
+
+    /** Velocity's half: the proxy answers the query with the signed profile, or nothing does. */
+    private fun handleForwardingAnswer(body: ByteBuffer) {
+        val answer = LoginPluginResponsePacket.read(body)
+        val name = pendingUsername
+        if (!proxy.asksTheProxy || name == null) {
+            connection.close()
+            return
+        }
+        val result = proxy.readAnswer(answer.transactionId, answer.payload)
+        proxy.accept(result, name, connection.remoteAddress)?.let { refusal ->
+            disconnectFromLogin(refusal)
+            return
+        }
+        val forwarded = proxy.login ?: return
+        // The proxy's name for them, not the one they claimed in the login packet.
+        val forwardedName = forwarded.name ?: name
+        if (pluginRefusesLogin(forwardedName, forwarded.profileId.toString())) return
+        finishLogin(forwarded.profileId, forwardedName, forwarded.properties)
+    }
+
+    /** Turns a client away while still in login, where a written reason still reaches the screen. */
+    private fun disconnectFromLogin(miniMessage: String) {
+        sendUncompressed(LoginDisconnectPacket.ID) {
+            LoginDisconnectPacket(MiniMessage.parse(miniMessage)).write(it)
+        }
+        connection.close()
     }
 
     /** Turns a client away at the door, telling them what is wrong in words they can act on. */
@@ -946,7 +1047,7 @@ public class ClientSession(
         access.banOf(id.toString(), BanKind.PLAYER)?.let { ban ->
             return Component.translatable("multiplayer.disconnect.banned.reason", Component.text(ban.reason))
         }
-        connection.remoteAddress?.let { address ->
+        remoteAddress?.let { address ->
             access.banOf(address, BanKind.IP)?.let { ban ->
                 return Component.translatable("multiplayer.disconnect.banned_ip.reason", Component.text(ban.reason))
             }

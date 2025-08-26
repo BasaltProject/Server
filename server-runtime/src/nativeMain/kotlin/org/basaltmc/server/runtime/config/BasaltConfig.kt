@@ -1,5 +1,6 @@
 package org.basaltmc.server.runtime.config
 
+import org.basaltmc.wire.auth.forwarding.ProxyForwarding
 import org.basaltmc.wire.common.logging.LogLevel
 import org.basaltmc.wire.common.logging.Logger
 import org.basaltmc.wire.common.toml.TomlValue
@@ -27,6 +28,8 @@ public data class BasaltConfig(
     public val gamemode: String,
     /** Whether only whitelisted players may join. Who is whitelisted lives in `players.db`. */
     public val whitelist: Boolean,
+    /** Which proxy, if any, is speaking for the players that reach this server. See `[network.forwarding]`. */
+    public val forwarding: ProxyForwarding,
     public val logLevel: LogLevel,
     public val logToFile: Boolean,
     public val logKeepDays: Int,
@@ -67,6 +70,7 @@ public data class BasaltConfig(
                 onlineMode = true,
                 gamemode = "survival",
                 whitelist = false,
+                forwarding = ProxyForwarding.DISABLED,
                 logLevel = LogLevel.INFO,
                 logToFile = true,
                 logKeepDays = 14,
@@ -109,7 +113,7 @@ public data class BasaltConfig(
             }
             val root = directory.load(FILE_NAME, SERVER_DEFAULT_TOML)
             if (announce) logger.info { "Loaded configuration from $path." }
-            return fromToml(root)
+            return fromToml(root, path)
         }
 
         /** What to write into a freshly created `server.toml`: an imported `server.properties`, or the default. */
@@ -125,7 +129,10 @@ public data class BasaltConfig(
             return SERVER_DEFAULT_TOML
         }
 
-        private fun fromToml(root: TomlValue.Table): BasaltConfig {
+        private fun fromToml(
+            root: TomlValue.Table,
+            path: String,
+        ): BasaltConfig {
             val server = root.tableOrNull("server")
             val logging = root.tableOrNull("logging")
             val performance = root.tableOrNull("performance")
@@ -136,6 +143,7 @@ public data class BasaltConfig(
                 onlineMode = server?.boolOrNull("online-mode") ?: DEFAULT.onlineMode,
                 gamemode = server?.stringOrNull("gamemode") ?: DEFAULT.gamemode,
                 whitelist = server?.boolOrNull("whitelist") ?: DEFAULT.whitelist,
+                forwarding = ForwardingConfig.fromToml(root, path),
                 logLevel = logging?.stringOrNull("level")?.let(::parseLogLevel) ?: DEFAULT.logLevel,
                 logToFile = logging?.boolOrNull("file") ?: DEFAULT.logToFile,
                 logKeepDays = logging?.intOrNull("keep-days")?.toInt() ?: DEFAULT.logKeepDays,

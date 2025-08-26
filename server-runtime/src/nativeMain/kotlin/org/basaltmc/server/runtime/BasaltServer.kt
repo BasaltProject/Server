@@ -21,6 +21,7 @@ import org.basaltmc.server.runtime.command.commands.Stopwatches
 import org.basaltmc.server.runtime.config.BackwardsSelection
 import org.basaltmc.server.runtime.config.BasaltConfig
 import org.basaltmc.server.runtime.config.CompatibilityConfig
+import org.basaltmc.server.runtime.config.ForwardingConfig
 import org.basaltmc.server.runtime.config.LiveConfigs
 import org.basaltmc.server.runtime.config.WorldDimension
 import org.basaltmc.server.runtime.config.WorldsConfig
@@ -1115,6 +1116,7 @@ public class BasaltServer(
             "Done (${elapsedSeconds}s)! Listening on port ${config.port} " +
                 "(${if (onlineMode != null) "online" else "offline"}-mode)."
         }
+        ForwardingConfig.announce(config.forwarding, config.onlineMode, config.port, logger)
         val translated = protocolGate.supported - ProtocolVersions.NATIVE
         if (translated.isNotEmpty()) {
             // The range and the count, not the list: forty eight of them is a wall of text nobody
@@ -1140,7 +1142,8 @@ public class BasaltServer(
                     defaultGamemode = defaultGamemode,
                     difficulty = difficulty,
                     playerStore = playerStore,
-                    rememberAddress = if (live.current.serverList.rememberIp) connection.remoteAddress else null,
+                    rememberIp = live.current.serverList.rememberIp,
+                    forwarding = config.forwarding,
                     ui = { live.current.ui },
                     placeholders = placeholders,
                     timings = timings,
