@@ -150,6 +150,9 @@ public class BasaltServer(
     /** Built once from the configuration and what this build can translate. */
     private val protocolGate = compatibility.gate(JavaTranslators.supported, logger)
 
+    /** Null when the operator turned the naming off, which is what the rewriter reads as "leave it". */
+    private val substitutionLabels = if (compatibility.nameSubstitutes) SubstituteLabels() else null
+
     /** Player-shaped entities a plugin made, drawn by every connection that may see them. */
     private val npcs = NpcRegistry()
     private val cpuMeter = CpuMeter()
@@ -1160,6 +1163,7 @@ public class BasaltServer(
                     pluginEvents = plugins.events,
                     pluginPackets = plugins.packets,
                     protocolGate = protocolGate,
+                    substitutionLabels = substitutionLabels,
                     npcs = npcs,
                     pluginChannel = { channel, uuid, bytes -> plugins.channelMessage(channel, uuid, bytes) },
                     pluginListensOn = { channel -> plugins.listeningOnChannel(channel) },
