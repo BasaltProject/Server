@@ -4,6 +4,8 @@ import org.basaltmc.server.runtime.entity.AgeableMobs
 import org.basaltmc.server.runtime.entity.CubeMobs
 import org.basaltmc.server.runtime.entity.Mobs
 import org.basaltmc.server.runtime.entity.ServerEntity
+import org.basaltmc.server.runtime.entity.numericDouble
+import org.basaltmc.server.runtime.entity.numericInt
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
 import org.basaltmc.wire.nbt.NbtFloat
@@ -24,7 +26,10 @@ internal fun generatedEntityMetadata(
             add(SetEntityDataPacket.Entry.Ints(AIR_SUPPLY_DATA_INDEX, data.getShort("Air").toInt()))
         }
 
-        if ("Health" in data) add(SetEntityDataPacket.Entry.Floats(9, data.getFloat("Health")))
+        // Read as a number rather than as a float tag: a save written before Health became one, or
+        // an imported world, still has to say how alive the mob is. Zero here is a mob the client
+        // lays on its side and plays the death animation for, however well it is walking around.
+        if ("Health" in data) add(SetEntityDataPacket.Entry.Floats(9, data.numericDouble("Health").toFloat()))
 
         if (Mobs.isMob(Identifier.vanilla(type))) {
             var mobFlags = 0
@@ -33,7 +38,7 @@ internal fun generatedEntityMetadata(
             if (mobFlags != 0) add(SetEntityDataPacket.Entry.Bytes(MOB_FLAGS_DATA_INDEX, mobFlags.toByte()))
         }
 
-        if (AgeableMobs.hasBabyMetadata(type) && (data.getInt("Age") < 0 || data.getBoolean("IsBaby"))) {
+        if (AgeableMobs.hasBabyMetadata(type) && (data.numericInt("Age") < 0 || data.getBoolean("IsBaby"))) {
             add(SetEntityDataPacket.Entry.Booleans(AgeableMobs.BABY_DATA_INDEX, true))
         }
         if (CubeMobs.isCube(type) && data.getInt("Size") != 0) {

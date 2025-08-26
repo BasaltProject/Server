@@ -33,19 +33,19 @@ public object EntityNbt {
         tag["Pos"] = doubles(entity.x, entity.y, entity.z)
         tag["Motion"] = doubles(entity.velocityX, entity.velocityY, entity.velocityZ)
         tag["Rotation"] = floats(entity.yaw, entity.pitch)
-        tag["Health"] = NbtDouble(entity.health)
-        tag["Age"] = NbtDouble(entity.age.toDouble())
-        tag["Fuse"] = NbtDouble(entity.fuse.toDouble())
+        tag.putFloat("Health", entity.health.toFloat())
+        tag.putInt("Age", entity.age)
+        tag.putShort("Fuse", entity.fuse.toShort())
         tag.putShort("Air", entity.airSupply.toShort())
         if (CubeMobs.isCube(entity.type)) tag["Size"] = NbtInt(entity.cubeSize.coerceAtLeast(1) - 1)
-        tag["PersistenceRequired"] = NbtDouble(if (entity.persistent) 1.0 else 0.0)
+        tag.putBoolean("PersistenceRequired", entity.persistent)
         tag.putBoolean("NoAI", entity.noAi)
         tag.putBoolean("CanPickUpLoot", entity.canPickUpLoot)
-        tag["LoveTicks"] = NbtDouble(entity.loveTicks.toDouble())
-        tag["BreedCooldown"] = NbtDouble(entity.breedCooldown.toDouble())
+        tag.putInt("LoveTicks", entity.loveTicks)
+        tag.putInt("BreedCooldown", entity.breedCooldown)
         tag["VillagerProfession"] = NbtString(entity.profession)
-        tag["VillagerLevel"] = NbtDouble(entity.villagerLevel.toDouble())
-        tag["VillagerExperience"] = NbtDouble(entity.villagerExperience.toDouble())
+        tag.putInt("VillagerLevel", entity.villagerLevel)
+        tag.putInt("VillagerExperience", entity.villagerExperience)
         if (entity.type.path == "villager" || entity.type.path == "zombie_villager") {
             val villagerData = tag.getCompound("VillagerData")
             if (villagerData.getString("type").isEmpty()) villagerData.putString("type", "minecraft:plains")
@@ -55,7 +55,7 @@ public object EntityNbt {
             tag.putInt("Xp", entity.villagerExperience)
         }
         entity.owner?.let { tag["Owner"] = NbtString(it) }
-        tag["Sitting"] = NbtDouble(if (entity.sitting) 1.0 else 0.0)
+        tag.putBoolean("Sitting", entity.sitting)
         entity.customName?.let { tag["CustomName"] = NbtString(it) }
         if (entity.tags.isNotEmpty()) {
             tag["Tags"] = NbtList(NbtType.STRING, entity.tags.map { NbtString(it) })
@@ -267,21 +267,21 @@ public object EntityNbt {
         }
     }
 
-    /** Vanilla uses byte/int/float tags while this server's older saves used doubles for the same fields. */
-    private fun NbtCompound.numericDouble(key: String): Double =
-        when (val value = this[key]) {
-            is NbtByte -> value.value.toDouble()
-            is NbtShort -> value.value.toDouble()
-            is NbtInt -> value.value.toDouble()
-            is NbtLong -> value.value.toDouble()
-            is NbtFloat -> value.value.toDouble()
-            is NbtDouble -> value.value
-            else -> 0.0
-        }
-
-    private fun NbtCompound.numericInt(key: String): Int = numericDouble(key).toInt()
-
-    private fun NbtCompound.numericBoolean(key: String): Boolean = numericDouble(key) != 0.0
-
     private const val MAX_HEALTH_ATTRIBUTE = "minecraft:max_health"
 }
+
+/** Vanilla uses byte/int/float tags while this server's older saves used doubles for the same fields. */
+internal fun NbtCompound.numericDouble(key: String): Double =
+    when (val value = this[key]) {
+        is NbtByte -> value.value.toDouble()
+        is NbtShort -> value.value.toDouble()
+        is NbtInt -> value.value.toDouble()
+        is NbtLong -> value.value.toDouble()
+        is NbtFloat -> value.value.toDouble()
+        is NbtDouble -> value.value
+        else -> 0.0
+    }
+
+internal fun NbtCompound.numericInt(key: String): Int = numericDouble(key).toInt()
+
+internal fun NbtCompound.numericBoolean(key: String): Boolean = numericDouble(key) != 0.0
