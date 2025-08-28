@@ -116,6 +116,7 @@ internal class MobTickSystem(
         }
         if (!entity.noAi) {
             actions.tickMobAi(world, entity, views, living, random)
+            if (entity.type.path == "villager") actions.tickVillageGolem(world, entity, living, random)
             val partner = Breeding.tick(entity, living)
             if (partner != null) actions.breed(world, entity, partner)
         }

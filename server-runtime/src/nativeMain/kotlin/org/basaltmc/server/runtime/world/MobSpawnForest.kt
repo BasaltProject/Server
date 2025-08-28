@@ -167,6 +167,7 @@ internal enum class MobSpawnReason {
     STRUCTURE,
     JOCKEY,
     TRIGGERED,
+    MOB_SUMMONED,
 }
 
 /** Builds the complete generated forest while preserving which descriptor is the requested mob. */

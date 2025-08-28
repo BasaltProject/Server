@@ -83,6 +83,15 @@ public class MobActionSystem(
         for (change in changes) broadcaster.announceRedstone(world, watchers, change)
     }
 
+    internal fun tickVillageGolem(
+        world: LoadedWorld,
+        villager: org.basaltmc.server.runtime.entity.ServerEntity,
+        living: List<org.basaltmc.server.runtime.entity.ServerEntity>,
+        random: LegacyRandom,
+    ) {
+        spawning.tickVillageGolem(world, villager, living, random)
+    }
+
     override fun swing(mob: org.basaltmc.server.runtime.entity.ServerEntity) {
         val world = worlds().values.firstOrNull { it.state.entity(mob.entityId) != null } ?: return
         for (player in playerRegistry.snapshot().filter { it.worldName == world.name }) {
@@ -229,8 +238,9 @@ public class MobActionSystem(
         sleeping: Boolean,
     ) {
         if (mob.sleeping == sleeping) return
-        mob.sleeping = sleeping
         val world = worlds().values.firstOrNull { it.state.entity(mob.entityId) != null } ?: return
+        mob.sleeping = sleeping
+        if (sleeping && mob.type.path == "villager") mob.lastSleptGameTime = world.gameTime
         val pose = if (sleeping) Pose.SLEEPING else Pose.STANDING
         for (player in playerRegistry.snapshot().filter { it.worldName == world.name }) {
             player.connection.sendPlayPacket(SetEntityDataPacket.ID) {

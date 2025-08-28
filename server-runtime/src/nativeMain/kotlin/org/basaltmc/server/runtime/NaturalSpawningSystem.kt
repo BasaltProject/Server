@@ -35,6 +35,7 @@ import org.basaltmc.server.runtime.world.SpawnEquipmentFinalizer
 import org.basaltmc.server.runtime.world.SpawnPotential
 import org.basaltmc.server.runtime.world.SpawnRequest
 import org.basaltmc.server.runtime.world.TraderLlamaSpawnRequest
+import org.basaltmc.server.runtime.world.VillageGolemSpawner
 import org.basaltmc.server.runtime.world.VillageSiegeSpawnRequest
 import org.basaltmc.server.runtime.world.WanderingTraderSpawnRequest
 import org.basaltmc.server.runtime.world.relocateMain
@@ -134,6 +135,36 @@ public class NaturalSpawningSystem(
             entity.hurtCooldown = SkeletonHorseTrap.ACTIVATION_INVULNERABLE_TICKS
         }
         return true
+    }
+
+    /** Villager Brain agreement and MOB_SUMMONED iron-golem placement. */
+    internal fun tickVillageGolem(
+        world: LoadedWorld,
+        villager: ServerEntity,
+        living: List<ServerEntity>,
+        random: LegacyRandom,
+    ) {
+        VillageGolemSpawner.tick(world, villager, living, random) { position ->
+            val request =
+                SpawnRequest(
+                    type = Identifier.vanilla("iron_golem"),
+                    x = position[0] + 0.5,
+                    y = position[1].toDouble(),
+                    z = position[2] + 0.5,
+                    yaw = random.nextFloat() * FULL_ROTATION,
+                    biome = NaturalSpawner.biomeAt(world, position[0], position[1], position[2]),
+                )
+            materializeSpawnForest(
+                world,
+                request,
+                position[0],
+                position[1],
+                position[2],
+                random,
+                MobSpawnReason.MOB_SUMMONED,
+                "mob_summoned",
+            ) != null
+        }
     }
 
     /**
