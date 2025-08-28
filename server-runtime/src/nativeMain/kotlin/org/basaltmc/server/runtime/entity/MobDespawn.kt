@@ -29,14 +29,23 @@ public object MobDespawn {
             return false
         }
         if (mob.type.path == "wandering_trader") return false
-        // SkeletonHorse inherits Animal.removeWhenFarAway(false); an armed trap gets its own
-        // eighteen-thousand-tick expiry instead of either generic distance rule.
-        if (mob.type.path == "skeleton_horse") return false
+        // Animal.removeWhenFarAway(false). The exceptional natural water animals, zombie horse,
+        // camel husk, chicken, cat and ocelot are deliberately absent or handled immediately below.
+        if (mob.type.path in NEVER_DESPAWN_ANIMALS) return false
         // parity: `removeWhenFarAway` answers false for the mobs that live in the misc category, a
         // villager and an iron golem among them, so a village does not empty when you walk away.
         if (category == MobCategory.MISC) return false
+        // Chicken alone opts back into normal distance despawning while carrying a jockey.
+        if (mob.type.path == "chicken" && mob.sourceNbt?.getBoolean("IsChickenJockey") != true) return false
         // Cat.removeWhenFarAway protects every newly spawned stray for its first two minutes.
         if (mob.type.path == "cat" && mob.tickCount <= CAT_DESPAWN_GRACE_TICKS) return false
+        // Ocelot has the same grace, and trusting one changes the answer permanently to false.
+        if (
+            mob.type.path == "ocelot" &&
+            (mob.tickCount <= CAT_DESPAWN_GRACE_TICKS || mob.sourceNbt?.getBoolean("Trusting") == true)
+        ) {
+            return false
+        }
         val distance = nearestDistance ?: return false
         val distanceSquared = distance * distance
         val despawn = category.despawnDistance.toDouble() * category.despawnDistance
@@ -55,4 +64,33 @@ public object MobDespawn {
 
     private const val PATROL_HARD_DESPAWN_SQUARED = 16_384.0
     private const val CAT_DESPAWN_GRACE_TICKS = 2_400
+
+    private val NEVER_DESPAWN_ANIMALS =
+        setOf(
+            "armadillo",
+            "bee",
+            "camel",
+            "cow",
+            "donkey",
+            "fox",
+            "frog",
+            "goat",
+            "happy_ghast",
+            "horse",
+            "llama",
+            "mooshroom",
+            "mule",
+            "panda",
+            "parrot",
+            "pig",
+            "polar_bear",
+            "rabbit",
+            "sheep",
+            "skeleton_horse",
+            "sniffer",
+            "strider",
+            "trader_llama",
+            "turtle",
+            "wolf",
+        )
 }

@@ -18,6 +18,7 @@ import org.basaltmc.wire.nbt.NbtCompound
 import org.basaltmc.wire.protocol.play.SetEntityDataPacket
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -486,7 +487,7 @@ class EntityNbtTest {
             )
         assertEquals(AgeableMobs.BABY_START_AGE, jockeyEntities.single { it.type.path == "zombie" }.age)
         assertEquals(jockeyEntities[0].entityId, jockeyEntities[1].vehicleId)
-        assertTrue(MobPersistence.keeps(jockeyEntities.single { it.type.path == "chicken" }))
+        assertFalse(MobPersistence.keeps(jockeyEntities.single { it.type.path == "chicken" }))
 
         val reusedChicken =
             assertNotNull(
