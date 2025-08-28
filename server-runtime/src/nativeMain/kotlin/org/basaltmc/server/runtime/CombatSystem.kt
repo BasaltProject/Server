@@ -8,6 +8,7 @@ import org.basaltmc.server.runtime.entity.DamageSource
 import org.basaltmc.server.runtime.entity.EntityCombat
 import org.basaltmc.server.runtime.entity.Projectiles
 import org.basaltmc.server.runtime.entity.ServerEntity
+import org.basaltmc.server.runtime.entity.displayName
 import org.basaltmc.server.runtime.player.PlayerSession
 import org.basaltmc.server.runtime.registry.VanillaRegistryData
 import org.basaltmc.server.runtime.world.BlockEffect
@@ -21,6 +22,7 @@ import org.basaltmc.wire.protocol.play.Gamemode
 import org.basaltmc.wire.protocol.play.SetEntityMotionPacket
 import org.basaltmc.wire.protocol.play.SoundPacket
 import org.basaltmc.wire.protocol.play.SoundSource
+import org.basaltmc.wire.text.Component
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.sqrt
@@ -91,7 +93,7 @@ public class CombatSystem(
                 SMALL_FIREBALL_DAMAGE,
                 DEATH_ON_FIRE,
                 DamageTypes.ON_FIRE,
-                DamageSource(entity.entityId, fromX, fromZ),
+                DamageSource(entity.entityId, fromX, fromZ, shooterName(watchers, living, entity)),
             )
             return
         }
@@ -282,9 +284,21 @@ public class CombatSystem(
             damage.toFloat(),
             DEATH_ARROW,
             DamageTypes.ARROW,
-            DamageSource(arrow.entityId, fromX, fromZ),
+            DamageSource(arrow.entityId, fromX, fromZ, shooterName(watchers, living, arrow)),
         )
         return true
+    }
+
+    // parity: Projectile.getOwner, since an arrow kills for whoever shot it. The arrow itself is the
+    // answer once its owner is gone.
+    private fun shooterName(
+        watchers: List<PlayerSession>,
+        living: List<ServerEntity>,
+        projectile: ServerEntity,
+    ): Component {
+        val ownerId = projectile.ownerId ?: return projectile.displayName()
+        watchers.firstOrNull { it.entityId == ownerId }?.let { return Component.text(it.name) }
+        return living.firstOrNull { it.entityId == ownerId }?.displayName() ?: projectile.displayName()
     }
 
     /** Where along its flight the arrow met this box, or null when it did not. */

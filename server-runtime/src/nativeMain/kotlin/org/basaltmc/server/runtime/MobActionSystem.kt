@@ -22,6 +22,7 @@ import org.basaltmc.server.runtime.entity.ai.MobGoals
 import org.basaltmc.server.runtime.entity.ai.MoveControl
 import org.basaltmc.server.runtime.entity.ai.Navigation
 import org.basaltmc.server.runtime.entity.ai.PlayerView
+import org.basaltmc.server.runtime.entity.displayName
 import org.basaltmc.server.runtime.player.Combat
 import org.basaltmc.server.runtime.player.PlayerRegistry
 import org.basaltmc.server.runtime.player.PlayerSession
@@ -103,7 +104,7 @@ public class MobActionSystem(
             Combat.afterDifficulty(damage, world.difficulty),
             DEATH_MOB,
             DamageTypes.MOB_ATTACK,
-            DamageSource(mob.entityId, mob.x, mob.z),
+            DamageSource(mob.entityId, mob.x, mob.z, mob.displayName()),
         )
         // parity: `OwnerHurtByTargetGoal`: a pet goes for whatever hit the person it follows.
         for (pet in world.state.entities()) {
@@ -321,7 +322,7 @@ public class MobActionSystem(
                     FANG_DAMAGE,
                     DEATH_MOB,
                     DamageTypes.MOB_ATTACK,
-                    DamageSource(mob.entityId, mob.x, mob.z),
+                    DamageSource(mob.entityId, mob.x, mob.z, mob.displayName()),
                 )
             }
             for (watcher in watchers) {

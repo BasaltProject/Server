@@ -5,6 +5,7 @@ import org.basaltmc.server.plugins.PluginEventTypes
 import org.basaltmc.server.registry.EntityAttributes
 import org.basaltmc.server.runtime.player.Combat
 import org.basaltmc.wire.common.Identifier
+import org.basaltmc.wire.text.Component
 
 /**
  * What a hit does to something that is not a player.
@@ -168,4 +169,10 @@ public class DamageSource(
     public val entityId: Int,
     public val x: Double,
     public val z: Double,
+    /** Travels with the hit because only where it comes from knows it: below there is just an id. */
+    public val name: Component? = null,
 )
+
+/** parity: `Entity.getDisplayName`, which is the name somebody gave it or the name of its kind. */
+public fun ServerEntity.displayName(): Component =
+    customName?.let { Component.text(it) } ?: Component.translatable("entity.minecraft.${type.path}")

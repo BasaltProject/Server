@@ -709,7 +709,7 @@ internal class CombatHandler(
         if (damage <= 0f) return
         session.stats.addDamageTaken(damage)
         session.health = maxOf(session.health - damage, 0f)
-        if (session.health <= 0f) die(deathMessageId) else owner.uiState.syncHealth()
+        if (session.health <= 0f) die(deathMessageId, source?.name) else owner.uiState.syncHealth()
     }
 
     /** parity: `LivingEntity.heal`, capped at the maximum and reported like any other change. */
@@ -748,7 +748,10 @@ internal class CombatHandler(
      * default) and the death screen itself is [PlayerCombatKillPacket]: without it the client never
      * learns it died and keeps playing.
      */
-    private fun die(deathMessageId: String) {
+    private fun die(
+        deathMessageId: String,
+        killer: Component? = null,
+    ) {
         owner.playerSession?.let { session ->
             owner.pluginEvents.emit(PluginEventTypes.PLAYER_DEATH) { event ->
                 event.set(0, session.name)
@@ -768,7 +771,13 @@ internal class CombatHandler(
         session.stats.increment(StoredStats.DEATHS)
         session.stats.reset(StoredStats.TIME_SINCE_REST)
         owner.uiState.syncHealth()
-        val message = Component.translatable("death.attack.$deathMessageId", Component.text(session.name))
+        // parity: `DamageSource.getLocalizedDeathMessage`, whose second argument is whoever did it.
+        // Half of vanilla's death messages name them, and one built without it reads as `%2$s`.
+        val message =
+            Component.translatable(
+                "death.attack.$deathMessageId",
+                *listOfNotNull(Component.text(session.name), killer).toTypedArray(),
+            )
         owner.sendCompressed(PlayerCombatKillPacket.ID) {
             PlayerCombatKillPacket(session.entityId, message).write(it)
         }
