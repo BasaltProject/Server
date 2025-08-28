@@ -594,6 +594,7 @@ public class BasaltServer(
             chunkSimulation,
             broadcaster,
             commands.environment,
+            spawning,
         )
 
     /**

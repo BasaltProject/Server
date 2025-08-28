@@ -24,6 +24,11 @@ internal object VanillaConfigurationRegistries {
                     RegistryEntry("minecraft:${entry.path}", with(VanillaBiomes) { entry.toNbt() })
                 },
             ),
+            variants(
+                "minecraft:banner_pattern",
+                VanillaRegistryData.bannerPatterns,
+                VanillaRegistryData::bannerPattern,
+            ),
             variants("minecraft:wolf_variant", VanillaRegistryData.wolfVariants, VanillaRegistryData::wolfVariant),
             variants(
                 "minecraft:wolf_sound_variant",

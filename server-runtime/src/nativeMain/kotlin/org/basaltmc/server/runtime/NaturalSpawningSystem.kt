@@ -13,9 +13,11 @@ import org.basaltmc.server.runtime.entity.MobPersistence
 import org.basaltmc.server.runtime.entity.Mobs
 import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.server.runtime.player.PlayerRegistry
+import org.basaltmc.server.runtime.player.PlayerSession
 import org.basaltmc.server.runtime.plugins.emit
 import org.basaltmc.server.runtime.sched.Region
 import org.basaltmc.server.runtime.world.BlockPlacement
+import org.basaltmc.server.runtime.world.CatSpawnRequest
 import org.basaltmc.server.runtime.world.GameRuleRegistry
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.runtime.world.LocalMobCaps
@@ -23,12 +25,19 @@ import org.basaltmc.server.runtime.world.MobCapPlayer
 import org.basaltmc.server.runtime.world.MobLocalDifficulty
 import org.basaltmc.server.runtime.world.MobSpawnEnvironment
 import org.basaltmc.server.runtime.world.MobSpawnForest
+import org.basaltmc.server.runtime.world.MobSpawnGroupData
 import org.basaltmc.server.runtime.world.MobSpawnReason
 import org.basaltmc.server.runtime.world.NaturalSpawner
+import org.basaltmc.server.runtime.world.PatrolSpawnRequest
 import org.basaltmc.server.runtime.world.RealBiomeSpawns
+import org.basaltmc.server.runtime.world.SkeletonHorseTrap
 import org.basaltmc.server.runtime.world.SpawnEquipmentFinalizer
 import org.basaltmc.server.runtime.world.SpawnPotential
 import org.basaltmc.server.runtime.world.SpawnRequest
+import org.basaltmc.server.runtime.world.TraderLlamaSpawnRequest
+import org.basaltmc.server.runtime.world.VillageSiegeSpawnRequest
+import org.basaltmc.server.runtime.world.WanderingTraderSpawnRequest
+import org.basaltmc.server.runtime.world.relocateMain
 import org.basaltmc.server.runtime.world.writeGeneratedForest
 import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.wire.common.Identifier
@@ -80,6 +89,53 @@ public class NaturalSpawningSystem(
         return entity
     }
 
+    /** The EVENT horse made by `ServerLevel.tickThunder`; it deliberately skips `finalizeSpawn`. */
+    internal fun spawnSkeletonTrap(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): ServerEntity? =
+        spawnMob(
+            world,
+            Identifier.vanilla("skeleton_horse"),
+            x.toDouble(),
+            y.toDouble(),
+            z.toDouble(),
+            reason = "event",
+        ) { horse ->
+            horse.skeletonTrap = true
+            horse.skeletonTrapTime = 0
+            horse.age = 0
+        }
+
+    /** The TRIGGERED rider forest created when a living player comes within ten blocks. */
+    internal fun activateSkeletonTrap(
+        world: LoadedWorld,
+        horse: ServerEntity,
+        random: LegacyRandom,
+    ): Boolean {
+        if (horse.type.path != "skeleton_horse" || !horse.skeletonTrap || horse.removed) return false
+        val forest =
+            SkeletonHorseTrap.activate(
+                world,
+                horse,
+                levelRandom = random,
+                horseRandom = LegacyRandom(Random.nextLong()),
+                entityRandomFactory = { LegacyRandom(Random.nextLong()) },
+                equipment = equipmentFinalizer,
+            )
+        materializeForest(
+            world,
+            forest,
+            eventReason = "triggered",
+            checkMain = true,
+        ) { entity, _ ->
+            entity.hurtCooldown = SkeletonHorseTrap.ACTIVATION_INVULNERABLE_TICKS
+        }
+        return true
+    }
+
     /**
      * Fills the world around the players with the mobs their biomes offer.
      *
@@ -95,11 +151,55 @@ public class NaturalSpawningSystem(
         // region made the first distant player consume the cap of every other one.
         if (!region.isPrimary) return
         if (!world.gameRules[GameRuleRegistry.SPAWN_MOBS]) return
+        val random = LegacyRandom(Random.nextLong())
+        val worldPlayers = playerRegistry.snapshot().filter { it.worldName == world.name }
         val watchers =
-            playerRegistry.snapshot().filter {
-                it.worldName == world.name && it.gamemode != Gamemode.SPECTATOR
-            }
-        if (watchers.isEmpty()) return
+            worldPlayers.filter { it.gamemode != Gamemode.SPECTATOR }
+        if (watchers.isNotEmpty()) tickNaturalSpawning(world, watchers, random)
+        world.phantomSpawner.tick(
+            world,
+            spawnEnemies = world.difficulty != "peaceful" && world.gameRules[GameRuleRegistry.SPAWN_MONSTERS],
+            players = worldPlayers,
+            random = random,
+        ) { request ->
+            val blockX = floor(request.x).toInt()
+            val blockY = floor(request.y).toInt()
+            val blockZ = floor(request.z).toInt()
+            materializeNaturalForest(world, request, blockX, blockY, blockZ, random)
+        }
+        world.patrolSpawner.tick(
+            world,
+            spawnEnemies = world.difficulty != "peaceful" && world.gameRules[GameRuleRegistry.SPAWN_MONSTERS],
+            players = worldPlayers,
+            random = random,
+        ) { request ->
+            materializePatrolMember(world, request, random) != null
+        }
+        world.catSpawner.tick(world, worldPlayers, random) { request ->
+            materializeCat(world, request, random)
+        }
+        world.villageSiegeSpawner.tick(
+            world,
+            spawnEnemies = world.difficulty != "peaceful" && world.gameRules[GameRuleRegistry.SPAWN_MONSTERS],
+            players = worldPlayers,
+            random = random,
+        ) { request ->
+            materializeVillageSiegeZombie(world, request, random)
+        }
+        world.wanderingTraderSpawner.tick(
+            world = world,
+            players = worldPlayers,
+            levelRandom = random,
+            spawnTrader = { request -> materializeWanderingTrader(world, request, random)?.entityId },
+            spawnLlama = { request, traderId -> materializeTraderLlama(world, request, traderId, random) },
+        )
+    }
+
+    private fun tickNaturalSpawning(
+        world: LoadedWorld,
+        watchers: List<PlayerSession>,
+        random: LegacyRandom,
+    ) {
         val localCaps = LocalMobCaps(watchers.map { MobCapPlayer(it.entityId, it.x, it.z) })
         val chunks = chunkSimulation.simulatedChunks(world).filter { localCaps.isSpawnCandidate(it[0], it[1]) }
         if (chunks.isEmpty()) return
@@ -107,7 +207,6 @@ public class NaturalSpawningSystem(
         // parity: NaturalSpawner.createState excludes both PersistenceRequired and each mob's
         // requiresCustomPersistence override before global caps, local caps and spawn costs.
         val alive = world.state.entities().filter { !it.removed && !MobPersistence.keeps(it) }
-        val random = LegacyRandom(Random.nextLong())
         val categories = NaturalSpawner.categoriesFor(world.difficulty, world.gameTime)
         val cappedCategories = MobCategory.entries.filter { it != MobCategory.MISC }
         val caps = cappedCategories.associateWith { NaturalSpawner.capFor(it, chunks.size) }
@@ -191,8 +290,222 @@ public class NaturalSpawningSystem(
         blockY: Int,
         blockZ: Int,
         random: LegacyRandom,
+    ): ServerEntity? =
+        materializeSpawnForest(
+            world,
+            request,
+            blockX,
+            blockY,
+            blockZ,
+            random,
+            MobSpawnReason.NATURAL,
+            "natural",
+        )
+
+    private fun materializePatrolMember(
+        world: LoadedWorld,
+        patrol: PatrolSpawnRequest,
+        random: LegacyRandom,
     ): ServerEntity? {
-        if (!spawnAllowed(world, request.type, request.x, request.y, request.z, "natural")) return null
+        val group =
+            MobSpawnGroupData().also {
+                it.patrolLeader = patrol.leader
+            }
+        val request =
+            SpawnRequest(
+                Identifier.vanilla("pillager"),
+                patrol.x,
+                patrol.y,
+                patrol.z,
+                yaw = 0f,
+                group = group,
+                biome = patrol.biome,
+            )
+        return materializeSpawnForest(
+            world,
+            request,
+            floor(patrol.x).toInt(),
+            floor(patrol.y).toInt(),
+            floor(patrol.z).toInt(),
+            random,
+            MobSpawnReason.PATROL,
+            "patrol",
+        )
+    }
+
+    private fun materializeCat(
+        world: LoadedWorld,
+        cat: CatSpawnRequest,
+        random: LegacyRandom,
+    ): ServerEntity? {
+        val group = MobSpawnGroupData().also { it.catSpawnContext = cat.context }
+        val request =
+            SpawnRequest(
+                Identifier.vanilla("cat"),
+                cat.x,
+                cat.y,
+                cat.z,
+                yaw = 0f,
+                group = group,
+                biome = cat.biome,
+            )
+        return materializeSpawnForest(
+            world,
+            request,
+            floor(cat.x).toInt(),
+            floor(cat.y).toInt(),
+            floor(cat.z).toInt(),
+            random,
+            MobSpawnReason.NATURAL,
+            "natural",
+        )?.also { it.persistent = cat.persistent }
+    }
+
+    /** VillageSiege finalizes a zero-position Zombie and only then moves that zombie, not its vehicle. */
+    private fun materializeVillageSiegeZombie(
+        world: LoadedWorld,
+        siege: VillageSiegeSpawnRequest,
+        random: LegacyRandom,
+    ): ServerEntity? {
+        val zombie = Identifier.vanilla("zombie")
+        if (!spawnAllowed(world, zombie, siege.x, siege.y, siege.z, "event")) return null
+        val inhabitedTime = world.state.chunkIfLoaded(0, 0)?.inhabitedTime ?: 0L
+        val specialMultiplier =
+            MobLocalDifficulty.specialMultiplier(
+                world.difficulty,
+                world.gameTime,
+                inhabitedTime,
+                NaturalSpawner.surfaceSlimeChance(world.clock.totalTicks) * 2f,
+            )
+        val forest =
+            writeGeneratedForest(
+                NbtCompound(),
+                zombie,
+                groupIndex = 0,
+                random = random,
+                specialMultiplier = specialMultiplier,
+                group = MobSpawnGroupData(),
+                biome = NaturalSpawner.biomeAt(world, 0, 0, 0),
+                blockX = 0,
+                blockY = 0,
+                blockZ = 0,
+                gameTime = world.gameTime,
+                difficulty = world.difficulty,
+                equipmentFinalizer = equipmentFinalizer,
+                entityX = 0.0,
+                entityY = 0.0,
+                entityZ = 0.0,
+                entityYaw = 0f,
+                entityRandom = LegacyRandom(Random.nextLong()),
+                reason = MobSpawnReason.EVENT,
+                entityRandomFactory = { LegacyRandom(Random.nextLong()) },
+                environment = spawnEnvironment(world),
+            )
+        val yaw = random.nextFloat() * FULL_ROTATION
+        return materializeForest(world, forest.relocateMain(siege.x, siege.y, siege.z, yaw))
+    }
+
+    private fun materializeWanderingTrader(
+        world: LoadedWorld,
+        request: WanderingTraderSpawnRequest,
+        random: LegacyRandom,
+    ): ServerEntity? {
+        val trader =
+            materializeEventMob(
+                world,
+                Identifier.vanilla("wandering_trader"),
+                request.x,
+                request.y,
+                request.z,
+                random,
+            ) ?: return null
+        trader.despawnDelay = WANDERING_TRADER_DESPAWN_DELAY
+        trader.wanderTarget = intArrayOf(request.referenceX, request.referenceY, request.referenceZ)
+        trader.homePosition = intArrayOf(request.referenceX, request.referenceY, request.referenceZ)
+        trader.homeRadius = WANDERING_TRADER_HOME_RADIUS
+        return trader
+    }
+
+    private fun materializeTraderLlama(
+        world: LoadedWorld,
+        request: TraderLlamaSpawnRequest,
+        traderId: Int,
+        random: LegacyRandom,
+    ) {
+        val trader = world.state.entity(traderId)?.takeIf { !it.removed } ?: return
+        val llama =
+            materializeEventMob(
+                world,
+                Identifier.vanilla("trader_llama"),
+                request.x,
+                request.y,
+                request.z,
+                random,
+            ) ?: return
+        llama.leashHolderId = trader.entityId
+        llama.leashHolderUuid = trader.uuid.toString()
+    }
+
+    /** EntityType.spawn: level yaw first, then EVENT finalization at the already-positioned mob. */
+    private fun materializeEventMob(
+        world: LoadedWorld,
+        type: Identifier,
+        x: Double,
+        y: Double,
+        z: Double,
+        random: LegacyRandom,
+    ): ServerEntity? {
+        if (!spawnAllowed(world, type, x, y, z, "event")) return null
+        val blockX = floor(x).toInt()
+        val blockY = floor(y).toInt()
+        val blockZ = floor(z).toInt()
+        val inhabitedTime = world.state.chunkIfLoaded(blockX shr 4, blockZ shr 4)?.inhabitedTime ?: 0L
+        val specialMultiplier =
+            MobLocalDifficulty.specialMultiplier(
+                world.difficulty,
+                world.gameTime,
+                inhabitedTime,
+                NaturalSpawner.surfaceSlimeChance(world.clock.totalTicks) * 2f,
+            )
+        val yaw = random.nextFloat() * FULL_ROTATION
+        val forest =
+            writeGeneratedForest(
+                NbtCompound(),
+                type,
+                groupIndex = 0,
+                random = random,
+                specialMultiplier = specialMultiplier,
+                group = MobSpawnGroupData(),
+                biome = NaturalSpawner.biomeAt(world, blockX, blockY, blockZ),
+                blockX = blockX,
+                blockY = blockY,
+                blockZ = blockZ,
+                gameTime = world.gameTime,
+                difficulty = world.difficulty,
+                equipmentFinalizer = equipmentFinalizer,
+                entityX = x,
+                entityY = y,
+                entityZ = z,
+                entityYaw = yaw,
+                entityRandom = LegacyRandom(Random.nextLong()),
+                reason = MobSpawnReason.EVENT,
+                entityRandomFactory = { LegacyRandom(Random.nextLong()) },
+                environment = spawnEnvironment(world),
+            )
+        return materializeForest(world, forest)
+    }
+
+    private fun materializeSpawnForest(
+        world: LoadedWorld,
+        request: SpawnRequest,
+        blockX: Int,
+        blockY: Int,
+        blockZ: Int,
+        random: LegacyRandom,
+        reason: MobSpawnReason,
+        eventReason: String,
+    ): ServerEntity? {
+        if (!spawnAllowed(world, request.type, request.x, request.y, request.z, eventReason)) return null
         val inhabitedTime =
             world.state
                 .chunkIfLoaded(blockX shr 4, blockZ shr 4)
@@ -230,7 +543,7 @@ public class NaturalSpawningSystem(
                 entityZ = request.z,
                 entityYaw = request.yaw,
                 entityRandom = LegacyRandom(Random.nextLong()),
-                reason = MobSpawnReason.NATURAL,
+                reason = reason,
                 entityRandomFactory = { LegacyRandom(Random.nextLong()) },
                 environment = spawnEnvironment(world),
             )
@@ -240,6 +553,9 @@ public class NaturalSpawningSystem(
     private fun materializeForest(
         world: LoadedWorld,
         forest: MobSpawnForest,
+        eventReason: String = "jockey",
+        checkMain: Boolean = false,
+        initialize: (ServerEntity, ChunkGeneratedEntity) -> Unit = { _, _ -> },
     ): ServerEntity? {
         var main: ServerEntity? = null
 
@@ -247,8 +563,8 @@ public class NaturalSpawningSystem(
             descriptor: ChunkGeneratedEntity,
             vehicle: ServerEntity?,
         ) {
-            if (descriptor !== forest.main &&
-                !spawnAllowed(world, descriptor.type, descriptor.x, descriptor.y, descriptor.z, "jockey")
+            if ((descriptor !== forest.main || checkMain) &&
+                !spawnAllowed(world, descriptor.type, descriptor.x, descriptor.y, descriptor.z, eventReason)
             ) {
                 return
             }
@@ -270,6 +586,7 @@ public class NaturalSpawningSystem(
                     vehicleData.putBoolean("IsChickenJockey", true)
                 }
             }
+            initialize(entity, descriptor)
             world.state.spawnEntity(entity)
             if (descriptor === forest.main) main = entity
             descriptor.passengers.forEach { passenger -> materialize(passenger, entity) }
@@ -361,5 +678,8 @@ public class NaturalSpawningSystem(
     private companion object {
         const val CHICKEN_SEARCH_HORIZONTAL = 5.0
         const val CHICKEN_SEARCH_VERTICAL = 3.0
+        const val FULL_ROTATION = 360f
+        const val WANDERING_TRADER_DESPAWN_DELAY = 48_000
+        const val WANDERING_TRADER_HOME_RADIUS = 16
     }
 }

@@ -236,6 +236,29 @@ public object NaturalSpawner {
         }
     }
 
+    /** parity: `NaturalSpawner.isValidEmptySpawnBlock`, for custom spawners at one position. */
+    internal fun isValidEmptySpawnBlock(
+        world: LoadedWorld,
+        type: Identifier,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Boolean {
+        val state = world.state.getBlockState(x, y, z) ?: return false
+        return canStandIn(state, type.path)
+    }
+
+    /** parity: `Mob.checkMobSpawnRules`, whose patrol path only asks about the block below. */
+    internal fun canSpawnOnGround(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Boolean {
+        val ground = world.state.getBlockState(x, y - 1, z) ?: return false
+        return BlockShapes.isFaceSturdy(ground, org.basaltmc.server.registry.BlockFace.UP)
+    }
+
     // parity: NaturalSpawner.isValidEmptySpawnBlock, all four of its answers.
     private fun canStandIn(
         stateId: Int,
@@ -282,7 +305,7 @@ public object NaturalSpawner {
         }
     }
 
-    private fun canSeeSky(
+    internal fun canSeeSky(
         world: LoadedWorld,
         x: Int,
         y: Int,

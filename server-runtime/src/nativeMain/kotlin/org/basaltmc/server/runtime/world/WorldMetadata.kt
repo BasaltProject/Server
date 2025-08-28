@@ -42,6 +42,9 @@ public data class WorldMetadata(
     val difficulty: String? = null,
     val difficultyLocked: Boolean = false,
     val defaultGamemode: String? = null,
+    /** parity: `WanderingTraderData`, persisted independently of the spawner's 1,200-tick counter. */
+    val wanderingTraderSpawnDelay: Int = 24_000,
+    val wanderingTraderSpawnChance: Int = 25,
 ) {
     public fun writeTo(worldRoot: String) {
         val root =
@@ -63,6 +66,11 @@ public data class WorldMetadata(
                 difficulty?.let { putString("Difficulty", it) }
                 putBoolean("DifficultyLocked", difficultyLocked)
                 defaultGamemode?.let { putString("DefaultGamemode", it) }
+                this["WanderingTrader"] =
+                    NbtCompound().apply {
+                        putInt("spawn_delay", wanderingTraderSpawnDelay)
+                        putInt("spawn_chance", wanderingTraderSpawnChance)
+                    }
                 gameRules.writeTo(this)
             }
         FileIO.createDirectories(worldRoot)
@@ -85,6 +93,7 @@ public data class WorldMetadata(
             check(version == FORMAT_VERSION) {
                 "${pathFor(worldRoot)} is format version $version, this build reads $FORMAT_VERSION"
             }
+            val wanderingTrader = root.getCompound("WanderingTrader")
             return WorldMetadata(
                 seed = root.getLong("Seed"),
                 spawnX = root.getInt("SpawnX"),
@@ -103,6 +112,8 @@ public data class WorldMetadata(
                 difficulty = if ("Difficulty" in root.keys) root.getString("Difficulty") else null,
                 difficultyLocked = root.getBoolean("DifficultyLocked"),
                 defaultGamemode = if ("DefaultGamemode" in root.keys) root.getString("DefaultGamemode") else null,
+                wanderingTraderSpawnDelay = wanderingTrader.getInt("spawn_delay", 24_000),
+                wanderingTraderSpawnChance = wanderingTrader.getInt("spawn_chance", 25),
             )
         }
 

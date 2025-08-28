@@ -2604,7 +2604,7 @@ private const val LEFT_INPUT_FLAG = 1 shl 2
 private const val RIGHT_INPUT_FLAG = 1 shl 3
 
 /**
- * The 10 registries in `RegistryDataLoader.SYNCHRONIZED_REGISTRIES` that nothing sent elsewhere in
+ * The 8 registries in `RegistryDataLoader.SYNCHRONIZED_REGISTRIES` that nothing sent elsewhere in
  * [ClientSession.sendRegistriesThenFinish] populates yet. Sent with zero entries: matches the real
  * 29-registry synced set (see [VanillaRegistryData]'s KDoc) so the client's `RegistryAccess` has an
  * entry for each, which [VanillaTagData]'s tags for them need to resolve at all.
@@ -2614,7 +2614,6 @@ private val EMPTY_SYNCHRONIZED_REGISTRIES =
         "minecraft:chat_type",
         "minecraft:trim_pattern",
         "minecraft:sulfur_cube_archetype",
-        "minecraft:banner_pattern",
         "minecraft:enchantment",
         "minecraft:test_environment",
         "minecraft:test_instance",

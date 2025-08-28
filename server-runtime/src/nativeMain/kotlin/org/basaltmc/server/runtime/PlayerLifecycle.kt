@@ -7,6 +7,7 @@ import org.basaltmc.server.runtime.plugins.emit
 import org.basaltmc.server.runtime.world.DamageTypes
 import org.basaltmc.server.runtime.world.LoadedWorld
 import org.basaltmc.server.storage.StoredPlayer
+import org.basaltmc.server.storage.StoredStats
 import org.basaltmc.wire.protocol.play.BlockPos
 import org.basaltmc.wire.protocol.play.EntityTeleportPacket
 import org.basaltmc.wire.protocol.play.GameEventPacket
@@ -40,6 +41,7 @@ internal class PlayerLifecycle(
     internal fun tickPlayer() {
         val session = owner.playerSession ?: return
         owner.playTimeTicks++
+        if (session.sleepingBed == null) session.stats.increment(StoredStats.TIME_SINCE_REST)
         checkAdvancements(session)
         if (session.invulnerableTicks > 0) session.invulnerableTicks--
         // parity: `Player.tick`, which counts this up for as long as the player is not swinging.

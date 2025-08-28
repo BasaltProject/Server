@@ -19,6 +19,7 @@ import org.basaltmc.wire.protocol.play.Pose
 import org.basaltmc.wire.protocol.play.RemoveEntitiesPacket
 import org.basaltmc.wire.protocol.play.RotateHeadPacket
 import org.basaltmc.wire.protocol.play.SetEntityDataPacket
+import org.basaltmc.wire.protocol.play.SetEntityLinkPacket
 import org.basaltmc.wire.protocol.play.SetEquipmentPacket
 import org.basaltmc.wire.protocol.play.SetPassengersPacket
 import org.basaltmc.wire.protocol.play.SetPlayerTeamPacket
@@ -69,6 +70,9 @@ internal class EntityVisibilityTracker(
     /** Passenger ids last sent for each visible vehicle. */
     private val lastPassengers = HashMap<Int, List<Int>>()
 
+    /** Leash holder last sent for each visible mob. */
+    private val lastLeashHolders = HashMap<Int, Int>()
+
     /** Which other players this client currently has as entities, kept by [syncPlayers]. */
     private val trackedPlayers = HashSet<Int>()
 
@@ -114,6 +118,7 @@ internal class EntityVisibilityTracker(
                     lastEntityPositions.remove(entity.entityId)
                     lastRuntimeEntityMetadata.remove(entity.entityId)
                     lastPassengers.remove(entity.entityId)
+                    lastLeashHolders.remove(entity.entityId)
                     owner.sendPlayPacket(RemoveEntitiesPacket.ID) {
                         RemoveEntitiesPacket(listOf(entity.entityId)).write(it)
                     }
@@ -185,6 +190,7 @@ internal class EntityVisibilityTracker(
                     }
                 }
                 entity.displayText?.let { text -> sendDisplayText(entity.entityId, text) }
+                syncLeash(entity)
                 continue
             }
             val liveMetadata = runtimeEntityMetadata(entity)
@@ -195,6 +201,7 @@ internal class EntityVisibilityTracker(
                     SetEntityDataPacket(entity.entityId, metadataChanges).write(it)
                 }
             }
+            syncLeash(entity)
             // parity: `ServerEntity.sendChanges`, which sends nothing at all for an entity that has
             // not moved. A pen of animals standing still is free to watch; without this every one of
             // them costs a packet per player per tick.
@@ -238,6 +245,7 @@ internal class EntityVisibilityTracker(
             lastEntityPositions.remove(entityId)
             lastRuntimeEntityMetadata.remove(entityId)
             lastPassengers.remove(entityId)
+            lastLeashHolders.remove(entityId)
         }
         if (gone.isNotEmpty()) {
             owner.sendPlayPacket(RemoveEntitiesPacket.ID) { RemoveEntitiesPacket(gone).write(it) }
@@ -277,6 +285,18 @@ internal class EntityVisibilityTracker(
         lastPassengers.keys.removeAll { vehicleId ->
             vehicleId !in trackedEntities || vehicleId !in visibleEntityIds
         }
+    }
+
+    private fun syncLeash(entity: ServerEntity) {
+        val holder = entity.leashHolderId
+        val previous = lastLeashHolders[entity.entityId]
+        if (previous == holder) return
+        if (previous != null || holder != null) {
+            owner.sendPlayPacket(SetEntityLinkPacket.ID) {
+                SetEntityLinkPacket(entity.entityId, holder ?: SetEntityLinkPacket.NO_VEHICLE).write(it)
+            }
+        }
+        if (holder == null) lastLeashHolders.remove(entity.entityId) else lastLeashHolders[entity.entityId] = holder
     }
 
     /**

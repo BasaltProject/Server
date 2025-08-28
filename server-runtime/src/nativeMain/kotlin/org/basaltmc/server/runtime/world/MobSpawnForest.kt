@@ -109,6 +109,38 @@ internal data class MobSpawnForest(
     val externalVehicleLinks: List<MobExternalVehicleLink> = emptyList(),
 )
 
+/** Moves only the requested entity after finalization, keeping vehicle positions. // parity: VillageSiege. */
+internal fun MobSpawnForest.relocateMain(
+    x: Double,
+    y: Double,
+    z: Double,
+    yaw: Float,
+): MobSpawnForest {
+    val replacements = mutableMapOf<ChunkGeneratedEntity, ChunkGeneratedEntity>()
+
+    fun copyTree(entity: ChunkGeneratedEntity): ChunkGeneratedEntity {
+        val passengers = entity.passengers.map(::copyTree)
+        val copied =
+            if (entity === main) {
+                entity.copy(x = x, y = y, z = z, yaw = yaw, passengers = passengers)
+            } else {
+                entity.copy(passengers = passengers)
+            }
+        replacements[entity] = copied
+        return copied
+    }
+
+    val movedRoots = roots.map(::copyTree)
+    return MobSpawnForest(
+        main = checkNotNull(replacements[main]),
+        roots = movedRoots,
+        externalVehicleLinks =
+            externalVehicleLinks.map { link ->
+                MobExternalVehicleLink(checkNotNull(replacements[link.passenger]), link.vehicleId)
+            },
+    )
+}
+
 internal data class MobExternalVehicleLink(
     val passenger: ChunkGeneratedEntity,
     val vehicleId: Int,
@@ -129,9 +161,12 @@ internal class MobSpawnEnvironment(
 
 internal enum class MobSpawnReason {
     NATURAL,
+    PATROL,
+    EVENT,
     CHUNK_GENERATION,
     STRUCTURE,
     JOCKEY,
+    TRIGGERED,
 }
 
 /** Builds the complete generated forest while preserving which descriptor is the requested mob. */

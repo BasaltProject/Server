@@ -43,6 +43,24 @@ public class SpawnEquipmentFinalizer(
         }
     }
 
+    /** parity: `Pillager.finalizeSpawn`, before `PatrollingMonster` and the common mob layer. */
+    internal fun finalizePillagerEquipmentBeforeCommon(
+        data: NbtCompound,
+        random: BasaltRandom,
+        specialMultiplier: Float,
+    ) {
+        setItem(data, "mainhand", "crossbow")
+        enchantSlot(data, "mainhand", random, WEAPON_ENCHANT_CHANCE, specialMultiplier)
+        if (random.nextInt(PILLAGER_PIERCING_ODDS) == 0) {
+            val crossbow = item(data, "mainhand")
+            val components = crossbow.getCompound("components")
+            val enchantments = components.getCompound("minecraft:enchantments")
+            enchantments.putInt("minecraft:piercing", maxOf(1, enchantments.getInt("minecraft:piercing")))
+            components["minecraft:enchantments"] = enchantments
+            crossbow["components"] = components
+        }
+    }
+
     internal fun finalizeZombieEquipmentAfterCommon(
         data: NbtCompound,
         type: String,
@@ -187,6 +205,22 @@ public class SpawnEquipmentFinalizer(
         data["equipment"] = equipment
     }
 
+    /** The guaranteed helmet and provider pass applied after a skeleton trap rider's finalizer. */
+    internal fun finalizeSkeletonTrapEquipment(
+        data: NbtCompound,
+        random: BasaltRandom,
+        specialMultiplier: Float,
+    ) {
+        if (item(data, "head").size == 0) setItem(data, "head", "iron_helmet")
+        for (slot in SKELETON_TRAP_ENCHANTMENT_ORDER) {
+            val stack = item(data, slot)
+            val components = stack.getCompound("components")
+            components.remove("minecraft:enchantments")
+            stack["components"] = components
+            enchantments.enchant(stack, random, specialMultiplier)
+        }
+    }
+
     private fun isHalloween(): Boolean {
         val date =
             Clock.System
@@ -214,11 +248,13 @@ public class SpawnEquipmentFinalizer(
         const val DROWNED_TRIDENT_RESULTS = 10
         const val ZOMBIE_WEAPON_BOUND = 6
         const val ZOMBIFIED_PIGLIN_SPEAR_ODDS = 20
+        const val PILLAGER_PIERCING_ODDS = 300
         const val HALLOWEEN_HEAD_CHANCE = 0.25f
         const val JACK_O_LANTERN_CHANCE = 0.1f
         const val GUARANTEED_DROP_CHANCE = 2f
 
         val ABSTRACT_SKELETON_TYPES = setOf("skeleton", "stray", "bogged", "parched", "wither_skeleton")
+        val SKELETON_TRAP_ENCHANTMENT_ORDER = listOf("mainhand", "head")
         val ARMOR_POPULATION_ORDER = listOf("head", "chest", "legs", "feet")
         val ARMOR_ENCHANTMENT_ORDER = listOf("feet", "legs", "chest", "head")
         val PIGLIN_ARMOR =

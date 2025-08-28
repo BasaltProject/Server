@@ -8,10 +8,13 @@ import org.basaltmc.server.runtime.entity.MobCategory
 import org.basaltmc.server.runtime.entity.MobDespawn
 import org.basaltmc.server.runtime.entity.Mobs
 import org.basaltmc.server.runtime.entity.ServerEntity
+import org.basaltmc.server.runtime.entity.WanderingTraderLifetime
 import org.basaltmc.server.runtime.entity.Wardens
 import org.basaltmc.server.runtime.entity.ai.PlayerView
 import org.basaltmc.server.runtime.player.PlayerSession
 import org.basaltmc.server.runtime.world.LoadedWorld
+import org.basaltmc.server.runtime.world.SkeletonHorseTrap
+import org.basaltmc.wire.protocol.play.Gamemode
 
 /** Ticks one mob vehicle and its passenger tree in vanilla's root-first order. */
 internal class MobTickSystem(
@@ -96,10 +99,29 @@ internal class MobTickSystem(
         }
         if (entity.panicTicks > 0) entity.panicTicks--
         actions.tickFire(world, watchers, entity, random)
+        if (entity.type.path == "skeleton_horse" && entity.skeletonTrap) {
+            val rangeSquared = SkeletonHorseTrap.PLAYER_RANGE * SkeletonHorseTrap.PLAYER_RANGE
+            val nearbyAlivePlayer =
+                !entity.noAi &&
+                    watchers.any { player ->
+                        if (player.dead || player.gamemode == Gamemode.SPECTATOR) return@any false
+                        val dx = player.x - entity.x
+                        val dy = player.y - entity.y
+                        val dz = player.z - entity.z
+                        dx * dx + dy * dy + dz * dz <= rangeSquared
+                    }
+            if (nearbyAlivePlayer) actions.activateSkeletonTrap(world, entity, random)
+            SkeletonHorseTrap.tickLifetime(entity)
+            if (entity.removed) return
+        }
         if (!entity.noAi) {
             actions.tickMobAi(world, entity, views, living, random)
             val partner = Breeding.tick(entity, living)
             if (partner != null) actions.breed(world, entity, partner)
+        }
+        if (entity.type.path == "wandering_trader" || entity.type.path == "trader_llama") {
+            WanderingTraderLifetime.tick(entity, living, watchers.mapTo(hashSetOf()) { it.entityId })
+            if (entity.removed) return
         }
         val category = MobCategory.byName(Mobs.categoryOf(entity.type)) ?: MobCategory.MISC
         val nearest = watchers.minOfOrNull { MobBrain.distanceTo(entity, it.x, it.y, it.z) }

@@ -289,6 +289,7 @@ internal data class RuntimeEntityMetadata(
     val airSupply: Int,
     val baby: Boolean?,
     val cubeSize: Int?,
+    val horseFlags: Byte?,
 ) {
     /** Initial non-default fields, or every field whose live value changed since [previous]. */
     fun changesFrom(previous: RuntimeEntityMetadata?): List<SetEntityDataPacket.Entry> =
@@ -306,6 +307,13 @@ internal data class RuntimeEntityMetadata(
             ) {
                 add(SetEntityDataPacket.Entry.Ints(CUBE_SIZE_DATA_INDEX, cubeSize))
             }
+            if (
+                horseFlags != null &&
+                previous?.horseFlags != horseFlags &&
+                (previous != null || horseFlags != 0.toByte())
+            ) {
+                add(SetEntityDataPacket.Entry.Bytes(ABSTRACT_HORSE_FLAGS_DATA_INDEX, horseFlags))
+            }
         }
 }
 
@@ -314,13 +322,22 @@ internal fun runtimeEntityMetadata(entity: ServerEntity): RuntimeEntityMetadata 
         airSupply = entity.airSupply,
         baby = (entity.age < 0).takeIf { AgeableMobs.hasBabyMetadata(entity.type.path) },
         cubeSize = entity.cubeSize.takeIf { CubeMobs.isCube(entity.type) },
+        horseFlags =
+            (if (entity.tamedHorse) ABSTRACT_HORSE_TAME_FLAG else 0)
+                .toByte()
+                .takeIf { entity.type.path in ABSTRACT_HORSE_TYPES },
     )
 
 /** `AbstractCubeMob.ID_SIZE`: two `AgeableMob` fields follow the common index 16. */
 private const val CUBE_SIZE_DATA_INDEX = 18
+private const val ABSTRACT_HORSE_FLAGS_DATA_INDEX = 18
+private const val ABSTRACT_HORSE_TAME_FLAG = 2
 private const val MOB_FLAGS_DATA_INDEX = 15
 private const val AIR_SUPPLY_DATA_INDEX = 1
 private const val DEFAULT_AIR_SUPPLY = 300
+
+private val ABSTRACT_HORSE_TYPES =
+    setOf("horse", "donkey", "mule", "skeleton_horse", "zombie_horse", "llama", "trader_llama", "camel", "camel_husk")
 
 private val ARMOR_STAND_POSES =
     listOf(

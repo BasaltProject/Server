@@ -14,6 +14,9 @@ public object MobGoals {
     /** parity: `Mob.registerGoals` for this type, or null when this build has nothing for it. */
     public fun forType(type: Identifier): GoalSelector? {
         val selector = GoalSelector()
+        // PatrollingMonster.registerGoals runs through super before each concrete Raider adds its
+        // own priority-four goals, so insertion order at the same priority matters here too.
+        if (type.path in PATROLLING_TYPES) selector.add(4, LongDistancePatrolGoal())
         when (type.path) {
             "cow", "mooshroom" -> farmAnimal(selector, type, panic = 2.0, tempt = 1.25, follow = 1.25)
             "pig" -> farmAnimal(selector, type, panic = 1.25, tempt = 1.2, follow = 1.1)
@@ -38,6 +41,7 @@ public object MobGoals {
                 selector.add(6, RandomStrollGoal(0.6))
                 selector.add(11, LookAtPlayerGoal(10.0))
             }
+            "trader_llama" -> farmAnimal(selector, type, panic = 2.0, tempt = 1.2, follow = 1.1)
             "goat", "horse", "donkey", "mule", "llama", "camel", "sniffer", "armadillo",
             "turtle", "panda", "fox", "bee", "strider", "frog", "axolotl",
             -> farmAnimal(selector, type, panic = 1.25, tempt = 1.2, follow = 1.1)
@@ -274,7 +278,7 @@ public object MobGoals {
                 selector.add(1, FlyingWanderGoal(BAT_RANGE, BAT_STEP, gated = false))
                 selector.add(2, LookAtPlayerGoal(LOOK_FAR))
             }
-            "villager", "wandering_trader" -> {
+            "villager" -> {
                 // parity: a villager runs on a brain rather than on goals, so this is that brain's
                 // schedule read by goals: the job site by day, the bell in the afternoon, the bed at
                 // night, and a run from anything that raids the village.
@@ -286,6 +290,21 @@ public object MobGoals {
                 selector.add(5, RandomStrollGoal(0.6))
                 selector.add(6, LookAtPlayerGoal(LOOK_NEAR))
                 selector.add(7, RandomLookAroundGoal())
+            }
+            "wandering_trader" -> {
+                selector.add(0, FloatGoal())
+                selector.add(1, AvoidEntityGoal(setOf("zombie"), 8.0, 0.5, 0.5))
+                selector.add(1, AvoidEntityGoal(setOf("evoker"), 12.0, 0.5, 0.5))
+                selector.add(1, AvoidEntityGoal(setOf("vindicator"), 8.0, 0.5, 0.5))
+                selector.add(1, AvoidEntityGoal(setOf("vex"), 8.0, 0.5, 0.5))
+                selector.add(1, AvoidEntityGoal(setOf("pillager"), 15.0, 0.5, 0.5))
+                selector.add(1, AvoidEntityGoal(setOf("illusioner"), 12.0, 0.5, 0.5))
+                selector.add(1, AvoidEntityGoal(setOf("zoglin"), 10.0, 0.5, 0.5))
+                selector.add(1, PanicGoal(0.5))
+                selector.add(2, WanderingTraderWanderGoal())
+                selector.add(4, MoveTowardsTraderHomeGoal())
+                selector.add(8, RandomStrollGoal(0.35))
+                selector.add(10, LookAtPlayerGoal(LOOK_FAR))
             }
             // parity: `Squid.SquidRandomMovementGoal` and `AbstractFish.FishSwimGoal`, neither of
             // which walks a path: they push themselves about in the water.
@@ -349,6 +368,9 @@ public object MobGoals {
             "piglin_brute",
             "zoglin",
         )
+
+    /** Every Raider inherits PatrollingMonster's priority-four long-distance goal. */
+    private val PATROLLING_TYPES = setOf("pillager", "vindicator", "evoker", "illusioner", "witch", "ravager")
 
     /** parity: `BegGoal`'s own list, which is whatever a wolf will eat. */
     private val WOLF_BEG_ITEMS: Set<String> =

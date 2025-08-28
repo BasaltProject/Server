@@ -124,6 +124,20 @@ internal object MobVariantSpawnFinalizer {
                         NAUTILUS_MIN_ATTACK_COOLDOWN + random.nextInt(NAUTILUS_ATTACK_COOLDOWN_RANGE),
                 )
             "parrot" -> data.putInt("Variant", random.nextInt(PARROT_VARIANTS))
+            "phantom" -> {
+                data.putIntArray("anchor_pos", intArrayOf(blockX, blockY + PHANTOM_ANCHOR_HEIGHT, blockZ))
+                data.putInt("size", 0)
+            }
+            "pillager" ->
+                PillagerSpawnFinalizer.beforeCommon(
+                    group,
+                    random,
+                    entityRandom,
+                    specialMultiplier,
+                    reason,
+                    equipmentFinalizer,
+                    data,
+                )
             "piglin" ->
                 concreteBaby =
                     PiglinSpawnFinalizer.finalizeBeforeCommon(
@@ -204,6 +218,10 @@ internal object MobVariantSpawnFinalizer {
         random: BasaltRandom,
         data: NbtCompound,
     ) {
+        if (type == "cat") {
+            CatSpawnFinalizer.afterCommon(group.catSpawnContext, random, data)
+            return
+        }
         if (type != "tropical_fish") return
         val existing = group.variant
         val packed =
@@ -377,6 +395,7 @@ internal object MobVariantSpawnFinalizer {
     private const val LLAMA_MAX_STRENGTH_CHANCE = 0.04f
     private const val LLAMA_VARIANTS = 4
     private const val PARROT_VARIANTS = 5
+    private const val PHANTOM_ANCHOR_HEIGHT = 5
     private const val SALMON_SMALL_WEIGHT = 30
     private const val SALMON_MEDIUM_WEIGHT = 50
     private const val SALMON_TOTAL_WEIGHT = 95
