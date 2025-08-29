@@ -70,9 +70,10 @@ public object GrassPatchDecoration {
             "patch_grass_savanna" to 12,
             "patch_grass_meadow" to 35,
             "patch_grass_plain" to 54,
+            "patch_grass_taiga" to 58,
+            // The village feature of this name is a different placement over the same body.
             "patch_taiga_grass" to 58,
             "patch_grass_forest" to 59,
-            "patch_grass_taiga" to 60,
             "patch_grass_taiga_2" to 60,
             "patch_grass_normal" to 61,
             "patch_grass_badlands" to 68,

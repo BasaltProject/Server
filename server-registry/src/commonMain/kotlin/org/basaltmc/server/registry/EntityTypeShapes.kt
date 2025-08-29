@@ -41,6 +41,18 @@ public object EntityTypeShapes {
 
     public fun isFireImmune(type: Identifier): Boolean = byEntity[type]?.fireImmune ?: false
 
+    /** parity: the builder `immuneTo` block tags consulted by `EntityType.isBlockDangerous`. */
+    public fun isImmuneTo(
+        type: Identifier,
+        block: String,
+    ): Boolean =
+        when (type.path) {
+            "fox" -> block == "sweet_berry_bush"
+            "polar_bear", "snow_golem", "stray" -> block == "powder_snow"
+            "wither", "wither_skeleton" -> block == "wither_rose"
+            else -> false
+        }
+
     /** parity: `EntityType.canSpawnFarFromPlayer`, true by default for unknown/custom MISC types. */
     public fun canSpawnFarFromPlayer(type: Identifier): Boolean = byEntity[type]?.farFromPlayer ?: true
 

@@ -314,7 +314,8 @@ public object TreeDecoration {
                 Selector(
                     listOf(
                         0.33333334f to tree(TreeConfigs.FANCY_OAK_BEES_005),
-                        0.0125f to fallen(FallenTreeConfigs.OAK),
+                        // Only this entry is `fallen_oak_tree`, which carries its own would_survive.
+                        0.0125f to checkedFallen(FallenTreeConfigs.OAK, "oak_sapling"),
                     ),
                     tree(TreeConfigs.OAK_BEES_005),
                 ),

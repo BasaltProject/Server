@@ -250,7 +250,7 @@ public object NaturalSpawner {
         }
         val feet = world.state.getBlockState(x, y, z) ?: return false
         val head = world.state.getBlockState(x, y + 1, z) ?: return false
-        if (!canStandIn(feet, typePath) || !canStandIn(head, typePath)) return false
+        if (!canStandIn(feet, type) || !canStandIn(head, type)) return false
         if (typePath == "ocelot") {
             return y >= world.declaration.dimension.seaLevel &&
                 (BlockStateDefinitions.blockOf(ground)?.path == "grass_block" || Blocks.isLeavesState(ground)) &&
@@ -294,7 +294,7 @@ public object NaturalSpawner {
         z: Int,
     ): Boolean {
         val state = world.state.getBlockState(x, y, z) ?: return false
-        return canStandIn(state, type.path)
+        return canStandIn(state, type)
     }
 
     /** parity: `Mob.checkMobSpawnRules`, whose patrol path only asks about the block below. */
@@ -311,7 +311,7 @@ public object NaturalSpawner {
     // parity: NaturalSpawner.isValidEmptySpawnBlock, all four of its answers.
     private fun canStandIn(
         stateId: Int,
-        typePath: String?,
+        type: Identifier?,
     ): Boolean {
         if (BlockShapes.isFullCube(stateId)) return false
         if (Redstone.isSignalSource(stateId)) return false
@@ -319,19 +319,20 @@ public object NaturalSpawner {
         val path = BlockStateDefinitions.blockOf(stateId)?.path ?: return false
         // parity: `BlockTags.PREVENT_MOB_SPAWNING_INSIDE`, which is the rails and nothing else.
         if (path in RAILS) return false
-        return !isDangerous(stateId, path, typePath)
+        return !isDangerous(stateId, path, type)
     }
 
     /** parity: `EntityType.isBlockDangerous`, whose burning half a fire-immune mob walks through. */
     private fun isDangerous(
         stateId: Int,
         path: String,
-        typePath: String?,
+        type: Identifier?,
     ): Boolean {
+        if (type != null && EntityTypeShapes.isImmuneTo(type, path)) return false
         val burning =
             path in BURNING_BLOCKS ||
                 (path == "campfire" && BlockStateDefinitions.propertiesOf(stateId)["lit"] == "true")
-        val immune = typePath != null && EntityTypeShapes.isFireImmune(Identifier.vanilla(typePath))
+        val immune = type != null && EntityTypeShapes.isFireImmune(type)
         if (burning && !immune) return true
         return path in HURTS_ON_CONTACT
     }
@@ -349,6 +350,7 @@ public object NaturalSpawner {
         return when (type) {
             "ghast" -> random.nextInt(20) == 0
             "hoglin", "piglin", "zombified_piglin" -> groundPath != "nether_wart_block"
+            "stray" -> canSeeSkyAbovePowderSnow(world, x, y, z)
             else -> !NaturalSpawnPredicates.isSurfaceMonster(type) || canSeeSky(world, x, y, z)
         }
     }
@@ -358,9 +360,21 @@ public object NaturalSpawner {
         x: Int,
         y: Int,
         z: Int,
+    ): Boolean = WorldLight.skyLight(world, x, y, z) >= WorldLight.MAX_LEVEL
+
+    private fun canSeeSkyAbovePowderSnow(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
     ): Boolean {
-        val chunk = world.state.chunkIfLoaded(x shr 4, z shr 4) ?: return false
-        return y >= chunk.heightAt(x and 15, z and 15, Chunk.HeightmapType.WORLD_SURFACE)
+        var scanY = y + 1
+        while (true) {
+            val state = world.state.getBlockState(x, scanY, z) ?: return false
+            if (BlockStateDefinitions.blockOf(state)?.path != "powder_snow") break
+            scanY++
+        }
+        return canSeeSky(world, x, scanY - 1, z)
     }
 
     private fun canSpawnBat(

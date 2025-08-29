@@ -201,13 +201,13 @@ public object OverworldVegetalDecoration {
             flower(55, "flower_cherry"),
             tree(56, "trees_cherry"),
             flower(57, "flower_default"),
-            feature(58, "patch_taiga_grass") { chunk, seed, environment ->
+            feature(58, "patch_grass_taiga") { chunk, seed, environment ->
                 GrassPatchDecoration.decorateFeature(58, chunk, seed, environment)
             },
             feature(59, "patch_grass_forest") { chunk, seed, environment ->
                 GrassPatchDecoration.decorateFeature(59, chunk, seed, environment)
             },
-            feature(60, "patch_grass_taiga") { chunk, seed, environment ->
+            feature(60, "patch_grass_taiga_2") { chunk, seed, environment ->
                 GrassPatchDecoration.decorateFeature(60, chunk, seed, environment)
             },
             feature(61, "patch_grass_normal") { chunk, seed, environment ->

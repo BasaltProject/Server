@@ -42,6 +42,14 @@ class NaturalSpawnPredicatesTest {
     }
 
     @Test
+    fun entityTypeDangerousBlockImmunitiesMatchTheirTags() {
+        assertTrue(EntityTypeShapes.isImmuneTo(Identifier.vanilla("fox"), "sweet_berry_bush"))
+        assertTrue(EntityTypeShapes.isImmuneTo(Identifier.vanilla("stray"), "powder_snow"))
+        assertTrue(EntityTypeShapes.isImmuneTo(Identifier.vanilla("wither_skeleton"), "wither_rose"))
+        assertFalse(EntityTypeShapes.isImmuneTo(Identifier.vanilla("zombie"), "powder_snow"))
+    }
+
+    @Test
     fun naturalSpawnDistanceUsesTheEntityTypeCategoryAndOverride() {
         val beyond = 128.0 * 128.0 + 1.0
         assertFalse(NaturalSpawner.canSpawnAtDistance(Identifier.vanilla("zombie"), MobCategory.CREATURE, beyond))

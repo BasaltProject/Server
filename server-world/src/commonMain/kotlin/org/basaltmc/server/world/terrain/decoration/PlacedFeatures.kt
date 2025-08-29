@@ -393,7 +393,7 @@ public object PlacedFeatures {
                 put(
                     Identifier.vanilla(name),
                     Placement { chunk, random, x, y, z ->
-                        DefaultVegetationDecoration.placeAt(chunk, random, DecorationPos(x, y, z))
+                        DefaultVegetationDecoration.placeDefaultPatchAt(chunk, random, DecorationPos(x, y, z))
                     },
                 )
             }

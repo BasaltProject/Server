@@ -294,7 +294,11 @@ public class WeightedRandomSpreadFoliagePlacer(
     ): Boolean = false
 }
 
-/** // parity: CherryFoliagePlacer: a wide layered canopy with random holes and hanging leaves below the two bottom rows. */
+/**
+ * // parity: CherryFoliagePlacer. Take [cornerHoleChance] from the bootstrap code, never a datapack
+ * dump: vanilla's codec reads `wideBottomLayerHoleChance` for `corner_hole_chance`, so the serialized
+ * cherry reports 0.25 where the object built at runtime holds 0.5.
+ */
 public class CherryFoliagePlacer(
     radius: IntProvider,
     offset: IntProvider,
