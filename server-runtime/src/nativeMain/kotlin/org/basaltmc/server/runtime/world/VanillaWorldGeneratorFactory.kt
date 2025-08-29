@@ -13,6 +13,7 @@ import org.basaltmc.server.world.noise.NormalNoise
 import org.basaltmc.server.world.structure.StructurePlacementGrid
 import org.basaltmc.server.world.terrain.DimensionTerrainGenerator
 import org.basaltmc.server.world.terrain.EndCityStructureGenerator
+import org.basaltmc.server.world.terrain.MineshaftStructureGenerator
 import org.basaltmc.server.world.terrain.NeighbourTerrainCache
 import org.basaltmc.server.world.terrain.NetherBiomeSource
 import org.basaltmc.server.world.terrain.NetherStructureGenerator
@@ -104,6 +105,15 @@ public class VanillaWorldGeneratorFactory(
                 templateLoader = villageLoader.templateLoader,
             ).also(villages::add)
         val biomeSpawns = RealBiomeSpawns(serverJar)
+        // The biomes a mineshaft may start in come from the jar's own tags, expanded through the
+        // references they are almost entirely written in.
+        val biomeTags = BiomeTagLoader(serverJar)
+        val mineshafts =
+            MineshaftStructureGenerator(
+                biomeAt = { x, y, z -> surface.biomeAt(x, y, z) },
+                normalBiomes = biomeTags.biomesIn("minecraft:has_structure/mineshaft"),
+                mesaBiomes = biomeTags.biomesIn("minecraft:has_structure/mineshaft_mesa"),
+            )
         // Step 1's bodies read past the chunk edge, so decoration needs the neighbours' undecorated
         // terrain. One cache per world: a neighbour generated for one chunk is read by the next.
         val neighbours =
@@ -116,6 +126,7 @@ public class VanillaWorldGeneratorFactory(
                         neighbourZ,
                         seed,
                         village,
+                        mineshafts,
                     ).chunk
             }
         return Generators(
@@ -134,6 +145,7 @@ public class VanillaWorldGeneratorFactory(
                         seed,
                         village,
                         neighbours,
+                        mineshafts,
                     ).also { chunk ->
                         if (spawnMobs) {
                             val biome =
@@ -180,6 +192,15 @@ public class VanillaWorldGeneratorFactory(
                 structureLoader.poolLookup,
             )
         val biomeSpawns = RealBiomeSpawns(serverJar)
+        // The biomes a mineshaft may start in come from the jar's own tags, expanded through the
+        // references they are almost entirely written in.
+        val biomeTags = BiomeTagLoader(serverJar)
+        val mineshafts =
+            MineshaftStructureGenerator(
+                biomeAt = { x, y, z -> surface.biomeAt(x, y, z) },
+                normalBiomes = biomeTags.biomesIn("minecraft:has_structure/mineshaft"),
+                mesaBiomes = biomeTags.biomesIn("minecraft:has_structure/mineshaft_mesa"),
+            )
         return { chunkX, chunkZ, gameTime, difficulty ->
             val chunk =
                 DimensionTerrainGenerator.nether(
