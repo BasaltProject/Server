@@ -5,6 +5,7 @@ import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.registry.Biomes
 import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.BlockStateDefinitions
+import org.basaltmc.server.registry.BlockSupport
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.registry.EntityTypeShapes
 import org.basaltmc.server.registry.hasFluid
@@ -85,6 +86,7 @@ public object NaturalSpawner {
         entriesFor: (Identifier) -> List<SpawnerEntry>,
         playerDistanceSquared: (Double, Double, Double) -> Double?,
         random: BasaltRandom,
+        canSpawnEntitiesInChunk: (Int, Int) -> Boolean = { x, z -> world.state.chunkIfLoaded(x, z) != null },
         /** Runs at the exact attempt, so rejected plugin/cost spawns do not consume the pack. */
         requestAccepted: ((SpawnRequest) -> Boolean)? = null,
     ): List<SpawnRequest> {
@@ -103,7 +105,7 @@ public object NaturalSpawner {
 
         // parity: a position inside a block that conducts redstone is refused outright.
         val at = world.state.getBlockState(startX, startY, startZ) ?: return emptyList()
-        if (BlockShapes.isFullCube(at)) return emptyList()
+        if (BlockSupport.conductsRedstone(at)) return emptyList()
 
         val requests = mutableListOf<SpawnRequest>()
         var clusterSize = 0
@@ -128,12 +130,25 @@ public object NaturalSpawner {
                 val spawnDy = spawn.second - startY
                 val spawnDz = spawn.third - centreZ
                 if (spawnDx * spawnDx + spawnDy * spawnDy + spawnDz * spawnDz <= MIN_PLAYER_DISTANCE_SQUARED) continue
+                if (x shr 4 != chunkX || z shr 4 != chunkZ) {
+                    if (!canSpawnEntitiesInChunk(x shr 4, z shr 4)) continue
+                }
+                val biome = biomeAt(world, x, startY, z) ?: continue
                 if (chosen == null) {
-                    val biome = biomeAt(world, x, startY, z) ?: return requests
-                    chosen = pick(entriesFor(biome), random) ?: return requests
+                    if (
+                        category == MobCategory.WATER_AMBIENT &&
+                        biome.path in REDUCED_WATER_AMBIENT_BIOMES &&
+                        random.nextFloat() < 0.98f
+                    ) {
+                        break
+                    }
+                    chosen = pick(entriesFor(biome), random) ?: break
                     pack = chosen.minCount + random.nextInt((1 + chosen.maxCount - chosen.minCount).coerceAtLeast(1))
                 }
+                if (!canSpawnAtDistance(chosen.type, category, distance)) continue
+                if (!containsSpawnData(entriesFor(biome), chosen)) continue
                 if (!canSpawnAt(world, chosen.type, category, x, startY, z, random)) continue
+                if (!NaturalSpawnObstruction.allows(world, chosen.type, centreX, startY.toDouble(), centreZ)) continue
                 val request =
                     SpawnRequest(
                         chosen.type,
@@ -143,13 +158,14 @@ public object NaturalSpawner {
                         random.nextFloat() * 360f,
                         groupIndex = spawned,
                         group = group,
-                        biome = biomeAt(world, x, startY, z),
+                        biome = biome,
                     )
                 if (requestAccepted != null && !requestAccepted(request)) continue
                 requests += request
                 spawned++
                 clusterSize++
                 if (clusterSize >= maxClusterSize(chosen.type)) return requests
+                if (chosen.type.path == "tropical_fish" && group.variant == null) break
                 if (spawned >= pack) break
             }
         }
@@ -171,6 +187,28 @@ public object NaturalSpawner {
             "cod", "pufferfish", "tropical_fish", "wolf" -> 8
             "salmon" -> 5
             else -> 4
+        }
+
+    /** parity: `EntityType.canSpawnFarFromPlayer` before a natural mob is constructed. */
+    internal fun canSpawnAtDistance(
+        type: Identifier,
+        fallbackCategory: MobCategory,
+        distanceSquared: Double,
+    ): Boolean {
+        val category = MobCategory.byName(EntityTypeShapes.categoryOf(type)) ?: fallbackCategory
+        val despawnDistance = category.despawnDistance.toDouble()
+        return distanceSquared <= despawnDistance * despawnDistance || EntityTypeShapes.canSpawnFarFromPlayer(type)
+    }
+
+    /** parity: `WeightedList<SpawnerData>.contains`; the weight belongs to the wrapper, not the record. */
+    internal fun containsSpawnData(
+        entries: List<SpawnerEntry>,
+        selected: SpawnerEntry,
+    ): Boolean =
+        entries.any { candidate ->
+            candidate.type == selected.type &&
+                candidate.minCount == selected.minCount &&
+                candidate.maxCount == selected.maxCount
         }
 
     /**
@@ -204,7 +242,12 @@ public object NaturalSpawner {
         if (typePath in WATER_TYPES) return canSpawnInWater(world, typePath, x, y, z, random)
 
         val ground = world.state.getBlockState(x, y - 1, z) ?: return false
-        if (!BlockShapes.isFaceSturdy(ground, org.basaltmc.server.registry.BlockFace.UP)) return false
+        if (
+            NaturalSpawnPredicates.usesGroundPlacement(typePath) &&
+            !BlockShapes.isFaceSturdy(ground, org.basaltmc.server.registry.BlockFace.UP)
+        ) {
+            return false
+        }
         val feet = world.state.getBlockState(x, y, z) ?: return false
         val head = world.state.getBlockState(x, y + 1, z) ?: return false
         if (!canStandIn(feet, typePath) || !canStandIn(head, typePath)) return false
@@ -229,9 +272,15 @@ public object NaturalSpawner {
                 dark && monsterTypeRule(typePath, ground, world, x, y, z, random)
             }
             MobCategory.CREATURE ->
-                animalGroundAllows(typePath, ground) &&
-                    WorldLight.rawBrightness(world, x, y, z) > ANIMAL_LIGHT &&
-                    (typePath != "turtle" || y < world.declaration.dimension.seaLevel + 4)
+                NaturalSpawnPredicates.allows(
+                    typePath,
+                    BlockStateDefinitions.blockOf(ground)?.path ?: return false,
+                    Blocks.isLeavesState(ground),
+                    biomeAt(world, x, y, z)?.path,
+                    y,
+                    world.declaration.dimension.seaLevel,
+                ) &&
+                    WorldLight.rawBrightness(world, x, y, z) > ANIMAL_LIGHT
             else -> true
         }
     }
@@ -300,8 +349,7 @@ public object NaturalSpawner {
         return when (type) {
             "ghast" -> random.nextInt(20) == 0
             "hoglin", "piglin", "zombified_piglin" -> groundPath != "nether_wart_block"
-            "husk", "parched", "stray" -> canSeeSky(world, x, y, z)
-            else -> true
+            else -> !NaturalSpawnPredicates.isSurfaceMonster(type) || canSeeSky(world, x, y, z)
         }
     }
 
@@ -384,14 +432,29 @@ public object NaturalSpawner {
     ): Boolean {
         val at = world.state.getBlockState(x, y, z) ?: return false
         val above = world.state.getBlockState(x, y + 1, z) ?: return false
-        if (!isWaterFluid(at) || BlockShapes.isFullCube(above)) return false
+        if (!NaturalSpawnPredicates.waterPlacementAllows(isWaterFluid(at), BlockSupport.conductsRedstone(above))) {
+            return false
+        }
         val below = world.state.getBlockState(x, y - 1, z) ?: return false
         val seaLevel = world.declaration.dimension.seaLevel
         return when (type) {
             "axolotl" -> BlockStateDefinitions.blockOf(below)?.path == "clay"
             "glow_squid" ->
-                y <= seaLevel - 33 &&
-                    maxOf(WorldLight.skyLight(world, x, y, z), WorldLight.blockLight(world, x, y, z)) == 0
+                NaturalSpawnPredicates.glowSquidAllows(
+                    y,
+                    seaLevel,
+                    maxOf(WorldLight.skyLight(world, x, y, z), WorldLight.blockLight(world, x, y, z)),
+                    isWaterBlock(at),
+                )
+            "guardian", "elder_guardian" ->
+                NaturalSpawnPredicates.guardianAllows(
+                    random.nextInt(20),
+                    world.difficulty,
+                    isWaterFluid(at),
+                    isWaterFluid(below),
+                ) {
+                    canSeeSkyFromBelowWater(world, x, y, z)
+                }
             "nautilus" -> y in seaLevel - 25..seaLevel - 5 && isWaterFluid(below) && isWaterBlock(above)
             "cod", "dolphin", "pufferfish", "salmon", "squid" ->
                 y in seaLevel - 13..seaLevel && isWaterFluid(below) && isWaterBlock(above)
@@ -434,40 +497,30 @@ public object NaturalSpawner {
         return false
     }
 
-    /** parity: 26.2 `BlockTags.ANIMALS_SPAWNABLE_ON`. */
-    private fun animalGroundAllows(
-        type: String?,
-        stateId: Int,
-    ): Boolean {
-        val ground = BlockStateDefinitions.blockOf(stateId)?.path ?: return false
-        return when (type) {
-            "armadillo" ->
-                ground in ARMADILLO_GROUND ||
-                    ("glazed" !in ground && (ground == "terracotta" || ground.endsWith("_terracotta")))
-            "camel" -> ground in SAND_GROUND
-            "fox" -> ground in FOX_WOLF_GROUND
-            "frog" -> ground in FROG_GROUND
-            "goat" -> ground in GOAT_GROUND
-            "mooshroom" -> ground == "mycelium"
-            "parrot" ->
-                ground in PARROT_GROUND ||
-                    ground.endsWith("_log") ||
-                    ground.endsWith("_wood") ||
-                    Blocks.isLeavesState(stateId)
-            "polar_bear" -> ground == "grass_block" || ground == "ice"
-            "rabbit" -> ground in RABBIT_GROUND
-            "turtle" -> ground in SAND_GROUND
-            "wolf" -> ground in FOX_WOLF_GROUND
-            else -> ground == "grass_block"
-        }
-    }
-
     private fun isWaterBlock(stateId: Int): Boolean = BlockStateDefinitions.blockOf(stateId)?.path == "water"
 
     private fun isWaterFluid(stateId: Int): Boolean =
         isWaterBlock(stateId) || BlockStateDefinitions.propertiesOf(stateId)["waterlogged"] == "true"
 
     private fun isLavaFluid(stateId: Int): Boolean = BlockStateDefinitions.blockOf(stateId)?.path == "lava"
+
+    /** parity: `LevelReader.canSeeSkyFromBelowWater`, including dampening non-liquid blocks. */
+    private fun canSeeSkyFromBelowWater(
+        world: LoadedWorld,
+        x: Int,
+        y: Int,
+        z: Int,
+    ): Boolean {
+        val seaLevel = world.declaration.dimension.seaLevel
+        if (y >= seaLevel) return canSeeSky(world, x, y, z)
+        if (!canSeeSky(world, x, seaLevel, z)) return false
+        for (scanY in seaLevel - 1 downTo y + 1) {
+            val state = world.state.getBlockState(x, scanY, z) ?: return false
+            val block = BlockStateDefinitions.blockOf(state)?.path
+            if (BlockShapes.dampening(state) > 0 && block != "water" && block != "lava") return false
+        }
+        return true
+    }
 
     /** parity: `WeightedRandomList.getRandom` over the biome's own weights. */
     public fun pick(
@@ -523,13 +576,6 @@ public object NaturalSpawner {
         return world.biomeSource?.biomeAtQuart(quartX, quartY, quartZ)?.id
     }
 
-    private val ARMADILLO_GROUND = setOf("grass_block", "red_sand", "coarse_dirt")
-    private val SAND_GROUND = setOf("sand", "red_sand", "suspicious_sand")
-    private val FOX_WOLF_GROUND = setOf("grass_block", "snow", "snow_block", "podzol", "coarse_dirt")
-    private val FROG_GROUND = setOf("grass_block", "mud", "mangrove_roots", "muddy_mangrove_roots")
-    private val GOAT_GROUND = setOf("grass_block", "stone", "snow", "snow_block", "packed_ice", "gravel")
-    private val PARROT_GROUND = setOf("grass_block", "air")
-    private val RABBIT_GROUND = setOf("grass_block", "snow", "snow_block", "sand")
     private val BAT_GROUND = setOf("stone", "granite", "diorite", "andesite", "tuff", "deepslate")
 
     /** parity: `BlockTags.RAILS`, the whole of `PREVENT_MOB_SPAWNING_INSIDE`. */
@@ -559,6 +605,8 @@ public object NaturalSpawner {
 
     private val MONSTERS_IGNORING_LIGHT =
         setOf("blaze", "breeze", "ghast", "hoglin", "magma_cube", "piglin", "sulfur_cube", "zoglin", "zombified_piglin")
+
+    private val REDUCED_WATER_AMBIENT_BIOMES = setOf("river", "frozen_river")
 
     private val SURFACE_SLIME_BIOMES = setOf("swamp", "mangrove_swamp")
 

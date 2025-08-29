@@ -234,6 +234,7 @@ public class NaturalSpawningSystem(
         val localCaps = LocalMobCaps(watchers.map { MobCapPlayer(it.entityId, it.x, it.z) })
         val chunks = chunkSimulation.simulatedChunks(world).filter { localCaps.isSpawnCandidate(it[0], it[1]) }
         if (chunks.isEmpty()) return
+        val spawnableChunks = chunks.mapTo(mutableSetOf()) { chunk -> chunkKey(chunk[0], chunk[1]) }
 
         // parity: NaturalSpawner.createState excludes both PersistenceRequired and each mob's
         // requiresCustomPersistence override before global caps, local caps and spawn costs.
@@ -286,6 +287,7 @@ public class NaturalSpawningSystem(
                         }
                     },
                     random = random,
+                    canSpawnEntitiesInChunk = { chunkX, chunkZ -> chunkKey(chunkX, chunkZ) in spawnableChunks },
                     requestAccepted = { request ->
                         val blockX = floor(request.x).toInt()
                         val blockY = floor(request.y).toInt()
@@ -712,5 +714,10 @@ public class NaturalSpawningSystem(
         const val FULL_ROTATION = 360f
         const val WANDERING_TRADER_DESPAWN_DELAY = 48_000
         const val WANDERING_TRADER_HOME_RADIUS = 16
+
+        fun chunkKey(
+            chunkX: Int,
+            chunkZ: Int,
+        ): Long = (chunkX.toLong() and 0xFFFFFFFFL) or (chunkZ.toLong() shl 32)
     }
 }

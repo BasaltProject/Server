@@ -1,5 +1,6 @@
 package org.basaltmc.server.runtime.world
 
+import org.basaltmc.server.runtime.entity.Aabb
 import org.basaltmc.server.runtime.entity.CubeMobs
 import org.basaltmc.server.runtime.entity.ServerEntity
 import org.basaltmc.wire.io.NativeMutex
@@ -30,6 +31,18 @@ internal class EntityRegistry(
 
     /** Everything `/summon` put here, alive or just removed and not yet forgotten by clients. */
     public fun entities(): List<ServerEntity> = mutex.withLock { entities.values.toList() }
+
+    /** Hot-path obstruction query without copying the whole entity registry for every spawn attempt. */
+    public fun hasNaturalSpawnObstruction(
+        spawnBox: Aabb,
+        entityBox: Aabb,
+    ): Boolean =
+        mutex.withLock {
+            for (entity in entities.values) {
+                if (NaturalSpawnObstruction.entityBlocksSpawn(entity, spawnBox, entityBox)) return@withLock true
+            }
+            false
+        }
 
     /** The live entities standing in this chunk, which is what gets written beside its blocks. */
     public fun entitiesIn(
