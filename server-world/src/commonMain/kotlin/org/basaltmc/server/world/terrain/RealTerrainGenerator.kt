@@ -14,6 +14,7 @@ import org.basaltmc.server.world.terrain.decoration.DesertWellDecoration
 import org.basaltmc.server.world.terrain.decoration.ForestRockDecoration
 import org.basaltmc.server.world.terrain.decoration.FrozenOceanDecoration
 import org.basaltmc.server.world.terrain.decoration.IceSpikesDecoration
+import org.basaltmc.server.world.terrain.decoration.OverworldLakeDecoration
 import org.basaltmc.server.world.terrain.decoration.OverworldOreDecoration
 import org.basaltmc.server.world.terrain.decoration.OverworldSpringDecoration
 import org.basaltmc.server.world.terrain.decoration.OverworldVegetalDecoration
@@ -39,6 +40,12 @@ public object RealTerrainGenerator {
     private const val CELL_WIDTH = 4
     private const val CELL_HEIGHT = 8
 
+    /** A chunk carrying everything a configured feature may read before decoration runs. */
+    public class GeneratedTerrain internal constructor(
+        public val chunk: Chunk,
+        internal val environment: SurfaceRuleEnvironment,
+    )
+
     public fun generate(
         router: OverworldNoiseRouter,
         environment: SurfaceRuleEnvironment,
@@ -46,7 +53,26 @@ public object RealTerrainGenerator {
         chunkZ: Int,
         seed: Long = 0L,
         villageGenerator: VillageStructureGenerator? = null,
+        neighbours: NeighbourTerrainCache? = null,
     ): Chunk {
+        val terrain = generateTerrain(router, environment, chunkX, chunkZ, seed, villageGenerator)
+        decorate(terrain, seed, neighbours?.around(chunkX, chunkZ))
+        return terrain.chunk
+    }
+
+    /**
+     * Everything a chunk holds before its own decoration: noise shape, surface rules, carvers and
+     * structures. A neighbour is generated only this far when a feature needs to read across the
+     * chunk edge, so reading one never recurses back into decoration.
+     */
+    public fun generateTerrain(
+        router: OverworldNoiseRouter,
+        environment: SurfaceRuleEnvironment,
+        chunkX: Int,
+        chunkZ: Int,
+        seed: Long = 0L,
+        villageGenerator: VillageStructureGenerator? = null,
+    ): GeneratedTerrain {
         val chunk = Chunk(chunkX, chunkZ)
         // One cache for the whole chunk, shared by terrain shape, surface rules and biome filling:
         // they all walk the same router subtrees, so a cache per phase would throw away most of it.
@@ -122,7 +148,25 @@ public object RealTerrainGenerator {
         GenerationMetrics.measure(GenerationMetrics.Phase.STRUCTURES) {
             villageGenerator?.generateInto(chunk, chunkX, chunkZ, seed)
         }
+        return GeneratedTerrain(chunk, chunkEnvironment)
+    }
+
+    /** The decoration steps of one already-generated [terrain], in their official order. */
+    public fun decorate(
+        terrain: GeneratedTerrain,
+        seed: Long = 0L,
+        neighbours: NeighbourTerrain? = null,
+    ) {
+        val chunk = terrain.chunk
+        val chunkEnvironment = terrain.environment
         GenerationMetrics.measure(GenerationMetrics.Phase.DECORATION) {
+            // Step 1. Its bodies are 16 wide, so they read and write across the chunk edge and need
+            // the neighbouring terrain rather than the air an absent reader would report.
+            chunk.withExternalDecorationBlockState(
+                reader = { x, y, z -> neighbours?.blockStateIdAt(x, y, z) },
+            ) {
+                OverworldLakeDecoration.decorate(chunk, seed, chunkEnvironment)
+            }
             FrozenOceanDecoration.decorateLocalModifications(chunk, seed, chunkEnvironment)
             CaveLocalModificationDecoration.decorate(chunk, seed, chunkEnvironment)
             ForestRockDecoration.decorate(chunk, seed, chunkEnvironment)
@@ -141,7 +185,6 @@ public object RealTerrainGenerator {
         }
         GenerationMetrics.measure(GenerationMetrics.Phase.BIOME_FILL) { fillBiomes(chunk, chunkEnvironment) }
         if (GenerationMetrics.enabled) GenerationMetrics.countChunk()
-        return chunk
     }
 
     /**

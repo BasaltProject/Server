@@ -13,6 +13,7 @@ import org.basaltmc.server.world.noise.NormalNoise
 import org.basaltmc.server.world.structure.StructurePlacementGrid
 import org.basaltmc.server.world.terrain.DimensionTerrainGenerator
 import org.basaltmc.server.world.terrain.EndCityStructureGenerator
+import org.basaltmc.server.world.terrain.NeighbourTerrainCache
 import org.basaltmc.server.world.terrain.NetherBiomeSource
 import org.basaltmc.server.world.terrain.NetherStructureGenerator
 import org.basaltmc.server.world.terrain.NoiseRouterData
@@ -103,6 +104,20 @@ public class VanillaWorldGeneratorFactory(
                 templateLoader = villageLoader.templateLoader,
             ).also(villages::add)
         val biomeSpawns = RealBiomeSpawns(serverJar)
+        // Step 1's bodies read past the chunk edge, so decoration needs the neighbours' undecorated
+        // terrain. One cache per world: a neighbour generated for one chunk is read by the next.
+        val neighbours =
+            NeighbourTerrainCache { neighbourX, neighbourZ ->
+                RealTerrainGenerator
+                    .generateTerrain(
+                        router,
+                        surface,
+                        neighbourX,
+                        neighbourZ,
+                        seed,
+                        village,
+                    ).chunk
+            }
         return Generators(
             generate = {
                 chunkX,
@@ -110,23 +125,32 @@ public class VanillaWorldGeneratorFactory(
                 gameTime,
                 difficulty,
                 ->
-                RealTerrainGenerator.generate(router, surface, chunkX, chunkZ, seed, village).also { chunk ->
-                    if (spawnMobs) {
-                        val biome =
-                            Identifier.parse(surface.biomeAt(chunkX shl 4, chunk.verticalBounds.maxY, chunkZ shl 4))
-                        val random = WorldgenRandom(LegacyRandom(0L))
-                        random.setDecorationSeed(seed, chunkX shl 4, chunkZ shl 4)
-                        OriginalMobSpawner.spawnInto(
-                            chunk,
-                            biomeSpawns.listFor(biome, "creature"),
-                            biomeSpawns.creatureProbabilityFor(biome),
-                            random,
-                            gameTime = gameTime,
-                            difficulty = difficulty,
-                            equipmentFinalizer = spawnEquipment,
-                        )
+                RealTerrainGenerator
+                    .generate(
+                        router,
+                        surface,
+                        chunkX,
+                        chunkZ,
+                        seed,
+                        village,
+                        neighbours,
+                    ).also { chunk ->
+                        if (spawnMobs) {
+                            val biome =
+                                Identifier.parse(surface.biomeAt(chunkX shl 4, chunk.verticalBounds.maxY, chunkZ shl 4))
+                            val random = WorldgenRandom(LegacyRandom(0L))
+                            random.setDecorationSeed(seed, chunkX shl 4, chunkZ shl 4)
+                            OriginalMobSpawner.spawnInto(
+                                chunk,
+                                biomeSpawns.listFor(biome, "creature"),
+                                biomeSpawns.creatureProbabilityFor(biome),
+                                random,
+                                gameTime = gameTime,
+                                difficulty = difficulty,
+                                equipmentFinalizer = spawnEquipment,
+                            )
+                        }
                     }
-                }
             },
             villages = village,
         )
