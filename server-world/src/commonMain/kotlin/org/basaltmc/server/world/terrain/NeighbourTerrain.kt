@@ -1,6 +1,8 @@
 package org.basaltmc.server.world.terrain
 
 import org.basaltmc.server.world.Chunk
+import org.basaltmc.server.world.GenerationMetrics
+import kotlin.concurrent.AtomicReference
 import kotlin.math.abs
 
 /**
@@ -26,16 +28,21 @@ public fun interface NeighbourTerrain {
  * it rather than once per reader.
  *
  * [generateTerrain] must stop before decoration, or reading a neighbour would decorate it and
- * recurse. Deliberately not thread-safe: one cache belongs to one generation owner, which is what
- * the regional scheduler hands out.
+ * recurse.
+ *
+ * Chunks generate concurrently, so one cache really is reached from several threads at once. It
+ * holds an immutable map behind an [AtomicReference] and swaps it, the same trade-off
+ * `VillageStructureGenerator` makes for its assemblies: a thread that loses the race discards its
+ * own copy and takes the winner's, because generating the same neighbour twice is wasted work and
+ * never a different result.
  */
 public class NeighbourTerrainCache(
     private val radius: Int = 1,
     private val capacity: Int = DEFAULT_CAPACITY,
     private val generateTerrain: (chunkX: Int, chunkZ: Int) -> Chunk,
 ) {
-    // Insertion-ordered, so evicting the first entry evicts the least recently generated one.
-    private val terrain = LinkedHashMap<Long, Chunk>()
+    // Insertion-ordered, so dropping the first entry drops the least recently generated one.
+    private val terrain = AtomicReference<Map<Long, Chunk>>(emptyMap())
 
     /** A view bounded to [radius] chunks around the one being decorated. */
     public fun around(
@@ -54,7 +61,7 @@ public class NeighbourTerrainCache(
 
     /** Forgets everything held, for an owner that is done generating. */
     public fun clear() {
-        terrain.clear()
+        terrain.value = emptyMap()
     }
 
     private fun blockAt(
@@ -64,10 +71,27 @@ public class NeighbourTerrainCache(
         y: Int,
         worldZ: Int,
     ): Int? {
-        val chunk = terrain.getOrPut(key(neighbourX, neighbourZ)) { generateTerrain(neighbourX, neighbourZ) }
-        if (terrain.size > capacity) terrain.remove(terrain.keys.first())
+        val key = key(neighbourX, neighbourZ)
+        val chunk = terrain.value[key] ?: generateAndKeep(key, neighbourX, neighbourZ)
         if (y !in chunk.verticalBounds.minY..chunk.verticalBounds.maxY) return null
         return chunk.getBlockStateId(worldX and 15, y, worldZ and 15)
+    }
+
+    private fun generateAndKeep(
+        key: Long,
+        neighbourX: Int,
+        neighbourZ: Int,
+    ): Chunk {
+        val generated =
+            GenerationMetrics.measure(GenerationMetrics.Phase.NEIGHBOURS) {
+                generateTerrain(neighbourX, neighbourZ)
+            }
+        while (true) {
+            val current = terrain.value
+            current[key]?.let { return it }
+            val trimmed = if (current.size >= capacity) current.entries.drop(1).associate { it.toPair() } else current
+            if (terrain.compareAndSet(current, trimmed + (key to generated))) return generated
+        }
     }
 
     private fun key(
@@ -76,8 +100,9 @@ public class NeighbourTerrainCache(
     ): Long = (chunkX.toLong() shl 32) or (chunkZ.toLong() and 0xFFFFFFFFL)
 
     private companion object {
-        // A ring of two around the chunk in flight, so a row-by-row or spiral order keeps its
-        // neighbours instead of regenerating them.
-        const val DEFAULT_CAPACITY = 25
+        // Wide enough that a chunk's eight neighbours survive until they generate for real: at 25
+        // the measured cost was 96 ms per chunk, about a neighbour and a half regenerated every
+        // time, because concurrent generation interleaves several chunks' working sets.
+        const val DEFAULT_CAPACITY = 128
     }
 }

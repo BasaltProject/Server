@@ -23,6 +23,13 @@ public object GenerationMetrics {
         DECORATION,
         SURFACE_FREEZE,
         BIOME_FILL,
+
+        /**
+         * Undecorated neighbours generated so a feature could read past the chunk edge. Nested
+         * inside DECORATION, and its own work is also counted in the phases above it, so this is
+         * how much of those belongs to a neighbour rather than to the chunk being generated.
+         */
+        NEIGHBOURS,
     }
 
     public var enabled: Boolean = false

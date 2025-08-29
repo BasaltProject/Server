@@ -393,6 +393,11 @@ internal class PlacementRegion(
             externalWrites[BlockPosition(x, y, z)] ?: externalBlockState?.invoke(x, y, z)
         }
 
+    /**
+     * An ore or stone blob is a sphere, so most cross a chunk edge. Keeping the outside only in
+     * [externalWrites] threw those blocks away, costing about 30% of every large blob against vanilla
+     * 26.2, so it now goes to the deferred pipeline guarded by the very block the blob replaced.
+     */
     fun setBlockStateId(
         x: Int,
         y: Int,
@@ -401,9 +406,12 @@ internal class PlacementRegion(
     ) {
         if (x shr 4 == chunk.chunkX && z shr 4 == chunk.chunkZ) {
             chunk.setBlockStateId(x and 15, y, z and 15, stateId)
-        } else {
-            externalWrites[BlockPosition(x, y, z)] = stateId
+            return
         }
+        val position = BlockPosition(x, y, z)
+        val observed = externalWrites[position] ?: externalBlockState?.invoke(x, y, z) ?: Blocks.AIR.stateId
+        externalWrites[position] = stateId
+        chunk.setDecorationBlockStateId(x, y, z, stateId, expectedExternalStateId = observed)
     }
 }
 

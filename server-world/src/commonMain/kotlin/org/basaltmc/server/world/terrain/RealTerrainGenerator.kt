@@ -160,25 +160,38 @@ public object RealTerrainGenerator {
         val chunk = terrain.chunk
         val chunkEnvironment = terrain.environment
         GenerationMetrics.measure(GenerationMetrics.Phase.DECORATION) {
-            // Step 1. Its bodies are 16 wide, so they read and write across the chunk edge and need
-            // the neighbouring terrain rather than the air an absent reader would report.
+            // One reader for the whole phase. A feature body that reaches past the chunk edge asks
+            // the chunk, and the chunk asks this: without it the outside reads as air, which makes
+            // a lake preflight reject itself and a grass patch find no ground to stand on.
             chunk.withExternalDecorationBlockState(
                 reader = { x, y, z -> neighbours?.blockStateIdAt(x, y, z) },
             ) {
                 OverworldLakeDecoration.decorate(chunk, seed, chunkEnvironment)
+                FrozenOceanDecoration.decorateLocalModifications(chunk, seed, chunkEnvironment)
+                CaveLocalModificationDecoration.decorate(chunk, seed, chunkEnvironment)
+                ForestRockDecoration.decorate(chunk, seed, chunkEnvironment)
+                IceSpikesDecoration.decorate(chunk, seed, chunkEnvironment)
+                DesertWellDecoration.decorate(chunk, seed, chunkEnvironment)
+                FrozenOceanDecoration.decorateSurfaceStructures(chunk, seed, chunkEnvironment)
+                // Ore and stone blobs are spheres around their origin, so most cross a chunk edge. The
+                // part outside is deferred, and its guard has to be the block actually out there.
+                OverworldOreDecoration.decorate(
+                    chunk,
+                    seed,
+                    chunkEnvironment,
+                    externalBlockState = { x, y, z -> neighbours?.blockStateIdAt(x, y, z) },
+                )
+                SculkDecoration.decorate(chunk, seed, chunkEnvironment)
+                CaveSpeleothemDecoration.decorate(chunk, seed, chunkEnvironment)
+                OverworldOreDecoration.decorateInfested(
+                    chunk,
+                    seed,
+                    chunkEnvironment,
+                    externalBlockState = { x, y, z -> neighbours?.blockStateIdAt(x, y, z) },
+                )
+                OverworldSpringDecoration.decorate(chunk, seed, chunkEnvironment)
+                OverworldVegetalDecoration.decorate(chunk, seed, chunkEnvironment)
             }
-            FrozenOceanDecoration.decorateLocalModifications(chunk, seed, chunkEnvironment)
-            CaveLocalModificationDecoration.decorate(chunk, seed, chunkEnvironment)
-            ForestRockDecoration.decorate(chunk, seed, chunkEnvironment)
-            IceSpikesDecoration.decorate(chunk, seed, chunkEnvironment)
-            DesertWellDecoration.decorate(chunk, seed, chunkEnvironment)
-            FrozenOceanDecoration.decorateSurfaceStructures(chunk, seed, chunkEnvironment)
-            OverworldOreDecoration.decorate(chunk, seed, chunkEnvironment)
-            SculkDecoration.decorate(chunk, seed, chunkEnvironment)
-            CaveSpeleothemDecoration.decorate(chunk, seed, chunkEnvironment)
-            OverworldOreDecoration.decorateInfested(chunk, seed, chunkEnvironment)
-            OverworldSpringDecoration.decorate(chunk, seed, chunkEnvironment)
-            OverworldVegetalDecoration.decorate(chunk, seed, chunkEnvironment)
         }
         GenerationMetrics.measure(GenerationMetrics.Phase.SURFACE_FREEZE) {
             SurfaceFreezingDecoration.decorate(chunk, chunkEnvironment)
