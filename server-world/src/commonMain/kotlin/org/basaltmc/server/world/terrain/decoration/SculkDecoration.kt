@@ -576,7 +576,10 @@ public object SculkDecoration {
                 position.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y -> Blocks.AIR.stateId
                 position.x shr 4 == chunk.chunkX && position.z shr 4 == chunk.chunkZ ->
                     chunk.getBlockStateId(position.x and 15, position.y, position.z and 15)
-                else -> externalWrites[position] ?: externalBlockState?.invoke(position.x, position.y, position.z)
+                else ->
+                    externalWrites[position]
+                        ?: externalBlockState?.invoke(position.x, position.y, position.z)
+                        ?: chunk.getDecorationBlockStateId(position.x, position.y, position.z)
             }
 
         fun set(
@@ -587,7 +590,9 @@ public object SculkDecoration {
             if (position.x shr 4 == chunk.chunkX && position.z shr 4 == chunk.chunkZ) {
                 chunk.setBlockStateId(position.x and 15, position.y, position.z and 15, stateId)
             } else {
-                externalWrites[position] = stateId
+                // A sculk patch spreads well past its own chunk, and the part outside was
+                // being collected and then dropped.
+                setExternalDecorationBlockStateId(chunk, externalWrites, externalBlockState, position, stateId)
             }
             blockWriteObserver?.invoke(position.x, position.y, position.z, stateId)
         }

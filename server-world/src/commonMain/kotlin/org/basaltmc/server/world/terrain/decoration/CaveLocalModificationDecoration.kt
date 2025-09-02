@@ -555,7 +555,10 @@ public object CaveLocalModificationDecoration {
                 position.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y -> Blocks.AIR.stateId
                 position.x shr 4 == chunk.chunkX && position.z shr 4 == chunk.chunkZ ->
                     chunk.getBlockStateId(position.x and 15, position.y, position.z and 15)
-                else -> externalWrites[position] ?: externalBlockState?.invoke(position.x, position.y, position.z)
+                else ->
+                    externalWrites[position]
+                        ?: externalBlockState?.invoke(position.x, position.y, position.z)
+                        ?: chunk.getDecorationBlockStateId(position.x, position.y, position.z)
             }
 
         fun set(
@@ -565,9 +568,11 @@ public object CaveLocalModificationDecoration {
             if (position.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y) return
             if (position.x shr 4 == chunk.chunkX && position.z shr 4 == chunk.chunkZ) {
                 chunk.setBlockStateId(position.x and 15, position.y, position.z and 15, stateId)
-            } else {
-                externalWrites[position] = stateId
+                return
             }
+            // A geode is 33 blocks across, so most of one falls in the neighbours. The map alone
+            // only keeps the feature self-consistent; deferring the write is what delivers it.
+            setExternalDecorationBlockStateId(chunk, externalWrites, externalBlockState, position, stateId)
         }
 
         fun safeSet(
