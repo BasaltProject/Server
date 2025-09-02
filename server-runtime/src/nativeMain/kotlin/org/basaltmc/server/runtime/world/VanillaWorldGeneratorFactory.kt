@@ -17,8 +17,10 @@ import org.basaltmc.server.world.terrain.MineshaftStructureGenerator
 import org.basaltmc.server.world.terrain.NeighbourTerrainCache
 import org.basaltmc.server.world.terrain.NetherBiomeSource
 import org.basaltmc.server.world.terrain.NetherStructureGenerator
+import org.basaltmc.server.world.terrain.NoiseColumnHeights
 import org.basaltmc.server.world.terrain.NoiseRouterData
 import org.basaltmc.server.world.terrain.RealTerrainGenerator
+import org.basaltmc.server.world.terrain.RuinedPortalStructureGenerator
 import org.basaltmc.server.world.terrain.TheEndBiomeSource
 import org.basaltmc.server.world.terrain.VillageStructureGenerator
 import org.basaltmc.wire.common.Identifier
@@ -114,6 +116,16 @@ public class VanillaWorldGeneratorFactory(
                 normalBiomes = biomeTags.biomesIn("minecraft:has_structure/mineshaft"),
                 mesaBiomes = biomeTags.biomesIn("minecraft:has_structure/mineshaft_mesa"),
             )
+        // A portal has to know the ground height at its four corners before any chunk exists.
+        val columns = NoiseColumnHeights(router)
+        val ruinedPortals =
+            RuinedPortalStructureGenerator(
+                variants = RuinedPortalVariants.overworld(biomeTags),
+                templateOf = { name -> villageLoader.templateLoader(name) },
+                biomeAt = { x, y, z -> surface.biomeAt(x, y, z) },
+                surfaceHeightAt = { x, z -> columns.surfaceHeight(x, z) },
+                isSolidAt = { x, y, z -> columns.isSolid(x, y, z) },
+            )
         // Step 1's bodies read past the chunk edge, so decoration needs the neighbours' undecorated
         // terrain. One cache per world: a neighbour generated for one chunk is read by the next.
         val neighbours =
@@ -127,6 +139,7 @@ public class VanillaWorldGeneratorFactory(
                         seed,
                         village,
                         mineshafts,
+                        ruinedPortals,
                     ).chunk
             }
         return Generators(
@@ -146,6 +159,7 @@ public class VanillaWorldGeneratorFactory(
                         village,
                         neighbours,
                         mineshafts,
+                        ruinedPortals,
                     ).also { chunk ->
                         if (spawnMobs) {
                             val biome =

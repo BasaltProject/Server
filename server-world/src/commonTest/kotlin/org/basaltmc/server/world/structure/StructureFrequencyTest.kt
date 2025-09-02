@@ -43,8 +43,33 @@ class StructureFrequencyTest {
         }
     }
 
+    /**
+     * A spread grid with real spacing, which the mineshaft vector cannot exercise because its
+     * spacing is 1. Both cells were read back from the same server's `structures.starts`.
+     */
+    @Test
+    fun `ruined portals land on the chunks a real server put them on`() {
+        val portals = StructurePlacementGrid(spacing = 40, separation = 15, salt = 34222645)
+        for ((cellX, cellZ, expected) in RUINED_PORTAL_CELLS) {
+            val found = mutableListOf<Pair<Int, Int>>()
+            for (chunkX in cellX * 40 until cellX * 40 + 40) {
+                for (chunkZ in cellZ * 40 until cellZ * 40 + 40) {
+                    if (portals.isStructureChunk(SEED, chunkX, chunkZ)) found += chunkX to chunkZ
+                }
+            }
+            assertEquals(listOf(expected), found, "cell ($cellX, $cellZ) no longer matches 26.2")
+        }
+    }
+
     private companion object {
         const val SEED = 12345L
+
+        /** One cell of the ruined portal grid each, as `cellX, cellZ, the chunk vanilla chose`. */
+        val RUINED_PORTAL_CELLS =
+            listOf(
+                Triple(0, 0, 1 to 0),
+                Triple(0, -1, 0 to -18),
+            )
 
         /** Chunk coordinates, in the iteration order of the scan above. */
         val VANILLA_STARTS =

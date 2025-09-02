@@ -56,9 +56,19 @@ public object RealTerrainGenerator {
         villageGenerator: VillageStructureGenerator? = null,
         neighbours: NeighbourTerrainCache? = null,
         mineshaftGenerator: MineshaftStructureGenerator? = null,
+        ruinedPortalGenerator: RuinedPortalStructureGenerator? = null,
     ): Chunk {
         val terrain =
-            generateTerrain(router, environment, chunkX, chunkZ, seed, villageGenerator, mineshaftGenerator)
+            generateTerrain(
+                router,
+                environment,
+                chunkX,
+                chunkZ,
+                seed,
+                villageGenerator,
+                mineshaftGenerator,
+                ruinedPortalGenerator,
+            )
         decorate(terrain, seed, neighbours?.around(chunkX, chunkZ))
         return terrain.chunk
     }
@@ -76,6 +86,7 @@ public object RealTerrainGenerator {
         seed: Long = 0L,
         villageGenerator: VillageStructureGenerator? = null,
         mineshaftGenerator: MineshaftStructureGenerator? = null,
+        ruinedPortalGenerator: RuinedPortalStructureGenerator? = null,
     ): GeneratedTerrain {
         val chunk = Chunk(chunkX, chunkZ)
         // One cache for the whole chunk, shared by terrain shape, surface rules and biome filling:
@@ -155,6 +166,8 @@ public object RealTerrainGenerator {
             mineshaftGenerator?.generateInto(chunk, seed) { x, z ->
                 chunk.heightAt(x and 15, z and 15, Chunk.HeightmapType.OCEAN_FLOOR)
             }
+            // Step 4, surface_structures, alongside the villages above.
+            ruinedPortalGenerator?.generateInto(chunk, seed)
         }
         return GeneratedTerrain(chunk, chunkEnvironment)
     }
