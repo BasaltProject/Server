@@ -206,6 +206,9 @@ public object RealTerrainGenerator {
                     chunk,
                     seed,
                     chunkEnvironment,
+                    // A blob's preflight asks for the height of every column its box covers, and
+                    // most of those columns belong to a neighbour.
+                    externalSurfaceHeight = { x, z -> neighbours?.oceanFloorHeightAt(x, z) },
                     externalBlockState = { x, y, z -> neighbours?.blockStateIdAt(x, y, z) },
                 )
                 // Step 7 opens with its structures, and the ancient city is the first of the

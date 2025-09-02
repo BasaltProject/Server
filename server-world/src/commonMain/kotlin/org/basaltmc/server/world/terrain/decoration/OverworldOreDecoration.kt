@@ -233,18 +233,19 @@ public object OverworldOreDecoration {
             val maxX = maxOf(Mth.floor(centerX + radius), minX)
             val maxY = maxOf(Mth.floor(centerY + radius), minY)
             val maxZ = maxOf(Mth.floor(centerZ + radius), minZ)
-            // parity: the comparison is against the squared radius, not a distance divided by it.
-            // The two agree on paper and not in floating point, and a blob this size is mostly edge.
-            val radiusSquared = radius * radius
+            // parity: each distance is divided by the radius and compared against 1, which is not
+            // the same as comparing squared distances against a squared radius once floating point
+            // is involved. A blob this size is mostly edge, and which edge cells are visited also
+            // decides how many draws the air-exposure check makes.
             for (x in minX..maxX) {
-                val xd = x + 0.5 - centerX
-                if (xd * xd >= radiusSquared) continue
+                val xd = (x + 0.5 - centerX) / radius
+                if (xd * xd >= 1.0) continue
                 for (y in minY..maxY) {
-                    val yd = y + 0.5 - centerY
-                    if (xd * xd + yd * yd >= radiusSquared) continue
+                    val yd = (y + 0.5 - centerY) / radius
+                    if (xd * xd + yd * yd >= 1.0) continue
                     for (z in minZ..maxZ) {
-                        val zd = z + 0.5 - centerZ
-                        if (xd * xd + yd * yd + zd * zd >= radiusSquared ||
+                        val zd = (z + 0.5 - centerZ) / radius
+                        if (xd * xd + yd * yd + zd * zd >= 1.0 ||
                             y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y
                         ) {
                             continue
@@ -345,15 +346,16 @@ internal class PlacementRegion(
     private val externalSurfaceHeight: ((x: Int, z: Int) -> Int?)?,
     private val externalBlockState: ((x: Int, y: Int, z: Int) -> Int?)?,
 ) {
-    private val localSurfaceHeight = chunk.heightmap(Chunk.HeightmapType.OCEAN_FLOOR)
     private val externalWrites = HashMap<BlockPosition, Int>()
 
+    // parity: the preflight asks the level, so it sees the blobs this very step has already put
+    // down. A copy taken when the region was built freezes the surface as it was before any ore.
     fun oceanFloorHeight(
         x: Int,
         z: Int,
     ): Int? =
         if (x shr 4 == chunk.chunkX && z shr 4 == chunk.chunkZ) {
-            localSurfaceHeight[(x and 15) + (z and 15) * 16]
+            chunk.heightAt(x and 15, z and 15, Chunk.HeightmapType.OCEAN_FLOOR)
         } else {
             externalSurfaceHeight?.invoke(x, z)
         }
@@ -372,7 +374,7 @@ internal class PlacementRegion(
         val localMaxZ = minOf(zStart + sizeXZ, chunkMinZ + 15)
         for (x in localMinX..localMaxX) {
             for (z in localMinZ..localMaxZ) {
-                if (yStart <= localSurfaceHeight[(x and 15) + (z and 15) * 16]) return true
+                if (yStart <= chunk.heightAt(x and 15, z and 15, Chunk.HeightmapType.OCEAN_FLOOR)) return true
             }
         }
         val outsideHeight = externalSurfaceHeight ?: return false
