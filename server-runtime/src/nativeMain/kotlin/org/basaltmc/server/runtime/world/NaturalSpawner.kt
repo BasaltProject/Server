@@ -83,7 +83,11 @@ public object NaturalSpawner {
         chunkX: Int,
         chunkZ: Int,
         category: MobCategory,
-        entriesFor: (Identifier) -> List<SpawnerEntry>,
+        /**
+         * The list for a biome at a position. // parity: `NaturalSpawner.mobsAt`, which takes a
+         * position because a structure standing there can replace the biome's list outright.
+         */
+        entriesFor: (Identifier, Int, Int, Int) -> List<SpawnerEntry>,
         playerDistanceSquared: (Double, Double, Double) -> Double?,
         random: BasaltRandom,
         canSpawnEntitiesInChunk: (Int, Int) -> Boolean = { x, z -> world.state.chunkIfLoaded(x, z) != null },
@@ -142,11 +146,11 @@ public object NaturalSpawner {
                     ) {
                         break
                     }
-                    chosen = pick(entriesFor(biome), random) ?: break
+                    chosen = pick(entriesFor(biome, x, startY, z), random) ?: break
                     pack = chosen.minCount + random.nextInt((1 + chosen.maxCount - chosen.minCount).coerceAtLeast(1))
                 }
                 if (!canSpawnAtDistance(chosen.type, category, distance)) continue
-                if (!containsSpawnData(entriesFor(biome), chosen)) continue
+                if (!containsSpawnData(entriesFor(biome, x, startY, z), chosen)) continue
                 if (!canSpawnAt(world, chosen.type, category, x, startY, z, random)) continue
                 if (!NaturalSpawnObstruction.allows(world, chosen.type, centreX, startY.toDouble(), centreZ)) continue
                 val request =

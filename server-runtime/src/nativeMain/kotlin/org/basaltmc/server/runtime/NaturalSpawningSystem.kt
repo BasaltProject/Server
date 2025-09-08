@@ -34,6 +34,7 @@ import org.basaltmc.server.runtime.world.SkeletonHorseTrap
 import org.basaltmc.server.runtime.world.SpawnEquipmentFinalizer
 import org.basaltmc.server.runtime.world.SpawnPotential
 import org.basaltmc.server.runtime.world.SpawnRequest
+import org.basaltmc.server.runtime.world.StructureSpawnLists
 import org.basaltmc.server.runtime.world.TraderLlamaSpawnRequest
 import org.basaltmc.server.runtime.world.VillageGolemSpawner
 import org.basaltmc.server.runtime.world.VillageSiegeSpawnRequest
@@ -235,6 +236,7 @@ public class NaturalSpawningSystem(
         val chunks = chunkSimulation.simulatedChunks(world).filter { localCaps.isSpawnCandidate(it[0], it[1]) }
         if (chunks.isEmpty()) return
         val spawnableChunks = chunks.mapTo(mutableSetOf()) { chunk -> chunkKey(chunk[0], chunk[1]) }
+        val structureSpawnLists = StructureSpawnLists(world)
 
         // parity: NaturalSpawner.createState excludes both PersistenceRequired and each mob's
         // requiresCustomPersistence override before global caps, local caps and spawn costs.
@@ -277,7 +279,10 @@ public class NaturalSpawningSystem(
                     chunk[0],
                     chunk[1],
                     category,
-                    entriesFor = { biome -> biomeSpawns.listFor(biome, category.categoryName) },
+                    entriesFor = { biome, x, y, z ->
+                        structureSpawnLists.listAt(category.categoryName, x, y, z)
+                            ?: biomeSpawns.listFor(biome, category.categoryName)
+                    },
                     playerDistanceSquared = { x, y, z ->
                         watchers.minOfOrNull { player ->
                             val dx = player.x - x

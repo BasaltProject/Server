@@ -5,6 +5,7 @@ import org.basaltmc.server.registry.BlockStateDefinitions
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.registry.hasFluid
 import org.basaltmc.server.registry.isLeavesState
+import org.basaltmc.server.world.structure.ChunkStructures
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
 
@@ -69,6 +70,10 @@ public class Chunk(
     private val generatedExternalBlockEntityWrites =
         LinkedHashMap<GeneratedWorldPos, ChunkGeneratedBlockEntityWrite>()
     private val generatedExternalBlockTicks = LinkedHashMap<GeneratedWorldPos, ChunkGeneratedBlockTick>()
+
+    /** What this chunk knows about structures, for position queries and for spawn overrides. */
+    public val structures: ChunkStructures = ChunkStructures { isDirty = true }
+
     private var blockWriteObserver: ((Int, Int, Int, Int, Int) -> Unit)? = null
     private var externalDecorationBlockState: ((x: Int, y: Int, z: Int) -> Int?)? = null
     private var generatedBlockWritePolicy: GeneratedBlockWritePolicy = GeneratedBlockWritePolicy.EXACT
