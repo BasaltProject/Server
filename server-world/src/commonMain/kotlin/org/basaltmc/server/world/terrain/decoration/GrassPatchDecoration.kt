@@ -135,9 +135,12 @@ public object GrassPatchDecoration {
                 position.y !in WorldHeight.MIN_Y..WorldHeight.MAX_Y -> Blocks.AIR.stateId
                 position.x shr 4 == chunk.chunkX && position.z shr 4 == chunk.chunkZ ->
                     chunk.getBlockStateId(position.x and 15, position.y, position.z and 15)
+                // Outside the chunk this used to read as air, so anything needing a block beneath it
+                // was refused everywhere but its own chunk. Falling through to the chunk reaches the
+                // phase-wide neighbour reader, which is what vanilla's own level lookup sees.
                 else ->
                     externalWrites[position] ?: externalBlockState?.invoke(position.x, position.y, position.z)
-                        ?: Blocks.AIR.stateId
+                        ?: chunk.getDecorationBlockStateId(position.x, position.y, position.z)
             }
 
         fun set(

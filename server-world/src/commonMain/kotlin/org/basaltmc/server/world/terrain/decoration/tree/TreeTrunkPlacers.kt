@@ -5,6 +5,7 @@ import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
 import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.server.world.terrain.decoration.IntProvider
+import org.basaltmc.wire.common.Mth
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.floor
@@ -566,8 +567,11 @@ public class MegaJungleTrunkPlacer(
             var branchX = 0
             var branchZ = 0
             for (step in 0 until 5) {
-                branchX = (1.5f + cos(angle) * step).toInt()
-                branchZ = (1.5f + sin(angle) * step).toInt()
+                // parity: this placer uses Mth's 65536-entry sine table, not real trigonometry, and
+                // the result is truncated to an int right after, so the two disagree at boundaries.
+                // The fancy oak above really does use exact `Math.sin`, hence the two ways here.
+                branchX = (1.5f + Mth.cos(angle) * step).toInt()
+                branchZ = (1.5f + Mth.sin(angle) * step).toInt()
                 placeLog(
                     chunk,
                     originX + branchX,
