@@ -23,6 +23,7 @@ import org.basaltmc.server.world.terrain.NoiseRouterData
 import org.basaltmc.server.world.terrain.RealTerrainGenerator
 import org.basaltmc.server.world.terrain.RuinedPortalStructureGenerator
 import org.basaltmc.server.world.terrain.TheEndBiomeSource
+import org.basaltmc.server.world.terrain.TrialChamberStructureGenerator
 import org.basaltmc.server.world.terrain.VillageStructureGenerator
 import org.basaltmc.wire.common.Identifier
 
@@ -134,6 +135,13 @@ public class VanillaWorldGeneratorFactory(
                 templateLoader = villageLoader.templateLoader,
                 cityBiomes = biomeTags.biomesIn("minecraft:has_structure/ancient_city"),
             )
+        val trialChambers =
+            TrialChamberStructureGenerator(
+                biomeAt = { x, y, z -> surface.biomeAt(x, y, z) },
+                poolLookup = villageLoader.poolLookup,
+                templateLoader = villageLoader.templateLoader,
+                chamberBiomes = biomeTags.biomesIn("minecraft:has_structure/trial_chambers"),
+            )
         // Step 1's bodies read past the chunk edge, so decoration needs the neighbours' undecorated
         // terrain. One cache per world: a neighbour generated for one chunk is read by the next.
         val neighbours =
@@ -149,6 +157,7 @@ public class VanillaWorldGeneratorFactory(
                         mineshafts,
                         ruinedPortals,
                         ancientCities,
+                        trialChambers,
                     ).chunk
             }
         return Generators(
@@ -170,6 +179,7 @@ public class VanillaWorldGeneratorFactory(
                         mineshafts,
                         ruinedPortals,
                         ancientCities,
+                        trialChambers,
                     ).also { chunk ->
                         if (spawnMobs) {
                             val biome =

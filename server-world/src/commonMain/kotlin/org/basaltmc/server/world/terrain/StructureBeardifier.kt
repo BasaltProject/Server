@@ -6,15 +6,17 @@ import org.basaltmc.server.world.structure.StructureBoundingBox
 import org.basaltmc.wire.common.Mth
 import kotlin.math.E
 import kotlin.math.pow
+import kotlin.math.sqrt
 
 /**
  * // parity: TerrainAdjustment, narrowed to the kinds a structure this server generates asks for.
- * `bury` (stronghold, trail ruins) and `encapsulate` (trial chambers) go in with their structures.
+ * `bury` (stronghold, trail ruins) goes in with its structures.
  */
 internal enum class TerrainAdjustment {
     NONE,
     BEARD_THIN,
     BEARD_BOX,
+    ENCAPSULATE,
 }
 
 /** // parity: Beardifier's rigid-piece and junction contributions. */
@@ -38,8 +40,18 @@ internal class StructureBeardifier(
                     // A box clears the piece's whole height instead of bearding up from its floor,
                     // which is what lets the ancient city sit in a hollow rather than in solid rock.
                     TerrainAdjustment.BEARD_BOX -> maxOf(0, maxOf(groundY - context.blockY, context.blockY - box.maxY))
+                    TerrainAdjustment.ENCAPSULATE ->
+                        maxOf(0, maxOf(box.minY - context.blockY, context.blockY - box.maxY))
                 }
-            density += beardContribution(dx, dy, dz, dyToGround) * 0.8
+            density +=
+                if (rigid.adjustment == TerrainAdjustment.ENCAPSULATE) {
+                    // parity: encapsulate ADDS density instead of carving, so the structure ends up
+                    // cased in rock rather than sitting in a hollow. Halving each axis first is
+                    // what stretches that casing out to roughly twelve blocks.
+                    buryContribution(dx / 2.0, dy / 2.0, dz / 2.0) * 0.8
+                } else {
+                    beardContribution(dx, dy, dz, dyToGround) * 0.8
+                }
         }
         for (junction in junctions) {
             val dx = context.blockX - junction.x
@@ -76,6 +88,13 @@ internal class StructureBeardifier(
                 val y = index % KERNEL_SIZE - KERNEL_RADIUS
                 E.pow(-(x * x + (y + 0.5) * (y + 0.5) + z * z) / 16.0).toFloat()
             }
+
+        /** // parity: Beardifier.getBuryContribution, a straight falloff from 1 to 0 over six blocks. */
+        fun buryContribution(
+            dx: Double,
+            dy: Double,
+            dz: Double,
+        ): Double = Mth.clampedMap(sqrt(dx * dx + dy * dy + dz * dz), 0.0, 6.0, 1.0, 0.0)
 
         fun beardContribution(
             dx: Int,
