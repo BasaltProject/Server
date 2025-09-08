@@ -18,6 +18,8 @@ public class StructurePlacementGrid(
     /** Below 1, the share of candidate chunks that actually get the structure. */
     public val frequency: Float = 1.0f,
     public val frequencyReduction: FrequencyReduction = FrequencyReduction.DEFAULT,
+    /** Keeps this structure away from another set's chunks. // parity: `exclusion_zone`. */
+    public val exclusionZone: ExclusionZone? = null,
 ) {
     init {
         require(spacing > separation) { "spacing must be larger than separation" }
@@ -50,9 +52,9 @@ public class StructurePlacementGrid(
     }
 
     /**
-     * Whether ([chunkX], [chunkZ]) really gets the structure: its own cell's candidate, and then
-     * the frequency roll. // parity: StructurePlacement.isStructureChunk, minus the exclusion zone,
-     * which no structure wired here declares.
+     * Whether ([chunkX], [chunkZ]) really gets the structure: its own cell's candidate, then the
+     * frequency roll, then the exclusion zone. // parity: StructurePlacement.isStructureChunk, in
+     * that order, which matters because the later tests are the expensive ones.
      */
     public fun isStructureChunk(
         seed: Long,
@@ -60,7 +62,31 @@ public class StructurePlacementGrid(
         chunkZ: Int,
     ): Boolean =
         isPlacementChunk(seed, chunkX, chunkZ) &&
-            frequencyReduction.shouldGenerate(seed, salt, chunkX, chunkZ, frequency)
+            frequencyReduction.shouldGenerate(seed, salt, chunkX, chunkZ, frequency) &&
+            exclusionZone?.forbids(seed, chunkX, chunkZ) != true
+
+    /**
+     * // parity: StructurePlacement.ExclusionZone, tested as a square and not a circle. [other] is a
+     * lambda so the two grids can be built in either order.
+     */
+    public class ExclusionZone(
+        public val chunkCount: Int,
+        private val other: () -> StructurePlacementGrid,
+    ) {
+        public fun forbids(
+            seed: Long,
+            chunkX: Int,
+            chunkZ: Int,
+        ): Boolean {
+            val grid = other()
+            for (testX in chunkX - chunkCount..chunkX + chunkCount) {
+                for (testZ in chunkZ - chunkCount..chunkZ + chunkCount) {
+                    if (grid.isStructureChunk(seed, testX, testZ)) return true
+                }
+            }
+            return false
+        }
+    }
 
     /**
      * // parity: StructurePlacement.FrequencyReductionMethod. Four ways of rolling the same

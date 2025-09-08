@@ -22,6 +22,7 @@ import org.basaltmc.server.world.terrain.NoiseColumnHeights
 import org.basaltmc.server.world.terrain.NoiseRouterData
 import org.basaltmc.server.world.terrain.RealTerrainGenerator
 import org.basaltmc.server.world.terrain.RuinedPortalStructureGenerator
+import org.basaltmc.server.world.terrain.SwampHutStructureGenerator
 import org.basaltmc.server.world.terrain.TheEndBiomeSource
 import org.basaltmc.server.world.terrain.TrialChamberStructureGenerator
 import org.basaltmc.server.world.terrain.VillageStructureGenerator
@@ -128,6 +129,11 @@ public class VanillaWorldGeneratorFactory(
                 surfaceHeightAt = { x, z -> columns.surfaceHeight(x, z) },
                 isSolidAt = { x, y, z -> columns.isSolid(x, y, z) },
             )
+        val swampHuts =
+            SwampHutStructureGenerator(
+                biomeAt = { x, y, z -> surface.biomeAt(x, y, z) },
+                surfaceHeightAt = { x, z -> columns.surfaceHeight(x, z) },
+            )
         val ancientCities =
             AncientCityStructureGenerator(
                 biomeAt = { x, y, z -> surface.biomeAt(x, y, z) },
@@ -156,6 +162,7 @@ public class VanillaWorldGeneratorFactory(
                         village,
                         mineshafts,
                         ruinedPortals,
+                        swampHuts,
                         ancientCities,
                         trialChambers,
                     ).chunk
@@ -178,6 +185,7 @@ public class VanillaWorldGeneratorFactory(
                         neighbours,
                         mineshafts,
                         ruinedPortals,
+                        swampHuts,
                         ancientCities,
                         trialChambers,
                     ).also { chunk ->

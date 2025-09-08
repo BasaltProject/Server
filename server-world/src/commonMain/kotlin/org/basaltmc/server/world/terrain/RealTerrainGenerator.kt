@@ -57,6 +57,7 @@ public object RealTerrainGenerator {
         neighbours: NeighbourTerrainCache? = null,
         mineshaftGenerator: MineshaftStructureGenerator? = null,
         ruinedPortalGenerator: RuinedPortalStructureGenerator? = null,
+        swampHutGenerator: SwampHutStructureGenerator? = null,
         ancientCityGenerator: AncientCityStructureGenerator? = null,
         trialChamberGenerator: TrialChamberStructureGenerator? = null,
     ): Chunk {
@@ -70,6 +71,7 @@ public object RealTerrainGenerator {
                 villageGenerator,
                 mineshaftGenerator,
                 ruinedPortalGenerator,
+                swampHutGenerator,
                 ancientCityGenerator,
                 trialChamberGenerator,
             )
@@ -91,6 +93,7 @@ public object RealTerrainGenerator {
         villageGenerator: VillageStructureGenerator? = null,
         mineshaftGenerator: MineshaftStructureGenerator? = null,
         ruinedPortalGenerator: RuinedPortalStructureGenerator? = null,
+        swampHutGenerator: SwampHutStructureGenerator? = null,
         ancientCityGenerator: AncientCityStructureGenerator? = null,
         trialChamberGenerator: TrialChamberStructureGenerator? = null,
     ): GeneratedTerrain {
@@ -177,6 +180,7 @@ public object RealTerrainGenerator {
             }
             // Step 4, surface_structures, alongside the villages above.
             ruinedPortalGenerator?.generateInto(chunk, seed)
+            swampHutGenerator?.generateInto(chunk, seed)
         }
         return GeneratedTerrain(chunk, chunkEnvironment)
     }

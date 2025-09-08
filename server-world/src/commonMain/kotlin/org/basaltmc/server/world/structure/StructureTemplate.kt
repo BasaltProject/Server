@@ -457,7 +457,7 @@ public class StructureTemplate {
         return transformedStateId(stateId, properties, mirror, rotation)
     }
 
-    private fun transformedStateId(
+    internal fun transformedStateId(
         stateId: Int,
         properties: Map<String, String>,
         mirror: StructureMirror,
@@ -512,14 +512,46 @@ public class StructureTemplate {
             transformed = transformed + ("rotation" to rotated.toString())
         }
         properties["shape"]?.let { shape ->
-            rotateRailShape(shape, mirror, rotation)?.let { transformedShape ->
-                transformed = transformed + ("shape" to transformedShape)
-            }
+            val transformedShape =
+                rotateRailShape(shape, mirror, rotation)
+                    ?: mirrorStairShape(shape, mirror, properties["facing"])
+            if (transformedShape != null) transformed = transformed + ("shape" to transformedShape)
         }
         return Blocks.stateIdOf(block, transformed) ?: stateId
     }
 
     private fun signedRotation(rotation: Int): Int = if (rotation > 8) rotation - 16 else rotation
+
+    /**
+     * // parity: StairBlock.mirror. A corner stair does not follow its facing under a mirror: the
+     * left and right halves of the shape swap, and only when the mirror crosses the facing's own
+     * axis. Rotation leaves the shape alone, which is why this takes no rotation.
+     *
+     * The two mirrors are not symmetric, and that asymmetry is the jar's: `LEFT_RIGHT` swaps both
+     * the inner and the outer pair, `FRONT_BACK` swaps only the outer one and leaves `inner_left`
+     * and `inner_right` where they are.
+     */
+    private fun mirrorStairShape(
+        shape: String,
+        mirror: StructureMirror,
+        facing: String?,
+    ): String? {
+        val axis = StructureDirection.fromName(facing ?: return null) ?: return null
+        val applies =
+            when (mirror) {
+                StructureMirror.LEFT_RIGHT -> axis == StructureDirection.NORTH || axis == StructureDirection.SOUTH
+                StructureMirror.FRONT_BACK -> axis == StructureDirection.EAST || axis == StructureDirection.WEST
+                StructureMirror.NONE -> false
+            }
+        if (!applies) return null
+        return when (shape) {
+            "outer_left" -> "outer_right"
+            "outer_right" -> "outer_left"
+            "inner_left" -> if (mirror == StructureMirror.LEFT_RIGHT) "inner_right" else null
+            "inner_right" -> if (mirror == StructureMirror.LEFT_RIGHT) "inner_left" else null
+            else -> null
+        }
+    }
 
     private fun rotateRailShape(
         shape: String,
@@ -538,7 +570,7 @@ public class StructureTemplate {
                 "south_west" -> listOf("south", "west")
                 "north_west" -> listOf("north", "west")
                 "north_east" -> listOf("north", "east")
-                else -> return null // stair shapes do not rotate independently of facing
+                else -> return null // not a rail shape; a stair shape goes to mirrorStairShape
             }.mapNotNull { transformHorizontal(it, mirror, rotation) }
                 .toSet()
         return when (directions) {
