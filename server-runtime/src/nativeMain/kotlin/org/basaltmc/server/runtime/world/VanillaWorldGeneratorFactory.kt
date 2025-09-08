@@ -20,6 +20,7 @@ import org.basaltmc.server.world.terrain.NetherBiomeSource
 import org.basaltmc.server.world.terrain.NetherStructureGenerator
 import org.basaltmc.server.world.terrain.NoiseColumnHeights
 import org.basaltmc.server.world.terrain.NoiseRouterData
+import org.basaltmc.server.world.terrain.PillagerOutpostStructureGenerator
 import org.basaltmc.server.world.terrain.RealTerrainGenerator
 import org.basaltmc.server.world.terrain.RuinedPortalStructureGenerator
 import org.basaltmc.server.world.terrain.SwampHutStructureGenerator
@@ -99,10 +100,11 @@ public class VanillaWorldGeneratorFactory(
         val router = NoiseRouterData.overworld(noises::get, base3d)
         val surface = RealSurfaceEnvironment(serverJar, positional, router, biomeZoomSeed)
         val villageLoader = VillageDataLoader(serverJar).also(loaders::add)
+        val villageGrid = StructurePlacementGrid(spacing = 34, separation = 8, salt = 10387312)
         val village =
             VillageStructureGenerator(
                 router,
-                StructurePlacementGrid(spacing = 34, separation = 8, salt = 10387312),
+                villageGrid,
                 biomeAt = { x, y, z -> surface.noiseBiomeAt(x shr 2, y shr 2, z shr 2) },
                 maxDepth = 6,
                 maxDistanceFromCenter = 80,
@@ -134,6 +136,24 @@ public class VanillaWorldGeneratorFactory(
                 biomeAt = { x, y, z -> surface.biomeAt(x, y, z) },
                 surfaceHeightAt = { x, z -> columns.surfaceHeight(x, z) },
             )
+        val pillagerOutposts =
+            PillagerOutpostStructureGenerator(
+                router,
+                // An outpost takes a fifth of its candidates and keeps ten chunks clear of any
+                // village, which is why it needs the villages' own grid to answer at all.
+                StructurePlacementGrid(
+                    spacing = 32,
+                    separation = 8,
+                    salt = 165745296,
+                    frequency = 0.2f,
+                    frequencyReduction = StructurePlacementGrid.FrequencyReduction.LEGACY_TYPE_1,
+                    exclusionZone = StructurePlacementGrid.ExclusionZone(chunkCount = 10) { villageGrid },
+                ),
+                biomeAt = { x, y, z -> surface.noiseBiomeAt(x shr 2, y shr 2, z shr 2) },
+                outpostBiomes = biomeTags.biomesIn("minecraft:has_structure/pillager_outpost"),
+                poolLookup = villageLoader.poolLookup,
+                templateLoader = villageLoader.templateLoader,
+            )
         val ancientCities =
             AncientCityStructureGenerator(
                 biomeAt = { x, y, z -> surface.biomeAt(x, y, z) },
@@ -163,6 +183,7 @@ public class VanillaWorldGeneratorFactory(
                         mineshafts,
                         ruinedPortals,
                         swampHuts,
+                        pillagerOutposts,
                         ancientCities,
                         trialChambers,
                     ).chunk
@@ -186,6 +207,7 @@ public class VanillaWorldGeneratorFactory(
                         mineshafts,
                         ruinedPortals,
                         swampHuts,
+                        pillagerOutposts,
                         ancientCities,
                         trialChambers,
                     ).also { chunk ->

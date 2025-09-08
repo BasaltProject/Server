@@ -220,7 +220,7 @@ public class AncientCityStructureGenerator(
         val chunkZ: Int,
     )
 
-    private companion object {
+    internal companion object {
         const val START_POOL = "minecraft:ancient_city/city_center"
         const val START_JIGSAW = "minecraft:city_anchor"
         const val START_Y = -27

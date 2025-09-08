@@ -58,6 +58,7 @@ public object RealTerrainGenerator {
         mineshaftGenerator: MineshaftStructureGenerator? = null,
         ruinedPortalGenerator: RuinedPortalStructureGenerator? = null,
         swampHutGenerator: SwampHutStructureGenerator? = null,
+        pillagerOutpostGenerator: PillagerOutpostStructureGenerator? = null,
         ancientCityGenerator: AncientCityStructureGenerator? = null,
         trialChamberGenerator: TrialChamberStructureGenerator? = null,
     ): Chunk {
@@ -72,6 +73,7 @@ public object RealTerrainGenerator {
                 mineshaftGenerator,
                 ruinedPortalGenerator,
                 swampHutGenerator,
+                pillagerOutpostGenerator,
                 ancientCityGenerator,
                 trialChamberGenerator,
             )
@@ -94,6 +96,7 @@ public object RealTerrainGenerator {
         mineshaftGenerator: MineshaftStructureGenerator? = null,
         ruinedPortalGenerator: RuinedPortalStructureGenerator? = null,
         swampHutGenerator: SwampHutStructureGenerator? = null,
+        pillagerOutpostGenerator: PillagerOutpostStructureGenerator? = null,
         ancientCityGenerator: AncientCityStructureGenerator? = null,
         trialChamberGenerator: TrialChamberStructureGenerator? = null,
     ): GeneratedTerrain {
@@ -104,6 +107,7 @@ public object RealTerrainGenerator {
         val sampler =
             DensityChunkSampler(
                 (villageGenerator?.finalDensityForChunk(chunkX, chunkZ, seed) ?: router.finalDensity)
+                    .let { pillagerOutpostGenerator?.beardified(it, chunkX, chunkZ, seed) ?: it }
                     .let { ancientCityGenerator?.beardified(it, chunkX, chunkZ, seed) ?: it }
                     .let { trialChamberGenerator?.beardified(it, chunkX, chunkZ, seed) ?: it },
                 chunkX,
@@ -181,6 +185,7 @@ public object RealTerrainGenerator {
             // Step 4, surface_structures, alongside the villages above.
             ruinedPortalGenerator?.generateInto(chunk, seed)
             swampHutGenerator?.generateInto(chunk, seed)
+            pillagerOutpostGenerator?.generateInto(chunk, chunkX, chunkZ, seed)
         }
         return GeneratedTerrain(chunk, chunkEnvironment)
     }
