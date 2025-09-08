@@ -10,15 +10,11 @@ import org.basaltmc.server.world.structure.StructurePos
 import org.basaltmc.server.world.structure.StructureProcessorList
 import org.basaltmc.server.world.structure.StructureRotation
 import org.basaltmc.server.world.structure.StructureTemplate
-import org.basaltmc.server.world.structure.TemplateBlockProcessors
 
 /**
- * // parity: net.minecraft.world.level.levelgen.feature.FossilFeature.
- *
- * A fossil is two templates at the same place: the bone base, and an overlay of ore that the
- * overlay's own `block_rot` thins to a scattering. Both are buried well below the ground the
- * placement chose, which is why this scans its whole footprint for the lowest ocean floor rather
- * than trusting the one column it was handed.
+ * // parity: `FossilFeature`. A fossil is two templates at one place: the bone base and an ore overlay
+ * its own `block_rot` thins. Both sit well below the placement's ground, which is why this scans its
+ * whole footprint for the lowest ocean floor rather than trusting the one column it was handed.
  */
 public object FossilFeature {
     /** One of the two fossil features, which differ only in their overlay's processors. */
@@ -31,11 +27,8 @@ public object FossilFeature {
     )
 
     /**
-     * Places one fossil at [origin], or reports false without writing anything.
-     *
-     * The draw order is the jar's and it is not the obvious one: the rotation comes before the
-     * structure index, and the burial depth after both, so reordering them changes the world even
-     * where the fossil still looks right.
+     * Places one fossil at [origin], or reports false without writing. The draw order is the jar's and not
+     * the obvious one: rotation, then structure index, then burial depth.
      */
     public fun place(
         chunk: Chunk,
@@ -85,7 +78,6 @@ public object FossilFeature {
             pivot = pivot,
             clipTo = clip,
             processors = spec.fossilProcessors,
-            blockProcessor = TemplateBlockProcessors.PROTECT_FEATURES,
             // parity: the feature calls `setRandom(random)`, so the palette pick and the rot draw
             // from this stream in template order rather than from a fresh source per position.
             settingsRandom = random,
@@ -98,7 +90,6 @@ public object FossilFeature {
             pivot = pivot,
             clipTo = clip,
             processors = spec.overlayProcessors,
-            blockProcessor = TemplateBlockProcessors.PROTECT_FEATURES,
             settingsRandom = random,
         )
         return true

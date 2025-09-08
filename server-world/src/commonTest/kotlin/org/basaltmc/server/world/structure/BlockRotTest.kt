@@ -80,6 +80,22 @@ class BlockRotTest {
         assertTrue(StructureProcessorList.EMPTY.isEmpty)
     }
 
+    @Test
+    fun `a protected block in the world keeps the whole list out`() {
+        // parity: every one of the jar's seven lists that carries `protected_blocks` puts it last,
+        // and it draws nothing, so it reads as a final veto on what the world already holds.
+        val chest = Blocks.REGISTRY.byIdentifier(Identifier.vanilla("chest"))?.stateId ?: error("no chest")
+        val stone = Blocks.REGISTRY.byIdentifier(Identifier.vanilla("stone"))?.stateId ?: error("no stone")
+        val list =
+            VillagePoolJson.parseProcessorList(
+                """{"processors":[{"processor_type":"minecraft:protected_blocks",""" +
+                    """"value":"#minecraft:features_cannot_replace"}]}""",
+            ) { if (it == "minecraft:features_cannot_replace") setOf(chest) else null }
+        assertTrue(!list.isEmpty, "a protection-only list still has work to do")
+        assertEquals(null, list.processAt(stone, chest, StructurePos(1, 2, 3)), "a chest must survive")
+        assertEquals(stone, list.processAt(stone, stone, StructurePos(1, 2, 3)), "plain stone must not")
+    }
+
     private companion object {
         /** The shape of `pillager_outpost/towers.json`, trimmed to the two sub-elements. */
         const val POOL_JSON: String =

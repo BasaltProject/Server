@@ -9,11 +9,11 @@ import kotlin.math.pow
 import kotlin.math.sqrt
 
 /**
- * // parity: TerrainAdjustment, narrowed to the kinds a structure this server generates asks for.
- * `bury` (stronghold, trail ruins) goes in with its structures.
+ * // parity: TerrainAdjustment, all four of the jar's kinds.
  */
 internal enum class TerrainAdjustment {
     NONE,
+    BURY,
     BEARD_THIN,
     BEARD_BOX,
     ENCAPSULATE,
@@ -36,7 +36,7 @@ internal class StructureBeardifier(
             val dy =
                 when (rigid.adjustment) {
                     TerrainAdjustment.NONE -> continue
-                    TerrainAdjustment.BEARD_THIN -> dyToGround
+                    TerrainAdjustment.BURY, TerrainAdjustment.BEARD_THIN -> dyToGround
                     // A box clears the piece's whole height instead of bearding up from its floor,
                     // which is what lets the ancient city sit in a hollow rather than in solid rock.
                     TerrainAdjustment.BEARD_BOX -> maxOf(0, maxOf(groundY - context.blockY, context.blockY - box.maxY))
@@ -44,13 +44,15 @@ internal class StructureBeardifier(
                         maxOf(0, maxOf(box.minY - context.blockY, context.blockY - box.maxY))
                 }
             density +=
-                if (rigid.adjustment == TerrainAdjustment.ENCAPSULATE) {
+                when (rigid.adjustment) {
                     // parity: encapsulate ADDS density instead of carving, so the structure ends up
                     // cased in rock rather than sitting in a hollow. Halving each axis first is
                     // what stretches that casing out to roughly twelve blocks.
-                    buryContribution(dx / 2.0, dy / 2.0, dz / 2.0) * 0.8
-                } else {
-                    beardContribution(dx, dy, dz, dyToGround) * 0.8
+                    TerrainAdjustment.ENCAPSULATE -> buryContribution(dx / 2.0, dy / 2.0, dz / 2.0) * 0.8
+                    // parity: bury halves only the vertical axis and takes no 0.8, so it fills the
+                    // ground back over the piece rather than clearing a hollow under it.
+                    TerrainAdjustment.BURY -> buryContribution(dx.toDouble(), dy / 2.0, dz.toDouble())
+                    else -> beardContribution(dx, dy, dz, dyToGround) * 0.8
                 }
         }
         for (junction in junctions) {

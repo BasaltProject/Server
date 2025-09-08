@@ -112,11 +112,23 @@ public object OverworldUndergroundStructures {
     private fun state(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: Blocks.AIR.stateId
 
+    /** // parity: `#minecraft:features_cannot_replace`, the tag all three fossil lists protect. */
+    private val PROTECTED =
+        setOf(
+            "bedrock",
+            "spawner",
+            "chest",
+            "end_portal_frame",
+            "reinforced_deepslate",
+            "trial_spawner",
+            "vault",
+        ).mapNotNull { Blocks.REGISTRY.byIdentifier(Identifier.vanilla(it))?.stateId }.toSet()
+
     /** // parity: `processor_list/fossil_rot`, the bones, which keep nine blocks in ten. */
-    private val FOSSIL_ROT = StructureProcessorList(emptyList(), BlockRot(0.9f, null))
+    private val FOSSIL_ROT = StructureProcessorList(emptyList(), BlockRot(0.9f, null), PROTECTED)
 
     /** // parity: `processor_list/fossil_coal`, one block in ten of the ore overlay. */
-    private val FOSSIL_COAL = StructureProcessorList(emptyList(), BlockRot(0.1f, null))
+    private val FOSSIL_COAL = StructureProcessorList(emptyList(), BlockRot(0.1f, null), PROTECTED)
 
     /** // parity: `processor_list/fossil_diamonds`, the same tenth with its coal swapped out. */
     private val FOSSIL_DIAMONDS =
@@ -129,6 +141,7 @@ public object OverworldUndergroundStructures {
                 ),
             ),
             BlockRot(0.1f, null),
+            PROTECTED,
         )
 
     private val FOSSIL_BASE =
