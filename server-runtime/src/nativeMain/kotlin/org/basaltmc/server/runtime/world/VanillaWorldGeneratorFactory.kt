@@ -210,6 +210,7 @@ public class VanillaWorldGeneratorFactory(
                         pillagerOutposts,
                         ancientCities,
                         trialChambers,
+                        villageLoader.templateLoader,
                     ).also { chunk ->
                         if (spawnMobs) {
                             val biome =

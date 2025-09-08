@@ -7,6 +7,7 @@ import org.basaltmc.server.world.GenerationMetrics
 import org.basaltmc.server.world.WorldHeight
 import org.basaltmc.server.world.densityfunction.DensityCache
 import org.basaltmc.server.world.densityfunction.Marker
+import org.basaltmc.server.world.structure.TemplateLoader
 import org.basaltmc.server.world.terrain.carver.OverworldCarvers
 import org.basaltmc.server.world.terrain.decoration.CaveLocalModificationDecoration
 import org.basaltmc.server.world.terrain.decoration.CaveSpeleothemDecoration
@@ -61,6 +62,7 @@ public object RealTerrainGenerator {
         pillagerOutpostGenerator: PillagerOutpostStructureGenerator? = null,
         ancientCityGenerator: AncientCityStructureGenerator? = null,
         trialChamberGenerator: TrialChamberStructureGenerator? = null,
+        templates: TemplateLoader? = null,
     ): Chunk {
         val terrain =
             generateTerrain(
@@ -77,7 +79,7 @@ public object RealTerrainGenerator {
                 ancientCityGenerator,
                 trialChamberGenerator,
             )
-        decorate(terrain, seed, neighbours?.around(chunkX, chunkZ), ancientCityGenerator)
+        decorate(terrain, seed, neighbours?.around(chunkX, chunkZ), ancientCityGenerator, templates)
         return terrain.chunk
     }
 
@@ -196,6 +198,8 @@ public object RealTerrainGenerator {
         seed: Long = 0L,
         neighbours: NeighbourTerrain? = null,
         ancientCityGenerator: AncientCityStructureGenerator? = null,
+        /** Structure files for the feature bodies that are templates, such as the two fossils. */
+        templates: TemplateLoader? = null,
     ) {
         val chunk = terrain.chunk
         val chunkEnvironment = terrain.environment
@@ -212,7 +216,13 @@ public object RealTerrainGenerator {
                 ForestRockDecoration.decorate(chunk, seed, chunkEnvironment)
                 IceSpikesDecoration.decorate(chunk, seed, chunkEnvironment)
                 DesertWellDecoration.decorate(chunk, seed, chunkEnvironment)
-                OverworldUndergroundStructures.decorate(chunk, seed, chunkEnvironment)
+                OverworldUndergroundStructures.decorate(
+                    chunk,
+                    seed,
+                    chunkEnvironment,
+                    templates = templates,
+                    externalOceanFloorHeight = { x, z -> neighbours?.oceanFloorHeightAt(x, z) },
+                )
                 FrozenOceanDecoration.decorateSurfaceStructures(chunk, seed, chunkEnvironment)
                 // Ore and stone blobs are spheres around their origin, so most cross a chunk edge. The
                 // part outside is deferred, and its guard has to be the block actually out there.

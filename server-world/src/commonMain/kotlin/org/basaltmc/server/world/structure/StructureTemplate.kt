@@ -209,10 +209,19 @@ public class StructureTemplate {
          */
         blockProcessor: TemplateBlockProcessor? = null,
         random: WorldgenRandom? = null,
+        /**
+         * // parity: `StructurePlaceSettings.setRandom`, which only two callers in the jar use
+         * (`TemplateFeature` and `FossilFeature`). Setting it makes `getRandom(pos)` hand back this
+         * stream instead of building a positional one, so the palette pick and every processor draw
+         * come from here, in template order. A jigsaw piece sets none and stays positional.
+         */
+        settingsRandom: WorldgenRandom? = null,
         ignoreStructureBlocks: Boolean = false,
         ignoreAir: Boolean = false,
         gravityOffset: Int? = null,
     ) {
+        // parity: `getRandomPalette` draws even for the single palette every template here has.
+        settingsRandom?.nextInt(1)
         val processedBlocks =
             blocksBacking.mapNotNull { blockInfo ->
                 if (
@@ -262,7 +271,8 @@ public class StructureTemplate {
                 } else if (!processors.isEmpty) {
                     val worldStateId = chunk.getBlockStateId(processorLocalX, processorPos.y, processorLocalZ)
                     val processedStateId =
-                        processors.processAt(blockInfo.stateId, worldStateId, processorPos) ?: continue
+                        processors.processAt(blockInfo.stateId, worldStateId, processorPos, settingsRandom)
+                            ?: continue
                     val properties =
                         if (processedStateId == blockInfo.stateId) {
                             blockInfo.properties
@@ -280,9 +290,21 @@ public class StructureTemplate {
                     val worldStateId = chunk.getBlockStateId(processorLocalX, processorPos.y, processorLocalZ)
                     blockProcessor.process(stateId, worldStateId, processorPos) ?: continue
                 }
-            val localX = worldPos.x and 15
-            val localZ = worldPos.z and 15
-            chunk.setBlockStateId(localX, worldPos.y, localZ, finalStateId)
+            if (worldPos.x shr 4 == chunk.chunkX && worldPos.z shr 4 == chunk.chunkZ) {
+                chunk.setBlockStateId(worldPos.x and 15, worldPos.y, worldPos.z and 15, finalStateId)
+            } else {
+                // A clip wider than the chunk is deliberate for the features that have one (the
+                // fossil's is the chunk grown by 16, as in the jar), so what falls outside belongs
+                // to a neighbour and has to be deferred. Masking it back in wrapped the far end of
+                // a fossil onto its own chunk's west edge.
+                chunk.setDecorationBlockStateId(
+                    worldPos.x,
+                    worldPos.y,
+                    worldPos.z,
+                    finalStateId,
+                    replaceAnyExternalState = true,
+                )
+            }
             placeBlockEntity(chunk, blockInfo, finalStateId, worldPos, random)
         }
         placeEntities(chunk, position, rotation, mirror, pivot, clipTo)

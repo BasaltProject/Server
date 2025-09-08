@@ -100,9 +100,12 @@ public class BlockRot(
     public fun keeps(
         stateId: Int,
         position: StructurePos,
+        /** The placement's own stream when it set one. // parity: `StructurePlaceSettings.getRandom`. */
+        shared: WorldgenRandom? = null,
     ): Boolean {
         if (rottable != null && stateId !in rottable) return true
-        val random = WorldgenRandom(LegacyRandom(PositionalHashing.getSeed(position.x, position.y, position.z)))
+        val random =
+            shared ?: WorldgenRandom(LegacyRandom(PositionalHashing.getSeed(position.x, position.y, position.z)))
         return random.nextFloat() <= integrity
     }
 }
@@ -147,12 +150,19 @@ public class StructureProcessorList(
         inputStateId: Int,
         worldStateId: Int,
         position: StructurePos,
+        /**
+         * The placement's own stream, for a caller that set one. // parity:
+         * `StructurePlaceSettings.getRandom` hands back the settings' random when there is one and
+         * only falls back to a fresh positional source when there is not, so a feature that sets
+         * its own (the fossil does) rots in template order rather than by position.
+         */
+        shared: WorldgenRandom? = null,
     ): Int? {
-        if (rot?.keeps(inputStateId, position) == false) return null
+        if (rot?.keeps(inputStateId, position, shared) == false) return null
         return process(
             inputStateId,
             worldStateId,
-            WorldgenRandom(LegacyRandom(PositionalHashing.getSeed(position.x, position.y, position.z))),
+            shared ?: WorldgenRandom(LegacyRandom(PositionalHashing.getSeed(position.x, position.y, position.z))),
         )
     }
 
