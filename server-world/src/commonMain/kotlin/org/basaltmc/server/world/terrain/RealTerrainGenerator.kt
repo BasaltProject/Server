@@ -227,6 +227,9 @@ public object RealTerrainGenerator {
                 OverworldVegetalDecoration.decorate(chunk, seed, chunkEnvironment)
             }
         }
+        // The water over a magma block or soul sand carries its column in the saved chunk, so this
+        // runs once decoration has put both of them down.
+        BubbleColumnFormation.formInto(chunk)
         GenerationMetrics.measure(GenerationMetrics.Phase.SURFACE_FREEZE) {
             SurfaceFreezingDecoration.decorate(chunk, chunkEnvironment)
         }
