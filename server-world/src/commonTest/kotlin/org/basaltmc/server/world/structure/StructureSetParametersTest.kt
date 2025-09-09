@@ -1,7 +1,9 @@
 package org.basaltmc.server.world.structure
 
 import org.basaltmc.server.world.terrain.AncientCityStructureGenerator
+import org.basaltmc.server.world.terrain.BuriedTreasureStructureGenerator
 import org.basaltmc.server.world.terrain.NetherStructureGenerator
+import org.basaltmc.server.world.terrain.ShipwreckStructureGenerator
 import org.basaltmc.server.world.terrain.SwampHutStructureGenerator
 import org.basaltmc.server.world.terrain.TrailRuinsStructureGenerator
 import org.basaltmc.server.world.terrain.TrialChamberStructureGenerator
@@ -51,6 +53,34 @@ class StructureSetParametersTest {
             }
         }
         assertEquals(3, TrailRuinsStructureGenerator.STRUCTURE_INDEX, "fourth of underground_structures")
+    }
+
+    @Test
+    fun `the buried treasure lands where the official server says`() {
+        // The jar answered [761, ~, 409], which is chunk (47, 25) plus the piece's own offset of 9
+        // in both axes. That the reported point is the piece and not the chunk corner is what pins
+        // the offset down.
+        val grid = BuriedTreasureStructureGenerator.GRID
+        assertTrue(grid.isStructureChunk(12345L, 47, 25))
+        assertEquals(0, BuriedTreasureStructureGenerator.STRUCTURE_INDEX, "first of underground_structures")
+        // At frequency 0.01 the roll has to reject the overwhelming majority.
+        var kept = 0
+        for (chunkX in 0 until 40) {
+            for (chunkZ in 0 until 40) {
+                if (grid.isStructureChunk(12345L, chunkX, chunkZ)) kept++
+            }
+        }
+        assertTrue(kept in 1..80, "kept $kept of 1600, expected around sixteen")
+    }
+
+    @Test
+    fun `the shipwreck lands where the official server says`() {
+        // The jar answered [-128, ~, 32] for the sunk one, the minimum corner of chunk (-8, 2).
+        assertTrue(ShipwreckStructureGenerator.GRID.isStructureChunk(12345L, -8, 2))
+        assertGrid(ShipwreckStructureGenerator.GRID, 24, 4, 165745295, "shipwrecks")
+        // The two variants share a set, so they share a chunk and differ only in their index.
+        assertEquals(17, ShipwreckStructureGenerator.SUNK_STRUCTURE_INDEX)
+        assertEquals(18, ShipwreckStructureGenerator.BEACHED_STRUCTURE_INDEX)
     }
 
     @Test
