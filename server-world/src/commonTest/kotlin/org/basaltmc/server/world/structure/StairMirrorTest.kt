@@ -80,4 +80,47 @@ class StairMirrorTest {
         assertEquals("east", result["facing"])
         assertEquals("outer_left", result["shape"])
     }
+
+    @Test
+    fun `a door swaps its hinge under any mirror and a chest keeps its half`() {
+        val doorProperties =
+            mapOf(
+                "facing" to "east",
+                "half" to "lower",
+                "hinge" to "left",
+                "open" to "false",
+                "powered" to "false",
+            )
+        val door =
+            Blocks.stateIdOf(Identifier.vanilla("oak_door"), doorProperties) ?: error("no oak door")
+        // parity: the hinge cycles even when the mirror does not touch this facing's axis.
+        val across =
+            Blocks
+                .byStateId(
+                    template.transformedStateId(
+                        door,
+                        doorProperties,
+                        StructureMirror.LEFT_RIGHT,
+                        StructureRotation.NONE,
+                    ),
+                )?.properties ?: error("no state")
+        assertEquals("east", across["facing"], "left-right does not turn an east-facing door")
+        assertEquals("right", across["hinge"], "but it still swaps the hinge")
+
+        // parity: ChestBlock.mirror only rotates the facing; `type` is left alone.
+        val chestProperties = mapOf("facing" to "north", "type" to "left", "waterlogged" to "false")
+        val chest = Blocks.stateIdOf(Identifier.vanilla("chest"), chestProperties) ?: error("no chest")
+        val mirrored =
+            Blocks
+                .byStateId(
+                    template.transformedStateId(
+                        chest,
+                        chestProperties,
+                        StructureMirror.LEFT_RIGHT,
+                        StructureRotation.NONE,
+                    ),
+                )?.properties ?: error("no state")
+        assertEquals("south", mirrored["facing"])
+        assertEquals("left", mirrored["type"], "a chest half is not swapped by a mirror")
+    }
 }

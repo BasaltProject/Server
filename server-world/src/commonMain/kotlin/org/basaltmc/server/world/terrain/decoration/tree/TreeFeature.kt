@@ -328,13 +328,18 @@ public object TreeFeature {
             val iterator = toCheck[smallestDistance].iterator()
             val pos = iterator.next()
             iterator.remove()
-            if (!isInside(pos) || !filled.add(pos)) continue
+            if (!isInside(pos)) continue
 
+            // parity: the jar sets the distance and *then* fills the shape, and it never skips a
+            // position that is already filled. A leaf reached at two distances is therefore written
+            // twice, and the second write wins even when it is the larger number. That looks like a
+            // bug and is one, but it is the jar's, and skipping the second write moves leaves.
             if (smallestDistance != 0) {
                 val currentStateId = chunk.getDecorationBlockStateId(pos.x, pos.y, pos.z)
-                val updatedStateId = Blocks.withLeafDistance(currentStateId, smallestDistance) ?: continue
-                chunk.setDecorationBlockStateId(pos.x, pos.y, pos.z, updatedStateId)
+                val updatedStateId = Blocks.withLeafDistance(currentStateId, smallestDistance)
+                if (updatedStateId != null) chunk.setDecorationBlockStateId(pos.x, pos.y, pos.z, updatedStateId)
             }
+            filled.add(pos)
 
             for ((dx, dy, dz) in BLOCK_NEIGHBOURS) {
                 val neighbor = BlockPos(pos.x + dx, pos.y + dy, pos.z + dz)
