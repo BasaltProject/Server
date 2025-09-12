@@ -1,0 +1,27 @@
+---
+# Replaces what the Kotlin compiler used to give for free: nullability, ownership and the
+# rules that stand in for "no !!", "no lateinit" and explicit API mode.
+Checks: >
+  bugprone-*,
+  cppcoreguidelines-*,
+  modernize-*,
+  performance-*,
+  readability-*,
+  -bugprone-easily-swappable-parameters,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -modernize-use-trailing-return-type,
+  -readability-magic-numbers,
+  -readability-identifier-length
+
+WarningsAsErrors: >
+  bugprone-use-after-move,
+  cppcoreguidelines-owning-memory,
+  cppcoreguidelines-pro-type-reinterpret-cast,
+  cppcoreguidelines-no-malloc
+
+HeaderFilterRegex: '.*/(basalt|src)/.*'
+
+CheckOptions:
+  - key: readability-function-cognitive-complexity.Threshold
+    value: 40
