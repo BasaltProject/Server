@@ -21,6 +21,16 @@ public interface SurfaceRuleEnvironment {
         z: Int,
     ): Int
 
+    /**
+     * // parity: NoiseChunk.preliminarySurfaceLevel, a coarse estimate off the terrain splines that sits
+     * well below the real surface. The window the surface rules may write in is measured from here, so
+     * using the real height cuts that window short.
+     */
+    public fun preliminarySurfaceLevel(
+        x: Int,
+        z: Int,
+    ): Int = estimatedSurfaceHeight(x, z)
+
     /** // parity: net.minecraft.world.level.levelgen.SurfaceSystem.getSurfaceSecondary. */
     public fun surfaceSecondaryNoise(
         x: Int,

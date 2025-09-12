@@ -60,6 +60,12 @@ public fun CommandSource.mayUse(node: CommandNode): Boolean = node.permission ==
 public class ConsoleCommandSource(
     private val logger: Logger = Logger("Console"),
     private val lang: LangTable = LangTable.EMPTY,
+    /**
+     * // parity: `MinecraftServer.createCommandSourceStack` stands the console at the overworld's shared
+     * spawn, not the origin, so `/locate` and relative coordinates answer from there. Asked lazily: the
+     * world is not loaded when the server builds this.
+     */
+    private val spawn: () -> Triple<Double, Double, Double> = { Triple(0.0, 0.0, 0.0) },
 ) : CommandSource {
     // Everything, unconditionally: whoever can type here can already stop the process, and making
     // the console depend on a group would let a typo in groups.toml lock the operator out.
@@ -68,7 +74,7 @@ public class ConsoleCommandSource(
     override val name: String = "Server"
     override val displayName: Component = Component.text("Server")
     override val permissionLevel: Int = PermissionLevel.OWNERS
-    override val position: Triple<Double, Double, Double> = Triple(0.0, 0.0, 0.0)
+    override val position: Triple<Double, Double, Double> get() = spawn()
     override val player: PlayerSession? = null
 
     override fun sendSystemMessage(message: Component) {

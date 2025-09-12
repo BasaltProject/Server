@@ -128,6 +128,7 @@ public object SurfaceBuilder {
                         blockZ,
                         startingHeight,
                         surfaceBiome,
+                        context.minSurfaceLevel(),
                     )
                 }
             }
@@ -177,6 +178,7 @@ public object SurfaceBuilder {
         blockZ: Int,
         height: Int,
         surfaceBiome: String,
+        minSurfaceLevel: Int,
     ) {
         val iceberg =
             minOf(
@@ -203,11 +205,6 @@ public object SurfaceBuilder {
         val maxSnowDepth = 2 + random.nextInt(4)
         val minSnowHeight = SEA_LEVEL + 18 + random.nextInt(10)
         var snowDepth = 0
-        val minSurfaceLevel =
-            environment.estimatedSurfaceHeight(blockX, blockZ) +
-                environment.surfaceDepthNoise(blockX, blockZ) -
-                8
-
         for (y in maxOf(height, top.toInt() + 1) downTo minSurfaceLevel) {
             val stateId = blockAt(chunk, localX, y, localZ)
             val fillAir = Blocks.isAir(stateId) && y < top.toInt() && random.nextDouble() > 0.01

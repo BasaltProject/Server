@@ -56,6 +56,7 @@ public class RuinedPortalStructureGenerator(
     private val templateOf: (String) -> StructureTemplate?,
     private val biomeAt: (x: Int, y: Int, z: Int) -> String,
     private val surfaceHeightAt: (x: Int, z: Int) -> Int,
+    private val oceanFloorAt: (x: Int, z: Int) -> Int,
     private val isSolidAt: (x: Int, y: Int, z: Int) -> Boolean,
 ) {
     private val grid = StructurePlacementGrid(spacing = 40, separation = 15, salt = SALT)
@@ -195,6 +196,37 @@ public class RuinedPortalStructureGenerator(
     }
 
     /**
+     * // parity: RuinedPortalPiece.getHeightMapType. Only the ocean floor variant reads
+     * `OCEAN_FLOOR_WG`; every other placement, the swamp one included, reads `WORLD_SURFACE_WG`,
+     * which over water is the surface of the water.
+     */
+    private fun columnHeight(
+        placement: RuinedPortalPlacement,
+        x: Int,
+        z: Int,
+    ): Int = if (placement == RuinedPortalPlacement.ON_OCEAN_FLOOR) oceanFloorAt(x, z) else surfaceHeightAt(x, z)
+
+    /**
+     * The `_WG` height as the level would answer it. Inside the chunk being written that is the
+     * frozen snapshot; outside it the apron never places anything, so the plain column stands in.
+     */
+    private fun frozenHeight(
+        chunk: Chunk,
+        placement: RuinedPortalPlacement,
+        x: Int,
+        z: Int,
+    ): Int {
+        if (x shr 4 != chunk.chunkX || z shr 4 != chunk.chunkZ) return columnHeight(placement, x, z)
+        val type =
+            if (placement == RuinedPortalPlacement.ON_OCEAN_FLOOR) {
+                Chunk.HeightmapType.OCEAN_FLOOR
+            } else {
+                Chunk.HeightmapType.WORLD_SURFACE
+            }
+        return chunk.worldgenHeightAt(x and 15, z and 15, type)
+    }
+
+    /**
      * // parity: RuinedPortalPiece.spreadNetherrack, the apron of netherrack around the portal that
      * fades out with taxicab distance from its centre.
      */
@@ -218,7 +250,7 @@ public class RuinedPortalStructureGenerator(
                 val distance = maxOf(0, kotlin.math.abs(x - centreX) + kotlin.math.abs(z - centreZ) + adjustment)
                 if (distance >= reach) continue
                 if (random.nextDouble() >= NETHERRACK_BY_DISTANCE[distance]) continue
-                val surfaceY = surfaceHeightAt(x, z) - 1
+                val surfaceY = frozenHeight(chunk, portal.setup.placement, x, z) - 1
                 val y = if (followsSurface) surfaceY else minOf(portal.box.minY, surfaceY)
                 if (kotlin.math.abs(y - portal.box.minY) > MAX_Y_DIFFERENCE) continue
                 if (!clip.isInside(StructurePos(x, y, z))) continue
@@ -343,7 +375,7 @@ public class RuinedPortalStructureGenerator(
         val box = template.getBoundingBox(base, rotation, pivot, mirror)
         val centreX = (box.minX + box.maxX) / 2
         val centreZ = (box.minZ + box.maxZ) / 2
-        val surfaceY = surfaceHeightAt(centreX, centreZ) - 1
+        val surfaceY = columnHeight(setup.placement, centreX, centreZ) - 1
         val ySpan = box.maxY - box.minY + 1
         val y = suitableY(random, setup.placement, airPocket, surfaceY, ySpan, box)
         val origin = StructurePos(base.x, y, base.z)

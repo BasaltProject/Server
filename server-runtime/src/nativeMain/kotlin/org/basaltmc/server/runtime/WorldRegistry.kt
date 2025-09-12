@@ -135,6 +135,8 @@ public class WorldRegistry(
             // The one generation itself uses, so `/place structure` and `/locate structure`
             // act on the same villages the world already has.
             villageGenerator = generators?.villages ?: villageGenerator,
+            strongholdGenerator = generators?.strongholds,
+            spawnChunkFinder = generators?.spawnChunk,
             normalGenerator = generators?.generate,
             scheduler = regionScheduler,
         )

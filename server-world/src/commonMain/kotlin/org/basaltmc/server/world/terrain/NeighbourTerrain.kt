@@ -85,7 +85,9 @@ public class NeighbourTerrainCache(
     ): Int {
         val key = key(neighbourX, neighbourZ)
         val chunk = terrain.value[key] ?: generateAndKeep(key, neighbourX, neighbourZ)
-        return chunk.heightAt(worldX and 15, worldZ and 15, Chunk.HeightmapType.OCEAN_FLOOR)
+        // The frozen one: whoever asks a neighbour for its floor is standing in for a `_WG` read,
+        // and the live map already has that neighbour's own structures piled on it.
+        return chunk.worldgenHeightAt(worldX and 15, worldZ and 15, Chunk.HeightmapType.OCEAN_FLOOR)
     }
 
     private fun blockAt(

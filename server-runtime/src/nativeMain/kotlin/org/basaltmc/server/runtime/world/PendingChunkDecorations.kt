@@ -8,6 +8,7 @@ import org.basaltmc.server.world.ChunkGeneratedBlockWrite
 import org.basaltmc.server.world.ChunkGeneratedEntity
 import org.basaltmc.server.world.ChunkScheduledTick
 import org.basaltmc.server.world.GeneratedBlockWritePolicy
+import org.basaltmc.server.world.terrain.decoration.OreBlockRules
 import org.basaltmc.server.world.terrain.decoration.tree.TreeBlockRules
 import org.basaltmc.wire.io.NativeMutex
 import kotlin.uuid.ExperimentalUuidApi
@@ -86,7 +87,8 @@ internal class PendingChunkDecorations(
             write.replaceAnyState ||
                 current == write.expectedStateId ||
                 write.policy == GeneratedBlockWritePolicy.TREE &&
-                TreeBlockRules.canReplaceDeferred(current, write.stateId)
+                TreeBlockRules.canReplaceDeferred(current, write.stateId) ||
+                OreBlockRules.canReplaceDeferred(write.policy, current)
         if (canReplace) {
             val stateId =
                 if (write.policy == GeneratedBlockWritePolicy.TREE) {

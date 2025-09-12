@@ -59,10 +59,17 @@ public object RealTerrainGenerator {
         mineshaftGenerator: MineshaftStructureGenerator? = null,
         ruinedPortalGenerator: RuinedPortalStructureGenerator? = null,
         swampHutGenerator: SwampHutStructureGenerator? = null,
+        desertPyramidGenerator: DesertPyramidStructureGenerator? = null,
+        jungleTempleGenerator: JungleTempleStructureGenerator? = null,
+        mansionGenerator: WoodlandMansionStructureGenerator? = null,
+        oceanMonumentGenerator: OceanMonumentStructureGenerator? = null,
+        strongholdGenerator: StrongholdStructureGenerator? = null,
         pillagerOutpostGenerator: PillagerOutpostStructureGenerator? = null,
         trailRuinsGenerator: TrailRuinsStructureGenerator? = null,
         buriedTreasureGenerator: BuriedTreasureStructureGenerator? = null,
         shipwreckGenerator: ShipwreckStructureGenerator? = null,
+        oceanRuinGenerator: OceanRuinStructureGenerator? = null,
+        iglooGenerator: IglooStructureGenerator? = null,
         ancientCityGenerator: AncientCityStructureGenerator? = null,
         trialChamberGenerator: TrialChamberStructureGenerator? = null,
         templates: TemplateLoader? = null,
@@ -78,10 +85,17 @@ public object RealTerrainGenerator {
                 mineshaftGenerator,
                 ruinedPortalGenerator,
                 swampHutGenerator,
+                desertPyramidGenerator,
+                jungleTempleGenerator,
+                mansionGenerator,
+                oceanMonumentGenerator,
+                strongholdGenerator,
                 pillagerOutpostGenerator,
                 trailRuinsGenerator,
                 buriedTreasureGenerator,
                 shipwreckGenerator,
+                oceanRuinGenerator,
+                iglooGenerator,
                 ancientCityGenerator,
                 trialChamberGenerator,
             )
@@ -104,10 +118,17 @@ public object RealTerrainGenerator {
         mineshaftGenerator: MineshaftStructureGenerator? = null,
         ruinedPortalGenerator: RuinedPortalStructureGenerator? = null,
         swampHutGenerator: SwampHutStructureGenerator? = null,
+        desertPyramidGenerator: DesertPyramidStructureGenerator? = null,
+        jungleTempleGenerator: JungleTempleStructureGenerator? = null,
+        mansionGenerator: WoodlandMansionStructureGenerator? = null,
+        oceanMonumentGenerator: OceanMonumentStructureGenerator? = null,
+        strongholdGenerator: StrongholdStructureGenerator? = null,
         pillagerOutpostGenerator: PillagerOutpostStructureGenerator? = null,
         trailRuinsGenerator: TrailRuinsStructureGenerator? = null,
         buriedTreasureGenerator: BuriedTreasureStructureGenerator? = null,
         shipwreckGenerator: ShipwreckStructureGenerator? = null,
+        oceanRuinGenerator: OceanRuinStructureGenerator? = null,
+        iglooGenerator: IglooStructureGenerator? = null,
         ancientCityGenerator: AncientCityStructureGenerator? = null,
         trialChamberGenerator: TrialChamberStructureGenerator? = null,
     ): GeneratedTerrain {
@@ -121,7 +142,8 @@ public object RealTerrainGenerator {
                     .let { pillagerOutpostGenerator?.beardified(it, chunkX, chunkZ, seed) ?: it }
                     .let { trailRuinsGenerator?.beardified(it, chunkX, chunkZ, seed) ?: it }
                     .let { ancientCityGenerator?.beardified(it, chunkX, chunkZ, seed) ?: it }
-                    .let { trialChamberGenerator?.beardified(it, chunkX, chunkZ, seed) ?: it },
+                    .let { trialChamberGenerator?.beardified(it, chunkX, chunkZ, seed) ?: it }
+                    .let { strongholdGenerator?.beardified(it, chunkX, chunkZ, seed) ?: it },
                 chunkX,
                 chunkZ,
                 WorldHeight.MIN_Y,
@@ -187,19 +209,27 @@ public object RealTerrainGenerator {
         GenerationMetrics.measure(GenerationMetrics.Phase.CARVERS) {
             OverworldCarvers.carve(chunk, seed, aquifer, chunkEnvironment, surfaceRule)
         }
+        // parity: the `_WG` heightmaps stop being updated here, so everything that follows sees the
+        // bare terrain rather than what the feature before it left standing.
+        chunk.freezeWorldgenHeights()
         GenerationMetrics.measure(GenerationMetrics.Phase.STRUCTURES) {
             villageGenerator?.generateInto(chunk, chunkX, chunkZ, seed)
             // Step 3, underground_structures, which is before every decoration step.
             buriedTreasureGenerator?.generateInto(chunk, seed)
             trailRuinsGenerator?.generateInto(chunk, chunkX, chunkZ, seed)
             trialChamberGenerator?.generateInto(chunk, chunkX, chunkZ, seed)
-            mineshaftGenerator?.generateInto(chunk, seed) { x, z ->
-                chunk.heightAt(x and 15, z and 15, Chunk.HeightmapType.OCEAN_FLOOR)
-            }
+            mineshaftGenerator?.generateInto(chunk, seed)
             // Step 4, surface_structures, alongside the villages above.
+            desertPyramidGenerator?.generateInto(chunk, seed)
+            jungleTempleGenerator?.generateInto(chunk, seed)
+            mansionGenerator?.generateInto(chunk, seed)
+            oceanMonumentGenerator?.generateInto(chunk, seed)
+            strongholdGenerator?.generateInto(chunk, seed)
             ruinedPortalGenerator?.generateInto(chunk, seed)
             swampHutGenerator?.generateInto(chunk, seed)
             shipwreckGenerator?.generateInto(chunk, seed)
+            oceanRuinGenerator?.generateInto(chunk, seed)
+            iglooGenerator?.generateInto(chunk, seed)
             pillagerOutpostGenerator?.generateInto(chunk, chunkX, chunkZ, seed)
         }
         return GeneratedTerrain(chunk, chunkEnvironment)

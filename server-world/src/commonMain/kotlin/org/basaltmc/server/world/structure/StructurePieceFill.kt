@@ -17,8 +17,6 @@ public class StructurePieceFill(
     private val orientation: StructureDirection?,
     private val chunk: Chunk,
     private val clip: StructureBoundingBox,
-    /** `OCEAN_FLOOR_WG` at a world column, which is what tells a piece it is underground. */
-    private val oceanFloorHeight: (x: Int, z: Int) -> Int,
     /** A piece may refuse to overwrite what is already there; by default it does not. */
     private val canBeReplaced: (stateId: Int) -> Boolean = { true },
 ) {
@@ -115,6 +113,8 @@ public class StructurePieceFill(
         y: Int,
         z: Int,
         data: NbtCompound,
+        /** Some structures stand an entity on the block instead of inside it. */
+        yOffset: Double = 0.5,
     ) {
         val worldX = worldX(x, z)
         val worldY = worldY(y)
@@ -124,7 +124,7 @@ public class StructurePieceFill(
             ChunkGeneratedEntity(
                 type = type,
                 x = worldX + 0.5,
-                y = worldY + 0.5,
+                y = worldY + yOffset,
                 z = worldZ + 0.5,
                 yaw = 0.0f,
                 pitch = 0.0f,
@@ -133,7 +133,11 @@ public class StructurePieceFill(
         )
     }
 
-    /** Whether the block above this one is still below the surface, so the piece is buried. */
+    /**
+     * Whether the block above is still below the surface, so the piece is buried. // parity:
+     * StructurePiece.isInterior reads `OCEAN_FLOOR_WG`; the chunk's own frozen map answers it, where a
+     * column function would give a lower floor wherever a structure raised the ground.
+     */
     public fun isInterior(
         x: Int,
         y: Int,
@@ -143,7 +147,7 @@ public class StructurePieceFill(
         val worldY = worldY(y + 1)
         val worldZ = worldZ(x, z)
         if (!clip.isInside(StructurePos(worldX, worldY, worldZ))) return false
-        return worldY < oceanFloorHeight(worldX, worldZ)
+        return worldY < chunk.worldgenHeightAt(worldX and 15, worldZ and 15, Chunk.HeightmapType.OCEAN_FLOOR)
     }
 
     /**

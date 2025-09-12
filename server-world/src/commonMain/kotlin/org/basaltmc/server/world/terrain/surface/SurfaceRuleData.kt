@@ -5,6 +5,7 @@ import org.basaltmc.server.world.terrain.surface.SurfaceRules.hole
 import org.basaltmc.server.world.terrain.surface.SurfaceRules.ifTrue
 import org.basaltmc.server.world.terrain.surface.SurfaceRules.isBiome
 import org.basaltmc.server.world.terrain.surface.SurfaceRules.noiseCondition2d
+import org.basaltmc.server.world.terrain.surface.SurfaceRules.noiseCondition3d
 import org.basaltmc.server.world.terrain.surface.SurfaceRules.not
 import org.basaltmc.server.world.terrain.surface.SurfaceRules.sequence
 import org.basaltmc.server.world.terrain.surface.SurfaceRules.state
@@ -109,11 +110,13 @@ public object SurfaceRuleData {
         val gravelOrStoneIfCeiling = sequence(ifTrue(SurfaceRules.ON_CEILING, STONE), GRAVEL)
         val biomesWithSandAndSandstone = isBiome("minecraft:warm_ocean", "minecraft:beach", "minecraft:snowy_beach")
         val biomesWithSandAndVeryDeepSandstone = isBiome("minecraft:desert")
+        // parity: these three read the noise in 3d, unlike every other band here, and their bounds
+        // are float literals in the jar, so they widen to a double a hair off the round number.
         val sulfurCaveBands =
             sequence(
-                ifTrue(noiseCondition2d("sulfur_cave_gradient", -0.4, -0.1), CINNABAR),
-                ifTrue(noiseCondition2d("sulfur_cave_gradient", 0.0, 0.4), SULFUR),
-                ifTrue(noiseCondition2d("sulfur_cave_gradient", 0.4), CINNABAR),
+                ifTrue(noiseCondition3d("sulfur_cave_gradient", -0.40000000596046448, -0.10000000149011612), CINNABAR),
+                ifTrue(noiseCondition3d("sulfur_cave_gradient", 0.0, 0.40000000596046448), SULFUR),
+                ifTrue(noiseCondition3d("sulfur_cave_gradient", 0.40000000596046448), CINNABAR),
             )
         val commonSurfaceAndUnderRules =
             sequence(

@@ -2,11 +2,17 @@ package org.basaltmc.server.world.structure
 
 import org.basaltmc.server.world.terrain.AncientCityStructureGenerator
 import org.basaltmc.server.world.terrain.BuriedTreasureStructureGenerator
+import org.basaltmc.server.world.terrain.DesertPyramidStructureGenerator
+import org.basaltmc.server.world.terrain.IglooStructureGenerator
+import org.basaltmc.server.world.terrain.JungleTempleStructureGenerator
 import org.basaltmc.server.world.terrain.NetherStructureGenerator
+import org.basaltmc.server.world.terrain.OceanMonumentStructureGenerator
+import org.basaltmc.server.world.terrain.OceanRuinStructureGenerator
 import org.basaltmc.server.world.terrain.ShipwreckStructureGenerator
 import org.basaltmc.server.world.terrain.SwampHutStructureGenerator
 import org.basaltmc.server.world.terrain.TrailRuinsStructureGenerator
 import org.basaltmc.server.world.terrain.TrialChamberStructureGenerator
+import org.basaltmc.server.world.terrain.WoodlandMansionStructureGenerator
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -32,10 +38,78 @@ class StructureSetParametersTest {
     @Test
     fun `every wired structure keeps its own set's numbers`() {
         assertGrid(SwampHutStructureGenerator.GRID, 32, 8, 14357620, "swamp_huts")
+        assertGrid(DesertPyramidStructureGenerator.GRID, 32, 8, 14357617, "desert_pyramids")
+        assertGrid(JungleTempleStructureGenerator.GRID, 32, 8, 14357619, "jungle_temples")
+        assertGrid(WoodlandMansionStructureGenerator.GRID, 80, 20, 10387319, "woodland_mansions")
+        assertGrid(OceanMonumentStructureGenerator.GRID, 32, 5, 10387313, "ocean_monuments")
         assertGrid(AncientCityStructureGenerator.GRID, 24, 8, 20083232, "ancient_cities")
         assertGrid(TrialChamberStructureGenerator.GRID, 34, 12, 94251327, "trial_chambers")
         assertGrid(NetherStructureGenerator.NETHER_FOSSIL_GRID, 2, 1, 14357921, "nether_fossils")
         assertGrid(NetherStructureGenerator.NETHER_COMPLEX_GRID, 27, 4, 30084232, "nether_complexes")
+    }
+
+    @Test
+    fun `the ocean monument lands where the official server says`() {
+        // The jar answered [608, ~, -1840] on seed 12345, the centre of the monument that starts in
+        // chunk (38, -115).
+        val grid = OceanMonumentStructureGenerator.GRID
+        assertTrue(grid.isStructureChunk(12345L, 38, -115))
+        for (dx in -1..1) {
+            for (dz in -1..1) {
+                if (dx == 0 && dz == 0) continue
+                assertTrue(
+                    !grid.isStructureChunk(12345L, 38 + dx, -115 + dz),
+                    "chunk (${38 + dx}, ${-115 + dz}) should not hold an ocean monument",
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `the desert pyramid lands where the official server says`() {
+        // The jar answered [-3808, ~, -5008] on seed 12345, the minimum corner of chunk (-238, -313).
+        val grid = DesertPyramidStructureGenerator.GRID
+        assertTrue(grid.isStructureChunk(12345L, -238, -313))
+        for (dx in -1..1) {
+            for (dz in -1..1) {
+                if (dx == 0 && dz == 0) continue
+                assertTrue(
+                    !grid.isStructureChunk(12345L, -238 + dx, -313 + dz),
+                    "chunk (${-238 + dx}, ${-313 + dz}) should not hold a desert pyramid",
+                )
+            }
+        }
+        assertEquals(1, DesertPyramidStructureGenerator.STRUCTURE_INDEX, "second of surface_structures")
+    }
+
+    @Test
+    fun `the jungle temple lands where the official server says`() {
+        // The jar answered [-1520, ~, 32] on seed 12345, the minimum corner of chunk (-95, 2).
+        val grid = JungleTempleStructureGenerator.GRID
+        assertTrue(grid.isStructureChunk(12345L, -95, 2))
+        for (dx in -1..1) {
+            for (dz in -1..1) {
+                if (dx == 0 && dz == 0) continue
+                assertTrue(
+                    !grid.isStructureChunk(12345L, -95 + dx, 2 + dz),
+                    "chunk (${-95 + dx}, ${2 + dz}) should not hold a jungle temple",
+                )
+            }
+        }
+        assertEquals(4, JungleTempleStructureGenerator.STRUCTURE_INDEX, "fifth of surface_structures")
+    }
+
+    @Test
+    fun `the woodland mansion lands where the official server says`() {
+        // The jar answered [4656, ~, 7056] on seed 12345, the minimum corner of chunk (291, 441).
+        val grid = WoodlandMansionStructureGenerator.GRID
+        assertTrue(grid.isStructureChunk(12345L, 291, 441))
+        assertEquals(5, WoodlandMansionStructureGenerator.STRUCTURE_INDEX, "sixth of surface_structures")
+        assertEquals(
+            StructurePlacementGrid.SpreadType.TRIANGULAR,
+            grid.spreadType,
+            "the mansion set is the one that spreads triangularly",
+        )
     }
 
     @Test
@@ -81,6 +155,24 @@ class StructureSetParametersTest {
         // The two variants share a set, so they share a chunk and differ only in their index.
         assertEquals(17, ShipwreckStructureGenerator.SUNK_STRUCTURE_INDEX)
         assertEquals(18, ShipwreckStructureGenerator.BEACHED_STRUCTURE_INDEX)
+    }
+
+    @Test
+    fun `the ocean ruin lands where the official server says`() {
+        // The jar answered [-256, ~, 80] for the cold one, the minimum corner of chunk (-16, 5).
+        assertTrue(OceanRuinStructureGenerator.GRID.isStructureChunk(12345L, -16, 5))
+        assertGrid(OceanRuinStructureGenerator.GRID, 20, 8, 14357621, "ocean_ruins")
+        // Cold before warm, as the set lists them, and adjacent because they share it.
+        assertEquals(7, OceanRuinStructureGenerator.COLD_STRUCTURE_INDEX)
+        assertEquals(8, OceanRuinStructureGenerator.WARM_STRUCTURE_INDEX)
+    }
+
+    @Test
+    fun `the igloo lands where the official server says`() {
+        // The jar answered [576, ~, 656], the minimum corner of chunk (36, 41).
+        assertTrue(IglooStructureGenerator.GRID.isStructureChunk(12345L, 36, 41))
+        assertGrid(IglooStructureGenerator.GRID, 32, 8, 14357618, "igloos")
+        assertEquals(3, IglooStructureGenerator.STRUCTURE_INDEX, "fourth of surface_structures")
     }
 
     @Test

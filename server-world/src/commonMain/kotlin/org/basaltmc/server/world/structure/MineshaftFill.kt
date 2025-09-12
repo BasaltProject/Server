@@ -6,8 +6,11 @@ import org.basaltmc.server.registry.BlockShapes
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.registry.hasFluid
 import org.basaltmc.server.world.Chunk
+import org.basaltmc.server.world.ChunkBlockEntity
 import org.basaltmc.wire.common.Identifier
 import org.basaltmc.wire.nbt.NbtCompound
+import org.basaltmc.wire.nbt.NbtList
+import org.basaltmc.wire.nbt.NbtType
 
 /**
  * // parity: the four `postProcess` bodies of MineshaftPieces, which turn an assembled shaft into
@@ -21,7 +24,7 @@ public object MineshaftFill {
         chunk: Chunk,
         clip: StructureBoundingBox,
         random: BasaltRandom,
-        oceanFloorHeight: (x: Int, z: Int) -> Int,
+        biomeAt: (x: Int, y: Int, z: Int) -> String = { _, _, _ -> "" },
     ) {
         val fill =
             StructurePieceFill(
@@ -29,12 +32,11 @@ public object MineshaftFill {
                 orientation = piece.fillOrientation,
                 chunk = chunk,
                 clip = clip,
-                oceanFloorHeight = oceanFloorHeight,
                 canBeReplaced = { stateId -> canBeReplaced(stateId, blocks) },
             )
-        if (isInInvalidLocation(piece, chunk, clip)) return
+        if (isInInvalidLocation(piece, chunk, clip, biomeAt)) return
         when (piece.kind) {
-            MineshaftPiece.Kind.CORRIDOR -> corridor(piece, blocks, fill, random)
+            MineshaftPiece.Kind.CORRIDOR -> corridor(piece, blocks, fill, random, chunk)
             MineshaftPiece.Kind.CROSSING -> crossing(piece, blocks, fill)
             MineshaftPiece.Kind.STAIRS -> stairs(fill)
             MineshaftPiece.Kind.ROOM -> room(piece, fill)
@@ -46,6 +48,7 @@ public object MineshaftFill {
         blocks: MineshaftBlocks,
         fill: StructurePieceFill,
         random: BasaltRandom,
+        chunk: Chunk,
     ) {
         val length = piece.sections * 5 - 1
         val caveAir = Blocks.CAVE_AIR.stateId
@@ -97,9 +100,10 @@ public object MineshaftFill {
             if (random.nextInt(100) == 0) placeChestRail(fill, random, 0, 0, z + 1)
             if (piece.spiderCorridor && !placedSpider) {
                 val spawnerZ = z - 1 + random.nextInt(3)
-                // The spawner block would be a broken one without its block entity, so it is left
-                // out; the draws and the flag still have to happen or the shaft shifts from here on.
-                if (fill.isInterior(1, 0, spawnerZ)) placedSpider = true
+                if (fill.isInterior(1, 0, spawnerZ)) {
+                    placedSpider = true
+                    placeCaveSpiderSpawner(chunk, fill, spawnerZ)
+                }
             }
         }
 
@@ -274,6 +278,7 @@ public object MineshaftFill {
         piece: MineshaftPiece,
         chunk: Chunk,
         clip: StructureBoundingBox,
+        biomeAt: (x: Int, y: Int, z: Int) -> String,
     ): Boolean {
         val x0 = maxOf(piece.box.minX - 1, clip.minX)
         val y0 = maxOf(piece.box.minY - 1, clip.minY)
@@ -281,6 +286,11 @@ public object MineshaftFill {
         val x1 = minOf(piece.box.maxX + 1, clip.maxX)
         val y1 = minOf(piece.box.maxY + 1, clip.maxY)
         val z1 = minOf(piece.box.maxZ + 1, clip.maxZ)
+
+        // parity: the biome at the centre of the clipped box is tested before any block, and a
+        // shaft simply refuses to exist in one that blocks it. Without this a mineshaft drives
+        // straight through a deep dark that vanilla leaves alone.
+        if (biomeAt((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2) in BLOCKING_BIOMES) return true
 
         fun liquid(
             x: Int,
@@ -304,6 +314,54 @@ public object MineshaftFill {
             }
         }
         return false
+    }
+
+    private val SPAWNER =
+        Blocks.REGISTRY.byIdentifier(Identifier.vanilla("spawner"))?.stateId ?: error("unknown block 'spawner'")
+
+    /** // parity: the `minecraft:mineshaft_blocking` biome tag. */
+    private val BLOCKING_BIOMES = setOf("minecraft:deep_dark")
+
+    /**
+     * // parity: the one cave spider spawner a spider corridor gets. The jar writes the block
+     * straight to the level, so it skips the orientation and the replacement rule the rest of the
+     * piece goes through, and `setEntityId` draws nothing: its spawn potentials are empty.
+     */
+    private fun placeCaveSpiderSpawner(
+        chunk: Chunk,
+        fill: StructurePieceFill,
+        z: Int,
+    ) {
+        val worldX = fill.worldX(1, z)
+        val worldY = fill.worldY(0)
+        val worldZ = fill.worldZ(1, z)
+        chunk.setBlockStateId(worldX and 15, worldY, worldZ and 15, SPAWNER)
+        chunk.setBlockEntity(
+            ChunkBlockEntity(
+                worldX and 15,
+                worldY,
+                worldZ and 15,
+                Identifier.vanilla("mob_spawner"),
+                NbtCompound().apply {
+                    putString("id", "minecraft:mob_spawner")
+                    putShort("Delay", 20)
+                    putShort("MinSpawnDelay", 200)
+                    putShort("MaxSpawnDelay", 800)
+                    putShort("SpawnCount", 4)
+                    putShort("MaxNearbyEntities", 6)
+                    putShort("RequiredPlayerRange", 16)
+                    putShort("SpawnRange", 4)
+                    putCompound(
+                        "SpawnData",
+                        NbtCompound().apply {
+                            putCompound("entity", NbtCompound().apply { putString("id", "minecraft:cave_spider") })
+                        },
+                    )
+                    this["SpawnPotentials"] = NbtList(NbtType.END)
+                    putCompound("components", NbtCompound())
+                },
+            ),
+        )
     }
 
     /** // parity: placeSupport. Two fence posts and a beam, or two stubs, once every five blocks. */

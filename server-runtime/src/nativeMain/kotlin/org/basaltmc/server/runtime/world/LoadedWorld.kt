@@ -13,11 +13,14 @@ import org.basaltmc.server.world.FlatWorldGenerator
 import org.basaltmc.server.world.LeafDistances
 import org.basaltmc.server.world.NoiseWorldGenerator
 import org.basaltmc.server.world.VoidWorldGenerator
+import org.basaltmc.server.world.climate.Sampler
+import org.basaltmc.server.world.climate.SpawnFinder
 import org.basaltmc.server.world.terrain.BiomeZoomer
 import org.basaltmc.server.world.terrain.NeighbourTerrainCache
 import org.basaltmc.server.world.terrain.OverworldBiomeSource
 import org.basaltmc.server.world.terrain.OverworldNoiseRouter
 import org.basaltmc.server.world.terrain.RealTerrainGenerator
+import org.basaltmc.server.world.terrain.StrongholdStructureGenerator
 import org.basaltmc.server.world.terrain.VillageStructureGenerator
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
 import org.basaltmc.wire.common.logging.Logger
@@ -47,6 +50,9 @@ public class LoadedWorld(
     private val overworldRouter: OverworldNoiseRouter? = null,
     public val surfaceEnvironment: SurfaceRuleEnvironment? = null,
     public val villageGenerator: VillageStructureGenerator? = null,
+    public val strongholdGenerator: StrongholdStructureGenerator? = null,
+    /** Where the climate search says this world's spawn chunk is; the origin without one. */
+    private val spawnChunkFinder: (() -> Pair<Int, Int>)? = null,
     private val normalGenerator: ((chunkX: Int, chunkZ: Int, gameTime: Long, difficulty: String) -> Chunk)? = null,
     /**
      * Who hands out the regions this world is ticked in.
@@ -371,26 +377,61 @@ public class LoadedWorld(
         }
 
     /**
-     * Generates the small warm cache around spawn and reads the spawn height out of it.
+     * Generates the small warm cache around spawn and picks the spawn block out of it.
      *
-     * A void world skips the height lookup: its spawn is whatever the metadata says, because there
-     * is no terrain to stand on other than the platform placed under exactly that point. A world
-     * whose spawn was moved by `/setworldspawn` skips it too: the point of moving it is that it is
-     * no longer wherever the terrain at the origin happens to be.
+     * A void world skips the search: its spawn is whatever the metadata says, because there is no
+     * terrain to stand on other than the platform placed under exactly that point. A world whose
+     * spawn was moved by `/setworldspawn` skips it too: the point of moving it is that it is no
+     * longer wherever the terrain happens to be.
      */
     public fun warmSpawnArea(spawnRadiusChunks: Int) {
+        val fixedSpawn = declaration.type == WorldType.VOID || movedSpawn
+        val (centreX, centreZ) = if (fixedSpawn) 0 to 0 else climateSpawnChunk()
         val positions =
-            (-spawnRadiusChunks..spawnRadiusChunks).flatMap { x ->
-                (-spawnRadiusChunks..spawnRadiusChunks).map { z -> x to z }
+            (centreX - spawnRadiusChunks..centreX + spawnRadiusChunks).flatMap { x ->
+                (centreZ - spawnRadiusChunks..centreZ + spawnRadiusChunks).map { z -> x to z }
             }
         generationQueue.awaitAll(positions)
         spawn =
-            if (declaration.type == WorldType.VOID || movedSpawn) {
+            if (fixedSpawn) {
                 Triple(metadata.spawnX + 0.5, metadata.spawnY.toDouble(), metadata.spawnZ + 0.5)
             } else {
-                val spawnChunk = state.getOrGenerateChunk(0, 0)
-                Triple(8.5, spawnChunk.heightmap()[8 + 8 * 16].toDouble(), 8.5)
+                spawnBlock(centreX, centreZ)
             }
+    }
+
+    /**
+     * // parity: `ChunkPos.containing(randomState().sampler().findSpawnPosition())`, the climate
+     * search that decides which chunk the spawn is looked for in. Without a noise router (a flat or
+     * a debug world) there is nothing to sample, so the origin stands in.
+     */
+    private fun climateSpawnChunk(): Pair<Int, Int> {
+        spawnChunkFinder?.let { return it() }
+        val router = overworldRouter ?: return 0 to 0
+        val sampler =
+            Sampler(
+                temperature = router.temperature,
+                humidity = router.vegetation,
+                continentalness = router.continents,
+                erosion = router.erosion,
+                depth = router.depth,
+                weirdness = router.ridges,
+            )
+        val (blockX, blockZ) = SpawnFinder.findSpawnPosition(sampler)
+        return (blockX shr 4) to (blockZ shr 4)
+    }
+
+    /**
+     * // parity: setInitialSpawn. The provisional spawn is the middle of the chunk at y 64, and the
+     * spiral replaces it with the first column that can hold a player.
+     */
+    private fun spawnBlock(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Triple<Double, Double, Double> {
+        val found = WorldSpawnPoint.find(chunkX, chunkZ) { x, z -> state.getOrGenerateChunk(x, z) }
+        if (found != null) return Triple(found.first + 0.5, found.second.toDouble(), found.third + 0.5)
+        return Triple(chunkX * 16 + 8.5, DEFAULT_SPAWN_HEIGHT.toDouble(), chunkZ * 16 + 8.5)
     }
 
     /**
@@ -506,5 +547,10 @@ public class LoadedWorld(
 
     public fun flushRegions() {
         regions.flush()
+    }
+
+    private companion object {
+        /** // parity: ChunkGenerator.getSpawnHeight, a flat 64 that only stands in if the spiral fails. */
+        const val DEFAULT_SPAWN_HEIGHT = 64
     }
 }

@@ -11,6 +11,7 @@ import org.basaltmc.server.world.terrain.OverworldNoiseRouter
 import org.basaltmc.server.world.terrain.surface.BadlandsClayBands
 import org.basaltmc.server.world.terrain.surface.SurfaceRuleEnvironment
 import kotlin.concurrent.Volatile
+import kotlin.math.floor
 
 /**
  * The real [SurfaceRuleEnvironment]: noise parameters from the downloaded [serverJar], the
@@ -47,6 +48,16 @@ public class RealSurfaceEnvironment(
         x: Int,
         z: Int,
     ): Double = noises.get("surface_secondary").getValue(x.toDouble(), 0.0, z.toDouble())
+
+    override fun preliminarySurfaceLevel(
+        x: Int,
+        z: Int,
+    ): Int {
+        // parity: the sample is quantized to its quart before the router is asked.
+        val quartX = (x shr 2) shl 2
+        val quartZ = (z shr 2) shl 2
+        return floor(router.preliminarySurfaceLevel.compute(FunctionContext(quartX, 0, quartZ))).toInt()
+    }
 
     override fun sample2d(
         noiseId: String,

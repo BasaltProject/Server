@@ -7,29 +7,39 @@ import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.runtime.config.WorldDeclaration
 import org.basaltmc.server.runtime.config.WorldDimension
 import org.basaltmc.server.world.Chunk
+import org.basaltmc.server.world.climate.Sampler
+import org.basaltmc.server.world.climate.SpawnFinder
 import org.basaltmc.server.world.densityfunction.BlendedNoise
 import org.basaltmc.server.world.noise.NoiseParametersJson
 import org.basaltmc.server.world.noise.NormalNoise
+import org.basaltmc.server.world.structure.ConcentricRingsPlacement
 import org.basaltmc.server.world.structure.StructurePlacementGrid
 import org.basaltmc.server.world.terrain.AncientCityStructureGenerator
 import org.basaltmc.server.world.terrain.BuriedTreasureStructureGenerator
+import org.basaltmc.server.world.terrain.DesertPyramidStructureGenerator
 import org.basaltmc.server.world.terrain.DimensionTerrainGenerator
 import org.basaltmc.server.world.terrain.EndCityStructureGenerator
+import org.basaltmc.server.world.terrain.IglooStructureGenerator
+import org.basaltmc.server.world.terrain.JungleTempleStructureGenerator
 import org.basaltmc.server.world.terrain.MineshaftStructureGenerator
 import org.basaltmc.server.world.terrain.NeighbourTerrainCache
 import org.basaltmc.server.world.terrain.NetherBiomeSource
 import org.basaltmc.server.world.terrain.NetherStructureGenerator
 import org.basaltmc.server.world.terrain.NoiseColumnHeights
 import org.basaltmc.server.world.terrain.NoiseRouterData
+import org.basaltmc.server.world.terrain.OceanMonumentStructureGenerator
+import org.basaltmc.server.world.terrain.OceanRuinStructureGenerator
 import org.basaltmc.server.world.terrain.PillagerOutpostStructureGenerator
 import org.basaltmc.server.world.terrain.RealTerrainGenerator
 import org.basaltmc.server.world.terrain.RuinedPortalStructureGenerator
 import org.basaltmc.server.world.terrain.ShipwreckStructureGenerator
+import org.basaltmc.server.world.terrain.StrongholdStructureGenerator
 import org.basaltmc.server.world.terrain.SwampHutStructureGenerator
 import org.basaltmc.server.world.terrain.TheEndBiomeSource
 import org.basaltmc.server.world.terrain.TrailRuinsStructureGenerator
 import org.basaltmc.server.world.terrain.TrialChamberStructureGenerator
 import org.basaltmc.server.world.terrain.VillageStructureGenerator
+import org.basaltmc.server.world.terrain.WoodlandMansionStructureGenerator
 import org.basaltmc.wire.common.Identifier
 
 /** Builds one correctly seeded normal-terrain generator for each loaded world. */
@@ -79,6 +89,9 @@ public class VanillaWorldGeneratorFactory(
     public class Generators(
         public val generate: (chunkX: Int, chunkZ: Int, gameTime: Long, difficulty: String) -> Chunk,
         public val villages: VillageStructureGenerator? = null,
+        public val strongholds: StrongholdStructureGenerator? = null,
+        /** // parity: `randomState().sampler().findSpawnPosition()`, in chunk coordinates. */
+        public val spawnChunk: (() -> Pair<Int, Int>)? = null,
     )
 
     public fun create(
@@ -132,12 +145,52 @@ public class VanillaWorldGeneratorFactory(
                 templateOf = { name -> villageLoader.templateLoader(name) },
                 biomeAt = { x, y, z -> surface.biomeAt(x, y, z) },
                 surfaceHeightAt = { x, z -> columns.surfaceHeight(x, z) },
+                oceanFloorAt = { x, z -> columns.oceanFloorHeight(x, z) },
                 isSolidAt = { x, y, z -> columns.isSolid(x, y, z) },
             )
         val swampHuts =
             SwampHutStructureGenerator(
                 biomeAt = { x, y, z -> surface.biomeAt(x, y, z) },
                 surfaceHeightAt = { x, z -> columns.surfaceHeight(x, z) },
+            )
+        val desertPyramids =
+            DesertPyramidStructureGenerator(
+                biomeAt = { x, y, z -> surface.biomeAt(x, y, z) },
+                surfaceHeightAt = { x, z -> columns.surfaceHeight(x, z) },
+            )
+        val jungleTemples =
+            JungleTempleStructureGenerator(
+                biomeAt = { x, y, z -> surface.biomeAt(x, y, z) },
+                templeBiomes = biomeTags.biomesIn("minecraft:has_structure/jungle_temple"),
+                surfaceHeightAt = { x, z -> columns.surfaceHeight(x, z) },
+            )
+        val mansions =
+            WoodlandMansionStructureGenerator(
+                biomeAt = { x, y, z -> surface.biomeAt(x, y, z) },
+                mansionBiomes = biomeTags.biomesIn("minecraft:has_structure/woodland_mansion"),
+                templateOf = { name -> villageLoader.templateLoader(name) },
+                surfaceHeightAt = { x, z -> columns.surfaceHeight(x, z) },
+            )
+        val oceanMonuments =
+            OceanMonumentStructureGenerator(
+                noiseBiomeAt = { x, y, z -> surface.noiseBiomeAt(x, y, z) },
+                monumentBiomes = biomeTags.biomesIn("minecraft:has_structure/ocean_monument"),
+                surroundingBiomes = biomeTags.biomesIn("minecraft:required_ocean_monument_surrounding"),
+                oceanFloorAt = { x, z -> columns.oceanFloorHeight(x, z) },
+            )
+        val strongholds =
+            StrongholdStructureGenerator(
+                seed = seed,
+                rings =
+                    ConcentricRingsPlacement(
+                        distance = 32,
+                        spread = 3,
+                        count = 128,
+                        preferredBiomes = biomeTags.biomesIn("minecraft:stronghold_biased_to"),
+                        noiseBiomeAt = { x, y, z -> surface.noiseBiomeAt(x, y, z) },
+                    ),
+                noiseBiomeAt = { x, y, z -> surface.noiseBiomeAt(x, y, z) },
+                overworldBiomes = biomeTags.biomesIn("minecraft:has_structure/stronghold"),
             )
         val pillagerOutposts =
             PillagerOutpostStructureGenerator(
@@ -181,6 +234,21 @@ public class VanillaWorldGeneratorFactory(
                 surfaceHeightAt = { x, z -> columns.surfaceHeight(x, z) },
                 oceanFloorAt = { x, z -> columns.oceanFloorHeight(x, z) },
             )
+        val oceanRuins =
+            OceanRuinStructureGenerator(
+                biomeAt = { x, y, z -> surface.noiseBiomeAt(x shr 2, y shr 2, z shr 2) },
+                coldBiomes = biomeTags.biomesIn("minecraft:has_structure/ocean_ruin_cold"),
+                warmBiomes = biomeTags.biomesIn("minecraft:has_structure/ocean_ruin_warm"),
+                templateOf = { name -> villageLoader.templateLoader(name) },
+                oceanFloorAt = { x, z -> columns.oceanFloorHeight(x, z) },
+            )
+        val igloos =
+            IglooStructureGenerator(
+                biomeAt = { x, y, z -> surface.noiseBiomeAt(x shr 2, y shr 2, z shr 2) },
+                iglooBiomes = biomeTags.biomesIn("minecraft:has_structure/igloo"),
+                templateOf = { name -> villageLoader.templateLoader(name) },
+                surfaceHeightAt = { x, z -> columns.surfaceHeight(x, z) },
+            )
         val ancientCities =
             AncientCityStructureGenerator(
                 biomeAt = { x, y, z -> surface.biomeAt(x, y, z) },
@@ -210,10 +278,17 @@ public class VanillaWorldGeneratorFactory(
                         mineshafts,
                         ruinedPortals,
                         swampHuts,
+                        desertPyramids,
+                        jungleTemples,
+                        mansions,
+                        oceanMonuments,
+                        strongholds,
                         pillagerOutposts,
                         trailRuins,
                         buriedTreasures,
                         shipwrecks,
+                        oceanRuins,
+                        igloos,
                         ancientCities,
                         trialChambers,
                     ).chunk
@@ -237,10 +312,17 @@ public class VanillaWorldGeneratorFactory(
                         mineshafts,
                         ruinedPortals,
                         swampHuts,
+                        desertPyramids,
+                        jungleTemples,
+                        mansions,
+                        oceanMonuments,
+                        strongholds,
                         pillagerOutposts,
                         trailRuins,
                         buriedTreasures,
                         shipwrecks,
+                        oceanRuins,
+                        igloos,
                         ancientCities,
                         trialChambers,
                         villageLoader.templateLoader,
@@ -263,6 +345,21 @@ public class VanillaWorldGeneratorFactory(
                     }
             },
             villages = village,
+            strongholds = strongholds,
+            spawnChunk = {
+                val (blockX, blockZ) =
+                    SpawnFinder.findSpawnPosition(
+                        Sampler(
+                            temperature = router.temperature,
+                            humidity = router.vegetation,
+                            continentalness = router.continents,
+                            erosion = router.erosion,
+                            depth = router.depth,
+                            weirdness = router.ridges,
+                        ),
+                    )
+                (blockX shr 4) to (blockZ shr 4)
+            },
         )
     }
 

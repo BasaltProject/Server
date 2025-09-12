@@ -19,7 +19,6 @@ class StructurePieceFillTest {
             orientation = orientation,
             chunk = Chunk(0, 0),
             clip = StructureBoundingBox(-64, -64, -64, 320, 320, 320),
-            oceanFloorHeight = { _, _ -> 70 },
         )
 
     @Test
@@ -79,7 +78,6 @@ class StructurePieceFillTest {
                 chunk = chunk,
                 // Only the first three blocks along the piece are in range.
                 clip = StructureBoundingBox(0, 60, 0, 15, 62, 2),
-                oceanFloorHeight = { _, _ -> 70 },
             )
         for (z in 0..10) piece.place(stone, 0, 0, z)
         assertEquals(stone, chunk.getBlockStateId(0, 60, 0))
@@ -103,7 +101,6 @@ class StructurePieceFillTest {
                 orientation = StructureDirection.SOUTH,
                 chunk = chunk,
                 clip = StructureBoundingBox(0, 0, 0, 15, 320, 15),
-                oceanFloorHeight = { _, _ -> 70 },
             )
         piece.generateBox(0, 0, 0, 4, 4, 4, stone, Blocks.AIR.stateId, skipAir = false)
         assertEquals(stone, chunk.getBlockStateId(0, 60, 0), "a corner is shell")

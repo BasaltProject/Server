@@ -620,7 +620,9 @@ public object CaveLocalModificationDecoration {
             z: Int,
         ): Int =
             if (x shr 4 == chunk.chunkX && z shr 4 == chunk.chunkZ) {
-                chunk.heightAt(x and 15, z and 15, Chunk.HeightmapType.WORLD_SURFACE)
+                // parity: the large dripstone stops at `WORLD_SURFACE_WG`, the frozen map, so a
+                // feature that ran earlier in the chunk cannot let the spike grow through it.
+                chunk.worldgenHeightAt(x and 15, z and 15, Chunk.HeightmapType.WORLD_SURFACE)
             } else {
                 externalSurfaceHeight?.invoke(x, z) ?: WorldHeight.MAX_Y + 1
             }
