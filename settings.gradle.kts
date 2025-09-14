@@ -24,6 +24,11 @@ dependencyResolutionManagement {
     }
 }
 
+// Only the modules that still have Kotlin, and that still build.
+//
+// A module whose C++ port is finished has had its Kotlin deleted (wire-multiversion), and
+// server-runtime is out because it consumed one: its sources stay on disk to be read while it is
+// ported, and the Kotlin server that still runs lives on the branch this one grew from.
 include(
     ":wire-common",
     ":wire-nbt",
@@ -35,11 +40,8 @@ include(
     ":server-world",
     ":server-storage",
     ":server-entity",
-    ":server-runtime",
     ":server-assets",
     ":wire-auth",
-    ":wire-multiversion",
-    ":wire-bedrock",
     ":server-lua",
     ":server-plugins",
     ":server-datagen",
@@ -54,8 +56,6 @@ for (name in listOf(
     "wire-io",
     "wire-protocol",
     "wire-auth",
-    "wire-multiversion",
-    "wire-bedrock",
 )) {
     project(":$name").projectDir = file("wire/$name")
 }
