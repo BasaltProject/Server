@@ -14,3 +14,8 @@ kotlin {
         }
     }
 }
+
+// Temporary: release-optimised test binary for the migration benchmark.
+kotlin.targets.withType<org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget>().configureEach {
+    binaries.test(listOf(org.jetbrains.kotlin.gradle.plugin.mpp.NativeBuildType.RELEASE))
+}
