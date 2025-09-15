@@ -2,8 +2,10 @@ basalt_module(server-registry
     SOURCES
         src/BlockStateDefinitions.cpp
         src/Blocks.cpp
+        src/Registries.cpp
         src/VanillaBlocks.cpp
-    DEPENDS basalt::wire-common basalt::wire-nbt
+        src/VanillaTables.cpp
+    DEPENDS basalt::wire-common basalt::wire-nbt basalt::wire-protocol
 )
 
 basalt_test(server-registry-test

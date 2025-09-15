@@ -1,9 +1,14 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/registry/VanillaBlocks.hpp>
+#include <basalt/server/registry/VanillaTables.hpp>
 
 #include <doctest.h>
+
+#include <set>
+#include <string>
 
 using namespace basalt::server::registry;
 using basalt::wire::common::Identifier;
@@ -65,4 +70,81 @@ TEST_CASE("bedrock is unbreakable and a flower comes apart on the spot") {
     const BlockHardness* flower = blocks::hardnessOf(Identifier::vanilla("dandelion"));
     REQUIRE(flower != nullptr);
     CHECK(flower->isInstant());
+}
+
+TEST_CASE("the shape index names a real shape for every block state") {
+    // Two characters per state id, in id order: a table of one entry per state would be thirty
+    // thousand lines of source for what fits in a few hundred here.
+    // Two base64 digits per state, most significant first.
+    constexpr std::string_view kAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const std::string_view index = blockShapeIndex();
+    REQUIRE(index.size() % 2 == 0);
+    CHECK(static_cast<std::int32_t>(index.size() / 2) >= blocks::stateCount());
+    for (std::size_t at = 0; at + 1 < index.size(); at += 2) {
+        const std::size_t high = kAlphabet.find(index[at]);
+        const std::size_t low = kAlphabet.find(index[at + 1]);
+        CAPTURE(at / 2);
+        REQUIRE(high != std::string_view::npos);
+        REQUIRE(low != std::string_view::npos);
+        REQUIRE(high * kAlphabet.size() + low < blockShapes().size());
+    }
+}
+
+TEST_CASE("a table row is one row, however it was written in the source") {
+    // The long rows are written as several joined pieces. Reading them as separate rows would turn
+    // one bitset into a dozen fragments, which is exactly the bug this catches.
+    for (const std::string_view set : supportSets()) {
+        CHECK(set.size() > 2);
+    }
+    for (const auto& [name, states] : blockFamilies()) {
+        CHECK_FALSE(name.empty());
+        CHECK(states.size() > 2);
+    }
+}
+
+TEST_CASE("an id table names each thing once and numbers it once") {
+    const auto unique = [](auto table) {
+        std::set<std::int32_t> ids;
+        std::set<std::string_view> names;
+        for (const auto& [id, name] : table) {
+            CHECK(ids.insert(id).second);
+            CHECK(names.insert(name).second);
+        }
+        return ids.size();
+    };
+    CHECK(unique(itemIds()) == itemIds().size());
+    CHECK(unique(entityTypeIds()) == entityTypeIds().size());
+    CHECK(unique(particleTypeIds()) == particleTypeIds().size());
+    CHECK(unique(dataComponentIds()) == dataComponentIds().size());
+}
+
+TEST_CASE("a particle's option shape decides how the packet after it is read") {
+    // The options are written straight after the type id with no length, so a wrong shape
+    // desynchronises the client on the very next packet rather than looking merely odd.
+    using basalt::wire::protocol::play::ParticleOptionShape;
+
+    const ParticleType* dust = particleTypes::of(Identifier::vanilla("dust"));
+    REQUIRE(dust != nullptr);
+    CHECK(dust->optionShape == ParticleOptionShape::Dust);
+
+    const ParticleType* flame = particleTypes::of(Identifier::vanilla("flame"));
+    REQUIRE(flame != nullptr);
+    CHECK_FALSE(flame->needsOptions());
+}
+
+TEST_CASE("a block entity is named after its type, not its block") {
+    // All eight copper chests are `minecraft:chest`: naming one after its block leaves it without a
+    // protocol id, so it drops out of the chunk and the block turns invisible.
+    const Identifier* chest = blockEntityTypes::ofBlock(Identifier::vanilla("copper_chest"));
+    REQUIRE(chest != nullptr);
+    CHECK(blockEntityTypes::idOf(*chest).has_value());
+}
+
+TEST_CASE("an entity type resolves both ways") {
+    const EntityTypeEntry* creeper = entityTypes::of(Identifier::vanilla("creeper"));
+    REQUIRE(creeper != nullptr);
+    const EntityTypeEntry* back = entityTypes::byProtocolId(creeper->protocolId);
+    REQUIRE(back != nullptr);
+    CHECK(back->id == creeper->id);
+    CHECK(entityTypes::of(Identifier::vanilla("not_a_mob")) == nullptr);
 }
