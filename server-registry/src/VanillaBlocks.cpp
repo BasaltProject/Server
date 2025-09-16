@@ -8,7 +8,7 @@
 namespace basalt::server::registry {
 namespace {
 
-constexpr std::array<std::pair<std::int32_t, std::string_view>, 1196> kDefaultBlockStates = {{
+constexpr std::array<std::pair<std::int32_t, std::string_view>, 1196> kDefaultBlockStatesTable = {{
     {0, "air"},
     {1, "stone"},
     {2, "granite"},
@@ -1207,7 +1207,7 @@ constexpr std::array<std::pair<std::int32_t, std::string_view>, 1196> kDefaultBl
     {32365, "firefly_bush"},
 }};
 
-constexpr std::array<std::pair<std::int32_t, std::string_view>, 1196> kBlockIds = {{
+constexpr std::array<std::pair<std::int32_t, std::string_view>, 1196> kBlockIdsTable = {{
     {0, "air"},
     {1, "stone"},
     {2, "granite"},
@@ -3419,7 +3419,7 @@ constexpr std::array<std::string_view, 797> kBlockStateDefinitions = {{
     "32359|pale_hanging_moss|tip=true,false",
 }};
 
-constexpr std::array<BlockHardnessEntry, 1196> kBlockHardness = {{
+constexpr std::array<BlockHardnessEntry, 1196> kBlockHardnessTable = {{
     {"acacia_button", 0.5F, false, 0.5F},
     {"acacia_door", 3.0F, false, 3.0F},
     {"acacia_fence", 2.0F, false, 3.0F},
@@ -4620,12 +4620,14 @@ constexpr std::array<BlockHardnessEntry, 1196> kBlockHardness = {{
 
 } // namespace
 
-std::span<const std::pair<std::int32_t, std::string_view>> defaultBlockStates() { return kDefaultBlockStates; }
+std::span<const std::pair<std::int32_t, std::string_view>> defaultBlockStatesTable() {
+    return kDefaultBlockStatesTable;
+}
 
-std::span<const std::pair<std::int32_t, std::string_view>> blockIds() { return kBlockIds; }
+std::span<const std::pair<std::int32_t, std::string_view>> blockIdsTable() { return kBlockIdsTable; }
 
-std::span<const std::string_view> blockStateProperties() { return kBlockStateDefinitions; }
+std::span<const std::string_view> blockStatePropertiesTable() { return kBlockStateDefinitions; }
 
-std::span<const BlockHardnessEntry> blockHardness() { return kBlockHardness; }
+std::span<const BlockHardnessEntry> blockHardnessTable() { return kBlockHardnessTable; }
 
 } // namespace basalt::server::registry

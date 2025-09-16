@@ -21,7 +21,7 @@ namespace items {
 const Registry<Item>& registry() {
     static const Registry<Item> built = [] {
         Registry<Item> registry;
-        for (const auto& [protocolId, path] : itemIds()) {
+        for (const auto& [protocolId, path] : itemIdsTable()) {
             Identifier id = vanilla(path);
             registry.registerEntry(protocolId, id, Item{id, protocolId});
         }
@@ -43,8 +43,8 @@ struct Table {
 [[nodiscard]] const Table& table() {
     static const Table built = [] {
         Table table;
-        table.byProtocolId.reserve(entityTypeIds().size());
-        for (const auto& [protocolId, path] : entityTypeIds()) {
+        table.byProtocolId.reserve(entityTypeIdsTable().size());
+        for (const auto& [protocolId, path] : entityTypeIdsTable()) {
             table.byProtocolId.push_back({vanilla(path), protocolId});
         }
         std::ranges::sort(table.byProtocolId, {}, &EntityTypeEntry::protocolId);
@@ -120,8 +120,8 @@ struct Table {
 [[nodiscard]] const Table& table() {
     static const Table built = [] {
         Table table;
-        table.byProtocolId.reserve(particleTypeIds().size());
-        for (const auto& [protocolId, path] : particleTypeIds()) {
+        table.byProtocolId.reserve(particleTypeIdsTable().size());
+        for (const auto& [protocolId, path] : particleTypeIdsTable()) {
             const auto shape =
                 std::ranges::find(kShapes, path, &std::pair<std::string_view, ParticleOptionShape>::first);
             table.byProtocolId.push_back(
@@ -159,7 +159,7 @@ struct Table {
 [[nodiscard]] const Table& table() {
     static const Table built = [] {
         Table table;
-        for (const auto& [id, path] : dataComponentIds()) {
+        for (const auto& [id, path] : dataComponentIdsTable()) {
             Identifier name = vanilla(path);
             table.byName.emplace(name, id);
             table.byId.emplace(id, name);
@@ -198,10 +198,10 @@ struct Table {
     static const Table built = [] {
         Table table;
         std::int32_t id = 0;
-        for (const std::string_view name : blockEntityTypeNames()) {
+        for (const std::string_view name : blockEntityTypeNamesTable()) {
             table.idsByName.emplace(name, id++);
         }
-        for (const auto& [block, type] : blockEntityOwners()) {
+        for (const auto& [block, type] : blockEntityOwnersTable()) {
             table.typesByBlock.emplace(vanilla(block), vanilla(type));
         }
         return table;
@@ -224,7 +224,7 @@ const Identifier* ofBlock(const Identifier& block) {
     return found == table().typesByBlock.end() ? nullptr : &found->second;
 }
 
-std::size_t size() { return blockEntityTypeNames().size(); }
+std::size_t size() { return blockEntityTypeNamesTable().size(); }
 
 } // namespace blockEntityTypes
 

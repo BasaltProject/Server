@@ -25,7 +25,7 @@ struct FireOddsEntry {
 /// Every item's real protocol id, straight from the real 26.2 server jar's own data
 /// generator (`net.minecraft.data.Main --reports`, the `registries.json` report):
 /// authoritative, not decompiled/guessed.
-[[nodiscard]] std::span<const std::pair<std::int32_t, std::string_view>> itemIds();
+[[nodiscard]] std::span<const std::pair<std::int32_t, std::string_view>> itemIdsTable();
 
 /// Every entity type's protocol id, in `BuiltInRegistries.ENTITY_TYPE` order, which is the order
 /// `EntityTypes` registers them in.
@@ -33,28 +33,28 @@ struct FireOddsEntry {
 /// A protocol fact, like the block and item tables beside it: the client resolves a spawned entity
 /// by this number alone, so a wrong one spawns something else entirely. Cross-checked against the
 /// two ids this server already had verified against a real client, `item` (71) and `player` (156).
-[[nodiscard]] std::span<const std::pair<std::int32_t, std::string_view>> entityTypeIds();
+[[nodiscard]] std::span<const std::pair<std::int32_t, std::string_view>> entityTypeIdsTable();
 
 /// Every particle type's protocol id, in `BuiltInRegistries.PARTICLE_TYPE` order, which is the
 /// order `ParticleTypes` registers them in. A protocol fact, like the block, item and entity tables
 /// beside it: the client resolves a particle by this number alone.
-[[nodiscard]] std::span<const std::pair<std::int32_t, std::string_view>> particleTypeIds();
+[[nodiscard]] std::span<const std::pair<std::int32_t, std::string_view>> particleTypeIdsTable();
 
 /// Every data component type's id in the `minecraft:data_component_type` registry, which is what
 /// an item stack's component patch carries on the wire.
 ///
 /// The names are what `/give diamond_sword`custom_name=...`` writes, so both directions of that
 /// translation come from the real registry rather than from a hand-kept list.
-[[nodiscard]] std::span<const std::pair<std::int32_t, std::string_view>> dataComponentIds();
+[[nodiscard]] std::span<const std::pair<std::int32_t, std::string_view>> dataComponentIdsTable();
 
 /// Every block entity type, in the registry order that is its protocol id.
 ///
 /// Not reported by the data generator, so it comes from a harness run against the real
 /// classes (see `basalt.datagen`).
-[[nodiscard]] std::span<const std::string_view> blockEntityTypeNames();
+[[nodiscard]] std::span<const std::string_view> blockEntityTypeNamesTable();
 
 /// Which block entity type each block owns. A block absent from this list has none.
-[[nodiscard]] std::span<const std::pair<std::string_view, std::string_view>> blockEntityOwners();
+[[nodiscard]] std::span<const std::pair<std::string_view, std::string_view>> blockEntityOwnersTable();
 
 /// Every distinct block shape, from the real server jar's own block classes: light
 /// dampening, whether it blocks movement, whether something placed there replaces it,
@@ -62,12 +62,12 @@ struct FireOddsEntry {
 /// sturdy, which support a centre and which support a rigid block, which face-occlusion
 /// shapes are full (down, up, north, south, west, east each time), and the boxes of the
 /// collision shape in thirty-seconds of a block.
-[[nodiscard]] std::span<const std::string_view> blockShapes();
+[[nodiscard]] std::span<const std::string_view> blockShapeSpecsTable();
 
 /// Which of `ALL_BLOCK_SHAPES` each block state uses, two characters per state id in id
 /// order. A table of one entry per state would be thirty thousand lines of source for what
 /// fits here in a few hundred.
-[[nodiscard]] std::string_view blockShapeIndex();
+[[nodiscard]] std::string_view blockShapeIndexTable();
 
 /// What each block state needs around it to stay put, asked of the real block classes.
 ///
@@ -75,53 +75,53 @@ struct FireOddsEntry {
 /// six with water at and around the position, and a field is empty when that side holds nothing
 /// up, `*` for any block whose face towards it is sturdy, `c` for one that supports a centre,
 /// and `#n` for a member of set n. A state survives when any one of its fields is satisfied.
-[[nodiscard]] std::span<const std::string_view> supportRules();
+[[nodiscard]] std::span<const std::string_view> supportRulesTable();
 
 /// Each rule's block sets, as base64 bitsets over block registry ids (not state ids).
-[[nodiscard]] std::span<const std::string_view> supportSets();
+[[nodiscard]] std::span<const std::string_view> supportSetsTable();
 
 /// The states vanilla ticks at random, which is what makes crops grow and ice melt.
-[[nodiscard]] std::span<const std::int32_t> randomTickingStates();
+[[nodiscard]] std::span<const std::int32_t> randomTickingStatesTable();
 
 /// How long each item burns in a furnace, in ticks. parity: `FuelValues.vanillaBurnTimes`,
 /// which vanilla builds in code rather than in data, so this is that call's answer.
-[[nodiscard]] std::span<const std::pair<std::string_view, std::int32_t>> fuelValues();
+[[nodiscard]] std::span<const std::pair<std::string_view, std::int32_t>> fuelValuesTable();
 
 /// The states redstone treats as solid: a signal reaches through them and a wire climbs over
 /// them. parity: `BlockStateBase.isRedstoneConductor`.
-[[nodiscard]] std::span<const std::int32_t> redstoneConductorStates();
+[[nodiscard]] std::span<const std::int32_t> redstoneConductorStatesTable();
 
 /// What a piston does with a state, for the states that are not simply pushed.
 /// parity: `BlockState.getPistonPushReaction`: `BLOCK` stops it, `DESTROY` breaks,
 /// `PUSH_ONLY` will not be pulled back and `IGNORE` is left where it is.
-[[nodiscard]] std::span<const std::pair<std::int32_t, std::string_view>> pushReactions();
+[[nodiscard]] std::span<const std::pair<std::int32_t, std::string_view>> pushReactionsTable();
 
 /// Every brew a stand can make: which list it belongs to, what goes in, what ingredient turns
 /// it and what comes out. parity: `PotionBrewing.bootstrap`, built in code and not in data.
-[[nodiscard]] std::span<const BrewingMix> brewingMixes();
+[[nodiscard]] std::span<const BrewingMix> brewingMixesTable();
 
 /// What each copper block turns into as it weathers. parity: `WeatheringCopper.NEXT_BY_BLOCK`.
-[[nodiscard]] std::span<const std::pair<std::string_view, std::string_view>> weatheringSteps();
+[[nodiscard]] std::span<const std::pair<std::string_view, std::string_view>> weatheringStepsTable();
 
 /// How readily each block catches fire and how readily it burns away, straight from the two
 /// tables `FireBlock` builds at bootstrap: block id, ignite odds, burn odds.
-[[nodiscard]] std::span<const FireOddsEntry> fireOdds();
+[[nodiscard]] std::span<const FireOddsEntry> fireOddsTable();
 
 /// Which blocks are a fence, a gate, panes, leaves or a wall, and which refuse to be
 /// connected to at all: what `connectsTo` and `attachsTo` ask about, as base64 bitsets over
 /// block registry ids.
-[[nodiscard]] std::span<const std::pair<std::string_view, std::string_view>> blockFamilies();
+[[nodiscard]] std::span<const std::pair<std::string_view, std::string_view>> blockFamiliesTable();
 
 /// How high each item stacks and how many ticks it waits between uses, as
 /// `name|stack|cooldown`. Only the items that differ from the default of sixty-four and no
 /// wait are here.
 ///
 /// From the item component report the data generator writes (see `basalt.datagen`).
-[[nodiscard]] std::span<const std::string_view> itemStacking();
+[[nodiscard]] std::span<const std::string_view> itemStackingTable();
 
 /// Every piece of armour: `<item>|<slot>|<armour>|<toughness>|<knockback resistance>`, from
 /// the real item component reports.
-[[nodiscard]] std::span<const std::string_view> itemArmour();
+[[nodiscard]] std::span<const std::string_view> itemArmourTable();
 
 /// Every edible item: `<item>|<nutrition>|<saturation>|<can always eat>|<seconds to eat>|
 /// <what eating it does>|<what it leaves behind>`, from the real item component reports.
@@ -129,49 +129,49 @@ struct FireOddsEntry {
 /// The last field is `apply:<effect>,<ticks>,<amplifier>,<probability>`, `remove:<effect>`
 /// or `clear`, several separated by `;`: what a golden apple, a bottle of honey and a bucket
 /// of milk respectively do.
-[[nodiscard]] std::span<const std::string_view> itemFood();
+[[nodiscard]] std::span<const std::string_view> itemFoodTable();
 
 /// What each item adds to the hand that holds it: attack damage and attack speed, as
 /// `name|damage|speed`. Both are the modifier the item carries, not the total: the player's
 /// own base of one damage and four speed is added on top.
 ///
 /// From the item component report the data generator writes (see `basalt.datagen`).
-[[nodiscard]] std::span<const std::string_view> itemWeapons();
+[[nodiscard]] std::span<const std::string_view> itemWeaponsTable();
 
 /// // parity: the state definitions of the two portal blocks, from the official `blocks.json`
 /// report. A portal is the one place where a property changes what the block *does*, not only how it
 /// looks: a Nether portal's axis is which way it faces, and an end portal frame's eye is whether the
 /// ring is armed.
-[[nodiscard]] std::span<const std::string_view> portalBlockStateSpecs();
+[[nodiscard]] std::span<const std::string_view> portalBlockStateSpecsTable();
 
 /// // parity: every possible 26.2 state definition for every block referenced by a village
 /// structure palette or processor output. Generated from the official BuiltInRegistries.BLOCK.
-[[nodiscard]] std::span<const std::string_view> villageBlockStateSpecs();
+[[nodiscard]] std::span<const std::string_view> villageBlockStateSpecsTable();
 
 /// Which instrument a note block plays over each block. Anything absent is the harp, which is
 /// what every ordinary block gives.
 ///
 /// Not reported by the data generator, so it comes from a harness run against the real
 /// classes (see `basalt.datagen`).
-[[nodiscard]] std::span<const std::pair<std::string_view, std::string_view>> blockInstruments();
+[[nodiscard]] std::span<const std::pair<std::string_view, std::string_view>> blockInstrumentsTable();
 
 /// What each item leaves in the grid when it is crafted with. An item absent from here is
 /// used up, which is nearly all of them.
 ///
 /// Not reported by the data generator, so it comes from a harness run against the real
 /// classes (see `basalt.datagen`).
-[[nodiscard]] std::span<const std::pair<std::string_view, std::string_view>> craftingRemainders();
+[[nodiscard]] std::span<const std::pair<std::string_view, std::string_view>> craftingRemaindersTable();
 
 /// The items whose block is not called the same as they are. Anything absent puts down the
 /// block of its own name, which is nearly all of them.
 ///
 /// Not reported by the data generator, so it comes from a harness run against the real
 /// classes (see `basalt.datagen`).
-[[nodiscard]] std::span<const std::pair<std::string_view, std::string_view>> itemBlocks();
+[[nodiscard]] std::span<const std::pair<std::string_view, std::string_view>> itemBlocksTable();
 
 /// Which trim material each item provides. An item absent from this list cannot trim armour.
 ///
 /// Read from the item component report the data generator writes (see `basalt.datagen`).
-[[nodiscard]] std::span<const std::pair<std::string_view, std::string_view>> trimMaterials();
+[[nodiscard]] std::span<const std::pair<std::string_view, std::string_view>> trimMaterialsTable();
 
 } // namespace basalt::server::registry
