@@ -72,7 +72,9 @@ struct ChunkScheduledTick {
 
 /// Entity emitted by world generation and waiting for the runtime entity layer to materialize it.
 struct ChunkGeneratedEntity {
-    wire::common::Identifier type;
+    /// The default is never a real entity: every one of these is built field by field, and a type
+    /// that has to be given makes an unset one impossible to store by accident.
+    wire::common::Identifier type{"minecraft", "marker"};
     double x = 0.0;
     double y = 0.0;
     double z = 0.0;

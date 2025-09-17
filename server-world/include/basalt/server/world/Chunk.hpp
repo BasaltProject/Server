@@ -110,6 +110,31 @@ public:
     /// section rebuilds once and not once per section.
     void invalidateHeightmaps();
 
+    /// One packed nibble array per section, which is how light travels and how it is kept.
+    using PackedLight = std::vector<std::vector<std::uint8_t>>;
+
+    /// This chunk's sky light, worked out once and kept until a block moves.
+    ///
+    /// A pass run without every neighbour loaded is kept all the same: it lets light in from where
+    /// nothing is known yet, and `invalidateLight` throws it away as soon as the missing neighbour
+    /// arrives. Not keeping it meant recomputing the whole chunk on *every* query at the edge of the
+    /// loaded area, which cost over two milliseconds a time.
+    const PackedLight& skyLight(const std::function<PackedLight()>& compute);
+
+    /// The same for the light the blocks themselves give off.
+    const PackedLight& blockLight(const std::function<PackedLight()>& compute);
+
+    /// The light this chunk has already worked out, or null when nobody has asked yet.
+    ///
+    /// A reader that only wants one block's light uses this to skip building a window over the nine
+    /// chunks around it: that window was costing more than the lookup it was there to serve.
+    [[nodiscard]] const PackedLight* cachedSkyLight() const;
+
+    [[nodiscard]] const PackedLight* cachedBlockLight() const;
+
+    /// Drops the kept light, for when a neighbour arrives and this chunk's own pass is now stale.
+    void invalidateLight();
+
     void setBlockEntity(ChunkBlockEntity blockEntity);
 
     [[nodiscard]] const ChunkBlockEntity* blockEntityAt(std::int32_t localX, std::int32_t y, std::int32_t localZ) const;
@@ -201,6 +226,8 @@ private:
     std::vector<ChunkScheduledTick> blockTicks_;
     std::vector<ChunkScheduledTick> fluidTicks_;
     structure::ChunkStructures structures_;
+    std::optional<PackedLight> skyLight_;
+    std::optional<PackedLight> blockLight_;
     bool dirty_ = false;
     std::int64_t inhabitedTime_ = 0;
 };
