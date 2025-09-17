@@ -28,8 +28,8 @@ namespace detail {
 
 template <typename C>
 MultipointSpline<C>::MultipointSpline(BoundedFloatFunction<C> coordinate, std::vector<float> locations,
-                                      std::vector<std::unique_ptr<CubicSpline<C>>> values,
-                                      std::vector<float> derivatives, float minValue, float maxValue)
+                                      std::vector<SplineRef<C>> values, std::vector<float> derivatives, float minValue,
+                                      float maxValue)
     : coordinate_(std::move(coordinate)), locations_(std::move(locations)), values_(std::move(values)),
       derivatives_(std::move(derivatives)), minValue_(minValue), maxValue_(maxValue) {}
 
@@ -59,9 +59,9 @@ float MultipointSpline<C>::sample(const C& coordinate) const {
 }
 
 template <typename C>
-std::unique_ptr<MultipointSpline<C>>
+std::shared_ptr<MultipointSpline<C>>
 MultipointSpline<C>::create(BoundedFloatFunction<C> coordinate, std::vector<float> locations,
-                            std::vector<std::unique_ptr<CubicSpline<C>>> values, std::vector<float> derivatives) {
+                            std::vector<SplineRef<C>> values, std::vector<float> derivatives) {
     if (locations.size() != values.size() || locations.size() != derivatives.size()) {
         throw std::invalid_argument{"a spline's locations, values and derivatives must be the same length"};
     }
@@ -87,7 +87,7 @@ MultipointSpline<C>::create(BoundedFloatFunction<C> coordinate, std::vector<floa
         minValue = std::min(minValue, std::min(edge1, edge2));
         maxValue = std::max(maxValue, std::max(edge1, edge2));
     }
-    for (const std::unique_ptr<CubicSpline<C>>& value : values) {
+    for (const SplineRef<C>& value : values) {
         minValue = std::min(minValue, value->minValue());
         maxValue = std::max(maxValue, value->maxValue());
     }
@@ -114,7 +114,7 @@ MultipointSpline<C>::create(BoundedFloatFunction<C> coordinate, std::vector<floa
         maxValue = std::max(maxValue, maxLerp1 + 0.25F * std::max(maxA, maxB));
     }
 
-    return std::make_unique<MultipointSpline<C>>(std::move(coordinate), std::move(locations), std::move(values),
+    return std::make_shared<MultipointSpline<C>>(std::move(coordinate), std::move(locations), std::move(values),
                                                  std::move(derivatives), minValue, maxValue);
 }
 

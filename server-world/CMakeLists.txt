@@ -15,6 +15,8 @@ basalt_module(server-world
         src/noise/ImprovedNoise.cpp
         src/region/ChunkNbt.cpp
         src/structure/StructureBounds.cpp
+        src/terrain/TerrainProvider.cpp
+    src/terrain/NoiseRouterData.cpp
         src/noise/NormalNoise.cpp
         src/noise/PerlinNoise.cpp
         src/noise/SimplexNoise.cpp
@@ -30,6 +32,18 @@ basalt_test(server-world-noise-test
 basalt_test(server-world-light-test
     SOURCES
         test/LightTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-noise-router-test
+    SOURCES
+        test/NoiseRouterTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-terrain-test
+    SOURCES
+        test/TerrainTest.cpp
     DEPENDS basalt::server-world
 )
 
