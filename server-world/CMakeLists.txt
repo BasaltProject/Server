@@ -1,5 +1,7 @@
 basalt_module(server-world
     SOURCES
+        src/ChunkSection.cpp
+        src/ChunkTypes.cpp
         src/PalettedContainer.cpp
         src/noise/ImprovedNoise.cpp
         src/noise/NormalNoise.cpp

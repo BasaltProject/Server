@@ -1,8 +1,13 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/world/ChunkHeight.hpp>
+#include <basalt/server/world/ChunkSection.hpp>
+#include <basalt/server/world/ChunkTypes.hpp>
 #include <basalt/server/world/PalettedContainer.hpp>
 
 #include <doctest.h>
 
+#include <stdexcept>
 #include <thread>
 #include <vector>
 
@@ -113,4 +118,104 @@ TEST_CASE("a reader never sees a palette index its palette does not have") {
     stop.store(true);
     reader.join();
     CHECK_FALSE(sawGarbage.load());
+}
+
+TEST_CASE("a section keeps its counts on write instead of recounting them") {
+    // Recounting scanned all 4096 entries every time, which is once per section per chunk send.
+    using namespace basalt::server::registry;
+    ChunkSection section;
+    CHECK(section.nonAirBlockCount() == 0);
+    CHECK(section.nonEmptyFluidCount() == 0);
+
+    CHECK(section.setBlockStateId(1, 2, 3, blocks::stone().stateId));
+    CHECK(section.nonAirBlockCount() == 1);
+    CHECK(section.nonEmptyFluidCount() == 0);
+
+    CHECK(section.setBlockStateId(4, 5, 6, blocks::water().stateId));
+    CHECK(section.nonAirBlockCount() == 2);
+    CHECK(section.nonEmptyFluidCount() == 1);
+
+    // Putting air back takes the block out of both counts it was in.
+    CHECK(section.setBlockStateId(4, 5, 6, blocks::air().stateId));
+    CHECK(section.nonAirBlockCount() == 1);
+    CHECK(section.nonEmptyFluidCount() == 0);
+
+    // Writing what is already there changes nothing, counts included.
+    CHECK_FALSE(section.setBlockStateId(1, 2, 3, blocks::stone().stateId));
+    CHECK(section.nonAirBlockCount() == 1);
+}
+
+TEST_CASE("filling a section wholesale counts what it was given") {
+    using namespace basalt::server::registry;
+    ChunkSection section;
+    std::vector<std::int32_t> ids(ChunkSection::kBlocks, blocks::air().stateId);
+    for (std::size_t i = 0; i < 100; ++i) {
+        ids[i] = blocks::stone().stateId;
+    }
+    for (std::size_t i = 100; i < 150; ++i) {
+        ids[i] = blocks::water().stateId;
+    }
+    section.setBlockStateIds(ids);
+    CHECK(section.nonAirBlockCount() == 150);
+    CHECK(section.nonEmptyFluidCount() == 50);
+    CHECK(section.blockStateId(0, 0, 0) == blocks::stone().stateId);
+    CHECK(section.blockStateIds() == ids);
+}
+
+TEST_CASE("a section refuses a coordinate outside it rather than wrapping") {
+    ChunkSection section;
+    CHECK_THROWS_AS(static_cast<void>(section.blockStateId(16, 0, 0)), std::out_of_range);
+    CHECK_THROWS_AS(static_cast<void>(section.blockStateId(0, -1, 0)), std::out_of_range);
+    CHECK_THROWS_AS(static_cast<void>(section.biomeId(4, 0, 0)), std::out_of_range);
+}
+
+TEST_CASE("biomes sit at quart resolution and survive a round trip") {
+    ChunkSection section;
+    section.setBiomeId(1, 2, 3, 42);
+    CHECK(section.biomeId(1, 2, 3) == 42);
+    CHECK(section.biomeId(0, 0, 0) == 0);
+
+    std::vector<std::int32_t> ids(ChunkSection::kBiomes, 7);
+    ids[5] = 9;
+    section.setBiomeIds(ids);
+    CHECK(section.biomeIds() == ids);
+}
+
+TEST_CASE("the overworld is twenty four sections from sixty four below zero") {
+    // parity: NoiseSettings.OVERWORLD_NOISE_SETTINGS, create(-64, 384, 1, 2).
+    CHECK(kOverworldHeight.minY() == -64);
+    CHECK(kOverworldHeight.maxY() == 319);
+    CHECK(kOverworldHeight.sectionCount() == 24);
+    CHECK(kOverworldHeight.minSection() == -4);
+    CHECK(kOverworldHeight.maxSection() == 19);
+    CHECK(kNetherHeight.sectionCount() == 16);
+    // A height the chunk NBT could not store its sections in is not a valid one.
+    CHECK_FALSE(ChunkHeight{-64, 100}.isValid());
+    CHECK_FALSE(ChunkHeight{-70, 384}.isValid());
+}
+
+TEST_CASE("a block entity is named after its type, however the caller names it") {
+    // Callers hand in a block, since a block is what they have. Getting this wrong left a copper
+    // chest without a protocol id, so it never reached the client and rendered as nothing.
+    using basalt::wire::common::Identifier;
+    const ChunkBlockEntity fromBlock{1, 64, 2, Identifier::vanilla("copper_chest"), {}};
+    CHECK(fromBlock.type() == Identifier::vanilla("chest"));
+
+    const ChunkBlockEntity fromType{1, 64, 2, Identifier::vanilla("chest"), {}};
+    CHECK(fromType.type() == Identifier::vanilla("chest"));
+
+    // A block that owns no block entity keeps the name it was given.
+    const ChunkBlockEntity plain{1, 64, 2, Identifier::vanilla("stone"), {}};
+    CHECK(plain.type() == Identifier::vanilla("stone"));
+}
+
+TEST_CASE("a block entity outside its chunk is refused rather than stored") {
+    using basalt::wire::common::Identifier;
+    CHECK_THROWS_AS((ChunkBlockEntity{16, 64, 0, Identifier::vanilla("chest"), {}}), std::out_of_range);
+    CHECK_THROWS_AS((ChunkBlockEntity{0, 400, 0, Identifier::vanilla("chest"), {}}), std::out_of_range);
+    CHECK(isInsideChunk(0, -64, 0, kOverworldHeight));
+    CHECK(isInsideChunk(15, 319, 15, kOverworldHeight));
+    CHECK_FALSE(isInsideChunk(0, 320, 0, kOverworldHeight));
+    // The nether is shorter, and what fits the overworld does not always fit it.
+    CHECK_FALSE(isInsideChunk(0, 300, 0, kNetherHeight));
 }
