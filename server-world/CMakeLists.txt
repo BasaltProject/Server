@@ -5,6 +5,8 @@ basalt_module(server-world
         src/ChunkSection.cpp
         src/ChunkTypes.cpp
         src/PalettedContainer.cpp
+        src/climate/Climate.cpp
+        src/climate/OverworldBiomes.cpp
         src/densityfunction/DensityCache.cpp
         src/densityfunction/DensityFunction.cpp
         src/light/Light.cpp
@@ -28,6 +30,12 @@ basalt_test(server-world-noise-test
 basalt_test(server-world-light-test
     SOURCES
         test/LightTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-climate-test
+    SOURCES
+        test/ClimateTest.cpp
     DEPENDS basalt::server-world
 )
 
