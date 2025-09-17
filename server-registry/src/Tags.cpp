@@ -82,4 +82,78 @@ std::expected<Resolved, TagError> resolve(const std::map<Identifier, TagFile>& f
     return std::move(resolver.resolved);
 }
 
+namespace tagFileJson {
+namespace {
+
+/// A leading `#` is what makes an entry a reference to another tag rather than an element.
+[[nodiscard]] std::expected<TagEntry, ParseError> idOrTag(std::string_view raw, bool required) {
+    const bool isTag = raw.starts_with('#');
+    const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(isTag ? raw.substr(1) : raw);
+    if (!id.has_value()) {
+        return std::unexpected(ParseError::BadIdentifier);
+    }
+    return TagEntry{*id, isTag, required};
+}
+
+[[nodiscard]] std::expected<TagEntry, ParseError> parseEntry(const wire::common::JsonValue& element) {
+    if (const auto* text = element.get<std::string>()) {
+        return idOrTag(*text, true);
+    }
+    const auto* object = element.get<wire::common::JsonObject>();
+    if (object == nullptr) {
+        return std::unexpected(ParseError::UnsupportedEntry);
+    }
+    const wire::common::JsonValue* id = object->find("id");
+    if (id == nullptr) {
+        return std::unexpected(ParseError::UnsupportedEntry);
+    }
+    const auto* text = id->get<std::string>();
+    if (text == nullptr) {
+        return std::unexpected(ParseError::UnsupportedEntry);
+    }
+    const wire::common::JsonValue* required = object->find("required");
+    const bool* flag = required == nullptr ? nullptr : required->get<bool>();
+    return idOrTag(*text, flag == nullptr || *flag);
+}
+
+} // namespace
+
+std::expected<TagFile, ParseError> parse(const wire::common::JsonValue& root) {
+    const auto* object = root.get<wire::common::JsonObject>();
+    if (object == nullptr) {
+        return std::unexpected(ParseError::NotAnObject);
+    }
+    const wire::common::JsonValue* values = object->find("values");
+    if (values == nullptr) {
+        return std::unexpected(ParseError::MissingValues);
+    }
+    const auto* entries = values->get<std::vector<wire::common::JsonValue>>();
+    if (entries == nullptr) {
+        return std::unexpected(ParseError::MissingValues);
+    }
+    TagFile file;
+    file.entries.reserve(entries->size());
+    for (const wire::common::JsonValue& element : *entries) {
+        const std::expected<TagEntry, ParseError> entry = parseEntry(element);
+        if (!entry.has_value()) {
+            return std::unexpected(entry.error());
+        }
+        file.entries.push_back(*entry);
+    }
+    const wire::common::JsonValue* replace = object->find("replace");
+    const bool* flag = replace == nullptr ? nullptr : replace->get<bool>();
+    file.replace = flag != nullptr && *flag;
+    return file;
+}
+
+std::expected<TagFile, ParseError> parse(std::string_view json) {
+    const std::expected<wire::common::JsonValue, wire::common::JsonError> root = wire::common::parseJson(json);
+    if (!root.has_value()) {
+        return std::unexpected(ParseError::NotAnObject);
+    }
+    return parse(*root);
+}
+
+} // namespace tagFileJson
+
 } // namespace basalt::server::registry::tags

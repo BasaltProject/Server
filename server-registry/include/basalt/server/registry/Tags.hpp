@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/wire/common/Identifier.hpp>
+#include <basalt/wire/common/json/Json.hpp>
 
 #include <expected>
 #include <functional>
@@ -54,5 +55,31 @@ using ElementExists = std::function<bool(const wire::common::Identifier&)>;
 /// always after the ones it refers to.
 [[nodiscard]] std::expected<std::map<wire::common::Identifier, std::set<wire::common::Identifier>>, TagError>
 resolve(const std::map<wire::common::Identifier, TagFile>& files, const ElementExists& elementExists);
+
+/// Reads the real vanilla tag file schema, `{"replace": bool, "values": [...]}`.
+///
+/// Each value is either a plain string (an element, or `#id` for a tag reference, always required)
+/// or `{"id": "...", "required": bool}`, with the same `#` rule and `required` defaulting to true.
+/// parity: `Codec.either(TAG_OR_ELEMENT_ID, FULL_CODEC)`.
+namespace tagFileJson {
+
+/// Why a tag file could not be read. Malformed JSON is refused before this, by the parser.
+enum class ParseError : std::uint8_t {
+    /// The document is not an object at all.
+    NotAnObject,
+    /// No `values`, or it is not an array.
+    MissingValues,
+    /// An entry that is neither a string nor an object with an `id`.
+    UnsupportedEntry,
+    /// An entry naming something that is not a valid identifier.
+    BadIdentifier,
+};
+
+[[nodiscard]] std::expected<TagFile, ParseError> parse(const wire::common::JsonValue& root);
+
+/// The same from the text of the file, which is how one arrives from disk.
+[[nodiscard]] std::expected<TagFile, ParseError> parse(std::string_view json);
+
+} // namespace tagFileJson
 
 } // namespace basalt::server::registry::tags
