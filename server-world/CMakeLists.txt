@@ -15,7 +15,15 @@ basalt_module(server-world
         src/noise/ImprovedNoise.cpp
         src/region/ChunkNbt.cpp
         src/structure/StructureBounds.cpp
-        src/terrain/BiomeClimateData.cpp
+        src/terrain/carver/OverworldCarvers.cpp
+    src/terrain/BiomeClimateData.cpp
+    src/terrain/surface/BadlandsClayBands.cpp
+    src/terrain/surface/SurfaceBuilder.cpp
+    src/terrain/surface/ChunkBiomeEnvironment.cpp
+    src/terrain/surface/SurfaceRuleContext.cpp
+    src/terrain/surface/SurfaceRuleData.cpp
+    src/terrain/surface/SurfaceRuleEnvironment.cpp
+    src/terrain/surface/SurfaceRules.cpp
     src/terrain/BiomeTemperature.cpp
     src/terrain/BiomeZoomer.cpp
     src/terrain/TerrainProvider.cpp
@@ -37,6 +45,18 @@ basalt_test(server-world-noise-test
 basalt_test(server-world-light-test
     SOURCES
         test/LightTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-carver-test
+    SOURCES
+        test/CarverTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-surface-test
+    SOURCES
+        test/SurfaceTest.cpp
     DEPENDS basalt::server-world
 )
 
