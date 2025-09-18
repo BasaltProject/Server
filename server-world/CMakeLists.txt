@@ -18,7 +18,12 @@ basalt_module(server-world
         src/terrain/carver/NetherCaveCarver.cpp
     src/terrain/carver/OverworldCarvers.cpp
     src/terrain/decoration/IntProvider.cpp
+    src/terrain/decoration/OreBlockRules.cpp
+    src/terrain/decoration/OverworldOreConfigs.cpp
+    src/terrain/decoration/OverworldOreDecoration.cpp
+    src/terrain/decoration/PlacementRegion.cpp
     src/terrain/decoration/Placement.cpp
+    src/terrain/decoration/SimpleBlockFeature.cpp
     src/terrain/BiomeClimateData.cpp
     src/terrain/surface/BadlandsClayBands.cpp
     src/terrain/surface/SurfaceBuilder.cpp
@@ -48,6 +53,18 @@ basalt_test(server-world-noise-test
 basalt_test(server-world-light-test
     SOURCES
         test/LightTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-simple-block-test
+    SOURCES
+        test/SimpleBlockTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-ore-test
+    SOURCES
+        test/OreTest.cpp
     DEPENDS basalt::server-world
 )
 
