@@ -25,6 +25,9 @@ basalt_module(server-world
     src/terrain/decoration/OverworldOreConfigs.cpp
     src/terrain/decoration/OverworldOreDecoration.cpp
     src/terrain/decoration/PlacementRegion.cpp
+    src/terrain/decoration/CactusFeature.cpp
+    src/terrain/decoration/PatchRegion.cpp
+    src/terrain/decoration/SurfacePatches.cpp
     src/terrain/decoration/Placement.cpp
     src/terrain/decoration/SimpleBlockFeature.cpp
     src/terrain/BiomeClimateData.cpp
@@ -56,6 +59,18 @@ basalt_test(server-world-noise-test
 basalt_test(server-world-light-test
     SOURCES
         test/LightTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-cactus-test
+    SOURCES
+        test/CactusTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-surface-patch-test
+    SOURCES
+        test/SurfacePatchTest.cpp
     DEPENDS basalt::server-world
 )
 
