@@ -1,4 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "support/DecorationFixture.hpp"
+
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/SurfacePatches.hpp>
@@ -14,52 +16,10 @@
 
 using namespace basalt::server::world;
 using namespace basalt::server::world::terrain::decoration;
+using basalt::server::world::testsupport::stateIdOf;
 namespace registry = basalt::server::registry;
 
 namespace {
-
-[[nodiscard]] std::int32_t stateIdOf(std::string_view path) { return registry::blocks::named(path)->stateId; }
-
-class FakeEnvironment final : public terrain::surface::SurfaceRuleEnvironment {
-public:
-    explicit FakeEnvironment(std::string biome) : biome_(std::move(biome)) {}
-
-    [[nodiscard]] std::int32_t surfaceDepthNoise(std::int32_t, std::int32_t) const override { return 0; }
-
-    [[nodiscard]] double surfaceSecondaryNoise(std::int32_t, std::int32_t) const override { return 0.0; }
-
-    [[nodiscard]] double sample2d(std::string_view, std::int32_t, std::int32_t) const override { return 0.0; }
-
-    [[nodiscard]] double sample3d(std::string_view, std::int32_t, std::int32_t, std::int32_t) const override {
-        return 0.0;
-    }
-
-    [[nodiscard]] float verticalGradientRandom(std::string_view, std::int32_t, std::int32_t,
-                                               std::int32_t) const override {
-        return 0.5F;
-    }
-
-    [[nodiscard]] basalt::server::random::RandomSource positionalRandom(std::int32_t x, std::int32_t,
-                                                                        std::int32_t z) const override {
-        return basalt::server::random::RandomSource::xoroshiro(x * 31LL + z);
-    }
-
-    [[nodiscard]] std::int32_t estimatedSurfaceHeight(std::int32_t, std::int32_t) const override { return 70; }
-
-    [[nodiscard]] const std::string& biomeAt(std::int32_t, std::int32_t, std::int32_t) const override { return biome_; }
-
-    [[nodiscard]] const std::string& noiseBiomeAt(std::int32_t, std::int32_t, std::int32_t,
-                                                  densityfunction::DensityCache*) const override {
-        return biome_;
-    }
-
-    [[nodiscard]] bool isSteep(std::int32_t, std::int32_t) const override { return false; }
-
-    [[nodiscard]] std::int32_t clayBand(std::int32_t, std::int32_t, std::int32_t) const override { return 0; }
-
-private:
-    std::string biome_;
-};
 
 /// Grass on land, water in a basin, so both patches have ground they accept.
 [[nodiscard]] Chunk surfaceChunk(std::int32_t chunkX, std::int32_t chunkZ) {
@@ -77,13 +37,13 @@ private:
 }
 
 [[nodiscard]] std::tuple<std::int32_t, std::size_t, std::int64_t>
-run(std::string_view biome, const std::function<void(Chunk&, const FakeEnvironment&)>& body) {
+run(std::string_view biome, const std::function<void(Chunk&, const testsupport::FixedBiomeEnvironment&)>& body) {
     std::uint64_t checksum = 14695981039346656037ULL;
     std::int32_t placed = 0;
     std::size_t deferred = 0;
     for (std::int32_t index = 0; index < 24; ++index) {
         Chunk chunk = surfaceChunk(index * 3 - 20, 7 - index * 2);
-        const FakeEnvironment environment{std::string{biome}};
+        const testsupport::FixedBiomeEnvironment environment{std::string{biome}};
         body(chunk, environment);
         for (std::int32_t y = 69; y <= 74; ++y) {
             for (std::int32_t z = 0; z < 16; ++z) {
@@ -108,7 +68,7 @@ run(std::string_view biome, const std::function<void(Chunk&, const FakeEnvironme
 TEST_CASE("the step-9 surface patches place what the frozen kotlin places") {
     SUBCASE("waterlily") {
         const auto [placed, deferred, checksum] =
-            run("minecraft:swamp", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:swamp", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 waterlilyPatchDecoration::decorate(chunk, 918273LL, environment);
             });
         CHECK(placed == 44);
@@ -118,7 +78,7 @@ TEST_CASE("the step-9 surface patches place what the frozen kotlin places") {
 
     SUBCASE("waterlilyWrongBiome") {
         const auto [placed, deferred, checksum] =
-            run("minecraft:plains", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:plains", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 waterlilyPatchDecoration::decorate(chunk, 918273LL, environment);
             });
         CHECK(placed == 0);
@@ -128,7 +88,7 @@ TEST_CASE("the step-9 surface patches place what the frozen kotlin places") {
 
     SUBCASE("leafLitter") {
         const auto [placed, deferred, checksum] =
-            run("minecraft:dark_forest", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:dark_forest", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 leafLitterPatchDecoration::decorate(chunk, 918273LL, environment);
             });
         CHECK(placed == 145);
@@ -138,7 +98,7 @@ TEST_CASE("the step-9 surface patches place what the frozen kotlin places") {
 
     SUBCASE("waterlilyRegional") {
         const auto [placed, deferred, checksum] =
-            run("minecraft:swamp", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:swamp", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 waterlilyPatchDecoration::decorate(
                     chunk, 918273LL, environment,
                     [](std::int32_t, std::int32_t y, std::int32_t) -> std::optional<std::int32_t> {
@@ -155,7 +115,7 @@ TEST_CASE("the step-9 surface patches place what the frozen kotlin places") {
 
     SUBCASE("leafLitterRegional") {
         const auto [placed, deferred, checksum] =
-            run("minecraft:dark_forest", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:dark_forest", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 leafLitterPatchDecoration::decorate(
                     chunk, 918273LL, environment,
                     [](std::int32_t, std::int32_t y, std::int32_t) -> std::optional<std::int32_t> {

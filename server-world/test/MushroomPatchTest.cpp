@@ -1,4 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "support/DecorationFixture.hpp"
+
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/MushroomPatchDecoration.hpp>
@@ -15,52 +17,10 @@
 
 using namespace basalt::server::world;
 using namespace basalt::server::world::terrain::decoration;
+using basalt::server::world::testsupport::stateIdOf;
 namespace registry = basalt::server::registry;
 
 namespace {
-
-[[nodiscard]] std::int32_t stateIdOf(std::string_view path) { return registry::blocks::named(path)->stateId; }
-
-class FakeEnvironment final : public terrain::surface::SurfaceRuleEnvironment {
-public:
-    explicit FakeEnvironment(std::string biome) : biome_(std::move(biome)) {}
-
-    [[nodiscard]] std::int32_t surfaceDepthNoise(std::int32_t, std::int32_t) const override { return 0; }
-
-    [[nodiscard]] double surfaceSecondaryNoise(std::int32_t, std::int32_t) const override { return 0.0; }
-
-    [[nodiscard]] double sample2d(std::string_view, std::int32_t, std::int32_t) const override { return 0.0; }
-
-    [[nodiscard]] double sample3d(std::string_view, std::int32_t, std::int32_t, std::int32_t) const override {
-        return 0.0;
-    }
-
-    [[nodiscard]] float verticalGradientRandom(std::string_view, std::int32_t, std::int32_t,
-                                               std::int32_t) const override {
-        return 0.5F;
-    }
-
-    [[nodiscard]] basalt::server::random::RandomSource positionalRandom(std::int32_t x, std::int32_t,
-                                                                        std::int32_t z) const override {
-        return basalt::server::random::RandomSource::xoroshiro(x * 31LL + z);
-    }
-
-    [[nodiscard]] std::int32_t estimatedSurfaceHeight(std::int32_t, std::int32_t) const override { return 70; }
-
-    [[nodiscard]] const std::string& biomeAt(std::int32_t, std::int32_t, std::int32_t) const override { return biome_; }
-
-    [[nodiscard]] const std::string& noiseBiomeAt(std::int32_t, std::int32_t, std::int32_t,
-                                                  densityfunction::DensityCache*) const override {
-        return biome_;
-    }
-
-    [[nodiscard]] bool isSteep(std::int32_t, std::int32_t) const override { return false; }
-
-    [[nodiscard]] std::int32_t clayBand(std::int32_t, std::int32_t, std::int32_t) const override { return 0; }
-
-private:
-    std::string biome_;
-};
 
 /// A stripe of non-solid-render top blocks beside solid ones: mushrooms test isSolidRender, so a
 /// uniformly solid floor would never exercise the rejection half of that check.
@@ -102,14 +62,15 @@ private:
 /// wider sample than the rest before they fire at all, and making every case pay for that made the
 /// suite six times slower for no extra coverage.
 [[nodiscard]] std::tuple<std::int32_t, std::int32_t, std::size_t, std::int64_t>
-run(std::string_view biome, std::int32_t chunks, const std::function<void(Chunk&, const FakeEnvironment&)>& body) {
+run(std::string_view biome, std::int32_t chunks,
+    const std::function<void(Chunk&, const testsupport::FixedBiomeEnvironment&)>& body) {
     std::uint64_t checksum = 14695981039346656037ULL;
     std::int32_t brown = 0;
     std::int32_t red = 0;
     std::size_t deferred = 0;
     for (std::int32_t index = 0; index < chunks; ++index) {
         Chunk chunk = groundChunk(index * 3 - 70, index * -5 + 25);
-        const FakeEnvironment environment{std::string{biome}};
+        const testsupport::FixedBiomeEnvironment environment{std::string{biome}};
         body(chunk, environment);
         const auto [chunkChecksum, chunkBrown, chunkRed] = fold(chunk);
         checksum = (checksum ^ static_cast<std::uint64_t>(chunkChecksum)) * 1099511628211ULL;
@@ -125,7 +86,7 @@ run(std::string_view biome, std::int32_t chunks, const std::function<void(Chunk&
 TEST_CASE("the mushroom patches place what the frozen kotlin places") {
     SUBCASE("swamp") {
         const auto [brown, red, deferred, checksum] =
-            run("minecraft:swamp", 150, [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:swamp", 150, [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 mushroomPatchDecoration::decorate(chunk, 424242LL, environment);
             });
         CHECK(brown == 3403);
@@ -136,9 +97,10 @@ TEST_CASE("the mushroom patches place what the frozen kotlin places") {
 
     SUBCASE("oldGrowth") {
         const auto [brown, red, deferred, checksum] =
-            run("minecraft:old_growth_pine_taiga", 150, [](Chunk& chunk, const FakeEnvironment& environment) {
-                mushroomPatchDecoration::decorate(chunk, 424242LL, environment);
-            });
+            run("minecraft:old_growth_pine_taiga", 150,
+                [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
+                    mushroomPatchDecoration::decorate(chunk, 424242LL, environment);
+                });
         CHECK(brown == 1458);
         CHECK(red == 0);
         CHECK(deferred == 0);
@@ -147,7 +109,7 @@ TEST_CASE("the mushroom patches place what the frozen kotlin places") {
 
     SUBCASE("taiga") {
         const auto [brown, red, deferred, checksum] =
-            run("minecraft:taiga", 150, [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:taiga", 150, [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 mushroomPatchDecoration::decorate(chunk, 424242LL, environment);
             });
         CHECK(brown == 408);
@@ -158,7 +120,7 @@ TEST_CASE("the mushroom patches place what the frozen kotlin places") {
 
     SUBCASE("normal") {
         const auto [brown, red, deferred, checksum] =
-            run("minecraft:plains", 900, [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:plains", 900, [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 mushroomPatchDecoration::decorate(chunk, 424242LL, environment);
             });
         CHECK(brown == 57);
@@ -170,7 +132,7 @@ TEST_CASE("the mushroom patches place what the frozen kotlin places") {
     SUBCASE("wrong") {
         // lush_caves is in none of the four lists, so this is the real rejection case.
         const auto [brown, red, deferred, checksum] =
-            run("minecraft:lush_caves", 900, [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:lush_caves", 900, [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 mushroomPatchDecoration::decorate(chunk, 424242LL, environment);
             });
         CHECK(brown == 0);
@@ -181,7 +143,7 @@ TEST_CASE("the mushroom patches place what the frozen kotlin places") {
 
     SUBCASE("before") {
         const auto [brown, red, deferred, checksum] =
-            run("minecraft:swamp", 150, [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:swamp", 150, [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 mushroomPatchDecoration::decorateBeforeMushroomIsland(chunk, 424242LL, environment);
             });
         CHECK(brown == 3403);
@@ -192,7 +154,7 @@ TEST_CASE("the mushroom patches place what the frozen kotlin places") {
 
     SUBCASE("after") {
         const auto [brown, red, deferred, checksum] =
-            run("minecraft:taiga", 150, [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:taiga", 150, [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 mushroomPatchDecoration::decorateAfterMushroomIsland(chunk, 424242LL, environment);
             });
         CHECK(brown == 408);
@@ -203,7 +165,7 @@ TEST_CASE("the mushroom patches place what the frozen kotlin places") {
 
     SUBCASE("swampBrownOnly") {
         const auto [brown, red, deferred, checksum] =
-            run("minecraft:swamp", 150, [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:swamp", 150, [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 mushroomPatchDecoration::decorateFeature(chunk, 424242LL, environment, "brown_mushroom_swamp");
             });
         CHECK(brown == 3403);
@@ -214,7 +176,7 @@ TEST_CASE("the mushroom patches place what the frozen kotlin places") {
 
     SUBCASE("regional") {
         const auto [brown, red, deferred, checksum] =
-            run("minecraft:swamp", 150, [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:swamp", 150, [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 mushroomPatchDecoration::decorate(
                     chunk, 424242LL, environment,
                     [](std::int32_t, std::int32_t y, std::int32_t) -> std::optional<std::int32_t> {

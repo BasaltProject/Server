@@ -1,4 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "support/DecorationFixture.hpp"
+
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/OverworldOreDecoration.hpp>
@@ -13,52 +15,10 @@
 
 using namespace basalt::server::world;
 using namespace basalt::server::world::terrain::decoration;
+using basalt::server::world::testsupport::stateIdOf;
 namespace registry = basalt::server::registry;
 
 namespace {
-
-[[nodiscard]] std::int32_t stateIdOf(std::string_view path) { return registry::blocks::named(path)->stateId; }
-
-class FakeEnvironment final : public terrain::surface::SurfaceRuleEnvironment {
-public:
-    explicit FakeEnvironment(std::string biome) : biome_(std::move(biome)) {}
-
-    [[nodiscard]] std::int32_t surfaceDepthNoise(std::int32_t, std::int32_t) const override { return 0; }
-
-    [[nodiscard]] double surfaceSecondaryNoise(std::int32_t, std::int32_t) const override { return 0.0; }
-
-    [[nodiscard]] double sample2d(std::string_view, std::int32_t, std::int32_t) const override { return 0.0; }
-
-    [[nodiscard]] double sample3d(std::string_view, std::int32_t, std::int32_t, std::int32_t) const override {
-        return 0.0;
-    }
-
-    [[nodiscard]] float verticalGradientRandom(std::string_view, std::int32_t, std::int32_t,
-                                               std::int32_t) const override {
-        return 0.5F;
-    }
-
-    [[nodiscard]] basalt::server::random::RandomSource positionalRandom(std::int32_t x, std::int32_t,
-                                                                        std::int32_t z) const override {
-        return basalt::server::random::RandomSource::xoroshiro(x * 31LL + z);
-    }
-
-    [[nodiscard]] std::int32_t estimatedSurfaceHeight(std::int32_t, std::int32_t) const override { return 100; }
-
-    [[nodiscard]] const std::string& biomeAt(std::int32_t, std::int32_t, std::int32_t) const override { return biome_; }
-
-    [[nodiscard]] const std::string& noiseBiomeAt(std::int32_t, std::int32_t, std::int32_t,
-                                                  densityfunction::DensityCache*) const override {
-        return biome_;
-    }
-
-    [[nodiscard]] bool isSteep(std::int32_t, std::int32_t) const override { return false; }
-
-    [[nodiscard]] std::int32_t clayBand(std::int32_t, std::int32_t, std::int32_t) const override { return 0; }
-
-private:
-    std::string biome_;
-};
 
 [[nodiscard]] Chunk stockedChunk() {
     Chunk chunk{-4, 6};
@@ -114,7 +74,7 @@ private:
 TEST_CASE("the underground ores step fills the same chunk as the frozen kotlin") {
     SUBCASE("plains") {
         Chunk chunk = stockedChunk();
-        const FakeEnvironment environment{"minecraft:plains"};
+        const testsupport::FixedBiomeEnvironment environment{"minecraft:plains"};
         overworldOreDecoration::decorate(chunk, 77777LL, environment);
         const auto [checksum, deferred, counts] = report(chunk);
         CHECK(counts == "coal_ore:274,copper_ore:87,deepslate_copper_ore:25,deepslate_diamond_ore:22,deepslate_gold_"
@@ -126,7 +86,7 @@ TEST_CASE("the underground ores step fills the same chunk as the frozen kotlin")
 
     SUBCASE("dripstone_caves") {
         Chunk chunk = stockedChunk();
-        const FakeEnvironment environment{"minecraft:dripstone_caves"};
+        const testsupport::FixedBiomeEnvironment environment{"minecraft:dripstone_caves"};
         overworldOreDecoration::decorate(chunk, 77777LL, environment);
         const auto [checksum, deferred, counts] = report(chunk);
         CHECK(counts == "coal_ore:274,copper_ore:479,deepslate_diamond_ore:22,deepslate_gold_ore:17,deepslate_iron_ore:"
@@ -138,7 +98,7 @@ TEST_CASE("the underground ores step fills the same chunk as the frozen kotlin")
 
     SUBCASE("badlands") {
         Chunk chunk = stockedChunk();
-        const FakeEnvironment environment{"minecraft:badlands"};
+        const testsupport::FixedBiomeEnvironment environment{"minecraft:badlands"};
         overworldOreDecoration::decorate(chunk, 77777LL, environment);
         const auto [checksum, deferred, counts] = report(chunk);
         CHECK(counts == "coal_ore:274,copper_ore:87,deepslate_copper_ore:25,deepslate_diamond_ore:22,deepslate_gold_"
@@ -150,7 +110,7 @@ TEST_CASE("the underground ores step fills the same chunk as the frozen kotlin")
 
     SUBCASE("infested") {
         Chunk chunk = stockedChunk();
-        const FakeEnvironment environment{"minecraft:grove"};
+        const testsupport::FixedBiomeEnvironment environment{"minecraft:grove"};
         overworldOreDecoration::decorateInfested(chunk, 77777LL, environment);
         const auto [checksum, deferred, counts] = report(chunk);
         CHECK(counts == "dirt:256");
@@ -162,7 +122,7 @@ TEST_CASE("the underground ores step fills the same chunk as the frozen kotlin")
         // With a region behind it every blob keeps the part that falls outside the chunk, which is
         // the deferred pipeline and about a third of a large vein.
         Chunk chunk = stockedChunk();
-        const FakeEnvironment environment{"minecraft:plains"};
+        const testsupport::FixedBiomeEnvironment environment{"minecraft:plains"};
         overworldOreDecoration::decorate(
             chunk, 77777LL, environment, [](std::int32_t, std::int32_t) -> std::optional<std::int32_t> { return 100; },
             [](std::int32_t, std::int32_t y, std::int32_t) -> std::optional<std::int32_t> {

@@ -1,4 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "support/DecorationFixture.hpp"
+
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/MelonPatchDecoration.hpp>
@@ -15,52 +17,10 @@
 
 using namespace basalt::server::world;
 using namespace basalt::server::world::terrain::decoration;
+using basalt::server::world::testsupport::stateIdOf;
 namespace registry = basalt::server::registry;
 
 namespace {
-
-[[nodiscard]] std::int32_t stateIdOf(std::string_view path) { return registry::blocks::named(path)->stateId; }
-
-class FakeEnvironment final : public terrain::surface::SurfaceRuleEnvironment {
-public:
-    explicit FakeEnvironment(std::string biome) : biome_(std::move(biome)) {}
-
-    [[nodiscard]] std::int32_t surfaceDepthNoise(std::int32_t, std::int32_t) const override { return 0; }
-
-    [[nodiscard]] double surfaceSecondaryNoise(std::int32_t, std::int32_t) const override { return 0.0; }
-
-    [[nodiscard]] double sample2d(std::string_view, std::int32_t, std::int32_t) const override { return 0.0; }
-
-    [[nodiscard]] double sample3d(std::string_view, std::int32_t, std::int32_t, std::int32_t) const override {
-        return 0.0;
-    }
-
-    [[nodiscard]] float verticalGradientRandom(std::string_view, std::int32_t, std::int32_t,
-                                               std::int32_t) const override {
-        return 0.5F;
-    }
-
-    [[nodiscard]] basalt::server::random::RandomSource positionalRandom(std::int32_t x, std::int32_t,
-                                                                        std::int32_t z) const override {
-        return basalt::server::random::RandomSource::xoroshiro(x * 31LL + z);
-    }
-
-    [[nodiscard]] std::int32_t estimatedSurfaceHeight(std::int32_t, std::int32_t) const override { return 70; }
-
-    [[nodiscard]] const std::string& biomeAt(std::int32_t, std::int32_t, std::int32_t) const override { return biome_; }
-
-    [[nodiscard]] const std::string& noiseBiomeAt(std::int32_t, std::int32_t, std::int32_t,
-                                                  densityfunction::DensityCache*) const override {
-        return biome_;
-    }
-
-    [[nodiscard]] bool isSteep(std::int32_t, std::int32_t) const override { return false; }
-
-    [[nodiscard]] std::int32_t clayBand(std::int32_t, std::int32_t, std::int32_t) const override { return 0; }
-
-private:
-    std::string biome_;
-};
 
 /// Grass floor with a stripe of soft cover above it: a melon replaces more than air, so a chunk of
 /// bare air would never exercise the replaceable list at all.
@@ -101,13 +61,13 @@ private:
 }
 
 [[nodiscard]] std::tuple<std::int32_t, std::size_t, std::int64_t>
-run(std::string_view biome, const std::function<void(Chunk&, const FakeEnvironment&)>& body) {
+run(std::string_view biome, const std::function<void(Chunk&, const testsupport::FixedBiomeEnvironment&)>& body) {
     std::uint64_t checksum = 14695981039346656037ULL;
     std::int32_t melons = 0;
     std::size_t deferred = 0;
     for (std::int32_t index = 0; index < 200; ++index) {
         Chunk chunk = jungleChunk(index * 3 - 90, index * -7 + 30);
-        const FakeEnvironment environment{std::string{biome}};
+        const testsupport::FixedBiomeEnvironment environment{std::string{biome}};
         body(chunk, environment);
         const auto [chunkChecksum, chunkMelons] = fold(chunk);
         checksum = (checksum ^ static_cast<std::uint64_t>(chunkChecksum)) * 1099511628211ULL;
@@ -122,7 +82,7 @@ run(std::string_view biome, const std::function<void(Chunk&, const FakeEnvironme
 TEST_CASE("the melon patches place what the frozen kotlin places") {
     SUBCASE("jungle") {
         const auto [melons, deferred, checksum] =
-            run("minecraft:jungle", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:jungle", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 melonPatchDecoration::decorate(chunk, 246810LL, environment);
             });
         CHECK(melons == 386);
@@ -132,7 +92,7 @@ TEST_CASE("the melon patches place what the frozen kotlin places") {
 
     SUBCASE("bambooJungle") {
         const auto [melons, deferred, checksum] =
-            run("minecraft:bamboo_jungle", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:bamboo_jungle", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 melonPatchDecoration::decorate(chunk, 246810LL, environment);
             });
         CHECK(melons == 386);
@@ -142,7 +102,7 @@ TEST_CASE("the melon patches place what the frozen kotlin places") {
 
     SUBCASE("sparseJungle") {
         const auto [melons, deferred, checksum] =
-            run("minecraft:sparse_jungle", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:sparse_jungle", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 melonPatchDecoration::decorate(chunk, 246810LL, environment);
             });
         CHECK(melons == 59);
@@ -153,7 +113,7 @@ TEST_CASE("the melon patches place what the frozen kotlin places") {
     SUBCASE("wrong") {
         // plains is in neither spec's list, so this is the real rejection case.
         const auto [melons, deferred, checksum] =
-            run("minecraft:plains", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:plains", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 melonPatchDecoration::decorate(chunk, 246810LL, environment);
             });
         CHECK(melons == 0);
@@ -163,7 +123,7 @@ TEST_CASE("the melon patches place what the frozen kotlin places") {
 
     SUBCASE("sparseOnly") {
         const auto [melons, deferred, checksum] =
-            run("minecraft:sparse_jungle", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:sparse_jungle", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 melonPatchDecoration::decorateFeature(chunk, 246810LL, environment, "patch_melon_sparse");
             });
         CHECK(melons == 59);
@@ -173,7 +133,7 @@ TEST_CASE("the melon patches place what the frozen kotlin places") {
 
     SUBCASE("regional") {
         const auto [melons, deferred, checksum] =
-            run("minecraft:jungle", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:jungle", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 melonPatchDecoration::decorate(
                     chunk, 246810LL, environment,
                     [](std::int32_t, std::int32_t y, std::int32_t) -> std::optional<std::int32_t> {

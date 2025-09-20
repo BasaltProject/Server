@@ -17,10 +17,12 @@ basalt_module(server-world
         src/structure/StructureBounds.cpp
         src/terrain/carver/NetherCaveCarver.cpp
     src/terrain/carver/OverworldCarvers.cpp
+    src/terrain/decoration/AquaticPatchDecoration.cpp
     src/terrain/decoration/BiomeDecoration.cpp
     src/terrain/decoration/FireflyBushPatchDecoration.cpp
     src/terrain/decoration/FlowerVegetation.cpp
     src/terrain/decoration/GrassScatterPatches.cpp
+    src/terrain/decoration/GrassPatchDecoration.cpp
     src/terrain/decoration/GroundPlantPatchDecoration.cpp
     src/terrain/decoration/GroundVegetation.cpp
     src/terrain/decoration/IntProvider.cpp
@@ -68,6 +70,18 @@ basalt_test(server-world-noise-test
 basalt_test(server-world-light-test
     SOURCES
         test/LightTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-grass-patch-test
+    SOURCES
+        test/GrassPatchTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-aquatic-test
+    SOURCES
+        test/AquaticTest.cpp
     DEPENDS basalt::server-world
 )
 

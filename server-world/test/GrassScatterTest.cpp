@@ -1,4 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "support/DecorationFixture.hpp"
+
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/GrassScatterPatches.hpp>
@@ -15,52 +17,10 @@
 
 using namespace basalt::server::world;
 using namespace basalt::server::world::terrain::decoration;
+using basalt::server::world::testsupport::stateIdOf;
 namespace registry = basalt::server::registry;
 
 namespace {
-
-[[nodiscard]] std::int32_t stateIdOf(std::string_view path) { return registry::blocks::named(path)->stateId; }
-
-class FakeEnvironment final : public terrain::surface::SurfaceRuleEnvironment {
-public:
-    explicit FakeEnvironment(std::string biome) : biome_(std::move(biome)) {}
-
-    [[nodiscard]] std::int32_t surfaceDepthNoise(std::int32_t, std::int32_t) const override { return 0; }
-
-    [[nodiscard]] double surfaceSecondaryNoise(std::int32_t, std::int32_t) const override { return 0.0; }
-
-    [[nodiscard]] double sample2d(std::string_view, std::int32_t, std::int32_t) const override { return 0.0; }
-
-    [[nodiscard]] double sample3d(std::string_view, std::int32_t, std::int32_t, std::int32_t) const override {
-        return 0.0;
-    }
-
-    [[nodiscard]] float verticalGradientRandom(std::string_view, std::int32_t, std::int32_t,
-                                               std::int32_t) const override {
-        return 0.5F;
-    }
-
-    [[nodiscard]] basalt::server::random::RandomSource positionalRandom(std::int32_t x, std::int32_t,
-                                                                        std::int32_t z) const override {
-        return basalt::server::random::RandomSource::xoroshiro(x * 31LL + z);
-    }
-
-    [[nodiscard]] std::int32_t estimatedSurfaceHeight(std::int32_t, std::int32_t) const override { return 70; }
-
-    [[nodiscard]] const std::string& biomeAt(std::int32_t, std::int32_t, std::int32_t) const override { return biome_; }
-
-    [[nodiscard]] const std::string& noiseBiomeAt(std::int32_t, std::int32_t, std::int32_t,
-                                                  densityfunction::DensityCache*) const override {
-        return biome_;
-    }
-
-    [[nodiscard]] bool isSteep(std::int32_t, std::int32_t) const override { return false; }
-
-    [[nodiscard]] std::int32_t clayBand(std::int32_t, std::int32_t, std::int32_t) const override { return 0; }
-
-private:
-    std::string biome_;
-};
 
 [[nodiscard]] Chunk grassChunk(std::int32_t chunkX, std::int32_t chunkZ) {
     Chunk chunk{chunkX, chunkZ};
@@ -98,13 +58,13 @@ private:
 /// Over many chunks with spaced seeds: rarity here runs to 1/384 and 1/300, and sequential legacy
 /// seeds leave the very draw those filters read correlated.
 [[nodiscard]] std::tuple<std::int32_t, std::size_t, std::int64_t>
-run(std::string_view biome, const std::function<void(Chunk&, const FakeEnvironment&)>& body) {
+run(std::string_view biome, const std::function<void(Chunk&, const testsupport::FixedBiomeEnvironment&)>& body) {
     std::uint64_t checksum = 14695981039346656037ULL;
     std::int32_t placed = 0;
     std::size_t deferred = 0;
     for (std::int32_t index = 0; index < 600; ++index) {
         Chunk chunk = grassChunk(index * 3 - 100, index * -7 + 50);
-        const FakeEnvironment environment{std::string{biome}};
+        const testsupport::FixedBiomeEnvironment environment{std::string{biome}};
         body(chunk, environment);
         const auto [chunkChecksum, chunkPlaced] = fold(chunk);
         checksum = (checksum ^ static_cast<std::uint64_t>(chunkChecksum)) * 1099511628211ULL;
@@ -119,7 +79,7 @@ run(std::string_view biome, const std::function<void(Chunk&, const FakeEnvironme
 TEST_CASE("the berry and pumpkin patches place what the frozen kotlin places") {
     SUBCASE("berryTaiga") {
         const auto [placed, deferred, checksum] =
-            run("minecraft:taiga", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:taiga", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 berryPatchDecoration::decorate(chunk, 606060LL, environment);
             });
         CHECK(placed == 278);
@@ -129,7 +89,7 @@ TEST_CASE("the berry and pumpkin patches place what the frozen kotlin places") {
 
     SUBCASE("berrySnowy") {
         const auto [placed, deferred, checksum] =
-            run("minecraft:snowy_taiga", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:snowy_taiga", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 berryPatchDecoration::decorate(chunk, 606060LL, environment);
             });
         CHECK(placed == 14);
@@ -139,7 +99,7 @@ TEST_CASE("the berry and pumpkin patches place what the frozen kotlin places") {
 
     SUBCASE("berryWrong") {
         const auto [placed, deferred, checksum] =
-            run("minecraft:desert", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:desert", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 berryPatchDecoration::decorate(chunk, 606060LL, environment);
             });
         CHECK(placed == 0);
@@ -149,7 +109,7 @@ TEST_CASE("the berry and pumpkin patches place what the frozen kotlin places") {
 
     SUBCASE("berryCommonOnly") {
         const auto [placed, deferred, checksum] =
-            run("minecraft:taiga", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:taiga", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 berryPatchDecoration::decorateFeature(chunk, 606060LL, environment, "patch_berry_common");
             });
         CHECK(placed == 278);
@@ -159,7 +119,7 @@ TEST_CASE("the berry and pumpkin patches place what the frozen kotlin places") {
 
     SUBCASE("pumpkin") {
         const auto [placed, deferred, checksum] =
-            run("minecraft:plains", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:plains", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 pumpkinPatchDecoration::decorate(chunk, 606060LL, environment);
             });
         CHECK(placed == 25);
@@ -171,7 +131,7 @@ TEST_CASE("the berry and pumpkin patches place what the frozen kotlin places") {
         // mushroom_fields is genuinely absent from the pumpkin list; desert is in it, so using
         // desert here would have tested acceptance twice and rejection never.
         const auto [placed, deferred, checksum] =
-            run("minecraft:mushroom_fields", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:mushroom_fields", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 pumpkinPatchDecoration::decorate(chunk, 606060LL, environment);
             });
         CHECK(placed == 0);
@@ -181,7 +141,7 @@ TEST_CASE("the berry and pumpkin patches place what the frozen kotlin places") {
 
     SUBCASE("berryRegional") {
         const auto [placed, deferred, checksum] =
-            run("minecraft:taiga", [](Chunk& chunk, const FakeEnvironment& environment) {
+            run("minecraft:taiga", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 berryPatchDecoration::decorate(
                     chunk, 606060LL, environment,
                     [](std::int32_t, std::int32_t y, std::int32_t) -> std::optional<std::int32_t> {
