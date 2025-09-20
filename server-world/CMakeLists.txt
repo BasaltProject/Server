@@ -27,6 +27,9 @@ basalt_module(server-world
     src/terrain/decoration/OverworldOreDecoration.cpp
     src/terrain/decoration/PlacementRegion.cpp
     src/terrain/decoration/CactusFeature.cpp
+    src/terrain/decoration/MelonPatchDecoration.cpp
+    src/terrain/decoration/DoublePlantPatchDecoration.cpp
+    src/terrain/decoration/MushroomPatchDecoration.cpp
     src/terrain/decoration/PatchRegion.cpp
     src/terrain/decoration/SugarCanePatchDecoration.cpp
     src/terrain/decoration/SurfacePatches.cpp
@@ -61,6 +64,24 @@ basalt_test(server-world-noise-test
 basalt_test(server-world-light-test
     SOURCES
         test/LightTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-mushroom-patch-test
+    SOURCES
+        test/MushroomPatchTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-double-plant-test
+    SOURCES
+        test/DoublePlantTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-melon-test
+    SOURCES
+        test/MelonTest.cpp
     DEPENDS basalt::server-world
 )
 
