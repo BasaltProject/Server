@@ -103,7 +103,10 @@ std::int32_t Chunk::blockStateId(std::int32_t x, std::int32_t y, std::int32_t z)
 bool Chunk::setBlockStateId(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
     ChunkSection& section = sections_[sectionIndexFor(y)];
     if (!blockEntities_.empty() && changesBlock(section.blockStateId(x, y & 15, z), stateId)) {
-        blockEntities_.erase(blockEntityKey(x, y, z));
+        const std::int32_t removedKey = blockEntityKey(x, y, z);
+        if (blockEntities_.erase(removedKey) != 0) {
+            std::erase(blockEntityOrder_, removedKey);
+        }
     }
     if (!section.setBlockStateId(x, y & 15, z, stateId)) {
         return false;
@@ -203,7 +206,9 @@ void Chunk::setBlockEntity(ChunkBlockEntity blockEntity) {
         throw std::out_of_range{"block entity outside chunk bounds"};
     }
     const std::int32_t key = blockEntityKey(blockEntity.localX(), blockEntity.y(), blockEntity.localZ());
-    blockEntities_.insert_or_assign(key, std::move(blockEntity));
+    if (blockEntities_.insert_or_assign(key, std::move(blockEntity)).second) {
+        blockEntityOrder_.push_back(key);
+    }
     dirty_ = true;
 }
 
@@ -215,8 +220,8 @@ const ChunkBlockEntity* Chunk::blockEntityAt(std::int32_t localX, std::int32_t y
 std::vector<ChunkBlockEntity> Chunk::blockEntities() const {
     std::vector<ChunkBlockEntity> all;
     all.reserve(blockEntities_.size());
-    for (const auto& [key, entity] : blockEntities_) {
-        all.push_back(entity);
+    for (const std::int32_t key : blockEntityOrder_) {
+        all.push_back(blockEntities_.at(key));
     }
     return all;
 }
