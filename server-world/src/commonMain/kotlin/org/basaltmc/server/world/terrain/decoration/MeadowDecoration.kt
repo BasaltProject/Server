@@ -138,4 +138,7 @@ public object MeadowDecoration : BiomeVegetalDecoration {
             .map(::stateId)
     private val fastNoise = NormalNoise.create(LegacyRandom(2345L), -3, doubleArrayOf(1.0))
     private val slowNoise = NormalNoise.create(LegacyRandom(2345L), -10, doubleArrayOf(1.0))
+
+    internal fun flowerStateAtForTest(position: DecorationPos): Int = flowerStateAt(position)
+
 }
