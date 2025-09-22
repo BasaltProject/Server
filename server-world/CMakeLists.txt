@@ -20,6 +20,7 @@ basalt_module(server-world
     src/terrain/decoration/AquaticPatchDecoration.cpp
     src/terrain/decoration/BiomeDecoration.cpp
     src/terrain/decoration/FireflyBushPatchDecoration.cpp
+    src/terrain/decoration/FlowerFeatures.cpp
     src/terrain/decoration/FlowerVegetation.cpp
     src/terrain/decoration/GrassScatterPatches.cpp
     src/terrain/decoration/GrassPatchDecoration.cpp
@@ -36,6 +37,7 @@ basalt_module(server-world
     src/terrain/decoration/DoublePlantPatchDecoration.cpp
     src/terrain/decoration/MushroomPatchDecoration.cpp
     src/terrain/decoration/PatchRegion.cpp
+    src/terrain/decoration/TallGrassDecoration.cpp
     src/terrain/decoration/VinePatchDecoration.cpp
     src/terrain/decoration/SugarCanePatchDecoration.cpp
     src/terrain/decoration/SurfacePatches.cpp
@@ -70,6 +72,18 @@ basalt_test(server-world-noise-test
 basalt_test(server-world-light-test
     SOURCES
         test/LightTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-flower-features-test
+    SOURCES
+        test/FlowerFeaturesTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-tall-grass-test
+    SOURCES
+        test/TallGrassTest.cpp
     DEPENDS basalt::server-world
 )
 
