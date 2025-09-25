@@ -122,6 +122,24 @@ TEST_CASE("the ground vegetation patches place what the frozen kotlin places") {
         CHECK(after == -789243648);
     }
 
+    SUBCASE("desert") {
+        const auto [plants, checksum, after] = run([](Chunk& chunk, basalt::server::random::RandomSource& random) {
+            desertDecoration::decoration()(chunk, random);
+        });
+        CHECK(plants == 9);
+        CHECK(checksum == -425545100770606844LL);
+        CHECK(after == -324137968);
+    }
+
+    SUBCASE("desertAt") {
+        const auto [plants, checksum, after] = run([](Chunk& chunk, basalt::server::random::RandomSource& random) {
+            desertDecoration::placeAt(chunk, random, DecorationPos{40, 70, -40});
+        });
+        CHECK(plants == 2);
+        CHECK(checksum == 4952213802481860123LL);
+        CHECK(after == 103831914);
+    }
+
     SUBCASE("badlands") {
         const auto [plants, checksum, after] = run([](Chunk& chunk, basalt::server::random::RandomSource& random) {
             badlandsDecoration::decoration()(chunk, random);

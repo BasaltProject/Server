@@ -39,6 +39,7 @@ basalt_module(server-world
     src/terrain/decoration/PlacementRegion.cpp
     src/terrain/decoration/BushPatchDecoration.cpp
     src/terrain/decoration/CactusFeature.cpp
+    src/terrain/decoration/JungleFeatures.cpp
     src/terrain/decoration/MelonPatchDecoration.cpp
     src/terrain/decoration/CaveVineColumnFeature.cpp
     src/terrain/decoration/DesertWellDecoration.cpp
@@ -82,6 +83,12 @@ basalt_test(server-world-noise-test
 basalt_test(server-world-light-test
     SOURCES
         test/LightTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-jungle-features-test
+    SOURCES
+        test/JungleFeaturesTest.cpp
     DEPENDS basalt::server-world
 )
 

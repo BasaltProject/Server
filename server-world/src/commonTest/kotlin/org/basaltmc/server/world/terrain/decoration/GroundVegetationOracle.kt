@@ -55,6 +55,8 @@ class GroundVegetationOracle {
         report("dryDesert") { c, r -> DryGrassDecoration.DESERT.decorate(c, r) }
         report("dryBadlands") { c, r -> DryGrassDecoration.BADLANDS.decorate(c, r) }
         report("badlands") { c, r -> BadlandsDecoration.decorate(c, r) }
+        report("desert") { c, r -> DesertDecoration.decorate(c, r) }
+        report("desertAt") { c, r -> DesertDecoration.placeAt(c, r, DecorationPos(40, 70, -40)) }
         report("dryAt") { c, r -> DryGrassDecoration.placeAt(c, r, DecorationPos(40, 72, -40)) }
         report("flowerAt") { c, r -> DefaultVegetationDecoration.placeDefaultPatchAt(c, r, DecorationPos(40, 72, -40)) }
         report("combined") { c, r ->
