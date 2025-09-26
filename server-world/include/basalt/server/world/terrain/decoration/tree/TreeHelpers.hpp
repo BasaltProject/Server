@@ -1,0 +1,30 @@
+#pragma once
+
+#include <basalt/server/world/Chunk.hpp>
+
+#include <array>
+#include <cstdint>
+
+namespace basalt::server::world::terrain::decoration::tree {
+
+/// parity: `Direction.Plane.HORIZONTAL` in declaration order, which is what `random.nextInt(4)`
+/// indexes into. Reordering this rotates every tree that leans.
+struct HorizontalDirection {
+    std::int32_t dx = 0;
+    std::int32_t dz = 0;
+
+    friend bool operator==(const HorizontalDirection&, const HorizontalDirection&) = default;
+};
+
+inline constexpr std::array<HorizontalDirection, 4> kHorizontalDirections{
+    HorizontalDirection{.dx = 0, .dz = -1}, HorizontalDirection{.dx = 1, .dz = 0},
+    HorizontalDirection{.dx = 0, .dz = 1}, HorizontalDirection{.dx = -1, .dz = 0}};
+
+/// parity: `TreeFeature.validTreePos`, read through the decoration view so a tree sees what earlier
+/// features in the same step wrote.
+[[nodiscard]] bool isValidTreePos(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z);
+
+/// Writes a tree block, dropping anything outside the world's vertical bounds.
+void setBlock(Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
+
+} // namespace basalt::server::world::terrain::decoration::tree
