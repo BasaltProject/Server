@@ -38,4 +38,8 @@ void placeBelowTrunkBlock(Chunk& chunk, std::int32_t x, std::int32_t y, std::int
 /// Places a leaf, waterlogging it when it lands in source water.
 bool tryPlaceLeaf(Chunk& chunk, std::int32_t foliageStateId, std::int32_t x, std::int32_t y, std::int32_t z);
 
+/// The chunk's own heightmap inside it, and a scan of what decoration wrote outside it.
+[[nodiscard]] std::int32_t decorationHeightAt(const Chunk& chunk, std::int32_t worldX, std::int32_t worldZ,
+                                              HeightmapType type);
+
 } // namespace basalt::server::world::terrain::decoration::tree

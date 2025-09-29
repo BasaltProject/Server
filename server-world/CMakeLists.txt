@@ -49,9 +49,13 @@ basalt_module(server-world
     src/terrain/decoration/PatchRegion.cpp
     src/terrain/decoration/PlainsFlowerFeatures.cpp
     src/terrain/decoration/TallGrassDecoration.cpp
+    src/terrain/decoration/tree/FallenTreeFeature.cpp
     src/terrain/decoration/tree/MangroveRootPlacer.cpp
     src/terrain/decoration/tree/TreeBlockRules.cpp
     src/terrain/decoration/tree/TreeBranchingTrunkPlacers.cpp
+    src/terrain/decoration/tree/TreeConfigs.cpp
+    src/terrain/decoration/tree/TreeFeature.cpp
+    src/terrain/decoration/tree/TreeFeatureDecorators.cpp
     src/terrain/decoration/tree/TreeFoliagePlacers.cpp
     src/terrain/decoration/tree/TreeHelpers.cpp
     src/terrain/decoration/tree/TreeTrunkPlacers.cpp
@@ -120,6 +124,18 @@ basalt_test(server-world-tree-foliage-placers-test
 basalt_test(server-world-tree-branching-trunk-placers-test
     SOURCES
         test/TreeBranchingTrunkPlacersTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-tree-feature-test
+    SOURCES
+        test/TreeFeatureTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-fallen-tree-test
+    SOURCES
+        test/FallenTreeTest.cpp
     DEPENDS basalt::server-world
 )
 

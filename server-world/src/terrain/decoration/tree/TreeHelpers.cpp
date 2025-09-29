@@ -59,6 +59,20 @@ void placeBelowTrunkBlock(Chunk& chunk, const std::int32_t x, const std::int32_t
     }
 }
 
+std::int32_t decorationHeightAt(const Chunk& chunk, const std::int32_t worldX, const std::int32_t worldZ,
+                                const HeightmapType type) {
+    if ((worldX >> 4) == chunk.chunkX() && (worldZ >> 4) == chunk.chunkZ()) {
+        return chunk.heightAt(worldX & 15, worldZ & 15, type);
+    }
+    const ChunkHeight bounds = chunk.verticalBounds();
+    for (std::int32_t y = bounds.maxY(); y >= bounds.minY(); --y) {
+        if (heightmapMatches(type, chunk.decorationBlockStateId(worldX, y, worldZ))) {
+            return y + 1;
+        }
+    }
+    return bounds.minY();
+}
+
 bool canPlaceLeaf(const Chunk& chunk, const std::int32_t x, const std::int32_t y, const std::int32_t z) {
     const ChunkHeight bounds = chunk.verticalBounds();
     if (y < bounds.minY() || y > bounds.maxY()) {
