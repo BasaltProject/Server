@@ -140,19 +140,10 @@ void placeVegetation(Chunk& chunk, random::RandomSource& random, random::RandomS
     return named.forkPositional().at(chunk.chunkX() * 16, 0, chunk.chunkZ() * 16);
 }
 
-[[nodiscard]] std::vector<DecorationPos> scatterOrigin(const PlacementContext& context, random::RandomSource& random,
-                                                       const Chunk& chunk) {
-    std::vector<DecorationPos> positions{DecorationPos{.x = chunk.chunkX() * 16, .y = 0, .z = chunk.chunkZ() * 16}};
-    for (const PlacementModifier& modifier :
-         {countPlacement(1), inSquarePlacement(), heightmapPlacement(HeightmapType::MotionBlockingNoLeaves)}) {
-        std::vector<DecorationPos> next;
-        for (const DecorationPos& position : positions) {
-            const std::vector<DecorationPos> produced = modifier(context, random, position);
-            next.insert(next.end(), produced.begin(), produced.end());
-        }
-        positions = std::move(next);
-    }
-    return positions;
+const std::vector<PlacementModifier>& scatterModifiers() {
+    static const std::vector<PlacementModifier> modifiers{countPlacement(1), inSquarePlacement(),
+                                                          heightmapPlacement(HeightmapType::MotionBlockingNoLeaves)};
+    return modifiers;
 }
 
 } // namespace
@@ -211,23 +202,22 @@ void paleMossDecoration::decorate(Chunk& chunk, std::int64_t seed, const surface
     const std::int64_t decorationSeed =
         random::setDecorationSeed(random, seed, chunk.chunkX() * 16, chunk.chunkZ() * 16);
     random::setFeatureSeed(random, decorationSeed, kPaleMossPatchIndex, kVegetalDecorationStep);
-    const PlacementContext context{chunk};
-    for (const DecorationPos& origin : scatterOrigin(context, random, chunk)) {
+    const DecorationPos chunkOrigin{.x = chunk.chunkX() * 16, .y = 0, .z = chunk.chunkZ() * 16};
+    placeFrom(chunk, random, chunkOrigin, scatterModifiers(), [&](const DecorationPos& origin) {
         if (biomePath(environment.biomeAt(origin.x, origin.y, origin.z)) != "pale_garden") {
-            continue;
+            return;
         }
         if (observer != nullptr) {
             observer(origin);
         }
         placePatchAt(chunk, random, origin, mossyCarpetRandom);
-    }
+    });
 }
 
 void paleMossDecoration::decorate(Chunk& chunk, random::RandomSource& random) {
-    const PlacementContext context{chunk};
-    for (const DecorationPos& origin : scatterOrigin(context, random, chunk)) {
-        placePatchAt(chunk, random, origin, random);
-    }
+    const DecorationPos chunkOrigin{.x = chunk.chunkX() * 16, .y = 0, .z = chunk.chunkZ() * 16};
+    placeFrom(chunk, random, chunkOrigin, scatterModifiers(),
+              [&](const DecorationPos& origin) { placePatchAt(chunk, random, origin, random); });
 }
 
 } // namespace basalt::server::world::terrain::decoration
