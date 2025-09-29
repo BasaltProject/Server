@@ -2,6 +2,9 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/noise/NormalNoise.hpp>
 #include <basalt/server/world/terrain/decoration/BiomeFlowerFeatures.hpp>
+#include <basalt/server/world/terrain/decoration/PlainsFlowerFeatures.hpp>
+#include <basalt/server/world/terrain/decoration/TreeDecoration.hpp>
+#include <basalt/server/world/terrain/decoration/tree/TreeConfigs.hpp>
 
 #include <algorithm>
 #include <array>
@@ -125,6 +128,91 @@ void meadowDecoration::placeAt(Chunk& chunk, random::RandomSource& random, const
                       stateId == stateIdOf("tall_grass")};
                   feature.place(chunk, random, position);
               });
+}
+
+namespace {
+
+void placeMeadowFlower(Chunk& chunk, random::RandomSource& random, const DecorationPos& position) {
+    const std::int32_t stateId = meadowDecoration::flowerStateAt(position);
+    const SimpleBlockFeature feature{[stateId](random::RandomSource&, const DecorationPos&) { return stateId; },
+                                     stateId == stateIdOf("tall_grass")};
+    feature.place(chunk, random, position);
+}
+
+[[nodiscard]] BiomeVegetalDecoration
+placed(std::vector<PlacementModifier> modifiers,
+       std::function<void(Chunk&, random::RandomSource&, const DecorationPos&)> place) {
+    return [modifiers = std::move(modifiers), place = std::move(place)](Chunk& chunk, random::RandomSource& random) {
+        const DecorationPos origin{.x = chunk.chunkX() * 16, .y = 0, .z = chunk.chunkZ() * 16};
+        placeFrom(chunk, random, origin, modifiers,
+                  [&](const DecorationPos& position) { place(chunk, random, position); });
+    };
+}
+
+// parity: VegetationFeatures.TREES_FLOWER_FOREST with treePlacement(countExtra(6, 0.1, 1)).
+const BiomeVegetalDecoration& flowerForestTrees() {
+    static const BiomeVegetalDecoration decoration = treeDecoration::candidateSequenceCountExtra(
+        {{0.0025F, treeDecoration::fallen(tree::fallenTreeConfigs::birch())},
+         {0.2F, treeDecoration::tree(tree::treeConfigs::birchBees002())},
+         {0.1F, treeDecoration::tree(tree::treeConfigs::fancyOakBees002())}},
+        treeDecoration::tree(tree::treeConfigs::oakBees002()), 6, 0.1F, 1);
+    return decoration;
+}
+
+} // namespace
+
+const BiomeVegetalDecoration& flowerForestDecoration::flowersOnly() {
+    static const BiomeVegetalDecoration decoration =
+        placed({countPlacement(3), rarityFilter(2), inSquarePlacement(), heightmapPlacement(), countPlacement(96),
+                randomOffsetPlacement(6, 2), airTargetFilter()},
+               [](Chunk& chunk, random::RandomSource& random, const DecorationPos& position) {
+                   const SimpleBlockFeature feature{[](random::RandomSource&, const DecorationPos& at) {
+                       return flowerForestDecoration::flowerAt(at.x, at.y, at.z);
+                   }};
+                   feature.place(chunk, random, position);
+               });
+    return decoration;
+}
+
+void flowerForestDecoration::decorate(Chunk& chunk, random::RandomSource& random) {
+    flowerForestTrees()(chunk, random);
+    flowersOnly()(chunk, random);
+}
+
+const BiomeVegetalDecoration& meadowDecoration::flowers() {
+    static const BiomeVegetalDecoration decoration = placed(
+        {inSquarePlacement(), heightmapPlacement(), countPlacement(96), randomOffsetPlacement(6, 2), airTargetFilter()},
+        placeMeadowFlower);
+    return decoration;
+}
+
+const BiomeVegetalDecoration& meadowDecoration::grass() {
+    static const BiomeVegetalDecoration decoration =
+        placed({noiseThresholdCountPlacement(-0.8, 5, 10), inSquarePlacement(), heightmapPlacement(),
+                countPlacement(16), randomOffsetPlacement(7, 3), airTargetFilter()},
+               [](Chunk& chunk, random::RandomSource& random, const DecorationPos& position) {
+                   const SimpleBlockFeature feature{
+                       [](random::RandomSource&, const DecorationPos&) { return stateIdOf("short_grass"); }};
+                   feature.place(chunk, random, position);
+               });
+    return decoration;
+}
+
+const BiomeVegetalDecoration& meadowDecoration::trees() {
+    static const BiomeVegetalDecoration decoration =
+        treeDecoration::rarityChoice(tree::treeConfigs::fancyOakBees(), 0.5F, tree::treeConfigs::superBirchBees(), 100);
+    return decoration;
+}
+
+const BiomeVegetalDecoration& meadowDecoration::withoutTrees() {
+    static const BiomeVegetalDecoration decoration = combine({flowers(), forestFloorDecoration::meadowWildflowers()});
+    return decoration;
+}
+
+void meadowDecoration::decorate(Chunk& chunk, random::RandomSource& random) {
+    flowers()(chunk, random);
+    trees()(chunk, random);
+    forestFloorDecoration::meadowWildflowers()(chunk, random);
 }
 
 } // namespace basalt::server::world::terrain::decoration

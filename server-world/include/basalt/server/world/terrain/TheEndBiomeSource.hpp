@@ -1,0 +1,34 @@
+#pragma once
+
+#include <basalt/server/world/densityfunction/DensityFunction.hpp>
+#include <basalt/server/world/terrain/BiomeZoomer.hpp>
+
+#include <cstdint>
+#include <optional>
+#include <string_view>
+#include <utility>
+
+namespace basalt::server::world::terrain {
+
+/// parity: `TheEndBiomeSource`. The central island is always `the_end`; outside its 64-chunk radius
+/// the End router's erosion value at the containing chunk's centre selects highlands, midlands,
+/// barrens or small islands with vanilla's own thresholds.
+class TheEndBiomeSource {
+public:
+    explicit TheEndBiomeSource(densityfunction::Function erosion,
+                               std::optional<std::int64_t> biomeZoomSeed = std::nullopt)
+        : erosion_(std::move(erosion)),
+          zoomer_(biomeZoomSeed.has_value() ? std::optional<BiomeZoomer>{BiomeZoomer{*biomeZoomSeed}} : std::nullopt) {}
+
+    /// Input coordinates are quart positions, matching `BiomeSource.getNoiseBiome`.
+    [[nodiscard]] std::string_view biomeAtQuart(std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ) const;
+
+    /// parity: `BiomeManager.getBiome`, which the placed-feature biome filters go through.
+    [[nodiscard]] std::string_view blockBiomeAt(std::int32_t x, std::int32_t y, std::int32_t z) const;
+
+private:
+    densityfunction::Function erosion_;
+    std::optional<BiomeZoomer> zoomer_;
+};
+
+} // namespace basalt::server::world::terrain

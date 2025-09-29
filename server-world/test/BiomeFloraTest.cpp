@@ -4,10 +4,9 @@
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/world/terrain/decoration/BiomeFlowerFeatures.hpp>
 #include <basalt/server/world/terrain/decoration/FlowerFeatures.hpp>
-#include <basalt/server/world/terrain/decoration/FlowerForestDecoration.hpp>
-#include <basalt/server/world/terrain/decoration/ForestFloorDecoration.hpp>
-#include <basalt/server/world/terrain/decoration/MeadowDecoration.hpp>
+#include <basalt/server/world/terrain/decoration/PlainsFlowerFeatures.hpp>
 
 #include <doctest.h>
 

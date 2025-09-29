@@ -1,5 +1,5 @@
 #include <basalt/server/world/terrain/decoration/BambooVegetationDecoration.hpp>
-#include <basalt/server/world/terrain/decoration/JungleGrassDecoration.hpp>
+#include <basalt/server/world/terrain/decoration/FlowerVegetation.hpp>
 #include <basalt/server/world/terrain/decoration/TreeDecoration.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeConfigs.hpp>
 
@@ -20,7 +20,7 @@ void placeCheckedTree(Chunk& chunk, random::RandomSource& random, const Decorati
 } // namespace
 
 void bambooVegetationDecoration::placeAt(Chunk& chunk, random::RandomSource& random, const DecorationPos& position,
-                                         const PlacementContext& context) {
+                                         const PlacementContext&) {
     if (random.nextFloat() < 0.05F) {
         placeCheckedTree(chunk, random, position, tree::treeConfigs::fancyOak(), "oak_sapling");
         return;
@@ -33,7 +33,7 @@ void bambooVegetationDecoration::placeAt(Chunk& chunk, random::RandomSource& ran
         placeCheckedTree(chunk, random, position, tree::treeConfigs::megaJungle(), "jungle_sapling");
         return;
     }
-    jungleGrassDecoration::placePatchAt(chunk, random, position, context);
+    jungleGrassDecoration::placePatchAt(chunk, random, position);
 }
 
 void bambooVegetationDecoration::decorate(Chunk& chunk, random::RandomSource& random) {

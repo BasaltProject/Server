@@ -18,8 +18,17 @@ void placeFlowerPlainAt(Chunk& chunk, random::RandomSource& random, std::int32_t
 
 } // namespace plainsDecoration
 
-/// The wildflower bed the birch forest and meadow both scatter.
+/// The wildflower bed the birch forest and meadow both scatter, and the dark forest's leaf litter.
 namespace forestFloorDecoration {
+
+/// parity: `wildflowers_birch_forest`, three independent rarity-1/2 patch attempts.
+[[nodiscard]] const BiomeVegetalDecoration& birchWildflowers();
+
+/// parity: `wildflowers_meadow`, biome-noise outer density and eight candidates per patch.
+[[nodiscard]] const BiomeVegetalDecoration& meadowWildflowers();
+
+/// parity: `patch_leaf_litter`, two 32-candidate patches restricted to grass block.
+[[nodiscard]] const BiomeVegetalDecoration& leafLitter();
 
 /// `count` differs per caller: 64 for the birch forest, 8 for the meadow.
 void placeWildflowersAt(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin, std::int32_t count);
