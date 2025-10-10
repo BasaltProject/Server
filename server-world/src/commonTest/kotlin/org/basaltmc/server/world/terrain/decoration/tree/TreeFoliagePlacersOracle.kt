@@ -14,7 +14,10 @@ class TreeFoliagePlacersOracle {
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
 
     /** Air over stone, with a log column to attach to and a water pool so waterlogging can fire. */
-    private fun groundChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun groundChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -83,7 +86,13 @@ class TreeFoliagePlacersOracle {
             val leafRadius = placer.foliageRadius(random, treeHeight)
             val foliageHeight = placer.foliageHeight(random, treeHeight)
             val offset = placer.offset(random)
-            shape.append(leafRadius).append(':').append(foliageHeight).append(':').append(offset).append(',')
+            shape
+                .append(leafRadius)
+                .append(':')
+                .append(foliageHeight)
+                .append(':')
+                .append(offset)
+                .append(',')
             val positions = mutableSetOf<Triple<Int, Int, Int>>()
             placer.createFoliage(
                 chunk,

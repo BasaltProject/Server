@@ -12,21 +12,79 @@ import kotlin.test.Test
 
 /** The frozen Kotlin as the oracle for the berry and pumpkin patches. */
 class GrassScatterOracle {
-    private inner class FakeEnvironment(private val biome: String) : SurfaceRuleEnvironment {
-        override fun surfaceDepthNoise(x: Int, z: Int): Int = 0
-        override fun surfaceSecondaryNoise(x: Int, z: Int): Double = 0.0
-        override fun sample2d(noiseId: String, x: Int, z: Int): Double = 0.0
-        override fun sample3d(noiseId: String, x: Int, y: Int, z: Int): Double = 0.0
-        override fun verticalGradientRandom(name: String, x: Int, y: Int, z: Int): Float = 0.5f
-        override fun positionalRandom(x: Int, y: Int, z: Int): BasaltRandom = XoroshiroRandom(x * 31L + z)
-        override fun estimatedSurfaceHeight(x: Int, z: Int): Int = 70
-        override fun biomeAt(x: Int, y: Int, z: Int): String = biome
-        override fun noiseBiomeAt(quartX: Int, quartY: Int, quartZ: Int, cache: DensityCache?): String = biome
-        override fun isSteep(x: Int, z: Int): Boolean = false
-        override fun clayBand(x: Int, y: Int, z: Int): Int = 0
+    private inner class FakeEnvironment(
+        private val biome: String,
+    ) : SurfaceRuleEnvironment {
+        override fun surfaceDepthNoise(
+            x: Int,
+            z: Int,
+        ): Int = 0
+
+        override fun surfaceSecondaryNoise(
+            x: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun sample2d(
+            noiseId: String,
+            x: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun sample3d(
+            noiseId: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun verticalGradientRandom(
+            name: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Float = 0.5f
+
+        override fun positionalRandom(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): BasaltRandom = XoroshiroRandom(x * 31L + z)
+
+        override fun estimatedSurfaceHeight(
+            x: Int,
+            z: Int,
+        ): Int = 70
+
+        override fun biomeAt(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): String = biome
+
+        override fun noiseBiomeAt(
+            quartX: Int,
+            quartY: Int,
+            quartZ: Int,
+            cache: DensityCache?,
+        ): String = biome
+
+        override fun isSteep(
+            x: Int,
+            z: Int,
+        ): Boolean = false
+
+        override fun clayBand(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Int = 0
     }
 
-    private fun grassChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun grassChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -60,7 +118,11 @@ class GrassScatterOracle {
      * Over many chunks with spaced seeds: rarity here runs to 1/384 and 1/300, and sequential legacy
      * seeds leave the very draw those filters read correlated.
      */
-    private fun report(name: String, biome: String, body: (Chunk, FakeEnvironment) -> Unit) {
+    private fun report(
+        name: String,
+        biome: String,
+        body: (Chunk, FakeEnvironment) -> Unit,
+    ) {
         var checksum = -3750763034362895579L
         var placed = 0
         var deferred = 0
@@ -91,9 +153,13 @@ class GrassScatterOracle {
         }
         report("berryRegional", "minecraft:taiga") { c, e ->
             BerryPatchDecoration.decorate(c, 606060L, e, externalBlockState = { _, y, _ ->
-                if (y < 70) Blocks.STONE.stateId
-                else if (y == 70) Blocks.GRASS_BLOCK.stateId
-                else Blocks.AIR.stateId
+                if (y < 70) {
+                    Blocks.STONE.stateId
+                } else if (y == 70) {
+                    Blocks.GRASS_BLOCK.stateId
+                } else {
+                    Blocks.AIR.stateId
+                }
             })
         }
 
@@ -101,7 +167,9 @@ class GrassScatterOracle {
         val random = WorldgenRandom(LegacyRandom(90210L))
         BerryPatchDecoration.placeAt(chunk, random, DecorationPos(8, 71, 8))
         PumpkinPatchDecoration.placeAt(chunk, random, DecorationPos(4, 71, 12))
-        println("ORACLE direct=" + fold(chunk).second + " checksum=" + fold(chunk).first +
-            " after=" + random.nextInt())
+        println(
+            "ORACLE direct=" + fold(chunk).second + " checksum=" + fold(chunk).first +
+                " after=" + random.nextInt(),
+        )
     }
 }

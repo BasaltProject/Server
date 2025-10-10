@@ -49,12 +49,15 @@ basalt_module(server-world
     src/terrain/decoration/nether/NetherVegetalShared.cpp
     src/terrain/decoration/nether/NetherVines.cpp
     src/terrain/decoration/OverworldOreConfigs.cpp
+    src/terrain/decoration/OverworldBiomePaths.cpp
     src/terrain/decoration/OverworldSpringDecoration.cpp
     src/terrain/decoration/OverworldOreDecoration.cpp
     src/terrain/decoration/PlacementRegion.cpp
     src/terrain/decoration/BushPatchDecoration.cpp
     src/terrain/decoration/BambooVegetationDecoration.cpp
     src/terrain/decoration/CactusFeature.cpp
+    src/terrain/decoration/CaveLocalModificationDecoration.cpp
+    src/terrain/decoration/CaveSpeleothemDecoration.cpp
     src/terrain/decoration/JungleFeatures.cpp
     src/terrain/decoration/LushVegetationPatchFeature.cpp
     src/terrain/decoration/MelonPatchDecoration.cpp
@@ -208,6 +211,18 @@ basalt_test(server-world-small-patch-test
 basalt_test(server-world-jungle-features-test
     SOURCES
         test/JungleFeaturesTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-cave-local-modification-test
+    SOURCES
+        test/CaveLocalModificationTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-cave-speleothem-test
+    SOURCES
+        test/CaveSpeleothemTest.cpp
     DEPENDS basalt::server-world
 )
 

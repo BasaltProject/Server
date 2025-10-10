@@ -13,7 +13,10 @@ class JungleFeaturesOracle {
      * Grass floor with a soft cover stripe, and stone pillars up through the vine height band: the
      * melon replaces more than air, and a vine needs a solid face beside open air.
      */
-    private fun jungleChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun jungleChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -46,7 +49,11 @@ class JungleFeaturesOracle {
     }
 
     /** [chunks] is per case: the sparse melon is 1/64, so it needs a far wider sample to fire. */
-    private fun report(name: String, chunks: Int = 60, body: (Chunk, WorldgenRandom) -> Unit) {
+    private fun report(
+        name: String,
+        chunks: Int = 60,
+        body: (Chunk, WorldgenRandom) -> Unit,
+    ) {
         var checksum = -3750763034362895579L
         var melons = 0
         var vines = 0
@@ -81,9 +88,19 @@ class JungleFeaturesOracle {
         val states = StringBuilder()
         for (face in 0 until 6) {
             val chunk = Chunk(0, 0)
-            val dx = when (face) { 3 -> -1; 4 -> 1; else -> 0 }
+            val dx =
+                when (face) {
+                    3 -> -1
+                    4 -> 1
+                    else -> 0
+                }
             val dy = if (face == 0) 1 else 0
-            val dz = when (face) { 1 -> -1; 2 -> 1; else -> 0 }
+            val dz =
+                when (face) {
+                    1 -> -1
+                    2 -> 1
+                    else -> 0
+                }
             if (face != 5) chunk.setBlockStateId(8 + dx, 80 + dy, 8 + dz, Blocks.STONE.stateId)
             val ok = JungleVineDecoration.placeAt(chunk, DecorationPos(8, 80, 8))
             states.append("$ok/${chunk.getBlockStateId(8, 80, 8)},")

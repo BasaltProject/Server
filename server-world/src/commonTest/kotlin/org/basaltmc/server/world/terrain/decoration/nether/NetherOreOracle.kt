@@ -13,8 +13,15 @@ import kotlin.test.Test
 
 /** The frozen Kotlin as the oracle for the ten Nether ore features. */
 class NetherOreOracle {
-    private class FixedBiome(private val biome: Biome) : NetherBiomeLookup {
-        override fun blockBiomeAt(x: Int, y: Int, z: Int, cache: DensityCache?): Biome = biome
+    private class FixedBiome(
+        private val biome: Biome,
+    ) : NetherBiomeLookup {
+        override fun blockBiomeAt(
+            x: Int,
+            y: Int,
+            z: Int,
+            cache: DensityCache?,
+        ): Biome = biome
     }
 
     private fun stateId(path: String): Int =
@@ -25,7 +32,10 @@ class NetherOreOracle {
      * blackstone bands: blackstone is also what one of the veins places, and terrain of the same
      * block would hide it from the count.
      */
-    private fun netherChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun netherChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -54,7 +64,12 @@ class NetherOreOracle {
         return checksum to ores
     }
 
-    private fun report(name: String, biome: Biome, index: Int? = null, count: Int = 16) {
+    private fun report(
+        name: String,
+        biome: Biome,
+        index: Int? = null,
+        count: Int = 16,
+    ) {
         var checksum = -3750763034362895579L
         var ores = 0
         var deferred = 0
@@ -80,9 +95,14 @@ class NetherOreOracle {
         report("deltasStep", Biomes.BASALT_DELTAS)
         report("valleyStep", Biomes.SOUL_SAND_VALLEY)
         for ((name, index) in NetherOreDecoration.PLACED_IDS) {
-            val biome = if (name.endsWith("_deltas")) Biomes.BASALT_DELTAS
-            else if (name == "ore_soul_sand") Biomes.SOUL_SAND_VALLEY
-            else Biomes.NETHER_WASTES
+            val biome =
+                if (name.endsWith("_deltas")) {
+                    Biomes.BASALT_DELTAS
+                } else if (name == "ore_soul_sand") {
+                    Biomes.SOUL_SAND_VALLEY
+                } else {
+                    Biomes.NETHER_WASTES
+                }
             report("feature_$name", biome, index)
         }
 

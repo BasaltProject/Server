@@ -13,15 +13,25 @@ import kotlin.test.Test
 
 /** The frozen Kotlin as the oracle for the Nether underground decoration step. */
 class NetherUndergroundOracle {
-    private class FixedBiome(private val biome: Biome) : NetherBiomeLookup {
-        override fun blockBiomeAt(x: Int, y: Int, z: Int, cache: DensityCache?): Biome = biome
+    private class FixedBiome(
+        private val biome: Biome,
+    ) : NetherBiomeLookup {
+        override fun blockBiomeAt(
+            x: Int,
+            y: Int,
+            z: Int,
+            cache: DensityCache?,
+        ): Biome = biome
     }
 
     private fun stateId(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
 
     /** Netherrack with soul soil, gravel and caverns, so every support and spring rule can fire. */
-    private fun netherChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun netherChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -60,7 +70,12 @@ class NetherUndergroundOracle {
         return checksum to placed
     }
 
-    private fun report(name: String, biome: Biome, index: Int? = null, count: Int = 4) {
+    private fun report(
+        name: String,
+        biome: Biome,
+        index: Int? = null,
+        count: Int = 4,
+    ) {
         var checksum = -3750763034362895579L
         var placed = 0
         var deferred = 0
@@ -85,18 +100,20 @@ class NetherUndergroundOracle {
         report("wastesStep", Biomes.NETHER_WASTES)
         report("valleyStep", Biomes.SOUL_SAND_VALLEY)
         for (index in 0..15) {
-            val biome = when (index) {
-                0, 1, 2, 12, 13, 14 -> Biomes.BASALT_DELTAS
-                8 -> Biomes.SOUL_SAND_VALLEY
-                else -> Biomes.NETHER_WASTES
-            }
+            val biome =
+                when (index) {
+                    0, 1, 2, 12, 13, 14 -> Biomes.BASALT_DELTAS
+                    8 -> Biomes.SOUL_SAND_VALLEY
+                    else -> Biomes.NETHER_WASTES
+                }
             // Each rare one is paid for only where it is rare: the crimson roots need a wider
             // sample than the rest before they fire at all.
-            val chunks = when (index) {
-                8 -> 44
-                5, 6, 9, 10 -> 24
-                else -> 4
-            }
+            val chunks =
+                when (index) {
+                    8 -> 44
+                    5, 6, 9, 10 -> 24
+                    else -> 4
+                }
             report("index_$index", biome, index, chunks)
         }
 

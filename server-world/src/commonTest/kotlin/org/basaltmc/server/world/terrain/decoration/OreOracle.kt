@@ -11,18 +11,73 @@ import kotlin.test.Test
 
 /** The frozen Kotlin as the oracle for the whole underground ores step. */
 class OreOracle {
-    private inner class FakeEnvironment(private val biome: String) : SurfaceRuleEnvironment {
-        override fun surfaceDepthNoise(x: Int, z: Int): Int = 0
-        override fun surfaceSecondaryNoise(x: Int, z: Int): Double = 0.0
-        override fun sample2d(noiseId: String, x: Int, z: Int): Double = 0.0
-        override fun sample3d(noiseId: String, x: Int, y: Int, z: Int): Double = 0.0
-        override fun verticalGradientRandom(name: String, x: Int, y: Int, z: Int): Float = 0.5f
-        override fun positionalRandom(x: Int, y: Int, z: Int): BasaltRandom = XoroshiroRandom(x * 31L + z)
-        override fun estimatedSurfaceHeight(x: Int, z: Int): Int = 100
-        override fun biomeAt(x: Int, y: Int, z: Int): String = biome
-        override fun noiseBiomeAt(quartX: Int, quartY: Int, quartZ: Int, cache: DensityCache?): String = biome
-        override fun isSteep(x: Int, z: Int): Boolean = false
-        override fun clayBand(x: Int, y: Int, z: Int): Int = 0
+    private inner class FakeEnvironment(
+        private val biome: String,
+    ) : SurfaceRuleEnvironment {
+        override fun surfaceDepthNoise(
+            x: Int,
+            z: Int,
+        ): Int = 0
+
+        override fun surfaceSecondaryNoise(
+            x: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun sample2d(
+            noiseId: String,
+            x: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun sample3d(
+            noiseId: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun verticalGradientRandom(
+            name: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Float = 0.5f
+
+        override fun positionalRandom(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): BasaltRandom = XoroshiroRandom(x * 31L + z)
+
+        override fun estimatedSurfaceHeight(
+            x: Int,
+            z: Int,
+        ): Int = 100
+
+        override fun biomeAt(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): String = biome
+
+        override fun noiseBiomeAt(
+            quartX: Int,
+            quartY: Int,
+            quartZ: Int,
+            cache: DensityCache?,
+        ): String = biome
+
+        override fun isSteep(
+            x: Int,
+            z: Int,
+        ): Boolean = false
+
+        override fun clayBand(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Int = 0
     }
 
     private fun stockedChunk(): Chunk {
@@ -41,7 +96,10 @@ class OreOracle {
         return chunk
     }
 
-    private fun report(name: String, chunk: Chunk) {
+    private fun report(
+        name: String,
+        chunk: Chunk,
+    ) {
         var checksum = -3750763034362895579L
         val counts = HashMap<String, Int>()
         for (y in WorldHeight.MIN_Y..WorldHeight.MAX_Y) {
@@ -57,8 +115,10 @@ class OreOracle {
             }
         }
         val deferred = chunk.takeGeneratedBlockWrites().size
-        println("ORACLE $name.checksum=$checksum deferred=$deferred counts=" +
-            counts.entries.sortedBy { it.key }.joinToString(",") { "${it.key}:${it.value}" })
+        println(
+            "ORACLE $name.checksum=$checksum deferred=$deferred counts=" +
+                counts.entries.sortedBy { it.key }.joinToString(",") { "${it.key}:${it.value}" },
+        )
     }
 
     @Test
@@ -81,7 +141,13 @@ class OreOracle {
             FakeEnvironment("minecraft:plains"),
             externalSurfaceHeight = { _, _ -> 100 },
             externalBlockState = { _, y, _ ->
-                if (y < 0) stateId("deepslate") else if (y < 100) Blocks.STONE.stateId else Blocks.AIR.stateId
+                if (y < 0) {
+                    stateId("deepslate")
+                } else if (y < 100) {
+                    Blocks.STONE.stateId
+                } else {
+                    Blocks.AIR.stateId
+                }
             },
         )
         report("regional", regional)

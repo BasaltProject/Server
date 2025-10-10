@@ -13,7 +13,11 @@ class ExtraVegetationOracle {
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
 
     /** Grass and sand shores around a pond, which is what cane and fireflies need beside them. */
-    private fun shoreChunk(chunkX: Int, chunkZ: Int, surface: String): Chunk {
+    private fun shoreChunk(
+        chunkX: Int,
+        chunkZ: Int,
+        surface: String,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {

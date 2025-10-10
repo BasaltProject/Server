@@ -1,6 +1,7 @@
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/world/terrain/decoration/OverworldBiomePaths.hpp>
 #include <basalt/server/world/terrain/decoration/OverworldSpringDecoration.hpp>
 
 #include <array>
@@ -42,65 +43,6 @@ const PathSet& frozenValidBlocks() {
     return paths;
 }
 
-const PathSet& overworldBiomes() {
-    static const PathSet paths = {"plains",
-                                  "sunflower_plains",
-                                  "desert",
-                                  "windswept_hills",
-                                  "windswept_gravelly_hills",
-                                  "windswept_forest",
-                                  "windswept_savanna",
-                                  "forest",
-                                  "flower_forest",
-                                  "birch_forest",
-                                  "old_growth_birch_forest",
-                                  "dark_forest",
-                                  "old_growth_pine_taiga",
-                                  "old_growth_spruce_taiga",
-                                  "taiga",
-                                  "snowy_taiga",
-                                  "savanna",
-                                  "savanna_plateau",
-                                  "badlands",
-                                  "wooded_badlands",
-                                  "eroded_badlands",
-                                  "jungle",
-                                  "sparse_jungle",
-                                  "bamboo_jungle",
-                                  "swamp",
-                                  "mangrove_swamp",
-                                  "river",
-                                  "frozen_river",
-                                  "beach",
-                                  "snowy_beach",
-                                  "stony_shore",
-                                  "snowy_plains",
-                                  "ice_spikes",
-                                  "ocean",
-                                  "deep_ocean",
-                                  "warm_ocean",
-                                  "lukewarm_ocean",
-                                  "deep_lukewarm_ocean",
-                                  "cold_ocean",
-                                  "deep_cold_ocean",
-                                  "frozen_ocean",
-                                  "deep_frozen_ocean",
-                                  "mushroom_fields",
-                                  "cherry_grove",
-                                  "pale_garden",
-                                  "meadow",
-                                  "grove",
-                                  "snowy_slopes",
-                                  "frozen_peaks",
-                                  "jagged_peaks",
-                                  "stony_peaks",
-                                  "dripstone_caves",
-                                  "lush_caves",
-                                  "deep_dark",
-                                  "sulfur_caves"};
-    return paths;
-}
-
 const PathSet& waterValidBlocks() {
     static const PathSet paths = [] {
         PathSet built = normalValidBlocks();
@@ -131,13 +73,13 @@ struct Spring {
 
 [[nodiscard]] const Spring& waterSpring() {
     static const Spring spring{registry::blocks::water().stateId, wire::common::Identifier::vanilla("water"),
-                               &waterValidBlocks(), &overworldBiomes()};
+                               &waterValidBlocks(), &overworldBiomePaths()};
     return spring;
 }
 
 [[nodiscard]] const Spring& lavaSpring() {
     static const Spring spring{registry::blocks::lava().stateId, wire::common::Identifier::vanilla("lava"),
-                               &normalValidBlocks(), &overworldBiomes()};
+                               &normalValidBlocks(), &overworldBiomePaths()};
     return spring;
 }
 

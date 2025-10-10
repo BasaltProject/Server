@@ -10,7 +10,10 @@ import kotlin.test.Test
 /** The frozen Kotlin as the oracle for the pale garden and cherry petal features. */
 class FlowerFeaturesOracle {
     /** Grass with a leaf canopy over half of it: the pale garden patch uses the no-leaves heightmap. */
-    private fun groundChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun groundChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -39,7 +42,10 @@ class FlowerFeaturesOracle {
         return Triple(checksum, eyeblossom, petals)
     }
 
-    private fun report(name: String, body: (Chunk, WorldgenRandom, DecorationPos) -> Unit) {
+    private fun report(
+        name: String,
+        body: (Chunk, WorldgenRandom, DecorationPos) -> Unit,
+    ) {
         var checksum = -3750763034362895579L
         var eyeblossom = 0
         var petals = 0
@@ -72,8 +78,11 @@ class FlowerFeaturesOracle {
         for (index in 0 until 60) {
             val chunk = groundChunk(index * 3 - 30, index * -5 + 10)
             val random = WorldgenRandom(LegacyRandom(4321L + index * 6364136223846793005L))
-            CherryGroveDecoration.placeAt(chunk, random,
-                DecorationPos(chunk.chunkX * 16 + 8, 71, chunk.chunkZ * 16 + 8))
+            CherryGroveDecoration.placeAt(
+                chunk,
+                random,
+                DecorationPos(chunk.chunkX * 16 + 8, 71, chunk.chunkZ * 16 + 8),
+            )
             for (y in 69..80) {
                 for (z in 0 until 16) {
                     for (x in 0 until 16) {

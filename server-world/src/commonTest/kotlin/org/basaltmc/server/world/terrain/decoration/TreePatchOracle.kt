@@ -1,7 +1,6 @@
 package org.basaltmc.server.world.terrain.decoration
 
 import org.basaltmc.server.random.BasaltRandom
-import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.random.XoroshiroRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
@@ -12,24 +11,84 @@ import kotlin.test.Test
 
 /** The frozen Kotlin as the oracle for the global tree placement step. */
 class TreePatchOracle {
-    private inner class FakeEnvironment(private val biome: String) : SurfaceRuleEnvironment {
-        override fun surfaceDepthNoise(x: Int, z: Int): Int = 0
-        override fun surfaceSecondaryNoise(x: Int, z: Int): Double = 0.0
-        override fun sample2d(noiseId: String, x: Int, z: Int): Double = 0.0
-        override fun sample3d(noiseId: String, x: Int, y: Int, z: Int): Double = 0.0
-        override fun verticalGradientRandom(name: String, x: Int, y: Int, z: Int): Float = 0.5f
-        override fun positionalRandom(x: Int, y: Int, z: Int): BasaltRandom = XoroshiroRandom(x * 31L + z)
-        override fun estimatedSurfaceHeight(x: Int, z: Int): Int = 70
-        override fun biomeAt(x: Int, y: Int, z: Int): String = biome
-        override fun noiseBiomeAt(quartX: Int, quartY: Int, quartZ: Int, cache: DensityCache?): String = biome
-        override fun isSteep(x: Int, z: Int): Boolean = false
-        override fun clayBand(x: Int, y: Int, z: Int): Int = 0
+    private inner class FakeEnvironment(
+        private val biome: String,
+    ) : SurfaceRuleEnvironment {
+        override fun surfaceDepthNoise(
+            x: Int,
+            z: Int,
+        ): Int = 0
+
+        override fun surfaceSecondaryNoise(
+            x: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun sample2d(
+            noiseId: String,
+            x: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun sample3d(
+            noiseId: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun verticalGradientRandom(
+            name: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Float = 0.5f
+
+        override fun positionalRandom(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): BasaltRandom = XoroshiroRandom(x * 31L + z)
+
+        override fun estimatedSurfaceHeight(
+            x: Int,
+            z: Int,
+        ): Int = 70
+
+        override fun biomeAt(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): String = biome
+
+        override fun noiseBiomeAt(
+            quartX: Int,
+            quartY: Int,
+            quartZ: Int,
+            cache: DensityCache?,
+        ): String = biome
+
+        override fun isSteep(
+            x: Int,
+            z: Int,
+        ): Boolean = false
+
+        override fun clayBand(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Int = 0
     }
 
     private fun stateId(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
 
-    private fun groundChunk(chunkX: Int, chunkZ: Int, surface: String, water: Boolean): Chunk {
+    private fun groundChunk(
+        chunkX: Int,
+        chunkZ: Int,
+        surface: String,
+        water: Boolean,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -69,7 +128,13 @@ class TreePatchOracle {
             val chunk = groundChunk(index * 5 - 30, index * -3 + 12, surface, water)
             TreePatchDecoration.decorateFeature(chunk, 4242L + index, FakeEnvironment(biome), name) { _, position ->
                 attempts++
-                origins.append(position.x).append(':').append(position.y).append(':').append(position.z).append(' ')
+                origins
+                    .append(position.x)
+                    .append(':')
+                    .append(position.y)
+                    .append(':')
+                    .append(position.z)
+                    .append(' ')
             }
             checksum = (checksum xor checksumOf(chunk)) * 1099511628211L
             deferred += chunk.takeGeneratedBlockWrites().size

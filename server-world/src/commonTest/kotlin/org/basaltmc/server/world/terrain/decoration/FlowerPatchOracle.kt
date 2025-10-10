@@ -10,22 +10,80 @@ import kotlin.test.Test
 
 /** The frozen Kotlin as the oracle for the thirteen-spec flower dispatcher. */
 class FlowerPatchOracle {
-    private inner class FakeEnvironment(private val biome: String) : SurfaceRuleEnvironment {
-        override fun surfaceDepthNoise(x: Int, z: Int): Int = 0
-        override fun surfaceSecondaryNoise(x: Int, z: Int): Double = 0.0
-        override fun sample2d(noiseId: String, x: Int, z: Int): Double = 0.0
-        override fun sample3d(noiseId: String, x: Int, y: Int, z: Int): Double = 0.0
-        override fun verticalGradientRandom(name: String, x: Int, y: Int, z: Int): Float = 0.5f
-        override fun positionalRandom(x: Int, y: Int, z: Int): BasaltRandom = XoroshiroRandom(x * 31L + z)
-        override fun estimatedSurfaceHeight(x: Int, z: Int): Int = 70
-        override fun biomeAt(x: Int, y: Int, z: Int): String = biome
-        override fun noiseBiomeAt(quartX: Int, quartY: Int, quartZ: Int, cache: DensityCache?): String = biome
-        override fun isSteep(x: Int, z: Int): Boolean = false
-        override fun clayBand(x: Int, y: Int, z: Int): Int = 0
+    private inner class FakeEnvironment(
+        private val biome: String,
+    ) : SurfaceRuleEnvironment {
+        override fun surfaceDepthNoise(
+            x: Int,
+            z: Int,
+        ): Int = 0
+
+        override fun surfaceSecondaryNoise(
+            x: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun sample2d(
+            noiseId: String,
+            x: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun sample3d(
+            noiseId: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun verticalGradientRandom(
+            name: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Float = 0.5f
+
+        override fun positionalRandom(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): BasaltRandom = XoroshiroRandom(x * 31L + z)
+
+        override fun estimatedSurfaceHeight(
+            x: Int,
+            z: Int,
+        ): Int = 70
+
+        override fun biomeAt(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): String = biome
+
+        override fun noiseBiomeAt(
+            quartX: Int,
+            quartY: Int,
+            quartZ: Int,
+            cache: DensityCache?,
+        ): String = biome
+
+        override fun isSteep(
+            x: Int,
+            z: Int,
+        ): Boolean = false
+
+        override fun clayBand(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Int = 0
     }
 
     /** Grass with a leaf canopy over half of it, so the no-leaves heightmap spec differs. */
-    private fun groundChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun groundChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -45,8 +103,10 @@ class FlowerPatchOracle {
                 for (x in 0 until 16) {
                     val id = chunk.getBlockStateId(x, y, z)
                     checksum = (checksum xor id.toLong()) * 1099511628211L
-                    if (!Blocks.isAir(id) && id != Blocks.STONE.stateId &&
-                        id != Blocks.GRASS_BLOCK.stateId && id != Blocks.OAK_LEAVES.stateId
+                    if (!Blocks.isAir(id) &&
+                        id != Blocks.STONE.stateId &&
+                        id != Blocks.GRASS_BLOCK.stateId &&
+                        id != Blocks.OAK_LEAVES.stateId
                     ) {
                         plants++
                     }
@@ -56,7 +116,11 @@ class FlowerPatchOracle {
         return checksum to plants
     }
 
-    private fun report(name: String, biome: String, body: (Chunk, FakeEnvironment) -> Unit) {
+    private fun report(
+        name: String,
+        biome: String,
+        body: (Chunk, FakeEnvironment) -> Unit,
+    ) {
         var checksum = -3750763034362895579L
         var plants = 0
         val distinct = mutableSetOf<Int>()
@@ -70,8 +134,10 @@ class FlowerPatchOracle {
                 for (z in 0 until 16) {
                     for (x in 0 until 16) {
                         val id = chunk.getBlockStateId(x, y, z)
-                        if (!Blocks.isAir(id) && id != Blocks.STONE.stateId &&
-                            id != Blocks.GRASS_BLOCK.stateId && id != Blocks.OAK_LEAVES.stateId
+                        if (!Blocks.isAir(id) &&
+                            id != Blocks.STONE.stateId &&
+                            id != Blocks.GRASS_BLOCK.stateId &&
+                            id != Blocks.OAK_LEAVES.stateId
                         ) {
                             distinct.add(id)
                         }
@@ -85,8 +151,14 @@ class FlowerPatchOracle {
     @Test
     fun dump() {
         for (biome in listOf(
-            "minecraft:plains", "minecraft:flower_forest", "minecraft:pale_garden", "minecraft:meadow",
-            "minecraft:swamp", "minecraft:cherry_grove", "minecraft:birch_forest", "minecraft:savanna",
+            "minecraft:plains",
+            "minecraft:flower_forest",
+            "minecraft:pale_garden",
+            "minecraft:meadow",
+            "minecraft:swamp",
+            "minecraft:cherry_grove",
+            "minecraft:birch_forest",
+            "minecraft:savanna",
             "minecraft:taiga",
         )) {
             report(biome.substringAfter(':'), biome) { c, e -> FlowerPatchDecoration.decorate(c, 31415L, e) }
@@ -94,12 +166,13 @@ class FlowerPatchOracle {
         // the_void is in none of the thirteen biome lists, so this is the real rejection case.
         report("wrong", "minecraft:the_void") { c, e -> FlowerPatchDecoration.decorate(c, 31415L, e) }
         for (name in listOf("flower_default", "flower_plains", "wildflowers_meadow", "pale_garden_flowers")) {
-            val biome = when (name) {
-                "flower_plains" -> "minecraft:plains"
-                "wildflowers_meadow" -> "minecraft:meadow"
-                "pale_garden_flowers" -> "minecraft:pale_garden"
-                else -> "minecraft:taiga"
-            }
+            val biome =
+                when (name) {
+                    "flower_plains" -> "minecraft:plains"
+                    "wildflowers_meadow" -> "minecraft:meadow"
+                    "pale_garden_flowers" -> "minecraft:pale_garden"
+                    else -> "minecraft:taiga"
+                }
             report("only_$name", biome) { c, e -> FlowerPatchDecoration.decorateFeature(c, 31415L, e, name, null) }
         }
     }

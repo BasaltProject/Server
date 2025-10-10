@@ -14,21 +14,25 @@ class SimpleBlockOracle {
             for (z in 0 until 16) {
                 for (y in -64 until 63) chunk.setBlockStateId(x, y, z, Blocks.STONE.stateId)
                 // A patchwork of supports so every branch of canSurvive is reached.
-                val ground = when ((x + z) % 6) {
-                    0 -> Blocks.GRASS_BLOCK.stateId
-                    1 -> stateId("sand")
-                    2 -> stateId("podzol")
-                    3 -> Blocks.STONE.stateId
-                    4 -> Blocks.WATER.stateId
-                    else -> stateId("mycelium")
-                }
+                val ground =
+                    when ((x + z) % 6) {
+                        0 -> Blocks.GRASS_BLOCK.stateId
+                        1 -> stateId("sand")
+                        2 -> stateId("podzol")
+                        3 -> Blocks.STONE.stateId
+                        4 -> Blocks.WATER.stateId
+                        else -> stateId("mycelium")
+                    }
                 chunk.setBlockStateId(x, 63, z, ground)
             }
         }
         return chunk
     }
 
-    private fun run(name: String, feature: SimpleBlockFeature) {
+    private fun run(
+        name: String,
+        feature: SimpleBlockFeature,
+    ) {
         val chunk = groundChunk()
         val random = WorldgenRandom(LegacyRandom(555L))
         var placed = 0

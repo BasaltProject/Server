@@ -44,7 +44,11 @@ class CaveVineOracle {
         return Triple(checksum, vines, distinct.size)
     }
 
-    private fun report(name: String, inMoss: Boolean, floorY: Int) {
+    private fun report(
+        name: String,
+        inMoss: Boolean,
+        floorY: Int,
+    ) {
         var checksum = -3750763034362895579L
         var vines = 0
         var distinct = 0

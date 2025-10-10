@@ -10,18 +10,73 @@ import kotlin.test.Test
 
 /** The frozen Kotlin as the oracle for the top-layer freeze. */
 class SurfaceFreezingOracle {
-    private inner class FakeEnvironment(private val biome: String) : SurfaceRuleEnvironment {
-        override fun surfaceDepthNoise(x: Int, z: Int): Int = 0
-        override fun surfaceSecondaryNoise(x: Int, z: Int): Double = 0.0
-        override fun sample2d(noiseId: String, x: Int, z: Int): Double = 0.0
-        override fun sample3d(noiseId: String, x: Int, y: Int, z: Int): Double = 0.0
-        override fun verticalGradientRandom(name: String, x: Int, y: Int, z: Int): Float = 0.5f
-        override fun positionalRandom(x: Int, y: Int, z: Int): BasaltRandom = XoroshiroRandom(x * 31L + z)
-        override fun estimatedSurfaceHeight(x: Int, z: Int): Int = 70
-        override fun biomeAt(x: Int, y: Int, z: Int): String = biome
-        override fun noiseBiomeAt(quartX: Int, quartY: Int, quartZ: Int, cache: DensityCache?): String = biome
-        override fun isSteep(x: Int, z: Int): Boolean = false
-        override fun clayBand(x: Int, y: Int, z: Int): Int = 0
+    private inner class FakeEnvironment(
+        private val biome: String,
+    ) : SurfaceRuleEnvironment {
+        override fun surfaceDepthNoise(
+            x: Int,
+            z: Int,
+        ): Int = 0
+
+        override fun surfaceSecondaryNoise(
+            x: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun sample2d(
+            noiseId: String,
+            x: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun sample3d(
+            noiseId: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun verticalGradientRandom(
+            name: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Float = 0.5f
+
+        override fun positionalRandom(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): BasaltRandom = XoroshiroRandom(x * 31L + z)
+
+        override fun estimatedSurfaceHeight(
+            x: Int,
+            z: Int,
+        ): Int = 70
+
+        override fun biomeAt(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): String = biome
+
+        override fun noiseBiomeAt(
+            quartX: Int,
+            quartY: Int,
+            quartZ: Int,
+            cache: DensityCache?,
+        ): String = biome
+
+        override fun isSteep(
+            x: Int,
+            z: Int,
+        ): Boolean = false
+
+        override fun clayBand(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Int = 0
     }
 
     /**
@@ -29,19 +84,23 @@ class SurfaceFreezingOracle {
      * snow refuses to sit on ice and is forced onto honey, and the snowy property only exists on
      * grass, podzol and mycelium.
      */
-    private fun terrainChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun terrainChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
                 val top = 68 + ((x * 3 + z * 5) % 4)
                 for (y in 60 until top) chunk.setBlockStateId(x, y, z, Blocks.STONE.stateId)
-                val surface = when ((x + z) % 5) {
-                    0 -> Blocks.WATER.stateId
-                    1 -> Blocks.GRASS_BLOCK.stateId
-                    2 -> stateId("podzol")
-                    3 -> stateId("ice")
-                    else -> stateId("honey_block")
-                }
+                val surface =
+                    when ((x + z) % 5) {
+                        0 -> Blocks.WATER.stateId
+                        1 -> Blocks.GRASS_BLOCK.stateId
+                        2 -> stateId("podzol")
+                        3 -> stateId("ice")
+                        else -> stateId("honey_block")
+                    }
                 chunk.setBlockStateId(x, top, z, surface)
             }
         }
@@ -65,7 +124,10 @@ class SurfaceFreezingOracle {
         return Triple(checksum, snow, ice)
     }
 
-    private fun report(name: String, biome: String) {
+    private fun report(
+        name: String,
+        biome: String,
+    ) {
         var checksum = -3750763034362895579L
         var snow = 0
         var ice = 0

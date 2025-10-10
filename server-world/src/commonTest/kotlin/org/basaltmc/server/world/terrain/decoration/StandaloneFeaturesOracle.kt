@@ -15,7 +15,12 @@ class StandaloneFeaturesOracle {
     private enum class Ground { SOLID, CAVE, CORRIDOR }
 
     /** Solid rock of one kind, optionally hollowed: a wide cave, or a narrow corridor. */
-    private fun rockChunk(chunkX: Int, chunkZ: Int, rock: String, ground: Ground): Chunk {
+    private fun rockChunk(
+        chunkX: Int,
+        chunkZ: Int,
+        rock: String,
+        ground: Ground,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -106,15 +111,29 @@ class StandaloneFeaturesOracle {
         report("springClosedDouble", "spring_closed_double", 25, rock = "netherrack", ground = Ground.SOLID)
         report("monsterRoom", "monster_room", 31, ground = Ground.CORRIDOR)
         report("monsterRoomDeep", "monster_room_deep", 31, ground = Ground.CORRIDOR)
-        report("monsterRoomEdge", "monster_room", 31, ground = Ground.CORRIDOR, localX = 1, localZ = 8,
-            withNeighbourTerrain = true)
+        report(
+            "monsterRoomEdge",
+            "monster_room",
+            31,
+            ground = Ground.CORRIDOR,
+            localX = 1,
+            localZ = 8,
+            withNeighbourTerrain = true,
+        )
         report("endPlatform", "end_platform", 32)
         report("voidStartPlatform", "void_start_platform", 32)
         report("endGatewayReturn", "end_gateway_return", 32)
         report("lakeLavaSurface", "lake_lava_surface", 20, ground = Ground.SOLID)
         report("lakeLavaUnderground", "lake_lava_underground", 20, ground = Ground.SOLID)
-        report("lakeLavaEdge", "lake_lava_surface", 20, ground = Ground.SOLID, localX = 2, localZ = 13,
-            withNeighbourTerrain = true)
+        report(
+            "lakeLavaEdge",
+            "lake_lava_surface",
+            20,
+            ground = Ground.SOLID,
+            localX = 2,
+            localZ = 13,
+            withNeighbourTerrain = true,
+        )
         report("caveVines", "cave_vines", 34)
         report("classicVines", "classic_vines_cave_feature", 35)
         report("lushVegetation", "lush_caves_vegetation", 32)

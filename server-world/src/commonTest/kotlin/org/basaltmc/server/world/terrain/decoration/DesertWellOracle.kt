@@ -13,7 +13,11 @@ class DesertWellOracle {
      * column of its 5 by 5 footprint has two air blocks beneath, so a solid plain would never reach
      * that abort.
      */
-    private fun sandChunk(chunkX: Int, chunkZ: Int, hollow: Boolean): Chunk {
+    private fun sandChunk(
+        chunkX: Int,
+        chunkZ: Int,
+        hollow: Boolean,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {

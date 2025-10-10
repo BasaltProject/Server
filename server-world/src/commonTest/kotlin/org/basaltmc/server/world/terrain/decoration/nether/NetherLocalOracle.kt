@@ -13,15 +13,25 @@ import kotlin.test.Test
 
 /** The frozen Kotlin as the oracle for the Nether basalt pillar. */
 class NetherLocalOracle {
-    private class FixedBiome(private val biome: Biome) : NetherBiomeLookup {
-        override fun blockBiomeAt(x: Int, y: Int, z: Int, cache: DensityCache?): Biome = biome
+    private class FixedBiome(
+        private val biome: Biome,
+    ) : NetherBiomeLookup {
+        override fun blockBiomeAt(
+            x: Int,
+            y: Int,
+            z: Int,
+            cache: DensityCache?,
+        ): Biome = biome
     }
 
     private fun stateId(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
 
     /** A soul sand valley roof over an open cavern, which is the only shape a pillar hangs from. */
-    private fun valleyChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun valleyChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {

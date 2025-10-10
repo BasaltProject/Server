@@ -12,26 +12,88 @@ import kotlin.test.Test
 
 /** The frozen Kotlin as the oracle for the pale moss patch. */
 class PaleMossOracle {
-    private inner class FakeEnvironment(private val biome: String) : SurfaceRuleEnvironment {
-        override fun surfaceDepthNoise(x: Int, z: Int): Int = 0
-        override fun surfaceSecondaryNoise(x: Int, z: Int): Double = 0.0
-        override fun sample2d(noiseId: String, x: Int, z: Int): Double = 0.0
-        override fun sample3d(noiseId: String, x: Int, y: Int, z: Int): Double = 0.0
-        override fun verticalGradientRandom(name: String, x: Int, y: Int, z: Int): Float = 0.5f
-        override fun positionalRandom(x: Int, y: Int, z: Int): BasaltRandom = XoroshiroRandom(x * 31L + z)
-        override fun estimatedSurfaceHeight(x: Int, z: Int): Int = 70
-        override fun biomeAt(x: Int, y: Int, z: Int): String = biome
-        override fun noiseBiomeAt(quartX: Int, quartY: Int, quartZ: Int, cache: DensityCache?): String = biome
-        override fun isSteep(x: Int, z: Int): Boolean = false
-        override fun clayBand(x: Int, y: Int, z: Int): Int = 0
+    private inner class FakeEnvironment(
+        private val biome: String,
+    ) : SurfaceRuleEnvironment {
+        override fun surfaceDepthNoise(
+            x: Int,
+            z: Int,
+        ): Int = 0
+
+        override fun surfaceSecondaryNoise(
+            x: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun sample2d(
+            noiseId: String,
+            x: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun sample3d(
+            noiseId: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun verticalGradientRandom(
+            name: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Float = 0.5f
+
+        override fun positionalRandom(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): BasaltRandom = XoroshiroRandom(x * 31L + z)
+
+        override fun estimatedSurfaceHeight(
+            x: Int,
+            z: Int,
+        ): Int = 70
+
+        override fun biomeAt(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): String = biome
+
+        override fun noiseBiomeAt(
+            quartX: Int,
+            quartY: Int,
+            quartZ: Int,
+            cache: DensityCache?,
+        ): String = biome
+
+        override fun isSteep(
+            x: Int,
+            z: Int,
+        ): Boolean = false
+
+        override fun clayBand(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Int = 0
     }
 
     private fun stateId(path: String): Int =
-        Blocks.REGISTRY.byIdentifier(org.basaltmc.wire.common.Identifier.vanilla(path))?.stateId
+        Blocks.REGISTRY
+            .byIdentifier(
+                org.basaltmc.wire.common.Identifier
+                    .vanilla(path),
+            )?.stateId
             ?: error("unknown block '$path'")
 
     /** Uneven ground: the patch has to find each column's own surface. */
-    private fun groundChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun groundChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -62,7 +124,12 @@ class PaleMossOracle {
         return Triple(checksum, moss, plants)
     }
 
-    private fun report(name: String, biome: String, count: Int, body: (Chunk, FakeEnvironment, Long) -> Unit) {
+    private fun report(
+        name: String,
+        biome: String,
+        count: Int,
+        body: (Chunk, FakeEnvironment, Long) -> Unit,
+    ) {
         var checksum = -3750763034362895579L
         var moss = 0
         var plants = 0
@@ -97,7 +164,11 @@ class PaleMossOracle {
             checksum = (checksum xor chunkChecksum) * 1099511628211L
             moss += chunkMoss
             plants += chunkPlants
-            heights.append(chunkMoss).append(':').append(chunkPlants).append(',')
+            heights
+                .append(chunkMoss)
+                .append(':')
+                .append(chunkPlants)
+                .append(',')
         }
         println("ORACLE patch moss=$moss plants=$plants checksum=$checksum after=${random.nextInt()} shape=$heights")
     }

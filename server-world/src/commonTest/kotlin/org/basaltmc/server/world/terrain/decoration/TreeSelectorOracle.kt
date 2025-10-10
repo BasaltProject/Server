@@ -12,7 +12,11 @@ class TreeSelectorOracle {
     private fun stateId(path: String): Int =
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
 
-    private fun groundChunk(chunkX: Int, chunkZ: Int, surface: String): Chunk {
+    private fun groundChunk(
+        chunkX: Int,
+        chunkZ: Int,
+        surface: String,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -24,7 +28,10 @@ class TreeSelectorOracle {
     }
 
     /** Powder snow over snow blocks, which is the only ground the grove selector accepts. */
-    private fun groveChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun groveChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = groundChunk(chunkX, chunkZ, "snow_block")
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -46,7 +53,10 @@ class TreeSelectorOracle {
         return checksum
     }
 
-    private fun changedBlocks(chunk: Chunk, reference: Chunk): Int {
+    private fun changedBlocks(
+        chunk: Chunk,
+        reference: Chunk,
+    ): Int {
         var changed = 0
         for (y in 60..140) {
             for (z in 0 until 16) {
@@ -60,7 +70,12 @@ class TreeSelectorOracle {
 
     private val seeds = longArrayOf(11L, 907L, 31337L, 654321L, 8675309L, 42424242L, 987654321L, 5150L)
 
-    private fun report(name: String, surface: String, originY: Int = 71, grove: Boolean = false) {
+    private fun report(
+        name: String,
+        surface: String,
+        originY: Int = 71,
+        grove: Boolean = false,
+    ) {
         var checksum = -3750763034362895579L
         var changed = 0
         var deferred = 0

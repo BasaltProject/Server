@@ -4,8 +4,8 @@ import org.basaltmc.server.random.LegacyRandom
 import org.basaltmc.server.random.WorldgenRandom
 import org.basaltmc.server.registry.Blocks
 import org.basaltmc.server.world.Chunk
-import org.basaltmc.wire.common.Identifier
 import org.basaltmc.server.world.terrain.decoration.IntProvider
+import org.basaltmc.wire.common.Identifier
 import kotlin.test.Test
 
 /** The frozen Kotlin as the oracle for the seven trunk placers. */
@@ -14,7 +14,10 @@ class TreeTrunkPlacersOracle {
         Blocks.REGISTRY.byIdentifier(Identifier.vanilla(path))?.stateId ?: error("unknown block '$path'")
 
     /** Grass over stone, plus an obstacle column and a leaf block so the free-space probes can fail. */
-    private fun groundChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun groundChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -68,11 +71,16 @@ class TreeTrunkPlacersOracle {
                 placer.placeTrunk(chunk, random, treeHeight, originX, 71, originZ, stateId("oak_log"))
             for (attachment in attachments) {
                 attached
-                    .append(attachment.x - originX).append(':')
-                    .append(attachment.y - 71).append(':')
-                    .append(attachment.z - originZ).append(':')
-                    .append(attachment.radiusOffset).append(':')
-                    .append(if (attachment.doubleTrunk) 1 else 0).append(' ')
+                    .append(attachment.x - originX)
+                    .append(':')
+                    .append(attachment.y - 71)
+                    .append(':')
+                    .append(attachment.z - originZ)
+                    .append(':')
+                    .append(attachment.radiusOffset)
+                    .append(':')
+                    .append(if (attachment.doubleTrunk) 1 else 0)
+                    .append(' ')
             }
             attached.append('|')
             val (chunkChecksum, chunkLogs) = fold(chunk)
@@ -80,7 +88,12 @@ class TreeTrunkPlacersOracle {
             logs += chunkLogs
             for (write in chunk.takeGeneratedBlockWrites()) {
                 deferred++
-                for (part in longArrayOf(write.x.toLong(), write.y.toLong(), write.z.toLong(), write.stateId.toLong())) {
+                for (part in longArrayOf(
+                    write.x.toLong(),
+                    write.y.toLong(),
+                    write.z.toLong(),
+                    write.stateId.toLong(),
+                )) {
                     deferredChecksum = (deferredChecksum xor part) * 1099511628211L
                 }
             }

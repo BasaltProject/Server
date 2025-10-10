@@ -23,7 +23,10 @@ class GroundVegetationOracle {
         return chunk
     }
 
-    private fun report(name: String, body: (Chunk, WorldgenRandom) -> Unit) {
+    private fun report(
+        name: String,
+        body: (Chunk, WorldgenRandom) -> Unit,
+    ) {
         val chunk = groundChunk()
         val random = WorldgenRandom(LegacyRandom(31337L))
         body(chunk, random)
@@ -34,8 +37,10 @@ class GroundVegetationOracle {
                 for (x in 0 until 16) {
                     val stateId = chunk.getBlockStateId(x, y, z)
                     checksum = (checksum xor stateId.toLong()) * 1099511628211L
-                    if (!Blocks.isAir(stateId) && stateId != Blocks.STONE.stateId &&
-                        stateId != Blocks.GRASS_BLOCK.stateId && stateId != stateId("sand")
+                    if (!Blocks.isAir(stateId) &&
+                        stateId != Blocks.STONE.stateId &&
+                        stateId != Blocks.GRASS_BLOCK.stateId &&
+                        stateId != stateId("sand")
                     ) {
                         plants++
                     }
@@ -62,7 +67,9 @@ class GroundVegetationOracle {
         report("combined") { c, r ->
             combine(ForestGroundDecoration.BUSH, ForestGroundDecoration.GRASS, DryGrassDecoration.DESERT).decorate(c, r)
         }
-        println("ORACLE known=" + (BiomeDecoration.forBiome(Identifier.vanilla("plains")) != null) +
-            "," + (BiomeDecoration.forBiome(Identifier.vanilla("nether_wastes")) != null))
+        println(
+            "ORACLE known=" + (BiomeDecoration.forBiome(Identifier.vanilla("plains")) != null) +
+                "," + (BiomeDecoration.forBiome(Identifier.vanilla("nether_wastes")) != null),
+        )
     }
 }

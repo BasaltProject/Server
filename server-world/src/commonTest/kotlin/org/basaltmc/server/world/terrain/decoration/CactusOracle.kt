@@ -12,22 +12,80 @@ import kotlin.test.Test
 
 /** The frozen Kotlin as the oracle for the cactus column and its two patches. */
 class CactusOracle {
-    private inner class FakeEnvironment(private val biome: String) : SurfaceRuleEnvironment {
-        override fun surfaceDepthNoise(x: Int, z: Int): Int = 0
-        override fun surfaceSecondaryNoise(x: Int, z: Int): Double = 0.0
-        override fun sample2d(noiseId: String, x: Int, z: Int): Double = 0.0
-        override fun sample3d(noiseId: String, x: Int, y: Int, z: Int): Double = 0.0
-        override fun verticalGradientRandom(name: String, x: Int, y: Int, z: Int): Float = 0.5f
-        override fun positionalRandom(x: Int, y: Int, z: Int): BasaltRandom = XoroshiroRandom(x * 31L + z)
-        override fun estimatedSurfaceHeight(x: Int, z: Int): Int = 70
-        override fun biomeAt(x: Int, y: Int, z: Int): String = biome
-        override fun noiseBiomeAt(quartX: Int, quartY: Int, quartZ: Int, cache: DensityCache?): String = biome
-        override fun isSteep(x: Int, z: Int): Boolean = false
-        override fun clayBand(x: Int, y: Int, z: Int): Int = 0
+    private inner class FakeEnvironment(
+        private val biome: String,
+    ) : SurfaceRuleEnvironment {
+        override fun surfaceDepthNoise(
+            x: Int,
+            z: Int,
+        ): Int = 0
+
+        override fun surfaceSecondaryNoise(
+            x: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun sample2d(
+            noiseId: String,
+            x: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun sample3d(
+            noiseId: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Double = 0.0
+
+        override fun verticalGradientRandom(
+            name: String,
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Float = 0.5f
+
+        override fun positionalRandom(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): BasaltRandom = XoroshiroRandom(x * 31L + z)
+
+        override fun estimatedSurfaceHeight(
+            x: Int,
+            z: Int,
+        ): Int = 70
+
+        override fun biomeAt(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): String = biome
+
+        override fun noiseBiomeAt(
+            quartX: Int,
+            quartY: Int,
+            quartZ: Int,
+            cache: DensityCache?,
+        ): String = biome
+
+        override fun isSteep(
+            x: Int,
+            z: Int,
+        ): Boolean = false
+
+        override fun clayBand(
+            x: Int,
+            y: Int,
+            z: Int,
+        ): Int = 0
     }
 
     /** Sand flats: cacti need sand below, air around and air above. */
-    private fun sandChunk(chunkX: Int, chunkZ: Int): Chunk {
+    private fun sandChunk(
+        chunkX: Int,
+        chunkZ: Int,
+    ): Chunk {
         val chunk = Chunk(chunkX, chunkZ)
         for (x in 0 until 16) {
             for (z in 0 until 16) {
@@ -53,7 +111,11 @@ class CactusOracle {
         return checksum to cacti
     }
 
-    private fun report(name: String, biome: String, body: (Chunk, FakeEnvironment) -> Unit) {
+    private fun report(
+        name: String,
+        biome: String,
+        body: (Chunk, FakeEnvironment) -> Unit,
+    ) {
         var checksum = -3750763034362895579L
         var cacti = 0
         var deferred = 0
@@ -78,7 +140,13 @@ class CactusOracle {
         }
         report("regional", "minecraft:desert") { c, e ->
             CactusPatchDecoration.decorate(c, 5150L, e, externalBlockState = { _, y, _ ->
-                if (y < 70) Blocks.STONE.stateId else if (y == 70) stateId("sand") else Blocks.AIR.stateId
+                if (y < 70) {
+                    Blocks.STONE.stateId
+                } else if (y == 70) {
+                    stateId("sand")
+                } else {
+                    Blocks.AIR.stateId
+                }
             })
         }
 
