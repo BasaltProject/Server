@@ -49,6 +49,8 @@ basalt_module(server-world
     src/terrain/decoration/nether/NetherVegetalShared.cpp
     src/terrain/decoration/nether/NetherVines.cpp
     src/terrain/decoration/OverworldOreConfigs.cpp
+    src/terrain/decoration/LushCaveVegetationDecoration.cpp
+    src/terrain/decoration/MushroomFieldsDecoration.cpp
     src/terrain/decoration/OverworldBiomePaths.cpp
     src/terrain/decoration/OverworldSpringDecoration.cpp
     src/terrain/decoration/OverworldOreDecoration.cpp
@@ -58,6 +60,8 @@ basalt_module(server-world
     src/terrain/decoration/CactusFeature.cpp
     src/terrain/decoration/CaveLocalModificationDecoration.cpp
     src/terrain/decoration/CoralDecoration.cpp
+    src/terrain/decoration/FrozenOceanDecoration.cpp
+    src/terrain/decoration/IcebergFeature.cpp
     src/terrain/decoration/CaveSpeleothemDecoration.cpp
     src/terrain/decoration/SculkDecoration.cpp
     src/terrain/decoration/SculkVeinSpread.cpp
@@ -71,6 +75,7 @@ basalt_module(server-world
     src/terrain/decoration/PaleMossDecoration.cpp
     src/terrain/decoration/PatchRegion.cpp
     src/terrain/decoration/PlainsFlowerFeatures.cpp
+    src/terrain/decoration/TaigaGroundDecoration.cpp
     src/terrain/decoration/TallGrassDecoration.cpp
     src/terrain/decoration/TreeDecoration.cpp
     src/terrain/decoration/TreePatchDecoration.cpp
@@ -226,6 +231,24 @@ basalt_test(server-world-cave-local-modification-test
 basalt_test(server-world-sculk-test
     SOURCES
         test/SculkTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-frozen-ocean-test
+    SOURCES
+        test/FrozenOceanTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-taiga-mushroom-test
+    SOURCES
+        test/TaigaMushroomTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-lush-cave-test
+    SOURCES
+        test/LushCaveTest.cpp
     DEPENDS basalt::server-world
 )
 
