@@ -17,7 +17,9 @@ basalt_module(server-world
         src/structure/StructureBounds.cpp
         src/terrain/carver/NetherCaveCarver.cpp
     src/terrain/carver/OverworldCarvers.cpp
+    src/terrain/decoration/AquaticDecoration.cpp
     src/terrain/decoration/AquaticPatchDecoration.cpp
+    src/terrain/decoration/AquaticSupport.cpp
     src/terrain/decoration/BiomeDecoration.cpp
     src/terrain/decoration/BiomeFlowerFeatures.cpp
     src/terrain/decoration/ExtraVegetationDecoration.cpp
@@ -56,6 +58,7 @@ basalt_module(server-world
     src/terrain/decoration/OverworldOreDecoration.cpp
     src/terrain/decoration/PlacementRegion.cpp
     src/terrain/decoration/BushPatchDecoration.cpp
+    src/terrain/decoration/BambooDecoration.cpp
     src/terrain/decoration/BambooVegetationDecoration.cpp
     src/terrain/decoration/CactusFeature.cpp
     src/terrain/decoration/CaveLocalModificationDecoration.cpp
@@ -249,6 +252,18 @@ basalt_test(server-world-taiga-mushroom-test
 basalt_test(server-world-lush-cave-test
     SOURCES
         test/LushCaveTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-bamboo-test
+    SOURCES
+        test/BambooTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-aquatic-vegetal-test
+    SOURCES
+        test/AquaticVegetalTest.cpp
     DEPENDS basalt::server-world
 )
 

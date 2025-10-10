@@ -1,3 +1,5 @@
+#include "AquaticSupport.hpp"
+
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
@@ -150,40 +152,18 @@ const std::vector<AquaticSpec>& specs() {
 }
 
 [[nodiscard]] bool canSeagrassSurvive(const AquaticRegion& region, const DecorationPos& position, ChunkHeight bounds) {
-    if (position.y <= bounds.minY()) {
-        return false;
-    }
-    const std::int32_t below = region.get(DecorationPos{position.x, position.y - 1, position.z});
-    return below != stateIdOf("magma_block") && registry::blockShapes::isFaceSturdy(below, registry::BlockFace::Up);
+    return position.y > bounds.minY() &&
+           aquaticsupport::seagrassSupport(region.get(DecorationPos{position.x, position.y - 1, position.z}));
 }
 
 [[nodiscard]] bool canSeaPickleSurvive(const AquaticRegion& region, const DecorationPos& position, ChunkHeight bounds) {
-    if (position.y <= bounds.minY()) {
-        return false;
-    }
-    const std::int32_t below = region.get(DecorationPos{position.x, position.y - 1, position.z});
-    // The boxes are flattened six numbers each; index 4 of a box is its top edge.
-    const std::span<const std::int32_t> boxes = registry::blockShapes::collisionBoxes(below);
-    bool hasTopCollision = false;
-    for (std::size_t offset = 4; offset < boxes.size(); offset += 6) {
-        if (boxes[offset] == registry::blockShapes::kUnits) {
-            hasTopCollision = true;
-            break;
-        }
-    }
-    return hasTopCollision || registry::blockShapes::isFaceSturdy(below, registry::BlockFace::Up);
+    return position.y > bounds.minY() &&
+           aquaticsupport::seaPickleSupport(region.get(DecorationPos{position.x, position.y - 1, position.z}));
 }
 
 [[nodiscard]] bool canKelpSurvive(const AquaticRegion& region, const DecorationPos& position, ChunkHeight bounds) {
-    if (position.y <= bounds.minY()) {
-        return false;
-    }
-    const std::int32_t below = region.get(DecorationPos{position.x, position.y - 1, position.z});
-    if (below == stateIdOf("magma_block")) {
-        return false;
-    }
-    return below == stateIdOf("kelp_plant") || registry::blockStateFamilies::isKelpState(below) ||
-           registry::blockShapes::isFaceSturdy(below, registry::BlockFace::Up);
+    return position.y > bounds.minY() &&
+           aquaticsupport::kelpSupport(region.get(DecorationPos{position.x, position.y - 1, position.z}));
 }
 
 void placeSeagrass(AquaticRegion& region, random::RandomSource& random, const DecorationPos& origin,
