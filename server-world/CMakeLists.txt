@@ -55,7 +55,9 @@ basalt_module(server-world
     src/terrain/decoration/MushroomFieldsDecoration.cpp
     src/terrain/decoration/OverworldBiomePaths.cpp
     src/terrain/decoration/OverworldSpringDecoration.cpp
+    src/terrain/decoration/OverworldVegetalDecoration.cpp
     src/terrain/decoration/OverworldOreDecoration.cpp
+    src/terrain/decoration/PlacedFeatures.cpp
     src/terrain/decoration/PlacementRegion.cpp
     src/terrain/decoration/BushPatchDecoration.cpp
     src/terrain/decoration/BambooDecoration.cpp
@@ -278,6 +280,18 @@ basalt_test(server-world-small-features-test
 basalt_test(server-world-village-features-test
     SOURCES
         test/VillageFeaturesTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-overworld-vegetal-test
+    SOURCES
+        test/OverworldVegetalTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-placed-features-test
+    SOURCES
+        test/PlacedFeaturesTest.cpp
     DEPENDS basalt::server-world
 )
 
