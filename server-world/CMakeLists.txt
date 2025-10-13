@@ -9,6 +9,7 @@ basalt_module(server-world
         src/ChunkTypes.cpp
         src/PalettedContainer.cpp
         src/climate/Climate.cpp
+    src/climate/SpawnFinder.cpp
         src/climate/OverworldBiomes.cpp
         src/densityfunction/DensityCache.cpp
         src/densityfunction/DensityFunction.cpp
@@ -108,6 +109,7 @@ basalt_module(server-world
     src/terrain/decoration/RootedAzaleaFeature.cpp
     src/terrain/decoration/SimpleBlockFeature.cpp
     src/terrain/BiomeClimateData.cpp
+    src/terrain/BubbleColumnFormation.cpp
     src/terrain/DensityChunkSampler.cpp
     src/terrain/NetherBiomeSource.cpp
     src/terrain/TheEndBiomeSource.cpp
@@ -123,6 +125,7 @@ basalt_module(server-world
     src/terrain/TerrainProvider.cpp
     src/terrain/NeighbourTerrain.cpp
     src/terrain/NoiseColumnHeights.cpp
+    src/terrain/StructureBeardifier.cpp
     src/terrain/OverworldBiomeSource.cpp
     src/terrain/NoiseRouterData.cpp
     src/terrain/OverworldOreVeinifier.cpp
@@ -335,6 +338,18 @@ basalt_test(server-world-generation-metrics-test
 basalt_test(server-world-neighbour-terrain-test
     SOURCES
         test/NeighbourTerrainTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-beardifier-bubble-test
+    SOURCES
+        test/BeardifierBubbleTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-spawn-finder-test
+    SOURCES
+        test/SpawnFinderTest.cpp
     DEPENDS basalt::server-world
 )
 
