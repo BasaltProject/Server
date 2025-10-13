@@ -1,6 +1,8 @@
 basalt_module(server-world
     SOURCES
         src/Chunk.cpp
+        src/ChunkTracker.cpp
+        src/GenerationMetrics.cpp
         src/LeafDistances.cpp
         src/ChunkDataCodec.cpp
         src/ChunkSection.cpp
@@ -119,6 +121,7 @@ basalt_module(server-world
     src/terrain/BiomeTemperature.cpp
     src/terrain/BiomeZoomer.cpp
     src/terrain/TerrainProvider.cpp
+    src/terrain/NeighbourTerrain.cpp
     src/terrain/NoiseColumnHeights.cpp
     src/terrain/OverworldBiomeSource.cpp
     src/terrain/NoiseRouterData.cpp
@@ -314,6 +317,24 @@ basalt_test(server-world-overworld-biome-source-test
 basalt_test(server-world-leaf-distances-test
     SOURCES
         test/LeafDistancesTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-chunk-tracker-test
+    SOURCES
+        test/ChunkTrackerTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-generation-metrics-test
+    SOURCES
+        test/GenerationMetricsTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-neighbour-terrain-test
+    SOURCES
+        test/NeighbourTerrainTest.cpp
     DEPENDS basalt::server-world
 )
 
