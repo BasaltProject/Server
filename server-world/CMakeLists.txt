@@ -119,6 +119,7 @@ basalt_module(server-world
     src/terrain/decoration/SurfacePatches.cpp
     src/terrain/decoration/Placement.cpp
     src/terrain/decoration/RootedAzaleaFeature.cpp
+    src/terrain/decoration/RootedSulfurSpringFeature.cpp
     src/terrain/decoration/SimpleBlockFeature.cpp
     src/terrain/BiomeClimateData.cpp
     src/terrain/BubbleColumnFormation.cpp

@@ -52,20 +52,24 @@ void countMarker(densityfunction::MarkerType type) noexcept;
 void addPhaseNanos(Phase phase, std::int64_t nanos) noexcept;
 
 /// Runs `block`, adding its wall time to `phase` when metrics are on.
-template <typename Block> decltype(auto) measure(Phase phase, Block&& block) {
+template <typename Block>
+decltype(auto) measure(Phase phase, Block&& block) {
     if (!enabled()) {
         return std::forward<Block>(block)();
     }
     const auto start = std::chrono::steady_clock::now();
+
     struct Recorder {
         Phase phase;
         std::chrono::steady_clock::time_point start;
+
         ~Recorder() {
-            addPhaseNanos(phase, std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                     std::chrono::steady_clock::now() - start)
-                                     .count());
+            addPhaseNanos(
+                phase,
+                std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count());
         }
     } recorder{phase, start};
+
     return std::forward<Block>(block)();
 }
 

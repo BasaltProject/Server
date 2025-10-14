@@ -19,7 +19,7 @@ constexpr std::int32_t kVegetalDecorationStep = 9;
 using PathSet = std::set<std::string, std::less<>>;
 
 const PathSet& podzolReplaceable() {
-    static const PathSet paths = {"dirt",       "coarse_dirt", "rooted_dirt",     "mud",    "muddy_mangrove_roots",
+    static const PathSet paths = {"dirt",       "coarse_dirt",     "rooted_dirt", "mud",    "muddy_mangrove_roots",
                                   "moss_block", "pale_moss_block", "grass_block", "podzol", "mycelium"};
     return paths;
 }
@@ -27,8 +27,8 @@ const PathSet& podzolReplaceable() {
 const PathSet& supportsBamboo() {
     static const PathSet paths = [] {
         PathSet built = podzolReplaceable();
-        built.insert({"sand", "red_sand", "suspicious_sand", "bamboo", "bamboo_sapling", "gravel",
-                      "suspicious_gravel"});
+        built.insert(
+            {"sand", "red_sand", "suspicious_sand", "bamboo", "bamboo_sapling", "gravel", "suspicious_gravel"});
         return built;
     }();
     return paths;
@@ -53,9 +53,8 @@ const std::vector<PlacementModifier>& lightModifiers() {
 }
 
 const std::vector<PlacementModifier>& denseModifiers() {
-    static const std::vector<PlacementModifier> modifiers = {noiseBasedCountPlacement(160, 80.0, 0.3),
-                                                             inSquarePlacement(),
-                                                             heightmapPlacement(HeightmapType::WorldSurface)};
+    static const std::vector<PlacementModifier> modifiers = {
+        noiseBasedCountPlacement(160, 80.0, 0.3), inSquarePlacement(), heightmapPlacement(HeightmapType::WorldSurface)};
     return modifiers;
 }
 
@@ -84,8 +83,7 @@ public:
             }
         }
         if (externalBlockState_) {
-            if (const std::optional<std::int32_t> observed =
-                    externalBlockState_(position.x, position.y, position.z);
+            if (const std::optional<std::int32_t> observed = externalBlockState_(position.x, position.y, position.z);
                 observed.has_value()) {
                 return observed;
             }
@@ -109,9 +107,9 @@ public:
         setExternalDecorationBlockStateId(*chunk_, externalWrites_, externalBlockState_, position, stateId);
         const std::pair<std::int32_t, std::int32_t> column{position.x, position.z};
         const auto found = externalWorldSurfaceHeights_.find(column);
-        const std::int32_t currentHeight =
-            found != externalWorldSurfaceHeights_.end() ? found->second
-                                                        : scanExternalWorldSurface(position.x, position.z);
+        const std::int32_t currentHeight = found != externalWorldSurfaceHeights_.end()
+                                               ? found->second
+                                               : scanExternalWorldSurface(position.x, position.z);
         if (!registry::blocks::isAir(stateId) && position.y + 1 > currentHeight) {
             externalWorldSurfaceHeights_[column] = position.y + 1;
         } else if (position.y + 1 == currentHeight && registry::blocks::isAir(stateId)) {
@@ -155,8 +153,7 @@ private:
                 }
             }
             if (!found && externalBlockState_) {
-                if (const std::optional<std::int32_t> observed = externalBlockState_(x, y, z);
-                    observed.has_value()) {
+                if (const std::optional<std::int32_t> observed = externalBlockState_(x, y, z); observed.has_value()) {
                     stateId = *observed;
                 }
             }
@@ -238,9 +235,8 @@ void decorateWith(Chunk& chunk, BambooRegion& region, random::RandomSource& rand
     const ChunkHeight bounds = chunk.verticalBounds();
     const DecorationPos chunkOrigin{.x = chunk.chunkX() * 16, .y = 0, .z = chunk.chunkZ() * 16};
     placeFrom(chunk, random, chunkOrigin, modifiers, [&](const DecorationPos& origin) {
-        if (!requiredBiome.empty() &&
-            (environment == nullptr ||
-             biomePath(environment->biomeAt(origin.x, origin.y, origin.z)) != requiredBiome)) {
+        if (!requiredBiome.empty() && (environment == nullptr || biomePath(environment->biomeAt(
+                                                                     origin.x, origin.y, origin.z)) != requiredBiome)) {
             return;
         }
         place(region, random, origin, podzolProbability, bounds);
