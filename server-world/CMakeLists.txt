@@ -22,13 +22,17 @@ basalt_module(server-world
         src/structure/StructureBounds.cpp
     src/structure/ConcentricRingsPlacement.cpp
     src/structure/MineshaftBlocks.cpp
+    src/structure/StructurePieceFill.cpp
     src/structure/StructurePlacementGrid.cpp
     src/structure/StructureProcessor.cpp
     src/structure/StructureQueries.cpp
     src/structure/StructureSpawnOverrides.cpp
     src/structure/StructureTemplate.cpp
+    src/structure/StructureTemplatePool.cpp
     src/structure/StructureTemplateTransform.cpp
+    src/structure/TemplateBlockProcessors.cpp
     src/structure/StructureTransform.cpp
+    src/structure/VillagePoolJson.cpp
         src/terrain/carver/NetherCaveCarver.cpp
     src/terrain/carver/OverworldCarvers.cpp
     src/terrain/decoration/AquaticDecoration.cpp
@@ -65,6 +69,7 @@ basalt_module(server-world
     src/terrain/decoration/nether/NetherVegetalDecoration.cpp
     src/terrain/decoration/nether/NetherVegetalShared.cpp
     src/terrain/decoration/nether/NetherVines.cpp
+    src/terrain/decoration/OverworldLakeDecoration.cpp
     src/terrain/decoration/OverworldOreConfigs.cpp
     src/terrain/decoration/LushCaveVegetationDecoration.cpp
     src/terrain/decoration/MushroomFieldsDecoration.cpp
@@ -74,6 +79,7 @@ basalt_module(server-world
     src/terrain/decoration/OverworldVegetalDecoration.cpp
     src/terrain/decoration/OverworldOreDecoration.cpp
     src/terrain/decoration/PlacedFeatures.cpp
+    src/terrain/decoration/PlacedFeaturesContextual.cpp
     src/terrain/decoration/PlacementRegion.cpp
     src/terrain/decoration/BushPatchDecoration.cpp
     src/terrain/decoration/BambooDecoration.cpp
@@ -309,6 +315,24 @@ basalt_test(server-world-village-features-test
 basalt_test(server-world-overworld-vegetal-test
     SOURCES
         test/OverworldVegetalTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-pool-and-piece-test
+    SOURCES
+        test/PoolAndPieceTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-template-block-processors-test
+    SOURCES
+        test/TemplateBlockProcessorsTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-lake-sulfur-spring-test
+    SOURCES
+        test/LakeAndSulfurSpringTest.cpp
     DEPENDS basalt::server-world
 )
 

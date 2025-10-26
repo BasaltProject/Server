@@ -55,6 +55,8 @@ class PlacedFeaturesOracle {
                 .map { it.path }
                 .sorted()
         println("ORACLE ids count=${ids.size} joined=${ids.joinToString(",")}")
+        val contextual = PlacedFeatures.contextualIds.map { it.path }.sorted()
+        println("ORACLE contextualIds count=${contextual.size} joined=${contextual.joinToString(",")}")
         var checksum = -3750763034362895579L
         var deferred = 0
         var trailing = 0
