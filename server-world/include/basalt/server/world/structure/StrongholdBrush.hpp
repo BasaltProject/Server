@@ -5,6 +5,7 @@
 #include <basalt/server/world/structure/StructurePieceFill.hpp>
 
 #include <cstdint>
+#include <initializer_list>
 #include <map>
 #include <string>
 #include <string_view>
@@ -35,7 +36,7 @@ namespace strongholdPalette {
 [[nodiscard]] std::int32_t oakDoor(std::string_view facing, std::string_view half);
 [[nodiscard]] std::int32_t ironDoor(std::string_view facing, std::string_view half);
 /// An iron-bars state with only the named sides connected.
-[[nodiscard]] std::int32_t bars(std::string_view first, std::string_view second = {});
+[[nodiscard]] std::int32_t bars(std::initializer_list<std::string_view> sides);
 [[nodiscard]] std::int32_t stairs(std::string_view path, std::string_view facing, std::string_view half = "bottom");
 [[nodiscard]] std::int32_t wallTorch(std::string_view facing);
 [[nodiscard]] std::int32_t button(std::string_view facing);

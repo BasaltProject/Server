@@ -20,12 +20,19 @@ basalt_module(server-world
         src/noise/ImprovedNoise.cpp
         src/region/ChunkNbt.cpp
         src/structure/StrongholdBrush.cpp
+    src/structure/StrongholdCorridors.cpp
     src/structure/StrongholdLayout.cpp
+    src/structure/StrongholdLibrary.cpp
+    src/structure/StrongholdPortalRoom.cpp
+    src/structure/StrongholdRooms.cpp
     src/structure/StructureBounds.cpp
     src/structure/ConcentricRingsPlacement.cpp
     src/structure/JigsawAssembly.cpp
     src/structure/MineshaftBlocks.cpp
     src/structure/MineshaftFill.cpp
+    src/structure/MonumentBrush.cpp
+    src/structure/MonumentRoomFitters.cpp
+    src/structure/MonumentRoomGraph.cpp
     src/structure/MineshaftLayout.cpp
     src/structure/StructurePieceFill.cpp
     src/structure/StructurePlacementGrid.cpp
@@ -347,9 +354,21 @@ basalt_test(server-world-stronghold-brush-test
     DEPENDS basalt::server-world
 )
 
+basalt_test(server-world-stronghold-pieces-test
+    SOURCES
+        test/StrongholdPiecesTest.cpp
+    DEPENDS basalt::server-world
+)
+
 basalt_test(server-world-stronghold-layout-test
     SOURCES
         test/StrongholdLayoutTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-monument-rooms-test
+    SOURCES
+        test/MonumentRoomsTest.cpp
     DEPENDS basalt::server-world
 )
 
