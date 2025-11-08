@@ -162,13 +162,16 @@ basalt_module(server-world
     src/terrain/BiomeTemperature.cpp
     src/terrain/BiomeZoomer.cpp
     src/terrain/TerrainProvider.cpp
+    src/terrain/WoodlandMansionStructureGenerator.cpp
     src/terrain/MineshaftStructureGenerator.cpp
     src/terrain/NeighbourTerrain.cpp
     src/terrain/NoiseColumnHeights.cpp
+    src/terrain/StrongholdStructureGenerator.cpp
     src/terrain/StructureBeardifier.cpp
     src/terrain/OverworldBiomeSource.cpp
     src/terrain/NoiseRouterData.cpp
     src/terrain/OverworldOreVeinifier.cpp
+    src/terrain/OceanMonumentStructureGenerator.cpp
     src/terrain/OverworldAquifer.cpp
         src/noise/NormalNoise.cpp
         src/noise/PerlinNoise.cpp
@@ -363,6 +366,12 @@ basalt_test(server-world-mineshaft-layout-test
     DEPENDS basalt::server-world
 )
 
+basalt_test(server-world-stronghold-generator-test
+    SOURCES
+        test/StrongholdGeneratorTest.cpp
+    DEPENDS basalt::server-world
+)
+
 basalt_test(server-world-stronghold-brush-test
     SOURCES
         test/StrongholdBrushTest.cpp
@@ -381,9 +390,21 @@ basalt_test(server-world-stronghold-layout-test
     DEPENDS basalt::server-world
 )
 
+basalt_test(server-world-woodland-mansion-generator-test
+    SOURCES
+        test/WoodlandMansionGeneratorTest.cpp
+    DEPENDS basalt::server-world
+)
+
 basalt_test(server-world-mansion-test
     SOURCES
         test/MansionTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-ocean-monument-generator-test
+    SOURCES
+        test/OceanMonumentGeneratorTest.cpp
     DEPENDS basalt::server-world
 )
 
