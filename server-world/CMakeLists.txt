@@ -28,11 +28,19 @@ basalt_module(server-world
     src/structure/StructureBounds.cpp
     src/structure/ConcentricRingsPlacement.cpp
     src/structure/JigsawAssembly.cpp
+    src/structure/MansionExterior.cpp
+    src/structure/MansionGrid.cpp
+    src/structure/MansionPlacer.cpp
+    src/structure/MansionRoomCollection.cpp
     src/structure/MineshaftBlocks.cpp
     src/structure/MineshaftFill.cpp
     src/structure/MonumentBrush.cpp
+    src/structure/MonumentDoubleRooms.cpp
     src/structure/MonumentRoomFitters.cpp
     src/structure/MonumentRoomGraph.cpp
+    src/structure/MonumentShell.cpp
+    src/structure/MonumentSingleRooms.cpp
+    src/structure/MonumentWings.cpp
     src/structure/MineshaftLayout.cpp
     src/structure/StructurePieceFill.cpp
     src/structure/StructurePlacementGrid.cpp
@@ -154,6 +162,7 @@ basalt_module(server-world
     src/terrain/BiomeTemperature.cpp
     src/terrain/BiomeZoomer.cpp
     src/terrain/TerrainProvider.cpp
+    src/terrain/MineshaftStructureGenerator.cpp
     src/terrain/NeighbourTerrain.cpp
     src/terrain/NoiseColumnHeights.cpp
     src/terrain/StructureBeardifier.cpp
@@ -336,6 +345,12 @@ basalt_test(server-world-jigsaw-assembly-test
     DEPENDS basalt::server-world
 )
 
+basalt_test(server-world-mineshaft-generator-test
+    SOURCES
+        test/MineshaftGeneratorTest.cpp
+    DEPENDS basalt::server-world
+)
+
 basalt_test(server-world-mineshaft-fill-test
     SOURCES
         test/MineshaftFillTest.cpp
@@ -363,6 +378,18 @@ basalt_test(server-world-stronghold-pieces-test
 basalt_test(server-world-stronghold-layout-test
     SOURCES
         test/StrongholdLayoutTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-mansion-test
+    SOURCES
+        test/MansionTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-monument-pieces-test
+    SOURCES
+        test/MonumentPiecesTest.cpp
     DEPENDS basalt::server-world
 )
 
