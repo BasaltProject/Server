@@ -56,12 +56,18 @@ struct Run {
 
 [[nodiscard]] Run run(std::int64_t seed, std::string_view biome, std::int32_t chunks) {
     const std::string biomeName{biome};
+    // Sixteen rings crowded into the same few chunks, so a chunk can see two starts at once and the
+    // generator's "seed the feature random only for the first" rule becomes observable.
     structure::ConcentricRingsPlacement rings{
-        2, 1, 4, {biomeName}, [biomeName](std::int32_t, std::int32_t, std::int32_t) -> std::string_view {
+        2, 1, 16, {biomeName}, [biomeName](std::int32_t, std::int32_t, std::int32_t) -> std::string_view {
             return biomeName;
         }};
-    StrongholdStructureGenerator generator{
-        rings, seed, [biomeName](std::int32_t, std::int32_t, std::int32_t) { return biomeName; }, {biomeName}};
+    // Banded on the quart coordinate, so which coordinate the validity probe is handed shows.
+    const auto probe = [biomeName](std::int32_t quartX, std::int32_t, std::int32_t) {
+        const std::int32_t band = quartX >= 0 ? quartX / 64 : (quartX - 63) / 64;
+        return band % 2 == 0 ? biomeName : std::string{"minecraft:the_void"};
+    };
+    StrongholdStructureGenerator generator{rings, seed, probe, {biomeName}};
     // Centred on the ring the world actually placed, so the window sees the maze at all.
     const std::optional<std::pair<std::int32_t, std::int32_t>> centre = generator.locate(0, 0);
     REQUIRE(centre.has_value());

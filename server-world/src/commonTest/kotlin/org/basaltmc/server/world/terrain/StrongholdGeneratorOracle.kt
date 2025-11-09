@@ -35,6 +35,10 @@ class StrongholdGeneratorOracle {
         return Triple(checksum, written, chunk.blockEntities().size)
     }
 
+    /**
+     * Sixteen rings crowded into the same few chunks, so a chunk can see two starts at once and the
+     * generator's "seed the feature random only for the first" rule becomes observable.
+     */
     private fun generator(
         seed: Long,
         biome: String,
@@ -43,11 +47,15 @@ class StrongholdGeneratorOracle {
             ConcentricRingsPlacement(
                 distance = 2,
                 spread = 1,
-                count = 4,
+                count = 16,
                 preferredBiomes = setOf(biome),
                 noiseBiomeAt = { _, _, _ -> biome },
             )
-        return StrongholdStructureGenerator(rings, seed, { _, _, _ -> biome }, setOf(biome))
+        // Banded on the quart coordinate, so which coordinate the validity probe is handed shows.
+        val probe = { quartX: Int, _: Int, _: Int ->
+            if ((quartX.floorDiv(64)) % 2 == 0) biome else "minecraft:the_void"
+        }
+        return StrongholdStructureGenerator(rings, seed, probe, setOf(biome))
     }
 
     private fun report(
