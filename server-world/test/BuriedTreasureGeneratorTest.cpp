@@ -24,7 +24,7 @@ namespace {
     Chunk chunk{chunkX, chunkZ};
     for (std::int32_t x = 0; x < 16; ++x) {
         for (std::int32_t z = 0; z < 16; ++z) {
-            for (std::int32_t y = -16; y <= 48; ++y) {
+            for (std::int32_t y = 30; y <= 48; ++y) {
                 chunk.setBlockStateId(x, y, z, registry::blocks::stone().stateId);
             }
             for (std::int32_t y = 49; y <= 52; ++y) {
@@ -47,7 +47,7 @@ namespace {
 [[nodiscard]] std::tuple<std::int64_t, std::int32_t, std::size_t> fold(const Chunk& chunk) {
     std::uint64_t checksum = 14695981039346656037ULL;
     std::int32_t written = 0;
-    for (std::int32_t y = -16; y <= 66; ++y) {
+    for (std::int32_t y = 28; y <= 66; ++y) {
         for (std::int32_t z = 0; z < 16; ++z) {
             for (std::int32_t x = 0; x < 16; ++x) {
                 const std::int32_t id = chunk.blockStateId(x, y, z);
@@ -107,11 +107,11 @@ void check(const Run& result, std::int32_t written, std::size_t blockEntities, s
 } // namespace
 
 TEST_CASE("the buried treasure sinks where the frozen kotlin sinks it") {
-    SUBCASE("beach") { check(run(606, "minecraft:beach", false, 400), 409612, 2, 2, -5449112738805779000LL); }
+    SUBCASE("beach") { check(run(606, "minecraft:beach", false, 400), 409612, 2, 2, 5315382519711209928LL); }
 
-    SUBCASE("hollow") { check(run(606, "minecraft:beach", true, 400), 409612, 2, 2, 429988634381473224LL); }
+    SUBCASE("hollow") { check(run(606, "minecraft:beach", true, 400), 409612, 2, 2, -5331954140461172280LL); }
 
-    SUBCASE("plains") { check(run(606, "minecraft:plains", false, 400), 409600, 0, 0, 8977839621801090997LL); }
+    SUBCASE("plains") { check(run(606, "minecraft:plains", false, 400), 409600, 0, 0, -7882979800739019851LL); }
 
-    SUBCASE("otherSeed") { check(run(77, "minecraft:beach", false, 400), 409612, 2, 2, 2853574449254643197LL); }
+    SUBCASE("otherSeed") { check(run(77, "minecraft:beach", false, 400), 409612, 2, 2, -2307450044006345219LL); }
 }

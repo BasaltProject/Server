@@ -168,8 +168,10 @@ basalt_module(server-world
     src/terrain/MineshaftStructureGenerator.cpp
     src/terrain/NeighbourTerrain.cpp
     src/terrain/NoiseColumnHeights.cpp
+    src/terrain/ShipwreckStructureGenerator.cpp
     src/terrain/StrongholdStructureGenerator.cpp
     src/terrain/StructureBeardifier.cpp
+    src/terrain/SwampHutStructureGenerator.cpp
     src/terrain/OverworldBiomeSource.cpp
     src/terrain/NoiseRouterData.cpp
     src/terrain/OverworldOreVeinifier.cpp
@@ -362,6 +364,12 @@ basalt_test(server-world-igloo-generator-test
     DEPENDS basalt::server-world
 )
 
+basalt_test(server-world-shipwreck-generator-test
+    SOURCES
+        test/ShipwreckGeneratorTest.cpp
+    DEPENDS basalt::server-world
+)
+
 basalt_test(server-world-mineshaft-generator-test
     SOURCES
         test/MineshaftGeneratorTest.cpp
@@ -377,6 +385,12 @@ basalt_test(server-world-mineshaft-fill-test
 basalt_test(server-world-mineshaft-layout-test
     SOURCES
         test/MineshaftLayoutTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-swamp-hut-generator-test
+    SOURCES
+        test/SwampHutGeneratorTest.cpp
     DEPENDS basalt::server-world
 )
 
