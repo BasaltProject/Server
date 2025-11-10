@@ -176,7 +176,9 @@ basalt_module(server-world
     src/terrain/NoiseRouterData.cpp
     src/terrain/OverworldOreVeinifier.cpp
     src/terrain/OceanMonumentStructureGenerator.cpp
+    src/terrain/OceanRuinStructureGenerator.cpp
     src/terrain/OverworldAquifer.cpp
+    src/terrain/PillagerOutpostStructureGenerator.cpp
         src/noise/NormalNoise.cpp
         src/noise/PerlinNoise.cpp
         src/noise/SimplexNoise.cpp
@@ -361,6 +363,18 @@ basalt_test(server-world-buried-treasure-generator-test
 basalt_test(server-world-igloo-generator-test
     SOURCES
         test/IglooGeneratorTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-ocean-ruin-generator-test
+    SOURCES
+        test/OceanRuinGeneratorTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-pillager-outpost-generator-test
+    SOURCES
+        test/PillagerOutpostGeneratorTest.cpp
     DEPENDS basalt::server-world
 )
 
