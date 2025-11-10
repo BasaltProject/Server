@@ -1,7 +1,6 @@
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/world/ChunkHeight.hpp>
-#include <basalt/server/world/terrain/PillagerOutpostStructureGenerator.hpp>
-#include <basalt/server/world/terrain/StructureBeardifier.hpp>
+#include <basalt/server/world/terrain/JigsawStructureGenerator.hpp>
 
 #include <algorithm>
 #include <cstdlib>
@@ -14,18 +13,10 @@ using structure::PlacedStructurePiece;
 using structure::StructureBoundingBox;
 using structure::StructurePos;
 
-/// parity: `start_height: {absolute: 0}`, which draws nothing from the random.
-constexpr std::int32_t kStartHeight = 0;
 constexpr std::int32_t kBeardRadius = 12;
-constexpr std::size_t kCacheCapacity = 32;
 constexpr std::int32_t kCellWidth = 4;
 constexpr std::int32_t kCellHeight = 8;
 constexpr std::int32_t kSeaLevel = 63;
-
-[[nodiscard]] StructureBoundingBox chunkClip(std::int32_t chunkX, std::int32_t chunkZ, std::int32_t margin) {
-    return StructureBoundingBox{chunkX * 16 - margin,      kOverworldHeight.minY(), chunkZ * 16 - margin,
-                                chunkX * 16 + 15 + margin, kOverworldHeight.maxY(), chunkZ * 16 + 15 + margin};
-}
 
 [[nodiscard]] std::int32_t floorDiv(std::int32_t value, std::int32_t divisor) {
     const std::int32_t quotient = value / divisor;
@@ -34,17 +25,14 @@ constexpr std::int32_t kSeaLevel = 63;
 
 } // namespace
 
-PillagerOutpostStructureGenerator::PillagerOutpostStructureGenerator(OverworldNoiseRouter router,
-                                                                     structure::StructurePlacementGrid grid,
-                                                                     BiomeAt biomeAt,
-                                                                     std::set<std::string, std::less<>> outpostBiomes,
-                                                                     PoolLookup poolLookup,
-                                                                     structure::PoolTemplateLoader templateLoader)
-    : router_(std::move(router)), grid_(std::move(grid)), biomeAt_(std::move(biomeAt)),
-      outpostBiomes_(std::move(outpostBiomes)), poolLookup_(std::move(poolLookup)),
-      templateLoader_(std::move(templateLoader)) {}
+JigsawStructureGenerator::JigsawStructureGenerator(JigsawStructureSettings settings, OverworldNoiseRouter router,
+                                                   structure::StructurePlacementGrid grid, BiomeAt biomeAt,
+                                                   std::set<std::string, std::less<>> biomes, PoolLookup poolLookup,
+                                                   structure::PoolTemplateLoader templateLoader)
+    : settings_(std::move(settings)), router_(std::move(router)), grid_(std::move(grid)), biomeAt_(std::move(biomeAt)),
+      biomes_(std::move(biomes)), poolLookup_(std::move(poolLookup)), templateLoader_(std::move(templateLoader)) {}
 
-std::pair<std::size_t, std::int64_t> PillagerOutpostStructureGenerator::assemblyStats() const {
+std::pair<std::size_t, std::int64_t> JigsawStructureGenerator::assemblyStats() const {
     const std::scoped_lock lock{mutex_};
     std::int64_t pieces = 0;
     for (const auto& [key, start] : cache_) {
@@ -53,8 +41,13 @@ std::pair<std::size_t, std::int64_t> PillagerOutpostStructureGenerator::assembly
     return {cache_.size(), pieces};
 }
 
-std::int32_t PillagerOutpostStructureGenerator::surfaceHeightAt(std::int32_t x, std::int32_t z,
-                                                                Samplers& samplers) const {
+StructureBoundingBox JigsawStructureGenerator::chunkClip(std::int32_t chunkX, std::int32_t chunkZ,
+                                                         std::int32_t margin) const {
+    return StructureBoundingBox{chunkX * 16 - margin,      kOverworldHeight.minY(), chunkZ * 16 - margin,
+                                chunkX * 16 + 15 + margin, kOverworldHeight.maxY(), chunkZ * 16 + 15 + margin};
+}
+
+std::int32_t JigsawStructureGenerator::surfaceHeightAt(std::int32_t x, std::int32_t z, Samplers& samplers) const {
     const std::int32_t chunkX = x >> 4;
     const std::int32_t chunkZ = z >> 4;
     const std::int64_t key =
@@ -76,17 +69,20 @@ std::int32_t PillagerOutpostStructureGenerator::surfaceHeightAt(std::int32_t x, 
     return std::max(y + 1, kSeaLevel);
 }
 
-bool PillagerOutpostStructureGenerator::inOutpostBiome(std::int32_t candidateChunkX, std::int32_t candidateChunkZ,
-                                                       Samplers& samplers) const {
+bool JigsawStructureGenerator::inBiome(std::int32_t candidateChunkX, std::int32_t candidateChunkZ,
+                                       Samplers& samplers) const {
     const std::int32_t centreX = candidateChunkX * 16 + 8;
     const std::int32_t centreZ = candidateChunkZ * 16 + 8;
+    const std::int32_t probeY = settings_.heightSource == JigsawHeightSource::Surface
+                                    ? surfaceHeightAt(centreX, centreZ, samplers)
+                                    : settings_.startY;
     // The tag keeps its namespace and so does the biome name, so neither side is stripped.
-    return outpostBiomes_.contains(biomeAt_(centreX, surfaceHeightAt(centreX, centreZ, samplers), centreZ));
+    return biomes_.contains(biomeAt_(centreX, probeY, centreZ));
 }
 
-const std::vector<PlacedStructurePiece>& PillagerOutpostStructureGenerator::assembledStart(std::int32_t candidateChunkX,
-                                                                                           std::int32_t candidateChunkZ,
-                                                                                           std::int64_t seed) {
+const std::vector<PlacedStructurePiece>& JigsawStructureGenerator::assembledStart(std::int32_t candidateChunkX,
+                                                                                  std::int32_t candidateChunkZ,
+                                                                                  std::int64_t seed) {
     const CandidateKey key{seed, candidateChunkX, candidateChunkZ};
     {
         const std::scoped_lock lock{mutex_};
@@ -99,22 +95,31 @@ const std::vector<PlacedStructurePiece>& PillagerOutpostStructureGenerator::asse
     Samplers samplers;
     std::vector<PlacedStructurePiece> assembled;
     if (grid_.isStructureChunk(seed, candidateChunkX, candidateChunkZ) &&
-        inOutpostBiome(candidateChunkX, candidateChunkZ, samplers)) {
+        inBiome(candidateChunkX, candidateChunkZ, samplers)) {
         random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::legacy(0));
         random::setLargeFeatureSeed(random, seed, candidateChunkX, candidateChunkZ);
-        const structure::JigsawWorld world{
-            .poolLookup = poolLookup_,
-            .templateLoader = templateLoader_,
-            .heightAt = [this, &samplers](std::int32_t x, std::int32_t z) { return surfaceHeightAt(x, z, samplers); }};
+        // parity: a drawn start height is a uniform provider, so it costs a draw before the
+        // assembly's own; a fixed height or the surface costs none.
+        const std::int32_t startY = settings_.heightSource == JigsawHeightSource::Drawn
+                                        ? settings_.startY + random.nextInt(settings_.startYMax - settings_.startY + 1)
+                                        : settings_.startY;
+        structure::JigsawWorld world{.poolLookup = poolLookup_, .templateLoader = templateLoader_, .heightAt = {}};
+        if (settings_.heightSource == JigsawHeightSource::Surface) {
+            world.heightAt = [this, &samplers](std::int32_t x, std::int32_t z) {
+                return surfaceHeightAt(x, z, samplers);
+            };
+        } else {
+            world.heightAt = [startY](std::int32_t, std::int32_t) { return startY; };
+        }
         assembled = structure::assembleJigsaw(
             world,
-            structure::JigsawRequest{.startPool = std::string{kStartPool},
-                                     .startPosition =
-                                         StructurePos{candidateChunkX * 16, kStartHeight, candidateChunkZ * 16},
-                                     .maxDepth = kMaxDepth,
-                                     .projectStartToHeightmap = true,
-                                     .maxDistanceFromCenter = kMaxDistanceFromCenter,
-                                     .useExpansionHack = true},
+            structure::JigsawRequest{.startPool = settings_.startPool,
+                                     .startPosition = StructurePos{candidateChunkX * 16, startY, candidateChunkZ * 16},
+                                     .maxDepth = settings_.maxDepth,
+                                     .projectStartToHeightmap = settings_.projectStartToHeightmap,
+                                     .maxDistanceFromCenter = settings_.maxDistanceFromCenter,
+                                     .useExpansionHack = settings_.useExpansionHack,
+                                     .startJigsawName = settings_.startJigsawName},
             random);
     }
 
@@ -123,18 +128,19 @@ const std::vector<PlacedStructurePiece>& PillagerOutpostStructureGenerator::asse
     if (found != cache_.end()) {
         return found->second;
     }
-    if (cache_.size() >= kCacheCapacity) {
+    if (cache_.size() >= settings_.cacheCapacity) {
         cache_.clear();
     }
     return cache_.emplace(key, std::move(assembled)).first->second;
 }
 
-std::vector<PillagerOutpostStructureGenerator::Start>
-PillagerOutpostStructureGenerator::nearbyStarts(std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed,
-                                                const StructureBoundingBox& clip) {
+std::vector<JigsawStructureGenerator::Start> JigsawStructureGenerator::nearbyStarts(std::int32_t chunkX,
+                                                                                    std::int32_t chunkZ,
+                                                                                    std::int64_t seed,
+                                                                                    const StructureBoundingBox& clip) {
     const std::int32_t cellX = floorDiv(chunkX, grid_.spacing());
     const std::int32_t cellZ = floorDiv(chunkZ, grid_.spacing());
-    const std::int32_t reachChunks = (kMaxDistanceFromCenter + kBeardRadius) / 16 + 1;
+    const std::int32_t reachChunks = (settings_.maxDistanceFromCenter + kBeardRadius) / 16 + 1;
     std::vector<Start> starts;
     for (std::int32_t cellOffsetX = -1; cellOffsetX <= 1; ++cellOffsetX) {
         for (std::int32_t cellOffsetZ = -1; cellOffsetZ <= 1; ++cellOffsetZ) {
@@ -158,8 +164,11 @@ PillagerOutpostStructureGenerator::nearbyStarts(std::int32_t chunkX, std::int32_
     return starts;
 }
 
-void PillagerOutpostStructureGenerator::recordStart(Chunk& chunk, const StructureBoundingBox& clip, CandidateKey origin,
-                                                    const std::vector<PlacedStructurePiece>& pieces) {
+void JigsawStructureGenerator::recordStart(Chunk& chunk, const StructureBoundingBox& clip, CandidateKey origin,
+                                           const std::vector<PlacedStructurePiece>& pieces) const {
+    if (settings_.startRecords == JigsawStartRecords::None || pieces.empty()) {
+        return;
+    }
     std::vector<StructureBoundingBox> here;
     std::vector<StructureBoundingBox> all;
     all.reserve(pieces.size());
@@ -173,19 +182,20 @@ void PillagerOutpostStructureGenerator::recordStart(Chunk& chunk, const Structur
         return;
     }
     const std::optional<structure::StructureStartRecord> whole =
-        structure::StructureStartRecord::of(std::string{kName}, 0, 0, std::move(all));
+        structure::StructureStartRecord::of(settings_.name, 0, 0, std::move(all));
     if (!whole.has_value()) {
         return;
     }
-    chunk.structures().add(structure::StructureStartRecord{.structure = std::string{kName},
-                                                           .chunkX = origin.chunkX,
-                                                           .chunkZ = origin.chunkZ,
-                                                           .fullBounds = whole->fullBounds,
-                                                           .pieces = std::move(here)});
+    const bool fromPiece = settings_.startRecords == JigsawStartRecords::FromFirstPiece;
+    chunk.structures().add(
+        structure::StructureStartRecord{.structure = settings_.name,
+                                        .chunkX = fromPiece ? pieces.front().position.x >> 4 : origin.chunkX,
+                                        .chunkZ = fromPiece ? pieces.front().position.z >> 4 : origin.chunkZ,
+                                        .fullBounds = whole->fullBounds,
+                                        .pieces = std::move(here)});
 }
 
-void PillagerOutpostStructureGenerator::generateInto(Chunk& chunk, std::int32_t chunkX, std::int32_t chunkZ,
-                                                     std::int64_t seed) {
+void JigsawStructureGenerator::generateInto(Chunk& chunk, std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed) {
     const StructureBoundingBox clip = chunkClip(chunkX, chunkZ, 0);
     const std::vector<Start> starts = nearbyStarts(chunkX, chunkZ, seed, clip);
     if (starts.empty()) {
@@ -193,21 +203,24 @@ void PillagerOutpostStructureGenerator::generateInto(Chunk& chunk, std::int32_t 
     }
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::xoroshiro(seed));
     const std::int64_t decorationSeed = random::setDecorationSeed(random, seed, chunkX * 16, chunkZ * 16);
-    random::setFeatureSeed(random, decorationSeed, kStructureIndex, kSurfaceStructuresStep);
+    random::setFeatureSeed(random, decorationSeed, settings_.structureIndex, settings_.step);
+    const std::optional<std::int64_t> worldSeed =
+        settings_.passWorldSeed ? std::optional<std::int64_t>{seed} : std::nullopt;
     for (const auto& [origin, pieces] : starts) {
         recordStart(chunk, clip, origin, *pieces);
         for (const PlacedStructurePiece& piece : *pieces) {
             if (!piece.boundingBox.intersects(clip)) {
                 continue;
             }
-            piece.element.place(templateLoader_, chunk, piece.position, piece.rotation, clip, random);
+            piece.element.place(templateLoader_, chunk, piece.position, piece.rotation, clip, random, worldSeed);
         }
     }
 }
 
-densityfunction::Function PillagerOutpostStructureGenerator::beardified(densityfunction::Function base,
-                                                                        std::int32_t chunkX, std::int32_t chunkZ,
-                                                                        std::int64_t seed) {
+densityfunction::Function JigsawStructureGenerator::beardified(densityfunction::Function base, std::int32_t chunkX,
+                                                               std::int32_t chunkZ, std::int64_t seed) {
+    // The starts are filtered with the inflated box, not the chunk itself: a chunk with no piece of
+    // its own still gets the beard of the pieces within twelve blocks of it.
     const StructureBoundingBox nearClip = chunkClip(chunkX, chunkZ, kBeardRadius);
     const std::int32_t chunkMinX = chunkX * 16;
     const std::int32_t chunkMinZ = chunkZ * 16;
@@ -218,11 +231,8 @@ densityfunction::Function PillagerOutpostStructureGenerator::beardified(densityf
             if (!piece.boundingBox.intersects(nearClip)) {
                 continue;
             }
-            if (piece.element.projection() == structure::StructureProjection::Rigid) {
-                rigids.push_back(BeardifierRigid{.box = piece.boundingBox,
-                                                 .groundLevelDelta = piece.groundLevelDelta,
-                                                 .adjustment = TerrainAdjustment::BeardThin});
-            }
+            // parity: a junction contributes whatever the piece's own projection is, so these are
+            // collected without the rigid-only test the boxes get.
             for (const structure::PlacedJigsawJunction& junction : piece.junctions) {
                 if (junction.sourceX > chunkMinX - kBeardRadius && junction.sourceX < chunkMinX + 15 + kBeardRadius &&
                     junction.sourceZ > chunkMinZ - kBeardRadius && junction.sourceZ < chunkMinZ + 15 + kBeardRadius) {
@@ -230,6 +240,12 @@ densityfunction::Function PillagerOutpostStructureGenerator::beardified(densityf
                         .x = junction.sourceX, .groundY = junction.sourceGroundY, .z = junction.sourceZ});
                 }
             }
+            if (piece.element.projection() != structure::StructureProjection::Rigid) {
+                continue;
+            }
+            rigids.push_back(BeardifierRigid{.box = piece.boundingBox,
+                                             .groundLevelDelta = piece.groundLevelDelta,
+                                             .adjustment = settings_.adjustment});
         }
     }
     if (rigids.empty() && junctions.empty()) {
@@ -239,10 +255,10 @@ densityfunction::Function PillagerOutpostStructureGenerator::beardified(densityf
                                            structureBeardifier(std::move(rigids), std::move(junctions)));
 }
 
-std::optional<std::pair<std::int32_t, std::int32_t>> PillagerOutpostStructureGenerator::locate(std::int64_t seed,
-                                                                                               std::int32_t fromChunkX,
-                                                                                               std::int32_t fromChunkZ,
-                                                                                               std::int32_t maxCells) {
+std::optional<std::pair<std::int32_t, std::int32_t>> JigsawStructureGenerator::locate(std::int64_t seed,
+                                                                                      std::int32_t fromChunkX,
+                                                                                      std::int32_t fromChunkZ,
+                                                                                      std::int32_t maxCells) {
     const std::int32_t cellX = floorDiv(fromChunkX, grid_.spacing());
     const std::int32_t cellZ = floorDiv(fromChunkZ, grid_.spacing());
     for (std::int32_t ring = 0; ring <= maxCells; ++ring) {

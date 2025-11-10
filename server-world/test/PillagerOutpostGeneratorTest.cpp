@@ -3,7 +3,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/noise/NormalNoise.hpp>
-#include <basalt/server/world/terrain/PillagerOutpostStructureGenerator.hpp>
+#include <basalt/server/world/terrain/JigsawStructureGenerator.hpp>
 
 #include <doctest.h>
 
@@ -296,11 +296,10 @@ struct Run {
 
 [[nodiscard]] Run run(std::int64_t seed, std::string_view biome) {
     const std::string biomeName{biome};
-    PillagerOutpostStructureGenerator generator{
+    JigsawStructureGenerator generator{
+        jigsawStructures::pillagerOutpost(),
         router(seed),
         grid(),
-        // Only the biome right at the surface answers, so the height the probe reads is observable
-        // through the biome test as well.
         // Only the centre column of a chunk answers at all, and only right at the surface, so where
         // the probe stands and what height it reads are both observable.
         [seed, biomeName](std::int32_t x, std::int32_t y, std::int32_t z) -> std::string {

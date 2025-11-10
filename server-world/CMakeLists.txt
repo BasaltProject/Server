@@ -178,7 +178,8 @@ basalt_module(server-world
     src/terrain/OceanMonumentStructureGenerator.cpp
     src/terrain/OceanRuinStructureGenerator.cpp
     src/terrain/OverworldAquifer.cpp
-    src/terrain/PillagerOutpostStructureGenerator.cpp
+    src/terrain/JigsawStructureGenerator.cpp
+    src/terrain/JigsawStructureSettings.cpp
         src/noise/NormalNoise.cpp
         src/noise/PerlinNoise.cpp
         src/noise/SimplexNoise.cpp
@@ -369,6 +370,12 @@ basalt_test(server-world-igloo-generator-test
 basalt_test(server-world-ocean-ruin-generator-test
     SOURCES
         test/OceanRuinGeneratorTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-jigsaw-structures-test
+    SOURCES
+        test/JigsawStructuresTest.cpp
     DEPENDS basalt::server-world
 )
 
