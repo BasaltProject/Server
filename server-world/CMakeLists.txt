@@ -161,10 +161,15 @@ basalt_module(server-world
     src/terrain/surface/SurfaceRuleEnvironment.cpp
     src/terrain/surface/SurfaceRules.cpp
     src/terrain/BiomeTemperature.cpp
+    src/terrain/DesertPyramidPiece.cpp
+    src/terrain/DesertPyramidStructureGenerator.cpp
     src/terrain/BiomeZoomer.cpp
     src/terrain/TerrainProvider.cpp
+    src/terrain/VillageStructureGenerator.cpp
     src/terrain/WoodlandMansionStructureGenerator.cpp
     src/terrain/IglooStructureGenerator.cpp
+    src/terrain/JungleTemplePiece.cpp
+    src/terrain/JungleTempleStructureGenerator.cpp
     src/terrain/MineshaftStructureGenerator.cpp
     src/terrain/NeighbourTerrain.cpp
     src/terrain/NoiseColumnHeights.cpp
@@ -361,6 +366,18 @@ basalt_test(server-world-buried-treasure-generator-test
     DEPENDS basalt::server-world
 )
 
+basalt_test(server-world-desert-pyramid-generator-test
+    SOURCES
+        test/DesertPyramidGeneratorTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-jungle-temple-generator-test
+    SOURCES
+        test/JungleTempleGeneratorTest.cpp
+    DEPENDS basalt::server-world
+)
+
 basalt_test(server-world-igloo-generator-test
     SOURCES
         test/IglooGeneratorTest.cpp
@@ -370,6 +387,12 @@ basalt_test(server-world-igloo-generator-test
 basalt_test(server-world-ocean-ruin-generator-test
     SOURCES
         test/OceanRuinGeneratorTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-village-generator-test
+    SOURCES
+        test/VillageGeneratorTest.cpp
     DEPENDS basalt::server-world
 )
 
