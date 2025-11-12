@@ -2,6 +2,7 @@ basalt_module(server-world
     SOURCES
         src/Chunk.cpp
         src/ChunkTracker.cpp
+        src/WorldTypes.cpp
         src/GenerationMetrics.cpp
         src/LeafDistances.cpp
         src/portal/PortalShape.cpp
@@ -160,6 +161,8 @@ basalt_module(server-world
     src/terrain/surface/SurfaceRuleData.cpp
     src/terrain/surface/SurfaceRuleEnvironment.cpp
     src/terrain/surface/SurfaceRules.cpp
+    src/advancement/Advancement.cpp
+    src/advancement/AdvancementJson.cpp
     src/crafting/Crafting.cpp
     src/crafting/RecipeJson.cpp
     src/crafting/SpecialCrafting.cpp
@@ -207,6 +210,7 @@ basalt_module(server-world
         src/noise/SimplexNoise.cpp
     src/noise/PerlinSimplexNoise.cpp
     DEPENDS basalt::server-random basalt::server-registry basalt::wire-common basalt::wire-protocol
+            basalt::wire-text
 )
 
 basalt_test(server-world-noise-test
@@ -386,6 +390,18 @@ basalt_test(server-world-buried-treasure-generator-test
 basalt_test(server-world-loot-test
     SOURCES
         test/LootTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-world-types-test
+    SOURCES
+        test/WorldTypesTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-advancement-test
+    SOURCES
+        test/AdvancementTest.cpp
     DEPENDS basalt::server-world
 )
 
