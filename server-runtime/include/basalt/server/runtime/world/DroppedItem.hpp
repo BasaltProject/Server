@@ -1,0 +1,51 @@
+#pragma once
+
+#include <basalt/wire/common/Identifier.hpp>
+#include <basalt/wire/common/Uuid.hpp>
+#include <basalt/wire/nbt/NbtTag.hpp>
+
+#include <cstdint>
+
+namespace basalt::server::runtime::world {
+
+/// parity: `ItemEntity` despawns after five minutes.
+inline constexpr std::int32_t kItemLifetimeTicks = 6000;
+
+/// parity: what a player's own toss gets, so it does not immediately fly back into their inventory.
+inline constexpr std::int32_t kDefaultPickupDelay = 40;
+
+/// One stack lying on the ground.
+struct DroppedItem {
+    std::int32_t entityId = 0;
+    wire::common::Uuid uuid;
+    wire::common::Identifier item{"minecraft", "stone"};
+    std::int32_t count = 1;
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
+    double velocityX = 0.0;
+    double velocityY = 0.0;
+    double velocityZ = 0.0;
+
+    /// Ticks before anyone may pick this up.
+    std::int32_t pickupDelay = kDefaultPickupDelay;
+
+    /// Ticks lived.
+    std::int32_t age = 0;
+
+    /// What the stack carries besides its id and count, as a shulker box carries its contents.
+    ///
+    /// parity: `ItemEntity` holds a whole `ItemStack`, components and all. Only what a block put
+    /// there travels this way today, which is enough for a box picked up and put back down.
+    wire::nbt::NbtCompound components;
+
+    /// Whether this settled: once true the server stops sending movement for it, as vanilla does.
+    bool resting = false;
+
+    /// Set when a merge changed the count, so whoever can see it is told the new stack.
+    bool countChanged = false;
+
+    [[nodiscard]] bool canBePickedUp() const noexcept { return pickupDelay <= 0; }
+};
+
+} // namespace basalt::server::runtime::world
