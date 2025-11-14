@@ -1,8 +1,21 @@
+# The commented defaults an operator gets on first run, compiled in rather than read from a folder
+# beside the binary: a release is one self-contained executable.
+file(GLOB BASALT_CONFIG_DEFAULTS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/resources/config-defaults/*.toml)
+basalt_embed_text(server-runtime-config-defaults
+    NAMESPACE basalt::server::runtime::config
+    HEADER basalt/server/runtime/config/ConfigDefaults.hpp
+    SUFFIX DefaultToml
+    FILES ${BASALT_CONFIG_DEFAULTS}
+)
+
 basalt_module(server-runtime-core
     SOURCES
         src/Connection.cpp
         src/LoginHandler.cpp
+        src/config/ConfigDirectory.cpp
         src/function/FunctionLibrary.cpp
+        src/net/ProxyLogin.cpp
+        src/net/SessionOutbox.cpp
         src/registry/VanillaBiomes.cpp
         src/registry/VanillaConfigurationRegistries.cpp
         src/registry/VanillaDimensionTypes.cpp
@@ -18,7 +31,8 @@ basalt_module(server-runtime-core
         src/scoreboard/Scoreboard.cpp
         src/scoreboard/Teams.cpp
         src/timings/TimingsReport.cpp
-    DEPENDS basalt::wire-auth basalt::wire-io basalt::wire-nbt basalt::wire-protocol basalt::wire-text
+    DEPENDS basalt::server-runtime-config-defaults basalt::wire-auth basalt::wire-io basalt::wire-nbt
+            basalt::wire-protocol basalt::wire-text
 )
 
 basalt_test(server-runtime-biome-registry-test
@@ -33,6 +47,16 @@ basalt_test(server-runtime-timings-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-config-test
+    SOURCES
+        test/ConfigDirectoryTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-config-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
 basalt_test(server-runtime-function-test
     SOURCES
         test/FunctionLibraryTest.cpp
@@ -42,6 +66,12 @@ basalt_test(server-runtime-function-test
 # The only test here that writes files, so it is told where inside the build tree to put them.
 target_compile_definitions(server-runtime-function-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-net-test
+    SOURCES
+        test/SessionNetTest.cpp
+    DEPENDS basalt::server-runtime-core
 )
 
 basalt_test(server-runtime-region-test
