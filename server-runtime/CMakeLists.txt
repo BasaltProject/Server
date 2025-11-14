@@ -55,6 +55,8 @@ basalt_module(server-runtime-core
         src/world/SculkSensorTracker.cpp
         src/world/MobLocalDifficulty.cpp
         src/world/SelectableSlots.cpp
+        src/world/GameRules.cpp
+        src/world/WorldState.cpp
         src/world/SpawnPotential.cpp
     DEPENDS basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-world basalt::wire-auth basalt::wire-io
             basalt::wire-multiversion basalt::wire-nbt basalt::wire-protocol basalt::wire-text
@@ -87,6 +89,18 @@ basalt_test(server-runtime-dropped-items-test
 basalt_test(server-runtime-pending-decorations-test
     SOURCES
         test/PendingDecorationsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-game-rules-test
+    SOURCES
+        test/GameRulesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-world-state-test
+    SOURCES
+        test/WorldStateTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

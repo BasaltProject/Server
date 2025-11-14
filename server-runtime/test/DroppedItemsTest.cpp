@@ -2,12 +2,12 @@
 
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/DroppedItemPhysics.hpp>
+#include <basalt/server/runtime/world/WorldMutex.hpp>
 
 #include <doctest.h>
 
 #include <array>
 #include <map>
-#include <mutex>
 #include <string>
 
 using namespace basalt::server::runtime::world;
@@ -44,7 +44,7 @@ namespace {
 } // namespace
 
 TEST_CASE("an item falls, lands and settles") {
-    std::mutex mutex;
+    WorldMutex mutex;
     DroppedItemPhysics items{mutex, floorOf(stateOf("stone"))};
     items.spawnItem(drop(1, "stone", 1, 0.5, 68.0, 0.5));
 
@@ -67,9 +67,9 @@ TEST_CASE("an item falls, lands and settles") {
 }
 
 TEST_CASE("an item lands on slime and keeps moving for a while") {
-    std::mutex mutex;
+    WorldMutex mutex;
     DroppedItemPhysics stone{mutex, floorOf(stateOf("stone"))};
-    std::mutex slimeMutex;
+    WorldMutex slimeMutex;
     DroppedItemPhysics slime{slimeMutex, floorOf(stateOf("slime_block"))};
     stone.spawnItem(drop(1, "stone", 1, 0.5, 68.0, 0.5));
     slime.spawnItem(drop(1, "stone", 1, 0.5, 68.0, 0.5));
@@ -94,9 +94,9 @@ TEST_CASE("an item lands on slime and keeps moving for a while") {
 }
 
 TEST_CASE("ice is slippery and stone is not") {
-    std::mutex stoneMutex;
+    WorldMutex stoneMutex;
     DroppedItemPhysics stone{stoneMutex, floorOf(stateOf("stone"))};
-    std::mutex iceMutex;
+    WorldMutex iceMutex;
     DroppedItemPhysics ice{iceMutex, floorOf(stateOf("ice"))};
     DroppedItem sliding = drop(1, "stone", 1, 0.5, 64.0, 0.5);
     sliding.velocityX = 0.5;
@@ -112,7 +112,7 @@ TEST_CASE("ice is slippery and stone is not") {
 }
 
 TEST_CASE("an item is forgotten after five minutes") {
-    std::mutex mutex;
+    WorldMutex mutex;
     DroppedItemPhysics items{mutex, floorOf(stateOf("stone"))};
     items.spawnItem(drop(1, "stone", 1, 0.5, 64.0, 0.5));
 
@@ -128,7 +128,7 @@ TEST_CASE("an item is forgotten after five minutes") {
 }
 
 TEST_CASE("a toss cannot be picked up straight away") {
-    std::mutex mutex;
+    WorldMutex mutex;
     DroppedItemPhysics items{mutex, floorOf(stateOf("stone"))};
     items.spawnItem(drop(1, "stone", 1, 0.5, 64.0, 0.5));
     CHECK_FALSE(items.items()[0].canBePickedUp());
@@ -142,7 +142,7 @@ TEST_CASE("a toss cannot be picked up straight away") {
 }
 
 TEST_CASE("two stacks of the same thing become one") {
-    std::mutex mutex;
+    WorldMutex mutex;
     DroppedItemPhysics items{mutex, floorOf(stateOf("stone"))};
     items.spawnItem(drop(1, "oak_log", 3, 0.5, 64.0, 0.5));
     items.spawnItem(drop(2, "oak_log", 4, 0.6, 64.0, 0.5));
@@ -160,7 +160,7 @@ TEST_CASE("two stacks of the same thing become one") {
 }
 
 TEST_CASE("what does not merge") {
-    std::mutex mutex;
+    WorldMutex mutex;
     DroppedItemPhysics items{mutex, floorOf(stateOf("stone"))};
     // A different item, one too far away sideways, one too far above, and two that would not fit
     // in one stack.
@@ -184,7 +184,7 @@ TEST_CASE("what does not merge") {
 }
 
 TEST_CASE("a merged stack keeps the younger age and the longer wait") {
-    std::mutex mutex;
+    WorldMutex mutex;
     DroppedItemPhysics items{mutex, floorOf(stateOf("stone"))};
     DroppedItem old = drop(1, "oak_log", 1, 0.5, 64.0, 0.5);
     old.age = 100;
@@ -215,7 +215,7 @@ TEST_CASE("a merged stack keeps the younger age and the longer wait") {
 }
 
 TEST_CASE("a stack that carries something of its own does not merge") {
-    std::mutex mutex;
+    WorldMutex mutex;
     DroppedItemPhysics items{mutex, floorOf(stateOf("stone"))};
     DroppedItem plain = drop(1, "shulker_box", 1, 0.5, 64.0, 0.5);
     DroppedItem full = drop(2, "shulker_box", 1, 0.6, 64.0, 0.5);
@@ -231,7 +231,7 @@ TEST_CASE("a stack that carries something of its own does not merge") {
 }
 
 TEST_CASE("a settled pair waits two seconds to merge, not two ticks") {
-    std::mutex mutex;
+    WorldMutex mutex;
     DroppedItemPhysics items{mutex, floorOf(stateOf("stone"))};
     items.spawnItem(drop(1, "oak_log", 3, 0.5, 64.0, 0.5));
     items.spawnItem(drop(2, "oak_log", 4, 0.6, 64.0, 0.5));
@@ -246,7 +246,7 @@ TEST_CASE("a settled pair waits two seconds to merge, not two ticks") {
 }
 
 TEST_CASE("what stops an item sideways, and what a ceiling does not do") {
-    std::mutex mutex;
+    WorldMutex mutex;
     // A floor, and a wall east of x = 1.
     DroppedItemPhysics items{mutex, [](std::int32_t x, std::int32_t y, std::int32_t) -> std::optional<std::int32_t> {
                                  const registry::BlockState* stone = registry::blocks::named("stone");
@@ -267,7 +267,7 @@ TEST_CASE("what stops an item sideways, and what a ceiling does not do") {
 }
 
 TEST_CASE("an item that hits a ceiling has not landed") {
-    std::mutex mutex;
+    WorldMutex mutex;
     // Air below, a ceiling at y = 70: nothing to stand on, so nothing is ever on the ground.
     DroppedItemPhysics items{mutex, [](std::int32_t, std::int32_t y, std::int32_t) -> std::optional<std::int32_t> {
                                  return y >= 70 ? std::optional<std::int32_t>{registry::blocks::named("stone")->stateId}
@@ -287,7 +287,7 @@ TEST_CASE("an item that hits a ceiling has not landed") {
 }
 
 TEST_CASE("what is nearby, and what is picked up") {
-    std::mutex mutex;
+    WorldMutex mutex;
     DroppedItemPhysics items{mutex, floorOf(stateOf("stone"))};
     // Dropped furthest first, so the order that comes back is the distance and not the order they
     // were dropped in.
@@ -311,7 +311,7 @@ TEST_CASE("what is nearby, and what is picked up") {
 }
 
 TEST_CASE("an item outside the region being ticked is left where it is") {
-    std::mutex mutex;
+    WorldMutex mutex;
     DroppedItemPhysics items{mutex, floorOf(stateOf("stone"))};
     items.spawnItem(drop(1, "stone", 1, 0.5, 68.0, 0.5));
     items.spawnItem(drop(2, "stone", 1, 5000.5, 68.0, 0.5));

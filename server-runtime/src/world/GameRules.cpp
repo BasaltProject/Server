@@ -1,0 +1,164 @@
+#include <basalt/server/runtime/world/GameRules.hpp>
+
+#include <algorithm>
+#include <array>
+#include <charconv>
+#include <utility>
+
+namespace basalt::server::runtime::world {
+namespace {
+
+/// Every rule, by id.
+///
+/// Vanilla declares them by field name instead, which puts `command_blocks_work` before
+/// `command_block_output` and `spawner_blocks_work` before `spawn_mobs`. Nothing observes that
+/// order: brigadier sorts the suggestions it offers, so the client sees this one either way.
+constexpr std::array kAll = {
+    gameRules::kAdvanceTime,
+    gameRules::kAdvanceWeather,
+    gameRules::kAllowEnteringNetherUsingPortals,
+    GameRule::boolean("block_drops", true),
+    GameRule::boolean("block_explosion_drop_decay", true),
+    GameRule::boolean("command_block_output", true),
+    GameRule::boolean("command_blocks_work", true),
+    GameRule::boolean("drowning_damage", true),
+    GameRule::boolean("elytra_movement_check", true),
+    GameRule::boolean("ender_pearls_vanish_on_death", true),
+    GameRule::boolean("entity_drops", true),
+    gameRules::kFallDamage,
+    GameRule::boolean("fire_damage", true),
+    GameRule::integer("fire_spread_radius_around_player", 128, -1),
+    GameRule::boolean("forgive_dead_players", true),
+    GameRule::boolean("freeze_damage", true),
+    GameRule::boolean("global_sound_events", true),
+    gameRules::kImmediateRespawn,
+    gameRules::kKeepInventory,
+    gameRules::kLavaSourceConversion,
+    gameRules::kLimitedCrafting,
+    GameRule::boolean("locator_bar", true),
+    gameRules::kLogAdminCommands,
+    gameRules::kMaxBlockModifications,
+    gameRules::kMaxCommandForks,
+    gameRules::kMaxCommandSequenceLength,
+    GameRule::integer("max_entity_cramming", 24, 0),
+    GameRule::integer("max_minecart_speed", 8, 1, 1000),
+    GameRule::integer("max_snow_accumulation_height", 1, 0, 8),
+    GameRule::boolean("mob_drops", true),
+    GameRule::boolean("mob_explosion_drop_decay", true),
+    GameRule::boolean("mob_griefing", true),
+    GameRule::boolean("natural_health_regeneration", true),
+    GameRule::boolean("player_movement_check", true),
+    gameRules::kPlayersNetherPortalCreativeDelay,
+    gameRules::kPlayersNetherPortalDefaultDelay,
+    gameRules::kPlayersSleepingPercentage,
+    GameRule::boolean("projectiles_can_break_blocks", true),
+    GameRule::boolean("pvp", true),
+    GameRule::boolean("raids", true),
+    gameRules::kRandomTickSpeed,
+    GameRule::boolean("reduced_debug_info", false),
+    GameRule::integer("respawn_radius", 10, 0),
+    gameRules::kSendCommandFeedback,
+    gameRules::kShowAdvancementMessages,
+    gameRules::kShowDeathMessages,
+    gameRules::kSpawnMobs,
+    gameRules::kSpawnMonsters,
+    gameRules::kSpawnPatrols,
+    gameRules::kSpawnPhantoms,
+    gameRules::kSpawnWanderingTraders,
+    GameRule::boolean("spawn_wardens", true),
+    GameRule::boolean("spawner_blocks_work", true),
+    GameRule::boolean("spectators_generate_chunks", true),
+    gameRules::kSpreadVines,
+    GameRule::boolean("tnt_explodes", true),
+    GameRule::boolean("tnt_explosion_drop_decay", false),
+    GameRule::boolean("universal_anger", false),
+    gameRules::kWaterSourceConversion,
+};
+
+} // namespace
+
+namespace gameRules {
+
+std::span<const GameRule> all() { return kAll; }
+
+const GameRule* byId(std::string_view id) {
+    constexpr std::string_view kVanilla = "minecraft:";
+    const std::string_view bare = id.starts_with(kVanilla) ? id.substr(kVanilla.size()) : id;
+    const auto found = std::ranges::find(kAll, bare, &GameRule::id);
+    return found == kAll.end() ? nullptr : &*found;
+}
+
+} // namespace gameRules
+
+bool GameRuleValues::get(const GameRule& rule) const {
+    const auto found = values_.find(rule.id);
+    if (found == values_.end()) {
+        return rule.defaultFlag;
+    }
+    // parity: `toBooleanStrictOrNull`, so anything that is not one of the two words falls back to
+    // the default rather than reading as false.
+    if (found->second == "true") {
+        return true;
+    }
+    if (found->second == "false") {
+        return false;
+    }
+    return rule.defaultFlag;
+}
+
+std::int32_t GameRuleValues::number(const GameRule& rule) const {
+    const auto found = values_.find(rule.id);
+    if (found == values_.end()) {
+        return rule.defaultNumber;
+    }
+    std::int32_t parsed = 0;
+    const char* first = found->second.data();
+    const char* last = first + found->second.size();
+    const std::from_chars_result result = std::from_chars(first, last, parsed);
+    if (result.ec != std::errc{} || result.ptr != last) {
+        return rule.defaultNumber;
+    }
+    return parsed;
+}
+
+std::string GameRuleValues::serialized(const GameRule& rule) const {
+    const auto found = values_.find(rule.id);
+    if (found != values_.end()) {
+        return found->second;
+    }
+    if (rule.kind == GameRule::Kind::Boolean) {
+        return rule.defaultFlag ? "true" : "false";
+    }
+    return std::to_string(rule.defaultNumber);
+}
+
+void GameRuleValues::set(const GameRule& rule, std::string value) { values_[std::string{rule.id}] = std::move(value); }
+
+void GameRuleValues::writeTo(wire::nbt::NbtCompound& root) const {
+    if (values_.empty()) {
+        return;
+    }
+    wire::nbt::NbtCompound rules;
+    for (const auto& [id, value] : values_) {
+        rules.putString(id, value);
+    }
+    root.set("GameRules", wire::nbt::NbtTag::ofCompound(std::move(rules)));
+}
+
+GameRuleValues GameRuleValues::readFrom(const wire::nbt::NbtCompound& root) {
+    GameRuleValues values;
+    const wire::nbt::NbtCompound* rules = root.getCompound("GameRules");
+    if (rules == nullptr) {
+        return values;
+    }
+    for (const std::string& id : rules->names()) {
+        // A rule this build does not know is dropped rather than kept: it would be written back out
+        // as a rule nothing can set, and vanilla drops it too.
+        if (const GameRule* rule = gameRules::byId(id); rule != nullptr) {
+            values.values_[std::string{rule->id}] = std::string{rules->getString(id)};
+        }
+    }
+    return values;
+}
+
+} // namespace basalt::server::runtime::world

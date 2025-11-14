@@ -167,7 +167,7 @@ std::vector<GeneratedWorldEntity>
 PendingChunkDecorations::generatedEntities(const std::function<std::int32_t()>& allocateEntityId,
                                            std::int32_t centerChunkX, std::int32_t centerChunkZ,
                                            std::int32_t radiusChunks, const ChunkAt& chunkAt) {
-    const std::lock_guard<std::mutex> lock{*mutex_};
+    const WorldWriteLock lock{*mutex_};
     std::vector<GeneratedWorldEntity> result;
     for (std::int32_t chunkX = centerChunkX - radiusChunks; chunkX <= centerChunkX + radiusChunks; ++chunkX) {
         for (std::int32_t chunkZ = centerChunkZ - radiusChunks; chunkZ <= centerChunkZ + radiusChunks; ++chunkZ) {
@@ -198,7 +198,7 @@ PendingChunkDecorations::generatedEntities(const std::function<std::int32_t()>& 
 }
 
 std::vector<server::world::ChunkGeneratedEntity> PendingChunkDecorations::takePendingGeneratedEntities() {
-    const std::lock_guard<std::mutex> lock{*mutex_};
+    const WorldWriteLock lock{*mutex_};
     std::vector<server::world::ChunkGeneratedEntity> taken;
     taken.swap(pendingGeneratedEntities_);
     return taken;

@@ -14,7 +14,7 @@ namespace {
 } // namespace
 
 std::vector<entity::ServerEntity*> EntityRegistry::entities() const {
-    const std::lock_guard<std::mutex> lock{*mutex_};
+    const WorldWriteLock lock{*mutex_};
     std::vector<entity::ServerEntity*> every;
     every.reserve(entities_.size());
     for (const std::unique_ptr<entity::ServerEntity>& entity : entities_) {
@@ -24,7 +24,7 @@ std::vector<entity::ServerEntity*> EntityRegistry::entities() const {
 }
 
 bool EntityRegistry::hasNaturalSpawnObstruction(const entity::Aabb& spawnBox, const entity::Aabb& entityBox) const {
-    const std::lock_guard<std::mutex> lock{*mutex_};
+    const WorldWriteLock lock{*mutex_};
     for (const std::unique_ptr<entity::ServerEntity>& entity : entities_) {
         if (naturalSpawnObstruction::entityBlocksSpawn(*entity, spawnBox, entityBox)) {
             return true;
@@ -34,7 +34,7 @@ bool EntityRegistry::hasNaturalSpawnObstruction(const entity::Aabb& spawnBox, co
 }
 
 std::vector<entity::ServerEntity*> EntityRegistry::entitiesIn(std::int32_t chunkX, std::int32_t chunkZ) const {
-    const std::lock_guard<std::mutex> lock{*mutex_};
+    const WorldWriteLock lock{*mutex_};
     std::vector<entity::ServerEntity*> found;
     for (const std::unique_ptr<entity::ServerEntity>& entity : entities_) {
         if (!entity->removed && chunkOf(entity->x) == chunkX && chunkOf(entity->z) == chunkZ) {
@@ -45,7 +45,7 @@ std::vector<entity::ServerEntity*> EntityRegistry::entitiesIn(std::int32_t chunk
 }
 
 std::vector<std::pair<std::int32_t, std::int32_t>> EntityRegistry::chunksWithEntities() const {
-    const std::lock_guard<std::mutex> lock{*mutex_};
+    const WorldWriteLock lock{*mutex_};
     std::vector<std::pair<std::int32_t, std::int32_t>> chunks;
     for (const std::unique_ptr<entity::ServerEntity>& entity : entities_) {
         if (entity->removed) {
@@ -60,7 +60,7 @@ std::vector<std::pair<std::int32_t, std::int32_t>> EntityRegistry::chunksWithEnt
 }
 
 void EntityRegistry::forgetEntitiesIn(std::int32_t chunkX, std::int32_t chunkZ) {
-    const std::lock_guard<std::mutex> lock{*mutex_};
+    const WorldWriteLock lock{*mutex_};
     // Removed or not: the chunk is going, and what was in it has just been written to disk.
     std::erase_if(entities_, [chunkX, chunkZ](const std::unique_ptr<entity::ServerEntity>& entity) {
         return chunkOf(entity->x) == chunkX && chunkOf(entity->z) == chunkZ;
@@ -75,14 +75,14 @@ void EntityRegistry::addPendingEntities(std::vector<wire::nbt::NbtCompound> save
 }
 
 std::vector<wire::nbt::NbtCompound> EntityRegistry::takePendingEntities() {
-    const std::lock_guard<std::mutex> lock{*mutex_};
+    const WorldWriteLock lock{*mutex_};
     std::vector<wire::nbt::NbtCompound> taken;
     taken.swap(pendingEntities_);
     return taken;
 }
 
 entity::ServerEntity* EntityRegistry::entity(std::int32_t entityId) const {
-    const std::lock_guard<std::mutex> lock{*mutex_};
+    const WorldWriteLock lock{*mutex_};
     for (const std::unique_ptr<entity::ServerEntity>& entity : entities_) {
         if (entity->entityId() == entityId) {
             return entity.get();
@@ -92,7 +92,7 @@ entity::ServerEntity* EntityRegistry::entity(std::int32_t entityId) const {
 }
 
 entity::ServerEntity& EntityRegistry::spawnEntity(std::unique_ptr<entity::ServerEntity> entity) {
-    const std::lock_guard<std::mutex> lock{*mutex_};
+    const WorldWriteLock lock{*mutex_};
     // A cube's speed, health and damage all derive from the size chosen when it was finalized.
     entity::cubeMobs::applySize(*entity);
     const std::int32_t id = entity->entityId();
@@ -104,7 +104,7 @@ entity::ServerEntity& EntityRegistry::spawnEntity(std::unique_ptr<entity::Server
 }
 
 std::vector<std::int32_t> EntityRegistry::collectRemovedEntities() {
-    const std::lock_guard<std::mutex> lock{*mutex_};
+    const WorldWriteLock lock{*mutex_};
     std::vector<std::int32_t> gone;
     for (const std::unique_ptr<entity::ServerEntity>& entity : entities_) {
         if (entity->removed) {

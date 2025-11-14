@@ -2,13 +2,13 @@
 
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/PendingChunkDecorations.hpp>
+#include <basalt/server/runtime/world/WorldMutex.hpp>
 
 #include <doctest.h>
 
 #include <array>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <string>
 
 using namespace basalt::server::runtime::world;
@@ -48,7 +48,7 @@ private:
 } // namespace
 
 TEST_CASE("a write that crossed a border lands in the chunk it was aimed at") {
-    std::mutex mutex;
+    WorldMutex mutex;
     PendingChunkDecorations pending{mutex};
     LoadedChunks chunks;
     world::Chunk& east = chunks.add(1, 0);
@@ -66,7 +66,7 @@ TEST_CASE("a write that crossed a border lands in the chunk it was aimed at") {
 }
 
 TEST_CASE("a write for a chunk nobody has loaded waits for it") {
-    std::mutex mutex;
+    WorldMutex mutex;
     PendingChunkDecorations pending{mutex};
     LoadedChunks chunks;
 
@@ -87,7 +87,7 @@ TEST_CASE("a write for a chunk nobody has loaded waits for it") {
 }
 
 TEST_CASE("a write only lands where the block it expected is still there") {
-    std::mutex mutex;
+    WorldMutex mutex;
     PendingChunkDecorations pending{mutex};
     LoadedChunks chunks;
     world::Chunk& east = chunks.add(1, 0);
@@ -108,7 +108,7 @@ TEST_CASE("a write only lands where the block it expected is still there") {
 }
 
 TEST_CASE("a write outside the chunk's own height is not written at all") {
-    std::mutex mutex;
+    WorldMutex mutex;
     PendingChunkDecorations pending{mutex};
     LoadedChunks chunks;
     world::Chunk& east = chunks.add(1, 0);
@@ -126,7 +126,7 @@ TEST_CASE("a write outside the chunk's own height is not written at all") {
 }
 
 TEST_CASE("a block entity needs the block it belongs to") {
-    std::mutex mutex;
+    WorldMutex mutex;
     PendingChunkDecorations pending{mutex};
     LoadedChunks chunks;
     world::Chunk& east = chunks.add(1, 0);
@@ -152,7 +152,7 @@ TEST_CASE("a block entity needs the block it belongs to") {
 }
 
 TEST_CASE("a scheduled tick crosses the border with the block it belongs to") {
-    std::mutex mutex;
+    WorldMutex mutex;
     PendingChunkDecorations pending{mutex};
     LoadedChunks chunks;
     world::Chunk& east = chunks.add(1, 0);
@@ -179,7 +179,7 @@ TEST_CASE("a scheduled tick crosses the border with the block it belongs to") {
 }
 
 TEST_CASE("the mobs a template brought wait for the tick loop to name them") {
-    std::mutex mutex;
+    WorldMutex mutex;
     PendingChunkDecorations pending{mutex};
     CHECK(pending.takePendingGeneratedEntities().empty());
 
@@ -194,7 +194,7 @@ TEST_CASE("the mobs a template brought wait for the tick loop to name them") {
 }
 
 TEST_CASE("a generated entity keeps the identity it was first given") {
-    std::mutex mutex;
+    WorldMutex mutex;
     PendingChunkDecorations pending{mutex};
     LoadedChunks chunks;
     world::Chunk& here = chunks.add(0, 0);
