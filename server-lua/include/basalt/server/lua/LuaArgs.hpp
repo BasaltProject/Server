@@ -48,6 +48,10 @@ public:
     /// Sets `key` on the table just below the value on top, popping the value.
     void setField(std::string_view key);
 
+    /// Sets a one-based position on the table just below the value on top, popping the value. Lua
+    /// arrays start at one, so this is what a list from the host is written with.
+    void setIndex(std::int64_t index);
+
     /// Raises a Lua error from inside a host function. Does not return.
     [[noreturn]] void raise(std::string_view message) const;
 

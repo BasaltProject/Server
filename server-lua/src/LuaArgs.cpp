@@ -71,6 +71,8 @@ void LuaArgs::pushTable() { lua_newtable(state_); }
 
 void LuaArgs::setField(std::string_view key) { lua_setfield(state_, -2, std::string{key}.c_str()); }
 
+void LuaArgs::setIndex(std::int64_t index) { lua_rawseti(state_, -2, static_cast<lua_Integer>(index)); }
+
 void LuaArgs::raise(std::string_view message) const {
     luaL_error(state_, "%s", std::string{message}.c_str());
     // `luaL_error` never returns; this is only here because the compiler cannot know that.
