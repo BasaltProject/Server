@@ -5,6 +5,7 @@ basalt_module(server-world
         src/WorldTypes.cpp
         src/GenerationMetrics.cpp
         src/LeafDistances.cpp
+        src/NoiseWorldGenerator.cpp
         src/portal/PortalShape.cpp
         src/ChunkDataCodec.cpp
         src/ChunkSection.cpp
@@ -390,6 +391,12 @@ basalt_test(server-world-buried-treasure-generator-test
 basalt_test(server-world-loot-test
     SOURCES
         test/LootTest.cpp
+    DEPENDS basalt::server-world
+)
+
+basalt_test(server-world-noise-generator-test
+    SOURCES
+        test/NoiseWorldGeneratorTest.cpp
     DEPENDS basalt::server-world
 )
 
