@@ -19,9 +19,11 @@ basalt_module(server-runtime-core
         src/config/ConfigDirectory.cpp
         src/config/ForwardingConfig.cpp
         src/config/GroupsConfig.cpp
+        src/config/LiveConfigs.cpp
         src/config/ProfileSelection.cpp
         src/config/ServerListConfig.cpp
         src/config/UiConfigs.cpp
+        src/entity/ServerEntity.cpp
         src/config/WorldsConfig.cpp
         src/function/FunctionLibrary.cpp
         src/net/ProxyLogin.cpp
@@ -41,7 +43,7 @@ basalt_module(server-runtime-core
         src/scoreboard/Scoreboard.cpp
         src/scoreboard/Teams.cpp
         src/timings/TimingsReport.cpp
-    DEPENDS basalt::server-runtime-config-defaults basalt::server-world basalt::wire-auth basalt::wire-io
+    DEPENDS basalt::server-registry basalt::server-runtime-config-defaults basalt::server-world basalt::wire-auth basalt::wire-io
             basalt::wire-multiversion basalt::wire-nbt basalt::wire-protocol basalt::wire-text
 )
 
@@ -61,6 +63,22 @@ basalt_test(server-runtime-config-test
     SOURCES
         test/ConfigDirectoryTest.cpp
     DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-entity-test
+    SOURCES
+        test/ServerEntityTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-live-config-test
+    SOURCES
+        test/LiveConfigsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-live-config-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
 basalt_test(server-runtime-server-list-test
