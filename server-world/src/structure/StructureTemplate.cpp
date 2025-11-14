@@ -18,13 +18,9 @@ using wire::nbt::NbtList;
 using wire::nbt::NbtTag;
 using wire::nbt::NbtType;
 
-constexpr std::array<std::string_view, 4> kHorizontalNames{"north", "east", "south", "west"};
-
 [[nodiscard]] StructurePos plus(StructurePos left, StructurePos right) {
     return StructurePos{.x = left.x + right.x, .y = left.y + right.y, .z = left.z + right.z};
 }
-
-[[nodiscard]] std::string lowerName(StructureDirection direction) { return std::string{serializedName(direction)}; }
 
 [[nodiscard]] std::string pathOf(std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);

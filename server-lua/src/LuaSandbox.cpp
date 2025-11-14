@@ -179,7 +179,11 @@ std::unique_ptr<LuaSandbox> LuaSandbox::create(std::string name, LuaLimits limit
                                                SourceFinder sources, PrintSink printLine) {
     std::unique_ptr<LuaSandbox> sandbox{
         new LuaSandbox{std::move(name), limits, std::move(sources), std::move(printLine)}};
-    sandbox->state_ = lua_newstate(&SandboxAccess::reallocate, sandbox.get(), seed);
+    // Lua seeds its own string hashing with 32 bits, and the cast is written out because the whole
+    // seed is not lost: `install` gives all 64 of it to `math.randomseed`, which is the one a
+    // plugin's randomness comes from.
+    sandbox->state_ =
+        lua_newstate(&SandboxAccess::reallocate, sandbox.get(), static_cast<unsigned int>(seed & 0xFFFFFFFFULL));
     if (sandbox->state_ == nullptr) {
         return nullptr;
     }
