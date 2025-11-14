@@ -10,12 +10,27 @@ basalt_module(server-runtime-core
         src/registry/VanillaOverworldBiomesB.cpp
         src/registry/VanillaRegistryData.cpp
         src/registry/VanillaTagData.cpp
+        src/scoreboard/Scoreboard.cpp
+        src/scoreboard/Teams.cpp
+        src/timings/TimingsReport.cpp
     DEPENDS basalt::wire-auth basalt::wire-io basalt::wire-nbt basalt::wire-protocol basalt::wire-text
 )
 
 basalt_test(server-runtime-biome-registry-test
     SOURCES
         test/BiomeRegistryTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-timings-test
+    SOURCES
+        test/TimingsReportTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-scoreboard-test
+    SOURCES
+        test/ScoreboardTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
