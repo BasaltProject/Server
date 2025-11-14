@@ -2,10 +2,21 @@ basalt_module(server-runtime-core
     SOURCES
         src/Connection.cpp
         src/LoginHandler.cpp
+        src/registry/VanillaBiomes.cpp
+        src/registry/VanillaConfigurationRegistries.cpp
         src/registry/VanillaDimensionTypes.cpp
+        src/registry/VanillaNetherEndBiomes.cpp
+        src/registry/VanillaOverworldBiomesA.cpp
+        src/registry/VanillaOverworldBiomesB.cpp
         src/registry/VanillaRegistryData.cpp
         src/registry/VanillaTagData.cpp
     DEPENDS basalt::wire-auth basalt::wire-io basalt::wire-nbt basalt::wire-protocol basalt::wire-text
+)
+
+basalt_test(server-runtime-biome-registry-test
+    SOURCES
+        test/BiomeRegistryTest.cpp
+    DEPENDS basalt::server-runtime-core
 )
 
 basalt_test(server-runtime-registry-test
