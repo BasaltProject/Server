@@ -12,7 +12,10 @@ basalt_module(server-runtime-core
     SOURCES
         src/Connection.cpp
         src/LoginHandler.cpp
+        src/config/BasaltConfig.cpp
         src/config/ConfigDirectory.cpp
+        src/config/ForwardingConfig.cpp
+        src/config/GroupsConfig.cpp
         src/function/FunctionLibrary.cpp
         src/net/ProxyLogin.cpp
         src/net/SessionOutbox.cpp
@@ -53,7 +56,28 @@ basalt_test(server-runtime-config-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-groups-test
+    SOURCES
+        test/GroupsConfigTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-groups-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-server-config-test
+    SOURCES
+        test/BasaltConfigTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+# The tests that write files are told where inside the build tree to put them.
 target_compile_definitions(server-runtime-config-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+target_compile_definitions(server-runtime-server-config-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
