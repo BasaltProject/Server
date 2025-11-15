@@ -59,6 +59,7 @@ basalt_module(server-runtime-core
         src/world/GameRules.cpp
         src/world/BambooGrowth.cpp
         src/world/BlockSurvival.cpp
+        src/world/Buckets.cpp
         src/world/ChunkGenerationQueue.cpp
         src/world/ContainerOpeners.cpp
         src/world/DetectorRails.cpp
@@ -69,6 +70,7 @@ basalt_module(server-runtime-core
         src/world/GrowthSupport.cpp
         src/world/LavaGrowth.cpp
         src/world/LocalMobCaps.cpp
+        src/world/Sponges.cpp
         src/world/StemGrowth.cpp
         src/world/PlantGrowth.cpp
         src/world/MiscGrowth.cpp
@@ -77,6 +79,7 @@ basalt_module(server-runtime-core
         src/world/PoweredRails.cpp
         src/world/PressurePlates.cpp
         src/world/Rails.cpp
+        src/world/Reshapes.cpp
         src/world/Redstone.cpp
         src/world/RedstoneComponents.cpp
         src/world/RedstoneReactors.cpp
@@ -141,6 +144,12 @@ basalt_test(server-runtime-container-openers-test
 basalt_test(server-runtime-world-border-test
     SOURCES
         test/WorldBorderTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-buckets-test
+    SOURCES
+        test/BucketsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
@@ -288,6 +297,12 @@ basalt_test(server-runtime-redstone-components-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-reshapes-test
+    SOURCES
+        test/ReshapesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-redstone-test
     SOURCES
         test/RedstoneTest.cpp
@@ -297,6 +312,12 @@ basalt_test(server-runtime-redstone-test
 basalt_test(server-runtime-plant-growth-test
     SOURCES
         test/PlantGrowthTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-sponges-test
+    SOURCES
+        test/SpongesTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
