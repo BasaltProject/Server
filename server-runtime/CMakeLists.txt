@@ -60,12 +60,14 @@ basalt_module(server-runtime-core
         src/world/ChunkGenerationQueue.cpp
         src/world/ContainerOpeners.cpp
         src/world/DetectorRails.cpp
+        src/world/DripstoneGrowth.cpp
         src/world/GrowthSupport.cpp
         src/world/LocalMobCaps.cpp
         src/world/StemGrowth.cpp
         src/world/PlantGrowth.cpp
         src/world/PressurePlates.cpp
         src/world/SnowyBlocks.cpp
+        src/world/VineGrowth.cpp
         src/world/WorldBorder.cpp
         src/world/WorldLight.cpp
         src/world/WorldClock.cpp
@@ -158,6 +160,18 @@ basalt_test(server-runtime-world-light-test
 basalt_test(server-runtime-bamboo-growth-test
     SOURCES
         test/BambooGrowthTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-dripstone-growth-test
+    SOURCES
+        test/DripstoneGrowthTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-vine-growth-test
+    SOURCES
+        test/VineGrowthTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
