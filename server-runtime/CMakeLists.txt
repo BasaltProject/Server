@@ -59,6 +59,8 @@ basalt_module(server-runtime-core
         src/world/ChunkGenerationQueue.cpp
         src/world/ContainerOpeners.cpp
         src/world/LocalMobCaps.cpp
+        src/world/PressurePlates.cpp
+        src/world/SnowyBlocks.cpp
         src/world/WorldBorder.cpp
         src/world/WorldClock.cpp
         src/world/RegionStore.cpp
@@ -120,6 +122,18 @@ basalt_test(server-runtime-world-border-test
 basalt_test(server-runtime-local-mob-caps-test
     SOURCES
         test/LocalMobCapsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-pressure-plates-test
+    SOURCES
+        test/PressurePlatesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-snowy-blocks-test
+    SOURCES
+        test/SnowyBlocksTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
