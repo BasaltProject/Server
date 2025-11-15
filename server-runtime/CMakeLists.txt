@@ -70,6 +70,7 @@ basalt_module(server-runtime-core
         src/world/LocalMobCaps.cpp
         src/world/StemGrowth.cpp
         src/world/PlantGrowth.cpp
+        src/world/MiscGrowth.cpp
         src/world/MushroomGrowth.cpp
         src/world/NoteBlocks.cpp
         src/world/PoweredRails.cpp
@@ -78,6 +79,7 @@ basalt_module(server-runtime-core
         src/world/Redstone.cpp
         src/world/RedstoneComponents.cpp
         src/world/RedstoneReactors.cpp
+        src/world/ScheduledBlocks.cpp
         src/world/SnowyBlocks.cpp
         src/world/Tripwires.cpp
         src/world/VineGrowth.cpp
@@ -164,6 +166,12 @@ basalt_test(server-runtime-pressure-plates-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-scheduled-blocks-test
+    SOURCES
+        test/ScheduledBlocksTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-snowy-blocks-test
     SOURCES
         test/SnowyBlocksTest.cpp
@@ -221,6 +229,12 @@ basalt_test(server-runtime-vine-growth-test
 basalt_test(server-runtime-falling-blocks-test
     SOURCES
         test/FallingBlocksTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-misc-growth-test
+    SOURCES
+        test/MiscGrowthTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
