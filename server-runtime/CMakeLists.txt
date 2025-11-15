@@ -56,6 +56,8 @@ basalt_module(server-runtime-core
         src/world/MobLocalDifficulty.cpp
         src/world/SelectableSlots.cpp
         src/world/GameRules.cpp
+        src/world/ChunkGenerationQueue.cpp
+        src/world/RegionStore.cpp
         src/world/WorldMetadata.cpp
         src/world/WorldState.cpp
         src/world/SpawnPotential.cpp
@@ -97,6 +99,22 @@ basalt_test(server-runtime-game-rules-test
     SOURCES
         test/GameRulesTest.cpp
     DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-generation-queue-test
+    SOURCES
+        test/ChunkGenerationQueueTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-region-store-test
+    SOURCES
+        test/RegionStoreTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-region-store-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
 basalt_test(server-runtime-world-metadata-test
