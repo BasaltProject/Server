@@ -57,6 +57,8 @@ basalt_module(server-runtime-core
         src/world/SelectableSlots.cpp
         src/world/GameRules.cpp
         src/world/ChunkGenerationQueue.cpp
+        src/world/ContainerOpeners.cpp
+        src/world/WorldClock.cpp
         src/world/RegionStore.cpp
         src/world/WorldMetadata.cpp
         src/world/WorldState.cpp
@@ -98,6 +100,18 @@ basalt_test(server-runtime-pending-decorations-test
 basalt_test(server-runtime-game-rules-test
     SOURCES
         test/GameRulesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-container-openers-test
+    SOURCES
+        test/ContainerOpenersTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-world-clock-test
+    SOURCES
+        test/WorldClockTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
