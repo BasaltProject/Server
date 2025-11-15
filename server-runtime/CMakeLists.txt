@@ -56,6 +56,7 @@ basalt_module(server-runtime-core
         src/world/MobLocalDifficulty.cpp
         src/world/SelectableSlots.cpp
         src/world/GameRules.cpp
+        src/world/WorldMetadata.cpp
         src/world/WorldState.cpp
         src/world/SpawnPotential.cpp
     DEPENDS basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-world basalt::wire-auth basalt::wire-io
@@ -96,6 +97,16 @@ basalt_test(server-runtime-game-rules-test
     SOURCES
         test/GameRulesTest.cpp
     DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-world-metadata-test
+    SOURCES
+        test/WorldMetadataTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-world-metadata-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
 basalt_test(server-runtime-world-state-test

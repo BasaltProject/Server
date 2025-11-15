@@ -6,6 +6,7 @@ basalt_module(server-world
         src/GenerationMetrics.cpp
         src/LeafDistances.cpp
         src/NoiseWorldGenerator.cpp
+        src/SimpleWorldGenerators.cpp
         src/portal/PortalShape.cpp
         src/ChunkDataCodec.cpp
         src/ChunkSection.cpp
@@ -212,6 +213,12 @@ basalt_module(server-world
     src/noise/PerlinSimplexNoise.cpp
     DEPENDS basalt::server-random basalt::server-registry basalt::wire-common basalt::wire-protocol
             basalt::wire-text
+)
+
+basalt_test(server-world-simple-generators-test
+    SOURCES
+        test/SimpleWorldGeneratorsTest.cpp
+    DEPENDS basalt::server-world
 )
 
 basalt_test(server-world-noise-test
