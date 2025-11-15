@@ -61,13 +61,16 @@ basalt_module(server-runtime-core
         src/world/ContainerOpeners.cpp
         src/world/DetectorRails.cpp
         src/world/DripstoneGrowth.cpp
+        src/world/FallingBlocks.cpp
         src/world/GrowthSupport.cpp
         src/world/LocalMobCaps.cpp
         src/world/StemGrowth.cpp
         src/world/PlantGrowth.cpp
+        src/world/PoweredRails.cpp
         src/world/PressurePlates.cpp
         src/world/Rails.cpp
         src/world/Redstone.cpp
+        src/world/RedstoneComponents.cpp
         src/world/SnowyBlocks.cpp
         src/world/VineGrowth.cpp
         src/world/WorldBorder.cpp
@@ -177,9 +180,27 @@ basalt_test(server-runtime-vine-growth-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-falling-blocks-test
+    SOURCES
+        test/FallingBlocksTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-powered-rails-test
+    SOURCES
+        test/PoweredRailsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-rails-test
     SOURCES
         test/RailsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-redstone-components-test
+    SOURCES
+        test/RedstoneComponentsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
