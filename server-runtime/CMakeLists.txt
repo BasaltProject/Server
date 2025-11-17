@@ -48,6 +48,8 @@ basalt_module(server-runtime-core
         src/scoreboard/Teams.cpp
         src/timings/TimingsReport.cpp
         src/world/ChorusFlowerGrowth.cpp
+        src/world/RealBlockTags.cpp
+        src/world/RealItemTags.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -115,6 +117,18 @@ basalt_module(server-runtime-core
 basalt_test(server-runtime-chorus-flower-growth-test
     SOURCES
         test/ChorusFlowerGrowthTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-real-block-tags-test
+    SOURCES
+        test/RealBlockTagsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-real-item-tags-test
+    SOURCES
+        test/RealItemTagsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
