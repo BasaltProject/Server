@@ -1,0 +1,71 @@
+#pragma once
+
+#include <basalt/server/random/RandomSource.hpp>
+#include <basalt/server/runtime/world/WorldState.hpp>
+#include <basalt/wire/protocol/play/BlockPos.hpp>
+
+#include <array>
+#include <cstdint>
+#include <span>
+
+namespace basalt::server::runtime::world {
+
+/// Which state a block goes down as: facing somewhere, on its side, upside down.
+///
+/// parity: each block's own `getStateForPlacement`, told apart by the properties the block really
+/// has plus the lists inside for the ones that break their family's rule.
+///
+/// Nothing here reads the world back for support, so no block refuses a spot it cannot hold on to.
+namespace blockPlacement {
+
+/// A box, as the six numbers an obstruction test compares: min x, y, z then max x, y, z.
+using Box = std::array<double, 6>;
+
+/// parity: `Player`'s own dimensions: 0.6 wide, 1.8 tall standing and 1.5 crouching.
+inline constexpr double kPlayerWidth = 0.6;
+inline constexpr double kPlayerHeight = 1.8;
+inline constexpr double kSneakingHeight = 1.5;
+
+/// Everything the placement of one block reads.
+///
+/// `world` is optional: without it the rules that look at a neighbour are simply skipped, which is
+/// what a caller that only wants the orientation of a state passes.
+struct Placement {
+    wire::protocol::play::Direction face = wire::protocol::play::Direction::Up;
+    /// Where in the clicked block the cursor was, 0 at its floor and 1 at its ceiling.
+    float clickY = 0.5F;
+    float clickX = 0.5F;
+    float clickZ = 0.5F;
+    float yaw = 0.0F;
+    float pitch = 0.0F;
+    /// The state the new block is going into, which is what a waterlogged block keeps.
+    std::int32_t replacing = 0;
+    const WorldState* world = nullptr;
+    std::int32_t x = 0;
+    std::int32_t y = 0;
+    std::int32_t z = 0;
+};
+
+/// The state `block` should be placed in, or `defaultStateId` when nothing about it orients.
+[[nodiscard]] std::int32_t stateFor(const wire::common::Identifier& block, std::int32_t defaultStateId,
+                                    const Placement& placement, random::RandomSource& random);
+
+/// Whether the block would be placed inside somebody.
+///
+/// parity: `BlockItem.canPlace` over `Level.isUnobstructed`. Touching is not overlapping, which is
+/// why a block at your own feet still goes down, and an empty shape never obstructs anyone.
+[[nodiscard]] bool isObstructed(std::int32_t stateId, std::int32_t blockX, std::int32_t blockY, std::int32_t blockZ,
+                                std::span<const Box> boxes);
+
+/// parity: `Player.getDimensions`, which is what the box around a player measures.
+[[nodiscard]] Box playerBox(double x, double y, double z, bool sneaking);
+
+/// parity: `Direction.fromYRot`, the quarter turn the player's yaw falls in.
+[[nodiscard]] wire::protocol::play::Direction playerDirection(float yaw);
+
+/// parity: `Direction.orderedByNearest`'s first entry: whichever face the player looks most along.
+[[nodiscard]] wire::protocol::play::Direction nearestLooking(float yaw, float pitch);
+
+} // namespace blockPlacement
+
+} // namespace basalt::server::runtime::world
