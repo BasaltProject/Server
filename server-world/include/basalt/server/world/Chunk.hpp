@@ -139,6 +139,10 @@ public:
 
     [[nodiscard]] const ChunkBlockEntity* blockEntityAt(std::int32_t localX, std::int32_t y, std::int32_t localZ) const;
 
+    /// The same, to write through: a container changes its own tag in place, and copying it out and
+    /// back would lose whatever else is in it. The caller marks the chunk dirty.
+    [[nodiscard]] ChunkBlockEntity* blockEntityAt(std::int32_t localX, std::int32_t y, std::int32_t localZ);
+
     [[nodiscard]] std::vector<ChunkBlockEntity> blockEntities() const;
 
     [[nodiscard]] std::size_t blockEntityCount() const noexcept { return blockEntities_.size(); }

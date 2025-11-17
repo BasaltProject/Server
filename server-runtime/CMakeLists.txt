@@ -63,12 +63,14 @@ basalt_module(server-runtime-core
         src/world/Buckets.cpp
         src/world/ChunkGenerationQueue.cpp
         src/world/ContainerOpeners.cpp
+        src/world/DecoratedPots.cpp
         src/world/DetectorRails.cpp
         src/world/DaylightDetectors.cpp
         src/world/DripstoneGrowth.cpp
         src/world/FallingBlocks.cpp
         src/world/Fires.cpp
         src/world/GrowthSupport.cpp
+        src/world/Jukeboxes.cpp
         src/world/LavaGrowth.cpp
         src/world/LocalMobCaps.cpp
         src/world/Sponges.cpp
@@ -161,6 +163,12 @@ basalt_test(server-runtime-fires-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-jukeboxes-test
+    SOURCES
+        test/JukeboxesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-lava-growth-test
     SOURCES
         test/LavaGrowthTest.cpp
@@ -194,6 +202,12 @@ basalt_test(server-runtime-shulkers-test
 basalt_test(server-runtime-snowy-blocks-test
     SOURCES
         test/SnowyBlocksTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-decorated-pots-test
+    SOURCES
+        test/DecoratedPotsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

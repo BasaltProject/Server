@@ -44,6 +44,9 @@ public:
 
     [[nodiscard]] const wire::nbt::NbtCompound& data() const noexcept { return data_; }
 
+    /// The tag to write through, for the container blocks that change their own contents in place.
+    [[nodiscard]] wire::nbt::NbtCompound& data() noexcept { return data_; }
+
     /// The same block entity carrying different NBT, which is what a `/data` write leaves behind.
     [[nodiscard]] ChunkBlockEntity withData(wire::nbt::NbtCompound data) const;
 
