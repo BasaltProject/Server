@@ -61,6 +61,8 @@ basalt_module(server-runtime-core
         src/world/RealTestInstances.cpp
         src/world/RealNoiseParameters.cpp
         src/world/BlockInteractions.cpp
+        src/world/ProjectileHits.cpp
+        src/world/Furnaces.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -206,6 +208,18 @@ basalt_test(server-runtime-real-noise-parameters-test
 basalt_test(server-runtime-block-interactions-test
     SOURCES
         test/BlockInteractionsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-projectile-hits-test
+    SOURCES
+        test/ProjectileHitsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-furnaces-test
+    SOURCES
+        test/FurnacesTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
