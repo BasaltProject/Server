@@ -25,6 +25,7 @@ basalt_module(server-runtime-core
         src/config/UiConfigs.cpp
         src/entity/Aabb.cpp
         src/entity/BlockRay.cpp
+        src/entity/Projectiles.cpp
         src/entity/EntityCollision.cpp
         src/entity/MobRules.cpp
         src/entity/ServerEntity.cpp
@@ -54,6 +55,7 @@ basalt_module(server-runtime-core
         src/world/RealEntityTypeTags.cpp
         src/world/RealTimelineTags.cpp
         src/world/SaplingGrowth.cpp
+        src/world/RealLootTables.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -157,6 +159,18 @@ basalt_test(server-runtime-real-timeline-tags-test
 basalt_test(server-runtime-sapling-growth-test
     SOURCES
         test/SaplingGrowthTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-projectiles-test
+    SOURCES
+        test/ProjectilesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-real-loot-tables-test
+    SOURCES
+        test/RealLootTablesTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
