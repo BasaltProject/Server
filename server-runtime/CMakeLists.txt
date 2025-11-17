@@ -68,6 +68,7 @@ basalt_module(server-runtime-core
         src/world/Containers.cpp
         src/world/DecoratedPots.cpp
         src/world/DetectorRails.cpp
+        src/world/Crafters.cpp
         src/world/DaylightDetectors.cpp
         src/world/DoubleChests.cpp
         src/world/DripstoneGrowth.cpp
@@ -92,6 +93,7 @@ basalt_module(server-runtime-core
         src/world/RedstoneComponents.cpp
         src/world/RedstoneReactors.cpp
         src/world/ScheduledBlocks.cpp
+        src/world/Shelves.cpp
         src/world/Shulkers.cpp
         src/world/SnowyBlocks.cpp
         src/world/Tripwires.cpp
@@ -222,6 +224,12 @@ basalt_test(server-runtime-scheduled-blocks-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-shelves-test
+    SOURCES
+        test/ShelvesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-shulkers-test
     SOURCES
         test/ShulkersTest.cpp
@@ -267,6 +275,12 @@ basalt_test(server-runtime-block-survival-test
 basalt_test(server-runtime-bamboo-growth-test
     SOURCES
         test/BambooGrowthTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-crafters-test
+    SOURCES
+        test/CraftersTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

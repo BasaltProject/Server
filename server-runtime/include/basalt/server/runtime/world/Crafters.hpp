@@ -1,0 +1,69 @@
+#pragma once
+
+#include <basalt/server/runtime/world/BlockChange.hpp>
+#include <basalt/server/runtime/world/WorldState.hpp>
+#include <basalt/server/world/crafting/Crafting.hpp>
+
+#include <cstdint>
+#include <functional>
+#include <optional>
+#include <set>
+#include <vector>
+
+namespace basalt::server::runtime::world {
+
+/// The block that crafts on its own when a signal reaches it.
+///
+/// parity: `CrafterBlock`, which is the one block that is a container and a redstone component at
+/// once: it books four ticks on the rising edge, crafts what its nine slots make, and puts the result
+/// into whatever it faces. Every slot with something in it loses exactly one, whatever the recipe
+/// asked for.
+///
+/// A slot can be switched off from its own screen, which counts as full for the comparator and
+/// refuses items from a hopper. That is kept beside the items in the block entity.
+namespace crafters {
+
+/// parity: `CrafterBlock`'s nine slots and its four ticks of delay.
+inline constexpr std::int32_t kSize = 9;
+
+[[nodiscard]] const wire::common::Identifier& block();
+
+/// parity: `CrafterBlock.neighborChanged`: on the rising edge it books a turn and remembers it, and
+/// when the signal goes it forgets both that and the animation.
+[[nodiscard]] std::optional<BlockChange> onNeighbourChange(WorldState& world, std::string_view worldName,
+                                                           std::int32_t x, std::int32_t y, std::int32_t z);
+
+/// What a crafter needs from the rest of the server to do its turn.
+struct Hooks {
+    /// What the nine slots make, or nothing when they make nothing.
+    std::function<std::optional<server::world::loot::ItemStack>(const server::world::crafting::CraftingInput& input)> resultFor;
+    /// A free entity id for the item it throws when there is nowhere to put the result.
+    std::function<std::int32_t()> allocateEntityId;
+    /// How many slots the container at these coordinates has, or nothing when it is not one.
+    std::function<std::optional<std::int32_t>(std::string_view path)> containerSize;
+};
+
+/// The turn itself. Answers what changed, so the caller can tell the clients.
+///
+/// parity: `CrafterBlock.dispenseFrom`: no recipe means the failure sound and nothing else, and a
+/// recipe means the result goes out the front and every slot loses one.
+[[nodiscard]] std::optional<BlockChange> craft(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                               const Hooks& hooks);
+
+/// parity: `CrafterBlockEntity.serverTick`, six ticks of animation and then the block goes still.
+[[nodiscard]] std::optional<BlockChange> tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                              wire::nbt::NbtCompound& data);
+
+/// parity: `CrafterBlockEntity.getRedstoneSignal`, which counts slots rather than items: a slot with
+/// one item in it reads the same as a full one, and a slot switched off reads as taken.
+[[nodiscard]] std::int32_t comparatorSignal(const wire::nbt::NbtCompound& data);
+
+[[nodiscard]] std::set<std::int32_t> disabledSlots(const wire::nbt::NbtCompound& data);
+
+/// parity: `CrafterBlockEntity.canPlaceItem`, which is what stops a hopper filling a slot that is
+/// off.
+[[nodiscard]] bool accepts(const wire::nbt::NbtCompound& data, std::int32_t slot);
+
+} // namespace crafters
+
+} // namespace basalt::server::runtime::world
