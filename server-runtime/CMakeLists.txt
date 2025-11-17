@@ -65,6 +65,9 @@ basalt_module(server-runtime-core
         src/world/Furnaces.cpp
         src/world/Hoppers.cpp
         src/world/EndPortals.cpp
+        src/world/EndPodium.cpp
+        src/world/NetherPortalGrowth.cpp
+        src/world/DamageProtection.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -234,6 +237,24 @@ basalt_test(server-runtime-hoppers-test
 basalt_test(server-runtime-end-portals-test
     SOURCES
         test/EndPortalsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-end-podium-test
+    SOURCES
+        test/EndPodiumTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-nether-portal-growth-test
+    SOURCES
+        test/NetherPortalGrowthTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-damage-protection-test
+    SOURCES
+        test/DamageProtectionTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
