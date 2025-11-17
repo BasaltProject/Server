@@ -72,6 +72,8 @@ basalt_module(server-runtime-core
         src/world/NaturalSpawnPredicates.cpp
         src/world/BiomeTagLoader.cpp
         src/world/Dispensers.cpp
+        src/world/PortalIndex.cpp
+        src/world/RealTimelines.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -283,6 +285,22 @@ basalt_test(server-runtime-biome-tag-loader-test
 basalt_test(server-runtime-dispensers-test
     SOURCES
         test/DispensersTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-portal-index-test
+    SOURCES
+        test/PortalIndexTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-portal-index-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-real-timelines-test
+    SOURCES
+        test/RealTimelinesTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
