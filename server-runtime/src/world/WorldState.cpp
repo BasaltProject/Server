@@ -398,6 +398,10 @@ std::vector<DroppedItem> WorldState::nearbyItems(double x, double y, double z, d
     return itemPhysics_.nearbyItems(x, y, z, radius);
 }
 
+bool WorldState::shiftItem(std::int32_t entityId, double dx, double dy, double dz) {
+    return itemPhysics_.shiftItem(entityId, dx, dy, dz);
+}
+
 std::optional<DroppedItem> WorldState::removeItem(std::int32_t entityId) {
     mine("A dropped item");
     return itemPhysics_.removeItem(entityId);

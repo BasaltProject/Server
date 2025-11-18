@@ -77,6 +77,7 @@ basalt_module(server-runtime-core
         src/world/StructureTemplates.cpp
         src/world/BlockPlacement.cpp
         src/world/RealRecipes.cpp
+        src/world/Pistons.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -322,6 +323,12 @@ basalt_test(server-runtime-block-placement-test
 basalt_test(server-runtime-real-recipes-test
     SOURCES
         test/RealRecipesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-pistons-test
+    SOURCES
+        test/PistonsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
