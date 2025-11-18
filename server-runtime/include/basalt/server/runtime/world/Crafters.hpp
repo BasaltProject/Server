@@ -36,7 +36,8 @@ inline constexpr std::int32_t kSize = 9;
 /// What a crafter needs from the rest of the server to do its turn.
 struct Hooks {
     /// What the nine slots make, or nothing when they make nothing.
-    std::function<std::optional<server::world::loot::ItemStack>(const server::world::crafting::CraftingInput& input)> resultFor;
+    std::function<std::optional<server::world::loot::ItemStack>(const server::world::crafting::CraftingInput& input)>
+        resultFor;
     /// A free entity id for the item it throws when there is nowhere to put the result.
     std::function<std::int32_t()> allocateEntityId;
     /// How many slots the container at these coordinates has, or nothing when it is not one.
