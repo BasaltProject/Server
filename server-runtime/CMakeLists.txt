@@ -28,6 +28,7 @@ basalt_module(server-runtime-core
         src/entity/EntityPhysics.cpp
         src/entity/FlyingMovement.cpp
         src/entity/LivingMovement.cpp
+        src/entity/PathFinder.cpp
         src/entity/Projectiles.cpp
         src/entity/EntityCollision.cpp
         src/entity/MobRules.cpp
@@ -86,6 +87,7 @@ basalt_module(server-runtime-core
         src/world/RealSurfaceEnvironment.cpp
         src/world/NetherSurfaceEnvironment.cpp
         src/world/Campfires.cpp
+        src/world/BlockEntityTicks.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -189,6 +191,12 @@ basalt_test(server-runtime-real-timeline-tags-test
 basalt_test(server-runtime-sapling-growth-test
     SOURCES
         test/SaplingGrowthTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-path-finder-test
+    SOURCES
+        test/PathFinderTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
@@ -385,6 +393,12 @@ basalt_test(server-runtime-nether-surface-environment-test
 basalt_test(server-runtime-campfires-test
     SOURCES
         test/CampfiresTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-block-entity-ticks-test
+    SOURCES
+        test/BlockEntityTicksTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
