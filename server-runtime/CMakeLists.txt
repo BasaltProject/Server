@@ -91,6 +91,7 @@ basalt_module(server-runtime-core
         src/world/BlockEntityTicks.cpp
         src/world/Walls.cpp
         src/world/RedstoneWire.cpp
+        src/world/Geysers.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -420,6 +421,12 @@ basalt_test(server-runtime-walls-test
 basalt_test(server-runtime-redstone-wire-test
     SOURCES
         test/RedstoneWireTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-geysers-test
+    SOURCES
+        test/GeysersTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
