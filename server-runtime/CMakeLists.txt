@@ -34,6 +34,7 @@ basalt_module(server-runtime-core
         src/entity/MobRules.cpp
         src/entity/ServerEntity.cpp
         src/config/WorldsConfig.cpp
+        src/command/StringReader.cpp
         src/function/FunctionLibrary.cpp
         src/net/ProxyLogin.cpp
         src/net/SessionOutbox.cpp
@@ -88,6 +89,8 @@ basalt_module(server-runtime-core
         src/world/NetherSurfaceEnvironment.cpp
         src/world/Campfires.cpp
         src/world/BlockEntityTicks.cpp
+        src/world/Walls.cpp
+        src/world/RedstoneWire.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -399,6 +402,24 @@ basalt_test(server-runtime-campfires-test
 basalt_test(server-runtime-block-entity-ticks-test
     SOURCES
         test/BlockEntityTicksTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-string-reader-test
+    SOURCES
+        test/StringReaderTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-walls-test
+    SOURCES
+        test/WallsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-redstone-wire-test
+    SOURCES
+        test/RedstoneWireTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
