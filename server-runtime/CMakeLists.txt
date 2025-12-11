@@ -136,13 +136,13 @@ basalt_module(server-runtime-core
         src/world/LocalMobCaps.cpp
         src/world/Sponges.cpp
         src/world/StemGrowth.cpp
-        src/world/PlantGrowth.cpp
         src/world/MiscGrowth.cpp
         src/world/MushroomGrowth.cpp
         src/world/NoteBlocks.cpp
         src/world/PoweredRails.cpp
         src/world/PressurePlates.cpp
         src/world/Rails.cpp
+        src/world/RandomTicks.cpp
         src/world/Reshapes.cpp
         src/world/Redstone.cpp
         src/world/RedstoneComponents.cpp
@@ -751,6 +751,12 @@ basalt_test(server-runtime-rails-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-random-ticks-test
+    SOURCES
+        test/RandomTicksTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-redstone-reactors-test
     SOURCES
         test/RedstoneReactorsTest.cpp
@@ -772,12 +778,6 @@ basalt_test(server-runtime-reshapes-test
 basalt_test(server-runtime-redstone-test
     SOURCES
         test/RedstoneTest.cpp
-    DEPENDS basalt::server-runtime-core
-)
-
-basalt_test(server-runtime-plant-growth-test
-    SOURCES
-        test/PlantGrowthTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
