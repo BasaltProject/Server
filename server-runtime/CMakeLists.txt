@@ -36,8 +36,12 @@ basalt_module(server-runtime-core
         src/config/WorldsConfig.cpp
         src/command/StringReader.cpp
         src/item/ItemWear.cpp
+        src/item/ItemComponentCodecs.cpp
+        src/item/ItemDamageEffects.cpp
+        src/item/ItemComponentPayloads.cpp
         src/function/FunctionLibrary.cpp
         src/player/FoodData.cpp
+        src/player/PlayerInventory.cpp
         src/player/Combat.cpp
         src/player/ExperienceData.cpp
         src/player/PlayerStats.cpp
@@ -295,6 +299,12 @@ basalt_test(server-runtime-experience-data-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-player-inventory-test
+    SOURCES
+        test/PlayerInventoryTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-player-stats-test
     SOURCES
         test/PlayerStatsTest.cpp
@@ -440,6 +450,18 @@ basalt_test(server-runtime-campfires-test
 basalt_test(server-runtime-block-entity-ticks-test
     SOURCES
         test/BlockEntityTicksTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-item-component-codecs-test
+    SOURCES
+        test/ItemComponentCodecsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-item-damage-effects-test
+    SOURCES
+        test/ItemDamageEffectsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
