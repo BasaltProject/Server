@@ -37,6 +37,10 @@ basalt_module(server-runtime-core
         src/command/StringReader.cpp
         src/item/ItemWear.cpp
         src/function/FunctionLibrary.cpp
+        src/player/FoodData.cpp
+        src/player/Combat.cpp
+        src/player/ExperienceData.cpp
+        src/player/PlayerStats.cpp
         src/net/ProxyLogin.cpp
         src/net/SessionOutbox.cpp
         src/registry/VanillaBiomes.cpp
@@ -276,6 +280,30 @@ basalt_test(server-runtime-block-interactions-test
 basalt_test(server-runtime-projectile-hits-test
     SOURCES
         test/ProjectileHitsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-combat-test
+    SOURCES
+        test/CombatTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-experience-data-test
+    SOURCES
+        test/ExperienceDataTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-player-stats-test
+    SOURCES
+        test/PlayerStatsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-food-data-test
+    SOURCES
+        test/FoodDataTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
