@@ -150,12 +150,14 @@ basalt_module(server-runtime-core
         src/world/Jukeboxes.cpp
         src/world/LavaGrowth.cpp
         src/world/Lecterns.cpp
+        src/world/LoadedWorld.cpp
         src/world/LocalMobCaps.cpp
         src/world/Sponges.cpp
         src/world/StemGrowth.cpp
         src/world/MiscGrowth.cpp
         src/world/MushroomGrowth.cpp
         src/world/NoteBlocks.cpp
+        src/world/PlayerProgress.cpp
         src/world/PoweredRails.cpp
         src/world/PressurePlates.cpp
         src/world/Rails.cpp
@@ -337,6 +339,12 @@ basalt_test(server-runtime-experience-data-test
 basalt_test(server-runtime-player-inventory-test
     SOURCES
         test/PlayerInventoryTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-player-progress-test
+    SOURCES
+        test/PlayerProgressTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
@@ -702,6 +710,16 @@ basalt_test(server-runtime-lecterns-test
     SOURCES
         test/LecternsTest.cpp
     DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-loaded-world-test
+    SOURCES
+        test/LoadedWorldTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-loaded-world-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
 basalt_test(server-runtime-local-mob-caps-test
