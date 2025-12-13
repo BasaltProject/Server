@@ -74,7 +74,8 @@ std::string TimingsReport::stamp() {
                        local.tm_mday, local.tm_hour, local.tm_min, local.tm_sec);
 }
 
-std::string TimingsReport::write(std::int64_t nowNanos, const std::string& directory) const {
+std::string TimingsReport::write(std::int64_t nowNanos) const {
+    const std::string& directory = directory_;
     wire::io::fileIO::createDirectories(directory);
     const std::string path = directory + "/" + stamp() + ".json";
     wire::io::fileIO::writeText(path, json(nowNanos));

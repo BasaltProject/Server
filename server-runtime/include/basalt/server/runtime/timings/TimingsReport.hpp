@@ -50,16 +50,21 @@ public:
     /// Beside the logs and the asset cache, in the directory the server already owns.
     static constexpr std::string_view kDefaultDirectory = "./.basalt/timings";
 
+    /// The directory is the report's own rather than each caller's: `/timings report`, `/debug
+    /// stop` and `/perf stop` all write the same file to the same place, and a test needs it
+    /// somewhere else.
     TimingsReport(const wire::common::Timings& timings, const wire::common::TickDurations& tickDurations,
-                  ReportSources sources)
-        : timings_(&timings), tickDurations_(&tickDurations), sources_(std::move(sources)) {}
+                  ReportSources sources, std::string directory = std::string{kDefaultDirectory})
+        : timings_(&timings), tickDurations_(&tickDurations), sources_(std::move(sources)),
+          directory_(std::move(directory)) {}
+
+    [[nodiscard]] const std::string& directory() const noexcept { return directory_; }
 
     /// Writes the report and answers its path.
     ///
     /// The file is named after local time to the second, which is how an operator refers to a run
     /// ("the one from just before it lagged") and what keeps two runs a minute apart from colliding.
-    [[nodiscard]] std::string write(std::int64_t nowNanos,
-                                    const std::string& directory = std::string{kDefaultDirectory}) const;
+    [[nodiscard]] std::string write(std::int64_t nowNanos) const;
 
     [[nodiscard]] std::string json(std::int64_t nowNanos) const;
 
@@ -70,6 +75,7 @@ private:
     const wire::common::Timings* timings_;
     const wire::common::TickDurations* tickDurations_;
     ReportSources sources_;
+    std::string directory_;
 };
 
 } // namespace basalt::server::runtime::timings
