@@ -86,12 +86,79 @@ Parsed<player::PlayerSession*> CommandContext::requirePlayer() const {
     return player;
 }
 
+Parsed<world::LoadedWorld*> CommandContext::world() const {
+    const std::map<std::string, world::LoadedWorld*, std::less<>>& worlds = environment().options().worlds;
+    if (const player::PlayerSession* player = source_->player(); player != nullptr) {
+        if (const auto found = worlds.find(player->worldName); found != worlds.end()) {
+            return found->second;
+        }
+    }
+    if (const auto found = worlds.find(environment().options().defaultWorldName); found != worlds.end()) {
+        return found->second;
+    }
+    if (worlds.empty()) {
+        return std::unexpected{CommandSyntaxError{.component = Component::text("No world is loaded.")}};
+    }
+    return worlds.begin()->second;
+}
+
 Parsed<player::PlayerSession*> CommandContext::requireEntity() const {
     player::PlayerSession* player = source_->player();
     if (player == nullptr) {
         return std::unexpected{CommandSyntaxError{.component = Component::translatable("permissions.requires.entity")}};
     }
     return player;
+}
+
+namespace {
+
+[[nodiscard]] std::string usageText(const CommandNode& node) {
+    return node.kind() == NodeKind::Argument ? "<" + node.name() + ">" : node.name();
+}
+
+} // namespace
+
+std::string smartUsage(const CommandNode& node, const CommandSource& source, bool optional, bool deep) {
+    const std::string self = optional ? "[" + usageText(node) + "]" : usageText(node);
+    if (deep) {
+        return self;
+    }
+    const bool childOptional = static_cast<bool>(node.executor);
+    const std::string open = childOptional ? "[" : "(";
+    const std::string close = childOptional ? "]" : ")";
+    const CommandNode& target = node.redirect == nullptr ? node : *node.redirect;
+    std::vector<CommandNode*> children;
+    for (CommandNode* child : target.sortedChildren()) {
+        if (mayUse(source, *child)) {
+            children.push_back(child);
+        }
+    }
+    if (children.size() == 1) {
+        return self + " " + smartUsage(*children.front(), source, childOptional, childOptional);
+    }
+    if (children.size() > 1) {
+        std::vector<std::string> usages;
+        for (const CommandNode* child : children) {
+            std::string usage = smartUsage(*child, source, childOptional, true);
+            if (std::ranges::find(usages, usage) == usages.end()) {
+                usages.push_back(std::move(usage));
+            }
+        }
+        if (usages.size() == 1) {
+            return self + " " + (childOptional ? "[" + usages.front() + "]" : usages.front());
+        }
+        if (usages.size() > 1) {
+            std::string joined;
+            for (const std::string& usage : usages) {
+                if (!joined.empty()) {
+                    joined += "|";
+                }
+                joined += usage;
+            }
+            return self + " " + open + joined + close;
+        }
+    }
+    return self;
 }
 
 Command::Command(std::string name, std::int32_t level, std::vector<std::string> aliases,
