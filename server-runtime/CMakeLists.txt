@@ -49,6 +49,7 @@ basalt_module(server-runtime-core
         src/command/commands/GroupCommands.cpp
         src/command/commands/HudCommands.cpp
         src/command/commands/RandomCommand.cpp
+        src/command/commands/ItemCommands.cpp
         src/command/commands/PlayerCommands.cpp
         src/command/commands/RegionCommands.cpp
         src/command/commands/SaveCommands.cpp
@@ -59,6 +60,7 @@ basalt_module(server-runtime-core
         src/command/commands/TimeCommand.cpp
         src/command/commands/ScoreCommands.cpp
         src/command/commands/SessionCommands.cpp
+        src/command/commands/WorldBorderCommand.cpp
         src/command/commands/WorldCommands.cpp
         src/command/CommandTree.cpp
         src/command/EntitySelector.cpp
@@ -510,6 +512,16 @@ target_compile_definitions(server-runtime-time-command-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
+basalt_test(server-runtime-world-border-command-test
+    SOURCES
+        test/WorldBorderCommandTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-world-border-command-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
 basalt_test(server-runtime-world-commands-test
     SOURCES
         test/WorldCommandsTest.cpp
@@ -517,6 +529,16 @@ basalt_test(server-runtime-world-commands-test
 )
 
 target_compile_definitions(server-runtime-world-commands-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-item-commands-test
+    SOURCES
+        test/ItemCommandsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-item-commands-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 

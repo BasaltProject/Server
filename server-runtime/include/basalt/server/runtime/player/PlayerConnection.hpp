@@ -72,6 +72,10 @@ struct PlayerConnection {
     std::function<void(wire::protocol::play::Gamemode mode)> setGamemode;
 
     /// Kills this player with the death message id vanilla would use.
+    /// Re-sends every inventory slot, which is how a change made on the server side is believed:
+    /// the client draws from its own copy and never asks.
+    std::function<void()> sendInventoryAll;
+
     /// Gives health back, up to whatever their maximum is.
     std::function<void(float amount)> heal;
 
