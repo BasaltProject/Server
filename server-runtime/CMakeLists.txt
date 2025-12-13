@@ -36,6 +36,8 @@ basalt_module(server-runtime-core
         src/entity/ServerEntity.cpp
         src/config/WorldsConfig.cpp
         src/command/StringReader.cpp
+        src/command/MessageOverrides.cpp
+        src/placeholder/PlaceholderSlots.cpp
         src/item/ItemWear.cpp
         src/item/ItemComponentCodecs.cpp
         src/item/ItemDamageEffects.cpp
@@ -117,6 +119,7 @@ basalt_module(server-runtime-core
         src/world/MobEffects.cpp
         src/world/Lightning.cpp
         src/world/Explosions.cpp
+        src/world/AdvancementTriggers.cpp
         src/world/Anvils.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
@@ -586,6 +589,12 @@ basalt_test(server-runtime-menu-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-message-overrides-test
+    SOURCES
+        test/MessageOverridesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-mob-effects-test
     SOURCES
         test/MobEffectsTest.cpp
@@ -601,6 +610,12 @@ basalt_test(server-runtime-lightning-test
 basalt_test(server-runtime-explosions-test
     SOURCES
         test/ExplosionsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-advancement-triggers-test
+    SOURCES
+        test/AdvancementTriggersTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
