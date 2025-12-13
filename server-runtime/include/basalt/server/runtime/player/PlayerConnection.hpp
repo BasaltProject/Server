@@ -65,6 +65,10 @@ struct PlayerConnection {
     std::function<void(wire::protocol::play::Gamemode mode)> setGamemode;
 
     /// Kills this player with the death message id vanilla would use.
+    /// Re-sends the command tree, which is filtered by permission and so goes stale the moment a
+    /// player's group changes.
+    std::function<void()> sendCommandTree;
+
     /// Pushes this player's level and bar after something moved them, since the client draws its
     /// own copy and never asks.
     std::function<void()> syncExperience;
