@@ -1,6 +1,8 @@
 #pragma once
 
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
+#include <basalt/server/runtime/world/BlockChange.hpp>
+#include <basalt/server/runtime/world/WorldClock.hpp>
 #include <basalt/wire/io/ByteBuffer.hpp>
 #include <basalt/wire/text/Component.hpp>
 
@@ -8,6 +10,8 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace basalt::server::runtime::player {
 
@@ -36,6 +40,21 @@ struct PlayerConnection {
     /// The packet writes itself into the buffer the connection hands over, so nothing here needs to
     /// know what any of them look like.
     std::function<void(std::int32_t packetId, const std::function<void(wire::io::ByteBuffer&)>& write)> sendPlayPacket;
+
+    /// What a block that changed asks everyone in this player's world to hear: a door, a note, a
+    /// bell. One connection sends these to its whole world rather than only to itself.
+    std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
+                       const std::vector<world::BlockEffect>& effects)>
+        broadcastEffects;
+
+    /// Sends one chunk again, for a change too big to patch block by block.
+    std::function<void(std::int32_t chunkX, std::int32_t chunkZ)> resendChunk;
+
+    /// Sends new biomes for these chunk columns without resending the columns themselves.
+    std::function<void(const std::vector<std::pair<std::int32_t, std::int32_t>>& columns)> sendBiomes;
+
+    /// Pushes the world's weather, which is three game events rather than one packet.
+    std::function<void(const world::WorldWeather& weather)> sendWeather;
 };
 
 } // namespace basalt::server::runtime::player
