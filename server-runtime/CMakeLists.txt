@@ -39,8 +39,11 @@ basalt_module(server-runtime-core
         src/command/ArgumentTypes.cpp
         src/command/commands/BasicCommands.cpp
         src/TickLoop.cpp
+        src/command/BlockEditor.cpp
         src/command/Coordinates.cpp
         src/command/RegistryArguments.cpp
+        src/command/WorldArguments.cpp
+        src/command/commands/BlockCommands.cpp
         src/command/commands/EffectCommand.cpp
         src/command/commands/GroupCommands.cpp
         src/command/commands/HudCommands.cpp
@@ -382,10 +385,26 @@ basalt_test(server-runtime-coordinates-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-world-arguments-test
+    SOURCES
+        test/WorldArgumentsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-registry-arguments-test
     SOURCES
         test/RegistryArgumentsTest.cpp
     DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-block-commands-test
+    SOURCES
+        test/BlockCommandsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-block-commands-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
 basalt_test(server-runtime-effect-command-test
