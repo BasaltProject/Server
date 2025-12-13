@@ -67,6 +67,7 @@ basalt_module(server-runtime-core
         src/scoreboard/Teams.cpp
         src/timings/TimingsReport.cpp
         src/world/ChorusFlowerGrowth.cpp
+        src/world/RealBiomeSpawns.cpp
         src/world/RealBlockTags.cpp
         src/world/RealItemTags.cpp
         src/world/RealFluidTags.cpp
@@ -84,6 +85,7 @@ basalt_module(server-runtime-core
         src/world/Furnaces.cpp
         src/world/Hoppers.cpp
         src/world/EndPortals.cpp
+        src/world/EnchantmentAttributes.cpp
         src/world/EndPodium.cpp
         src/world/NetherPortalGrowth.cpp
         src/world/DamageProtection.cpp
@@ -158,6 +160,7 @@ basalt_module(server-runtime-core
         src/world/Rails.cpp
         src/world/RandomTicks.cpp
         src/world/Reshapes.cpp
+        src/world/RecipeBook.cpp
         src/world/Redstone.cpp
         src/world/RedstoneComponents.cpp
         src/world/RedstoneReactors.cpp
@@ -182,6 +185,12 @@ basalt_module(server-runtime-core
 basalt_test(server-runtime-chorus-flower-growth-test
     SOURCES
         test/ChorusFlowerGrowthTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-real-biome-spawns-test
+    SOURCES
+        test/RealBiomeSpawnsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
@@ -353,6 +362,12 @@ basalt_test(server-runtime-hoppers-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-enchantment-attributes-test
+    SOURCES
+        test/EnchantmentAttributesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-end-portals-test
     SOURCES
         test/EndPortalsTest.cpp
@@ -504,6 +519,12 @@ basalt_test(server-runtime-string-reader-test
 basalt_test(server-runtime-walls-test
     SOURCES
         test/WallsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-recipe-book-test
+    SOURCES
+        test/RecipeBookTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
