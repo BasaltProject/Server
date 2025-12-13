@@ -75,6 +75,7 @@ basalt_module(server-runtime-core
         src/world/SaplingGrowth.cpp
         src/world/RealLootTables.cpp
         src/world/RealEnchantments.cpp
+        src/world/RealDamageTypeTags.cpp
         src/world/RealDialogs.cpp
         src/world/RealTestInstances.cpp
         src/world/RealNoiseParameters.cpp
@@ -106,6 +107,7 @@ basalt_module(server-runtime-core
         src/world/RedstoneWire.cpp
         src/world/Geysers.cpp
         src/world/Signs.cpp
+        src/world/BiomeZoomSeed.cpp
         src/world/Beds.cpp
         src/world/ClimbingPlantGrowth.cpp
         src/world/Fluids.cpp
@@ -261,6 +263,12 @@ basalt_test(server-runtime-real-enchantments-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-real-damage-type-tags-test
+    SOURCES
+        test/RealDamageTypeTagsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-real-dialogs-test
     SOURCES
         test/RealDialogsTest.cpp
@@ -276,6 +284,12 @@ basalt_test(server-runtime-real-test-instances-test
 basalt_test(server-runtime-real-noise-parameters-test
     SOURCES
         test/RealNoiseParametersTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-biome-zoom-seed-test
+    SOURCES
+        test/BiomeZoomSeedTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
