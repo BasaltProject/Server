@@ -37,7 +37,11 @@ basalt_module(server-runtime-core
         src/config/WorldsConfig.cpp
         src/command/StringReader.cpp
         src/command/ArgumentTypes.cpp
+        src/command/commands/BasicCommands.cpp
         src/command/CommandTree.cpp
+        src/command/EntitySelector.cpp
+        src/command/SelectorParser.cpp
+        src/command/SelectorOptions.cpp
         src/command/CommandDispatcher.cpp
         src/command/CommandEnvironment.cpp
         src/command/CommandTarget.cpp
@@ -196,6 +200,10 @@ basalt_module(server-runtime-core
             basalt::wire-multiversion basalt::wire-nbt basalt::wire-protocol basalt::wire-text
 )
 
+target_compile_definitions(server-runtime-core
+    PUBLIC BASALT_VERSION="${BASALT_VERSION}"
+)
+
 basalt_test(server-runtime-chorus-flower-growth-test
     SOURCES
         test/ChorusFlowerGrowthTest.cpp
@@ -259,6 +267,12 @@ basalt_test(server-runtime-living-movement-test
 basalt_test(server-runtime-flying-movement-test
     SOURCES
         test/FlyingMovementTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-entity-selector-test
+    SOURCES
+        test/EntitySelectorTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
@@ -569,6 +583,12 @@ basalt_test(server-runtime-geysers-test
 basalt_test(server-runtime-signs-test
     SOURCES
         test/SignsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-basic-commands-test
+    SOURCES
+        test/BasicCommandsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

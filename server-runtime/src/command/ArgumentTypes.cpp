@@ -1,6 +1,9 @@
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/CommandEnvironment.hpp>
+#include <basalt/server/runtime/command/EntitySelector.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/wire/common/json/Json.hpp>
+#include <basalt/wire/text/ComponentJson.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -340,6 +343,100 @@ public:
     }
 };
 
+/// The two selector-backed types. Both parse the same grammar and differ in what they hand back
+/// and in the message they refuse with.
+class SelectorArgument final : public ArgumentType {
+public:
+    SelectorArgument(bool single, bool playersOnly) : single_(single), playersOnly_(playersOnly) {}
+
+    [[nodiscard]] Parsed<ArgumentValue> parse(StringReader& reader, const CommandSource& source,
+                                              const CommandEnvironment& environment) const override {
+        const std::int32_t start = reader.cursor();
+        const Parsed<EntitySelector> selector = EntitySelector::parse(reader, source, environment);
+        if (!selector.has_value()) {
+            return std::unexpected{selector.error()};
+        }
+        std::vector<CommandTarget> matched = selector->select(source, environment, playersOnly_);
+        if (playersOnly_) {
+            std::erase_if(matched, [](const CommandTarget& target) { return target.player() == nullptr; });
+        }
+        if (matched.empty()) {
+            reader.setCursor(start);
+            return std::unexpected{CommandSyntaxError{
+                .component = Component::translatable(playersOnly_ ? "argument.entity.notfound.player"
+                                                                  : "argument.entity.notfound.entity"),
+                .input = reader.string(),
+                .cursor = reader.cursor()}};
+        }
+        if (single_ && matched.size() > 1) {
+            reader.setCursor(start);
+            return std::unexpected{CommandSyntaxError{
+                .component =
+                    Component::translatable(playersOnly_ ? "argument.player.toomany" : "argument.entity.toomany"),
+                .input = reader.string(),
+                .cursor = reader.cursor()}};
+        }
+        if (!playersOnly_) {
+            return ArgumentValue::of(std::move(matched));
+        }
+        std::vector<player::PlayerSession*> players;
+        players.reserve(matched.size());
+        for (const CommandTarget& target : matched) {
+            players.push_back(target.player());
+        }
+        return ArgumentValue::of(std::move(players));
+    }
+
+    [[nodiscard]] ArgumentParser wire() const override {
+        return ArgumentParser{parserId::kEntity,
+                              ArgumentParser::EntityProperties{.single = single_, .playersOnly = playersOnly_}};
+    }
+
+private:
+    bool single_;
+    bool playersOnly_;
+};
+
+class ComponentArgument final : public ArgumentType {
+public:
+    [[nodiscard]] Parsed<ArgumentValue> parse(StringReader& reader, const CommandSource&,
+                                              const CommandEnvironment&) const override {
+        const std::int32_t start = reader.cursor();
+        const std::string text = reader.remaining();
+        reader.setCursor(static_cast<std::int32_t>(reader.string().size()));
+        const std::expected<wire::common::JsonValue, wire::common::JsonError> json = wire::common::parseJson(text);
+        if (!json.has_value()) {
+            reader.setCursor(start);
+            return std::unexpected{CommandSyntaxError{
+                .component = Component::translatable("argument.component.invalid", {Component::text("not valid JSON")}),
+                .input = reader.string(),
+                .cursor = reader.cursor()}};
+        }
+        return ArgumentValue::of(wire::text::componentJson::deserialize(*json));
+    }
+
+    [[nodiscard]] ArgumentParser wire() const override { return ArgumentParser{parserId::kComponent}; }
+};
+
+class ResourceLocationArgument final : public ArgumentType {
+public:
+    [[nodiscard]] Parsed<ArgumentValue> parse(StringReader& reader, const CommandSource&,
+                                              const CommandEnvironment&) const override {
+        const std::int32_t start = reader.cursor();
+        const std::expected<wire::common::Identifier, wire::common::IdentifierError> parsed =
+            wire::common::Identifier::parse(reader.readIdentifier());
+        if (!parsed.has_value()) {
+            reader.setCursor(start);
+            return std::unexpected{CommandSyntaxError{.component = Component::translatable("argument.id.invalid"),
+                                                      .input = reader.string(),
+                                                      .cursor = reader.cursor()}};
+        }
+        return ArgumentValue::of(*parsed);
+    }
+
+    [[nodiscard]] ArgumentParser wire() const override { return ArgumentParser{parserId::kResourceLocation}; }
+};
+
 } // namespace
 
 std::shared_ptr<const ArgumentType> wordArgument() {
@@ -399,6 +496,28 @@ std::shared_ptr<const ArgumentType> gameModeArgument() {
 std::shared_ptr<const ArgumentType> worldArgument() {
     static const auto type = std::make_shared<const WorldArgument>();
     return type;
+}
+
+std::shared_ptr<const ArgumentType> componentArgument() {
+    static const auto type = std::make_shared<const ComponentArgument>();
+    return type;
+}
+
+std::shared_ptr<const ArgumentType> resourceLocationArgument() {
+    static const auto type = std::make_shared<const ResourceLocationArgument>();
+    return type;
+}
+
+std::shared_ptr<const ArgumentType> playersArgument(bool single) {
+    static const auto one = std::make_shared<const SelectorArgument>(true, true);
+    static const auto many = std::make_shared<const SelectorArgument>(false, true);
+    return single ? one : many;
+}
+
+std::shared_ptr<const ArgumentType> entitiesArgument(bool single) {
+    static const auto one = std::make_shared<const SelectorArgument>(true, false);
+    static const auto many = std::make_shared<const SelectorArgument>(false, false);
+    return single ? one : many;
 }
 
 } // namespace basalt::server::runtime::command
