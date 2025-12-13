@@ -41,6 +41,7 @@ basalt_module(server-runtime-core
         src/TickLoop.cpp
         src/command/BlockEditor.cpp
         src/command/Coordinates.cpp
+        src/command/ExecuteArguments.cpp
         src/command/RegistryArguments.cpp
         src/command/WorldArguments.cpp
         src/command/commands/BlockCommands.cpp
@@ -49,9 +50,11 @@ basalt_module(server-runtime-core
         src/command/commands/HudCommands.cpp
         src/command/commands/RandomCommand.cpp
         src/command/commands/PlayerCommands.cpp
+        src/command/commands/RegionCommands.cpp
         src/command/commands/SaveCommands.cpp
         src/command/commands/StopwatchCommand.cpp
         src/command/commands/TagCommand.cpp
+        src/command/commands/TeleportCommand.cpp
         src/command/commands/TickCommand.cpp
         src/command/commands/TimeCommand.cpp
         src/command/commands/ScoreCommands.cpp
@@ -391,6 +394,16 @@ basalt_test(server-runtime-world-arguments-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-region-commands-test
+    SOURCES
+        test/RegionCommandsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-region-commands-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
 basalt_test(server-runtime-registry-arguments-test
     SOURCES
         test/RegistryArgumentsTest.cpp
@@ -464,6 +477,16 @@ basalt_test(server-runtime-tag-command-test
 )
 
 target_compile_definitions(server-runtime-tag-command-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-teleport-command-test
+    SOURCES
+        test/TeleportCommandTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-teleport-command-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
