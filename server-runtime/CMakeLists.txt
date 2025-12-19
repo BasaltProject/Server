@@ -50,8 +50,10 @@ basalt_module(server-runtime-core
         src/command/commands/EffectCommand.cpp
         src/command/commands/GroupCommands.cpp
         src/command/commands/HudCommands.cpp
+        src/command/commands/ProgressCommands.cpp
         src/command/commands/RandomCommand.cpp
         src/command/commands/ItemCommands.cpp
+        src/command/commands/PlaceholderCommand.cpp
         src/command/commands/PlayerCommands.cpp
         src/command/commands/ProfilingCommands.cpp
         src/command/commands/RegionCommands.cpp
@@ -404,6 +406,16 @@ basalt_test(server-runtime-world-arguments-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-progress-commands-test
+    SOURCES
+        test/ProgressCommandsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-progress-commands-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
 basalt_test(server-runtime-region-commands-test
     SOURCES
         test/RegionCommandsTest.cpp
@@ -597,6 +609,16 @@ basalt_test(server-runtime-item-commands-test
 )
 
 target_compile_definitions(server-runtime-item-commands-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-placeholder-command-test
+    SOURCES
+        test/PlaceholderCommandTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-placeholder-command-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 

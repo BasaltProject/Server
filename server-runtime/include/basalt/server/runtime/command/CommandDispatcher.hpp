@@ -192,7 +192,10 @@ public:
 
     /// Runs a line (without its leading slash) as a source. Answers the command's own result, or 0
     /// if it failed; the failure has already been reported to the source by then.
-    std::int32_t execute(const CommandSource& source, const std::string& input);
+    ///
+    /// Const because running a command reads the tree rather than changing it, which is what lets a
+    /// command re-enter the dispatcher: `/placeholder cmdparse` and `/execute run` both do.
+    std::int32_t execute(const CommandSource& source, const std::string& input) const;
 
     /// What a line could be completed with, the line ending where the client's cursor is.
     [[nodiscard]] SuggestionResult suggest(const CommandSource& source, const std::string& input) const;
@@ -227,8 +230,8 @@ private:
 
     CommandNode* registerBuilt(const Command& command);
 
-    [[nodiscard]] Parsed<std::vector<Link>> parse(StringReader& reader, CommandNode& node, const CommandSource& source,
-                                                  const Arguments& arguments) const;
+    [[nodiscard]] Parsed<std::vector<Link>> parse(StringReader& reader, const CommandNode& node,
+                                                  const CommandSource& source, const Arguments& arguments) const;
 
     [[nodiscard]] Parsed<std::int32_t> runChain(const std::vector<Link>& links, std::size_t index,
                                                 const CommandSource& source, const std::string& input,
