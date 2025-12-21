@@ -15,6 +15,7 @@
 #include <basalt/server/runtime/command/commands/ProgressCommands.hpp>
 #include <basalt/server/runtime/command/commands/RandomCommand.hpp>
 #include <basalt/server/runtime/command/commands/RegionCommands.hpp>
+#include <basalt/server/runtime/command/commands/RemainingCommands.hpp>
 #include <basalt/server/runtime/command/commands/ScoreCommands.hpp>
 #include <basalt/server/runtime/command/commands/ScoreboardCommand.hpp>
 #include <basalt/server/runtime/command/commands/SessionCommands.hpp>
@@ -116,6 +117,23 @@ std::vector<std::shared_ptr<const Command>> vanillaCommands(const VanillaCommand
     }
     if (hooks.progress != nullptr && hooks.recipes != nullptr) {
         add(std::make_shared<commands::RecipeCommand>(*hooks.progress, *hooks.recipes));
+    }
+    add(std::make_shared<commands::WaypointCommand>());
+    add(std::make_shared<commands::ItemCommand>());
+    if (hooks.lootTables != nullptr && hooks.worldSeed) {
+        add(std::make_shared<commands::LootCommand>(*hooks.lootTables, hooks.worldSeed));
+    }
+    if (hooks.templates != nullptr && hooks.nextStructureSeed) {
+        add(std::make_shared<commands::PlaceCommand>(*hooks.templates, hooks.nextStructureSeed));
+    }
+    if (hooks.enchantments != nullptr) {
+        add(std::make_shared<commands::EnchantCommand>(*hooks.enchantments));
+    }
+    if (hooks.dialogs != nullptr) {
+        add(std::make_shared<commands::DialogCommand>(*hooks.dialogs));
+    }
+    if (hooks.testInstances != nullptr && hooks.functionRunner != nullptr) {
+        add(std::make_shared<commands::TestCommand>(*hooks.testInstances, *hooks.functionRunner));
     }
     if (hooks.worldSeed) {
         add(std::make_shared<commands::RandomCommand>(hooks.worldSeed));
