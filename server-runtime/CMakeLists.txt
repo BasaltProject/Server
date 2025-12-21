@@ -42,13 +42,18 @@ basalt_module(server-runtime-core
         src/command/commands/BasicCommands.cpp
         src/TickLoop.cpp
         src/command/BlockEditor.cpp
+        src/command/CommandStorage.cpp
         src/command/Coordinates.cpp
+        src/command/DataPaths.cpp
         src/command/ExecuteArguments.cpp
         src/command/ParticleArgument.cpp
         src/command/RegistryArguments.cpp
+        src/command/VanillaCommands.cpp
         src/command/WorldArguments.cpp
         src/command/commands/BlockCommands.cpp
         src/command/commands/BossBarCommand.cpp
+        src/command/commands/DataCommand.cpp
+        src/command/commands/DataModify.cpp
         src/command/commands/EffectCommand.cpp
         src/command/commands/EntityCommands.cpp
         src/command/commands/GroupCommands.cpp
@@ -57,10 +62,12 @@ basalt_module(server-runtime-core
         src/command/commands/RandomCommand.cpp
         src/command/commands/ItemCommands.cpp
         src/command/commands/PlaceholderCommand.cpp
+        src/command/commands/LocateCommand.cpp
         src/command/commands/ParticleCommand.cpp
         src/command/commands/PlayerCommands.cpp
         src/command/commands/ProfilingCommands.cpp
         src/command/commands/RegionCommands.cpp
+        src/command/commands/ReloadCommand.cpp
         src/command/commands/SaveCommands.cpp
         src/command/commands/StopwatchCommand.cpp
         src/command/commands/TagCommand.cpp
@@ -404,6 +411,16 @@ basalt_test(server-runtime-coordinates-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-vanilla-commands-test
+    SOURCES
+        test/VanillaCommandsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-vanilla-commands-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
 basalt_test(server-runtime-world-arguments-test
     SOURCES
         test/WorldArgumentsTest.cpp
@@ -464,6 +481,22 @@ basalt_test(server-runtime-boss-bar-command-test
 
 target_compile_definitions(server-runtime-boss-bar-command-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-data-command-test
+    SOURCES
+        test/DataCommandTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-data-command-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-data-paths-test
+    SOURCES
+        test/DataPathsTest.cpp
+    DEPENDS basalt::server-runtime-core
 )
 
 basalt_test(server-runtime-effect-command-test
@@ -623,6 +656,16 @@ basalt_test(server-runtime-item-commands-test
 )
 
 target_compile_definitions(server-runtime-item-commands-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-locate-command-test
+    SOURCES
+        test/LocateCommandTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-locate-command-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
