@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/command/commands/EntityCommands.hpp>
 #include <basalt/server/runtime/command/commands/GroupCommands.hpp>
 #include <basalt/server/runtime/command/commands/HudCommands.hpp>
+#include <basalt/server/runtime/command/commands/ImportPlayersCommand.hpp>
 #include <basalt/server/runtime/command/commands/ItemCommands.hpp>
 #include <basalt/server/runtime/command/commands/LocateCommand.hpp>
 #include <basalt/server/runtime/command/commands/ParticleCommand.hpp>
@@ -152,6 +153,7 @@ std::vector<std::shared_ptr<const Command>> vanillaCommands(const VanillaCommand
         add(std::make_shared<commands::SetIdleTimeoutCommand>(hooks.setIdleTimeout));
     }
     if (hooks.nowEpochSeconds) {
+        add(std::make_shared<commands::ImportPlayersCommand>(hooks.nowEpochSeconds));
         add(std::make_shared<commands::BanCommand>(hooks.nowEpochSeconds));
         add(std::make_shared<commands::BanIpCommand>(hooks.nowEpochSeconds));
         if (hooks.whitelistState && hooks.setWhitelistState) {
