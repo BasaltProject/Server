@@ -103,6 +103,7 @@ basalt_module(server-runtime-core
         src/ExplosionSystem.cpp
         src/Favicon.cpp
         src/PersistenceCoordinator.cpp
+        src/ServerListStatus.cpp
         src/ServerMetrics.cpp
         src/StatusEffectSystem.cpp
         src/VanillaGameData.cpp
@@ -259,7 +260,11 @@ basalt_module(server-runtime-core
         src/world/RegionStore.cpp
         src/world/WorldMetadata.cpp
         src/world/WorldSpawnPoint.cpp
+        src/world/MobSpawnAttributes.cpp
+        src/world/MobSpawnVariantData.cpp
         src/world/VanillaSaveImport.cpp
+        src/world/VillageProximity.cpp
+        src/world/WeaponDamage.cpp
         src/world/WorldState.cpp
         src/world/SpawnPotential.cpp
     DEPENDS basalt::server-assets basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-storage basalt::server-world basalt::wire-auth basalt::wire-io
@@ -569,6 +574,21 @@ basalt_test(server-runtime-group-commands-test
 target_compile_definitions(server-runtime-group-commands-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
+
+basalt_test(server-runtime-mob-spawn-attributes-test
+    SOURCES
+        test/MobSpawnAttributesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-server-list-status-test
+    SOURCES
+        test/ServerListStatusTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-server-list-status-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
 
 basalt_test(server-runtime-explosion-system-test
     SOURCES
