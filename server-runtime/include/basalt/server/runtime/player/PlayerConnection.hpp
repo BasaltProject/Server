@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
+#include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/io/ByteBuffer.hpp>
 #include <basalt/wire/protocol/play/SpawnInfo.hpp>
 #include <basalt/wire/text/Component.hpp>
@@ -106,6 +107,12 @@ struct PlayerConnection {
     std::function<void()> syncExperience;
 
     std::function<void(std::string_view deathMessageId)> killPlayer;
+
+    /// This player as the database stores them, or nothing when there is nothing worth writing yet.
+    ///
+    /// The connection owns it because what a saved player is made of (position, inventory, effects)
+    /// lives across the whole session, not in any one of the pieces that change it.
+    std::function<std::optional<storage::StoredPlayer>()> storedSnapshot;
 };
 
 } // namespace basalt::server::runtime::player
