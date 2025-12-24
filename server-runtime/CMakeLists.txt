@@ -107,6 +107,7 @@ basalt_module(server-runtime-core
         src/ServerMetrics.cpp
         src/StatusEffectSystem.cpp
         src/VanillaGameData.cpp
+        src/WorldRegistry.cpp
         src/SubstituteLabels.cpp
         src/command/CommandDispatcher.cpp
         src/command/CommandEnvironment.cpp
@@ -279,6 +280,8 @@ basalt_module(server-runtime-core
         src/world/Trades.cpp
         src/world/VanillaSaveImport.cpp
         src/world/VanillaWorldGeneratorFactory.cpp
+        src/entity/ai/GoalSelector.cpp
+        src/entity/ai/MobContext.cpp
         src/entity/ai/VillagerSchedule.cpp
         src/world/VillageDataLoader.cpp
         src/world/VillageGolemSpawner.cpp
@@ -593,6 +596,21 @@ basalt_test(server-runtime-group-commands-test
 target_compile_definitions(server-runtime-group-commands-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
+
+basalt_test(server-runtime-goal-selector-test
+    SOURCES
+        test/GoalSelectorTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-world-registry-test
+    SOURCES
+        test/WorldRegistryTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-world-registry-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
 
 basalt_test(server-runtime-vanilla-world-generator-factory-test
     SOURCES
