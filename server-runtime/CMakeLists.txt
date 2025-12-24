@@ -260,6 +260,7 @@ basalt_module(server-runtime-core
         src/world/RegionStore.cpp
         src/world/WorldMetadata.cpp
         src/world/WorldSpawnPoint.cpp
+        src/world/CustomSpawners.cpp
         src/world/MobSpawnAttributes.cpp
         src/world/MobSpawnFinalization.cpp
         src/world/MobSpawnFinalizers.cpp
@@ -273,6 +274,7 @@ basalt_module(server-runtime-core
         src/world/ZombieSpawnFinalizer.cpp
         src/world/Trades.cpp
         src/world/VanillaSaveImport.cpp
+        src/world/VillageDataLoader.cpp
         src/world/VillageProximity.cpp
         src/world/WeaponDamage.cpp
         src/world/WorldState.cpp
@@ -584,6 +586,15 @@ basalt_test(server-runtime-group-commands-test
 target_compile_definitions(server-runtime-group-commands-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
+
+basalt_test(server-runtime-custom-spawners-test
+    SOURCES
+        test/CustomSpawnersTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-custom-spawners-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
 
 basalt_test(server-runtime-natural-spawner-test
     SOURCES
