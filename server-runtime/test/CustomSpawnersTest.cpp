@@ -24,6 +24,9 @@ using basalt::server::runtime::world::PatrolSpawner;
 using basalt::server::runtime::world::PatrolSpawnRequest;
 using basalt::server::runtime::world::PhantomSpawner;
 using basalt::server::runtime::world::SpawnRequest;
+using basalt::server::runtime::world::TraderLlamaSpawnRequest;
+using basalt::server::runtime::world::WanderingTraderSpawner;
+using basalt::server::runtime::world::WanderingTraderSpawnRequest;
 using basalt::server::runtime::world::WorldMetadata;
 using basalt::wire::common::Identifier;
 using basalt::wire::common::Uuid;
@@ -167,4 +170,40 @@ TEST_CASE("no patrol before the fifth day, and none at all without the game rule
         ruled.tick(*fixture.world, true, fixture.players(), random, record);
     }
     CHECK(spawned.empty());
+}
+
+TEST_CASE("the trader's chance climbs until one arrives, and resets when it does") {
+    Fixture fixture{scratch("trader-chance")};
+    RandomSource levelRandom = RandomSource::legacy(1);
+    // A stream that never rolls the arrival, so the chance is free to climb to its ceiling.
+    WanderingTraderSpawner spawner{{}, RandomSource::legacy(2)};
+    for (std::int32_t tick = 0; tick < 200000; tick++) {
+        spawner.tick(
+            *fixture.world, fixture.players(), levelRandom,
+            [](const WanderingTraderSpawnRequest&) { return std::optional<std::int32_t>{}; },
+            [](const TraderLlamaSpawnRequest&, std::int32_t) {});
+    }
+    // parity: 25 up by 25 a time to a ceiling of 75, and never past it.
+    CHECK(spawner.savedState().spawnChance <= 75);
+    CHECK(spawner.savedState().spawnChance >= 25);
+}
+
+TEST_CASE("no trader without the game rule, whatever the clock says") {
+    Fixture fixture{scratch("trader-rule")};
+    fixture.world->gameRules().set(basalt::server::runtime::world::gameRules::kSpawnWanderingTraders, "false");
+    RandomSource levelRandom = RandomSource::legacy(1);
+    std::int32_t offered = 0;
+    WanderingTraderSpawner spawner;
+    for (std::int32_t tick = 0; tick < 60000; tick++) {
+        spawner.tick(
+            *fixture.world, fixture.players(), levelRandom,
+            [&offered](const WanderingTraderSpawnRequest&) {
+                offered++;
+                return std::optional<std::int32_t>{7};
+            },
+            [](const TraderLlamaSpawnRequest&, std::int32_t) {});
+    }
+    CHECK(offered == 0);
+    // And the saved state is untouched, so switching the rule back on does not owe a trader.
+    CHECK(spawner.savedState().spawnDelay == 24000);
 }

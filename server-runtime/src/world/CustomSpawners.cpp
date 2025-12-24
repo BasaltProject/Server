@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockShapes.hpp>
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -328,6 +329,208 @@ void PatrolSpawner::tick(LoadedWorld& world, bool spawnEnemies, const std::vecto
         spawnX += random.nextInt(kMemberSpread) - random.nextInt(kMemberSpread);
         spawnZ += random.nextInt(kMemberSpread) - random.nextInt(kMemberSpread);
     }
+}
+
+namespace {
+
+/// A block position, which the trader search passes around by value.
+struct BlockPosition {
+    std::int32_t x = 0;
+    std::int32_t y = 0;
+    std::int32_t z = 0;
+};
+
+[[nodiscard]] const Identifier& wanderingTrader() {
+    static const Identifier type = Identifier::vanilla("wandering_trader");
+    return type;
+}
+
+/// parity: `PoiManager.find(MEETING)`: the first bell in chunk and section traversal order, not the
+/// closest one. Which bell it is decides where the trader appears, so the order is observable.
+[[nodiscard]] std::optional<BlockPosition> findMeetingBell(LoadedWorld& world, BlockPosition centre,
+                                                           std::int32_t radius) {
+    const std::int32_t radiusSquared = radius * radius;
+    const std::int32_t chunkRadius = radius / 16 + 1;
+    const std::int32_t centreChunkX = centre.x >> 4;
+    const std::int32_t centreChunkZ = centre.z >> 4;
+    for (std::int32_t chunkZ = centreChunkZ - chunkRadius; chunkZ <= centreChunkZ + chunkRadius; chunkZ++) {
+        for (std::int32_t chunkX = centreChunkX - chunkRadius; chunkX <= centreChunkX + chunkRadius; chunkX++) {
+            const server::world::Chunk* chunk = world.state().chunkIfLoaded(chunkX, chunkZ);
+            if (chunk == nullptr) {
+                continue;
+            }
+            const std::int32_t minX = std::max(centre.x - radius, chunkX * 16);
+            const std::int32_t maxX = std::min(centre.x + radius, chunkX * 16 + 15);
+            const std::int32_t minZ = std::max(centre.z - radius, chunkZ * 16);
+            const std::int32_t maxZ = std::min(centre.z + radius, chunkZ * 16 + 15);
+            const std::int32_t minY = std::max(centre.y - radius, chunk->verticalBounds().minY());
+            const std::int32_t maxY = std::min(centre.y + radius, chunk->verticalBounds().maxY());
+            for (std::int32_t y = minY; y <= maxY; y++) {
+                for (std::int32_t z = minZ; z <= maxZ; z++) {
+                    for (std::int32_t x = minX; x <= maxX; x++) {
+                        const std::int32_t dx = x - centre.x;
+                        const std::int32_t dy = y - centre.y;
+                        const std::int32_t dz = z - centre.z;
+                        if (dx * dx + dy * dy + dz * dz > radiusSquared) {
+                            continue;
+                        }
+                        const Identifier* block =
+                            reg::blockStateDefinitions::blockOf(chunk->blockStateId(x & 15, y, z & 15));
+                        if (block != nullptr && block->path() == "bell") {
+                            return BlockPosition{x, y, z};
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+[[nodiscard]] bool isOnGroundSpawnPosition(LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    constexpr std::int32_t kMaxGroundEmission = 14;
+    if (world.border().distanceOutside(x + 0.5, z + 0.5) > 0.0) {
+        return false;
+    }
+    const std::optional<std::int32_t> ground = world.state().blockState(x, y - 1, z);
+    if (!ground.has_value() || !reg::blockShapes::isFaceSturdy(*ground, reg::BlockFace::Up) ||
+        server::world::light::blockLight::emission(*ground) >= kMaxGroundEmission) {
+        return false;
+    }
+    return naturalSpawner::isValidEmptySpawnBlock(world, wanderingTrader(), x, y, z) &&
+           naturalSpawner::isValidEmptySpawnBlock(world, wanderingTrader(), x, y + 1, z);
+}
+
+/// parity: ten signed-square probes through the `MOTION_BLOCKING_NO_LEAVES` heightmap.
+[[nodiscard]] std::optional<BlockPosition> findSpawnPositionNear(LoadedWorld& world, BlockPosition reference,
+                                                                 std::int32_t radius, random::RandomSource& random) {
+    constexpr std::int32_t kSpawnAttempts = 10;
+    for (std::int32_t attempt = 0; attempt < kSpawnAttempts; attempt++) {
+        const std::int32_t x = reference.x + random.nextInt(radius * 2) - radius;
+        const std::int32_t z = reference.z + random.nextInt(radius * 2) - radius;
+        const server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4);
+        if (chunk == nullptr) {
+            continue;
+        }
+        const std::int32_t y = chunk->heightAt(x & 15, z & 15, server::world::HeightmapType::MotionBlockingNoLeaves);
+        if (isOnGroundSpawnPosition(world, x, y, z)) {
+            return BlockPosition{x, y, z};
+        }
+    }
+    return std::nullopt;
+}
+
+/// parity: the separate inclusive two-by-three-by-two volume checked only for the trader itself.
+[[nodiscard]] bool hasEnoughSpace(LoadedWorld& world, BlockPosition position) {
+    for (std::int32_t x = position.x; x <= position.x + 1; x++) {
+        for (std::int32_t y = position.y; y <= position.y + 2; y++) {
+            for (std::int32_t z = position.z; z <= position.z + 1; z++) {
+                const std::optional<std::int32_t> state = world.state().blockState(x, y, z);
+                if (!state.has_value() || !reg::blockShapes::isEmptyShape(*state)) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+} // namespace
+
+WanderingTraderSpawner::WanderingTraderSpawner(WanderingTraderSpawnState state, random::RandomSource random)
+    : state_(state), random_(random) {}
+
+void WanderingTraderSpawner::tick(LoadedWorld& world, const std::vector<player::PlayerSession*>& players,
+                                  random::RandomSource& levelRandom, const SpawnTrader& spawnTrader,
+                                  const SpawnLlama& spawnLlama) {
+    constexpr std::int32_t kDefaultTickDelay = 1200;
+    constexpr std::int32_t kDefaultSpawnDelay = 24000;
+    constexpr std::int32_t kMinSpawnChance = 25;
+    constexpr std::int32_t kMaxSpawnChance = 75;
+    constexpr std::int32_t kSpawnChanceIncrease = 25;
+    constexpr std::int32_t kPercentRange = 100;
+
+    if (world.declaration().dimension != config::WorldDimension::Overworld ||
+        !world.gameRules().get(gameRules::kSpawnWanderingTraders)) {
+        return;
+    }
+    tickDelay_--;
+    if (tickDelay_ > 0) {
+        return;
+    }
+    tickDelay_ = kDefaultTickDelay;
+    state_.spawnDelay -= kDefaultTickDelay;
+    if (state_.spawnDelay > 0) {
+        return;
+    }
+    state_.spawnDelay = kDefaultSpawnDelay;
+    const std::int32_t chanceToSpawn = state_.spawnChance;
+    state_.spawnChance = std::clamp(chanceToSpawn + kSpawnChanceIncrease, kMinSpawnChance, kMaxSpawnChance);
+    if (random_.nextInt(kPercentRange) > chanceToSpawn) {
+        return;
+    }
+    if (spawn(world, players, levelRandom, spawnTrader, spawnLlama)) {
+        state_.spawnChance = kMinSpawnChance;
+    }
+}
+
+bool WanderingTraderSpawner::spawn(LoadedWorld& world, const std::vector<player::PlayerSession*>& players,
+                                   random::RandomSource& levelRandom, const SpawnTrader& spawnTrader,
+                                   const SpawnLlama& spawnLlama) {
+    constexpr std::int32_t kSpawnOneInXChance = 10;
+    constexpr std::int32_t kReferenceRadius = 48;
+    constexpr std::int32_t kLlamaRadius = 4;
+    constexpr std::int32_t kLlamaCount = 2;
+
+    std::vector<const player::PlayerSession*> alive;
+    for (const player::PlayerSession* player : players) {
+        if (!player->dead && player->health() > 0.0F) {
+            alive.push_back(player);
+        }
+    }
+    // parity: nobody to arrive for counts as a success, which resets the chance rather than raising
+    // it on an empty server.
+    if (alive.empty()) {
+        return true;
+    }
+    const player::PlayerSession& player =
+        *alive[static_cast<std::size_t>(levelRandom.nextInt(static_cast<std::int32_t>(alive.size())))];
+    if (random_.nextInt(kSpawnOneInXChance) != 0) {
+        return false;
+    }
+
+    const BlockPosition playerPos{blockOf(player.x), blockOf(player.y), blockOf(player.z)};
+    const BlockPosition reference = findMeetingBell(world, playerPos, kReferenceRadius).value_or(playerPos);
+    const std::optional<BlockPosition> traderPos = findSpawnPositionNear(world, reference, kReferenceRadius, random_);
+    if (!traderPos.has_value() || !hasEnoughSpace(world, *traderPos)) {
+        return false;
+    }
+    const std::optional<Identifier> biome = naturalSpawner::biomeAt(world, traderPos->x, traderPos->y, traderPos->z);
+    if (biome.has_value() && biome->path() == "the_void") {
+        return false;
+    }
+
+    const std::optional<std::int32_t> traderId =
+        spawnTrader ? spawnTrader(WanderingTraderSpawnRequest{.x = traderPos->x + 0.5,
+                                                              .y = static_cast<double>(traderPos->y),
+                                                              .z = traderPos->z + 0.5,
+                                                              .referenceX = reference.x,
+                                                              .referenceY = reference.y,
+                                                              .referenceZ = reference.z})
+                    : std::nullopt;
+    if (!traderId.has_value()) {
+        return false;
+    }
+    for (std::int32_t index = 0; index < kLlamaCount; index++) {
+        const std::optional<BlockPosition> llamaPos = findSpawnPositionNear(world, *traderPos, kLlamaRadius, random_);
+        if (llamaPos.has_value() && spawnLlama) {
+            spawnLlama(TraderLlamaSpawnRequest{.x = llamaPos->x + 0.5,
+                                               .y = static_cast<double>(llamaPos->y),
+                                               .z = llamaPos->z + 0.5},
+                       *traderId);
+        }
+    }
+    return true;
 }
 
 } // namespace basalt::server::runtime::world
