@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <numbers>
 #include <utility>
 
 namespace basalt::server::runtime::world {
@@ -531,6 +532,161 @@ bool WanderingTraderSpawner::spawn(LoadedWorld& world, const std::vector<player:
         }
     }
     return true;
+}
+
+namespace {
+
+constexpr std::int32_t kSiegeBrightOutsideDarken = 4;
+constexpr std::int64_t kSiegeRollTime = 18000;
+constexpr std::int32_t kSiegeChance = 10;
+constexpr std::int32_t kSiegeCentreAttempts = 10;
+constexpr float kSiegeCentreDistance = 32.0F;
+constexpr std::int32_t kSiegePositionAttempts = 10;
+constexpr std::int32_t kSiegePositionRadius = 8;
+constexpr std::int32_t kSiegePositionDiameter = 16;
+constexpr std::int32_t kSiegeVillageSectionDistance = 1;
+constexpr std::int32_t kSiegeZombieCount = 20;
+constexpr std::int32_t kSiegeSpawnDelay = 2;
+constexpr std::int32_t kSiegeMaxRandomSkyLight = 32;
+constexpr std::int32_t kSiegeMaxMonsterBlockLight = 0;
+constexpr std::int32_t kSiegeMonsterLightRange = 8;
+constexpr std::int32_t kSiegeThunderSkyDampen = 10;
+constexpr std::int32_t kSiegeMaxGroundEmission = 14;
+
+/// parity: `Mth.sin` reads a 65,536-entry table, and the siege's ring of positions depends on the
+/// exact values that table holds rather than on `std::sin` of the same angle.
+constexpr double kSinIndexScale = 10430.378350470453;
+constexpr std::int32_t kSinIndexMask = 65535;
+constexpr std::int32_t kCosIndexOffset = 16384;
+
+[[nodiscard]] float minecraftSin(float angle) {
+    const auto index =
+        static_cast<std::int32_t>(static_cast<std::int64_t>(static_cast<double>(angle) * kSinIndexScale)) &
+        kSinIndexMask;
+    return static_cast<float>(std::sin(index / kSinIndexScale));
+}
+
+[[nodiscard]] float minecraftCos(float angle) {
+    const auto index =
+        (static_cast<std::int32_t>(static_cast<std::int64_t>(static_cast<double>(angle) * kSinIndexScale)) +
+         kCosIndexOffset) &
+        kSinIndexMask;
+    return static_cast<float>(std::sin(index / kSinIndexScale));
+}
+
+/// parity: `Monster.checkMonsterSpawnRules(EVENT)`, including its RNG order.
+[[nodiscard]] bool checkZombieSpawnRules(LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                         random::RandomSource& random) {
+    if (worldLight::skyLight(world.state(), x, y, z) > random.nextInt(kSiegeMaxRandomSkyLight)) {
+        return false;
+    }
+    if (worldLight::blockLight(world.state(), x, y, z) > kSiegeMaxMonsterBlockLight) {
+        return false;
+    }
+    const std::int32_t skyDampen = world.weather().thundering
+                                       ? kSiegeThunderSkyDampen
+                                       : daylightDetectors::skyDarken(world.clock(), world.weather());
+    if (worldLight::rawBrightness(world.state(), x, y, z, true, skyDampen) > random.nextInt(kSiegeMonsterLightRange)) {
+        return false;
+    }
+    const std::optional<std::int32_t> ground = world.state().blockState(x, y - 1, z);
+    return ground.has_value() && reg::blockShapes::isFaceSturdy(*ground, reg::BlockFace::Up) &&
+           server::world::light::blockLight::emission(*ground) < kSiegeMaxGroundEmission;
+}
+
+[[nodiscard]] std::optional<VillageSiegeSpawnRequest>
+findRandomSiegePos(LoadedWorld& world, std::int32_t centreX, std::int32_t centreZ, random::RandomSource& random) {
+    for (std::int32_t attempt = 0; attempt < kSiegePositionAttempts; attempt++) {
+        const std::int32_t x = centreX + random.nextInt(kSiegePositionDiameter) - kSiegePositionRadius;
+        const std::int32_t z = centreZ + random.nextInt(kSiegePositionDiameter) - kSiegePositionRadius;
+        const server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4);
+        if (chunk == nullptr) {
+            continue;
+        }
+        const std::int32_t y = chunk->heightAt(x & 15, z & 15, server::world::HeightmapType::WorldSurface);
+        if (!villageProximity::isCloseToVillage(world.state(), x, y, z, kSiegeVillageSectionDistance) ||
+            !checkZombieSpawnRules(world, x, y, z, random)) {
+            continue;
+        }
+        return VillageSiegeSpawnRequest{.x = x + 0.5, .y = static_cast<double>(y), .z = z + 0.5};
+    }
+    return std::nullopt;
+}
+
+} // namespace
+
+bool VillageSiegeSpawner::trySetUpSiege(LoadedWorld& world, const std::vector<player::PlayerSession*>& players,
+                                        random::RandomSource& random) {
+    for (const player::PlayerSession* player : players) {
+        if (player->gamemode == wire::protocol::play::Gamemode::Spectator) {
+            continue;
+        }
+        const std::int32_t centreX = blockOf(player->x);
+        const std::int32_t centreY = blockOf(player->y);
+        const std::int32_t centreZ = blockOf(player->z);
+        if (!villageProximity::isCloseToVillage(world.state(), centreX, centreY, centreZ,
+                                                kSiegeVillageSectionDistance)) {
+            continue;
+        }
+        const std::optional<Identifier> biome = naturalSpawner::biomeAt(world, centreX, centreY, centreZ);
+        if (biome.has_value() && biome->path() == "mushroom_fields") {
+            continue;
+        }
+        for (std::int32_t attempt = 0; attempt < kSiegeCentreAttempts; attempt++) {
+            const float angle = random.nextFloat() * static_cast<float>(std::numbers::pi * 2.0);
+            spawnX_ = centreX + static_cast<std::int32_t>(std::floor(minecraftCos(angle) * kSiegeCentreDistance));
+            spawnY_ = centreY;
+            spawnZ_ = centreZ + static_cast<std::int32_t>(std::floor(minecraftSin(angle) * kSiegeCentreDistance));
+            if (findRandomSiegePos(world, spawnX_, spawnZ_, random).has_value()) {
+                nextSpawnTime_ = 0;
+                zombiesToSpawn_ = kSiegeZombieCount;
+                return true;
+            }
+        }
+        // parity: a qualifying player is enough to count as set up, even when every probe failed.
+        return true;
+    }
+    return false;
+}
+
+void VillageSiegeSpawner::tick(LoadedWorld& world, bool spawnEnemies,
+                               const std::vector<player::PlayerSession*>& players, random::RandomSource& random,
+                               const Spawn& spawn) {
+    if (world.declaration().dimension != config::WorldDimension::Overworld) {
+        return;
+    }
+    if (daylightDetectors::skyDarken(world.clock(), world.weather()) < kSiegeBrightOutsideDarken || !spawnEnemies) {
+        siegeTonight_ = false;
+        hasSetUpSiege_ = false;
+        return;
+    }
+    const std::int64_t dayLength = WorldClock::kDayLength;
+    if (((world.clock().totalTicks() % dayLength) + dayLength) % dayLength == kSiegeRollTime) {
+        siegeTonight_ = random.nextInt(kSiegeChance) == 0;
+    }
+    if (!siegeTonight_) {
+        return;
+    }
+    if (!hasSetUpSiege_) {
+        if (!trySetUpSiege(world, players, random)) {
+            return;
+        }
+        hasSetUpSiege_ = true;
+    }
+    if (nextSpawnTime_ > 0) {
+        nextSpawnTime_--;
+        return;
+    }
+    nextSpawnTime_ = kSiegeSpawnDelay;
+    if (zombiesToSpawn_ <= 0) {
+        siegeTonight_ = false;
+        return;
+    }
+    if (const std::optional<VillageSiegeSpawnRequest> request = findRandomSiegePos(world, spawnX_, spawnZ_, random);
+        request.has_value() && spawn) {
+        spawn(*request);
+    }
+    zombiesToSpawn_--;
 }
 
 } // namespace basalt::server::runtime::world

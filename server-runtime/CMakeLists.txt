@@ -267,6 +267,9 @@ basalt_module(server-runtime-core
         src/world/MobSpawnForest.cpp
         src/world/MobVariantSpawnFinalizer.cpp
         src/world/NaturalSpawner.cpp
+        src/world/NetherPortals.cpp
+        src/world/NoiseParametersJson.cpp
+        src/world/OriginalMobSpawner.cpp
         src/world/MobSpawnVariantData.cpp
         src/world/SpawnEquipmentEnchantments.cpp
         src/world/SpawnEquipmentFinalizer.cpp
@@ -275,6 +278,7 @@ basalt_module(server-runtime-core
         src/world/ZombieSpawnFinalizer.cpp
         src/world/Trades.cpp
         src/world/VanillaSaveImport.cpp
+        src/world/VanillaWorldGeneratorFactory.cpp
         src/entity/ai/VillagerSchedule.cpp
         src/world/VillageDataLoader.cpp
         src/world/VillageGolemSpawner.cpp
@@ -589,6 +593,21 @@ basalt_test(server-runtime-group-commands-test
 target_compile_definitions(server-runtime-group-commands-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
+
+basalt_test(server-runtime-vanilla-world-generator-factory-test
+    SOURCES
+        test/VanillaWorldGeneratorFactoryTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-nether-portals-test
+    SOURCES
+        test/NetherPortalsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-nether-portals-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
 
 basalt_test(server-runtime-village-golem-spawner-test
     SOURCES

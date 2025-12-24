@@ -136,4 +136,36 @@ private:
     std::int32_t tickDelay_ = 1200;
 };
 
+/// One zombie of a siege, placed on the ground it was found standing on.
+struct VillageSiegeSpawnRequest {
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
+};
+
+/// Minecraft 26.2's midnight village zombie siege.
+///
+/// parity: `VillageSiege`. The roll happens at a fixed time of night, once; a siege that is on sends
+/// twenty zombies in over the following seconds, and darkness ending cancels the whole thing.
+class VillageSiegeSpawner {
+public:
+    using Spawn = std::function<void(const VillageSiegeSpawnRequest&)>;
+
+    void tick(LoadedWorld& world, bool spawnEnemies, const std::vector<player::PlayerSession*>& players,
+              random::RandomSource& random, const Spawn& spawn);
+
+private:
+    /// True once a qualifying player is found, even if all ten centre probes fail.
+    [[nodiscard]] bool trySetUpSiege(LoadedWorld& world, const std::vector<player::PlayerSession*>& players,
+                                     random::RandomSource& random);
+
+    bool hasSetUpSiege_ = false;
+    bool siegeTonight_ = false;
+    std::int32_t zombiesToSpawn_ = 0;
+    std::int32_t nextSpawnTime_ = 0;
+    std::int32_t spawnX_ = 0;
+    std::int32_t spawnY_ = 0;
+    std::int32_t spawnZ_ = 0;
+};
+
 } // namespace basalt::server::runtime::world
