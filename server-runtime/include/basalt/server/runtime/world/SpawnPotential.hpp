@@ -1,17 +1,11 @@
 #pragma once
 
+#include <basalt/server/runtime/world/RealBiomeSpawns.hpp>
+
 #include <cstdint>
 #include <vector>
 
 namespace basalt::server::runtime::world {
-
-/// How strongly one mob repels another of the same biome-defined cost family.
-struct MobSpawnCost {
-    double energyBudget = 0.0;
-    double charge = 0.0;
-
-    friend bool operator==(const MobSpawnCost&, const MobSpawnCost&) = default;
-};
 
 /// The biome-defined repulsion field that keeps costly mobs from packing into one Nether pocket.
 ///
