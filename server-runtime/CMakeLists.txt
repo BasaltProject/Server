@@ -288,12 +288,15 @@ basalt_module(server-runtime-core
         src/entity/ai/FlyingGoals.cpp
         src/entity/ai/GoalSelector.cpp
         src/entity/ai/Goals.cpp
+        src/entity/ai/IllagerGoals.cpp
+        src/entity/ai/LongDistancePatrolGoal.cpp
         src/entity/ai/MobContext.cpp
         src/entity/ai/SpecialGoals.cpp
         src/entity/ai/TameGoals.cpp
         src/entity/ai/TargetGoals.cpp
         src/entity/ai/VillagerGoals.cpp
         src/entity/ai/VillagerSchedule.cpp
+        src/entity/ai/WanderingTraderGoals.cpp
         src/world/VillageDataLoader.cpp
         src/world/VillageGolemSpawner.cpp
         src/world/VillageProximity.cpp
@@ -611,6 +614,24 @@ target_compile_definitions(server-runtime-group-commands-test
 basalt_test(server-runtime-flying-goals-test
     SOURCES
         test/FlyingGoalsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-long-distance-patrol-test
+    SOURCES
+        test/LongDistancePatrolGoalTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-wandering-trader-goals-test
+    SOURCES
+        test/WanderingTraderGoalsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-illager-goals-test
+    SOURCES
+        test/IllagerGoalsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
