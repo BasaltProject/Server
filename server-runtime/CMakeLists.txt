@@ -104,11 +104,14 @@ basalt_module(server-runtime-core
         src/ChunkSimulationView.cpp
         src/CombatSystem.cpp
         src/MobActionSystem.cpp
+        src/RedstoneTickSystem.cpp
+        src/ScheduledBlockTick.cpp
         src/MobTickSystem.cpp
         src/MobActionTick.cpp
         src/NaturalSpawningMaterialize.cpp
         src/NaturalSpawningSystem.cpp
         src/RaidSystem.cpp
+        src/EnvironmentTickSystem.cpp
         src/ExplosionSystem.cpp
         src/Favicon.cpp
         src/PersistenceCoordinator.cpp
@@ -798,6 +801,24 @@ basalt_test(server-runtime-raids-test
         test/RaidsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
+
+basalt_test(server-runtime-redstone-tick-system-test
+    SOURCES
+        test/RedstoneTickSystemTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-redstone-tick-system-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
+
+basalt_test(server-runtime-environment-tick-system-test
+    SOURCES
+        test/EnvironmentTickSystemTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-environment-tick-system-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
 
 basalt_test(server-runtime-mob-tick-system-test
     SOURCES
