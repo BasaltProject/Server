@@ -285,10 +285,14 @@ basalt_module(server-runtime-core
         src/entity/MobBrain.cpp
         src/entity/MobCombat.cpp
         src/entity/ai/Controls.cpp
+        src/entity/ai/FlyingGoals.cpp
         src/entity/ai/GoalSelector.cpp
         src/entity/ai/Goals.cpp
-        src/entity/ai/TargetGoals.cpp
         src/entity/ai/MobContext.cpp
+        src/entity/ai/SpecialGoals.cpp
+        src/entity/ai/TameGoals.cpp
+        src/entity/ai/TargetGoals.cpp
+        src/entity/ai/VillagerGoals.cpp
         src/entity/ai/VillagerSchedule.cpp
         src/world/VillageDataLoader.cpp
         src/world/VillageGolemSpawner.cpp
@@ -602,6 +606,30 @@ basalt_test(server-runtime-group-commands-test
 
 target_compile_definitions(server-runtime-group-commands-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-flying-goals-test
+    SOURCES
+        test/FlyingGoalsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-special-goals-test
+    SOURCES
+        test/SpecialGoalsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-tame-goals-test
+    SOURCES
+        test/TameGoalsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-villager-goals-test
+    SOURCES
+        test/VillagerGoalsTest.cpp
+    DEPENDS basalt::server-runtime-core
 )
 
 basalt_test(server-runtime-target-goals-test
