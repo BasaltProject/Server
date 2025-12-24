@@ -280,6 +280,9 @@ basalt_module(server-runtime-core
         src/world/Trades.cpp
         src/world/VanillaSaveImport.cpp
         src/world/VanillaWorldGeneratorFactory.cpp
+        src/entity/Breeding.cpp
+        src/entity/MobBrain.cpp
+        src/entity/ai/Controls.cpp
         src/entity/ai/GoalSelector.cpp
         src/entity/ai/MobContext.cpp
         src/entity/ai/VillagerSchedule.cpp
@@ -595,6 +598,18 @@ basalt_test(server-runtime-group-commands-test
 
 target_compile_definitions(server-runtime-group-commands-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-breeding-test
+    SOURCES
+        test/BreedingTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-controls-test
+    SOURCES
+        test/ControlsTest.cpp
+    DEPENDS basalt::server-runtime-core
 )
 
 basalt_test(server-runtime-goal-selector-test
