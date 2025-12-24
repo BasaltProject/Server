@@ -137,7 +137,7 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
                                           (player->z - z) * (player->z - z));
         const float damage = world::explosions::damageAt(distance, power, power * 2.0F);
         if (damage > 0.0F && player->connection().hurt) {
-            player->connection().hurt(damage, "explosion", world::damageTypes::kExplosion);
+            player->connection().hurt(damage, "explosion", world::damageTypes::kExplosion, std::nullopt);
         }
     }
 }

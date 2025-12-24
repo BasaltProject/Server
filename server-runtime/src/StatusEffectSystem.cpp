@@ -70,11 +70,11 @@ void StatusEffectSystem::applyEffectTick(world::LoadedWorld& world, player::Play
     } else if (active.effect == world::mobEffects::poison()) {
         // parity: poison never kills, so it stops at one point of health rather than at zero.
         if (onInterval(ticks, kPoisonInterval, active.amplifier) && player.health() > 1.0F && connection.hurt) {
-            connection.hurt(1.0F, "magic", world::damageTypes::kMagic);
+            connection.hurt(1.0F, "magic", world::damageTypes::kMagic, std::nullopt);
         }
     } else if (active.effect == world::mobEffects::wither()) {
         if (onInterval(ticks, kWitherInterval, active.amplifier) && connection.hurt) {
-            connection.hurt(1.0F, "wither", world::damageTypes::kWither);
+            connection.hurt(1.0F, "wither", world::damageTypes::kWither, std::nullopt);
         }
     } else if (active.effect == world::mobEffects::hunger()) {
         player.food.addExhaustion(kHungerExhaustion * static_cast<float>(active.amplifier + 1));

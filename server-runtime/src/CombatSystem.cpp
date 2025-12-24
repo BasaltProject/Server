@@ -1,0 +1,373 @@
+#include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
+#include <basalt/server/runtime/CombatSystem.hpp>
+#include <basalt/server/runtime/ExplosionSystem.hpp>
+#include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
+#include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/ProjectileHits.hpp>
+#include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
+#include <basalt/wire/protocol/play/EntityPackets.hpp>
+#include <basalt/wire/protocol/play/HudPackets.hpp>
+
+#include <cmath>
+#include <limits>
+#include <utility>
+
+namespace basalt::server::runtime {
+namespace {
+
+using entity::ServerEntity;
+using player::PlayerSession;
+using wire::common::Identifier;
+using wire::protocol::play::Gamemode;
+using wire::text::Component;
+
+/// parity: `SmallFireball.onHitEntity`, five points and five seconds of burning.
+constexpr float kSmallFireballDamage = 5.0F;
+constexpr std::int32_t kSmallFireballFireTicks = 100;
+constexpr std::string_view kDeathOnFire = "onFire";
+
+/// parity: `applySplash`, four blocks across and twenty seconds at the centre.
+constexpr double kSplashRange = 4.0;
+constexpr double kSplashDuration = 400.0;
+constexpr std::string_view kSoundSplash = "entity.splash_potion.break";
+
+constexpr std::string_view kSoundTeleport = "entity.player.teleport";
+constexpr std::string_view kDeathFall = "fall";
+
+/// parity: `ThrownEnderpearl.onHit`, five points of fall damage on arrival.
+constexpr float kEnderPearlDamage = 5.0F;
+
+constexpr double kArrowBaseDamage = 2.0;
+
+/// parity: `AbstractArrow.onHitEntity`'s own `scale(0.2)` when the hit did not land.
+constexpr double kArrowBounce = 0.2;
+
+/// parity: `PanicGoal`, which runs for as long as the last hit is remembered.
+constexpr std::int32_t kPanicTicks = 40;
+
+/// parity: `death.attack.arrow`, and `AbstractArrow`'s own two points of damage.
+constexpr std::string_view kDeathArrow = "arrow";
+
+/// parity: `EntityType.PLAYER`, whose box is what a projectile's reach is measured against.
+const Identifier& playerType() {
+    static const Identifier kType = Identifier::vanilla("player");
+    return kType;
+}
+
+/// Where along its flight the projectile met this box, or nothing when it did not.
+std::optional<double> clip(const ServerEntity& arrow, double fromX, double fromY, double fromZ, double x, double y,
+                           double z, double width, double height) {
+    return entity::projectiles::clipBox(fromX, fromY, fromZ, arrow.x, arrow.y, arrow.z, x - (width / 2.0), y,
+                                        z - (width / 2.0), x + (width / 2.0), y + height, z + (width / 2.0));
+}
+
+} // namespace
+
+CombatSystem::CombatSystem(BlockChangeBroadcaster& broadcaster, ExplosionSystem& explosions, Hooks hooks,
+                           Options options)
+    : broadcaster_(broadcaster), explosions_(explosions), hooks_(std::move(hooks)), options_(std::move(options)) {}
+
+void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                                  const std::vector<ServerEntity*>& living, ServerEntity& entity,
+                                  const entity::projectiles::Kind& kind) {
+    const double fromX = entity.x;
+    const double fromY = entity.y;
+    const double fromZ = entity.z;
+    const std::optional<entity::BlockHit> hit = entity::projectiles::tick(world.state(), entity, kind);
+    const std::string_view path = kind.type.path();
+
+    // parity: `AbstractHurtingProjectile.onHit`: a fireball goes off where it lands, whether that is
+    // a block or somebody's face.
+    if (path == "fireball" || path == "small_fireball") {
+        const std::optional<Target> target = targetAlong(watchers, living, entity, fromX, fromY, fromZ);
+        if (!hit.has_value() && !target.has_value()) {
+            return;
+        }
+        entity.removed = true;
+        if (path == "fireball") {
+            explosions_.blowUp(world, watchers, entity.x, entity.y, entity.z, entity.explosionPower, "tnt",
+                               entity.entityId());
+            return;
+        }
+        if (!target.has_value()) {
+            return;
+        }
+        // parity: a small fireball burns whoever it hits for five seconds and takes five off.
+        if (target->mob != nullptr) {
+            target->mob->fireTicks = kSmallFireballFireTicks;
+            const entity::entityCombat::Result result =
+                entity::entityCombat::hurt(*target->mob, kSmallFireballDamage, fromX, fromZ, hooks_, "fireball");
+            if (result.landed) {
+                announceEntityHit(watchers, *target->mob, world::damageTypes::kOnFire, entity.entityId(), result.died);
+            }
+        }
+        if (target->player != nullptr && target->player->connection().hurt) {
+            target->player->connection().hurt(kSmallFireballDamage, kDeathOnFire, world::damageTypes::kOnFire,
+                                              entity::DamageSource{.entityId = entity.entityId(),
+                                                                   .x = fromX,
+                                                                   .z = fromZ,
+                                                                   .name = shooterName(watchers, living, entity)});
+        }
+        return;
+    }
+    if (path == "ender_pearl") {
+        if (hit.has_value() || targetAlong(watchers, living, entity, fromX, fromY, fromZ).has_value()) {
+            landEnderPearl(watchers, entity);
+        }
+        return;
+    }
+    if (path == "potion") {
+        if (!hit.has_value() && !targetAlong(watchers, living, entity, fromX, fromY, fromZ).has_value()) {
+            return;
+        }
+        entity.removed = true;
+        splashPotion(watchers, entity);
+        return;
+    }
+    if (kind.sticks && hitEntityAlong(watchers, living, entity, fromX, fromY, fromZ)) {
+        return;
+    }
+    if (!hit.has_value()) {
+        return;
+    }
+    const std::optional<world::BlockChange> change = world::projectileHits::onHit(world.state(), *hit, kind.sticks);
+    if (change.has_value()) {
+        broadcaster_.announceRedstone(world, watchers, *change);
+    }
+    if (!kind.sticks) {
+        entity.removed = true;
+    }
+}
+
+void CombatSystem::splashPotion(const std::vector<PlayerSession*>& watchers, const ServerEntity& bottle) {
+    if (!bottle.potionEffect.has_value()) {
+        return;
+    }
+    for (PlayerSession* player : watchers) {
+        const double dx = player->x - bottle.x;
+        const double dy = player->y - bottle.y;
+        const double dz = player->z - bottle.z;
+        const double distanceSquared = (dx * dx) + (dy * dy) + (dz * dz);
+        if (distanceSquared > kSplashRange * kSplashRange) {
+            continue;
+        }
+        // parity: `ThrownSplashPotion.applySplash`, where the further away you are the less of the
+        // effect you get, down to nothing at the edge.
+        const double share = 1.0 - (std::sqrt(distanceSquared) / kSplashRange);
+        const auto ticks = static_cast<std::int32_t>(kSplashDuration * share);
+        if (ticks <= 0 || !player->connection().addEffect) {
+            continue;
+        }
+        player->connection().addEffect(Identifier::vanilla(*bottle.potionEffect), ticks, 0);
+    }
+    broadcaster_.sendEffects(watchers, static_cast<std::int32_t>(std::floor(bottle.x)),
+                             static_cast<std::int32_t>(std::floor(bottle.y)),
+                             static_cast<std::int32_t>(std::floor(bottle.z)), server::registry::blocks::air().stateId,
+                             {world::blockEffect::Sound{.name = std::string{kSoundSplash},
+                                                        .source = wire::protocol::play::SoundSource::Neutral,
+                                                        .volume = 1.0F,
+                                                        .pitch = 1.0F}});
+}
+
+void CombatSystem::landEnderPearl(const std::vector<PlayerSession*>& watchers, ServerEntity& pearl) {
+    pearl.removed = true;
+    if (!pearl.ownerId.has_value()) {
+        return;
+    }
+    PlayerSession* owner = nullptr;
+    for (PlayerSession* candidate : watchers) {
+        if (candidate->entityId() == *pearl.ownerId) {
+            owner = candidate;
+            break;
+        }
+    }
+    if (owner == nullptr || owner->dead) {
+        return;
+    }
+    broadcaster_.sendEffects(watchers, static_cast<std::int32_t>(std::floor(pearl.x)),
+                             static_cast<std::int32_t>(std::floor(pearl.y)),
+                             static_cast<std::int32_t>(std::floor(pearl.z)), server::registry::blocks::air().stateId,
+                             {world::blockEffect::Sound{.name = std::string{kSoundTeleport},
+                                                        .source = wire::protocol::play::SoundSource::Players,
+                                                        .volume = 1.0F,
+                                                        .pitch = 1.0F}});
+    if (owner->connection().teleportTo) {
+        owner->connection().teleportTo(pearl.x, pearl.y, pearl.z, owner->yaw, owner->pitch);
+    }
+    if (owner->connection().hurt) {
+        owner->connection().hurt(kEnderPearlDamage, kDeathFall, world::damageTypes::kEnderPearl, std::nullopt);
+    }
+}
+
+std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<PlayerSession*>& watchers,
+                                                              const std::vector<ServerEntity*>& living,
+                                                              const ServerEntity& projectile, double fromX,
+                                                              double fromY, double fromZ) {
+    double nearest = std::numeric_limits<double>::max();
+    Target found;
+    for (ServerEntity* candidate : living) {
+        if (candidate->entityId() == projectile.entityId() ||
+            (projectile.ownerId.has_value() && candidate->entityId() == *projectile.ownerId)) {
+            continue;
+        }
+        if (!server::registry::entityAttributes::isLiving(candidate->type())) {
+            continue;
+        }
+        const std::optional<double> at = clip(projectile, fromX, fromY, fromZ, candidate->x, candidate->y, candidate->z,
+                                              candidate->width(), candidate->height());
+        if (!at.has_value() || *at >= nearest) {
+            continue;
+        }
+        nearest = *at;
+        found = Target{.mob = candidate, .player = nullptr};
+    }
+    for (PlayerSession* candidate : watchers) {
+        if ((projectile.ownerId.has_value() && candidate->entityId() == *projectile.ownerId) || candidate->dead) {
+            continue;
+        }
+        if (candidate->gamemode == Gamemode::Creative || candidate->gamemode == Gamemode::Spectator) {
+            continue;
+        }
+        const std::optional<double> at = clip(projectile, fromX, fromY, fromZ, candidate->x, candidate->y, candidate->z,
+                                              server::registry::entityTypeShapes::widthOf(playerType()),
+                                              server::registry::entityTypeShapes::heightOf(playerType()));
+        if (!at.has_value() || *at >= nearest) {
+            continue;
+        }
+        nearest = *at;
+        found = Target{.mob = nullptr, .player = candidate};
+    }
+    if (found.mob == nullptr && found.player == nullptr) {
+        return std::nullopt;
+    }
+    return found;
+}
+
+bool CombatSystem::hitEntityAlong(const std::vector<PlayerSession*>& watchers, const std::vector<ServerEntity*>& living,
+                                  ServerEntity& arrow, double fromX, double fromY, double fromZ) {
+    const std::optional<Target> target = targetAlong(watchers, living, arrow, fromX, fromY, fromZ);
+    if (!target.has_value()) {
+        return false;
+    }
+    // parity: `AbstractArrow.onHitEntity`: the damage is the speed times the arrow's own two points,
+    // rounded up, and a fully drawn bow adds a roll on top of it.
+    const double speed = std::sqrt((arrow.velocityX * arrow.velocityX) + (arrow.velocityY * arrow.velocityY) +
+                                   (arrow.velocityZ * arrow.velocityZ));
+    auto damage = static_cast<std::int32_t>(std::ceil(speed * kArrowBaseDamage));
+    if (arrow.critical && options_.nextInt) {
+        damage += options_.nextInt((damage / 2) + 2);
+    }
+
+    if (target->mob != nullptr) {
+        const entity::entityCombat::Result result =
+            entity::entityCombat::hurt(*target->mob, static_cast<float>(damage), fromX, fromZ, hooks_, "projectile");
+        if (!result.landed) {
+            // parity: an arrow that found somebody still inside their hurt cooldown bounces off.
+            arrow.velocityX *= kArrowBounce;
+            arrow.velocityY *= kArrowBounce;
+            arrow.velocityZ *= kArrowBounce;
+            return true;
+        }
+        arrow.removed = true;
+        if (arrow.ownerId.has_value()) {
+            target->mob->hurtBy = *arrow.ownerId;
+        }
+        target->mob->panicTicks = kPanicTicks;
+        announceEntityHit(watchers, *target->mob, world::damageTypes::kArrow, arrow.entityId(), result.died);
+        return true;
+    }
+    arrow.removed = true;
+    if (target->player != nullptr && target->player->connection().hurt) {
+        target->player->connection().hurt(
+            static_cast<float>(damage), kDeathArrow, world::damageTypes::kArrow,
+            entity::DamageSource{
+                .entityId = arrow.entityId(), .x = fromX, .z = fromZ, .name = shooterName(watchers, living, arrow)});
+    }
+    return true;
+}
+
+Component CombatSystem::shooterName(const std::vector<PlayerSession*>& watchers,
+                                    const std::vector<ServerEntity*>& living, const ServerEntity& projectile) {
+    if (!projectile.ownerId.has_value()) {
+        return entity::entityCombat::displayName(projectile);
+    }
+    for (const PlayerSession* candidate : watchers) {
+        if (candidate->entityId() == *projectile.ownerId) {
+            return Component::text(candidate->name());
+        }
+    }
+    for (const ServerEntity* candidate : living) {
+        if (candidate->entityId() == *projectile.ownerId) {
+            return entity::entityCombat::displayName(*candidate);
+        }
+    }
+    return entity::entityCombat::displayName(projectile);
+}
+
+void CombatSystem::announceEntityHit(const std::vector<PlayerSession*>& watchers, ServerEntity& entity,
+                                     const Identifier& damageType, std::int32_t causeEntityId, bool died) {
+    const std::vector<registry::vanillaRegistryData::Entry>& types = registry::vanillaRegistryData::damageTypes();
+    std::int32_t registryId = -1;
+    for (std::size_t index = 0; index < types.size(); index++) {
+        if (types[index].first == damageType.path()) {
+            registryId = static_cast<std::int32_t>(index);
+            break;
+        }
+    }
+    const std::string sound =
+        died ? entity::entityCombat::deathSound(entity.type()) : entity::entityCombat::hurtSound(entity.type());
+    for (PlayerSession* watcher : watchers) {
+        if (!watcher->connection().sendPlayPacket) {
+            continue;
+        }
+        if (registryId >= 0) {
+            watcher->connection().sendPlayPacket(
+                wire::protocol::play::DamageEventPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+                    wire::protocol::play::DamageEventPacket{.entityId = entity.entityId(),
+                                                            .damageType = registryId,
+                                                            .causeEntityId = causeEntityId,
+                                                            .directEntityId = causeEntityId}
+                        .write(buffer);
+                });
+        }
+        watcher->connection().sendPlayPacket(
+            wire::protocol::play::SetEntityMotionPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+                wire::protocol::play::SetEntityMotionPacket{.entityId = entity.entityId(),
+                                                            .velocityX = entity.velocityX,
+                                                            .velocityY = entity.velocityY,
+                                                            .velocityZ = entity.velocityZ}
+                    .write(buffer);
+            });
+        watcher->connection().sendPlayPacket(wire::protocol::play::SoundPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            wire::protocol::play::SoundPacket{.sound = sound,
+                                              .source = wire::protocol::play::SoundSource::Hostile,
+                                              .x = entity.x,
+                                              .y = entity.y,
+                                              .z = entity.z,
+                                              .volume = 1.0F,
+                                              .pitch = 1.0F,
+                                              .seed = options_.nextSeed ? options_.nextSeed() : 0}
+                .write(buffer);
+        });
+        if (died) {
+            watcher->connection().sendPlayPacket(
+                wire::protocol::play::EntityEventPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+                    wire::protocol::play::EntityEventPacket{
+                        .entityId = entity.entityId(),
+                        .eventId = static_cast<std::int8_t>(wire::protocol::play::EntityEventPacket::kLivingDeath)}
+                        .write(buffer);
+                });
+        }
+    }
+    if (!died) {
+        return;
+    }
+    entity.killed = true;
+    entity.removed = true;
+}
+
+} // namespace basalt::server::runtime

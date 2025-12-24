@@ -47,7 +47,8 @@ struct Fixture {
               config::WorldSettings{}, WorldMetadata{}, root, basalt::wire::common::Logger{"Test"})) {
         PlayerConnection connection;
         connection.heal = [this](float amount) { healed += amount; };
-        connection.hurt = [this](float, std::string_view, const Identifier& type) { hurtBy.push_back(type); };
+        connection.hurt = [this](float, std::string_view, const Identifier& type,
+                               const std::optional<basalt::server::runtime::entity::DamageSource>&) { hurtBy.push_back(type); };
         connection.sendEffectRemoved = [this](const Identifier& effect) { removed.push_back(effect); };
         player = std::make_unique<PlayerSession>(Uuid{1, 1}, "Steve", 1, std::move(connection));
         player->worldName = "world";
