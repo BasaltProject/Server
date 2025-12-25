@@ -13,6 +13,10 @@ namespace basalt::server::runtime::player {
 class PlayerSession;
 }
 
+namespace basalt::server::runtime::world {
+class LoadedWorld;
+}
+
 namespace basalt::server::runtime {
 
 class ClientSession;
@@ -75,6 +79,35 @@ private:
     void die(std::string_view deathMessageId, const std::optional<wire::text::Component>& killer);
 
     void applyFallDamage(player::PlayerSession& session);
+
+    /// parity: `Player.attack`'s sweep, which hits what is standing beside what was hit.
+    void sweepAround(player::PlayerSession& session, const entity::ServerEntity& target, world::LoadedWorld& world,
+                     float strength);
+
+    /// parity: `TamableAnimal.mobInteract`: a pet sits or stands, and a wild one may be tamed.
+    bool tameOrSit(player::PlayerSession& session, entity::ServerEntity& entity);
+
+    void mount(player::PlayerSession& session, entity::ServerEntity& vehicle);
+
+    /// parity: `VehicleEntity.hurtServer`, which is damage points rather than health.
+    void breakVehicle(player::PlayerSession& session, entity::ServerEntity& vehicle);
+
+    void killEntity(entity::ServerEntity& entity);
+
+    void broadcastEntityEvent(std::int32_t entityId, std::int32_t event);
+
+    void broadcastDamageEvent(const entity::ServerEntity& entity, const wire::common::Identifier& damageType,
+                              std::int32_t causeEntityId);
+
+    void broadcastMotion(const entity::ServerEntity& entity);
+
+    void broadcastTameFlags(const entity::ServerEntity& entity);
+
+    void broadcastPassengers(const entity::ServerEntity& vehicle);
+
+    void broadcastAnimation(std::int32_t entityId, std::int32_t animation);
+
+    void broadcastParticle(std::string_view particle, double x, double y, double z, std::int32_t count);
 
     ClientSession* owner_;
     Hooks hooks_;

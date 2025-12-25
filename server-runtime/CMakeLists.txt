@@ -34,6 +34,7 @@ basalt_module(server-runtime-core
         src/entity/EntityCollision.cpp
         src/entity/MobRules.cpp
         src/entity/GeneratedEntityPresentation.cpp
+        src/entity/Villagers.cpp
         src/entity/Raids.cpp
         src/entity/WanderingTraderLifetime.cpp
         src/entity/ServerEntity.cpp
@@ -103,9 +104,13 @@ basalt_module(server-runtime-core
         src/command/SelectorOptions.cpp
         src/BlockChangeBroadcaster.cpp
         src/ChunkSimulationView.cpp
+        src/CombatAttack.cpp
+        src/CombatHandler.cpp
         src/CombatSystem.cpp
         src/MobActionSystem.cpp
+        src/ItemUseTimers.cpp
         src/PlayerLifecycle.cpp
+        src/VillagerTradeController.cpp
         src/UiStateSync.cpp
         src/RedstoneTickSystem.cpp
         src/ScheduledBlockTick.cpp

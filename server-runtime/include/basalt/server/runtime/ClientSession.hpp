@@ -1,6 +1,10 @@
 #pragma once
 
+#include <basalt/server/registry/ItemFood.hpp>
 #include <basalt/server/runtime/config/UiConfigs.hpp>
+#include <basalt/server/runtime/world/RealBlockTags.hpp>
+#include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
+#include <basalt/server/runtime/world/RealItemTags.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/net/ProxyLogin.hpp>
 #include <basalt/server/runtime/net/SessionOutbox.hpp>
@@ -14,6 +18,7 @@
 #include <basalt/wire/io/ByteBuffer.hpp>
 #include <basalt/wire/io/TcpSocket.hpp>
 #include <basalt/wire/multiversion/ProtocolChain.hpp>
+#include <basalt/wire/text/LangTable.hpp>
 #include <basalt/wire/multiversion/ProtocolGate.hpp>
 #include <basalt/wire/protocol/ProtocolState.hpp>
 #include <basalt/wire/protocol/handshake/HandshakePacket.hpp>
@@ -45,9 +50,6 @@ class RealLootTables;
 class RealRecipes;
 class RealVillagerTrades;
 class RealEnchantments;
-class RealBlockTags;
-class RealItemTags;
-class RealDamageTypeTags;
 class Jukeboxes;
 class PlayerProgress;
 class AdvancementTriggers;
@@ -135,9 +137,9 @@ public:
         world::RealEnchantments* enchantments = nullptr;
         world::PlayerProgress* progress = nullptr;
         world::AdvancementTriggers* advancementTriggers = nullptr;
-        world::RealBlockTags* blockTags = nullptr;
-        world::RealItemTags* itemTags = nullptr;
-        world::RealDamageTypeTags* damageTypeTags = nullptr;
+        const world::realBlockTags::TagMembers* blockTags = nullptr;
+        const world::realItemTags::TagMembers* itemTags = nullptr;
+        const world::realDamageTypeTags::TagMembers* damageTypeTags = nullptr;
         /// Which client versions may in. Defaults to this build's own and nothing else.
         wire::multiversion::ProtocolGate protocolGate{{wire::multiversion::protocolVersions::kNative},
                                                       wire::multiversion::UnknownProtocolPolicy::Warn,
@@ -238,6 +240,31 @@ public:
 
     /// A chat line everybody on the server sees.
     void broadcastToEveryone(const wire::text::Component& message);
+
+    /// Whether this player can reach that entity to hit it. parity: `Player.canReach`.
+    [[nodiscard]] bool withinAttackReach(const player::PlayerSession& session,
+                                         const entity::ServerEntity& target) const;
+
+    /// The console's own language table, which is what a death message is written out with.
+    [[nodiscard]] const wire::text::LangTable& consoleLang() const;
+
+    /// A sound everybody near it hears, which is how a bow, a pearl and a step all travel.
+    void broadcastSound(std::string_view sound, double x, double y, double z,
+                        wire::protocol::play::SoundSource source, float volume = 1.0F, float pitch = 1.0F);
+
+    /// The inventory delegates, which the satellites and the plugin bridge both reach for.
+    void sendInventory();
+    void sendInventoryAll();
+    void sendInventorySlot(std::int32_t slot);
+    void syncHealth();
+
+    /// One stack on the ground where it was dropped.
+    void spawnDroppedItem(const wire::common::Identifier& item, std::int32_t count, double x, double y, double z,
+                          double velocityX = 0.0, double velocityY = 0.0, double velocityZ = 0.0);
+
+    /// parity: `Consumable.onConsume`, which is what makes a golden apple worth eating.
+    void applyConsumeEffects(player::PlayerSession& session,
+                             const std::vector<server::registry::ConsumeEffect>& effects);
 
     /// The satellites' delegates, kept because their callers (commands, portals, the plugin
     /// bridge) are too wide to move wholesale.
