@@ -29,9 +29,9 @@ constexpr std::array<std::string_view, 6> kPatrollingTypes{"pillager",   "vindic
     return std::ranges::find(kPatrollingTypes, path) != kPatrollingTypes.end();
 }
 
-/// Vanilla uses byte/int/float tags while this server's older saves used doubles for the same
-/// fields, so every read takes whichever it finds.
-[[nodiscard]] double numericDouble(const NbtCompound& tag, std::string_view key) {
+} // namespace
+
+double numericDouble(const NbtCompound& tag, std::string_view key) {
     const NbtTag* value = tag.find(key);
     if (value == nullptr) {
         return 0.0;
@@ -55,9 +55,11 @@ constexpr std::array<std::string_view, 6> kPatrollingTypes{"pillager",   "vindic
     return asDouble == nullptr ? 0.0 : *asDouble;
 }
 
-[[nodiscard]] std::int32_t numericInt(const NbtCompound& tag, std::string_view key) {
+std::int32_t numericInt(const NbtCompound& tag, std::string_view key) {
     return static_cast<std::int32_t>(numericDouble(tag, key));
 }
+
+namespace {
 
 [[nodiscard]] bool numericBoolean(const NbtCompound& tag, std::string_view key) {
     return numericDouble(tag, key) != 0.0;

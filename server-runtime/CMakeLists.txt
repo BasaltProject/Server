@@ -33,6 +33,7 @@ basalt_module(server-runtime-core
         src/entity/EntityNbt.cpp
         src/entity/EntityCollision.cpp
         src/entity/MobRules.cpp
+        src/entity/GeneratedEntityPresentation.cpp
         src/entity/Raids.cpp
         src/entity/WanderingTraderLifetime.cpp
         src/entity/ServerEntity.cpp
@@ -104,6 +105,8 @@ basalt_module(server-runtime-core
         src/ChunkSimulationView.cpp
         src/CombatSystem.cpp
         src/MobActionSystem.cpp
+        src/PlayerLifecycle.cpp
+        src/UiStateSync.cpp
         src/RedstoneTickSystem.cpp
         src/ScheduledBlockTick.cpp
         src/MobTickSystem.cpp
@@ -162,6 +165,7 @@ basalt_module(server-runtime-core
         src/sched/RegionWorkers.cpp
         src/scoreboard/Scoreboard.cpp
         src/scoreboard/Teams.cpp
+        src/ui/PlayerUi.cpp
         src/timings/TimingsReport.cpp
         src/world/ChorusFlowerGrowth.cpp
         src/world/RealBiomeSpawns.cpp
@@ -796,6 +800,12 @@ basalt_test(server-runtime-server-list-status-test
 target_compile_definitions(server-runtime-server-list-status-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
 
+basalt_test(server-runtime-generated-entity-presentation-test
+    SOURCES
+        test/GeneratedEntityPresentationTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-raids-test
     SOURCES
         test/RaidsTest.cpp
@@ -1087,6 +1097,12 @@ target_compile_definitions(server-runtime-particle-command-test
 basalt_test(server-runtime-animation-placeholders-test
     SOURCES
         test/AnimationPlaceholdersTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-player-ui-test
+    SOURCES
+        test/PlayerUiTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

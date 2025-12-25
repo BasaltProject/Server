@@ -1,0 +1,388 @@
+#include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/registry/World.hpp>
+#include <basalt/server/runtime/ClientSession.hpp>
+#include <basalt/server/runtime/UiStateSync.hpp>
+#include <basalt/server/runtime/command/CommandDispatcher.hpp>
+#include <basalt/server/runtime/command/CommandEnvironment.hpp>
+#include <basalt/server/runtime/command/CommandSource.hpp>
+#include <basalt/server/runtime/placeholder/PlaceholderSlots.hpp>
+#include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/world/EnchantmentAttributes.hpp>
+#include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/MobEffects.hpp>
+#include <basalt/server/runtime/world/RealEnchantments.hpp>
+#include <basalt/wire/protocol/play/CommandPackets.hpp>
+#include <basalt/wire/protocol/play/EntityPackets.hpp>
+#include <basalt/wire/protocol/play/HudPackets.hpp>
+#include <basalt/wire/protocol/play/PlayerStatePackets.hpp>
+#include <basalt/wire/protocol/play/SimplePackets.hpp>
+#include <basalt/wire/protocol/play/UiPackets.hpp>
+#include <basalt/wire/protocol/play/WorldPackets.hpp>
+
+#include <algorithm>
+#include <limits>
+#include <utility>
+
+namespace basalt::server::runtime {
+namespace {
+
+using player::PlayerSession;
+using wire::common::Identifier;
+using wire::protocol::play::Pose;
+using wire::protocol::play::SetEntityDataPacket;
+
+/// parity: `AbsorptionMobEffect`, four hearts a level.
+constexpr float kAbsorptionPerLevel = 4.0F;
+
+/// The shared flags byte: everything about how this player is standing that fits in eight bits.
+///
+/// parity: `Entity.DATA_SHARED_FLAGS_ID`. One byte for all of them, which is why it is composed in
+/// one place: whoever writes only the bit they care about erases the others.
+std::uint8_t sharedFlags(const PlayerSession& session) {
+    std::uint8_t flags = 0;
+    if (session.fireTicks > 0) {
+        flags |= SetEntityDataPacket::kFlagOnFire;
+    }
+    if (session.sneaking) {
+        flags |= SetEntityDataPacket::kFlagSneaking;
+    }
+    if (session.sprinting) {
+        flags |= SetEntityDataPacket::kFlagSprinting;
+    }
+    return flags;
+}
+
+/// One packet to everybody else who can see this player.
+void sendToOthers(ClientSession& owner, const PlayerSession& session, std::int32_t packetId,
+                  const std::function<void(wire::io::ByteBuffer&)>& write) {
+    for (PlayerSession* other : owner.playersInSameWorld()) {
+        if (other->entityId() == session.entityId() || !other->connection().sendPlayPacket) {
+            continue;
+        }
+        other->connection().sendPlayPacket(packetId, write);
+    }
+}
+
+} // namespace
+
+UiStateSync::UiStateSync(ClientSession& owner, Hooks hooks) : owner_(&owner), hooks_(std::move(hooks)) {}
+
+void UiStateSync::syncPosture() {
+    PlayerSession* session = owner_->playerSession();
+    if (session == nullptr || session->sleepingBed.has_value()) {
+        return;
+    }
+    const std::uint8_t flags = sharedFlags(*session);
+    // parity: `Player.updatePlayerPose`, of which this build has the two poses it can tell apart:
+    // crouching and standing.
+    const Pose pose = session->sneaking ? Pose::Crouching : Pose::Standing;
+    if (flags == owner_->lastSharedFlags && pose == owner_->lastPose) {
+        return;
+    }
+    owner_->lastSharedFlags = flags;
+    owner_->lastPose = pose;
+    const SetEntityDataPacket packet = SetEntityDataPacket::posture(session->entityId(), flags, pose);
+    const auto write = [packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); };
+    owner_->sendPlayPacket(SetEntityDataPacket::kId, write);
+    sendToOthers(*owner_, *session, SetEntityDataPacket::kId, write);
+}
+
+void UiStateSync::syncSubmersion() {
+    PlayerSession* session = owner_->playerSession();
+    if (session == nullptr) {
+        return;
+    }
+    const SetEntityDataPacket packet =
+        SetEntityDataPacket::submersion(session->entityId(), session->airSupply, sharedFlags(*session));
+    const auto write = [packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); };
+    owner_->sendPlayPacket(SetEntityDataPacket::kId, write);
+    sendToOthers(*owner_, *session, SetEntityDataPacket::kId, write);
+}
+
+void UiStateSync::syncHealth() {
+    PlayerSession* session = owner_->playerSession();
+    if (session == nullptr) {
+        return;
+    }
+    owner_->sendCompressed(wire::protocol::play::SetHealthPacket::kId, [session](wire::io::ByteBuffer& buffer) {
+        wire::protocol::play::SetHealthPacket{.health = session->health(),
+                                              .food = session->food.foodLevel(),
+                                              .saturation = session->food.saturationLevel()}
+            .write(buffer);
+    });
+}
+
+void UiStateSync::addEffect(const Identifier& effect, std::int32_t durationTicks, std::int32_t amplifier) {
+    PlayerSession* session = owner_->playerSession();
+    if (session == nullptr) {
+        return;
+    }
+    if (hooks_.effectAllowed && !hooks_.effectAllowed(*session, effect, amplifier, durationTicks)) {
+        return;
+    }
+    const world::ActiveEffect active{.effect = effect, .amplifier = amplifier, .remainingTicks = durationTicks};
+    session->effects.insert_or_assign(effect, active);
+    sendEffect(active);
+}
+
+void UiStateSync::sendEffect(const world::ActiveEffect& effect) {
+    PlayerSession* session = owner_->playerSession();
+    if (session == nullptr) {
+        return;
+    }
+    const std::optional<std::int32_t> id = world::mobEffects::protocolIdOf(effect.effect);
+    if (!id.has_value()) {
+        return;
+    }
+    // parity: `AbsorptionMobEffect.onEffectStarted` adds its hearts on top of whatever is left.
+    if (effect.effect == world::mobEffects::absorption()) {
+        session->absorption += kAbsorptionPerLevel * static_cast<float>(effect.amplifier + 1);
+        syncAbsorption();
+    }
+    owner_->sendPlayPacket(wire::protocol::play::UpdateMobEffectPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+        wire::protocol::play::UpdateMobEffectPacket{.entityId = session->entityId(),
+                                                    .effect = *id,
+                                                    .amplifier = effect.amplifier,
+                                                    .durationTicks = effect.remainingTicks,
+                                                    .ambient = effect.ambient,
+                                                    .visible = effect.visible,
+                                                    .showIcon = effect.showIcon}
+            .write(buffer);
+    });
+}
+
+void UiStateSync::sendEffectRemoved(const Identifier& effect) {
+    PlayerSession* session = owner_->playerSession();
+    if (session == nullptr) {
+        return;
+    }
+    const std::optional<std::int32_t> id = world::mobEffects::protocolIdOf(effect);
+    if (!id.has_value()) {
+        return;
+    }
+    // parity: `AbsorptionMobEffect.onEffectRemoved` takes back exactly what it gave, and here
+    // nothing else gives any, so the pool empties.
+    if (effect == world::mobEffects::absorption()) {
+        session->absorption = 0.0F;
+        syncAbsorption();
+    }
+    owner_->sendPlayPacket(wire::protocol::play::RemoveMobEffectPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+        wire::protocol::play::RemoveMobEffectPacket{.entityId = session->entityId(), .effect = *id}.write(buffer);
+    });
+}
+
+void UiStateSync::syncHeldAttributes() {
+    PlayerSession* session = owner_->playerSession();
+    if (session == nullptr) {
+        return;
+    }
+    const std::optional<storage::StoredItemStack>& held =
+        session->inventory.at(player::PlayerInventory::kHotbarStart + session->inventory.heldSlot());
+    world::RealEnchantments* enchantments = owner_->options().enchantments;
+    std::vector<wire::protocol::play::UpdateAttributesPacket::AttributeSnapshot> all =
+        world::enchantmentAttributes::snapshotsFor(held, [enchantments](const Identifier& id) {
+            return enchantments == nullptr ? nullptr : enchantments->definitionOf(id);
+        });
+    // Whatever a plugin set goes out beside them, and wins where both name the same attribute: the
+    // base a plugin chose is the base, and the enchantments are modifiers on top.
+    for (const auto& [name, base] : session->attributeBases) {
+        const std::optional<std::int32_t> id = server::registry::attributeIds::protocolId(name);
+        if (!id.has_value()) {
+            continue;
+        }
+        std::erase_if(all, [id](const auto& snapshot) { return snapshot.attribute == *id; });
+        all.push_back(wire::protocol::play::UpdateAttributesPacket::AttributeSnapshot{.attribute = *id, .base = base});
+    }
+    owner_->sendPlayPacket(wire::protocol::play::UpdateAttributesPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+        wire::protocol::play::UpdateAttributesPacket{.entityId = session->entityId(), .attributes = all}.write(buffer);
+    });
+}
+
+void UiStateSync::tickUi() {
+    PlayerSession* session = owner_->playerSession();
+    if (session == nullptr) {
+        return;
+    }
+    const ClientSession::PluginHooks& plugins = owner_->options().plugins;
+    // A plugin holding a surface is reason enough to draw, even with all the files switched off.
+    const bool anyEnabled = owner_->options().ui && owner_->options().ui().anyEnabled();
+    const bool pluginDraws = (plugins.surfaces.holdsSidebar && plugins.surfaces.holdsSidebar()) ||
+                             (plugins.surfaces.holdsBossBar && plugins.surfaces.holdsBossBar());
+    if (!anyEnabled && !pluginDraws) {
+        return;
+    }
+    const wire::common::placeholder::PlaceholderContext context =
+        wire::common::placeholder::PlaceholderContext{}.with(placeholder::playerSlot(), session);
+    owner_->playerUi().tick(owner_->uiTick++, context);
+}
+
+void UiStateSync::syncAbsorption() {
+    PlayerSession* session = owner_->playerSession();
+    if (session == nullptr) {
+        return;
+    }
+    const SetEntityDataPacket packet = SetEntityDataPacket::playerAbsorption(session->entityId(), session->absorption);
+    const auto write = [packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); };
+    owner_->sendCompressed(SetEntityDataPacket::kId, write);
+    sendToOthers(*owner_, *session, SetEntityDataPacket::kId, write);
+}
+
+void UiStateSync::sendTime(const world::LoadedWorld& world) {
+    const wire::protocol::play::SetTimePacket packet = command::timePacketOf(world);
+    owner_->sendPlayPacket(wire::protocol::play::SetTimePacket::kId,
+                           [packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+}
+
+void UiStateSync::sendWeather(const world::WorldWeather& weather) {
+    using wire::protocol::play::GameEventPacket;
+    // parity: `PlayerList.sendLevelInfo`, which announces rain as a start or stop event *and* the
+    // two levels: the events swap the client's weather renderer, the levels set how heavy it is,
+    // and a client sent only one of the two shows the wrong thing.
+    owner_->sendPlayPacket(GameEventPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+        GameEventPacket{.event = weather.raining ? GameEventPacket::kStartRaining : GameEventPacket::kStopRaining,
+                        .param = 0.0F}
+            .write(buffer);
+    });
+    owner_->sendPlayPacket(GameEventPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+        GameEventPacket{.event = GameEventPacket::kRainLevelChange, .param = weather.rainLevel()}.write(buffer);
+    });
+    owner_->sendPlayPacket(GameEventPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+        GameEventPacket{.event = GameEventPacket::kThunderLevelChange, .param = weather.thunderLevel()}.write(buffer);
+    });
+}
+
+void UiStateSync::syncExperience() {
+    PlayerSession* session = owner_->playerSession();
+    if (session == nullptr) {
+        return;
+    }
+    if (session->experience.level() != owner_->lastSyncedLevel) {
+        const std::int32_t was = owner_->lastSyncedLevel;
+        owner_->lastSyncedLevel = session->experience.level();
+        if (hooks_.levelChanged) {
+            hooks_.levelChanged(*session, session->experience.level(), was);
+        }
+    }
+    owner_->sendCompressed(wire::protocol::play::SetExperiencePacket::kId, [session](wire::io::ByteBuffer& buffer) {
+        wire::protocol::play::SetExperiencePacket{.progress = session->experience.progress(),
+                                                  .level = session->experience.level(),
+                                                  .total = session->experience.total()}
+            .write(buffer);
+    });
+}
+
+void UiStateSync::sendAbilities() {
+    PlayerSession* session = owner_->playerSession();
+    if (session == nullptr) {
+        return;
+    }
+    owner_->sendCompressed(
+        wire::protocol::play::ClientboundPlayerAbilitiesPacket::kId, [session](wire::io::ByteBuffer& buffer) {
+            wire::protocol::play::ClientboundPlayerAbilitiesPacket{.invulnerable = session->invulnerable(),
+                                                                   .flying = session->flying,
+                                                                   .mayFly = session->mayFly(),
+                                                                   .instabuild = session->instabuild()}
+                .write(buffer);
+        });
+}
+
+void UiStateSync::sendCommandTree() {
+    PlayerSession* session = owner_->playerSession();
+    command::CommandDispatcher* dispatcher = owner_->options().commands;
+    if (session == nullptr || dispatcher == nullptr) {
+        return;
+    }
+    sendPermissionLevel();
+    const wire::protocol::play::CommandsPacket tree =
+        dispatcher->treeFor(command::PlayerCommandSource{*session, dispatcher->environment().groups()});
+    owner_->sendCompressed(wire::protocol::play::CommandsPacket::kId,
+                           [&tree](wire::io::ByteBuffer& buffer) { tree.write(buffer); });
+}
+
+void UiStateSync::sendPermissionLevel() {
+    PlayerSession* session = owner_->playerSession();
+    command::CommandDispatcher* dispatcher = owner_->options().commands;
+    if (session == nullptr || dispatcher == nullptr) {
+        return;
+    }
+    // The client parses commands locally against this: below gamemaster it refuses selectors, so
+    // without it `/tellraw @a ...` is underlined in red even though the server runs it fine.
+    const std::int32_t level =
+        command::PlayerCommandSource{*session, dispatcher->environment().groups()}.permissionLevel();
+    const wire::protocol::play::EntityEventPacket packet =
+        wire::protocol::play::EntityEventPacket::permissionLevel(session->entityId(), level);
+    owner_->sendPlayPacket(wire::protocol::play::EntityEventPacket::kId,
+                           [packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+}
+
+void UiStateSync::sendStats() {
+    PlayerSession* session = owner_->playerSession();
+    if (session == nullptr) {
+        return;
+    }
+    using wire::protocol::play::AwardStatsPacket;
+    using wire::protocol::play::StatCounter;
+    std::vector<StatCounter> stats;
+    for (const auto& [key, value] : session->stats.snapshot(owner_->playTimeTicks).counters) {
+        const auto count =
+            static_cast<std::int32_t>(std::min<std::int64_t>(value, std::numeric_limits<std::int32_t>::max()));
+        if (key.starts_with(storage::stats::kCustom)) {
+            const std::optional<std::int32_t> id =
+                server::registry::customStats::idOf(key.substr(std::string_view{storage::stats::kCustom}.size() + 1));
+            if (id.has_value()) {
+                stats.push_back(StatCounter{.statType = AwardStatsPacket::kTypeCustom, .value = *id, .count = count});
+            }
+            continue;
+        }
+        if (key.starts_with(storage::stats::kMined)) {
+            const std::expected<Identifier, wire::common::IdentifierError> block =
+                Identifier::parse(key.substr(std::string_view{storage::stats::kMined}.size() + 1));
+            const std::optional<std::int32_t> id =
+                block.has_value() ? server::registry::blocks::registry().idOf(*block) : std::nullopt;
+            if (id.has_value()) {
+                stats.push_back(StatCounter{.statType = AwardStatsPacket::kTypeMined, .value = *id, .count = count});
+            }
+        }
+    }
+    owner_->sendCompressed(AwardStatsPacket::kId,
+                           [&stats](wire::io::ByteBuffer& buffer) { AwardStatsPacket{.stats = stats}.write(buffer); });
+}
+
+void UiStateSync::applyConsumeEffects(PlayerSession& session,
+                                      const std::vector<server::registry::ConsumeEffect>& effects,
+                                      const std::function<float()>& nextFloat) {
+    for (const server::registry::ConsumeEffect& effect : effects) {
+        if (effect.as<server::registry::ConsumeEffect::ClearAll>() != nullptr) {
+            std::vector<Identifier> held;
+            for (const auto& [id, active] : session.effects) {
+                held.push_back(id);
+            }
+            for (const Identifier& id : held) {
+                session.effects.erase(id);
+                sendEffectRemoved(id);
+            }
+            continue;
+        }
+        if (const auto* removed = effect.as<server::registry::ConsumeEffect::Remove>(); removed != nullptr) {
+            if (session.effects.erase(removed->effect) > 0) {
+                sendEffectRemoved(removed->effect);
+            }
+            continue;
+        }
+        const auto* applied = effect.as<server::registry::ConsumeEffect::Apply>();
+        if (applied == nullptr) {
+            continue;
+        }
+        if (applied->probability < 1.0F && (!nextFloat || nextFloat() >= applied->probability)) {
+            continue;
+        }
+        const world::ActiveEffect active{
+            .effect = applied->effect, .amplifier = applied->amplifier, .remainingTicks = applied->durationTicks};
+        session.effects.insert_or_assign(applied->effect, active);
+        sendEffect(active);
+    }
+}
+
+} // namespace basalt::server::runtime

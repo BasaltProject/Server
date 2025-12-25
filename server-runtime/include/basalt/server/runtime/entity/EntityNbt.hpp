@@ -52,4 +52,10 @@ using ProtocolTypeOf = std::function<std::optional<std::int32_t>(const wire::com
 decodeGeneratedTree(const server::world::ChunkGeneratedEntity& descriptor, const AllocateEntityId& allocateEntityId,
                     const ProtocolTypeOf& protocolTypeOf);
 
+/// Vanilla uses byte, int and float tags while this server's older saves used doubles for the same
+/// fields, so every read takes whichever it finds.
+[[nodiscard]] double numericDouble(const wire::nbt::NbtCompound& tag, std::string_view key);
+
+[[nodiscard]] std::int32_t numericInt(const wire::nbt::NbtCompound& tag, std::string_view key);
+
 } // namespace basalt::server::runtime::entity::entityNbt
