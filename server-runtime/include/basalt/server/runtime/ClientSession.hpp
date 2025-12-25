@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/net/SessionOutbox.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/EntityVisibilityTracker.hpp>
 #include <basalt/server/runtime/ui/PlayerUi.hpp>
 #include <basalt/wire/auth/Cfb8Cipher.hpp>
 #include <basalt/wire/auth/SessionProfile.hpp>
@@ -65,7 +66,6 @@ class ChunkStreamer;
 class CombatHandler;
 class ContainerMenuController;
 class BlockInteractionHandler;
-class EntityVisibilityTracker;
 class ItemUseTimers;
 class PlayerLifecycle;
 class UiStateSync;
@@ -107,6 +107,9 @@ public:
             channelMessage;
         /// The surfaces a plugin may take over for this player.
         ui::PlayerUi::Plugin surfaces;
+        /// The NPCs a plugin is drawing in this world, and what a click on one does.
+        std::function<std::vector<NpcView>()> npcs;
+        std::function<bool(std::int32_t entityId, const std::string& playerUuid)> npcClicked;
     };
 
     /// Everything the session is handed at construction. A struct rather than forty parameters:

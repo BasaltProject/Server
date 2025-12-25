@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/ChunkTracker.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 
@@ -50,6 +51,14 @@ public:
 
 private:
     [[nodiscard]] std::int64_t squaredDistanceToCenter(std::int32_t chunkX, std::int32_t chunkZ) const;
+
+    void sendChunk(server::world::Chunk& chunk);
+
+    /// Asks for the ground the player is walking towards before they can see it.
+    void prefetchAhead(std::int32_t chunkX, std::int32_t chunkZ, std::int32_t movedX, std::int32_t movedZ);
+
+    /// Whether the eight around this one are loaded, asking for any that are not.
+    [[nodiscard]] bool neighboursLoaded(std::int32_t chunkX, std::int32_t chunkZ);
 
     ClientSession* owner_;
     server::world::ChunkTracker chunkTracker_;
