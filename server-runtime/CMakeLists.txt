@@ -103,7 +103,14 @@ basalt_module(server-runtime-core
         src/command/SelectorParser.cpp
         src/command/SelectorOptions.cpp
         src/BlockChangeBroadcaster.cpp
+        src/BlockInteractionHandler.cpp
+        src/BlockUseHelpers.cpp
+        src/BlockUseOn.cpp
         src/ChunkSimulationView.cpp
+        src/ClientSession.cpp
+        src/SessionLogin.cpp
+        src/SessionPlay.cpp
+        src/SessionDelegates.cpp
         src/ChunkStreamer.cpp
         src/CombatAttack.cpp
         src/CombatHandler.cpp
