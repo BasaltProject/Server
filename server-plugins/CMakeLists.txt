@@ -8,6 +8,9 @@ basalt_module(server-plugins
         src/PluginFolder.cpp
         src/PluginJson.cpp
         src/PluginOrder.cpp
+        src/PluginConfig.cpp
+        src/PluginHost.cpp
+        src/PluginHostRuns.cpp
         src/PluginPackage.cpp
         src/PluginRegistrations.cpp
         src/PluginSurfaces.cpp
