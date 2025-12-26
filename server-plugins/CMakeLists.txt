@@ -11,7 +11,11 @@ basalt_module(server-plugins
         src/PluginConfig.cpp
         src/PluginHost.cpp
         src/PluginHostRuns.cpp
+        src/PluginObject.cpp
+        src/PluginObjects.cpp
+        src/PluginWorldObjects.cpp
         src/PluginPackage.cpp
+        src/PluginPacketRegistry.cpp
         src/PluginRegistrations.cpp
         src/PluginSurfaces.cpp
         src/PluginText.cpp
@@ -21,6 +25,12 @@ basalt_module(server-plugins
     # deliberately does not expose. `lua.h` stays out of every header here and lives in that one
     # `.cpp`, which is the same rule the rest of the project follows for a fat dependency.
     PRIVATE_DEPENDS basalt::lua
+)
+
+basalt_test(server-plugins-object-test
+    SOURCES
+        test/PluginObjectTest.cpp
+    DEPENDS basalt::server-plugins
 )
 
 basalt_test(server-plugins-event-types-test

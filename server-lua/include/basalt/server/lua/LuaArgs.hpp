@@ -82,6 +82,15 @@ public:
     /// The value at `index` as text, whatever it is, the way Lua itself writes it.
     [[nodiscard]] std::string toText(std::int32_t index) const;
 
+    /// Makes the table on top of the stack the metatable of the value at `index`, popping it.
+    void setMetatable(std::int32_t index);
+
+    /// Pushes the metatable of the value at `index`, or nil when it has none.
+    void pushMetatable(std::int32_t index);
+
+    /// How many values are on the stack, which is what a host function counts its results by.
+    [[nodiscard]] std::int32_t top() const;
+
     /// Raises a Lua error from inside a host function. Does not return.
     [[noreturn]] void raise(std::string_view message) const;
 

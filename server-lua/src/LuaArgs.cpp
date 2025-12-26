@@ -127,4 +127,14 @@ void LuaArgs::raise(std::string_view message) const {
     std::abort();
 }
 
+void LuaArgs::setMetatable(std::int32_t index) { lua_setmetatable(state_, index); }
+
+void LuaArgs::pushMetatable(std::int32_t index) {
+    if (lua_getmetatable(state_, index) == 0) {
+        lua_pushnil(state_);
+    }
+}
+
+std::int32_t LuaArgs::top() const { return lua_gettop(state_); }
+
 } // namespace basalt::server::lua
