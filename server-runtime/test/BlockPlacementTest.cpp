@@ -668,3 +668,39 @@ TEST_CASE("a block put down against an unloaded chunk is put down against nothin
     CHECK(propertyOf(alone, "distance") == "7");
     CHECK(propertyOf(alone, "bottom") == "true");
 }
+
+TEST_CASE("the wall form of a standing block is the one the registry really has") {
+    // parity: `StandingAndWallBlockItem`'s own pairs, which every family in 26.2 names the same way.
+    CHECK(wallVariants::of(block("oak_sign")) == block("oak_wall_sign"));
+    CHECK(wallVariants::of(block("torch")) == block("wall_torch"));
+    CHECK(wallVariants::of(block("skeleton_skull")) == block("skeleton_wall_skull"));
+    // A hanging sign puts the wall in front of the pair of words, not before the last one.
+    CHECK(wallVariants::of(block("oak_hanging_sign")) == block("oak_wall_hanging_sign"));
+    // A block with no wall form answers with nothing rather than an id nobody has.
+    CHECK(!wallVariants::of(block("stone")).has_value());
+}
+
+TEST_CASE("a two-block block knows its other half") {
+    const std::int32_t door = defaultOf("oak_door");
+    const std::optional<SecondHalf> upper = doubleBlocks::secondHalf(doubleBlocks::firstHalf(door), 8, 64, 8);
+    REQUIRE(upper.has_value());
+    CHECK(upper->y == 65);
+    CHECK(propertyOf(upper->stateId, "half") == "upper");
+
+    // parity: the head goes where the foot faces, so a bed placed facing east reaches east.
+    const std::optional<std::int32_t> foot = registry::blockStateDefinitions::stateIdOf(
+        block("red_bed"), {{"part", "foot"}, {"facing", "east"}}, std::nullopt);
+    REQUIRE(foot.has_value());
+    const std::optional<SecondHalf> head = doubleBlocks::secondHalf(*foot, 8, 64, 8);
+    REQUIRE(head.has_value());
+    CHECK(head->x == 9);
+    CHECK(head->y == 64);
+    CHECK(propertyOf(head->stateId, "part") == "head");
+
+    // An ordinary block has no other half, and a stair's `half` is top or bottom, not upper.
+    CHECK(!doubleBlocks::secondHalf(defaultOf("stone"), 0, 0, 0).has_value());
+    const std::optional<std::int32_t> top =
+        registry::blockStateDefinitions::stateIdOf(block("oak_stairs"), {{"half", "top"}}, defaultOf("oak_stairs"));
+    REQUIRE(top.has_value());
+    CHECK(doubleBlocks::firstHalf(*top) == *top);
+}
