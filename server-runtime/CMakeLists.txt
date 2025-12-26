@@ -114,6 +114,7 @@ basalt_module(server-runtime-core
         src/plugins/ServerWorldModel.cpp
         src/ChunkSimulationView.cpp
         src/ClientSession.cpp
+        src/CommandWiring.cpp
         src/SessionLogin.cpp
         src/SessionPlay.cpp
         src/SessionDelegates.cpp
@@ -150,6 +151,7 @@ basalt_module(server-runtime-core
         src/SubstituteLabels.cpp
         src/command/CommandDispatcher.cpp
         src/command/CommandEnvironment.cpp
+        src/command/ConsoleReader.cpp
         src/command/CommandTarget.cpp
         src/command/ExecutionSource.cpp
         src/command/CommandSource.cpp
