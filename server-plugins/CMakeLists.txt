@@ -4,6 +4,7 @@ basalt_module(server-plugins
         src/PluginManifest.cpp
         src/PluginEvents.cpp
         src/PluginEventTypes.cpp
+        src/PluginDispatch.cpp
         src/PluginEventView.cpp
         src/PluginFolder.cpp
         src/PluginJson.cpp
@@ -11,6 +12,7 @@ basalt_module(server-plugins
         src/PluginConfig.cpp
         src/PluginHost.cpp
         src/PluginHostRuns.cpp
+        src/PluginMenuObject.cpp
         src/PluginObject.cpp
         src/PluginObjects.cpp
         src/PluginWorldObjects.cpp
