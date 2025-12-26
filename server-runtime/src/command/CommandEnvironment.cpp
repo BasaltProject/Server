@@ -29,7 +29,7 @@ const config::CommandsConfig& CommandEnvironment::commands() const {
     return options_.commands ? options_.commands() : emptyCommands_;
 }
 
-plugins::PluginEventBus* CommandEnvironment::pluginEvents() const {
+server::plugins::PluginEventBus* CommandEnvironment::pluginEvents() const {
     return options_.pluginEvents ? options_.pluginEvents() : nullptr;
 }
 

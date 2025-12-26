@@ -64,7 +64,7 @@ public:
         std::function<const config::CommandsConfig&()> commands;
         /// Where plugin events go, or null when there are no plugins. Read through a supplier: the
         /// plugin host is built after the command tree, which it registers `/plugins` into.
-        std::function<plugins::PluginEventBus*()> pluginEvents;
+        std::function<server::plugins::PluginEventBus*()> pluginEvents;
 
         /// What `/weather` samples a duration from when it was given none, which is the level's own
         /// random in vanilla. Null where there is none, and the shortest the range allows stands in.
@@ -127,7 +127,7 @@ public:
     [[nodiscard]] const config::CommandsConfig& commands() const;
 
     /// Where plugin events go right now, or null when there are none.
-    [[nodiscard]] plugins::PluginEventBus* pluginEvents() const;
+    [[nodiscard]] server::plugins::PluginEventBus* pluginEvents() const;
 
     [[nodiscard]] const wire::common::placeholder::PlaceholderRegistry& placeholders() const;
 
