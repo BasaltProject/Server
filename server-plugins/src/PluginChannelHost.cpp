@@ -1,4 +1,5 @@
 #include <basalt/server/plugins/PluginChannelHost.hpp>
+#include <basalt/server/plugins/PluginHost.hpp>
 #include <basalt/server/plugins/PluginObjects.hpp>
 
 #include <algorithm>

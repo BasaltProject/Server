@@ -129,6 +129,8 @@ void LuaArgs::raise(std::string_view message) const {
 
 void LuaArgs::setMetatable(std::int32_t index) { lua_setmetatable(state_, index); }
 
+void LuaArgs::setGlobal(std::string_view name) { lua_setglobal(state_, std::string{name}.c_str()); }
+
 void LuaArgs::pushMetatable(std::int32_t index) {
     if (lua_getmetatable(state_, index) == 0) {
         lua_pushnil(state_);

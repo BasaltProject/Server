@@ -1,15 +1,20 @@
 #pragma once
 
 #include <basalt/server/lua/LuaRef.hpp>
+#include <basalt/server/plugins/PluginCommandSpec.hpp>
 #include <basalt/server/plugins/PluginEvents.hpp>
-#include <basalt/server/plugins/PluginHost.hpp>
 
 #include <map>
 #include <string>
 
 namespace basalt::server::plugins {
 
+struct CommandEntry;
+class LoadedPlugin;
+class PluginCommandCall;
 class PluginEventView;
+class PluginHost;
+struct PluginInstance;
 
 /// Registers a plugin's commands with the server's own dispatcher, and runs them when called.
 class PluginCommandDispatch {

@@ -88,6 +88,9 @@ public:
     /// Pushes the metatable of the value at `index`, or nil when it has none.
     void pushMetatable(std::int32_t index);
 
+    /// Sets the value on top as a global, popping it. What an installed API is put into place with.
+    void setGlobal(std::string_view name);
+
     /// How many values are on the stack, which is what a host function counts its results by.
     [[nodiscard]] std::int32_t top() const;
 

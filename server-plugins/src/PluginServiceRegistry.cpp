@@ -1,4 +1,5 @@
 #include <basalt/server/lua/LuaCall.hpp>
+#include <basalt/server/plugins/PluginHost.hpp>
 #include <basalt/server/plugins/PluginObjects.hpp>
 #include <basalt/server/plugins/PluginServiceRegistry.hpp>
 

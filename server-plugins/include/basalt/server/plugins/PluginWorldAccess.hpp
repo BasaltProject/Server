@@ -70,7 +70,7 @@ public:
 /// A handle rather than a copy: reading `health` reads the player's health now, and writing it
 /// changes it. The handle stops working when they leave, and says so rather than quietly writing
 /// into nothing.
-class PluginPlayerRef {
+class PluginPlayerRef : public std::enable_shared_from_this<PluginPlayerRef> {
 public:
     PluginPlayerRef() = default;
     PluginPlayerRef(const PluginPlayerRef&) = delete;

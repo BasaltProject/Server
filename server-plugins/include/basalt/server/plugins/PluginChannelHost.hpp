@@ -1,7 +1,7 @@
 #pragma once
 
 #include <basalt/server/lua/LuaRef.hpp>
-#include <basalt/server/plugins/PluginHost.hpp>
+#include <basalt/server/plugins/PluginEvents.hpp>
 
 #include <cstdint>
 #include <map>
@@ -11,6 +11,9 @@
 #include <vector>
 
 namespace basalt::server::plugins {
+
+class LoadedPlugin;
+class PluginHost;
 
 /// Who is listening on which channel, by channel name.
 class PluginChannelHost {

@@ -1,5 +1,6 @@
 #include <basalt/server/lua/LuaCall.hpp>
 #include <basalt/server/plugins/PluginConfig.hpp>
+#include <basalt/server/plugins/PluginDispatch.hpp>
 #include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/plugins/PluginFolder.hpp>
 #include <basalt/server/plugins/PluginHost.hpp>
@@ -41,13 +42,50 @@ CommandEntry* LoadedPlugin::commandNamed(std::string_view name) {
 
 PluginHost::PluginHost(PluginServices& services, std::int32_t lanes, lua::LuaLimits limits, std::int32_t strikeLimit)
     : services_(&services), lanes_(lanes), limits_(limits), strikeLimit_(strikeLimit),
-      surfaces_([this](const std::string& message) { log_.warn([&message] { return message; }); }) {
+      surfaces_([this](const std::string& message) { log_.warn([&message] { return message; }); }),
+      packets_([this](LoadedPlugin& plugin, const lua::LuaRef& fn, PluginPacket& packet) {
+          deliverPacket(plugin, fn, packet);
+      }),
+      commandDispatch_(std::make_unique<PluginCommandDispatch>(*this)),
+      eventDispatch_(std::make_unique<PluginEventDispatch>(*this)) {
     for (const PluginEventType* type : pluginEventTypes::all()) {
         events_.declare(*type);
     }
 }
 
 PluginHost::~PluginHost() { unloadAll(); }
+
+void PluginHost::registerCommand(LoadedPlugin& plugin, PluginInstance& instance, const PluginCommandSpec& spec,
+                                 lua::LuaRef handler) {
+    commandDispatch_->registerCommand(plugin, instance, spec, std::move(handler));
+}
+
+void PluginHost::registerEventHandler(LoadedPlugin& plugin, PluginInstance& instance, const PluginEventType& type,
+                                      PluginEventPriority priority, bool observer, bool wantsCancelled,
+                                      std::map<std::string, PluginEventValue, std::less<>> filters,
+                                      lua::LuaRef handler) {
+    eventDispatch_->registerEventHandler(plugin, instance, type, priority, observer, wantsCancelled, std::move(filters),
+                                         std::move(handler));
+}
+
+void PluginHost::announce(LoadedPlugin& plugin, const std::string& name, lua::LuaRef handler) {
+    announcements_.announce(*this, plugin, name, std::move(handler));
+}
+
+std::int32_t PluginHost::emit(const std::string& name, const lua::LuaRef& payload) {
+    return announcements_.emit(*this, name, payload);
+}
+
+void PluginHost::listenOn(LoadedPlugin& plugin, const std::string& channel, lua::LuaRef fn) {
+    channels_.listenOn(plugin, channel, std::move(fn));
+}
+
+bool PluginHost::listeningOnChannel(std::string_view channel) const { return channels_.listeningOnChannel(channel); }
+
+void PluginHost::channelMessage(const std::string& channel, const std::string& playerUuid,
+                                std::span<const std::uint8_t> bytes) {
+    channels_.channelMessage(*this, channel, playerUuid, bytes);
+}
 
 std::set<PluginPermission> PluginHost::allowed(const std::string& pluginId) const {
     return allowed_ ? allowed_(pluginId) : std::set<PluginPermission>{};
