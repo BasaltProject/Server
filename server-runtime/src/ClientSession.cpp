@@ -31,6 +31,30 @@ constexpr std::chrono::milliseconds kOutboundInterval{50};
 /// A client that has been idle cannot then be handed an enormous burst at once.
 constexpr float kMaxBurstChunks = 64.0F;
 
+/// The per-player half of the surface hooks: `PlayerUi` draws one player and asks about that one,
+/// while a claim is made on the server as a whole.
+[[nodiscard]] ui::PlayerUi::Plugin surfacesOf(ClientSession& session) {
+    const ClientSession::PluginHooks::Surfaces& surfaces = session.options().plugins.surfaces;
+    ui::PlayerUi::Plugin plugin;
+    plugin.holdsSidebar = surfaces.holdsSidebar;
+    plugin.holdsBossBar = surfaces.holdsBossBar;
+    if (surfaces.sidebar) {
+        plugin.sidebar = [&session]() -> std::optional<ui::SurfaceContent> {
+            const player::PlayerSession* player = session.playerSession();
+            return player == nullptr ? std::nullopt
+                                     : session.options().plugins.surfaces.sidebar(player->uuid().toString());
+        };
+    }
+    if (surfaces.bossBar) {
+        plugin.bossBar = [&session]() -> std::optional<ui::SurfaceContent> {
+            const player::PlayerSession* player = session.playerSession();
+            return player == nullptr ? std::nullopt
+                                     : session.options().plugins.surfaces.bossBar(player->uuid().toString());
+        };
+    }
+    return plugin;
+}
+
 } // namespace
 
 ClientSession::ClientSession(wire::io::TcpConnection connection, Options options)
@@ -40,7 +64,7 @@ ClientSession::ClientSession(wire::io::TcpConnection connection, Options options
           [this](std::int32_t id, const std::function<void(wire::io::ByteBuffer&)>& write) {
               sendPlayPacket(id, write);
           },
-          options_.plugins.surfaces),
+          surfacesOf(*this)),
       menus_(std::make_unique<ContainerMenuController>(*this)),
       blockInteraction_(std::make_unique<BlockInteractionHandler>(*this)),
       chunkStreamer_(std::make_unique<ChunkStreamer>(*this)), combat_(std::make_unique<CombatHandler>(*this)),
@@ -188,17 +212,19 @@ void ClientSession::handleFrame(wire::io::ByteBuffer& body) {
     // it, so nothing past this line knows there is more than one version.
     const std::span<const std::uint8_t> readable = body.readable();
     const std::vector<std::uint8_t> rest(readable.begin(), readable.end());
-    translation_->chain().serverbound(state_, packetId, rest, [this](std::int32_t id, std::span<const std::uint8_t> bytes) {
-        lastPacketId_ = id;
-        wire::io::ByteBuffer translated;
-        translated.writeBytes(bytes);
-        handleFrameBody(id, translated);
-    });
+    translation_->chain().serverbound(state_, packetId, rest,
+                                      [this](std::int32_t id, std::span<const std::uint8_t> bytes) {
+                                          lastPacketId_ = id;
+                                          wire::io::ByteBuffer translated;
+                                          translated.writeBytes(bytes);
+                                          handleFrameBody(id, translated);
+                                      });
 }
 
 void ClientSession::handleFrameBody(std::int32_t packetId, wire::io::ByteBuffer& body) {
     if (options_.plugins.incoming) {
-        const std::optional<std::vector<std::uint8_t>> edited = options_.plugins.incoming(packetId, body.readable());
+        const std::optional<std::vector<std::uint8_t>> edited =
+            options_.plugins.incoming(state_, packetId, body.readable());
         if (!edited.has_value()) {
             return;
         }
@@ -285,7 +311,7 @@ void ClientSession::sendCompressed(std::int32_t id, const std::function<void(wir
     if (options_.plugins.outgoing) {
         // The id is in front of the body, and a plugin is shown the packet without it.
         const std::optional<std::vector<std::uint8_t>> edited =
-            options_.plugins.outgoing(id, std::span{bytes}.subspan(idBytes));
+            options_.plugins.outgoing(state_, id, std::span{bytes}.subspan(idBytes));
         if (!edited.has_value()) {
             return;
         }

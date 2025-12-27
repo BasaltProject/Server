@@ -121,17 +121,32 @@ public:
                                                  const std::string& address)>
             loginRefused;
         /// A packet on its way out, which a plugin may edit or drop. Answers nothing to drop it.
-        std::function<std::optional<std::vector<std::uint8_t>>(std::int32_t id, std::span<const std::uint8_t> packet)>
+        ///
+        /// The state comes with it because a packet id only names a packet within one: 0x01 is a
+        /// different thing in configuration than it is in play.
+        std::function<std::optional<std::vector<std::uint8_t>>(wire::protocol::ProtocolState state, std::int32_t id,
+                                                               std::span<const std::uint8_t> packet)>
             outgoing;
         /// The same on the way in.
-        std::function<std::optional<std::vector<std::uint8_t>>(std::int32_t id, std::span<const std::uint8_t> packet)>
+        std::function<std::optional<std::vector<std::uint8_t>>(wire::protocol::ProtocolState state, std::int32_t id,
+                                                               std::span<const std::uint8_t> packet)>
             incoming;
         /// Whether anybody is listening on a plugin channel, and what to do with what arrives.
         std::function<bool(const std::string& channel)> listensOn;
         std::function<void(const std::string& uuid, const std::string& channel, std::span<const std::uint8_t> payload)>
             channelMessage;
+
         /// The surfaces a plugin may take over for this player.
-        ui::PlayerUi::Plugin surfaces;
+        /// Which surfaces a plugin is drawing, asked per player: what one sees on the sidebar is
+        /// not what the next one does.
+        struct Surfaces {
+            std::function<bool()> holdsSidebar;
+            std::function<std::optional<ui::SurfaceContent>(const std::string& playerUuid)> sidebar;
+            std::function<bool()> holdsBossBar;
+            std::function<std::optional<ui::SurfaceContent>(const std::string& playerUuid)> bossBar;
+        };
+
+        Surfaces surfaces;
         /// The NPCs a plugin is drawing in this world, and what a click on one does.
         std::function<std::vector<NpcView>()> npcs;
         std::function<bool(std::int32_t entityId, const std::string& playerUuid)> npcClicked;
