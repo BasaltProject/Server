@@ -71,9 +71,13 @@ public:
     /// The names, in the order the file declares them.
     [[nodiscard]] std::vector<std::string> names() const;
 
-    [[nodiscard]] const PermissionGroup& defaultGroup() const noexcept { return groups_[defaultIndex_]; }
+    /// The default and operator groups, or a group that grants nothing when there are none at all.
+    ///
+    /// A configuration with no groups is what a test fixture and a server with no `groups.toml`
+    /// both hand over, and indexing an empty list for them is how this crashed in release.
+    [[nodiscard]] const PermissionGroup& defaultGroup() const noexcept { return at(defaultIndex_); }
 
-    [[nodiscard]] const PermissionGroup& operatorGroup() const noexcept { return groups_[operatorIndex_]; }
+    [[nodiscard]] const PermissionGroup& operatorGroup() const noexcept { return at(operatorIndex_); }
 
     /// The named group, or the default one when there is no such group and when there is no name.
     [[nodiscard]] const PermissionGroup& get(std::optional<std::string_view> name) const;
@@ -87,6 +91,8 @@ public:
     [[nodiscard]] bool resolve(std::optional<std::string_view> groupName, std::string_view node) const;
 
 private:
+    [[nodiscard]] const PermissionGroup& at(std::size_t index) const noexcept;
+
     [[nodiscard]] const PermissionGroup* find(std::string_view name) const;
 
     std::vector<PermissionGroup> groups_;

@@ -149,7 +149,9 @@ TEST_CASE("a time below what the command allows is refused") {
     CHECK(fixture.parse<std::int32_t>(*atLeastOne, "1") == 1);
     CHECK(fixture.refuses(*atLeastOne, "0"));
 
-    const auto* properties = atLeastOne->wire().as<ArgumentParser::TimeProperties>();
+    // `wire()` answers by value, so the parser is kept alive rather than pointed into.
+    const ArgumentParser parser = atLeastOne->wire();
+    const auto* properties = parser.as<ArgumentParser::TimeProperties>();
     REQUIRE(properties != nullptr);
     CHECK(properties->min == 1);
 }
@@ -216,7 +218,8 @@ TEST_CASE("the simple types name the parser the client should use") {
     CHECK(command::gameProfileArgument()->wire().registryId() == argumentType::kGameProfile);
     CHECK(command::gameModeArgument()->wire().registryId() == argumentType::kGamemode);
 
-    const auto* greedy = command::greedyStringArgument()->wire().as<ArgumentParser::StringProperties>();
+    const ArgumentParser parser = command::greedyStringArgument()->wire();
+    const auto* greedy = parser.as<ArgumentParser::StringProperties>();
     REQUIRE(greedy != nullptr);
     CHECK(greedy->kind == ArgumentParser::StringKind::GreedyPhrase);
 }

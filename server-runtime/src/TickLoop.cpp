@@ -1,5 +1,7 @@
 #include <basalt/server/runtime/TickLoop.hpp>
 
+#include <thread>
+
 #include <algorithm>
 #include <chrono>
 
@@ -219,7 +221,9 @@ void TickLoop::stop() {
         sleepMillis(kSweepPollMillis);
         waited += kSweepPollMillis;
     }
-    if (ticker_.joinable()) {
+    // A stop from inside the tick itself (a signal noticed mid-tick) would be the ticker joining
+    // itself, so it is left to run out its own turn instead.
+    if (ticker_.joinable() && ticker_.get_id() != std::this_thread::get_id()) {
         ticker_.join();
     }
     if (sweeper_.joinable()) {
