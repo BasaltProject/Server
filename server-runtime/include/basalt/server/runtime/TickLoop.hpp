@@ -74,6 +74,11 @@ public:
     TickLoop(TickLoop&&) = delete;
     TickLoop& operator=(TickLoop&&) = delete;
 
+    /// Whether the calling thread is the one running the ticks.
+    ///
+    /// Asked by the shutdown, which joins this thread and so must never run on it.
+    [[nodiscard]] bool isTickThread() const noexcept { return ticker_.get_id() == std::this_thread::get_id(); }
+
     /// Every tick's duration, for the distribution `/timings` reports.
     [[nodiscard]] wire::common::TickDurations& durations() noexcept { return durations_; }
 

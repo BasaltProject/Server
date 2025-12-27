@@ -143,6 +143,20 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
 }
 
 void BasaltServer::shutdown() {
+    // Both ways in arrive on the tick thread: a signal is noticed inside the tick, and `/stop` runs
+    // on the owner of a world. Winding down joins that thread, and no thread can join itself, so the
+    // work moves to one of its own and the caller carries on to the end of its turn.
+    if (tickLoop_ != nullptr && tickLoop_->isTickThread()) {
+        bool expected = false;
+        if (movingOffTick_.compare_exchange_strong(expected, true)) {
+            shutdownThread_ = std::jthread{[this] { shutdownNow(); }};
+        }
+        return;
+    }
+    shutdownNow();
+}
+
+void BasaltServer::shutdownNow() {
     // Once only: `/stop` and a signal can arrive together, and running this twice means two
     // concurrent saves of the same regions.
     bool expected = false;
@@ -154,7 +168,11 @@ void BasaltServer::shutdown() {
     // with auto-reconnect walks straight back in mid-save and starts requesting chunks again, which
     // is exactly the work shutting down is trying to finish.
     accepting_.store(false);
-    listener_.reset();
+    // Closed, not destroyed: the thread that started the server is inside `accept` on it right now,
+    // and taking the object away under it is worse than the error it gets from a closed socket.
+    if (listener_.has_value()) {
+        listener_->close();
+    }
 
     const std::vector<player::PlayerSession*> players = playerRegistry_.snapshot();
     if (!players.empty()) {
