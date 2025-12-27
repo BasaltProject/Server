@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdlib>
+#include <memory>
 #include <utility>
 
 namespace basalt::server::world::terrain {
@@ -320,24 +321,25 @@ RuinedPortalStructureGenerator::assemble(std::int64_t seed, std::int32_t chunkX,
     return std::nullopt;
 }
 
-const RuinedPortalStructureGenerator::Portal*
+std::shared_ptr<const RuinedPortalStructureGenerator::Portal>
 RuinedPortalStructureGenerator::portalAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) {
     const std::int64_t key =
         (static_cast<std::int64_t>(chunkX) << 32) | (static_cast<std::int64_t>(chunkZ) & 0xFFFFFFFFLL);
     const std::scoped_lock lock{mutex_};
     const auto found = placed_.find(key);
     if (found != placed_.end()) {
-        return found->second.has_value() ? &*found->second : nullptr;
+        return found->second;
     }
-    std::optional<Portal> portal;
+    std::shared_ptr<const Portal> portal;
     if (grid_.isStructureChunk(seed, chunkX, chunkZ)) {
-        portal = assemble(seed, chunkX, chunkZ);
+        if (std::optional<Portal> assembled = assemble(seed, chunkX, chunkZ); assembled.has_value()) {
+            portal = std::make_shared<const Portal>(std::move(*assembled));
+        }
     }
     if (placed_.size() >= kCacheCapacity) {
         placed_.clear();
     }
-    const std::optional<Portal>& stored = placed_.emplace(key, std::move(portal)).first->second;
-    return stored.has_value() ? &*stored : nullptr;
+    return placed_.emplace(key, std::move(portal)).first->second;
 }
 
 void RuinedPortalStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {
@@ -345,7 +347,7 @@ void RuinedPortalStructureGenerator::generateInto(Chunk& chunk, std::int64_t see
                                     chunk.chunkX() * 16 + 15, kOverworldHeight.maxY(), chunk.chunkZ() * 16 + 15};
     for (std::int32_t startX = chunk.chunkX() - kReachChunks; startX <= chunk.chunkX() + kReachChunks; ++startX) {
         for (std::int32_t startZ = chunk.chunkZ() - kReachChunks; startZ <= chunk.chunkZ() + kReachChunks; ++startZ) {
-            const Portal* portal = portalAt(seed, startX, startZ);
+            const std::shared_ptr<const Portal> portal = portalAt(seed, startX, startZ);
             if (portal == nullptr || !portal->box.intersects(clip)) {
                 continue;
             }

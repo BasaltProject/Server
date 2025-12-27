@@ -23,6 +23,13 @@ const BlockSet& deepslateReplaceables() {
     return blocks;
 }
 
+/// parity: block tag `features_cannot_replace`, the only thing a geode refuses to carve through.
+const BlockSet& geodeCannotReplace() {
+    static const BlockSet blocks = {"bedrock", "spawner",      "chest", "end_portal_frame", "reinforced_deepslate",
+                                    "vault",   "trial_spawner"};
+    return blocks;
+}
+
 [[nodiscard]] bool contains(const BlockSet& set, const std::string& path) { return set.find(path) != set.end(); }
 
 [[nodiscard]] bool containsAll(const BlockSet& haystack, const BlockSet& needles) {
@@ -45,6 +52,8 @@ bool oreBlockRules::canReplaceDeferred(GeneratedBlockWritePolicy policy, std::in
         return contains(stoneReplaceables(), path);
     case GeneratedBlockWritePolicy::OreDeepslate:
         return contains(deepslateReplaceables(), path);
+    case GeneratedBlockWritePolicy::Geode:
+        return !contains(geodeCannotReplace(), path);
     case GeneratedBlockWritePolicy::Exact:
     case GeneratedBlockWritePolicy::Tree:
         break;

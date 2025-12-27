@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <map>
+#include <mutex>
 #include <numbers>
 #include <string_view>
 #include <utility>
@@ -59,7 +60,11 @@ void setBlock(Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z, std:
 /// parity: `SpikeConfiguration`'s own shuffle of the ten sizes, seeded from the world seed's first
 /// legacy draw.
 [[nodiscard]] const std::vector<EndSpike>& spikesForSeed(std::int64_t seed) {
+    // Every End chunk asks for these, so several generation workers reach the cache at once. The
+    // reference outlives the lock because a map keeps its nodes where they are and nothing erases.
+    static std::mutex mutex;
     static std::map<std::int64_t, std::vector<EndSpike>> cache;
+    const std::scoped_lock lock{mutex};
     const auto found = cache.find(seed);
     if (found != cache.end()) {
         return found->second;

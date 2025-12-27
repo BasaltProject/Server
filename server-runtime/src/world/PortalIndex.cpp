@@ -7,6 +7,7 @@
 
 #include <charconv>
 #include <limits>
+#include <mutex>
 
 namespace basalt::server::runtime::world {
 namespace {
@@ -44,7 +45,13 @@ constexpr std::int32_t kSectionWidth = 16;
 
 } // namespace
 
-std::size_t PortalIndex::size() const noexcept {
+bool PortalIndex::dirty() const {
+    const std::scoped_lock lock{mutex_};
+    return dirty_;
+}
+
+std::size_t PortalIndex::size() const {
+    const std::scoped_lock lock{mutex_};
     std::size_t total = 0;
     for (const auto& [chunk, positions] : byChunk_) {
         total += positions.size();
@@ -53,6 +60,7 @@ std::size_t PortalIndex::size() const noexcept {
 }
 
 void PortalIndex::scan(const server::world::Chunk& chunk) {
+    const std::scoped_lock lock{mutex_};
     std::vector<std::int64_t> found;
     for (std::size_t index = 0; index < chunk.sectionCount(); ++index) {
         const server::world::ChunkSection& section = chunk.section(index);
@@ -80,6 +88,7 @@ void PortalIndex::scan(const server::world::Chunk& chunk) {
 
 std::optional<std::array<std::int32_t, 3>> PortalIndex::nearest(std::int32_t x, std::int32_t y, std::int32_t z,
                                                                 std::int32_t radius) const {
+    const std::scoped_lock lock{mutex_};
     std::optional<std::array<std::int32_t, 3>> best;
     std::int64_t bestDistance = std::numeric_limits<std::int64_t>::max();
     for (std::int32_t chunkX = (x - radius) >> 4; chunkX <= ((x + radius) >> 4); ++chunkX) {
@@ -111,6 +120,7 @@ std::optional<std::array<std::int32_t, 3>> PortalIndex::nearest(std::int32_t x, 
 }
 
 void PortalIndex::load(std::string_view worldRoot) {
+    const std::scoped_lock lock{mutex_};
     const std::optional<std::vector<std::uint8_t>> bytes = wire::io::fileIO::readBytes(pathFor(worldRoot));
     if (!bytes.has_value()) {
         return;
@@ -138,6 +148,7 @@ void PortalIndex::load(std::string_view worldRoot) {
 }
 
 void PortalIndex::save(std::string_view worldRoot) {
+    const std::scoped_lock lock{mutex_};
     if (!dirty_) {
         return;
     }

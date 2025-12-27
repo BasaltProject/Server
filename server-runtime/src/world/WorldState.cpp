@@ -235,8 +235,8 @@ void WorldState::installLater(Chunk chunk) {
     sched::Owner* target = installOwner_ != nullptr ? installOwner_ : owner_;
     if (target == nullptr) {
         Chunk& installed = install(std::move(chunk));
-        if (onChunkInstalled_) {
-            onChunkInstalled_(installed);
+        if (const std::function<void(Chunk&)> handler = chunkInstalledHandler()) {
+            handler(installed);
         }
         return;
     }
@@ -244,8 +244,8 @@ void WorldState::installLater(Chunk chunk) {
     // waiting for it, and by the time the owner runs this their own copy is gone.
     target->submit([this, moved = std::make_shared<Chunk>(std::move(chunk))]() mutable {
         Chunk& installed = install(std::move(*moved));
-        if (onChunkInstalled_) {
-            onChunkInstalled_(installed);
+        if (const std::function<void(Chunk&)> handler = chunkInstalledHandler()) {
+            handler(installed);
         }
     });
 }

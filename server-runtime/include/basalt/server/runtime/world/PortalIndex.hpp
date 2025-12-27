@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <map>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -23,10 +24,10 @@ namespace basalt::server::runtime::world {
 class PortalIndex {
 public:
     /// Whether anything has changed since the last load or save.
-    [[nodiscard]] bool dirty() const noexcept { return dirty_; }
+    [[nodiscard]] bool dirty() const;
 
     /// How many portal blocks the index knows of, over every chunk.
-    [[nodiscard]] std::size_t size() const noexcept;
+    [[nodiscard]] std::size_t size() const;
 
     /// Replaces what is known about a chunk with what its blocks actually say.
     void scan(const server::world::Chunk& chunk);
@@ -41,8 +42,12 @@ public:
     void save(std::string_view worldRoot);
 
 private:
+    /// Expects `mutex_` to be held: the only caller is `scan`, which takes it.
     void put(std::int64_t chunk, std::vector<std::int64_t> positions);
 
+    /// Every chunk generation worker scans the chunk it just made, so two of them reach `put` at
+    /// once. Without this the map itself is mutated from several threads, not just the flag.
+    mutable std::mutex mutex_;
     std::map<std::int64_t, std::vector<std::int64_t>> byChunk_;
     bool dirty_ = false;
 };

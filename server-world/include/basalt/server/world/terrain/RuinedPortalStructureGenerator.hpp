@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <set>
@@ -114,7 +115,10 @@ private:
     [[nodiscard]] std::int32_t frozenHeight(const Chunk& chunk, RuinedPortalPlacement placement, std::int32_t x,
                                             std::int32_t z) const;
 
-    [[nodiscard]] const Portal* portalAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ);
+    /// Shared rather than borrowed: the cache is cleared when it fills, and a pointer into it would
+    /// dangle the moment another worker triggered that while this one was still reading. A null
+    /// pointer for a key that is present means the chunk was checked and holds no portal.
+    [[nodiscard]] std::shared_ptr<const Portal> portalAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ);
 
     /// parity: `ChunkGenerator`'s retry loop. A variant is drawn by weight, its whole generation
     /// point computed, and only then is the biome checked, at that point rather than at the chunk. A
@@ -137,7 +141,7 @@ private:
     IsSolidAt isSolidAt_;
     structure::StructurePlacementGrid grid_;
     mutable std::mutex mutex_;
-    std::map<std::int64_t, std::optional<Portal>> placed_;
+    std::map<std::int64_t, std::shared_ptr<const Portal>> placed_;
 };
 
 } // namespace basalt::server::world::terrain

@@ -4,6 +4,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/noise/NormalNoise.hpp>
 #include <basalt/server/world/terrain/decoration/CaveLocalModificationDecoration.hpp>
+#include <basalt/server/world/terrain/decoration/OreBlockRules.hpp>
 #include <basalt/server/world/terrain/decoration/OverworldBiomePaths.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
@@ -57,12 +58,6 @@ constexpr std::array<std::string_view, 4> kAmethystPlacements{"small_amethyst_bu
 [[nodiscard]] std::string_view biomePath(std::string_view id) {
     const std::size_t colon = id.find(':');
     return colon == std::string_view::npos ? id : id.substr(colon + 1);
-}
-
-const PathSet& geodeCannotReplace() {
-    static const PathSet paths = {
-        "bedrock", "spawner", "chest", "end_portal_frame", "vault", "trial_spawner", "reinforced_deepslate"};
-    return paths;
 }
 
 const PathSet& geodeInvalidBlocks() {
@@ -184,9 +179,12 @@ public:
 
     bool safeSet(const DecorationPos& position, std::int32_t stateId) {
         const std::optional<std::int32_t> current = get(position);
-        if (!current.has_value() || geodeCannotReplace().contains(pathOf(*current))) {
+        if (!current.has_value() || !oreBlockRules::canReplaceDeferred(GeneratedBlockWritePolicy::Geode, *current)) {
             return false;
         }
+        // A neighbour that does not exist yet reads as air, so testing here decides nothing for it.
+        // The policy travels with the write and is tested again against whatever really turns up.
+        const Chunk::WritePolicyScope scope{*chunk_, GeneratedBlockWritePolicy::Geode};
         set(position, stateId);
         return true;
     }

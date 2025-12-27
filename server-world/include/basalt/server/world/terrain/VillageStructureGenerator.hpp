@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <set>
@@ -122,12 +123,14 @@ private:
     /// because a finished assembly is cached and never recomputed.
     using Samplers = std::map<std::int64_t, DensityChunkSampler>;
 
-    [[nodiscard]] std::vector<const VillageStart*> referencedStarts(std::int32_t chunkX, std::int32_t chunkZ,
-                                                                    std::int64_t seed,
-                                                                    const structure::StructureBoundingBox& clip);
+    [[nodiscard]] std::vector<std::shared_ptr<const VillageStart>>
+    referencedStarts(std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed,
+                     const structure::StructureBoundingBox& clip);
 
-    [[nodiscard]] const VillageStart* assembledStart(std::int32_t candidateChunkX, std::int32_t candidateChunkZ,
-                                                     std::int64_t seed);
+    /// Shared rather than borrowed: the cache is cleared when it fills, and a pointer into it would
+    /// dangle as soon as another worker triggered that mid-read.
+    [[nodiscard]] std::shared_ptr<const VillageStart> assembledStart(std::int32_t candidateChunkX,
+                                                                     std::int32_t candidateChunkZ, std::int64_t seed);
 
     /// parity: `ChunkGenerator`'s own structure-set generation loop, its real branch for multi-entry
     /// sets: the five real `village_*` structures share one `villages` set, all weight one, and are
@@ -161,7 +164,7 @@ private:
     PoolLookup poolLookup_;
     structure::PoolTemplateLoader templateLoader_;
     mutable std::mutex mutex_;
-    std::map<CandidateKey, VillageStart> cache_;
+    std::map<CandidateKey, std::shared_ptr<const VillageStart>> cache_;
 };
 
 } // namespace basalt::server::world::terrain

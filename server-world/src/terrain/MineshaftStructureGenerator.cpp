@@ -3,6 +3,7 @@
 #include <basalt/server/world/terrain/MineshaftStructureGenerator.hpp>
 
 #include <array>
+#include <memory>
 #include <utility>
 
 namespace basalt::server::world::terrain {
@@ -57,11 +58,11 @@ bool MineshaftStructureGenerator::accepts(std::int64_t seed, std::int32_t chunkX
     // parity: the biome is read at the structure's own start, not at sea level, and vanilla builds
     // that position out of the chunk's middle x but its minimum z. A shaft that ends up in a cave
     // biome is kept on that biome's tag even when the surface above it is ocean.
-    const structure::mineshaftLayout::Assembly& assembly = assemblyOf(seed, chunkX, chunkZ, type);
-    return allows(type, biomeAt_(chunkX * 16 + 8, assembly.stubY, chunkZ * 16));
+    const std::shared_ptr<const structure::mineshaftLayout::Assembly> assembly = assemblyOf(seed, chunkX, chunkZ, type);
+    return allows(type, biomeAt_(chunkX * 16 + 8, assembly->stubY, chunkZ * 16));
 }
 
-const structure::mineshaftLayout::Assembly&
+std::shared_ptr<const structure::mineshaftLayout::Assembly>
 MineshaftStructureGenerator::assemblyOf(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
                                         structure::MineshaftType type) const {
     const std::pair<std::int64_t, structure::MineshaftType> key{
@@ -72,8 +73,8 @@ MineshaftStructureGenerator::assemblyOf(std::int64_t seed, std::int32_t chunkX, 
             return found->second;
         }
     }
-    structure::mineshaftLayout::Assembly assembly = structure::mineshaftLayout::assemble(
-        seed, chunkX, chunkZ, type, seaLevel_, kOverworldHeight.minY(), surfaceHeightAt_);
+    auto assembly = std::make_shared<const structure::mineshaftLayout::Assembly>(structure::mineshaftLayout::assemble(
+        seed, chunkX, chunkZ, type, seaLevel_, kOverworldHeight.minY(), surfaceHeightAt_));
     const std::scoped_lock lock{mutex_};
     if (const auto found = assembled_.find(key); found != assembled_.end()) {
         return found->second;
@@ -104,7 +105,9 @@ void MineshaftStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) 
                 if (!type.has_value() || *type != wanted) {
                     continue;
                 }
-                const std::vector<structure::MineshaftPiece>& pieces = assemblyOf(seed, startX, startZ, *type).pieces;
+                const std::shared_ptr<const structure::mineshaftLayout::Assembly> assembly =
+                    assemblyOf(seed, startX, startZ, *type);
+                const std::vector<structure::MineshaftPiece>& pieces = assembly->pieces;
                 const structure::MineshaftBlocks blocks{*type};
                 for (const structure::MineshaftPiece& piece : pieces) {
                     if (!piece.box.intersects(clip)) {

@@ -250,13 +250,16 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
         jar_.readText, noiseParametersJson::parse, positional, *built->overworldRouter, biomeZoomSeed);
 
     const RealSurfaceEnvironment& surface = *built->overworldSurface;
-    const auto blockBiome = [&surface](std::int32_t x, std::int32_t y, std::int32_t z) {
+    // The return type is spelled out because `auto` would deduce a copy, and a consumer that takes
+    // a `std::function` returning `string_view` would then be handed a view of a temporary that dies
+    // on the way out. The environment interns these names, so the reference outlives every reader.
+    const auto blockBiome = [&surface](std::int32_t x, std::int32_t y, std::int32_t z) -> const std::string& {
         return surface.biomeAt(x, y, z);
     };
-    const auto noiseBiome = [&surface](std::int32_t x, std::int32_t y, std::int32_t z) {
+    const auto noiseBiome = [&surface](std::int32_t x, std::int32_t y, std::int32_t z) -> const std::string& {
         return surface.noiseBiomeAt(x, y, z);
     };
-    const auto quartBiome = [&surface](std::int32_t x, std::int32_t y, std::int32_t z) {
+    const auto quartBiome = [&surface](std::int32_t x, std::int32_t y, std::int32_t z) -> const std::string& {
         return surface.noiseBiomeAt(x >> 2, y >> 2, z >> 2);
     };
     // Two shapes of the same lookup: the pool assembly names templates by string, and the
