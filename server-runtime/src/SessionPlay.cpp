@@ -380,6 +380,9 @@ void ClientSession::enterPlay() {
                oneDecimal(player.x) + ", " + oneDecimal(player.y) + ", " + oneDecimal(player.z) + ")";
     });
     logger_.info([&player] { return player.name() + " joined the game"; });
+    if (options_.plugins.joined) {
+        options_.plugins.joined(player);
+    }
 
     std::vector<play::PlayerInfoEntry> entries;
     entries.reserve(others.size() + 1);
@@ -530,8 +533,14 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         if (command->action == play::PlayerCommandPacket::Action::StopSleeping) {
             wakeUp();
         } else if (command->action == play::PlayerCommandPacket::Action::StartSprinting && session != nullptr) {
+            if (options_.plugins.sprintChanged) {
+                options_.plugins.sprintChanged(*session, true);
+            }
             session->sprinting = true;
         } else if (command->action == play::PlayerCommandPacket::Action::StopSprinting && session != nullptr) {
+            if (options_.plugins.sprintChanged) {
+                options_.plugins.sprintChanged(*session, false);
+            }
             session->sprinting = false;
         }
         return;
@@ -549,6 +558,9 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
             play::ServerboundSetCarriedItemPacket::read(body);
         if (session != nullptr && carried.has_value() && carried->slot >= 0 &&
             carried->slot < PlayerInventory::kHotbarSize) {
+            if (options_.plugins.heldSlotChanged) {
+                options_.plugins.heldSlotChanged(*session, carried->slot, session->inventory.heldSlot());
+            }
             session->inventory.setHeldSlot(carried->slot);
             uiState_->syncHeldAttributes();
         }
@@ -577,6 +589,9 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
     if (packetId == play::ContainerClosePacket::kServerboundId) {
         static_cast<void>(play::ContainerClosePacket::read(body));
         if (session != nullptr) {
+            if (options_.plugins.menuClosed) {
+                options_.plugins.menuClosed(*session, menus_->openMenu.containerId() == 0 ? "player" : "container");
+            }
             menus_->closeOpenMenu(*session);
         }
         return;
@@ -691,6 +706,9 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         const std::int32_t inputs = body.readByte();
         if (session == nullptr || body.failed()) {
             return;
+        }
+        if (options_.plugins.sneakChanged && ((inputs & kSneakInputFlag) != 0) != session->sneaking) {
+            options_.plugins.sneakChanged(*session, (inputs & kSneakInputFlag) != 0);
         }
         session->sneaking = (inputs & kSneakInputFlag) != 0;
         session->inputForward = (inputs & kForwardInputFlag) != 0;

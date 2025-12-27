@@ -165,6 +165,16 @@ public:
         std::function<bool(const player::PlayerSession& player)> swapHandsAllowed;
         /// Whether the server-wide message goes out, and what it says.
         std::function<bool(std::string& message)> broadcastAllowed;
+
+        /// The things a plugin is only told about, never asked. Each is what it says and no more:
+        /// nothing here can refuse, so an unset one is a boolean on the packet path.
+        std::function<void(const player::PlayerSession& player)> joined;
+        std::function<void(const player::PlayerSession& player, bool sprinting)> sprintChanged;
+        std::function<void(const player::PlayerSession& player, bool sneaking)> sneakChanged;
+        std::function<void(const player::PlayerSession& player, std::int32_t slot, std::int32_t fromSlot)>
+            heldSlotChanged;
+        /// `kind` is "player" for the inventory itself and "container" for anything else.
+        std::function<void(const player::PlayerSession& player, std::string_view kind)> menuClosed;
     };
 
     /// Everything the session is handed at construction. A struct rather than forty parameters:

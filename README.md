@@ -5,15 +5,15 @@
 <h2 align="center">Basalt Server</h2>
 
 <p align="center">
-  <strong>A Minecraft server rewritten from scratch in Kotlin/Native. No JVM.</strong>
+  <strong>A Minecraft server rewritten from scratch in C++23. No JVM.</strong>
 </p>
 
 <p align="center">
   <img alt="Minecraft" src="https://img.shields.io/badge/Minecraft-26.2-62B47A?logo=minecraft&logoColor=white">
   <img alt="Protocol" src="https://img.shields.io/badge/protocol-776-62B47A">
-  <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-2.4.10-7F52FF?logo=kotlin&logoColor=white">
-  <img alt="Kotlin/Native" src="https://img.shields.io/badge/Kotlin%2FNative-macOS_%7C_Linux_%7C_Windows-7F52FF?logo=kotlin&logoColor=white">
-  <img alt="Build" src="https://img.shields.io/badge/build-Gradle-02303A?logo=gradle&logoColor=white">
+  <img alt="C++" src="https://img.shields.io/badge/C%2B%2B-23-00599C?logo=cplusplus&logoColor=white">
+  <img alt="Platforms" src="https://img.shields.io/badge/platforms-macOS_%7C_Linux_%7C_Windows-00599C">
+  <img alt="Build" src="https://img.shields.io/badge/build-CMake-064F8C?logo=cmake&logoColor=white">
   <img alt="Plugins" src="https://img.shields.io/badge/plugins-Lua-000080?logo=lua&logoColor=white">
   <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-green">
 </p>
@@ -25,7 +25,7 @@
 ## Overview
 
 Basalt Server is a complete reimplementation of the Minecraft server, written
-entirely in **Kotlin/Native** and shipped as a native binary for each platform.
+entirely in **C++23** and shipped as a native binary for each platform.
 There is no JVM anywhere in the runtime: no bundled JRE, no embedded VM, no hidden
 Java process.
 
@@ -45,7 +45,7 @@ Two goals drive every decision:
 
 | | |
 |---|---|
-| Language | Kotlin/Native, 100 %. No Java, no JVM at runtime |
+| Language | C++23, 100 %. No Java, no JVM at runtime |
 | Target version | Minecraft 26.2 (protocol 776) |
 | Distribution | Native binaries per platform |
 | World storage | Linear regions by default; Anvil worlds are read and converted on load |
@@ -80,9 +80,9 @@ end)
 Text is authored in MiniMessage and rendered through the component model, never
 through legacy colour codes.
 
-The Lua runtime is [BlueLuaK](https://github.com/BluevaDevelopment/BlueLuaK), a
-Kotlin Multiplatform implementation, so it is the same runtime everywhere Basalt
-runs with no native Lua dependency to install.
+The Lua runtime is the official Lua 5.5.1, built from source into the binary, so
+it is the same runtime everywhere Basalt runs with nothing to install alongside
+it.
 
 ## Configuration
 
@@ -130,30 +130,27 @@ git clone --recurse-submodules https://github.com/BasaltProject/Server.git
 In an existing clone, `git submodule update --init` does the same. Without it the
 build fails immediately: half the modules are missing.
 
-Then one command, the same on macOS, Linux and Windows:
+You need CMake 3.28 or newer, Ninja and Clang. Then two commands, the same on
+macOS, Linux and Windows:
 
 ```bash
-./gradlew build
+cmake --preset release
+cmake --build build/release
 ```
 
-It builds and tests a release binary for the machine it runs on and leaves it in
-`build/`, named for what it is:
+That leaves a release binary in `build/release/bin/`, named for what it is:
 
 ```
-build/BasaltServer-26.2.0-dev-macOS-arm64
-build/BasaltServer-26.2.14-Linux-x64
-build/BasaltServer-26.2.14-Windows-x64.exe
+build/release/bin/BasaltServer-26.2.0-dev-macOS-arm64
+build/release/bin/BasaltServer-26.2.14-Linux-x64
+build/release/bin/BasaltServer-26.2.14-Windows-x64.exe
 ```
 
-A build made outside the CI has no build number, so it is `.0-dev`. Gradle
-orchestrates the build and needs JDK 25; the server it produces needs no Java at
-all.
+A build made outside the CI has no build number, so it is `.0-dev`.
 
-Kotlin/Native does not cross-compile between host families, so a machine builds
-its own: `macosArm64` and `macosX64` on macOS, `linuxX64` and `linuxArm64` on
-Linux, `mingwX64` on Windows. Of those, the build makes the one it is running on.
-For the rest there is `-Pbasalt.targets`, and for a debug binary in the same
-place, `-Pbasalt.debug`.
+The tests run with `ctest --preset debug`, and `--preset asan` builds the same
+tree under the address and undefined sanitizers, which is what the CI does on
+every push.
 
 ## Related repositories
 

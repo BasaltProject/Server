@@ -15,7 +15,7 @@ using namespace basalt::server::lua;
 
 namespace {
 
-/// Kotlin prints a Double with a decimal point always present.
+/// A double is printed with a decimal point always present.
 [[nodiscard]] std::string number(double value) {
     std::string text = std::format("{}", value);
     if (text.find('.') == std::string::npos && text.find('e') == std::string::npos) {
