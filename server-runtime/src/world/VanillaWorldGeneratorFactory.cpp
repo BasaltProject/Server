@@ -60,8 +60,10 @@ using wire::common::Identifier;
 
 [[nodiscard]] terrain::JigsawStructureSettings pillagerOutpostSettings() {
     return {.name = "pillager_outpost",
-            .structureIndex = 0,
-            .step = 2,
+            // parity: `pillager_outpost.json` puts it in `surface_structures`, which is step 4, and
+            // it is the tenth of that step in registry order.
+            .structureIndex = 9,
+            .step = 4,
             .startPool = "minecraft:pillager_outpost/base_plates",
             .maxDepth = 7,
             .maxDistanceFromCenter = 80,
@@ -73,14 +75,19 @@ using wire::common::Identifier;
 
 [[nodiscard]] terrain::JigsawStructureSettings trailRuinsSettings() {
     return {.name = "trail_ruins",
-            .structureIndex = 0,
-            .step = 6,
+            // parity: `trail_ruins.json` puts it in `underground_structures`, step 3, after the
+            // buried treasure and the two mineshafts.
+            .structureIndex = 3,
+            .step = 3,
             .startPool = "minecraft:trail_ruins/tower",
             .maxDepth = 7,
             .maxDistanceFromCenter = 80,
-            .heightSource = terrain::JigsawHeightSource::Drawn,
+            // parity: `trail_ruins.json` gives a constant `start_height` of -15 and projects the
+            // start to `WORLD_SURFACE_WG`. Drawing a height instead both puts the ruins at the wrong
+            // depth and spends a draw the jar never spends, which moves the whole assembly after it.
+            .projectStartToHeightmap = true,
+            .heightSource = terrain::JigsawHeightSource::Surface,
             .startY = -15,
-            .startYMax = -5,
             .adjustment = terrain::TerrainAdjustment::Bury,
             .passWorldSeed = true};
 }
@@ -102,15 +109,17 @@ using wire::common::Identifier;
 
 [[nodiscard]] terrain::JigsawStructureSettings trialChamberSettings() {
     return {.name = "trial_chambers",
-            .structureIndex = 1,
-            .step = 7,
+            // parity: `trial_chambers.json` puts it in `underground_structures`, step 3, as the last
+            // of that step's five entries.
+            .structureIndex = 4,
+            .step = 3,
             .startPool = "minecraft:trial_chambers/chamber/end",
             .maxDepth = 20,
             .maxDistanceFromCenter = 116,
             .heightSource = terrain::JigsawHeightSource::Drawn,
             .startY = -40,
             .startYMax = -20,
-            .adjustment = terrain::TerrainAdjustment::BeardBox,
+            .adjustment = terrain::TerrainAdjustment::Encapsulate,
             .startRecords = terrain::JigsawStartRecords::FromFirstPiece,
             .cacheCapacity = 16};
 }
