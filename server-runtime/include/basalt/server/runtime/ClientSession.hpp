@@ -538,6 +538,20 @@ private:
     std::atomic<bool> closeWhenDrained_{false};
     std::jthread outbound_;
 
+    /// What every task this session hands another owner carries with it.
+    ///
+    /// A task queued on the world's owner runs on the tick thread one turn later, and the client
+    /// can be gone by then: the socket closes on its own thread and this session is destroyed the
+    /// moment `run` returns. The task asks `alive` before touching anything of this session's, and
+    /// the destructor waits for whoever is already inside one, which is the half a flag alone
+    /// cannot do.
+    struct OwnerWork {
+        std::atomic<bool> alive{true};
+        std::atomic<std::int32_t> running{0};
+    };
+
+    std::shared_ptr<OwnerWork> ownerWork_{std::make_shared<OwnerWork>()};
+
     /// Remembered, not passed around: the only reader is the failure path in `run`, and knowing
     /// which packet a decoder died on is the difference between a one-line fix and a hunt.
     std::int32_t lastPacketId_ = -1;

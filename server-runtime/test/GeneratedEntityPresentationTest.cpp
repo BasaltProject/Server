@@ -76,6 +76,25 @@ TEST_CASE("a sheep's colour and its shearing share one byte") {
     CHECK(std::get<SetEntityDataPacket::ByteValue>(wool->value).value == (4 | 0x10));
 }
 
+TEST_CASE("a panda's genes go where the client keeps bytes, not where it keeps counters") {
+    // parity: `Panda` defines UNHAPPY_COUNTER, SNEEZE_COUNTER and EAT_COUNTER at 18, 19 and 20, so
+    // its two genes are 21 and 22. A byte at 19 is an integer field to the client, and it answers
+    // by dropping the connection, which is why this is pinned rather than left to reading.
+    NbtCompound data;
+    data.putString("MainGene", "weak");
+    data.putString("HiddenGene", "brown");
+
+    const std::vector<SetEntityDataPacket::Entry> entries = generatedEntityMetadata("panda", data);
+    CHECK(entryAt(entries, 19) == nullptr);
+    CHECK(entryAt(entries, 20) == nullptr);
+    const SetEntityDataPacket::Entry* main = entryAt(entries, 21);
+    REQUIRE(main != nullptr);
+    CHECK(std::get<SetEntityDataPacket::ByteValue>(main->value).value == 5);
+    const SetEntityDataPacket::Entry* hidden = entryAt(entries, 22);
+    REQUIRE(hidden != nullptr);
+    CHECK(std::get<SetEntityDataPacket::ByteValue>(hidden->value).value == 4);
+}
+
 TEST_CASE("a villager carries its trade and the flag that says it was chosen") {
     NbtCompound villager;
     villager.putString("type", "minecraft:taiga");

@@ -75,6 +75,19 @@ ClientSession::ClientSession(wire::io::TcpConnection connection, Options options
 ClientSession::~ClientSession() {
     streaming_.store(false);
     outbox_.close();
+    // Joined here rather than left to the member's own destructor: it is the thread that hands work
+    // to the world's owner, so nothing below means anything while it is still running.
+    if (outbound_.joinable()) {
+        outbound_.request_stop();
+        outbound_.join();
+    }
+    // Nothing queued will run from here on, and whatever is already inside a task is waited for.
+    // The tick thread is holding a pointer to this session while it runs one, and it does not get a
+    // second chance to be right about it.
+    ownerWork_->alive.store(false);
+    while (ownerWork_->running.load() > 0) {
+        std::this_thread::yield();
+    }
 }
 
 std::optional<std::string> ClientSession::remoteAddress() const {
@@ -92,7 +105,15 @@ void ClientSession::onOwner(std::function<void()> work) {
         return;
     }
     sched::Owner& owner = regionOwner_ == nullptr ? world->owner() : *regionOwner_;
-    static_cast<void>(owner.submit(std::move(work)));
+    static_cast<void>(owner.submit([work = std::move(work), guard = ownerWork_] {
+        // Counted before the question is asked, so a destructor that has already asked its own sees
+        // this one and waits, rather than freeing the session out from under it.
+        guard->running.fetch_add(1);
+        if (guard->alive.load()) {
+            work();
+        }
+        guard->running.fetch_sub(1);
+    }));
 }
 
 void ClientSession::handOverToRegionOf(world::LoadedWorld& world) {
