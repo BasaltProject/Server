@@ -44,6 +44,10 @@ constexpr int kDatabaseExitCode = 4;
 
 constexpr std::string_view kLogRoot = "./.basalt/logs";
 
+/// Where a crash report goes. The server's own, not the project's: the proxy has its own tracker and
+/// its own half of the code.
+constexpr std::string_view kIssuesUrl = "https://github.com/BasaltProject/Server/issues";
+
 // Raw string, and deliberately not indented: the art is full of backslashes, and every leading
 // space in it is significant.
 constexpr std::string_view kBanner = R"(
@@ -193,7 +197,7 @@ int main(int argc, char** argv) {
 
     // Before anything that could fail: a crash from here on says what it was and where, instead of
     // leaving the operator with one line from their shell.
-    wire::common::panic::install("Basalt Server", std::string{buildInfo::kVersion});
+    wire::common::panic::install("Basalt Server", std::string{buildInfo::kVersion}, std::string{kIssuesUrl});
 
     // No prompts and no TTY detection: identical behaviour interactive, headless or containerized.
     // `--accept-eula` is a deliberate operator act, not a fallback.

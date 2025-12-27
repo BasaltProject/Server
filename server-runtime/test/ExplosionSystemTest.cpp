@@ -58,7 +58,9 @@ struct Fixture {
             packets.push_back(id);
         };
         connection.hurt = [this](float amount, std::string_view, const Identifier&,
-                               const std::optional<basalt::server::runtime::entity::DamageSource>&) { hurt += amount; };
+                                 const std::optional<basalt::server::runtime::entity::DamageSource>&) {
+            hurt += amount;
+        };
         player = std::make_unique<PlayerSession>(Uuid{1, 1}, "Steve", 1, std::move(connection));
         player->worldName = "world";
         registry.add(player.get());

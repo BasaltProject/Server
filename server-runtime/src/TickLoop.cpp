@@ -220,9 +220,11 @@ void TickLoop::stop() {
         sleepMillis(kSweepPollMillis);
         waited += kSweepPollMillis;
     }
-    // Never called from the ticker itself: `BasaltServer::shutdown` moves off it first, because a
-    // thread that joins itself is a hard error and a detached one would outlive what it reads.
-    if (ticker_.joinable()) {
+    // A stop from inside the tick itself (a signal noticed mid-tick, `/stop` run on the owner) is
+    // the ticker asking to join itself, which is a hard error. It is left to finish its own turn
+    // and the destructor does the join, because that one runs on whoever is tearing the server
+    // down and never on the ticker.
+    if (ticker_.joinable() && ticker_.get_id() != std::this_thread::get_id()) {
         ticker_.join();
     }
     if (sweeper_.joinable()) {
