@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <cmath>
 #include <set>
 
 namespace basalt::server::runtime::world {
@@ -226,9 +227,16 @@ void LoadedWorld::warmSpawnArea(std::int32_t spawnRadiusChunks) {
         }
     }
     static_cast<void>(generationQueue_.awaitAll(positions));
-    spawn_ = fixedSpawn ? std::array<double, 3>{metadata_.spawnX + 0.5, static_cast<double>(metadata_.spawnY),
-                                                metadata_.spawnZ + 0.5}
-                        : spawnBlock(centre.first, centre.second);
+    if (fixedSpawn) {
+        spawn_ = {metadata_.spawnX + 0.5, static_cast<double>(metadata_.spawnY), metadata_.spawnZ + 0.5};
+        return;
+    }
+    spawn_ = spawnBlock(centre.first, centre.second);
+    // parity: `setInitialSpawn` writes the climate search's answer into the level data, so a world picks
+    // its spawn once and every later boot reads it back instead of searching the same terrain again.
+    spawnOverride_ = std::array<std::int32_t, 3>{static_cast<std::int32_t>(std::floor(spawn_[0])),
+                                                 static_cast<std::int32_t>(spawn_[1]),
+                                                 static_cast<std::int32_t>(std::floor(spawn_[2]))};
 }
 
 void LoadedWorld::stashEntities(const std::vector<Chunk*>& chunks) {

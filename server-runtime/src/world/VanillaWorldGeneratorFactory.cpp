@@ -212,7 +212,9 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
         SpawnEquipmentJar{.entriesUnder = nullptr, .readText = jar_.readText});
 
     const std::int64_t biomeZoomSeed = obfuscateBiomeSeed(seed);
-    const random::PositionalRandomFactory positional = random::PositionalRandomFactory::xoroshiro(seed, 0);
+    // parity: `RandomState` forks the factory off a seeded source, so the two longs it draws are what
+    // seeds every noise. Building the factory straight from the level seed generates another world.
+    const random::PositionalRandomFactory positional = random::RandomSource::xoroshiro(seed).forkPositional();
     // parity: `RandomState` wires `BlendedNoise` from `random.fromHashOf("minecraft:terrain")`.
     random::RandomSource terrainSource = positional.fromHashOf("minecraft:terrain");
     const densityfunction::Function base3d =
@@ -452,8 +454,8 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::nether(st
     built->netherBiomes = std::make_unique<terrain::NetherBiomeSource>(built->netherRouter->temperature,
                                                                        built->netherRouter->vegetation, biomeZoomSeed);
     built->netherSurface = std::make_unique<NetherSurfaceEnvironment>(
-        jar_.readText, noiseParametersJson::parse, random::PositionalRandomFactory::legacy(seed), *built->netherRouter,
-        *built->netherBiomes, biomeZoomSeed);
+        jar_.readText, noiseParametersJson::parse, random::RandomSource::legacy(seed).forkPositional(),
+        *built->netherRouter, *built->netherBiomes, biomeZoomSeed);
     built->netherStructures = std::make_unique<terrain::NetherStructureGenerator>(
         *built->netherRouter, *built->netherBiomes, built->loader->templateLoader(),
         [&loader = *built->loader](std::string_view name) { return loader.pool(name); });

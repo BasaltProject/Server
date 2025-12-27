@@ -66,12 +66,14 @@ bool StructureSpawnLists::isInNetherFortressBounds(std::string_view category, st
     if (category != "monster") {
         return false;
     }
-    const server::world::Chunk* below = world_->state().chunkIfLoaded(pos.x >> 4, pos.z >> 4);
-    if (below == nullptr) {
+    // Through the world and not the chunk: a spawn candidate sits as low as the world's floor, so
+    // the block under it is below the bedrock. The world answers that with nothing, which is the
+    // no this wants; the chunk throws, and the whole spawning turn died with it on a void world.
+    const std::optional<std::int32_t> state = world_->state().blockState(pos.x, pos.y - 1, pos.z);
+    if (!state.has_value()) {
         return false;
     }
-    const std::int32_t state = below->blockStateId(pos.x & 15, pos.y - 1, pos.z & 15);
-    const std::optional<registry::BlockState> block = registry::blocks::byStateId(state);
+    const std::optional<registry::BlockState> block = registry::blocks::byStateId(*state);
     if (!block.has_value() || block->block.path() != "nether_bricks") {
         return false;
     }
