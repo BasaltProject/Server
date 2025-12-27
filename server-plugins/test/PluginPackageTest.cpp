@@ -309,3 +309,25 @@ TEST_CASE("a built package answers the same questions as a folder") {
 
     std::filesystem::remove_all(root, ignored);
 }
+
+TEST_CASE("a module is named the way lua names one") {
+    const auto file = [](std::string_view module) { return packageLayout::moduleFile(module).value_or("<no>"); };
+
+    CHECK(file("coins") == "src/coins.lua");
+    CHECK(file("util.money") == "src/util/money.lua");
+    CHECK(file("a.b.c") == "src/a/b/c.lua");
+
+    // Writing the extension is not a second way to say `coins`: the dot separates, so it asks for
+    // a file that is not there rather than for that one under another name.
+    CHECK(file("coins.lua") == "src/coins/lua.lua");
+
+    // Neither is a path.
+    CHECK(file("util/money") == "<no>");
+    CHECK(file("") == "<no>");
+    CHECK(file(".coins") == "<no>");
+    CHECK(file("coins.") == "<no>");
+    CHECK(file("util..money") == "<no>");
+    // `..` cannot climb out of `src/`, whichever separator it is written with.
+    CHECK(file("...") == "<no>");
+    CHECK(file("..\\..\\etc") == "<no>");
+}

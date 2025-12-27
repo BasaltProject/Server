@@ -29,6 +29,8 @@ struct PluginMenuItem {
     std::int32_t count = 1;
     /// MiniMessage on the plugin's side, parsed into a component when the window is drawn.
     std::optional<std::string> name;
+    /// One line each, the same way.
+    std::vector<std::string> lore;
 };
 
 /// Container, menu, inventory and crafting state: every window this player can have open, and what
