@@ -2,6 +2,7 @@
 
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/structure/MineshaftFill.hpp>
+#include <basalt/server/world/structure/MineshaftLayout.hpp>
 #include <basalt/server/world/structure/StructurePlacementGrid.hpp>
 
 #include <cstdint>
@@ -10,6 +11,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace basalt::server::world::terrain {
@@ -23,8 +25,11 @@ public:
 
     /// `normalBiomes` is `#minecraft:has_structure/mineshaft` and `mesaBiomes` is
     /// `#minecraft:has_structure/mineshaft_mesa`, both read from the jar by the caller.
+    /// `surfaceHeightAt` is only read by the mesa variant, which is lifted to the surface.
     MineshaftStructureGenerator(BiomeAt biomeAt, std::set<std::string, std::less<>> normalBiomes,
-                                std::set<std::string, std::less<>> mesaBiomes, std::int32_t seaLevel = 63);
+                                std::set<std::string, std::less<>> mesaBiomes,
+                                structure::mineshaftLayout::SurfaceHeightAt surfaceHeightAt = {},
+                                std::int32_t seaLevel = 63);
 
     /// Writes into `chunk` whatever any nearby mineshaft puts there.
     void generateInto(Chunk& chunk, std::int64_t seed);
@@ -38,18 +43,24 @@ private:
 
     [[nodiscard]] bool allows(structure::MineshaftType type, const std::string& biome) const;
 
+    /// Whether a shaft of this type survives the biome check at its own start.
+    [[nodiscard]] bool accepts(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                               structure::MineshaftType type) const;
+
     /// Assembling a shaft is expensive and every chunk it touches asks for the same one, so the
     /// result is shared behind a lock.
-    [[nodiscard]] const std::vector<structure::MineshaftPiece>&
-    piecesOf(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ, structure::MineshaftType type);
+    [[nodiscard]] const structure::mineshaftLayout::Assembly&
+    assemblyOf(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ, structure::MineshaftType type) const;
 
     BiomeAt biomeAt_;
     std::set<std::string, std::less<>> normalBiomes_;
     std::set<std::string, std::less<>> mesaBiomes_;
+    structure::mineshaftLayout::SurfaceHeightAt surfaceHeightAt_;
     std::int32_t seaLevel_;
     structure::StructurePlacementGrid grid_;
     mutable std::mutex mutex_;
-    std::map<std::int64_t, std::vector<structure::MineshaftPiece>> assembled_;
+    mutable std::map<std::pair<std::int64_t, structure::MineshaftType>, structure::mineshaftLayout::Assembly>
+        assembled_;
 };
 
 } // namespace basalt::server::world::terrain

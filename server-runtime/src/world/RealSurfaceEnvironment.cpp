@@ -101,7 +101,14 @@ const std::string& RealSurfaceEnvironment::nameOf(std::string_view biome) const 
     if (known != biomeNames_.end()) {
         return known->second;
     }
-    return biomeNames_.emplace(std::string{biome}, std::string{biome}).first->second;
+    // The overworld's table names its biomes by path alone while the Nether's and the End's carry the
+    // namespace, and everything downstream compares against full identifiers: surface rules, biome
+    // tags and the sets structures are built with. Interning is the one place all three pass through.
+    std::string full{biome};
+    if (full.find(':') == std::string::npos) {
+        full.insert(0, "minecraft:");
+    }
+    return biomeNames_.emplace(std::string{biome}, std::move(full)).first->second;
 }
 
 const std::string& RealSurfaceEnvironment::biomeAt(std::int32_t x, std::int32_t y, std::int32_t z) const {

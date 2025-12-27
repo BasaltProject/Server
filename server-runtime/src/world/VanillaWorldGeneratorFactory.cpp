@@ -280,7 +280,7 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
 
     built->mineshafts = std::make_unique<terrain::MineshaftStructureGenerator>(
         blockBiome, biomesOf(tags, "minecraft:has_structure/mineshaft"),
-        biomesOf(tags, "minecraft:has_structure/mineshaft_mesa"));
+        biomesOf(tags, "minecraft:has_structure/mineshaft_mesa"), surfaceHeight);
     built->ruinedPortals = std::make_unique<terrain::RuinedPortalStructureGenerator>(
         ruinedPortalVariants::overworld(tags), templateOf, blockBiome, surfaceHeight, oceanFloor,
         [&columns](std::int32_t x, std::int32_t y, std::int32_t z) { return columns.isSolid(x, y, z); });

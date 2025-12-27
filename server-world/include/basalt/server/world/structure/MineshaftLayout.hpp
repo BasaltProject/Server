@@ -5,6 +5,7 @@
 #include <basalt/server/world/structure/StructureTransform.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <vector>
 
@@ -38,9 +39,20 @@ struct MineshaftPiece {
 /// against a live world's `structures.starts` before a plank is placed.
 namespace mineshaftLayout {
 
+/// An assembled mineshaft: its pieces and the position vanilla reports as the structure's start.
+struct Assembly {
+    std::vector<MineshaftPiece> pieces;
+    /// parity: `findGenerationPoint` starts at y 50 and offsets by whatever the vertical move applied,
+    /// and that is the y whose biome decides whether the mineshaft is kept.
+    std::int32_t stubY = 0;
+};
+
+/// The `WORLD_SURFACE_WG` height of a column, which only the mesa variant needs.
+using SurfaceHeightAt = std::function<std::int32_t(std::int32_t, std::int32_t)>;
+
 /// The pieces of the mineshaft starting at `chunkX`/`chunkZ`, in the order vanilla adds them.
-[[nodiscard]] std::vector<MineshaftPiece> assemble(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
-                                                   MineshaftType type, std::int32_t seaLevel, std::int32_t minY);
+[[nodiscard]] Assembly assemble(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ, MineshaftType type,
+                                std::int32_t seaLevel, std::int32_t minY, const SurfaceHeightAt& surfaceHeightAt = {});
 
 } // namespace mineshaftLayout
 
