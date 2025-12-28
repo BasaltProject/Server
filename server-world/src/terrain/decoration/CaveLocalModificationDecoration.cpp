@@ -6,6 +6,7 @@
 #include <basalt/server/world/terrain/decoration/CaveLocalModificationDecoration.hpp>
 #include <basalt/server/world/terrain/decoration/OreBlockRules.hpp>
 #include <basalt/server/world/terrain/decoration/OverworldBiomePaths.hpp>
+#include <basalt/server/world/terrain/decoration/StoneBlockTags.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
 #include <algorithm>
@@ -65,10 +66,7 @@ const PathSet& geodeInvalidBlocks() {
     return paths;
 }
 
-const PathSet& baseStoneOverworld() {
-    static const PathSet paths = {"stone", "granite", "diorite", "andesite", "tuff", "deepslate"};
-    return paths;
-}
+const PathSet& baseStoneOverworld() { return stoneBlockTags::baseStoneOverworld(); }
 
 [[nodiscard]] DecorationPos offset(const DecorationPos& position, std::int32_t dx, std::int32_t dy, std::int32_t dz) {
     return DecorationPos{.x = position.x + dx, .y = position.y + dy, .z = position.z + dz};

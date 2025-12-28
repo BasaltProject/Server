@@ -78,9 +78,7 @@ const JigsawStructureSettings& trialChamber() {
         .startYMax = -20,
         // `encapsulate` adds density rather than carving.
         .adjustment = TerrainAdjustment::Encapsulate,
-        // Gap: the frozen Kotlin records no start for a chamber, so neither does this. It is the one
-        // thing here the jar does that both implementations still miss.
-        .startRecords = JigsawStartRecords::None,
+        .startRecords = JigsawStartRecords::FromFirstPiece,
         .cacheCapacity = 16,
     };
     return built;

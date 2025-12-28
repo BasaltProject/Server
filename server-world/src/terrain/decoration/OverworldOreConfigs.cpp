@@ -1,5 +1,6 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/OverworldOreConfigs.hpp>
+#include <basalt/server/world/terrain/decoration/StoneBlockTags.hpp>
 
 #include <map>
 #include <stdexcept>
@@ -45,20 +46,11 @@ namespace {
     };
 }
 
-const BlockSet& baseStoneOverworld() {
-    static const BlockSet blocks = {"stone", "granite", "diorite", "andesite", "tuff", "deepslate"};
-    return blocks;
-}
+const BlockSet& baseStoneOverworld() { return stoneBlockTags::baseStoneOverworld(); }
 
-const BlockSet& stoneOreReplaceables() {
-    static const BlockSet blocks = {"stone", "granite", "diorite", "andesite"};
-    return blocks;
-}
+const BlockSet& stoneOreReplaceables() { return stoneBlockTags::stoneOreReplaceables(); }
 
-const BlockSet& deepslateOreReplaceables() {
-    static const BlockSet blocks = {"deepslate", "tuff"};
-    return blocks;
-}
+const BlockSet& deepslateOreReplaceables() { return stoneBlockTags::deepslateOreReplaceables(); }
 
 const BlockSet& mountainBiomes() {
     static const BlockSet blocks = {"windswept_hills",  "windswept_gravelly_hills",

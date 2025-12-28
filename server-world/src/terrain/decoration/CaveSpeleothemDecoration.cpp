@@ -4,6 +4,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/CaveSpeleothemDecoration.hpp>
+#include <basalt/server/world/terrain/decoration/StoneBlockTags.hpp>
 
 #include <algorithm>
 #include <array>
@@ -87,10 +88,7 @@ struct CaveColumn {
     return colon == std::string_view::npos ? id : id.substr(colon + 1);
 }
 
-const PathSet& baseStoneOverworld() {
-    static const PathSet paths = {"stone", "granite", "diorite", "andesite", "tuff", "deepslate"};
-    return paths;
-}
+const PathSet& baseStoneOverworld() { return stoneBlockTags::baseStoneOverworld(); }
 
 const PathSet& sulfurReplaceable() {
     static const PathSet paths = {"sulfur", "cinnabar"};
