@@ -22,6 +22,7 @@ constexpr std::int32_t kStructureReferenceRange = 8;
 constexpr std::int32_t kEndCityStructureIndex = 2;
 constexpr std::int32_t kSurfaceStructuresStep = 4;
 constexpr std::string_view kEndCityLootTable = "minecraft:chests/end_city_treasure";
+constexpr std::string_view kName = "end_city";
 constexpr StructurePos kZero{0, 0, 0};
 
 constexpr std::array<StructureRotation, 4> kRotations{StructureRotation::None, StructureRotation::Clockwise90,
@@ -187,6 +188,21 @@ void EndCityStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {
         random::setDecorationSeed(random, seed, chunk.chunkX() * 16, chunk.chunkZ() * 16);
     random::setFeatureSeed(random, decorationSeed, kEndCityStructureIndex, kSurfaceStructuresStep);
     for (const CityReference& reference : references) {
+        // The blocks alone leave the chunk unable to say what it holds: without the start nothing
+        // knows a position is inside a city. parity: the start belongs to the chunk it began in.
+        std::vector<StructureBoundingBox> boxes;
+        boxes.reserve(reference.pieces->size());
+        for (const endCityPieces::Piece& piece : *reference.pieces) {
+            boxes.push_back(piece.boundingBox);
+        }
+        if (std::optional<structure::StructureStartRecord> start =
+                structure::StructureStartRecord::of(std::string{kName}, reference.chunkX, reference.chunkZ, boxes)) {
+            // The full box covers the whole city; the pieces kept are the ones this chunk holds,
+            // which is all a question about a position inside it can need.
+            std::erase_if(start->pieces,
+                          [&clip](const StructureBoundingBox& piece) { return !piece.intersects(clip); });
+            chunk.structures().add(std::move(*start));
+        }
         for (const endCityPieces::Piece& piece : *reference.pieces) {
             if (piece.piece == nullptr || !piece.boundingBox.intersects(clip)) {
                 continue;

@@ -203,6 +203,8 @@ VillageStructureGenerator::assembledStart(std::int32_t candidateChunkX, std::int
     random::setLargeFeatureSeed(random, seed, candidateChunkX, candidateChunkZ);
     Samplers samplers;
     VillageStart built;
+    built.chunkX = candidateChunkX;
+    built.chunkZ = candidateChunkZ;
     built.variant = selectVariant(candidateChunkX, candidateChunkZ, seed, samplers);
     if (built.variant != nullptr) {
         built.pieces =
@@ -262,6 +264,22 @@ void VillageStructureGenerator::generateInto(Chunk& chunk, std::int32_t chunkX, 
         for (const std::shared_ptr<const VillageStart>& start : starts) {
             if (start->variant != variant) {
                 continue;
+            }
+            // Without the start the chunk cannot say it holds a village, however many houses of it
+            // are standing here. parity: the start belongs to the chunk the village began in, and
+            // each biome's village is its own structure in the registry.
+            std::vector<StructureBoundingBox> boxes;
+            boxes.reserve(start->pieces.size());
+            for (const PlacedStructurePiece& piece : start->pieces) {
+                boxes.push_back(piece.boundingBox);
+            }
+            if (std::optional<structure::StructureStartRecord> record = structure::StructureStartRecord::of(
+                    std::string{variant->id.path()}, start->chunkX, start->chunkZ, boxes)) {
+                // The full box covers the whole village; the pieces kept are the ones this chunk
+                // holds, which is all a question about a position inside it can need.
+                std::erase_if(record->pieces,
+                              [&clip](const StructureBoundingBox& piece) { return !piece.intersects(clip); });
+                chunk.structures().add(std::move(*record));
             }
             for (const PlacedStructurePiece& piece : start->pieces) {
                 if (!piece.boundingBox.intersects(clip)) {
