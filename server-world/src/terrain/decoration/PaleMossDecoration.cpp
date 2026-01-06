@@ -3,6 +3,7 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/world/terrain/decoration/JavaHashSetOrder.hpp>
 #include <basalt/server/world/terrain/decoration/PaleMossDecoration.hpp>
 #include <basalt/server/world/terrain/decoration/SimpleBlockFeature.hpp>
 
@@ -96,28 +97,6 @@ const std::set<std::string, std::less<>>& mossReplaceablePaths() {
 }
 
 /// The bucket iteration order of vanilla's `HashSet<BlockPos>`, which is observable here because the
-/// vegetation draws once per position.
-[[nodiscard]] std::vector<DecorationPos> javaHashSetOrder(const std::vector<DecorationPos>& positions) {
-    if (positions.empty()) {
-        return {};
-    }
-    std::size_t capacity = 16;
-    while (positions.size() > capacity * 3 / 4) {
-        capacity *= 2;
-    }
-    std::vector<DecorationPos> ordered;
-    ordered.reserve(positions.size());
-    for (std::size_t bucket = 0; bucket < capacity; ++bucket) {
-        for (const DecorationPos& position : positions) {
-            const std::int32_t hash = (position.y + position.z * 31) * 31 + position.x;
-            const std::uint32_t spread = static_cast<std::uint32_t>(hash) ^ (static_cast<std::uint32_t>(hash) >> 16U);
-            if ((spread & static_cast<std::uint32_t>(capacity - 1)) == bucket) {
-                ordered.push_back(position);
-            }
-        }
-    }
-    return ordered;
-}
 
 void placeVegetation(Chunk& chunk, random::RandomSource& random, random::RandomSource& mossyCarpetRandom,
                      const DecorationPos& ground) {

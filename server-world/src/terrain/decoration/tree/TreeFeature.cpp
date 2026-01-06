@@ -1,6 +1,6 @@
 #include <basalt/server/registry/BlockStateFamilies.hpp>
 #include <basalt/server/registry/Blocks.hpp>
-#include <basalt/server/world/terrain/decoration/tree/JavaHashSetOrder.hpp>
+#include <basalt/server/world/terrain/decoration/JavaHashSetOrder.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeFeature.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeFeatureDecorators.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeHelpers.hpp>
@@ -19,52 +19,6 @@ constexpr std::int32_t kMaxLeafDistance = 7;
 constexpr std::array<std::array<std::int32_t, 3>, 6> kBlockNeighbours{
     std::array<std::int32_t, 3>{0, -1, 0}, std::array<std::int32_t, 3>{0, 1, 0},  std::array<std::int32_t, 3>{0, 0, -1},
     std::array<std::int32_t, 3>{0, 0, 1},  std::array<std::int32_t, 3>{-1, 0, 0}, std::array<std::int32_t, 3>{1, 0, 0}};
-
-/// The bucket iteration order of vanilla's `HashSet<BlockPos>`, which the decorators see.
-[[nodiscard]] std::vector<BlockPos> javaHashSetOrder(const std::vector<BlockPos>& positions) {
-    if (positions.empty()) {
-        return {};
-    }
-    std::size_t capacity = 16;
-    while (positions.size() > capacity * 3 / 4) {
-        capacity *= 2;
-    }
-    std::vector<BlockPos> ordered;
-    ordered.reserve(positions.size());
-    for (std::size_t bucket = 0; bucket < capacity; ++bucket) {
-        for (const BlockPos& position : positions) {
-            const std::int32_t hash = (position.y + position.z * 31) * 31 + position.x;
-            const std::uint32_t spread = static_cast<std::uint32_t>(hash) ^ (static_cast<std::uint32_t>(hash) >> 16U);
-            if ((spread & static_cast<std::uint32_t>(capacity - 1)) == bucket) {
-                ordered.push_back(position);
-            }
-        }
-    }
-    return ordered;
-}
-
-/// parity: the leaf buckets are `Sets.newHashSet()`, so the order the jar takes them in is a hash
-/// order and not the order they went in. It matters because a leaf reached twice is written twice.
-class OrderedPositions {
-public:
-    void add(const BlockPos& position) { static_cast<void>(order_.add(position)); }
-
-    [[nodiscard]] bool empty() const noexcept { return order_.empty(); }
-
-    [[nodiscard]] bool contains(const BlockPos& position) const { return order_.contains(position); }
-
-    /// Takes whichever entry the jar's iterator would answer first, which is what it removes.
-    [[nodiscard]] BlockPos takeFirst() {
-        const BlockPos position = order_.first();
-        static_cast<void>(order_.remove(position));
-        return position;
-    }
-
-    [[nodiscard]] std::vector<BlockPos> inOrder() const { return order_.inOrder(); }
-
-private:
-    JavaHashSetOrder order_;
-};
 
 enum class PlacementPhase : std::uint8_t { Root, Log, Leaf, Decoration };
 
@@ -101,8 +55,8 @@ public:
     }
 
 private:
-    [[nodiscard]] static std::vector<BlockPos> sorted(const OrderedPositions& positions) {
-        std::vector<BlockPos> ordered = javaHashSetOrder(positions.inOrder());
+    [[nodiscard]] static std::vector<BlockPos> sorted(const JavaHashSetOrder<BlockPos>& positions) {
+        std::vector<BlockPos> ordered = positions.inOrder();
         std::stable_sort(ordered.begin(), ordered.end(),
                          [](const BlockPos& a, const BlockPos& b) { return a.y < b.y; });
         return ordered;
@@ -110,10 +64,10 @@ private:
 
     const Chunk* chunk_;
     PlacementPhase phase_ = PlacementPhase::Root;
-    OrderedPositions logs_;
-    OrderedPositions leaves_;
-    OrderedPositions roots_;
-    OrderedPositions decorations_;
+    JavaHashSetOrder<BlockPos> logs_;
+    JavaHashSetOrder<BlockPos> leaves_;
+    JavaHashSetOrder<BlockPos> roots_;
+    JavaHashSetOrder<BlockPos> decorations_;
 };
 
 /// parity: `TreeFeature.getMaxFreeTreeHeight`.
@@ -164,7 +118,9 @@ void updateLeaves(Chunk& chunk, const TreeDecoratorContext& context) {
         return pos.x >= minX && pos.x <= maxX && pos.y >= minY && pos.y <= maxY && pos.z >= minZ && pos.z <= maxZ;
     };
 
-    std::array<OrderedPositions, kMaxLeafDistance> toCheck;
+    // parity: the leaf buckets are `Sets.newHashSet()`, so which of two paths reaches a leaf
+    // second, and therefore which distance it keeps, is decided by that hash order.
+    std::array<JavaHashSetOrder<BlockPos>, kMaxLeafDistance> toCheck;
     for (const BlockPos& log : context.logs) {
         toCheck[0].add(log);
     }

@@ -134,7 +134,6 @@ basalt_module(server-world
     src/terrain/decoration/TreeDecoration.cpp
     src/terrain/decoration/TreePatchDecoration.cpp
     src/terrain/decoration/tree/FallenTreeFeature.cpp
-    src/terrain/decoration/tree/JavaHashSetOrder.cpp
     src/terrain/decoration/tree/MangroveRootPlacer.cpp
     src/terrain/decoration/tree/TreeBlockRules.cpp
     src/terrain/decoration/tree/TreeBranchingTrunkPlacers.cpp
