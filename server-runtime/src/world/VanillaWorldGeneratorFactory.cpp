@@ -432,12 +432,20 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::nether(st
         biomesOf(*built->tags, "minecraft:has_structure/mineshaft_mesa"));
 
     Built& world = *built;
+    // The Nether's springs, patches and blobs read the block next to them, so decoration needs the
+    // neighbours' undecorated terrain, exactly like the Overworld's.
+    built->neighbours =
+        std::make_unique<terrain::NeighbourTerrainCache>([&world](std::int32_t neighbourX, std::int32_t neighbourZ) {
+            return terrain::dimensionTerrainGenerator::netherTerrain(*world.netherRouter, *world.netherBiomes,
+                                                                     neighbourX, neighbourZ, world.netherSurface.get(),
+                                                                     world.seed, world.netherStructures.get());
+        });
     Generators answer;
     answer.generate = [&world](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t gameTime,
                                const std::string& difficulty) {
         server::world::Chunk chunk = terrain::dimensionTerrainGenerator::nether(
             *world.netherRouter, *world.netherBiomes, chunkX, chunkZ, world.netherSurface.get(), world.seed,
-            world.netherStructures.get());
+            world.netherStructures.get(), world.neighbours.get());
         if (world.spawnMobs) {
             const std::expected<Identifier, wire::common::IdentifierError> biome =
                 Identifier::parse(world.netherBiomes->biomeAt(chunkX << 4, chunk.verticalBounds().maxY(), chunkZ << 4));

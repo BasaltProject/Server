@@ -239,7 +239,7 @@ TEST_CASE("the pipelines generate what the frozen kotlin generates") {
 
     SUBCASE("otherSeed") { check(runOverworld(77, 0), 116480, 6144, -5150231774236398971LL); }
 
-    SUBCASE("nether") { check(runNether(1234, 0.0, 0.0), 33082, 4096, -6295919273274973332LL); }
+    SUBCASE("nether") { check(runNether(1234, 0.0, 0.0), 33082, 4096, -4176307358586819173LL); }
 
     SUBCASE("netherOther") { check(runNether(77, 0.4, 0.0), 34390, 4096, -36632428756019527LL); }
 

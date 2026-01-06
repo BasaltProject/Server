@@ -137,30 +137,30 @@ struct RunAt {
 TEST_CASE("the nether vegetal step places what the frozen kotlin places") {
     SUBCASE("crimsonStep") {
         const Run result = runStep("minecraft:crimson_forest", "crimson_nylium", 12, -1, false);
-        CHECK(result.placed == 7227);
+        CHECK(result.placed == 7232);
         CHECK(result.deferred == 1335);
-        CHECK(result.checksum == -6776116247678658538LL);
+        CHECK(result.checksum == -7404685675944845863LL);
     }
 
     SUBCASE("warpedStep") {
         const Run result = runStep("minecraft:warped_forest", "warped_nylium", 12, -1, false);
-        CHECK(result.placed == 6908);
+        CHECK(result.placed == 6913);
         CHECK(result.deferred == 1109);
-        CHECK(result.checksum == 5015220838742974609LL);
+        CHECK(result.checksum == -4187614241718651774LL);
     }
 
     SUBCASE("wastesStep") {
         const Run result = runStep("minecraft:nether_wastes", "netherrack", 12, -1, false);
-        CHECK(result.placed == 1);
+        CHECK(result.placed == 6);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 907310211892432118LL);
+        CHECK(result.checksum == 958350344332094253LL);
     }
 
     SUBCASE("step_spring_lava") {
         const Run result = runStep("minecraft:crimson_forest", "crimson_nylium", 12, 0, false);
-        CHECK(result.placed == 1);
+        CHECK(result.placed == 6);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 8974891502348516086LL);
+        CHECK(result.checksum == 3869784222657742637LL);
     }
 
     SUBCASE("step_brown_mushroom_normal") {

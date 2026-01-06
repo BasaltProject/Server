@@ -101,10 +101,10 @@ const PathSet& baseStoneNether() {
         const std::int32_t adjacentX = x + direction[0];
         const std::int32_t adjacentY = y + direction[1];
         const std::int32_t adjacentZ = z + direction[2];
-        if (!isInChunk(chunk, adjacentX, adjacentZ) || adjacentY < bounds.minY() || adjacentY > bounds.maxY()) {
+        if (adjacentY < bounds.minY() || adjacentY > bounds.maxY()) {
             continue;
         }
-        if (registry::blocks::isAir(chunk.blockStateId(adjacentX & 15, adjacentY, adjacentZ & 15))) {
+        if (registry::blocks::isAir(chunk.decorationBlockStateId(adjacentX, adjacentY, adjacentZ))) {
             return true;
         }
     }
@@ -113,15 +113,9 @@ const PathSet& baseStoneNether() {
 
 [[nodiscard]] bool canPlace(const Chunk& chunk, std::int32_t worldX, std::int32_t y, std::int32_t worldZ, Target target,
                             bool discardOnAirExposure) {
-    std::int32_t stateId = 0;
-    if (isInChunk(chunk, worldX, worldZ)) {
-        stateId = chunk.blockStateId(worldX & 15, y, worldZ & 15);
-    } else {
-        if (target != Target::Netherrack || discardOnAirExposure) {
-            return false;
-        }
-        stateId = stateIdOf("netherrack");
-    }
+    // parity: `OreFeature` asks the level, which reaches into the neighbours. Guessing netherrack
+    // for everything outside approved veins over cells that hold air, lava or bedrock.
+    const std::int32_t stateId = chunk.decorationBlockStateId(worldX, y, worldZ);
     const std::string path = pathOf(stateId);
     if (path.empty()) {
         return false;

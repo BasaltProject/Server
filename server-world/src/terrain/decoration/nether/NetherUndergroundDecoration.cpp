@@ -144,11 +144,13 @@ const Spring& closedSpring() {
 [[nodiscard]] std::optional<std::int32_t> terrainStateAt(const Chunk& chunk, std::int32_t x, std::int32_t y,
                                                          std::int32_t z) {
     const ChunkHeight bounds = chunk.verticalBounds();
-    const bool inChunk = (x >> 4) == chunk.chunkX() && (z >> 4) == chunk.chunkZ();
-    if (!inChunk || y < bounds.minY() || y > bounds.maxY()) {
+    if (y < bounds.minY() || y > bounds.maxY()) {
         return std::nullopt;
     }
-    return chunk.blockStateId(x & 15, y, z & 15);
+    // parity: `SpringFeature` counts the rocks and the holes around itself through the level, so a
+    // spring on a chunk border sees the next chunk. Refusing the outside made five rocks impossible
+    // there, and `spring_closed` never placed a source in an edge column.
+    return chunk.decorationBlockStateId(x, y, z);
 }
 
 [[nodiscard]] std::string blockPathAt(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z) {

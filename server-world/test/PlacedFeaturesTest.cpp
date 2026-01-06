@@ -385,7 +385,7 @@ TEST_CASE("every placed feature places what the frozen kotlin places") {
         deferred += chunk.takeGeneratedBlockWrites().size();
         after = random.nextInt();
     }
-    CHECK(deferred == 44);
-    CHECK(static_cast<std::int64_t>(checksum) == -8152315433557779845LL);
+    CHECK(deferred == 71);
+    CHECK(static_cast<std::int64_t>(checksum) == 4539318681170738607LL);
     CHECK(after == -1699011601);
 }

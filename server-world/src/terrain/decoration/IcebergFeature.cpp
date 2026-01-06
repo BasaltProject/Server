@@ -46,8 +46,6 @@ constexpr DecorationPos kZero{0, 0, 0};
         scale = (1.0F - static_cast<float>(adjustedY) / (static_cast<float>(height) * k * 0.4F)) *
                 static_cast<float>(width);
     }
-    if (height > 15) {
-    }
     return wire::common::toIntLikeJava(static_cast<double>(std::ceil(scale / 2.0F)));
 }
 
