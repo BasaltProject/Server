@@ -386,6 +386,6 @@ TEST_CASE("every placed feature places what the frozen kotlin places") {
         after = random.nextInt();
     }
     CHECK(deferred == 44);
-    CHECK(static_cast<std::int64_t>(checksum) == 7090619636410780399LL);
+    CHECK(static_cast<std::int64_t>(checksum) == 5059768779474310261LL);
     CHECK(after == -1699011601);
 }

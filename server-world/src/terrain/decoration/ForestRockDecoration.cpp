@@ -46,20 +46,21 @@ const std::set<std::string, std::less<>>& supportBlocks() {
     return paths;
 }
 
-/// Outside the chunk reads as air and writes are dropped: this feature is chunk-local by
-/// construction, unlike the patch features which defer across the border.
+/// parity: a boulder is up to three blobs whose origin drifts by one per blob, so its body reaches
+/// past the chunk edge often. Vanilla writes there through the `WorldGenLevel`; dropping those writes
+/// loses the half of every boulder that a neighbouring chunk seeded. Coordinates are world ones.
 [[nodiscard]] std::int32_t get(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z) {
     const ChunkHeight bounds = chunk.verticalBounds();
-    if (x >= 0 && x < 16 && z >= 0 && z < 16 && y >= bounds.minY() && y <= bounds.maxY()) {
-        return chunk.blockStateId(x, y, z);
+    if (y < bounds.minY() || y > bounds.maxY()) {
+        return registry::blocks::air().stateId;
     }
-    return registry::blocks::air().stateId;
+    return chunk.decorationBlockStateId(x, y, z);
 }
 
 void set(Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
     const ChunkHeight bounds = chunk.verticalBounds();
-    if (x >= 0 && x < 16 && z >= 0 && z < 16 && y >= bounds.minY() && y <= bounds.maxY()) {
-        chunk.setBlockStateId(x, y, z, stateId);
+    if (y >= bounds.minY() && y <= bounds.maxY()) {
+        chunk.setDecorationBlockStateId(x, y, z, stateId);
     }
 }
 
@@ -117,14 +118,16 @@ void forestRockDecoration::decorate(Chunk& chunk, std::int64_t seed,
     for (std::int32_t attempt = 0; attempt < 2; ++attempt) {
         const std::int32_t localX = random.nextInt(16);
         const std::int32_t localZ = random.nextInt(16);
-        const std::int32_t y = chunk.heightAt(localX, localZ, HeightmapType::WorldSurface);
+        // parity: `forest_rock`'s placement asks for `MOTION_BLOCKING`, not the world surface, so the
+        // ferns and the grass of an old growth taiga do not lift the boulder a block.
+        const std::int32_t y = chunk.heightAt(localX, localZ, HeightmapType::MotionBlocking);
         const std::int32_t worldX = chunk.chunkX() * 16 + localX;
         const std::int32_t worldZ = chunk.chunkZ() * 16 + localZ;
         if (oldGrowthTaigaBiomes().find(biomePath(environment.biomeAt(worldX, y, worldZ))) ==
             oldGrowthTaigaBiomes().end()) {
             continue;
         }
-        placeAt(chunk, random, localX, y, localZ);
+        placeAt(chunk, random, worldX, y, worldZ);
     }
 }
 

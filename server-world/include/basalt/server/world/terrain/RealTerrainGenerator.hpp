@@ -87,7 +87,7 @@ private:
 
 /// The decoration steps of one already-generated terrain, in their official order.
 void decorate(GeneratedTerrain& terrain, std::int64_t seed = 0, const NeighbourTerrain* neighbours = nullptr,
-              JigsawStructureGenerator* ancientCity = nullptr, const structure::TemplateLoader& templates = nullptr);
+              const TerrainStructureGenerators& generators = {}, const structure::TemplateLoader& templates = nullptr);
 
 [[nodiscard]] Chunk generate(const OverworldNoiseRouter& router, const surface::SurfaceRuleEnvironment& environment,
                              std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed = 0,
