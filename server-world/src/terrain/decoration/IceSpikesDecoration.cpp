@@ -43,19 +43,20 @@ const std::set<std::int32_t>& icePatchTargetStateIds() {
     return ids;
 }
 
-/// Chunk-local by construction: outside reads as air and outside writes are dropped.
+/// parity: La puia y el parche de hielo tienen radio, asi que cruzan el borde a menudo. Vanilla escribe ahi
+/// por el `WorldGenLevel`; recortar pierde el trozo que asoma. Coordenadas de mundo.
 [[nodiscard]] std::int32_t get(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z) {
     const ChunkHeight bounds = chunk.verticalBounds();
-    if (x >= 0 && x < 16 && z >= 0 && z < 16 && y >= bounds.minY() && y <= bounds.maxY()) {
-        return chunk.blockStateId(x, y, z);
+    if (y < bounds.minY() || y > bounds.maxY()) {
+        return registry::blocks::air().stateId;
     }
-    return registry::blocks::air().stateId;
+    return chunk.decorationBlockStateId(x, y, z);
 }
 
 void set(Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
     const ChunkHeight bounds = chunk.verticalBounds();
-    if (x >= 0 && x < 16 && z >= 0 && z < 16 && y >= bounds.minY() && y <= bounds.maxY()) {
-        chunk.setBlockStateId(x, y, z, stateId);
+    if (y >= bounds.minY() && y <= bounds.maxY()) {
+        chunk.setDecorationBlockStateId(x, y, z, stateId);
     }
 }
 
@@ -150,9 +151,9 @@ void placeIcePatch(Chunk& chunk, random::RandomSource& random, const DecorationP
     }
 }
 
-[[nodiscard]] bool isIceSpikesBiome(const Chunk& chunk, const surface::SurfaceRuleEnvironment& environment,
-                                    std::int32_t localX, std::int32_t y, std::int32_t localZ) {
-    const std::string& id = environment.biomeAt(chunk.chunkX() * 16 + localX, y, chunk.chunkZ() * 16 + localZ);
+[[nodiscard]] bool isIceSpikesBiome(const surface::SurfaceRuleEnvironment& environment, std::int32_t worldX,
+                                    std::int32_t y, std::int32_t worldZ) {
+    const std::string& id = environment.biomeAt(worldX, y, worldZ);
     const std::size_t colon = id.find(':');
     return (colon == std::string::npos ? id : id.substr(colon + 1)) == "ice_spikes";
 }
@@ -184,22 +185,27 @@ void iceSpikesDecoration::decorate(Chunk& chunk, std::int64_t seed,
         random::setDecorationSeed(random, seed, chunk.chunkX() * 16, chunk.chunkZ() * 16);
     random::setFeatureSeed(random, decorationSeed, kIceSpikeGlobalIndex, kSurfaceStructuresStep);
     for (std::int32_t attempt = 0; attempt < 3; ++attempt) {
-        const std::int32_t x = random.nextInt(16);
-        const std::int32_t z = random.nextInt(16);
-        const std::int32_t y = chunk.heightAt(x, z, HeightmapType::WorldSurface);
-        if (!isIceSpikesBiome(chunk, environment, x, y, z)) {
+        const std::int32_t localX = random.nextInt(16);
+        const std::int32_t localZ = random.nextInt(16);
+        const std::int32_t y = chunk.heightAt(localX, localZ, HeightmapType::WorldSurface);
+        const std::int32_t worldX = chunk.chunkX() * 16 + localX;
+        const std::int32_t worldZ = chunk.chunkZ() * 16 + localZ;
+        if (!isIceSpikesBiome(environment, worldX, y, worldZ)) {
             continue;
         }
-        placeSpike(chunk, random, DecorationPos{x, y, z});
+        placeSpike(chunk, random, DecorationPos{worldX, y, worldZ});
     }
 
     random::setFeatureSeed(random, decorationSeed, kIcePatchGlobalIndex, kSurfaceStructuresStep);
     for (std::int32_t attempt = 0; attempt < 2; ++attempt) {
-        const std::int32_t x = random.nextInt(16);
-        const std::int32_t z = random.nextInt(16);
-        const std::int32_t y = chunk.heightAt(x, z, HeightmapType::WorldSurface) - 1;
-        if (get(chunk, x, y, z) == stateIdOf("snow_block") && isIceSpikesBiome(chunk, environment, x, y, z)) {
-            placeIcePatch(chunk, random, DecorationPos{x, y, z});
+        const std::int32_t localX = random.nextInt(16);
+        const std::int32_t localZ = random.nextInt(16);
+        const std::int32_t y = chunk.heightAt(localX, localZ, HeightmapType::WorldSurface) - 1;
+        const std::int32_t worldX = chunk.chunkX() * 16 + localX;
+        const std::int32_t worldZ = chunk.chunkZ() * 16 + localZ;
+        if (get(chunk, worldX, y, worldZ) == stateIdOf("snow_block") &&
+            isIceSpikesBiome(environment, worldX, y, worldZ)) {
+            placeIcePatch(chunk, random, DecorationPos{worldX, y, worldZ});
         }
     }
 }

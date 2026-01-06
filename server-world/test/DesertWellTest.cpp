@@ -73,7 +73,8 @@ namespace {
         basalt::server::random::RandomSource random =
             basalt::server::random::RandomSource::worldgen(basalt::server::random::RandomSource::legacy(
                 static_cast<std::int64_t>(818181ULL + static_cast<std::uint64_t>(index) * 6364136223846793005ULL)));
-        desertWellDecoration::placeAt(chunk, random, 5, 70, 5);
+        // `placeAt` takes world coordinates, like the placed-feature registry hands it.
+        desertWellDecoration::placeAt(chunk, random, chunk.chunkX() * 16 + 5, 70, chunk.chunkZ() * 16 + 5);
         const auto [chunkChecksum, chunkSandstone, chunkSuspicious] = fold(chunk);
         checksum.feed(chunkChecksum);
         sandstone += chunkSandstone;
