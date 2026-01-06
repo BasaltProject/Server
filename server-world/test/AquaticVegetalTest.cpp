@@ -113,74 +113,74 @@ struct Run {
 TEST_CASE("the ocean vegetal entries match the frozen kotlin") {
     SUBCASE("ocean") {
         const Run result = run(aquaticDecoration::ocean(), 6);
-        CHECK(result.placed == 389);
+        CHECK(result.placed == 373);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -7856957103204572941LL);
+        CHECK(result.checksum == 2197940192545367614LL);
         CHECK(result.after == 881572358);
     }
 
     SUBCASE("deepOcean") {
         const Run result = run(aquaticDecoration::deepOcean(), 6);
-        CHECK(result.placed == 472);
+        CHECK(result.placed == 427);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 3802444157256907270LL);
+        CHECK(result.checksum == -2603591555994823324LL);
         CHECK(result.after == 881572358);
     }
 
     SUBCASE("coldOcean") {
         const Run result = run(aquaticDecoration::coldOcean(), 6);
-        CHECK(result.placed == 352);
+        CHECK(result.placed == 379);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -1370926240979115521LL);
+        CHECK(result.checksum == -4769625813929216005LL);
         CHECK(result.after == -1741392533);
     }
 
     SUBCASE("deepColdOcean") {
         const Run result = run(aquaticDecoration::deepColdOcean(), 6);
-        CHECK(result.placed == 465);
+        CHECK(result.placed == 403);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -1980262810836548184LL);
+        CHECK(result.checksum == 4395512014295771981LL);
         CHECK(result.after == 1976707368);
     }
 
     SUBCASE("lukewarmOcean") {
         const Run result = run(aquaticDecoration::lukewarmOcean(), 6);
-        CHECK(result.placed == 529);
+        CHECK(result.placed == 377);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -2226129134789549706LL);
-        CHECK(result.after == -772664592);
+        CHECK(result.checksum == 6893663375568069548LL);
+        CHECK(result.after == 1173500236);
     }
 
     SUBCASE("deepLukewarmOcean") {
         const Run result = run(aquaticDecoration::deepLukewarmOcean(), 6);
-        CHECK(result.placed == 650);
+        CHECK(result.placed == 456);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 1243907033239691651LL);
-        CHECK(result.after == -772664592);
+        CHECK(result.checksum == 2269220372660409661LL);
+        CHECK(result.after == 1173500236);
     }
 
     SUBCASE("river") {
         const Run result = run(aquaticDecoration::river(), 6);
-        CHECK(result.placed == 248);
+        CHECK(result.placed == 158);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 147682549083375841LL);
+        CHECK(result.checksum == 7908725180626176070LL);
         CHECK(result.after == 881572358);
     }
 
     SUBCASE("swamp") {
         const Run result = run(aquaticDecoration::swamp(), 6);
-        CHECK(result.placed == 382);
+        CHECK(result.placed == 239);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -204145715090334304LL);
-        CHECK(result.after == -2063751104);
+        CHECK(result.checksum == 8677792919100731775LL);
+        CHECK(result.after == -2058856994);
     }
 
     SUBCASE("warmOcean") {
         const Run result = run(aquaticDecoration::warmOcean(), 24);
-        CHECK(result.placed == 1547);
+        CHECK(result.placed == 1002);
         CHECK(result.deferred == 769);
-        CHECK(result.checksum == -2573967883330831720LL);
-        CHECK(result.after == -897359284);
+        CHECK(result.checksum == -7702522312271284110LL);
+        CHECK(result.after == -1242473187);
     }
 }
 

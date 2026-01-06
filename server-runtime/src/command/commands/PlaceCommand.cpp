@@ -172,7 +172,7 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
         random::RandomSource random =
             random::RandomSource::worldgen(random::RandomSource::xoroshiro(nextSeed_ ? nextSeed_() : 0));
         if (placement != nullptr) {
-            (*placement)(*chunk, random, at[0] & 15, at[1], at[2] & 15);
+            (*placement)(*chunk, random, at[0], at[1], at[2]);
         } else {
             // Features that need more than a chunk: the End's own, fossils, the freeze pass and
             // template-backed sulfur roots. Refuse instead of half-placing one without its context.
@@ -184,7 +184,7 @@ void PlaceCommand::build(const CommandNodeBuilder& root) const {
                     [&world](std::int32_t x, std::int32_t y, std::int32_t z) {
                         return (*world)->state().blockState(x, y, z).value_or(reg::blocks::air().stateId);
                     }};
-            if (!(*contextual)(*chunk, random, at[0] & 15, at[1], at[2] & 15, built)) {
+            if (!(*contextual)(*chunk, random, at[0], at[1], at[2], built)) {
                 return std::unexpected{CommandSyntaxError{
                     .component = Component::text(
                         "'" + id->toString() + "' needs something world '" + (*world)->name() +

@@ -1,5 +1,7 @@
+#include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/PendingChunkDecorations.hpp>
 #include <basalt/server/world/terrain/decoration/OreBlockRules.hpp>
+#include <basalt/server/world/terrain/decoration/VegetationBlockRules.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeBlockRules.hpp>
 
 #include <utility>
@@ -38,6 +40,13 @@ void applyGeneratedBlockWrite(Chunk& chunk, const ChunkGeneratedBlockWrite& writ
         write.policy == GeneratedBlockWritePolicy::Tree
             ? server::world::terrain::decoration::tree::treeBlockRules::resolveDeferredState(current, write.stateId)
             : write.stateId;
+    // The ground this plant was validated against may have been refused, or replaced by whatever the
+    // receiving chunk generated. A plant with nothing under it breaks on the first block update.
+    const std::int32_t below = write.y > chunk.verticalBounds().minY() ? chunk.blockStateId(localX, write.y - 1, localZ)
+                                                                       : registry::blocks::air().stateId;
+    if (!server::world::terrain::decoration::vegetationBlockRules::survivesDeferred(stateId, below)) {
+        return;
+    }
     chunk.setBlockStateId(localX, write.y, localZ, stateId);
 }
 
