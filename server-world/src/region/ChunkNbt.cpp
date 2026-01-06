@@ -435,44 +435,62 @@ namespace {
     return entity;
 }
 
+void decodeStructureStart(const NbtTag& entry, std::vector<structure::StructureStartRecord>& into) {
+    const NbtCompound* startTag = entry.get<NbtCompound>();
+    if (startTag == nullptr) {
+        return;
+    }
+    std::vector<structure::StructureBoundingBox> pieces;
+    if (const NbtList* children = startTag->getList("Children")) {
+        for (const NbtTag& child : *children) {
+            const NbtCompound* childTag = child.get<NbtCompound>();
+            if (childTag == nullptr) {
+                continue;
+            }
+            if (const std::optional<structure::StructureBoundingBox> piece = arrayToBox(childTag->getIntArray("BB"))) {
+                pieces.push_back(*piece);
+            }
+        }
+    }
+    std::optional<structure::StructureBoundingBox> bounds = arrayToBox(startTag->getIntArray("BB"));
+    if (!bounds.has_value()) {
+        // parity: `StructureStart.createTag` never writes the start's own box, and
+        // `getBoundingBox()` works it out from the pieces. A world from vanilla has no `BB` at all.
+        for (const structure::StructureBoundingBox& piece : pieces) {
+            bounds = bounds.has_value() ? bounds->encapsulating(piece) : piece;
+        }
+    }
+    if (!bounds.has_value()) {
+        return;
+    }
+    // parity: a start that found no place writes itself as `INVALID` rather than being left out.
+    if (startTag->getString("id") == "INVALID") {
+        return;
+    }
+    const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(startTag->getString("id"));
+    if (!id.has_value()) {
+        return;
+    }
+    into.push_back({id->path(), startTag->getInt("ChunkX"), startTag->getInt("ChunkZ"), *bounds, std::move(pieces)});
+}
+
 void decodeStructures(const NbtCompound* tag, structure::ChunkStructures& into) {
     if (tag == nullptr) {
         return;
     }
-    const NbtList* starts = tag->getList("starts");
-    if (starts == nullptr) {
-        return;
-    }
     std::vector<structure::StructureStartRecord> records;
-    for (const NbtTag& entry : *starts) {
-        const NbtCompound* startTag = entry.get<NbtCompound>();
-        if (startTag == nullptr) {
-            continue;
+    if (const NbtList* starts = tag->getList("starts"); starts != nullptr) {
+        for (const NbtTag& entry : *starts) {
+            decodeStructureStart(entry, records);
         }
-        const std::optional<structure::StructureBoundingBox> bounds = arrayToBox(startTag->getIntArray("BB"));
-        if (!bounds.has_value()) {
-            continue;
+    } else if (const NbtCompound* byName = tag->getCompound("starts"); byName != nullptr) {
+        // A world coming from vanilla keys its starts by structure id instead of listing them, and
+        // each one repeats its own id inside. Reading only the list shape lost every structure an
+        // imported world had, silently: no `/locate`, and nothing that asks whether a position is
+        // inside one.
+        for (const NbtTag& entry : byName->values()) {
+            decodeStructureStart(entry, records);
         }
-        std::vector<structure::StructureBoundingBox> pieces;
-        if (const NbtList* children = startTag->getList("Children")) {
-            for (const NbtTag& child : *children) {
-                const NbtCompound* childTag = child.get<NbtCompound>();
-                if (childTag == nullptr) {
-                    continue;
-                }
-                if (const std::optional<structure::StructureBoundingBox> piece =
-                        arrayToBox(childTag->getIntArray("BB"))) {
-                    pieces.push_back(*piece);
-                }
-            }
-        }
-        const std::expected<Identifier, wire::common::IdentifierError> id =
-            Identifier::parse(startTag->getString("id"));
-        if (!id.has_value()) {
-            continue;
-        }
-        records.push_back(
-            {id->path(), startTag->getInt("ChunkX"), startTag->getInt("ChunkZ"), *bounds, std::move(pieces)});
     }
     into.restore(std::move(records));
 }

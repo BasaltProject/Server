@@ -47,6 +47,12 @@ struct StructureBoundingBox {
                minY <= other.maxY && maxY >= other.minY;
     }
 
+    /// parity: `BoundingBox.encapsulate`, the smallest box holding both.
+    [[nodiscard]] constexpr StructureBoundingBox encapsulating(const StructureBoundingBox& other) const noexcept {
+        return {std::min(minX, other.minX), std::min(minY, other.minY), std::min(minZ, other.minZ),
+                std::max(maxX, other.maxX), std::max(maxY, other.maxY), std::max(maxZ, other.maxZ)};
+    }
+
     [[nodiscard]] static constexpr StructureBoundingBox fromCorners(StructurePos first, StructurePos second) noexcept {
         return {std::min(first.x, second.x), std::min(first.y, second.y), std::min(first.z, second.z),
                 std::max(first.x, second.x), std::max(first.y, second.y), std::max(first.z, second.z)};
