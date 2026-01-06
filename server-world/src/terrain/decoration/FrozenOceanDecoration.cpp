@@ -109,11 +109,19 @@ bool isFrozenWater(const std::int32_t stateId) {
     return block != nullptr && block->path() == "water";
 }
 
+std::int64_t ChunkFeatureRegion::keyOf(const DecorationPos& position) noexcept {
+    // Packed, not mixed: an overlay only ever holds positions a few dozen blocks apart, so twenty six
+    // bits of each horizontal coordinate tell them apart and the height goes in unsigned.
+    constexpr std::int64_t kHorizontalMask = 0x3FFFFFF;
+    constexpr std::int64_t kHeightBias = 2048;
+    return ((static_cast<std::int64_t>(position.x) & kHorizontalMask) << 38) |
+           ((static_cast<std::int64_t>(position.z) & kHorizontalMask) << 12) |
+           ((static_cast<std::int64_t>(position.y) + kHeightBias) & 0xFFF);
+}
+
 std::int32_t ChunkFeatureRegion::get(const DecorationPos& position) const {
-    for (const auto& [written, stateId] : changes_) {
-        if (written == position) {
-            return stateId;
-        }
+    if (const auto found = byPosition_.find(keyOf(position)); found != byPosition_.end()) {
+        return changes_[found->second].second;
     }
     const ChunkHeight bounds = chunk_->verticalBounds();
     if (position.y < bounds.minY() || position.y > bounds.maxY()) {
@@ -130,11 +138,10 @@ void ChunkFeatureRegion::set(const DecorationPos& position, const std::int32_t s
     if (position.y < bounds.minY() || position.y > bounds.maxY()) {
         return;
     }
-    for (auto& [written, existing] : changes_) {
-        if (written == position) {
-            existing = stateId;
-            return;
-        }
+    const auto [found, fresh] = byPosition_.try_emplace(keyOf(position), changes_.size());
+    if (!fresh) {
+        changes_[found->second].second = stateId;
+        return;
     }
     changes_.emplace_back(position, stateId);
 }
