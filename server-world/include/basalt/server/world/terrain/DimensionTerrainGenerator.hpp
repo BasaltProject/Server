@@ -6,10 +6,12 @@
 #include <basalt/server/world/terrain/NetherBiomeSource.hpp>
 #include <basalt/server/world/terrain/NetherStructureGenerator.hpp>
 #include <basalt/server/world/terrain/NoiseRouterData.hpp>
+#include <basalt/server/world/terrain/RealTerrainGenerator.hpp>
 #include <basalt/server/world/terrain/TheEndBiomeSource.hpp>
 #include <basalt/server/world/terrain/surface/SurfaceRuleEnvironment.hpp>
 
 #include <cstdint>
+#include <functional>
 
 namespace basalt::server::world::terrain::dimensionTerrainGenerator {
 
@@ -20,7 +22,8 @@ namespace basalt::server::world::terrain::dimensionTerrainGenerator {
 [[nodiscard]] Chunk nether(const NetherNoiseRouter& router, const NetherBiomeSource& biomeSource, std::int32_t chunkX,
                            std::int32_t chunkZ, const surface::SurfaceRuleEnvironment* surfaceEnvironment = nullptr,
                            std::int64_t seed = 0, NetherStructureGenerator* structureGenerator = nullptr,
-                           NeighbourTerrainCache* neighbours = nullptr);
+                           NeighbourTerrainCache* neighbours = nullptr,
+                           const realTerrainGenerator::BeforeDecoration& beforeDecoration = {});
 
 /// The same chunk stopped before decoration, which is what a neighbour read is allowed to see.
 /// Generating a decorated neighbour would recurse.
@@ -32,6 +35,7 @@ namespace basalt::server::world::terrain::dimensionTerrainGenerator {
 /// parity: `noise_settings/end.json` base shape, block default and cell sizes.
 [[nodiscard]] Chunk end(const EndNoiseRouter& router, const TheEndBiomeSource& biomeSource, std::int32_t chunkX,
                         std::int32_t chunkZ, std::int64_t seed = 0,
-                        EndCityStructureGenerator* structureGenerator = nullptr);
+                        EndCityStructureGenerator* structureGenerator = nullptr,
+                        const realTerrainGenerator::BeforeDecoration& beforeDecoration = {});
 
 } // namespace basalt::server::world::terrain::dimensionTerrainGenerator

@@ -73,10 +73,12 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
         options.strongholdGenerator = built.strongholds;
         options.spawnChunkFinder = built.spawnChunk;
         if (built.generate) {
-            options.normalGenerator = [generate = built.generate](std::int32_t chunkX, std::int32_t chunkZ,
-                                                                  std::int64_t gameTime, std::string_view difficulty) {
-                return generate(chunkX, chunkZ, gameTime, std::string{difficulty});
-            };
+            options.normalGenerator =
+                [generate = built.generate](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t gameTime,
+                                            std::string_view difficulty,
+                                            const std::function<void(server::world::Chunk&)>& beforeDecoration) {
+                    return generate(chunkX, chunkZ, gameTime, std::string{difficulty}, beforeDecoration);
+                };
         }
         built_.insert_or_assign(declaration.name, std::move(built));
     }

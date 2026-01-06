@@ -138,6 +138,12 @@ public:
     /// already there if two workers raced on the same position.
     server::world::Chunk& install(server::world::Chunk chunk);
 
+    /// Delivers whatever a neighbour queued for this chunk while it did not exist. parity: vanilla
+    /// writes a feature that crosses a chunk edge straight into the neighbour's proto chunk, so the
+    /// chunk decorates on top of it and reads it while doing so. Called between terrain and
+    /// decoration, which is the same point.
+    void applyPendingWritesTo(server::world::Chunk& chunk);
+
     /// Hands the chunk over to be installed, or installs it here when nobody owns this world.
     void installLater(server::world::Chunk chunk);
 

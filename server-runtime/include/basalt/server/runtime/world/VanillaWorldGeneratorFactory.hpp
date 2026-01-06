@@ -43,8 +43,12 @@ public:
     /// The generator is handed back because `/place structure` and `/locate structure` need the very
     /// object generation uses: a second one built from the same seed would still be a second one.
     struct Generators {
+        /// `beforeDecoration` runs on the finished terrain, before the chunk decorates itself: it is
+        /// where a write a neighbour queued for this chunk gets delivered, which is the point vanilla
+        /// has it because there the neighbour is already a proto chunk.
         std::function<server::world::Chunk(std::int32_t chunkX, std::int32_t chunkZ, std::int64_t gameTime,
-                                           const std::string& difficulty)>
+                                           const std::string& difficulty,
+                                           const std::function<void(server::world::Chunk&)>& beforeDecoration)>
             generate;
         server::world::terrain::VillageStructureGenerator* villages = nullptr;
         server::world::terrain::StrongholdStructureGenerator* strongholds = nullptr;

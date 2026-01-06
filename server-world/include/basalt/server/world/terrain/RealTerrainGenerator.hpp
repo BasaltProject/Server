@@ -21,6 +21,7 @@
 #include <basalt/server/world/terrain/surface/SurfaceRuleEnvironment.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 
 namespace basalt::server::world::terrain {
@@ -89,11 +90,17 @@ private:
 void decorate(GeneratedTerrain& terrain, std::int64_t seed = 0, const NeighbourTerrain* neighbours = nullptr,
               const TerrainStructureGenerators& generators = {}, const structure::TemplateLoader& templates = nullptr);
 
+/// Run on the finished terrain, before its decoration. parity: vanilla writes a feature that crosses
+/// a chunk edge straight into the neighbour's proto chunk, so a chunk always decorates on top of what
+/// its neighbours already left there. This is where a write we had to queue gets the same standing.
+using BeforeDecoration = std::function<void(Chunk&)>;
+
 [[nodiscard]] Chunk generate(const OverworldNoiseRouter& router, const surface::SurfaceRuleEnvironment& environment,
                              std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed = 0,
                              const TerrainStructureGenerators& generators = {},
                              NeighbourTerrainCache* neighbours = nullptr,
-                             const structure::TemplateLoader& templates = nullptr);
+                             const structure::TemplateLoader& templates = nullptr,
+                             const BeforeDecoration& beforeDecoration = {});
 
 } // namespace realTerrainGenerator
 

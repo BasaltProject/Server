@@ -49,7 +49,8 @@ struct LoadedWorldOptions {
     std::function<std::pair<std::int32_t, std::int32_t>()> spawnChunkFinder;
     /// A generator the server built for this dimension, which is what a real server passes.
     std::function<server::world::Chunk(std::int32_t chunkX, std::int32_t chunkZ, std::int64_t gameTime,
-                                       std::string_view difficulty)>
+                                       std::string_view difficulty,
+                                       const std::function<void(server::world::Chunk&)>& beforeDecoration)>
         normalGenerator;
     std::int32_t generationWorkers = 1;
     /// Who hands out the regions this world is ticked in. The server passes its own, so every
@@ -258,7 +259,9 @@ private:
     server::world::terrain::VillageStructureGenerator* villageGenerator_ = nullptr;
     server::world::terrain::StrongholdStructureGenerator* strongholdGenerator_ = nullptr;
     std::function<std::pair<std::int32_t, std::int32_t>()> spawnChunkFinder_;
-    std::function<server::world::Chunk(std::int32_t, std::int32_t, std::int64_t, std::string_view)> normalGenerator_;
+    std::function<server::world::Chunk(std::int32_t, std::int32_t, std::int64_t, std::string_view,
+                                       const std::function<void(server::world::Chunk&)>&)>
+        normalGenerator_;
     sched::RegionScheduler ownScheduler_;
     sched::RegionScheduler& scheduler_;
     sched::Region* region_ = nullptr;

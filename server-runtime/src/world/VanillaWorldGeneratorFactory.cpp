@@ -332,10 +332,11 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
     answer.villages = built->village.get();
     answer.strongholds = built->strongholds.get();
     answer.generate = [&world](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t gameTime,
-                               const std::string& difficulty) {
+                               const std::string& difficulty,
+                               const std::function<void(server::world::Chunk&)>& beforeDecoration) {
         server::world::Chunk chunk = terrain::realTerrainGenerator::generate(
             *world.overworldRouter, *world.overworldSurface, chunkX, chunkZ, world.seed, world.generators,
-            world.neighbours.get(), world.loader->templateLoader());
+            world.neighbours.get(), world.loader->templateLoader(), beforeDecoration);
         if (world.spawnMobs) {
             const std::expected<Identifier, wire::common::IdentifierError> biome = Identifier::parse(
                 world.overworldSurface->biomeAt(chunkX << 4, chunk.verticalBounds().maxY(), chunkZ << 4));
@@ -442,10 +443,11 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::nether(st
         });
     Generators answer;
     answer.generate = [&world](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t gameTime,
-                               const std::string& difficulty) {
+                               const std::string& difficulty,
+                               const std::function<void(server::world::Chunk&)>& beforeDecoration) {
         server::world::Chunk chunk = terrain::dimensionTerrainGenerator::nether(
             *world.netherRouter, *world.netherBiomes, chunkX, chunkZ, world.netherSurface.get(), world.seed,
-            world.netherStructures.get(), world.neighbours.get());
+            world.netherStructures.get(), world.neighbours.get(), beforeDecoration);
         if (world.spawnMobs) {
             const std::expected<Identifier, wire::common::IdentifierError> biome =
                 Identifier::parse(world.netherBiomes->biomeAt(chunkX << 4, chunk.verticalBounds().maxY(), chunkZ << 4));
@@ -486,9 +488,10 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::end(std::
 
     Built& world = *built;
     Generators answer;
-    answer.generate = [&world](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t, const std::string&) {
+    answer.generate = [&world](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t, const std::string&,
+                               const std::function<void(server::world::Chunk&)>& beforeDecoration) {
         return terrain::dimensionTerrainGenerator::end(*world.endRouter, *world.endBiomes, chunkX, chunkZ, world.seed,
-                                                       world.endCities.get());
+                                                       world.endCities.get(), beforeDecoration);
     };
     built_.push_back(std::move(built));
     return answer;

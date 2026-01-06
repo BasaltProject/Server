@@ -39,7 +39,7 @@ using BatchWritten = std::unordered_set<std::int64_t>;
 }
 
 bool applyGeneratedBlockWrite(Chunk& chunk, const ChunkGeneratedBlockWrite& write,
-                             const BatchWritten* queued = nullptr) {
+                              const BatchWritten* queued = nullptr) {
     if (!insideChunk(chunk, write.y)) {
         return false;
     }
@@ -47,7 +47,9 @@ bool applyGeneratedBlockWrite(Chunk& chunk, const ChunkGeneratedBlockWrite& writ
     const std::int32_t localZ = write.z & 15;
     const std::int32_t current = chunk.blockStateId(localX, write.y, localZ);
     const bool decorated = queued != nullptr && current != write.expectedStateId && !queued->contains(cellKey(write));
-    const bool loosely = !(decorated && isOrePolicy(write.policy)) &&
+    const bool outranks =
+        server::world::terrain::decoration::oreBlockRules::outranksOreDecoration(write.stateId, current);
+    const bool loosely = !(decorated && isOrePolicy(write.policy) && !outranks) &&
                          server::world::terrain::decoration::oreBlockRules::canReplaceDeferred(write.policy, current);
     const bool canReplace =
         write.replaceAnyState || current == write.expectedStateId ||

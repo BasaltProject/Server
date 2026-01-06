@@ -153,8 +153,11 @@ Chunk LoadedWorld::generateChunk(std::int32_t chunkX, std::int32_t chunkZ) {
         default:
             break;
         }
+        // What a neighbour queued for this chunk belongs in it before it decorates, not after it is
+        // installed: a feature that reads the block next to it has to see the same world vanilla does.
+        const auto deliverQueued = [this](server::world::Chunk& generated) { state_.applyPendingWritesTo(generated); };
         if (normalGenerator_) {
-            return normalGenerator_(chunkX, chunkZ, gameTime_, difficulty_);
+            return normalGenerator_(chunkX, chunkZ, gameTime_, difficulty_, deliverQueued);
         }
         if (overworldRouter_ != nullptr && surfaceEnvironment_ != nullptr) {
             if (fallbackNeighbours_ == nullptr) {
@@ -169,7 +172,8 @@ Chunk LoadedWorld::generateChunk(std::int32_t chunkX, std::int32_t chunkZ) {
             }
             return terrain::realTerrainGenerator::generate(
                 *overworldRouter_, *surfaceEnvironment_, chunkX, chunkZ, metadata_.seed,
-                terrain::TerrainStructureGenerators{.village = villageGenerator_}, fallbackNeighbours_.get());
+                terrain::TerrainStructureGenerators{.village = villageGenerator_}, fallbackNeighbours_.get(), nullptr,
+                deliverQueued);
         }
         // Nothing to generate a real Nether or End with, and a noise approximation of one would be
         // a different world rather than a cheaper one.

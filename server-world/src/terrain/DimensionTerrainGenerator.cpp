@@ -42,7 +42,8 @@ using BiomeAt =
 [[nodiscard]] Chunk generate(const densityfunction::Function& finalDensity, const Settings& settings,
                              std::int32_t chunkX, std::int32_t chunkZ, const ChunkPass& surfacePass,
                              const ChunkPass& carverPass, const ChunkPass& structurePass,
-                             const ChunkPass& decorationPass, const BiomeAt& biomeAt) {
+                             const ChunkPass& decorationPass, const BiomeAt& biomeAt,
+                             const realTerrainGenerator::BeforeDecoration& beforeDecoration) {
     Chunk chunk{chunkX, chunkZ, settings.verticalBounds};
     densityfunction::DensityCache cache{chunkX, chunkZ, densityfunction::markerSlotCount()};
     DensityChunkSampler sampler{
@@ -113,6 +114,9 @@ using BiomeAt =
     generationMetrics::measure(generationMetrics::Phase::SurfaceRules, [&] { surfacePass(chunk, cache); });
     generationMetrics::measure(generationMetrics::Phase::Carvers, [&] { carverPass(chunk, cache); });
     generationMetrics::measure(generationMetrics::Phase::Structures, [&] { structurePass(chunk, cache); });
+    if (beforeDecoration) {
+        beforeDecoration(chunk);
+    }
     generationMetrics::measure(generationMetrics::Phase::Decoration, [&] { decorationPass(chunk, cache); });
     if (generationMetrics::enabled()) {
         generationMetrics::countChunk();
@@ -134,7 +138,8 @@ namespace {
 [[nodiscard]] Chunk generateNether(const NetherNoiseRouter& router, const NetherBiomeSource& biomeSource,
                                    std::int32_t chunkX, std::int32_t chunkZ,
                                    const surface::SurfaceRuleEnvironment* surfaceEnvironment, std::int64_t seed,
-                                   NetherStructureGenerator* structureGenerator, const ChunkPass& decorationPass) {
+                                   NetherStructureGenerator* structureGenerator, const ChunkPass& decorationPass,
+                                   const realTerrainGenerator::BeforeDecoration& beforeDecoration = {}) {
     static const std::int32_t netherrack = plainState("netherrack");
     const Settings settings{.verticalBounds = kNetherHeight,
                             .noiseMinY = 0,
@@ -167,7 +172,8 @@ namespace {
         [&biomeSource](std::int32_t blockX, std::int32_t blockY, std::int32_t blockZ,
                        densityfunction::DensityCache& cache) {
             return biomeSource.biomeAtQuart(blockX >> 2, blockY >> 2, blockZ >> 2, &cache);
-        });
+        },
+        beforeDecoration);
 }
 
 } // namespace
@@ -181,7 +187,8 @@ Chunk netherTerrain(const NetherNoiseRouter& router, const NetherBiomeSource& bi
 
 Chunk nether(const NetherNoiseRouter& router, const NetherBiomeSource& biomeSource, std::int32_t chunkX,
              std::int32_t chunkZ, const surface::SurfaceRuleEnvironment* surfaceEnvironment, std::int64_t seed,
-             NetherStructureGenerator* structureGenerator, NeighbourTerrainCache* neighbours) {
+             NetherStructureGenerator* structureGenerator, NeighbourTerrainCache* neighbours,
+             const realTerrainGenerator::BeforeDecoration& beforeDecoration) {
     const std::unique_ptr<NeighbourTerrain> around =
         neighbours == nullptr ? nullptr : neighbours->around(chunkX, chunkZ);
     return generateNether(
@@ -199,11 +206,13 @@ Chunk nether(const NetherNoiseRouter& router, const NetherBiomeSource& biomeSour
             decoration::nether::netherSurfaceStructuresDecoration::decorate(chunk, seed, biomeLookup);
             decoration::nether::netherUndergroundDecoration::decorate(chunk, seed, biomeLookup);
             decoration::nether::netherVegetalDecoration::decorate(chunk, seed, biomeLookup);
-        });
+        },
+        beforeDecoration);
 }
 
 Chunk end(const EndNoiseRouter& router, const TheEndBiomeSource& biomeSource, std::int32_t chunkX, std::int32_t chunkZ,
-          std::int64_t seed, EndCityStructureGenerator* structureGenerator) {
+          std::int64_t seed, EndCityStructureGenerator* structureGenerator,
+          const realTerrainGenerator::BeforeDecoration& beforeDecoration) {
     static const std::int32_t endStone = plainState("end_stone");
     const Settings settings{.verticalBounds = kEndHeight,
                             .noiseMinY = 0,
@@ -229,7 +238,8 @@ Chunk end(const EndNoiseRouter& router, const TheEndBiomeSource& biomeSource, st
         },
         [&biomeSource](std::int32_t blockX, std::int32_t blockY, std::int32_t blockZ, densityfunction::DensityCache&) {
             return biomeSource.biomeAtQuart(blockX >> 2, blockY >> 2, blockZ >> 2);
-        });
+        },
+        beforeDecoration);
 }
 
 } // namespace basalt::server::world::terrain::dimensionTerrainGenerator
