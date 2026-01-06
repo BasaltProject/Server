@@ -139,24 +139,33 @@ void fillBiomes(Chunk& chunk, const surface::SurfaceRuleEnvironment& environment
     // A chunk holds a handful of distinct biomes, so the identifier parse and the registry lookup
     // are paid once per name instead of once per each of the 1536 quarts.
     std::map<std::string, std::int32_t, std::less<>> idByName;
-    for (std::int32_t quartY = 0; quartY < kOverworldHeight.height() / 4; ++quartY) {
-        const std::int32_t blockY = kOverworldHeight.minY() + quartY * 4;
+    // parity: `ChunkAccess.fillBiomesFromNoise` goes section by section and
+    // `LevelChunkSection.fillBiomesFromNoise` goes x, then y, then z inside each one. The order decides real
+    // biomes: `Climate.RTree` seeds every search with the thread's previous leaf and keeps it when nothing is
+    // strictly closer, so a column whose continentalness quantises onto a band edge takes the biome of the
+    // cell asked for just before it.
+    const std::int32_t sections = kOverworldHeight.height() / 16;
+    for (std::int32_t section = 0; section < sections; ++section) {
         for (std::int32_t quartX = 0; quartX < 4; ++quartX) {
-            for (std::int32_t quartZ = 0; quartZ < 4; ++quartZ) {
-                const std::string& biome = environment.noiseBiomeAt(chunk.chunkX() * 4 + quartX, blockY >> 2,
-                                                                    chunk.chunkZ() * 4 + quartZ, cache);
-                auto found = idByName.find(biome);
-                if (found == idByName.end()) {
-                    std::int32_t id = 0;
-                    const std::expected<wire::common::Identifier, wire::common::IdentifierError> parsed =
-                        wire::common::Identifier::parse(biome);
-                    if (parsed.has_value()) {
-                        const std::optional<std::int32_t> registered = registry::biomes::registry().idOf(*parsed);
-                        id = registered.value_or(0);
+            for (std::int32_t withinSection = 0; withinSection < 4; ++withinSection) {
+                const std::int32_t quartY = section * 4 + withinSection;
+                const std::int32_t blockY = kOverworldHeight.minY() + quartY * 4;
+                for (std::int32_t quartZ = 0; quartZ < 4; ++quartZ) {
+                    const std::string& biome = environment.noiseBiomeAt(chunk.chunkX() * 4 + quartX, blockY >> 2,
+                                                                        chunk.chunkZ() * 4 + quartZ, cache);
+                    auto found = idByName.find(biome);
+                    if (found == idByName.end()) {
+                        std::int32_t id = 0;
+                        const std::expected<wire::common::Identifier, wire::common::IdentifierError> parsed =
+                            wire::common::Identifier::parse(biome);
+                        if (parsed.has_value()) {
+                            const std::optional<std::int32_t> registered = registry::biomes::registry().idOf(*parsed);
+                            id = registered.value_or(0);
+                        }
+                        found = idByName.emplace(biome, id).first;
                     }
-                    found = idByName.emplace(biome, id).first;
+                    chunk.setBiomeId(quartX, quartY, quartZ, found->second);
                 }
-                chunk.setBiomeId(quartX, quartY, quartZ, found->second);
             }
         }
     }
@@ -191,6 +200,14 @@ GeneratedTerrain generateTerrain(const OverworldNoiseRouter& router, const surfa
     if (generators.stronghold != nullptr) {
         density = generators.stronghold->beardified(std::move(density), chunkX, chunkZ, seed);
     }
+    // parity: `ChunkStatus.BIOMES` runs before `NOISE`, and everything after it reads the biome container
+    // rather than the climate tree. Filling first and letting the surface rules and the decorators read the
+    // same memo is what reproduces that: `Climate.RTree` seeds each search with the thread's previous leaf
+    // and keeps it when nothing is strictly closer, so a lookup served from a cache instead of the tree
+    // silently moves every tie that follows it.
+    auto biomeEnvironment = std::make_unique<surface::ChunkBiomeEnvironment>(environment, cache.get());
+    generationMetrics::measure(generationMetrics::Phase::BiomeFill,
+                               [&] { fillBiomes(chunk, *biomeEnvironment, cache.get()); });
     DensityChunkSampler sampler{std::move(density),        chunkX,     chunkZ,      kOverworldHeight.minY(),
                                 kOverworldHeight.height(), kCellWidth, kCellHeight, cache.get()};
     OverworldAquifer aquifer{router,     seed, chunkX, chunkZ, kOverworldHeight.minY(), kOverworldHeight.height(),
@@ -227,9 +244,8 @@ GeneratedTerrain generateTerrain(const OverworldNoiseRouter& router, const surfa
         }
     });
     std::vector<std::int32_t> heightmap = chunk.heightmap(HeightmapType::OceanFloor);
-    auto chunkEnvironment = std::make_unique<ChunkScopedSurfaceEnvironment>(
-        std::make_unique<surface::ChunkBiomeEnvironment>(environment, cache.get()), std::move(heightmap), chunkX,
-        chunkZ);
+    auto chunkEnvironment = std::make_unique<ChunkScopedSurfaceEnvironment>(std::move(biomeEnvironment),
+                                                                            std::move(heightmap), chunkX, chunkZ);
     const surface::RuleSource& surfaceRule = surface::surfaceRuleData::overworld();
     generationMetrics::measure(generationMetrics::Phase::SurfaceRules,
                                [&] { surface::surfaceBuilder::buildSurface(chunk, *chunkEnvironment, surfaceRule); });
@@ -344,7 +360,6 @@ void decorate(GeneratedTerrain& terrain, std::int64_t seed, const NeighbourTerra
     bubbleColumnFormation::formInto(chunk);
     generationMetrics::measure(generationMetrics::Phase::SurfaceFreeze,
                                [&] { decoration::surfaceFreezingDecoration::decorate(chunk, environment); });
-    generationMetrics::measure(generationMetrics::Phase::BiomeFill, [&] { fillBiomes(chunk, environment, nullptr); });
     if (generationMetrics::enabled()) {
         generationMetrics::countChunk();
     }
