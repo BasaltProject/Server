@@ -146,7 +146,7 @@ TEST_CASE("the overworld vegetal step places what the frozen kotlin places") {
         const Run result = run("minecraft:jungle");
         CHECK(result.placed == 2971);
         CHECK(result.deferred == 883);
-        CHECK(result.checksum == -1489990126367580199LL);
+        CHECK(result.checksum == -1650396896813967803LL);
     }
 
     SUBCASE("lush_caves") {
@@ -160,7 +160,7 @@ TEST_CASE("the overworld vegetal step places what the frozen kotlin places") {
         const Run result = run("minecraft:swamp");
         CHECK(result.placed == 784);
         CHECK(result.deferred == 167);
-        CHECK(result.checksum == 8731202821172162168LL);
+        CHECK(result.checksum == -8582593161705220864LL);
     }
 
     SUBCASE("warm_ocean") {

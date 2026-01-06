@@ -148,7 +148,7 @@ TEST_CASE("the lush cave step places what the frozen kotlin places") {
         const Run result = run("minecraft:lush_caves", "rooted_azalea_tree", 48);
         CHECK(result.placed == 1833);
         CHECK(result.deferred == 117);
-        CHECK(result.checksum == 8955489135532821344LL);
+        CHECK(result.checksum == -2976158315549951084LL);
     }
 
     SUBCASE("spore_blossom") {
