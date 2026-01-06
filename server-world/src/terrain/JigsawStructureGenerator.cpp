@@ -1,9 +1,11 @@
+#include <basalt/server/random/PositionalRandomFactory.hpp>
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/world/ChunkHeight.hpp>
 #include <basalt/server/world/terrain/JigsawStructureGenerator.hpp>
 
 #include <algorithm>
 #include <cstdlib>
+#include <map>
 #include <memory>
 #include <utility>
 
@@ -104,6 +106,27 @@ JigsawStructureGenerator::assembledStart(std::int32_t candidateChunkX, std::int3
         const std::int32_t startY = settings_.heightSource == JigsawHeightSource::Drawn
                                         ? settings_.startY + random.nextInt(settings_.startYMax - settings_.startY + 1)
                                         : settings_.startY;
+        // parity: `PoolAliasLookup.create(poolAliases, startPos, seed)`, which forks a **legacy**
+        // positional factory off the world seed and reads it at the start position. Its draws are
+        // separate from the assembly's own random, so they cost nothing to the sequence below.
+        std::map<std::string, std::string, std::less<>> resolvedAliases;
+        if (!settings_.poolAliases.empty()) {
+            random::RandomSource aliasRandom =
+                random::PositionalRandomFactory::legacy(seed).at(candidateChunkX * 16, startY, candidateChunkZ * 16);
+            for (const JigsawStructureSettings::PoolAlias& binding : settings_.poolAliases) {
+                if (binding.kind == JigsawStructureSettings::PoolAlias::Kind::Random) {
+                    const std::size_t pick = static_cast<std::size_t>(
+                        aliasRandom.nextInt(static_cast<std::int32_t>(binding.targets.size())));
+                    resolvedAliases.insert_or_assign(binding.alias, binding.targets[pick]);
+                } else {
+                    const std::size_t pick =
+                        static_cast<std::size_t>(aliasRandom.nextInt(static_cast<std::int32_t>(binding.groups.size())));
+                    for (const auto& [alias, target] : binding.groups[pick]) {
+                        resolvedAliases.insert_or_assign(alias, target);
+                    }
+                }
+            }
+        }
         structure::JigsawWorld world{.poolLookup = poolLookup_, .templateLoader = templateLoader_, .heightAt = {}};
         if (settings_.heightSource == JigsawHeightSource::Surface) {
             world.heightAt = [this, &samplers](std::int32_t x, std::int32_t z) {
@@ -119,8 +142,16 @@ JigsawStructureGenerator::assembledStart(std::int32_t candidateChunkX, std::int3
                                      .maxDepth = settings_.maxDepth,
                                      .projectStartToHeightmap = settings_.projectStartToHeightmap,
                                      .maxDistanceFromCenter = settings_.maxDistanceFromCenter,
+                                     // parity: `max_distance_from_center` is written as one number, and
+                                     // `MaxDistance(int)` gives that number to both axes.
+                                     .maxVerticalDistanceFromCenter = settings_.maxDistanceFromCenter,
+                                     .dimensionPaddingBottom = settings_.dimensionPadding,
+                                     .dimensionPaddingTop = settings_.dimensionPadding,
+                                     .worldMinY = kOverworldHeight.minY(),
+                                     .worldMaxY = kOverworldHeight.maxY(),
                                      .useExpansionHack = settings_.useExpansionHack,
-                                     .startJigsawName = settings_.startJigsawName},
+                                     .startJigsawName = settings_.startJigsawName,
+                                     .poolAliases = std::move(resolvedAliases)},
             random);
     }
 

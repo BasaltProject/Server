@@ -143,14 +143,27 @@ std::vector<PlacedStructurePiece> Assembler::run() {
         return std::move(pieces_);
     }
 
+    // parity: `JigsawPlacement`'s allowed region is the reach box intersected with the world height
+    // shrunk by the dimension padding, so the floor and the ceiling bound the assembly even when the
+    // vertical reach alone would not. Leaving the vertical side open lets pieces land where vanilla
+    // refuses them, and every later collision test then sees a different set of neighbours.
     const bool unbounded = request_->maxVerticalDistanceFromCenter == std::numeric_limits<std::int32_t>::max();
-    const StructureBoundingBox allowedRegion{
-        centerX - request_->maxDistanceFromCenter,
-        unbounded ? std::numeric_limits<std::int32_t>::min() : bottomY - request_->maxVerticalDistanceFromCenter,
-        centerZ - request_->maxDistanceFromCenter,
-        centerX + request_->maxDistanceFromCenter,
-        unbounded ? std::numeric_limits<std::int32_t>::max() : bottomY + request_->maxVerticalDistanceFromCenter,
-        centerZ + request_->maxDistanceFromCenter};
+    const std::int32_t reachMinY =
+        unbounded ? std::numeric_limits<std::int32_t>::min() : bottomY - request_->maxVerticalDistanceFromCenter;
+    const std::int32_t reachMaxY =
+        unbounded ? std::numeric_limits<std::int32_t>::max() : bottomY + request_->maxVerticalDistanceFromCenter;
+    const std::int32_t floorY = request_->worldMinY == std::numeric_limits<std::int32_t>::min()
+                                    ? reachMinY
+                                    : request_->worldMinY + request_->dimensionPaddingBottom;
+    const std::int32_t ceilingY = request_->worldMaxY == std::numeric_limits<std::int32_t>::max()
+                                      ? reachMaxY
+                                      : request_->worldMaxY - request_->dimensionPaddingTop;
+    const StructureBoundingBox allowedRegion{centerX - request_->maxDistanceFromCenter,
+                                             std::max(reachMinY, floorY),
+                                             centerZ - request_->maxDistanceFromCenter,
+                                             centerX + request_->maxDistanceFromCenter,
+                                             std::min(reachMaxY, ceilingY),
+                                             centerZ + request_->maxDistanceFromCenter};
 
     const CollisionSpaceRef globalFree =
         std::make_shared<CollisionSpace>(allowedRegion, std::vector<StructureBoundingBox>{centerBox});
@@ -193,7 +206,11 @@ void Assembler::tryPlacingChildren(std::size_t sourceIndex, std::int32_t depth, 
             childrenFree = insideSourceFree;
         }
 
-        const StructureTemplatePool* targetPool = world_->poolLookup(sourceJigsaw.pool);
+        // parity: `poolAliasLookup.lookup(sourceJigsaw.pool())`, applied before the pool is resolved.
+        const auto aliased = request_->poolAliases.find(sourceJigsaw.pool);
+        const std::string_view poolName =
+            aliased == request_->poolAliases.end() ? std::string_view{sourceJigsaw.pool} : aliased->second;
+        const StructureTemplatePool* targetPool = world_->poolLookup(poolName);
         if (targetPool == nullptr || targetPool->size() == 0) {
             continue;
         }

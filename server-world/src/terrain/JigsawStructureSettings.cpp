@@ -73,6 +73,40 @@ const JigsawStructureSettings& trialChamber() {
         .startPool = "minecraft:trial_chambers/chamber/end",
         .maxDepth = 20,
         .maxDistanceFromCenter = 116,
+        // parity: the chamber is the only jigsaw structure with `pool_aliases`. The group keeps the
+        // ranged and the slow ranged spawner on the same mob, which is why it is one binding and not
+        // two.
+        .poolAliases =
+            {
+                {.kind = JigsawStructureSettings::PoolAlias::Kind::RandomGroup,
+                 .groups =
+                     {
+                         {{"minecraft:trial_chambers/spawner/contents/ranged",
+                           "minecraft:trial_chambers/spawner/ranged/skeleton"},
+                          {"minecraft:trial_chambers/spawner/contents/slow_ranged",
+                           "minecraft:trial_chambers/spawner/slow_ranged/skeleton"}},
+                         {{"minecraft:trial_chambers/spawner/contents/ranged",
+                           "minecraft:trial_chambers/spawner/ranged/stray"},
+                          {"minecraft:trial_chambers/spawner/contents/slow_ranged",
+                           "minecraft:trial_chambers/spawner/slow_ranged/stray"}},
+                         {{"minecraft:trial_chambers/spawner/contents/ranged",
+                           "minecraft:trial_chambers/spawner/ranged/poison_skeleton"},
+                          {"minecraft:trial_chambers/spawner/contents/slow_ranged",
+                           "minecraft:trial_chambers/spawner/slow_ranged/poison_skeleton"}},
+                     }},
+                {.kind = JigsawStructureSettings::PoolAlias::Kind::Random,
+                 .alias = "minecraft:trial_chambers/spawner/contents/melee",
+                 .targets = {"minecraft:trial_chambers/spawner/melee/zombie",
+                             "minecraft:trial_chambers/spawner/melee/husk",
+                             "minecraft:trial_chambers/spawner/melee/spider"}},
+                {.kind = JigsawStructureSettings::PoolAlias::Kind::Random,
+                 .alias = "minecraft:trial_chambers/spawner/contents/small_melee",
+                 .targets = {"minecraft:trial_chambers/spawner/small_melee/slime",
+                             "minecraft:trial_chambers/spawner/small_melee/cave_spider",
+                             "minecraft:trial_chambers/spawner/small_melee/silverfish",
+                             "minecraft:trial_chambers/spawner/small_melee/baby_zombie"}},
+            },
+        .dimensionPadding = 10,
         .heightSource = JigsawHeightSource::Drawn,
         .startY = -40,
         .startYMax = -20,

@@ -46,6 +46,22 @@ struct JigsawStructureSettings {
     std::string startJigsawName;
     std::int32_t maxDepth = 0;
     std::int32_t maxDistanceFromCenter = 0;
+
+    /// parity: one `pool_aliases` binding. `Random` picks one target for its alias; `RandomGroup`
+    /// picks one group and takes every direct binding in it, which is how the trial chamber keeps
+    /// `ranged` and `slow_ranged` on the same mob.
+    struct PoolAlias {
+        enum class Kind : std::uint8_t { Random, RandomGroup };
+        Kind kind = Kind::Random;
+        std::string alias;
+        std::vector<std::string> targets;
+        std::vector<std::vector<std::pair<std::string, std::string>>> groups;
+    };
+
+    /// Resolved once per start, in this order: the draws they make are part of the world's sequence.
+    std::vector<PoolAlias> poolAliases;
+    /// parity: `JigsawStructure`'s `dimension_padding`, non-zero only for the trial chamber.
+    std::int32_t dimensionPadding = 0;
     bool useExpansionHack = false;
     bool projectStartToHeightmap = false;
     JigsawHeightSource heightSource = JigsawHeightSource::Surface;
