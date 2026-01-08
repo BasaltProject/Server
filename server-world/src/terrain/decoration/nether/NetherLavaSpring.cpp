@@ -71,6 +71,14 @@ void placeLavaSpring(Chunk& chunk, const std::int32_t x, const std::int32_t y, c
     }
     if (rocks == 4 && holes == 1) {
         setBlock(chunk, x, y, z, registry::blocks::named("lava")->stateId);
+        // parity: `SpringFeature` schedules the fluid the moment it places it, which is what makes a
+        // spring run. Without it the Nether's lava never leaves the block it was put in.
+        chunk.scheduleFluidTick(ChunkScheduledTick{.type = wire::common::Identifier::vanilla("lava"),
+                                                   .localX = x & 15,
+                                                   .y = y,
+                                                   .localZ = z & 15,
+                                                   .delay = 0,
+                                                   .priority = 0});
     }
 }
 

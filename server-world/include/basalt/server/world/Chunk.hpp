@@ -195,6 +195,11 @@ public:
     /// Reads a world-coordinate position while a decoration is being generated. Positions outside
     /// this chunk see earlier writes from the same feature rather than wrapping through `and 15`. A
     /// scoped feature-stage reader can supply unloaded neighbour terrain; otherwise it is air.
+    /// Remembers a fluid the aquifer placed, so the world can tick it once the chunk is in.
+    void markFluidUpdate(std::int32_t worldX, std::int32_t y, std::int32_t worldZ);
+
+    [[nodiscard]] std::span<const ChunkShapeUpdate> fluidUpdates() const { return fluidUpdates_; }
+
     /// Remembers a block whose connections depend on neighbours that may not exist yet.
     void markShapeUpdate(std::int32_t worldX, std::int32_t y, std::int32_t worldZ);
 
@@ -324,6 +329,7 @@ private:
     /// Keyed by packed world position so a later write to the same block replaces the earlier one,
     /// insertion order preserved because delivery order is observable.
     std::vector<ChunkShapeUpdate> shapeUpdates_;
+    std::vector<ChunkShapeUpdate> fluidUpdates_;
     std::vector<ChunkGeneratedBlockWrite> generatedBlockWrites_;
     std::vector<ChunkGeneratedBlockEntityWrite> generatedBlockEntityWrites_;
     std::vector<ChunkGeneratedBlockTick> generatedBlockTicks_;

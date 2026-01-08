@@ -1,3 +1,4 @@
+#include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/World.hpp>
 #include <basalt/server/world/ChunkHeight.hpp>
@@ -235,6 +236,13 @@ GeneratedTerrain generateTerrain(const OverworldNoiseRouter& router, const surfa
                                     chunk.setBlockStateId(x, y, z, vein.value_or(registry::blocks::stone().stateId));
                                 } else if (material->stateId != registry::blocks::air().stateId) {
                                     chunk.setBlockStateId(x, y, z, material->stateId);
+                                    // parity: `NoiseBasedChunkGenerator` marks the fluid an aquifer
+                                    // places so the chunk's post-processing ticks it. Without that a
+                                    // lake never starts running at all.
+                                    if (aquifer.shouldScheduleFluidUpdate() &&
+                                        registry::blockFluids::hasFluid(material->stateId)) {
+                                        chunk.markFluidUpdate(chunkX * 16 + x, y, chunkZ * 16 + z);
+                                    }
                                 }
                             }
                         }

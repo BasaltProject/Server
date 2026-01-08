@@ -419,6 +419,10 @@ template <typename Write>
 
 } // namespace
 
+void Chunk::markFluidUpdate(std::int32_t worldX, std::int32_t y, std::int32_t worldZ) {
+    fluidUpdates_.push_back(ChunkShapeUpdate{.x = worldX, .y = y, .z = worldZ});
+}
+
 void Chunk::markShapeUpdate(std::int32_t worldX, std::int32_t y, std::int32_t worldZ) {
     const ChunkShapeUpdate mark{.x = worldX, .y = y, .z = worldZ};
     if (std::ranges::find(shapeUpdates_, mark) == shapeUpdates_.end()) {
