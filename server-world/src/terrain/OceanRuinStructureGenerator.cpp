@@ -192,7 +192,10 @@ OceanRuinStructureGenerator::addPiece(Chunk& chunk, const StructureBoundingBox& 
                                     .processors = &processors,
                                     .blockProcessor = structure::templateBlockProcessors::ignoreStructureAndAir(),
                                     .random = &random,
-                                    .settingsRandom = &random});
+                                    // parity: `OceanRuinPieces.makeSettings` never sets a random on
+                                    // the settings, so the palette pick and the rot both take their
+                                    // own from the position, not from this piece's stream.
+                                    .settingsRandom = nullptr});
         boxes.push_back(piece->getBoundingBox(settled, rotation, kZero, StructureMirror::None));
     }
     return boxes;

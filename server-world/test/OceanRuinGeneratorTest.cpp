@@ -233,19 +233,24 @@ void check(const Run& result, std::int32_t written, std::size_t starts, std::siz
 
 } // namespace
 
-TEST_CASE("the ocean ruins rot where the frozen kotlin rots them") {
-    SUBCASE("cold") { check(run(1234, true, false), 134, 2, 6, -5226634331540335863LL); }
+/// The numbers were re-taken when the rot moved to its own positional random, which is what the jar
+/// does: `OceanRuinPieces.makeSettings` never sets a random on the settings, so `getRandom(pos)`
+/// hands out one seeded from the block. Checked against the jar on seed 113, where the ruin's census
+/// then matched it on air, ice, mossy, cracked and snow exactly and on water to one block. The old
+/// numbers came from the retired Kotlin tree, which stopped being the oracle with ADR-008.
+TEST_CASE("the ocean ruins rot the way the jar rots them") {
+    SUBCASE("cold") { check(run(1234, true, false), 132, 2, 6, 1866715353195390021LL); }
 
-    SUBCASE("warm") { check(run(1234, false, true), 142, 2, 2, -290695644856220408LL); }
+    SUBCASE("warm") { check(run(1234, false, true), 137, 2, 2, 952536064983659329LL); }
 
-    SUBCASE("both") { check(run(1234, true, true), 134, 2, 6, -5226634331540335863LL); }
+    SUBCASE("both") { check(run(1234, true, true), 132, 2, 6, 1866715353195390021LL); }
 
     SUBCASE("neither") { check(run(1234, false, false), 0, 0, 0, -9113849115773802060LL); }
 
     // A seed whose ruin drew large and then drew its cluster of small ones around it.
-    SUBCASE("cluster") { check(run(7, true, true), 1645, 11, 40, -1798360077413730078LL); }
+    SUBCASE("cluster") { check(run(7, true, true), 1599, 11, 40, -2284153736936210576LL); }
 
-    SUBCASE("clusterWarm") { check(run(7, false, true), 835, 9, 11, 1325752336280421905LL); }
+    SUBCASE("clusterWarm") { check(run(7, false, true), 825, 9, 11, 429754515008186462LL); }
 
-    SUBCASE("otherSeed") { check(run(3, true, true), 236, 4, 12, 322115479206173380LL); }
+    SUBCASE("otherSeed") { check(run(3, true, true), 248, 4, 12, -3108741486969595655LL); }
 }
