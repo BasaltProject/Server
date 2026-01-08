@@ -159,10 +159,37 @@ StructurePos OceanRuinStructureGenerator::settle(const Chunk& chunk, const struc
     return StructurePos{position.x, settledY, position.z};
 }
 
+/// parity: `OceanRuinPieces.archyRuleProcessor`, at most five blocks turned into their suspicious
+/// twin, each carrying the ruin's archaeology loot. Its own positional random, so it neither reads
+/// nor moves the stream anything else draws from.
+[[nodiscard]] const std::vector<structure::CappedRules>& archaeologyRules(bool cold) {
+    const auto build = [](const char* from, const char* to, const char* table) {
+        std::vector<structure::CappedRules> built;
+        const registry::BlockState* candidate = registry::blocks::named(from);
+        const registry::BlockState* replacement = registry::blocks::named(to);
+        if (candidate == nullptr || replacement == nullptr) {
+            return built;
+        }
+        built.push_back(
+            structure::CappedRules{.delegate = {structure::StructureProcessorRule{
+                                       .inputTest = structure::StructureRuleTest::blockMatch(candidate->stateId),
+                                       .locationTest = std::nullopt,
+                                       .outputStateId = replacement->stateId,
+                                       .appendLootTable = std::string{table}}},
+                                   .limit = 5});
+        return built;
+    };
+    static const std::vector<structure::CappedRules> coldRules =
+        build("gravel", "suspicious_gravel", "minecraft:archaeology/ocean_ruin_cold");
+    static const std::vector<structure::CappedRules> warmRules =
+        build("sand", "suspicious_sand", "minecraft:archaeology/ocean_ruin_warm");
+    return cold ? coldRules : warmRules;
+}
+
 std::vector<StructureBoundingBox>
-OceanRuinStructureGenerator::addPiece(Chunk& chunk, const StructureBoundingBox& clip, random::RandomSource& random,
-                                      random::RandomSource& pick, StructurePos position, StructureRotation rotation,
-                                      bool cold, bool large, float baseIntegrity) const {
+OceanRuinStructureGenerator::addPiece(Chunk& chunk, std::int64_t seed, const StructureBoundingBox& clip,
+                                      random::RandomSource& random, random::RandomSource& pick, StructurePos position,
+                                      StructureRotation rotation, bool cold, bool large, float baseIntegrity) const {
     std::vector<std::pair<std::string, float>> names;
     if (cold) {
         const std::int32_t count = large ? 4 : 8;
@@ -182,7 +209,8 @@ OceanRuinStructureGenerator::addPiece(Chunk& chunk, const StructureBoundingBox& 
             continue;
         }
         const StructurePos settled = settle(chunk, *piece, position, rotation);
-        const structure::StructureProcessorList processors{{}, structure::BlockRot{.integrity = integrity}};
+        const structure::StructureProcessorList processors{
+            {}, structure::BlockRot{.integrity = integrity}, std::nullopt, archaeologyRules(cold)};
         piece->placeInto(chunk, structure::TemplatePlacement{
                                     .position = settled,
                                     .rotation = rotation,
@@ -195,15 +223,16 @@ OceanRuinStructureGenerator::addPiece(Chunk& chunk, const StructureBoundingBox& 
                                     // parity: `OceanRuinPieces.makeSettings` never sets a random on
                                     // the settings, so the palette pick and the rot both take their
                                     // own from the position, not from this piece's stream.
-                                    .settingsRandom = nullptr});
+                                    .settingsRandom = nullptr,
+                                    .worldSeed = seed});
         boxes.push_back(piece->getBoundingBox(settled, rotation, kZero, StructureMirror::None));
     }
     return boxes;
 }
 
 std::vector<StructureBoundingBox>
-OceanRuinStructureGenerator::addCluster(Chunk& chunk, const StructureBoundingBox& clip, random::RandomSource& random,
-                                        random::RandomSource& pick, StructurePos parent,
+OceanRuinStructureGenerator::addCluster(Chunk& chunk, std::int64_t seed, const StructureBoundingBox& clip,
+                                        random::RandomSource& random, random::RandomSource& pick, StructurePos parent,
                                         StructureRotation parentRotation, bool cold) const {
     const StructurePos parentOrigin{parent.x, kPlaceholderY, parent.z};
     const StructurePos parentCorner =
@@ -229,7 +258,7 @@ OceanRuinStructureGenerator::addCluster(Chunk& chunk, const StructureBoundingBox
             continue;
         }
         const std::vector<StructureBoundingBox> placed =
-            addPiece(chunk, clip, random, pick, spot, rotation, cold, false, 0.8F);
+            addPiece(chunk, seed, clip, random, pick, spot, rotation, cold, false, 0.8F);
         boxes.insert(boxes.end(), placed.begin(), placed.end());
     }
     return boxes;
@@ -262,10 +291,10 @@ void OceanRuinStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed, std
                            kSurfaceStructuresStep);
 
     std::vector<StructureBoundingBox> boxes =
-        addPiece(chunk, clip, random, pick, origin, rotation, *cold, large, baseIntegrity);
+        addPiece(chunk, seed, clip, random, pick, origin, rotation, *cold, large, baseIntegrity);
     if (large && pick.nextFloat() <= kClusterProbability) {
         const std::vector<StructureBoundingBox> cluster =
-            addCluster(chunk, clip, random, pick, origin, rotation, *cold);
+            addCluster(chunk, seed, clip, random, pick, origin, rotation, *cold);
         boxes.insert(boxes.end(), cluster.begin(), cluster.end());
     }
     std::vector<StructureBoundingBox> touching;
