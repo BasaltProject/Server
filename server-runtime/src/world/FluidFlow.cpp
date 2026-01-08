@@ -343,13 +343,18 @@ private:
                 continue;
             }
             const std::int32_t target = newLiquid(nextX, y, nextZ, kind);
-            if (target == kEmpty || !canBeReplacedWith(neighbour, kind, false)) {
+            if (target == kEmpty) {
                 continue;
             }
             const std::int32_t distance =
                 isHole(nextX, y, nextZ, kind) ? 0 : slopeDistance(nextX, y, nextZ, 1, opposite(index), kind);
             distances[index] = distance;
-            targets[index] = target;
+            // parity: `getSpread` only records a direction the fluid can really be put in, but it
+            // lowers `lowest` either way. A nearer drop behind a block that refuses the water still
+            // rules out the farther directions, and skipping it is what floods a cave.
+            if (canBeReplacedWith(neighbour, kind, false)) {
+                targets[index] = target;
+            }
             lowest = std::min(lowest, distance);
         }
 
