@@ -46,6 +46,18 @@ std::jthread reader;
 /// lines, so a log line arriving with nothing half-typed prints on its own.
 std::function<void()> redrawPrompt;
 
+/// A byte from standard input, or -1 when input ended or the reader was told to stop. Waiting in
+/// slices is what lets `stop` be noticed: a plain read parks inside the call until input arrives,
+/// and stdin held open by a supervisor or a fifo never delivers any.
+[[nodiscard]] int readByteOrStop() {
+    while (running.load()) {
+        if (wire::io::terminal::waitForInput(kPoll)) {
+            return wire::io::terminal::readByte();
+        }
+    }
+    return -1;
+}
+
 /// One line, edited in place: printable characters, backspace, left and right, and up and down
 /// through the history. Answers nothing at end of input.
 ///
@@ -72,7 +84,7 @@ std::function<void()> redrawPrompt;
     redrawPrompt = redraw;
     redraw();
     while (true) {
-        const int byte = wire::io::terminal::readByte();
+        const int byte = readByteOrStop();
         if (byte == -1) {
             redrawPrompt = nullptr;
             return std::nullopt;
@@ -148,8 +160,10 @@ void readLoop(const std::function<CommandDispatcher*()>& current, bool editing) 
         if (editing) {
             line = readEditedLine(history);
         } else {
+            while (running.load() && !wire::io::terminal::waitForInput(kPoll)) {
+            }
             std::string read;
-            if (std::getline(std::cin, read)) {
+            if (running.load() && std::getline(std::cin, read)) {
                 line = read;
             }
         }
@@ -245,6 +259,11 @@ void start(std::function<CommandDispatcher*()> current) {
     });
 }
 
-void stop() { running.store(false); }
+void stop() {
+    running.store(false);
+    if (reader.joinable()) {
+        reader.join();
+    }
+}
 
 } // namespace basalt::server::runtime::command::consoleReader
