@@ -28,10 +28,12 @@ WorldState::WorldState(std::vector<Chunk> initialChunks, LoadOrGenerate loadOrGe
     for (const auto& [chunkKey, chunk] : chunksByPos_) {
         pendingDecorations_.addPendingGeneratedEntities(chunk->takeGeneratedEntitiesMatching(
             [](const server::world::ChunkGeneratedEntity& entity) { return entity::mobs::isMob(entity.type); }));
-        pendingDecorations_.applyPendingGeneratedBlockWrites(*chunk);
+        pendingDecorations_.applyPendingGeneratedBlockWrites(*chunk,
+                                                             PendingChunkDecorations::WritePhase::AfterDecoration);
         pendingDecorations_.applyPendingGeneratedBlockEntityWrites(*chunk);
         pendingDecorations_.applyPendingGeneratedBlockTicks(*chunk);
-        pendingDecorations_.deliverGeneratedBlockWrites(chunk->takeGeneratedBlockWrites(), chunkAt);
+        pendingDecorations_.deliverGeneratedBlockWrites(chunk->takeGeneratedBlockWrites(), chunk->chunkX(),
+                                                        chunk->chunkZ(), chunkAt);
         pendingDecorations_.deliverGeneratedBlockEntityWrites(chunk->takeGeneratedBlockEntityWrites(), chunkAt);
         pendingDecorations_.deliverGeneratedBlockTicks(chunk->takeGeneratedBlockTicks(), chunkAt);
     }
@@ -189,7 +191,7 @@ Chunk& WorldState::getOrGenerateChunk(std::int32_t chunkX, std::int32_t chunkZ) 
 
 void WorldState::applyPendingWritesTo(Chunk& chunk) {
     const WorldWriteLock lock{mutex_};
-    pendingDecorations_.applyPendingGeneratedBlockWrites(chunk);
+    pendingDecorations_.applyPendingGeneratedBlockWrites(chunk, PendingChunkDecorations::WritePhase::BeforeDecoration);
 }
 
 Chunk& WorldState::installLocked(Chunk chunk) {
@@ -202,10 +204,12 @@ Chunk& WorldState::installLocked(Chunk chunk) {
 
     Chunk& installed = *chunksByPos_.emplace(chunkKey, std::make_unique<Chunk>(std::move(chunk))).first->second;
     const PendingChunkDecorations::ChunkAt chunkAt = [this](std::int64_t otherKey) { return chunkAtLocked(otherKey); };
-    pendingDecorations_.applyPendingGeneratedBlockWrites(installed);
+    pendingDecorations_.applyPendingGeneratedBlockWrites(installed,
+                                                         PendingChunkDecorations::WritePhase::AfterDecoration);
     pendingDecorations_.applyPendingGeneratedBlockEntityWrites(installed);
     pendingDecorations_.applyPendingGeneratedBlockTicks(installed);
-    pendingDecorations_.deliverGeneratedBlockWrites(installed.takeGeneratedBlockWrites(), chunkAt);
+    pendingDecorations_.deliverGeneratedBlockWrites(installed.takeGeneratedBlockWrites(), installed.chunkX(),
+                                                    installed.chunkZ(), chunkAt);
     pendingDecorations_.deliverGeneratedBlockEntityWrites(installed.takeGeneratedBlockEntityWrites(), chunkAt);
     pendingDecorations_.deliverGeneratedBlockTicks(installed.takeGeneratedBlockTicks(), chunkAt);
     chunkVersion_.fetch_add(1);

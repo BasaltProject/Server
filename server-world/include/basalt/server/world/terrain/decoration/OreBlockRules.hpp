@@ -15,10 +15,4 @@ namespace basalt::server::world::terrain::decoration::oreBlockRules {
 
 [[nodiscard]] GeneratedBlockWritePolicy policyFor(const std::set<std::string, std::less<>>& replaceable);
 
-/// parity: every overworld ore targets a subset of `base_stone_overworld`, so none of them can carve
-/// through a dirt, gravel or clay blob. A write queued across a chunk edge that carries one of those
-/// still wins over an ore the receiving chunk decorated on top, because in vanilla the blob was
-/// already there and the ore had to go around it.
-[[nodiscard]] bool outranksOreDecoration(std::int32_t writeStateId, std::int32_t currentStateId);
-
 } // namespace basalt::server::world::terrain::decoration::oreBlockRules

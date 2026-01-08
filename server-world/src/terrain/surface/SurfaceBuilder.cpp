@@ -150,7 +150,10 @@ void surfaceBuilder::buildSurface(Chunk& chunk, const SurfaceRuleEnvironment& en
         for (std::int32_t z = 0; z < 16; ++z) {
             const std::int32_t blockX = minBlockX + x;
             const std::int32_t blockZ = minBlockZ + z;
-            const std::int32_t startingHeight = chunk.heightAt(x, z, HeightmapType::WorldSurface) + 1;
+            // parity: the jar asks for `WORLD_SURFACE_WG` and adds one, and its heightmap answers with
+            // the topmost matching block. Ours answers with the free space over it, which is already
+            // that same number.
+            const std::int32_t startingHeight = chunk.heightAt(x, z, HeightmapType::WorldSurface);
             const std::string surfaceBiome = environment.biomeAt(blockX, startingHeight, blockZ);
             if (surfaceBiome == "minecraft:eroded_badlands") {
                 erodedBadlandsExtension(chunk, environment, x, z, blockX, blockZ, startingHeight, defaultStateId);

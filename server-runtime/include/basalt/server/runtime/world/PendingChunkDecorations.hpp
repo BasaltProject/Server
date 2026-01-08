@@ -42,12 +42,21 @@ public:
     /// Forgets the generated-entity identities that belonged to this now-evicted chunk.
     void forgetGeneratedEntities(std::int64_t chunkKey);
 
+    /// When a queued write gets to land, relative to the receiving chunk's own decoration.
+    enum class WritePhase : std::uint8_t {
+        /// Everything a chunk that decorates earlier left for this one, so its decoration goes on
+        /// top of them, exactly as it does in vanilla.
+        BeforeDecoration,
+        /// Whatever is left, which is what later chunks wrote and what arrived after the fact.
+        AfterDecoration,
+    };
+
     /// Delivers decorations that crossed out of their source chunk without ever wrapping them back
     /// into it. A target that has not arrived yet keeps the write until its own install.
     void deliverGeneratedBlockWrites(std::span<const server::world::ChunkGeneratedBlockWrite> writes,
-                                     const ChunkAt& chunkAt);
+                                     std::int32_t sourceChunkX, std::int32_t sourceChunkZ, const ChunkAt& chunkAt);
 
-    void applyPendingGeneratedBlockWrites(server::world::Chunk& chunk);
+    void applyPendingGeneratedBlockWrites(server::world::Chunk& chunk, WritePhase phase);
 
     void deliverGeneratedBlockEntityWrites(std::span<const server::world::ChunkGeneratedBlockEntityWrite> writes,
                                            const ChunkAt& chunkAt);
@@ -85,7 +94,16 @@ private:
     WorldMutex* mutex_;
     std::map<GeneratedEntityKey, GeneratedWorldEntity> generatedEntitiesByKey_;
     std::vector<server::world::ChunkGeneratedEntity> pendingGeneratedEntities_;
-    std::map<std::int64_t, std::vector<server::world::ChunkGeneratedBlockWrite>> pendingGeneratedBlockWrites_;
+
+    /// A queued write plus where it came from: which of the two chunks decorates first decides
+    /// whether it lands under the receiver's own decoration or over it.
+    struct QueuedBlockWrite {
+        server::world::ChunkGeneratedBlockWrite write;
+        std::int32_t sourceChunkX = 0;
+        std::int32_t sourceChunkZ = 0;
+    };
+
+    std::map<std::int64_t, std::vector<QueuedBlockWrite>> pendingGeneratedBlockWrites_;
     std::map<std::int64_t, std::vector<server::world::ChunkGeneratedBlockEntityWrite>>
         pendingGeneratedBlockEntityWrites_;
     std::map<std::int64_t, std::vector<server::world::ChunkGeneratedBlockTick>> pendingGeneratedBlockTicks_;
