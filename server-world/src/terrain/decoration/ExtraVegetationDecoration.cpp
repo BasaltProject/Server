@@ -4,6 +4,7 @@
 #include <basalt/server/world/terrain/decoration/ExtraVegetationDecoration.hpp>
 
 #include <array>
+#include <cstdint>
 #include <optional>
 #include <set>
 #include <stdexcept>

@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <string>
 #include <vector>
 

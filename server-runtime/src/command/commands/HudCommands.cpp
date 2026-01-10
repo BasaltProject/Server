@@ -9,6 +9,7 @@
 #include <basalt/wire/text/MiniMessage.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <string>
 #include <vector>
 

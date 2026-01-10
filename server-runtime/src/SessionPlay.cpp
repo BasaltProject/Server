@@ -32,6 +32,7 @@
 #include <basalt/wire/text/TranslationResolver.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime {

@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/world/RealTestInstances.hpp>
 #include <basalt/server/runtime/world/StructureTemplates.hpp>
 
+#include <cstdint>
 #include <map>
 #include <set>
 

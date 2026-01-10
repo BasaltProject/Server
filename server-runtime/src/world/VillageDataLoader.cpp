@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Tags.hpp>
 #include <basalt/server/runtime/world/VillageDataLoader.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::world {

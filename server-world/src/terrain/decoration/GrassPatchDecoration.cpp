@@ -5,6 +5,7 @@
 #include <basalt/server/world/terrain/decoration/Placement.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <optional>
 #include <set>
 #include <stdexcept>

@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 
+#include <cstdint>
 #include <map>
 
 namespace basalt::server::runtime::world {

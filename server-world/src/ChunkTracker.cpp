@@ -1,6 +1,7 @@
 #include <basalt/server/world/ChunkTracker.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <stdexcept>
 
 namespace basalt::server::world {

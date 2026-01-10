@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cstdint>
 
 namespace basalt::server::plugins {
 namespace {

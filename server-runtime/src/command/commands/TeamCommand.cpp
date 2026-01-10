@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/command/WorldArguments.hpp>
 #include <basalt/server/runtime/command/commands/TeamCommand.hpp>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 

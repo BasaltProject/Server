@@ -1,5 +1,7 @@
 #include <basalt/server/entity/ecs/MovementSystem.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::entity::ecs {
 
 void applyVelocity(ComponentStore<component::Position>& positions, ComponentStore<component::Velocity>& velocities) {

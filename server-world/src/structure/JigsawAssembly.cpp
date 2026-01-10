@@ -1,6 +1,7 @@
 #include <basalt/server/world/structure/JigsawAssembly.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <utility>

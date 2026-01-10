@@ -1,6 +1,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/world/ChunkTypes.hpp>
 
+#include <cstdint>
 #include <stdexcept>
 #include <utility>
 

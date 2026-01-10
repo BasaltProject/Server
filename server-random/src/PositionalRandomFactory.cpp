@@ -1,6 +1,8 @@
 #include <basalt/server/random/PositionalHashing.hpp>
 #include <basalt/server/random/PositionalRandomFactory.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::random {
 
 RandomSource PositionalRandomFactory::at(std::int32_t x, std::int32_t y, std::int32_t z) const noexcept {

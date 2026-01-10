@@ -6,6 +6,8 @@
 
 #include <doctest.h>
 
+#include <cstdint>
+
 using namespace basalt::server::runtime::entity;
 using basalt::server::runtime::world::WorldState;
 using basalt::server::world::Chunk;

@@ -1,6 +1,7 @@
 #include "SculkShared.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <stdexcept>
 

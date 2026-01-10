@@ -2,6 +2,8 @@
 
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::command::commands {
 
 /// The commands that act on a player's session: who they watch, who hears them, where they play.

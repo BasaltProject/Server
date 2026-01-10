@@ -3,6 +3,7 @@
 #include <basalt/server/plugins/PluginObjects.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::plugins {

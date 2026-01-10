@@ -3,6 +3,7 @@
 #include <basalt/server/world/terrain/MineshaftStructureGenerator.hpp>
 
 #include <array>
+#include <cstdint>
 #include <memory>
 #include <utility>
 

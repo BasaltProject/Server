@@ -24,6 +24,7 @@
 #include <basalt/wire/text/TranslationResolver.hpp>
 
 #include <cmath>
+#include <cstdint>
 
 namespace basalt::server::runtime {
 namespace {

@@ -6,6 +6,8 @@
 
 #include <doctest.h>
 
+#include <cstdint>
+
 using basalt::server::runtime::config::Animation;
 using basalt::server::runtime::config::AnimationsConfig;
 using basalt::wire::common::placeholder::PlaceholderContext;

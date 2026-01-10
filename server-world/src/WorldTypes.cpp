@@ -1,6 +1,8 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/WorldTypes.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::world {
 
 Chunk flatWorld::generate(std::int32_t chunkX, std::int32_t chunkZ, ChunkHeight bounds) {

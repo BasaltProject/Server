@@ -2,6 +2,7 @@
 #include <basalt/server/world/terrain/surface/BadlandsClayBands.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <string_view>

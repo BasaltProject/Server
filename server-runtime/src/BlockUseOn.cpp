@@ -35,6 +35,7 @@
 #include <basalt/server/runtime/world/Signs.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime {

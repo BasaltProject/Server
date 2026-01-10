@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <vector>

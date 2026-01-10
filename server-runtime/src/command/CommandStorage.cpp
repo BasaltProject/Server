@@ -4,6 +4,7 @@
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 

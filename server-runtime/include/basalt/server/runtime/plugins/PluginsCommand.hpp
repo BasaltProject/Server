@@ -3,6 +3,7 @@
 #include <basalt/server/plugins/PluginHost.hpp>
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 
+#include <cstdint>
 #include <functional>
 #include <optional>
 #include <string>

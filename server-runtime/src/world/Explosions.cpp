@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/Explosions.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <set>
 
 namespace basalt::server::runtime::world::explosions {

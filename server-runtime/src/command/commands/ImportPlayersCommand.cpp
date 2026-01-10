@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/command/commands/ImportPlayersCommand.hpp>
 #include <basalt/server/runtime/world/VanillaSaveImport.hpp>
 
+#include <cstdint>
 #include <string>
 
 namespace basalt::server::runtime::command::commands {

@@ -6,6 +6,7 @@
 #include <basalt/server/world/terrain/decoration/AquaticDecoration.hpp>
 #include <basalt/server/world/terrain/decoration/CoralDecoration.hpp>
 
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <utility>

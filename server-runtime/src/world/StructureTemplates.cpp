@@ -3,6 +3,8 @@
 #include <basalt/wire/nbt/NbtIO.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::world {
 namespace {
 

@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/Hoppers.hpp>
 
+#include <cstdint>
 #include <map>
 #include <string>
 

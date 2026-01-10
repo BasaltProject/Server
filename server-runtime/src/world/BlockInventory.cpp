@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <expected>
 #include <string>
 

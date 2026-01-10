@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <string>
 
 namespace basalt::server::runtime::command::commands {

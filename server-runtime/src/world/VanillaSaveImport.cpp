@@ -5,6 +5,7 @@
 #include <basalt/wire/io/Compression.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 
+#include <cstdint>
 #include <vector>
 
 namespace basalt::server::runtime::world {

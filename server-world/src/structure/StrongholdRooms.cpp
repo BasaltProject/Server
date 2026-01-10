@@ -1,5 +1,7 @@
 #include <basalt/server/world/structure/StrongholdRooms.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::world::structure {
 namespace {
 

@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::config {

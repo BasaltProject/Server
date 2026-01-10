@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/BushPatchDecoration.hpp>
 
+#include <cstdint>
 #include <set>
 #include <stdexcept>
 #include <string>

@@ -7,6 +7,7 @@
 #include <basalt/server/world/terrain/decoration/Placement.hpp>
 #include <basalt/server/world/terrain/decoration/StandaloneFeatures.hpp>
 
+#include <cstdint>
 #include <set>
 #include <stdexcept>
 #include <string>

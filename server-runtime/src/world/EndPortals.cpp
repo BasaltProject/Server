@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/world/EndPortals.hpp>
 
 #include <array>
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <string>

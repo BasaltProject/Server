@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cstdint>
 #include <string>
 
 namespace basalt::server::runtime::command::commands {

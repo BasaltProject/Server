@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/config/ServerListConfig.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::config {

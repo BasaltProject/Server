@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <optional>
 #include <string>

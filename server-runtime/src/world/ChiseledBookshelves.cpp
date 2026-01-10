@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
 #include <basalt/server/runtime/world/SelectableSlots.hpp>
 
+#include <cstdint>
 #include <map>
 #include <string>
 

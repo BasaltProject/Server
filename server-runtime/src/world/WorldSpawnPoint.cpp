@@ -2,6 +2,8 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/runtime/world/WorldSpawnPoint.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::world::worldSpawnPoint {
 namespace {
 

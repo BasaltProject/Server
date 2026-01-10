@@ -4,6 +4,7 @@
 
 #include <cctype>
 #include <charconv>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::world::advancement::advancementJson {

@@ -7,6 +7,7 @@
 
 #include <doctest.h>
 
+#include <cstdint>
 #include <vector>
 
 // Golden vectors captured by running the actual decompiled 26.2 server bytecode through a small JVM

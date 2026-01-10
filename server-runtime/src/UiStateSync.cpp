@@ -22,6 +22,7 @@
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <limits>
 #include <utility>
 

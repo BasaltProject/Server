@@ -1,6 +1,7 @@
 #include <basalt/server/world/terrain/StructureReferenceOrder.hpp>
 
 #include <array>
+#include <cstdint>
 #include <optional>
 
 namespace basalt::server::world::terrain {

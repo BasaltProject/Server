@@ -3,6 +3,7 @@
 #include <basalt/server/plugins/PluginObjects.hpp>
 #include <basalt/server/plugins/PluginServiceRegistry.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::plugins {

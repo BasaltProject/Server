@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/command/CommandTarget.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::command {

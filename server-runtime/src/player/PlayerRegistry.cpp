@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 
 #include <algorithm>
+#include <cstdint>
 
 namespace basalt::server::runtime::player {
 

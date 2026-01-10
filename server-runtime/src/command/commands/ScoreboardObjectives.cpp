@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 

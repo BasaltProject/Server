@@ -7,6 +7,7 @@
 #include <basalt/server/world/terrain/decoration/PaleMossDecoration.hpp>
 #include <basalt/server/world/terrain/decoration/SimpleBlockFeature.hpp>
 
+#include <cstdint>
 #include <optional>
 #include <set>
 #include <stdexcept>

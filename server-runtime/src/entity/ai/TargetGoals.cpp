@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/entity/ai/TargetGoals.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::entity::ai {

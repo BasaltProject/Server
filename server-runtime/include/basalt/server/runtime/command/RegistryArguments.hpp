@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/command/CommandTree.hpp>
 
+#include <cstdint>
 #include <memory>
 #include <string>
 

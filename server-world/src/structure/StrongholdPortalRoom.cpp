@@ -1,6 +1,7 @@
 #include <basalt/server/world/structure/StrongholdLibrary.hpp>
 
 #include <array>
+#include <cstdint>
 #include <string_view>
 
 namespace basalt::server::world::structure {

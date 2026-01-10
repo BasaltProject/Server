@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 
 namespace basalt::server::runtime::player {
 namespace {

@@ -1,6 +1,7 @@
 #include <basalt/server/entity/ecs/World.hpp>
 
 #include <algorithm>
+#include <cstdint>
 
 namespace basalt::server::entity::ecs {
 

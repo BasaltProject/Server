@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 

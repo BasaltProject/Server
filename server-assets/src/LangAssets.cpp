@@ -2,6 +2,7 @@
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/io/ZipReader.hpp>
 
+#include <cstdint>
 #include <format>
 
 namespace basalt::server::assets::langAssets {

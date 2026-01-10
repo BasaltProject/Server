@@ -7,6 +7,7 @@
 #include <doctest.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <map>
 #include <string>
 

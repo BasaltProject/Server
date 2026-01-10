@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/scoreboard/Scoreboard.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <limits>
 #include <utility>
 

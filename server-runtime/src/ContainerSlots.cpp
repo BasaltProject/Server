@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime {

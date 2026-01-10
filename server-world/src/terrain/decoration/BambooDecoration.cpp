@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/BambooDecoration.hpp>
 
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <stdexcept>

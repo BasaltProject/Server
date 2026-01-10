@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/entity/ai/Goals.hpp>
 
+#include <cstdint>
 #include <set>
 #include <string>
 

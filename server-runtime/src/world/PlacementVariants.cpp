@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <string>
 
 namespace basalt::server::runtime::world {

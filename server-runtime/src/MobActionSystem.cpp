@@ -18,6 +18,7 @@
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime {

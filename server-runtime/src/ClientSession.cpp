@@ -18,6 +18,7 @@
 #include <basalt/wire/protocol/play/SimplePackets.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime {

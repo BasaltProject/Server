@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/world/MobSpawnForest.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <map>
 #include <utility>
 

@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/world/WorldLight.hpp>
 
 #include <charconv>
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <string>

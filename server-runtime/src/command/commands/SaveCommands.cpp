@@ -1,5 +1,7 @@
 #include <basalt/server/runtime/command/commands/SaveCommands.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::command::commands {
 namespace {
 

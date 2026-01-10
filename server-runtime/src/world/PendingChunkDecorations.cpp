@@ -4,6 +4,7 @@
 #include <basalt/server/world/terrain/decoration/VegetationBlockRules.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeBlockRules.hpp>
 
+#include <cstdint>
 #include <unordered_set>
 #include <utility>
 

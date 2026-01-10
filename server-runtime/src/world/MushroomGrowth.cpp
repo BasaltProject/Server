@@ -2,6 +2,8 @@
 #include <basalt/server/runtime/world/GrowthSupport.hpp>
 #include <basalt/server/runtime/world/MushroomGrowth.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::world::mushroomGrowth {
 namespace {
 

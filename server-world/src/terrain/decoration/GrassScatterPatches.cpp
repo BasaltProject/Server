@@ -4,6 +4,7 @@
 #include <basalt/server/world/terrain/decoration/GrassScatterPatches.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <set>
 #include <stdexcept>
 #include <string>

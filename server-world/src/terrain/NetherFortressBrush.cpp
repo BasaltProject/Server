@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/NetherFortressBrush.hpp>
 
+#include <cstdint>
 #include <string>
 #include <utility>
 

@@ -8,6 +8,7 @@
 #include <basalt/wire/common/logging/Logger.hpp>
 #include <basalt/wire/common/timings/Timings.hpp>
 
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>

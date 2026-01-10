@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/BubbleColumnFormation.hpp>
 
+#include <cstdint>
 #include <optional>
 #include <string>
 

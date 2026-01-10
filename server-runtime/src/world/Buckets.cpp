@@ -4,6 +4,7 @@
 #include <basalt/server/world/Chunk.hpp>
 
 #include <cmath>
+#include <cstdint>
 
 namespace basalt::server::runtime::world::buckets {
 namespace {

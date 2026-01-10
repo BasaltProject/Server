@@ -4,6 +4,7 @@
 #include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <array>
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <string_view>

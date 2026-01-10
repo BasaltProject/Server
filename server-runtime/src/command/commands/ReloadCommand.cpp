@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/command/commands/ReloadCommand.hpp>
 
+#include <cstdint>
 #include <string>
 
 namespace basalt::server::runtime::command::commands {

@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
+#include <cstdint>
 #include <memory>
 
 namespace basalt::server::runtime::entity::primedTnt {

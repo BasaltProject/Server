@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/command/WorldArguments.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <string>
 
 namespace basalt::server::runtime::command {

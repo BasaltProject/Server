@@ -25,6 +25,7 @@
 #include <doctest.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <filesystem>
 #include <map>
 #include <memory>

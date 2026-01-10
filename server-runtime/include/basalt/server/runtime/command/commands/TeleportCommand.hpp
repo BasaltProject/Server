@@ -2,6 +2,8 @@
 
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::command::commands {
 
 /// parity: `TeleportCommand`, minus its cross-dimension branches.

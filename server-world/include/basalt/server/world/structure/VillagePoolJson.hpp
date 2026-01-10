@@ -2,6 +2,7 @@
 
 #include <basalt/server/world/structure/StructureTemplatePool.hpp>
 
+#include <cstdint>
 #include <expected>
 #include <functional>
 #include <optional>

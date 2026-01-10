@@ -1,6 +1,7 @@
 #include <basalt/server/world/climate/OverworldBiomes.hpp>
 #include <basalt/server/world/terrain/NetherBiomeSource.hpp>
 
+#include <cstdint>
 #include <map>
 #include <utility>
 #include <vector>

@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/plugins/ServerNpcs.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>

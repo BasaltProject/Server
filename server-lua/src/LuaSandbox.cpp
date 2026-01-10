@@ -6,6 +6,7 @@ extern "C" {
 #include <lualib.h>
 }
 
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <utility>

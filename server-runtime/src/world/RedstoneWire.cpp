@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/world/RedstoneWire.hpp>
 
 #include <array>
+#include <cstdint>
 #include <string_view>
 
 namespace basalt::server::runtime::world::redstoneWire {

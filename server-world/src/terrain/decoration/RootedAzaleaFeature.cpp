@@ -6,6 +6,7 @@
 #include <basalt/server/world/terrain/decoration/tree/TreeConfigs.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeFeature.hpp>
 
+#include <cstdint>
 #include <set>
 #include <stdexcept>
 #include <string>

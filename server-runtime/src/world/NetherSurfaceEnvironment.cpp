@@ -1,6 +1,8 @@
 #include <basalt/server/runtime/world/NetherSurfaceEnvironment.hpp>
 #include <basalt/server/world/densityfunction/DensityFunction.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::world {
 namespace {
 

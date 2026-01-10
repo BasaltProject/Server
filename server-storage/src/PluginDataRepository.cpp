@@ -1,5 +1,7 @@
 #include <basalt/server/storage/PluginDataRepository.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::storage {
 
 std::optional<std::string> PluginDataRepository::get(std::string_view plugin, std::string_view uuid,

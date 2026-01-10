@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/world/Vibrations.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <map>
 #include <string>
 #include <unordered_map>

@@ -4,6 +4,7 @@
 #include <basalt/server/plugins/PluginPacketView.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <mutex>
 #include <utility>
 

@@ -4,6 +4,8 @@
 
 #include <doctest.h>
 
+#include <cstdint>
+
 using basalt::server::runtime::world::trades::Offer;
 using basalt::server::world::loot::ItemStack;
 using basalt::wire::common::Identifier;

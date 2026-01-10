@@ -5,6 +5,7 @@
 #include <basalt/wire/protocol/play/UiPackets.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <string>
 #include <vector>
 

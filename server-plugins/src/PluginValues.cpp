@@ -1,5 +1,6 @@
 #include <basalt/server/plugins/PluginValues.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::plugins {

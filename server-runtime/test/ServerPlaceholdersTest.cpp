@@ -5,6 +5,8 @@
 
 #include <doctest.h>
 
+#include <cstdint>
+
 using basalt::wire::common::placeholder::PlaceholderContext;
 using basalt::wire::common::placeholder::PlaceholderKind;
 using basalt::wire::common::placeholder::PlaceholderValue;

@@ -3,6 +3,7 @@
 #include <basalt/wire/common/Mth.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <set>
 #include <stdexcept>

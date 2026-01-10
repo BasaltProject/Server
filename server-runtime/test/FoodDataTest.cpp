@@ -4,6 +4,7 @@
 
 #include <doctest.h>
 
+#include <cstdint>
 #include <vector>
 
 using basalt::server::runtime::player::Difficulty;

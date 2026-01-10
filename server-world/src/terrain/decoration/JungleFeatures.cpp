@@ -3,6 +3,7 @@
 #include <basalt/server/world/terrain/decoration/JungleFeatures.hpp>
 
 #include <array>
+#include <cstdint>
 #include <initializer_list>
 #include <optional>
 #include <set>

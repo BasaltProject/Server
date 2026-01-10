@@ -11,6 +11,7 @@
 #include <basalt/wire/common/timings/TickDurations.hpp>
 #include <basalt/wire/multiversion/ProtocolGate.hpp>
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>

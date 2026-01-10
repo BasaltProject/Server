@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <set>
 #include <string>
 

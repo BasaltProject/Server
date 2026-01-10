@@ -3,6 +3,7 @@
 #include <basalt/wire/common/placeholder/Placeholders.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::config {

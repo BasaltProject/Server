@@ -4,6 +4,7 @@
 #include <basalt/server/world/structure/StructureTemplatePool.hpp>
 #include <basalt/server/world/structure/VillagePoolJson.hpp>
 
+#include <cstdint>
 #include <map>
 #include <mutex>
 #include <optional>

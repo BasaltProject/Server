@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/world/DamageProtection.hpp>
 
+#include <cstdint>
 #include <expected>
 #include <string>
 #include <string_view>

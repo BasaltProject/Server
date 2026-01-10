@@ -1,5 +1,7 @@
 #include <basalt/server/world/terrain/surface/ChunkBiomeEnvironment.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::world::terrain::surface {
 
 ChunkBiomeEnvironment::ChunkBiomeEnvironment(const SurfaceRuleEnvironment& delegate,

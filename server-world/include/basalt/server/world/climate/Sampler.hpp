@@ -3,6 +3,8 @@
 #include <basalt/server/world/climate/Climate.hpp>
 #include <basalt/server/world/densityfunction/DensityFunction.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::world::climate {
 
 /// parity: `Climate.Sampler`. Samples the six axes at a position given in quart coordinates,

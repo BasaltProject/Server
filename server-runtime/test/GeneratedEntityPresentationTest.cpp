@@ -4,6 +4,8 @@
 
 #include <doctest.h>
 
+#include <cstdint>
+
 using basalt::server::runtime::entity::generatedEntityEquipment;
 using basalt::server::runtime::entity::generatedEntityMetadata;
 using basalt::server::runtime::entity::GeneratedEquipment;

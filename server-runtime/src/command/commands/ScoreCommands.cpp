@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
 #include <charconv>
+#include <cstdint>
 #include <string>
 #include <vector>
 

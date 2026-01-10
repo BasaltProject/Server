@@ -7,6 +7,7 @@
 #include <array>
 #include <bit>
 #include <cmath>
+#include <cstdint>
 
 using namespace basalt::server::world::densityfunction;
 namespace fn = basalt::server::world::densityfunction::functions;

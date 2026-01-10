@@ -6,6 +6,7 @@
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <sstream>
 #include <string>
 

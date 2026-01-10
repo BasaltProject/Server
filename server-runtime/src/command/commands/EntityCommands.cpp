@@ -14,6 +14,7 @@
 #include <basalt/wire/text/Serializers.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <string>
 #include <vector>
 

@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 
 #include <charconv>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::world::jukeboxes {

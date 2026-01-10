@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/world/SkeletonHorseTrap.hpp>
 
 #include <algorithm>
+#include <cstdint>
 
 namespace basalt::server::runtime {
 namespace {

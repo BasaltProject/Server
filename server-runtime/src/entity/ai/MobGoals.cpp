@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/entity/ai/VillagerGoals.hpp>
 #include <basalt/server/runtime/entity/ai/WanderingTraderGoals.hpp>
 
+#include <cstdint>
 #include <set>
 #include <string>
 #include <string_view>

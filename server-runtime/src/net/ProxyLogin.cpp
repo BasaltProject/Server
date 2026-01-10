@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/net/ProxyLogin.hpp>
 #include <basalt/wire/auth/forwarding/LegacyForwarding.hpp>
 
+#include <cstdint>
 #include <random>
 #include <utility>
 

@@ -4,6 +4,7 @@
 #include <basalt/server/world/terrain/decoration/tree/MangroveRootPlacer.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeHelpers.hpp>
 
+#include <cstdint>
 #include <cstdlib>
 #include <map>
 #include <optional>

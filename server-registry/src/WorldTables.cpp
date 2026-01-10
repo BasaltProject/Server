@@ -4,6 +4,7 @@
 #include <basalt/server/registry/World.hpp>
 
 #include <array>
+#include <cstdint>
 
 namespace basalt::server::registry {
 namespace {

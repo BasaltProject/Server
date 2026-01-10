@@ -8,6 +8,7 @@
 
 #include <doctest.h>
 
+#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <vector>

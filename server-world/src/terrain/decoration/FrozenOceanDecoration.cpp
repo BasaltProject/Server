@@ -5,6 +5,7 @@
 #include <basalt/server/world/terrain/decoration/FrozenOceanDecoration.hpp>
 
 #include <algorithm>
+#include <cstdint>
 
 namespace basalt::server::world::terrain::decoration {
 namespace {

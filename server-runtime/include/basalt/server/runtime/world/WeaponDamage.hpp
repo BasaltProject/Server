@@ -4,6 +4,7 @@
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 
+#include <cstdint>
 #include <functional>
 #include <optional>
 #include <string>

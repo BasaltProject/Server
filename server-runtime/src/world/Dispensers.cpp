@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/world/Fires.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 
+#include <cstdint>
 #include <map>
 #include <string>
 

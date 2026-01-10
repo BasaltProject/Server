@@ -3,6 +3,7 @@
 #include <basalt/server/world/terrain/decoration/tree/TreeTrunkPlacers.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <map>
 #include <optional>

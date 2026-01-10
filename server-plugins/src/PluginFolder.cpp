@@ -2,6 +2,7 @@
 #include <basalt/wire/io/FileIO.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <map>
 #include <vector>
 

@@ -1,5 +1,7 @@
 #include <basalt/server/random/WorldgenSeeds.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::random {
 namespace {
 

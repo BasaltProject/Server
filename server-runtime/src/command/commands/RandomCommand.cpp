@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/command/commands/RandomCommand.hpp>
 
 #include <charconv>
+#include <cstdint>
 #include <limits>
 #include <string>
 #include <vector>

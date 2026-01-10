@@ -3,6 +3,7 @@
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 
+#include <cstdint>
 #include <expected>
 #include <functional>
 #include <map>

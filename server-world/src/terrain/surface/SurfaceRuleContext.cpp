@@ -2,6 +2,7 @@
 #include <basalt/wire/common/Mth.hpp>
 
 #include <cmath>
+#include <cstdint>
 
 namespace basalt::server::world::terrain::surface {
 namespace mth = wire::common::mth;

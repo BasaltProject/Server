@@ -3,6 +3,7 @@
 #include <basalt/wire/text/ComponentNbt.hpp>
 #include <basalt/wire/text/TextColor.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::registry::vanillaRegistryData {

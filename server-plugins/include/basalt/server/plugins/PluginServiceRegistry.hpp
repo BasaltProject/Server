@@ -4,6 +4,7 @@
 #include <basalt/server/plugins/PluginEvents.hpp>
 #include <basalt/server/plugins/PluginValues.hpp>
 
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <set>

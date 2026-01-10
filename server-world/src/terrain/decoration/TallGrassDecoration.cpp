@@ -5,6 +5,7 @@
 #include <basalt/server/world/terrain/decoration/Placement.hpp>
 #include <basalt/server/world/terrain/decoration/TallGrassDecoration.hpp>
 
+#include <cstdint>
 #include <set>
 #include <stdexcept>
 #include <string>

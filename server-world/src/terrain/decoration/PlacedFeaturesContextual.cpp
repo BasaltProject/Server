@@ -5,6 +5,7 @@
 #include <basalt/server/world/terrain/decoration/end/EndDecoration.hpp>
 
 #include <array>
+#include <cstdint>
 #include <map>
 #include <string_view>
 

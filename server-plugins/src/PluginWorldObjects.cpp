@@ -2,6 +2,7 @@
 #include <basalt/server/plugins/PluginObjects.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::plugins {

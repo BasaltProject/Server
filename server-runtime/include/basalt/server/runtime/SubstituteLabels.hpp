@@ -2,6 +2,7 @@
 
 #include <basalt/wire/multiversion/SubstitutionLabels.hpp>
 
+#include <cstdint>
 #include <string>
 
 namespace basalt::server::runtime {

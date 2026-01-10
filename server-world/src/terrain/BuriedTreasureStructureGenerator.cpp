@@ -6,6 +6,7 @@
 #include <basalt/server/world/terrain/BuriedTreasureStructureGenerator.hpp>
 
 #include <array>
+#include <cstdint>
 #include <map>
 #include <utility>
 

@@ -7,6 +7,8 @@
 
 #include <doctest.h>
 
+#include <cstdint>
+
 using namespace basalt::server::world;
 using namespace basalt::server::world::light;
 using basalt::wire::common::Identifier;

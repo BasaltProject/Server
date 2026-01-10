@@ -5,6 +5,7 @@
 #include <basalt/server/world/terrain/decoration/DoublePlantPatchDecoration.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <stdexcept>
 #include <utility>
 #include <vector>

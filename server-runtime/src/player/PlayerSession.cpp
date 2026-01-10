@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::player {

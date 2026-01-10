@@ -6,6 +6,7 @@
 #include <basalt/server/world/Chunk.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <set>
 #include <string>
 

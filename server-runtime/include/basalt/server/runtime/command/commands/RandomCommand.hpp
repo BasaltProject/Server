@@ -3,6 +3,7 @@
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 
+#include <cstdint>
 #include <map>
 
 namespace basalt::server::runtime::command::commands {

@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/player/ExperienceData.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <limits>
 
 namespace basalt::server::runtime::player {

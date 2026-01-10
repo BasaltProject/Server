@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/command/commands/BossBarCommand.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <string>
 
 namespace basalt::server::runtime::command::commands {

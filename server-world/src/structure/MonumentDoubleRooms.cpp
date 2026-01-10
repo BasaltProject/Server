@@ -1,6 +1,7 @@
 #include <basalt/server/world/structure/MonumentDoubleRooms.hpp>
 
 #include <array>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::world::structure {

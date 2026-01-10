@@ -2,6 +2,7 @@
 
 #include <basalt/wire/nbt/NbtTag.hpp>
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>

@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <unordered_set>
 
 namespace basalt::server::runtime {

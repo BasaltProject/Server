@@ -2,6 +2,7 @@
 #include <basalt/server/world/terrain/NeighbourTerrain.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <utility>
 

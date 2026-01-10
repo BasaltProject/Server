@@ -1,6 +1,7 @@
 #include <basalt/server/world/terrain/NetherFortressPlacement.hpp>
 
 #include <array>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::world::terrain::netherFortressPieces {

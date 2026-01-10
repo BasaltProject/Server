@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/entity/WanderingTraderLifetime.hpp>
 
 #include <algorithm>
+#include <cstdint>
 
 namespace basalt::server::runtime::entity::wanderingTraderLifetime {
 namespace {

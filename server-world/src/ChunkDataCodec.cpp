@@ -8,6 +8,7 @@
 #include <basalt/wire/protocol/play/PalettedContainer.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <tuple>
 
 namespace basalt::server::world::chunkDataCodec {

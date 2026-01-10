@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/BuildInfo.hpp>
 #include <basalt/server/runtime/SubstituteLabels.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime {

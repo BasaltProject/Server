@@ -4,6 +4,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 
 #include <array>
+#include <cstdint>
 #include <optional>
 #include <stdexcept>
 #include <string>

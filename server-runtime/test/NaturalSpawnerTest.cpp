@@ -6,6 +6,7 @@
 
 #include <doctest.h>
 
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <string>

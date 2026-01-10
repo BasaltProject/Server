@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <cmath>
+#include <cstdint>
 
 namespace basalt::server::runtime::entity::ai {
 namespace {

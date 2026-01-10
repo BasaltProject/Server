@@ -5,6 +5,7 @@
 #include <basalt/server/world/structure/TemplateBlockProcessors.hpp>
 
 #include <array>
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <set>

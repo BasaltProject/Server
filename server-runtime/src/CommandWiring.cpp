@@ -20,6 +20,7 @@
 #include <basalt/server/runtime/timings/TimingsReport.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime {

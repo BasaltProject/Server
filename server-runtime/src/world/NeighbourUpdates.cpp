@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <charconv>
+#include <cstdint>
 #include <deque>
 #include <string>
 #include <utility>

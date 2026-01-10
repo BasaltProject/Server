@@ -2,6 +2,8 @@
 
 #include <basalt/server/world/crafting/Crafting.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::world::crafting {
 
 /// The recipes whose result is a function of what went in. parity: one class each in vanilla, all of

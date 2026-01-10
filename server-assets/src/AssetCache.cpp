@@ -2,6 +2,7 @@
 #include <basalt/wire/io/FileIO.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <format>
 #include <mbedtls/sha1.h>
 #include <utility>

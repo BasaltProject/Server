@@ -2,6 +2,8 @@
 
 #include <basalt/server/world/structure/MonumentBrush.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::world::structure {
 
 /// The three pieces outside the lattice: the two wings, an elder guardian each, and the roof

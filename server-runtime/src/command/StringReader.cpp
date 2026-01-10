@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/command/StringReader.hpp>
 
 #include <charconv>
+#include <cstdint>
 
 namespace basalt::server::runtime::command {
 namespace {

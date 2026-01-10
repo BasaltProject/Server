@@ -5,6 +5,7 @@
 #include <basalt/wire/text/MiniMessage.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <string>
 #include <vector>
 

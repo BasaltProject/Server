@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/world/MobSpawnFinalization.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime {

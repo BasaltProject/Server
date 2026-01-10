@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/world/MobSpawnVariantData.hpp>
 
 #include <array>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::world {

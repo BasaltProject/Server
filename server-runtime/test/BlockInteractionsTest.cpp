@@ -5,6 +5,7 @@
 
 #include <doctest.h>
 
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <string>

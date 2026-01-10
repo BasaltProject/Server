@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 

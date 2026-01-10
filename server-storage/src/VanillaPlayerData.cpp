@@ -1,6 +1,7 @@
 #include <basalt/server/storage/VanillaPlayerData.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
 
+#include <cstdint>
 #include <string>
 #include <utility>
 

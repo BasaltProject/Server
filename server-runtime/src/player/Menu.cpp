@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::player {

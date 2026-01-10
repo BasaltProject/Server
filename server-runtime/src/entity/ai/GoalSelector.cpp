@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/entity/ai/GoalSelector.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::entity::ai {

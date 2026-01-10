@@ -1,5 +1,7 @@
 #include <basalt/server/world/terrain/OverworldBiomeSource.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::world::terrain {
 
 OverworldBiomeSource::OverworldBiomeSource(const OverworldNoiseRouter& router,

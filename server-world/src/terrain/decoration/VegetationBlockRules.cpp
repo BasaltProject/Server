@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/VegetationBlockRules.hpp>
 
+#include <cstdint>
 #include <optional>
 #include <set>
 #include <string>

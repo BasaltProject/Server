@@ -2,6 +2,7 @@
 #include <basalt/server/world/crafting/SpecialCrafting.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::world::crafting {

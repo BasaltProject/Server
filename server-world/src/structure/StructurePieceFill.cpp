@@ -4,6 +4,7 @@
 #include <basalt/server/world/structure/StructurePieceFill.hpp>
 #include <basalt/server/world/structure/StructureTemplate.hpp>
 
+#include <cstdint>
 #include <map>
 #include <string>
 #include <utility>

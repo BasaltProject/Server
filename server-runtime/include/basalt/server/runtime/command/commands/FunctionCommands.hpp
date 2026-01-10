@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/command/CommandStorage.hpp>
 #include <basalt/server/runtime/function/FunctionLibrary.hpp>
 
+#include <cstdint>
 #include <vector>
 
 namespace basalt::server::runtime::command::commands {

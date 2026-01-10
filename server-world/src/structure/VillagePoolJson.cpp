@@ -2,6 +2,7 @@
 #include <basalt/server/world/structure/VillagePoolJson.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 
+#include <cstdint>
 #include <map>
 #include <utility>
 #include <vector>

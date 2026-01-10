@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <cstdint>
 #include <map>
 #include <string>
 #include <unordered_map>

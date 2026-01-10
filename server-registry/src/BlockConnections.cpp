@@ -3,6 +3,7 @@
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/VanillaTables.hpp>
 
+#include <cstdint>
 #include <map>
 #include <string>
 #include <unordered_map>

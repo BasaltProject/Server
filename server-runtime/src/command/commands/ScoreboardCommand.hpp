@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/command/commands/ScoreboardCommand.hpp>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 

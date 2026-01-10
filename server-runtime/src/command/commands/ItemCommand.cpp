@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/command/commands/ItemCommands.hpp>
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 

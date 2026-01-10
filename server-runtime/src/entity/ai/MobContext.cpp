@@ -1,6 +1,8 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::entity::ai {
 
 const PlayerView* MobContext::nearestPlayer(double range) const {

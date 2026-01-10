@@ -3,6 +3,7 @@
 #include <basalt/server/world/terrain/JungleTempleStructureGenerator.hpp>
 
 #include <array>
+#include <cstdint>
 #include <cstdlib>
 #include <utility>
 

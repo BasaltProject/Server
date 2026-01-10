@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/world/MobEffects.hpp>
 
 #include <array>
+#include <cstdint>
 #include <vector>
 
 namespace basalt::server::runtime::world::mobEffects {

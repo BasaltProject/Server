@@ -22,6 +22,7 @@
 #include <basalt/server/world/terrain/decoration/TreePatchDecoration.hpp>
 #include <basalt/server/world/terrain/decoration/VinePatchDecoration.hpp>
 
+#include <cstdint>
 #include <functional>
 
 namespace basalt::server::world::terrain::decoration {

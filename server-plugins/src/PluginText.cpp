@@ -3,6 +3,7 @@
 #include <basalt/wire/io/FileIO.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <vector>
 
 namespace basalt::server::plugins {

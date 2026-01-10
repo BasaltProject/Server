@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/item/ItemDamageEffects.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>

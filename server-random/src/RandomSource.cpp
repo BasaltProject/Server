@@ -2,6 +2,7 @@
 #include <basalt/server/random/RandomSource.hpp>
 
 #include <cmath>
+#include <cstdint>
 
 namespace basalt::server::random {
 namespace {

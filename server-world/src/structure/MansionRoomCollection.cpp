@@ -1,5 +1,7 @@
 #include <basalt/server/world/structure/MansionRoomCollection.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::world::structure {
 
 std::string MansionRoomCollection::room1x1(random::RandomSource& random) const {

@@ -5,6 +5,7 @@
 #include <basalt/server/world/terrain/decoration/SmallFeatures.hpp>
 
 #include <array>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <optional>

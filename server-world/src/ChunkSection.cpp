@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/ChunkSection.hpp>
 
+#include <cstdint>
 #include <stdexcept>
 
 namespace basalt::server::world {

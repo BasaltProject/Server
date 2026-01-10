@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/sched/RegionMap.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <deque>
 #include <utility>
 

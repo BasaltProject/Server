@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/SelectableSlots.hpp>
 #include <basalt/server/runtime/world/Shelves.hpp>
 
+#include <cstdint>
 #include <deque>
 #include <functional>
 #include <map>

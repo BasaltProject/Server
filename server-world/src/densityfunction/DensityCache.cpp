@@ -2,6 +2,7 @@
 #include <basalt/server/world/densityfunction/DensityFunction.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
+#include <cstdint>
 #include <stdexcept>
 
 namespace basalt::server::world::densityfunction {

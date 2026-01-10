@@ -3,6 +3,7 @@
 #include <basalt/server/world/terrain/decoration/FlowerVegetation.hpp>
 
 #include <array>
+#include <cstdint>
 #include <optional>
 #include <stdexcept>
 #include <string_view>

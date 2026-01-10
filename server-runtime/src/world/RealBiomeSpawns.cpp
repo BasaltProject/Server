@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/world/RealBiomeSpawns.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 
+#include <cstdint>
 #include <expected>
 #include <utility>
 

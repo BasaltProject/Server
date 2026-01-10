@@ -9,6 +9,7 @@
 #include <basalt/wire/protocol/play/InventoryPackets.hpp>
 #include <basalt/wire/text/Component.hpp>
 
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime {

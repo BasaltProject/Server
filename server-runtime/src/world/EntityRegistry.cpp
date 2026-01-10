@@ -4,6 +4,7 @@
 #include <basalt/wire/common/Mth.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::runtime::world {

@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/player/Combat.hpp>
 
 #include <algorithm>
+#include <cstdint>
 
 namespace basalt::server::runtime::entity::entityCombat {
 namespace {

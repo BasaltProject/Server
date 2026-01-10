@@ -3,6 +3,8 @@
 #include <basalt/server/runtime/world/StructureSpawnLists.hpp>
 #include <basalt/server/world/structure/StructureSpawnOverrides.hpp>
 
+#include <cstdint>
+
 namespace basalt::server::runtime::world {
 namespace {
 

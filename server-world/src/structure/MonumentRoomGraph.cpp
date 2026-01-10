@@ -1,6 +1,7 @@
 #include <basalt/server/world/structure/MonumentRoomGraph.hpp>
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 namespace basalt::server::world::structure {

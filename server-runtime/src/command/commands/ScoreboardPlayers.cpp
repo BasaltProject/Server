@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/command/WorldArguments.hpp>
 
 #include <cmath>
+#include <cstdint>
 #include <string>
 #include <vector>
 

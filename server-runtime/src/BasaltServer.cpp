@@ -13,6 +13,7 @@
 #include <basalt/wire/multiversion/java/JavaTranslators.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
 
+#include <cstdint>
 #include <random>
 #include <utility>
 

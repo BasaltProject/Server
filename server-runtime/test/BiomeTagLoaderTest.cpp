@@ -4,6 +4,7 @@
 
 #include <doctest.h>
 
+#include <cstdint>
 #include <map>
 
 using basalt::server::runtime::world::BiomeTagLoader;

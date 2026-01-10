@@ -1,6 +1,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeConfigs.hpp>
 
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <string_view>
