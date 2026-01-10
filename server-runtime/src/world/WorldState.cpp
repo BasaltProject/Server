@@ -201,9 +201,31 @@ void WorldState::applyPendingWritesTo(Chunk& chunk) {
 
 namespace {
 
+/// North, south, west and east of a marked block, in the order the shape rules ask for them, or
+/// nothing when one of them lives in a chunk that is not here yet.
+[[nodiscard]] std::optional<std::array<std::int32_t, 4>>
+horizontalNeighbours(Chunk& chunk, const server::world::ChunkShapeUpdate& mark,
+                     const std::function<Chunk*(std::int32_t, std::int32_t)>& chunkAt) {
+    static constexpr std::array<registry::BlockFace, 4> kSides{registry::BlockFace::North, registry::BlockFace::South,
+                                                               registry::BlockFace::West, registry::BlockFace::East};
+    std::array<std::int32_t, 4> around{};
+    for (std::size_t index = 0; index < kSides.size(); ++index) {
+        const std::int32_t nx = mark.x + registry::stepX(kSides[index]);
+        const std::int32_t nz = mark.z + registry::stepZ(kSides[index]);
+        Chunk* holder = (nx >> 4) == chunk.chunkX() && (nz >> 4) == chunk.chunkZ() ? &chunk : chunkAt(nx >> 4, nz >> 4);
+        if (holder == nullptr) {
+            // The neighbour is not here yet; its own install redoes this block from its side.
+            return std::nullopt;
+        }
+        around[index] = holder->blockStateId(nx & 15, mark.y, nz & 15);
+    }
+    return around;
+}
+
 /// parity: `LevelChunk.postProcessGeneration` running `Block.updateFromNeighbourShapes` over what
-/// the structure pieces marked. Only the connecting blocks are redone here; a torch losing its
-/// support is a different check and is not one of these.
+/// the structure pieces marked, and the same pass `StructureTemplate.placeInWorld` ends with. Only
+/// the connecting blocks and the stairs are redone here; a torch losing its support is a different
+/// check and is not one of these.
 void redoShapes(Chunk& chunk, const std::function<Chunk*(std::int32_t, std::int32_t)>& chunkAt) {
     static constexpr std::array<std::pair<registry::BlockFace, std::string_view>, 4> kSides{
         {{registry::BlockFace::North, "north"},
@@ -212,27 +234,28 @@ void redoShapes(Chunk& chunk, const std::function<Chunk*(std::int32_t, std::int3
          {registry::BlockFace::East, "east"}}};
     for (const server::world::ChunkShapeUpdate& mark : chunk.shapeUpdates()) {
         const std::int32_t stateId = chunk.blockStateId(mark.x & 15, mark.y, mark.z & 15);
-        if (!registry::blockConnections::connects(stateId)) {
+        const bool connects = registry::blockConnections::connects(stateId);
+        if (!connects && !registry::blockConnections::isStairs(stateId)) {
+            continue;
+        }
+        const std::optional<std::array<std::int32_t, 4>> around = horizontalNeighbours(chunk, mark, chunkAt);
+        if (!around.has_value()) {
             continue;
         }
         std::map<std::string, std::string> wanted;
-        bool complete = true;
-        for (const auto& [face, name] : kSides) {
-            const std::int32_t nx = mark.x + registry::stepX(face);
-            const std::int32_t nz = mark.z + registry::stepZ(face);
-            Chunk* holder =
-                (nx >> 4) == chunk.chunkX() && (nz >> 4) == chunk.chunkZ() ? &chunk : chunkAt(nx >> 4, nz >> 4);
-            if (holder == nullptr) {
-                // The neighbour is not here yet; its own install redoes this block from its side.
-                complete = false;
-                break;
+        if (connects) {
+            for (std::size_t index = 0; index < kSides.size(); ++index) {
+                wanted[std::string{kSides[index].second}] =
+                    registry::blockConnections::connectsTo(stateId, (*around)[index], kSides[index].first) ? "true"
+                                                                                                           : "false";
             }
-            const std::int32_t neighbour = holder->blockStateId(nx & 15, mark.y, nz & 15);
-            wanted[std::string{name}] =
-                registry::blockConnections::connectsTo(stateId, neighbour, face) ? "true" : "false";
-        }
-        if (!complete) {
-            continue;
+        } else {
+            const std::optional<std::string_view> shape =
+                registry::blockConnections::stairShape(stateId, (*around)[0], (*around)[1], (*around)[2], (*around)[3]);
+            if (!shape.has_value()) {
+                continue;
+            }
+            wanted["shape"] = std::string{*shape};
         }
         const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
         if (block == nullptr) {
