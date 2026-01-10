@@ -103,9 +103,11 @@ constexpr std::array<StructureRotation, 4> kRotations{StructureRotation::None, S
 
 OceanRuinStructureGenerator::OceanRuinStructureGenerator(BiomeAt biomeAt, std::set<std::string, std::less<>> coldBiomes,
                                                          std::set<std::string, std::less<>> warmBiomes,
-                                                         TemplateOf templateOf, OceanFloorAt oceanFloorAt)
+                                                         TemplateOf templateOf, OceanFloorAt oceanFloorAt,
+                                                         WorldHeightAt worldHeightAt)
     : biomeAt_(std::move(biomeAt)), coldBiomes_(std::move(coldBiomes)), warmBiomes_(std::move(warmBiomes)),
-      templateOf_(std::move(templateOf)), oceanFloorAt_(std::move(oceanFloorAt)) {}
+      templateOf_(std::move(templateOf)), oceanFloorAt_(std::move(oceanFloorAt)),
+      worldHeightAt_(std::move(worldHeightAt)) {}
 
 const structure::StructurePlacementGrid& OceanRuinStructureGenerator::grid() {
     static const structure::StructurePlacementGrid built{20, 8, 14357621};
@@ -135,7 +137,7 @@ std::optional<bool> OceanRuinStructureGenerator::chooseVariant(std::int64_t seed
 
 StructurePos OceanRuinStructureGenerator::settle(const Chunk& chunk, const structure::StructureTemplate& piece,
                                                  StructurePos position, StructureRotation rotation) const {
-    const std::int32_t floor = oceanFloorAt_(position.x, position.z);
+    const std::int32_t floor = worldHeightAt_(position.x, position.z, HeightmapType::OceanFloor);
     const StructurePos start{position.x, floor, position.z};
     const StructurePos corner = plus(structure::transform(StructurePos{piece.size().x - 1, 0, piece.size().z - 1},
                                                           StructureMirror::None, rotation, kZero),

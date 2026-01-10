@@ -191,7 +191,10 @@ struct Run {
         {"minecraft:cold_ocean", "minecraft:frozen_ocean"},
         {"minecraft:warm_ocean", "minecraft:lukewarm_ocean"},
         templateOf,
-        [](std::int32_t x, std::int32_t z) { return bedTop(x, z) + 1; }};
+        [](std::int32_t x, std::int32_t z) { return bedTop(x, z) + 1; },
+        // The settle reads the world's map, which over this synthetic bed answers the same as the
+        // density estimate: what the goldens pin is the sag scan, not the gap between the two.
+        [](std::int32_t x, std::int32_t z, HeightmapType) { return bedTop(x, z) + 1; }};
     const auto centre = OceanRuinStructureGenerator::grid().candidateChunk(seed, 0, 0);
     Run result;
     std::uint64_t checksum = 14695981039346656037ULL;

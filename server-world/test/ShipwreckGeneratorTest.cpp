@@ -209,7 +209,12 @@ struct Run {
         {"minecraft:beach", "minecraft:snowy_beach"},
         templateOf,
         surfaceHeightAt,
-        oceanFloorAt};
+        oceanFloorAt,
+        // The settle reads the world's map, which here answers the same as the density estimate:
+        // what the test pins is the mean over the footprint, not the gap between the two sources.
+        [oceanFloorAt, surfaceHeightAt](std::int32_t x, std::int32_t z, HeightmapType type) {
+            return type == HeightmapType::WorldSurface ? surfaceHeightAt(x, z) : oceanFloorAt(x, z);
+        }};
     const auto centre = ShipwreckStructureGenerator::grid().candidateChunk(seed, 0, 0);
     Run result;
     std::uint64_t checksum = 14695981039346656037ULL;

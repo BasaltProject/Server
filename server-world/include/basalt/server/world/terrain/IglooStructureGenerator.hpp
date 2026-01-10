@@ -3,6 +3,7 @@
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/structure/StructurePlacementGrid.hpp>
 #include <basalt/server/world/structure/StructureTemplate.hpp>
+#include <basalt/server/world/terrain/NeighbourTerrain.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -27,7 +28,7 @@ public:
     static constexpr std::int32_t kSurfaceStructuresStep = 4;
 
     IglooStructureGenerator(BiomeAt biomeAt, std::set<std::string, std::less<>> iglooBiomes, TemplateOf templateOf,
-                            SurfaceHeightAt surfaceHeightAt);
+                            SurfaceHeightAt surfaceHeightAt, WorldHeightAt worldHeightAt);
 
     void generateInto(Chunk& chunk, std::int64_t seed);
 
@@ -55,6 +56,7 @@ private:
     std::set<std::string, std::less<>> iglooBiomes_;
     TemplateOf templateOf_;
     SurfaceHeightAt surfaceHeightAt_;
+    WorldHeightAt worldHeightAt_;
 };
 
 } // namespace basalt::server::world::terrain

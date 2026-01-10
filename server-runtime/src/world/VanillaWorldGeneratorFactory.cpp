@@ -115,6 +115,9 @@ struct VanillaWorldGeneratorFactory::Built {
     std::unique_ptr<terrain::NetherStructureGenerator> netherStructures;
     std::unique_ptr<terrain::EndCityStructureGenerator> endCities;
     std::unique_ptr<terrain::NeighbourTerrainCache> neighbours;
+    /// Its own, not the one the features read: a structure height query generates chunks a feature
+    /// never asked for, and sharing the cache moves what the features find in it.
+    std::unique_ptr<terrain::NeighbourTerrainCache> structureHeights;
     std::unique_ptr<SpawnEquipmentFinalizer> equipment;
     terrain::TerrainStructureGenerators generators;
     std::int64_t seed = 0;
@@ -242,6 +245,13 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
     const terrain::NoiseColumnHeights& columns = *built->columns;
     const auto surfaceHeight = [&columns](std::int32_t x, std::int32_t z) { return columns.surfaceHeight(x, z); };
     const auto oceanFloor = [&columns](std::int32_t x, std::int32_t z) { return columns.oceanFloorHeight(x, z); };
+    // A cache and not the bounded view the features read: a piece settling on the mean of its
+    // footprint is placed by every chunk it crosses, and a view that sometimes refuses would tear it
+    // in two. Its own cache, because generating a chunk nobody asked for moves what the features
+    // find in theirs.
+    const auto worldHeight = [holder = built.get()](std::int32_t x, std::int32_t z, server::world::HeightmapType type) {
+        return holder->structureHeights->worldgenHeightAt(x, z, type);
+    };
 
     built->mineshafts = std::make_unique<terrain::MineshaftStructureGenerator>(
         blockBiome, biomesOf(tags, "minecraft:has_structure/mineshaft"),
@@ -285,12 +295,13 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
         quartBiome, biomesOf(tags, "minecraft:has_structure/buried_treasure"), surfaceHeight);
     built->shipwrecks = std::make_unique<terrain::ShipwreckStructureGenerator>(
         quartBiome, biomesOf(tags, "minecraft:has_structure/shipwreck"),
-        biomesOf(tags, "minecraft:has_structure/shipwreck_beached"), templateOf, surfaceHeight, oceanFloor);
+        biomesOf(tags, "minecraft:has_structure/shipwreck_beached"), templateOf, surfaceHeight, oceanFloor,
+        worldHeight);
     built->oceanRuins = std::make_unique<terrain::OceanRuinStructureGenerator>(
         quartBiome, biomesOf(tags, "minecraft:has_structure/ocean_ruin_cold"),
-        biomesOf(tags, "minecraft:has_structure/ocean_ruin_warm"), templateOf, oceanFloor);
+        biomesOf(tags, "minecraft:has_structure/ocean_ruin_warm"), templateOf, oceanFloor, worldHeight);
     built->igloos = std::make_unique<terrain::IglooStructureGenerator>(
-        quartBiome, biomesOf(tags, "minecraft:has_structure/igloo"), templateOf, surfaceHeight);
+        quartBiome, biomesOf(tags, "minecraft:has_structure/igloo"), templateOf, surfaceHeight, worldHeight);
     built->ancientCities = std::make_unique<terrain::JigsawStructureGenerator>(
         ancientCitySettings(), *built->overworldRouter, structure::StructurePlacementGrid{24, 8, 20083232}, blockBiome,
         biomesOf(tags, "minecraft:has_structure/ancient_city"), poolLookup, templateOf);
@@ -323,6 +334,13 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
         std::make_unique<terrain::NeighbourTerrainCache>([&world](std::int32_t neighbourX, std::int32_t neighbourZ) {
             // Moved out rather than copied: a chunk owns its sections, and the terrain that made
             // it is finished with them the moment it answers.
+            terrain::realTerrainGenerator::GeneratedTerrain terrain = terrain::realTerrainGenerator::generateTerrain(
+                *world.overworldRouter, *world.overworldSurface, neighbourX, neighbourZ, world.seed, world.generators);
+            return std::move(terrain.chunk());
+        });
+
+    built->structureHeights =
+        std::make_unique<terrain::NeighbourTerrainCache>([&world](std::int32_t neighbourX, std::int32_t neighbourZ) {
             terrain::realTerrainGenerator::GeneratedTerrain terrain = terrain::realTerrainGenerator::generateTerrain(
                 *world.overworldRouter, *world.overworldSurface, neighbourX, neighbourZ, world.seed, world.generators);
             return std::move(terrain.chunk());

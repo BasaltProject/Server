@@ -129,6 +129,10 @@ struct Run {
                                       [surface](std::int32_t x, std::int32_t z) {
                                           const std::int32_t rest = (x + z) % 4;
                                           return surface + (rest < 0 ? rest + 4 : rest);
+                                      },
+                                      [surface](std::int32_t x, std::int32_t z, HeightmapType) {
+                                          const std::int32_t rest = (x + z) % 4;
+                                          return surface + (rest < 0 ? rest + 4 : rest);
                                       }};
     // Centred on the candidate the grid picks, which is 32 chunks wide.
     const auto centre = IglooStructureGenerator::grid().candidateChunk(seed, 0, 0);
