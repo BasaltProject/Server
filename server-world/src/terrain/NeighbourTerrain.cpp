@@ -94,9 +94,16 @@ decltype(auto) NeighbourTerrainCache::withChunk(const std::int64_t key, const st
     return reader(found->second);
 }
 
+void NeighbourTerrainCache::setQueuedAt(QueuedAt queuedAt) { queuedAt_ = std::move(queuedAt); }
+
 std::optional<std::int32_t> NeighbourTerrainCache::blockAt(const std::int32_t neighbourX, const std::int32_t neighbourZ,
                                                            const std::int32_t worldX, const std::int32_t y,
                                                            const std::int32_t worldZ) {
+    if (queuedAt_) {
+        if (const std::optional<std::int32_t> queued = queuedAt_(worldX, y, worldZ); queued.has_value()) {
+            return queued;
+        }
+    }
     return withChunk(keyOf(neighbourX, neighbourZ), neighbourX, neighbourZ,
                      [&](const Chunk& chunk) -> std::optional<std::int32_t> {
                          const ChunkHeight bounds = chunk.verticalBounds();

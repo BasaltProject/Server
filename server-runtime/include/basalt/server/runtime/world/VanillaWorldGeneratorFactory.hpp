@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/StructureTemplates.hpp>
 #include <basalt/server/runtime/world/WorldMetadata.hpp>
 #include <basalt/server/world/Chunk.hpp>
+#include <basalt/server/world/terrain/NeighbourTerrain.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 
 #include <cstdint>
@@ -54,6 +55,9 @@ public:
         server::world::terrain::StrongholdStructureGenerator* strongholds = nullptr;
         /// parity: `randomState().sampler().findSpawnPosition()`, in chunk coordinates.
         std::function<std::pair<std::int32_t, std::int32_t>()> spawnChunk;
+        /// Installs the lookup that lets a neighbour read see what another chunk already queued for
+        /// it, the way vanilla's proto chunk already holds that write.
+        std::function<void(server::world::terrain::NeighbourTerrainCache::QueuedAt)> useQueuedWrites;
     };
 
     /// What the structure caches hold across every world built by this factory.

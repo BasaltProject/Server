@@ -144,6 +144,10 @@ public:
     /// decoration, which is the same point.
     void applyPendingWritesTo(server::world::Chunk& chunk);
 
+    /// What a neighbour already queued for a cell of a chunk that has not generated yet.
+    [[nodiscard]] std::optional<std::int32_t> queuedWriteAt(std::int32_t worldX, std::int32_t y,
+                                                            std::int32_t worldZ) const;
+
     /// Hands the chunk over to be installed, or installs it here when nobody owns this world.
     void installLater(server::world::Chunk chunk);
 
