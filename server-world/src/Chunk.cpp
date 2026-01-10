@@ -451,6 +451,16 @@ std::int32_t Chunk::decorationBlockStateId(std::int32_t worldX, std::int32_t y, 
     return registry::blocks::air().stateId;
 }
 
+std::optional<std::int32_t> Chunk::queuedDecorationStateId(std::int32_t worldX, std::int32_t y,
+                                                           std::int32_t worldZ) const {
+    for (const ChunkGeneratedBlockWrite& write : generatedBlockWrites_) {
+        if (write.x == worldX && write.y == y && write.z == worldZ) {
+            return write.stateId;
+        }
+    }
+    return std::nullopt;
+}
+
 void Chunk::setDecorationBlockStateId(std::int32_t worldX, std::int32_t y, std::int32_t worldZ, std::int32_t stateId,
                                       std::optional<std::int32_t> expectedExternalStateId,
                                       bool replaceAnyExternalState) {

@@ -62,6 +62,12 @@ std::optional<std::int32_t> PlacementRegion::blockStateId(std::int32_t x, std::i
             return stateId;
         }
     }
+    // parity: a feature of an earlier step may already have queued a write here, and vanilla would
+    // be reading the block it put down. Its own buffer is not this one: a geode keeps its writes
+    // elsewhere, and only the chunk holds every step's.
+    if (const std::optional<std::int32_t> queued = chunk_->queuedDecorationStateId(x, y, z); queued.has_value()) {
+        return *queued;
+    }
     if (externalBlockState_) {
         return externalBlockState_(x, y, z);
     }

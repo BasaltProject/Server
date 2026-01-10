@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace basalt::server::runtime::world {
@@ -38,6 +40,9 @@ public:
     /// Queues the mobs a just-installed chunk's structures brought with it. Called with no lock
     /// held.
     void addPendingGeneratedEntities(std::vector<server::world::ChunkGeneratedEntity> entities);
+
+    /// Forgets which source chunk won each cell of this now-evicted chunk.
+    void forgetGeneratedWriteSources(std::int64_t chunkKey);
 
     /// Forgets the generated-entity identities that belonged to this now-evicted chunk.
     void forgetGeneratedEntities(std::int64_t chunkKey);
@@ -104,6 +109,16 @@ private:
     };
 
     std::map<std::int64_t, std::vector<QueuedBlockWrite>> pendingGeneratedBlockWrites_;
+
+    /// Which source chunk last wrote each cell, so two neighbours competing for one cell resolve the
+    /// same way whatever order the generation threads deliver them in. Without it the last write to
+    /// arrive won and the same seed produced different worlds.
+    std::map<std::int64_t, std::unordered_map<std::int64_t, std::pair<std::int32_t, std::int32_t>>> writeSourceByCell_;
+
+    /// Answers whether this source may write the cell, remembering it when it may.
+    [[nodiscard]] bool sourceMayWrite(std::int64_t chunkKey, std::int64_t cellKey, std::int32_t sourceChunkX,
+                                      std::int32_t sourceChunkZ);
+
     std::map<std::int64_t, std::vector<server::world::ChunkGeneratedBlockEntityWrite>>
         pendingGeneratedBlockEntityWrites_;
     std::map<std::int64_t, std::vector<server::world::ChunkGeneratedBlockTick>> pendingGeneratedBlockTicks_;

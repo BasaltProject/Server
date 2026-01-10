@@ -129,6 +129,31 @@ void PendingChunkDecorations::addPendingGeneratedEntities(std::vector<server::wo
     }
 }
 
+bool PendingChunkDecorations::sourceMayWrite(const std::int64_t chunkKey, const std::int64_t cellKey,
+                                             const std::int32_t sourceChunkX, const std::int32_t sourceChunkZ) {
+    const std::pair<std::int32_t, std::int32_t> source{sourceChunkX, sourceChunkZ};
+    auto& cells = writeSourceByCell_[chunkKey];
+    const auto found = cells.find(cellKey);
+    if (found == cells.end()) {
+        cells.emplace(cellKey, source);
+        return true;
+    }
+    if (found->second == source) {
+        return true;
+    }
+    // The one that decorates last wins, whichever arrived first. Reading the winner off the cell
+    // instead made the result depend on which generation thread got there first.
+    if (decoratesBefore(sourceChunkX, sourceChunkZ, found->second.first, found->second.second)) {
+        return false;
+    }
+    found->second = source;
+    return true;
+}
+
+void PendingChunkDecorations::forgetGeneratedWriteSources(const std::int64_t chunkKey) {
+    writeSourceByCell_.erase(chunkKey);
+}
+
 void PendingChunkDecorations::forgetGeneratedEntities(std::int64_t chunkKey) {
     std::erase_if(generatedEntitiesByKey_, [chunkKey](const auto& entry) { return entry.first.chunkKey == chunkKey; });
 }
@@ -144,7 +169,7 @@ void PendingChunkDecorations::deliverGeneratedBlockWrites(std::span<const ChunkG
         if (target == nullptr) {
             pendingGeneratedBlockWrites_[targetKey].push_back(
                 QueuedBlockWrite{.write = write, .sourceChunkX = sourceChunkX, .sourceChunkZ = sourceChunkZ});
-        } else {
+        } else if (sourceMayWrite(targetKey, cellKey(write), sourceChunkX, sourceChunkZ)) {
             applyGeneratedBlockWrite(*target, write,
                                      decoratesBefore(targetChunkX, targetChunkZ, sourceChunkX, sourceChunkZ));
         }
@@ -166,6 +191,10 @@ void PendingChunkDecorations::applyPendingGeneratedBlockWrites(Chunk& chunk, con
         // cover a write that in vanilla went on last.
         if (phase == WritePhase::BeforeDecoration && onTop) {
             notYet.push_back(entry);
+            continue;
+        }
+        if (!sourceMayWrite(key(chunk.chunkX(), chunk.chunkZ()), cellKey(entry.write), entry.sourceChunkX,
+                            entry.sourceChunkZ)) {
             continue;
         }
         if (applyGeneratedBlockWrite(chunk, entry.write, onTop, &queued)) {
