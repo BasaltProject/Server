@@ -233,7 +233,7 @@ void check(const Run& result, std::int32_t solid, std::int32_t biomes, std::int6
 } // namespace
 
 TEST_CASE("the pipelines generate what the jar generates") {
-    SUBCASE("plains") { check(runOverworld(1234, 0), 126913, 6144, -5180958617207259769LL); }
+    SUBCASE("plains") { check(runOverworld(1234, 0), 126910, 6144, 6779609785803754535LL); }
 
     SUBCASE("desert") { check(runOverworld(1234, 1), 126919, 6144, -6765849239462433688LL); }
 

@@ -5,6 +5,7 @@
 #include <basalt/server/world/terrain/decoration/MushroomPatchDecoration.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <set>
@@ -33,16 +34,61 @@ constexpr std::int32_t kMushroomIslandIndex = 79;
     return block.has_value() && paths.find(block->block.path()) != paths.end();
 }
 
-/// parity: `MushroomBlock.canSurvive` also asks for light under 13. Only a column with nothing over
-/// it is refused here: that is sky light 15 exactly, the one case vanilla is certain to reject. A
-/// sheltered spot can still be too bright, and those are left in rather than guessed at.
-[[nodiscard]] bool openToSky(const PatchRegion& region, const DecorationPos& target, ChunkHeight bounds) {
-    for (std::int32_t y = target.y + 1; y <= bounds.maxY(); ++y) {
-        if (light::skyLight::opacity(region.get(DecorationPos{target.x, y, target.z})) > 0) {
+/// Whether the sky reaches this block at full strength. parity: `ChunkSkyLightSources`, whose column
+/// is lit to 15 from the first occluded edge upward, and an edge is occluded as soon as the block
+/// under it dampens light at all.
+[[nodiscard]] bool skySource(const PatchRegion& region, const DecorationPos& at, ChunkHeight bounds) {
+    for (std::int32_t y = at.y; y <= bounds.maxY(); ++y) {
+        if (light::skyLight::opacity(region.get(DecorationPos{at.x, y, at.z})) > 0) {
             return false;
         }
     }
     return true;
+}
+
+[[nodiscard]] bool transparent(const PatchRegion& region, const DecorationPos& at) {
+    return light::skyLight::opacity(region.get(at)) == 0;
+}
+
+constexpr std::array<DecorationPos, 6> kAround = {DecorationPos{1, 0, 0}, DecorationPos{-1, 0, 0},
+                                                  DecorationPos{0, 1, 0}, DecorationPos{0, -1, 0},
+                                                  DecorationPos{0, 0, 1}, DecorationPos{0, 0, -1}};
+
+[[nodiscard]] DecorationPos step(const DecorationPos& at, const DecorationPos& by) {
+    return DecorationPos{at.x + by.x, at.y + by.y, at.z + by.z};
+}
+
+/// parity: `MushroomBlock.canSurvive` also asks for `getRawBrightness < 13`. Sky light loses at least
+/// one level per block (`LightEngine.getOpacity` is `max(1, dampening)`), so reaching 13 needs a
+/// source within two steps and nothing more distant can matter. The block itself is air here, which
+/// costs one, so the three ways to be too bright are: this column is open, a neighbour's column is,
+/// or a neighbour that dampens nothing has one of its own.
+[[nodiscard]] bool tooBrightForMushroom(const PatchRegion& region, const DecorationPos& target, ChunkHeight bounds) {
+    if (skySource(region, target, bounds)) {
+        return true;
+    }
+    for (const DecorationPos& first : kAround) {
+        const DecorationPos near = step(target, first);
+        if (near.y < bounds.minY() || near.y > bounds.maxY()) {
+            continue;
+        }
+        if (skySource(region, near, bounds)) {
+            return true;
+        }
+        if (!transparent(region, near)) {
+            continue;
+        }
+        for (const DecorationPos& second : kAround) {
+            const DecorationPos far = step(near, second);
+            if (far == target || far.y < bounds.minY() || far.y > bounds.maxY()) {
+                continue;
+            }
+            if (skySource(region, far, bounds)) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 [[nodiscard]] std::string_view biomePath(std::string_view id) {
@@ -148,7 +194,7 @@ void placeCandidate(PatchRegion& region, random::RandomSource& random, const Dec
     if (!registry::blockShapes::isSolidRender(below)) {
         return;
     }
-    if (!overridesLightRequirement(below) && openToSky(region, target, bounds)) {
+    if (!overridesLightRequirement(below) && tooBrightForMushroom(region, target, bounds)) {
         return;
     }
     region.set(target, stateId);
