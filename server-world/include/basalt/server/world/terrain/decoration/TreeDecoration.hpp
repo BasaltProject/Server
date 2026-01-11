@@ -21,11 +21,10 @@
 namespace basalt::server::world::terrain::decoration {
 
 /// Real per-biome tree placement, from the jar's own `VegetationPlacements` and
-/// `BiomeDefaultFeatures`.
-///
-/// A `RANDOM_SELECTOR` rolls its entries in declaration order, each with its own draw, and stops at
-/// the first that lands. An empty candidate marks a real entry that is not ported yet: it still
-/// consumes the draw, and places nothing.
+/// `BiomeDefaultFeatures`. A `RANDOM_SELECTOR` rolls its entries in declaration order, each with its
+/// own draw, and stops at the first that lands. All 21 of the jar's selectors are here, keyed by
+/// placed feature name: `trees_mangrove` is the jar's `mangrove_vegetation`, and
+/// `trees_windswept_forest` shares `trees_windswept_hills`.
 namespace treeDecoration {
 
 using Candidate = std::function<void(Chunk&, random::RandomSource&, const DecorationPos&, random::RandomSource&)>;
