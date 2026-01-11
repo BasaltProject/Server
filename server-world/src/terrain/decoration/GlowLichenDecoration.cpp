@@ -103,6 +103,16 @@ const std::set<std::int32_t>& canBePlacedOnStateIds() {
            registry::blockStateFamilies::isGlowLichenState(stateId);
 }
 
+/// parity: `MultifaceSpreader.DefaultSpreaderConfig.stateCanBeReplaced`. The spread step is stricter
+/// than the first placement: it takes water only where it is a source, while an origin or a search
+/// target takes any water level.
+[[nodiscard]] bool spreadCanReplace(std::int32_t stateId) {
+    if (registry::blocks::isAir(stateId) || registry::blockStateFamilies::isGlowLichenState(stateId)) {
+        return true;
+    }
+    return isWaterBlock(stateId) && stateId == registry::blocks::water().stateId;
+}
+
 /// Source water only: a flowing level would waterlog the lichen with the wrong fluid state.
 [[nodiscard]] bool hasSourceWaterFluid(std::int32_t stateId) {
     const std::int32_t water = registry::blocks::water().stateId;
@@ -205,7 +215,7 @@ void spread(LichenRegion& region, random::RandomSource& random, const Decoration
             std::pair{relative(relative(source, spreadDirection), startingFace), opposite(spreadDirection)}};
         for (const auto& [position, face] : candidates) {
             const std::optional<std::int32_t> oldState = region.get(position);
-            if (!oldState.has_value() || !isAirWaterOrLichen(*oldState)) {
+            if (!oldState.has_value() || !spreadCanReplace(*oldState)) {
                 continue;
             }
             // After the first placement vanilla attaches by the generic sturdy-face test, not by the
