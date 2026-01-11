@@ -84,10 +84,10 @@ void check(const Run& result, std::int32_t written, std::size_t blockEntities, s
 
 } // namespace
 
-TEST_CASE("the mineshafts start where the frozen kotlin starts them") {
+TEST_CASE("the mineshafts start where the jar starts them") {
     SUBCASE("plains") {
         check(run(12345, 64, [](std::int32_t, std::int32_t, std::int32_t) { return std::string{"minecraft:plains"}; }),
-              6277, 4, 0, 1351777243360702303LL);
+              6277, 4, 0, -7198636584338907090LL);
     }
 
     SUBCASE("badlands") {
@@ -105,7 +105,7 @@ TEST_CASE("the mineshafts start where the frozen kotlin starts them") {
     SUBCASE("both") {
         // A biome in both tags, so the type comes from the coin flip and not from the refusal.
         check(run(12345, 64, [](std::int32_t, std::int32_t, std::int32_t) { return std::string{"minecraft:savanna"}; }),
-              6277, 4, 0, 1351777243360702303LL);
+              6277, 4, 0, -7198636584338907090LL);
     }
 
     SUBCASE("layered") {
@@ -114,7 +114,7 @@ TEST_CASE("the mineshafts start where the frozen kotlin starts them") {
                   [](std::int32_t, std::int32_t y, std::int32_t) {
                       return std::string{y >= 32 ? "minecraft:plains" : "minecraft:badlands"};
                   }),
-              6277, 4, 0, 1351777243360702303LL);
+              6277, 4, 0, -7198636584338907090LL);
     }
 
     SUBCASE("otherSeed") {

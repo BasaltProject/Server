@@ -2,6 +2,7 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/world/ChunkHeight.hpp>
 #include <basalt/server/world/structure/MineshaftFill.hpp>
 #include <basalt/server/world/structure/StructurePieceFill.hpp>
 
@@ -38,6 +39,16 @@ constexpr std::int32_t kLowerFloorHeight = 3;
 
 [[nodiscard]] std::int32_t cobweb() {
     static const std::int32_t stateId = named("cobweb");
+    return stateId;
+}
+
+[[nodiscard]] std::int32_t lava() {
+    static const std::int32_t stateId = named("lava");
+    return stateId;
+}
+
+[[nodiscard]] std::int32_t ironChain() {
+    static const std::int32_t stateId = named("iron_chain");
     return stateId;
 }
 
@@ -182,13 +193,82 @@ void setPlanks(const StructurePieceFill& fill, const MineshaftBlocks& blocks, st
     fill.place(blocks.planks(), x, y, z);
 }
 
+/// parity: `StructurePiece.isReplaceableByStructures`. `liquid()` is a block property, not a fluid
+/// state, so a waterlogged block is not empty here and a bubble column is.
+[[nodiscard]] bool isReplaceableByStructures(std::int32_t stateId) {
+    if (registry::blocks::isAir(stateId)) {
+        return true;
+    }
+    static const std::set<std::string, std::less<>> paths = {"water",       "lava",     "bubble_column",
+                                                             "glow_lichen", "seagrass", "tall_seagrass"};
+    const wire::common::Identifier* block = blockOf(stateId);
+    return block != nullptr && paths.find(block->path()) != paths.end();
+}
+
+/// parity: `Block.canSupportCenter(level, pos, Direction.DOWN)`, which is the centre of the face
+/// rather than the whole of it, minus the `#unstable_bottom_center` tag: only the fence gates.
+[[nodiscard]] bool canSupportCentreBelow(std::int32_t stateId) {
+    const wire::common::Identifier* block = blockOf(stateId);
+    if (block != nullptr && block->path().ends_with("fence_gate")) {
+        return false;
+    }
+    return registry::blockShapes::supportsCentre(stateId, registry::BlockFace::Down);
+}
+
+/// parity: `!(state.getBlock() instanceof FallingBlock)`. A chain refuses to hang from what falls.
+[[nodiscard]] bool isFallingBlock(std::int32_t stateId) {
+    static const std::set<std::string, std::less<>> paths = {"sand",  "red_sand",      "gravel",       "dragon_egg",
+                                                             "anvil", "chipped_anvil", "damaged_anvil"};
+    const wire::common::Identifier* block = blockOf(stateId);
+    if (block == nullptr) {
+        return false;
+    }
+    return paths.find(block->path()) != paths.end() || block->path().ends_with("_concrete_powder");
+}
+
+/// parity: `fillPillarDownOrChainUp`. The support does not stand where the plank is: it looks down
+/// for footing and fills the gap under the plank with wood, or, failing that, up for a ceiling and
+/// hangs a fence and a chain from it. Both searches advance one step at a time, together, so the
+/// nearer of the two wins.
+void fillPillarDownOrChainUp(const StructurePieceFill& fill, const MineshaftBlocks& blocks, std::int32_t x,
+                             std::int32_t y, std::int32_t z) {
+    const std::int32_t originY = fill.worldY(y);
+    bool checkBelow = true;
+    bool checkAbove = true;
+    for (std::int32_t distance = 1; checkBelow || checkAbove; ++distance) {
+        if (checkBelow) {
+            const std::int32_t below = fill.blockAt(x, y - distance, z);
+            const bool emptyBelow = isReplaceableByStructures(below) && !sameBlock(below, lava());
+            if (!emptyBelow && registry::blockShapes::isFaceSturdy(below, registry::BlockFace::Up)) {
+                for (std::int32_t pillarY = y - distance + 1; pillarY < y; ++pillarY) {
+                    fill.placeRaw(blocks.log(), x, pillarY, z);
+                }
+                return;
+            }
+            checkBelow = distance <= 20 && emptyBelow && originY - distance > kOverworldHeight.minY() + 1;
+        }
+        if (checkAbove) {
+            const std::int32_t above = fill.blockAt(x, y + distance, z);
+            const bool emptyAbove = isReplaceableByStructures(above);
+            if (!emptyAbove && canSupportCentreBelow(above) && !isFallingBlock(above)) {
+                fill.placeRaw(blocks.fence(), x, y + 1, z);
+                for (std::int32_t chainY = y + 2; chainY < y + distance; ++chainY) {
+                    fill.placeRaw(ironChain(), x, chainY, z);
+                }
+                return;
+            }
+            checkAbove = distance <= 50 && emptyAbove && originY + distance < kOverworldHeight.maxY();
+        }
+    }
+}
+
 void placeDoubleSupport(const StructurePieceFill& fill, const MineshaftBlocks& blocks, std::int32_t x, std::int32_t y,
                         std::int32_t z) {
     if (sameBlock(fill.blockAt(x, y, z), blocks.planks())) {
-        fill.place(blocks.log(), x, y, z);
+        fillPillarDownOrChainUp(fill, blocks, x, y, z);
     }
     if (sameBlock(fill.blockAt(x + 2, y, z), blocks.planks())) {
-        fill.place(blocks.log(), x + 2, y, z);
+        fillPillarDownOrChainUp(fill, blocks, x + 2, y, z);
     }
 }
 

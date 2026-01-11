@@ -31,6 +31,11 @@ public:
 
     void place(std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) const;
 
+    /// The write a piece makes with `level.setBlock` instead of `placeBlock`: no replace check, no
+    /// turning by the orientation and no shape pass afterwards. It is what the mineshaft's support
+    /// pillars use, and the difference is visible: they overwrite another piece's frame.
+    void placeRaw(std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) const;
+
     /// Adds a generated entity at the centre of a piece-local block, if this chunk owns it.
     /// parity: the structures that call `addFreshEntity` while placing, such as the mineshaft's
     /// chest minecart, which rides the rail it just put down.

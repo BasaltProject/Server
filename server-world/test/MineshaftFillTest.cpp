@@ -104,20 +104,20 @@ void check(const Run& result, std::int32_t placed, std::int32_t written, std::si
 
 } // namespace
 
-TEST_CASE("the mineshaft fill writes what the frozen kotlin writes") {
+TEST_CASE("the mineshaft fill writes what the jar writes") {
     SUBCASE("normal") {
         check(run(4242, MineshaftType::Normal, false, "minecraft:plains", 40), 244, 22655, 2, 5, 0,
-              1657795336415617398LL);
+              -5252154790985086062LL);
     }
 
     SUBCASE("mesa") {
         check(run(4242, MineshaftType::Mesa, false, "minecraft:badlands", 40), 390, 36630, 4, 4, 0,
-              -3355036388178176706LL);
+              6487294457901109038LL);
     }
 
     SUBCASE("flooded") {
         check(run(4242, MineshaftType::Normal, true, "minecraft:plains", 40), 244, 27505, 3, 2, 0,
-              1807300684606125337LL);
+              -120515259870943891LL);
     }
 
     SUBCASE("deepDark") {
