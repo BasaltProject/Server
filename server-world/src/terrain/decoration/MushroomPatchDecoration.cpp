@@ -1,10 +1,13 @@
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/world/light/Light.hpp>
 #include <basalt/server/world/terrain/decoration/MushroomPatchDecoration.hpp>
 
 #include <algorithm>
 #include <cstdint>
+#include <optional>
+#include <set>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -21,6 +24,25 @@ constexpr std::int32_t kMushroomIslandIndex = 79;
         throw std::runtime_error{"unknown block '" + std::string{path} + "'"};
     }
     return found->stateId;
+}
+
+/// parity: block tag `overrides_mushroom_light_requirement`.
+[[nodiscard]] bool overridesLightRequirement(std::int32_t stateId) {
+    static const std::set<std::string, std::less<>> paths = {"mycelium", "podzol", "crimson_nylium", "warped_nylium"};
+    const std::optional<registry::BlockState> block = registry::blocks::byStateId(stateId);
+    return block.has_value() && paths.find(block->block.path()) != paths.end();
+}
+
+/// parity: `MushroomBlock.canSurvive` also asks for light under 13. Only a column with nothing over
+/// it is refused here: that is sky light 15 exactly, the one case vanilla is certain to reject. A
+/// sheltered spot can still be too bright, and those are left in rather than guessed at.
+[[nodiscard]] bool openToSky(const PatchRegion& region, const DecorationPos& target, ChunkHeight bounds) {
+    for (std::int32_t y = target.y + 1; y <= bounds.maxY(); ++y) {
+        if (light::skyLight::opacity(region.get(DecorationPos{target.x, y, target.z})) > 0) {
+            return false;
+        }
+    }
+    return true;
 }
 
 [[nodiscard]] std::string_view biomePath(std::string_view id) {
@@ -119,8 +141,14 @@ void placeCandidate(PatchRegion& region, random::RandomSource& random, const Dec
     if (target.y < bounds.minY() || target.y > bounds.maxY() || !registry::blocks::isAir(region.get(target))) {
         return;
     }
-    if (target.y == bounds.minY() ||
-        !registry::blockShapes::isSolidRender(region.get(DecorationPos{target.x, target.y - 1, target.z}))) {
+    if (target.y == bounds.minY()) {
+        return;
+    }
+    const std::int32_t below = region.get(DecorationPos{target.x, target.y - 1, target.z});
+    if (!registry::blockShapes::isSolidRender(below)) {
+        return;
+    }
+    if (!overridesLightRequirement(below) && openToSky(region, target, bounds)) {
         return;
     }
     region.set(target, stateId);

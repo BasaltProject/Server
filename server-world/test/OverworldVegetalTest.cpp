@@ -134,7 +134,7 @@ TEST_CASE("the overworld vegetal step runs its nodes in the frozen kotlin's orde
     }
 }
 
-TEST_CASE("the overworld vegetal step places what the frozen kotlin places") {
+TEST_CASE("the overworld vegetal step places what the jar places") {
     SUBCASE("plains") {
         const Run result = run("minecraft:plains");
         CHECK(result.placed == 68);
@@ -158,9 +158,9 @@ TEST_CASE("the overworld vegetal step places what the frozen kotlin places") {
 
     SUBCASE("swamp") {
         const Run result = run("minecraft:swamp");
-        CHECK(result.placed == 784);
+        CHECK(result.placed == 756);
         CHECK(result.deferred == 167);
-        CHECK(result.checksum == -8582593161705220864LL);
+        CHECK(result.checksum == 8064041867149315264LL);
     }
 
     SUBCASE("warm_ocean") {

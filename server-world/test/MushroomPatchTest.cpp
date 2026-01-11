@@ -22,8 +22,9 @@ namespace registry = basalt::server::registry;
 
 namespace {
 
-/// A stripe of non-solid-render top blocks beside solid ones: mushrooms test isSolidRender, so a
-/// uniformly solid floor would never exercise the rejection half of that check.
+/// A stripe of non-solid-render top blocks beside solid ones, so the isSolidRender test is
+/// exercised both ways. The roof at 73 is what makes the floor at 70 usable at all: a mushroom
+/// needs light under 13, so an open column is refused outright.
 [[nodiscard]] Chunk groundChunk(std::int32_t chunkX, std::int32_t chunkZ) {
     Chunk chunk{chunkX, chunkZ};
     for (std::int32_t x = 0; x < 16; ++x) {
@@ -32,6 +33,7 @@ namespace {
                 chunk.setBlockStateId(x, y, z, registry::blocks::stone().stateId);
             }
             chunk.setBlockStateId(x, 70, z, x % 4 == 0 ? stateIdOf("glass") : registry::blocks::stone().stateId);
+            chunk.setBlockStateId(x, 73, z, registry::blocks::stone().stateId);
         }
     }
     return chunk;
@@ -83,16 +85,16 @@ run(std::string_view biome, std::int32_t chunks,
 
 } // namespace
 
-TEST_CASE("the mushroom patches place what the frozen kotlin places") {
+TEST_CASE("the mushroom patches place what the jar places") {
     SUBCASE("swamp") {
         const auto [brown, red, deferred, checksum] =
             run("minecraft:swamp", 150, [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 mushroomPatchDecoration::decorate(chunk, 424242LL, environment);
             });
-        CHECK(brown == 3403);
-        CHECK(red == 46);
+        CHECK(brown == 936);
+        CHECK(red == 15);
         CHECK(deferred == 0);
-        CHECK(checksum == 5659365285847962345LL);
+        CHECK(checksum == 4089898643565213680LL);
     }
 
     SUBCASE("oldGrowth") {
@@ -101,10 +103,10 @@ TEST_CASE("the mushroom patches place what the frozen kotlin places") {
                 [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                     mushroomPatchDecoration::decorate(chunk, 424242LL, environment);
                 });
-        CHECK(brown == 1458);
+        CHECK(brown == 397);
         CHECK(red == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == 8883574831473757227LL);
+        CHECK(checksum == -6618251123435244981LL);
     }
 
     SUBCASE("taiga") {
@@ -112,10 +114,10 @@ TEST_CASE("the mushroom patches place what the frozen kotlin places") {
             run("minecraft:taiga", 150, [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 mushroomPatchDecoration::decorate(chunk, 424242LL, environment);
             });
-        CHECK(brown == 408);
+        CHECK(brown == 120);
         CHECK(red == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == 8856817558561670891LL);
+        CHECK(checksum == 1119117109171076075LL);
     }
 
     SUBCASE("normal") {
@@ -123,10 +125,10 @@ TEST_CASE("the mushroom patches place what the frozen kotlin places") {
             run("minecraft:plains", 900, [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 mushroomPatchDecoration::decorate(chunk, 424242LL, environment);
             });
-        CHECK(brown == 57);
-        CHECK(red == 14);
+        CHECK(brown == 14);
+        CHECK(red == 4);
         CHECK(deferred == 0);
-        CHECK(checksum == 4944419373562959303LL);
+        CHECK(checksum == 3318493274006371069LL);
     }
 
     SUBCASE("wrong") {
@@ -138,7 +140,7 @@ TEST_CASE("the mushroom patches place what the frozen kotlin places") {
         CHECK(brown == 0);
         CHECK(red == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == 4823481526664831441LL);
+        CHECK(checksum == -281519154226748975LL);
     }
 
     SUBCASE("before") {
@@ -146,10 +148,10 @@ TEST_CASE("the mushroom patches place what the frozen kotlin places") {
             run("minecraft:swamp", 150, [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 mushroomPatchDecoration::decorateBeforeMushroomIsland(chunk, 424242LL, environment);
             });
-        CHECK(brown == 3403);
-        CHECK(red == 46);
+        CHECK(brown == 936);
+        CHECK(red == 15);
         CHECK(deferred == 0);
-        CHECK(checksum == 5659365285847962345LL);
+        CHECK(checksum == 4089898643565213680LL);
     }
 
     SUBCASE("after") {
@@ -157,10 +159,10 @@ TEST_CASE("the mushroom patches place what the frozen kotlin places") {
             run("minecraft:taiga", 150, [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 mushroomPatchDecoration::decorateAfterMushroomIsland(chunk, 424242LL, environment);
             });
-        CHECK(brown == 408);
+        CHECK(brown == 120);
         CHECK(red == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == 8856817558561670891LL);
+        CHECK(checksum == 1119117109171076075LL);
     }
 
     SUBCASE("swampBrownOnly") {
@@ -168,10 +170,10 @@ TEST_CASE("the mushroom patches place what the frozen kotlin places") {
             run("minecraft:swamp", 150, [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 mushroomPatchDecoration::decorateFeature(chunk, 424242LL, environment, "brown_mushroom_swamp");
             });
-        CHECK(brown == 3403);
+        CHECK(brown == 936);
         CHECK(red == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == -5873941266383804341LL);
+        CHECK(checksum == 5168173853263061867LL);
     }
 
     SUBCASE("regional") {
@@ -180,13 +182,14 @@ TEST_CASE("the mushroom patches place what the frozen kotlin places") {
                 mushroomPatchDecoration::decorate(
                     chunk, 424242LL, environment,
                     [](std::int32_t, std::int32_t y, std::int32_t) -> std::optional<std::int32_t> {
-                        return y >= 66 && y <= 70 ? registry::blocks::stone().stateId : registry::blocks::air().stateId;
+                        return (y >= 66 && y <= 70) || y == 73 ? registry::blocks::stone().stateId
+                                                               : registry::blocks::air().stateId;
                     });
             });
-        CHECK(brown == 3403);
-        CHECK(red == 46);
-        CHECK(deferred == 2009);
-        CHECK(checksum == 5659365285847962345LL);
+        CHECK(brown == 936);
+        CHECK(red == 15);
+        CHECK(deferred == 550);
+        CHECK(checksum == 4089898643565213680LL);
     }
 }
 
@@ -199,7 +202,7 @@ TEST_CASE("one mushroom patch at an origin matches the frozen kotlin") {
     const auto [checksum, brown, red] = fold(chunk);
     CHECK(brown == 0);
     CHECK(red == 18);
-    CHECK(checksum == 3979032266984473801LL);
+    CHECK(checksum == -3908914218328857143LL);
     CHECK(random.nextInt() == -289515299);
 }
 
