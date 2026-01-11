@@ -40,6 +40,12 @@ public:
     /// Sends everything written since the last flush to whoever is in this world.
     void flush();
 
+    /// parity: `BlockInput.place` runs `Block.updateFromNeighbourShapes` on the state unless the
+    /// caller asked for `strict`, which is why `/setblock` of a dust beside a dust draws a line and
+    /// not a stub. Say this before writing to get the `strict` behaviour, which places what is
+    /// written and nothing else.
+    void placeExactly() noexcept { adjustToNeighbours_ = false; }
+
 private:
     /// parity: `Level.setBlock` gives a block its block entity as it lands, so `/setblock` of a
     /// chest leaves something `/data` can read. This build creates them where they are used instead,
@@ -49,6 +55,8 @@ private:
     /// Lets what was written act on what was already there, which is what makes a command build
     /// work.
     void notifyNeighbours();
+
+    bool adjustToNeighbours_ = true;
 
     const CommandEnvironment* environment_;
     world::LoadedWorld* world_;
