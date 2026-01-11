@@ -47,7 +47,7 @@ constexpr std::string_view kTntPrimedSound = "entity.tnt.primed";
 
 } // namespace
 
-void BasaltServer::tickWorlds() {
+void BasaltServer::tickWorlds(const bool worldRuns) {
     // Told once a tick, and only if somebody asked: with no listener this is a boolean.
     server::plugins::PluginEventBus* bus = plugins_ == nullptr ? nullptr : &plugins_->events();
     static_cast<void>(
@@ -105,7 +105,7 @@ void BasaltServer::tickWorlds() {
         [this](const std::exception& failure) {
             logger_.error([&failure] { return std::string{"A tick task failed: "} + failure.what(); });
         },
-        [this, &worlds](sched::Region& region) {
+        [this, &worlds, worldRuns](sched::Region& region) {
             const auto found = worlds.find(region.worldName());
             if (found == worlds.end()) {
                 return;
@@ -120,10 +120,18 @@ void BasaltServer::tickWorlds() {
             // This region's own queue, not the world's: once a world is split there are several, and
             // running the first region's queue from every region's thread was two threads in the
             // same queue at once.
-            timings_.of("tick.tasks").time([&region, &onTaskFailure] {
-                region.owner().advanceTick();
+            timings_.of("tick.tasks").time([&region, &onTaskFailure, worldRuns] {
+                // parity: a frozen turn does not move the clock, so nothing waiting on a delay comes
+                // due, but what is already queued still runs: that is how a console command lands
+                // while `/tick freeze` holds.
+                if (worldRuns) {
+                    region.owner().advanceTick();
+                }
                 static_cast<void>(region.owner().runPending(onTaskFailure));
             });
+            if (!worldRuns) {
+                return;
+            }
 
             const auto step = [this, &world](std::string_view what, auto&& body) {
                 try {

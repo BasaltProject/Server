@@ -37,7 +37,11 @@ struct TickLoopOptions {
     std::function<void()> onUnloadInterval;
     /// Runs every tick. Deliberately not a general extension point: it exists so something checks
     /// for a termination signal 20 times a second, which no other thread here can do.
-    std::function<void()> onTick;
+    ///
+    /// parity: `worldRuns` is false while `/tick freeze` holds and no step is owed. Vanilla keeps
+    /// serving the console while frozen and only stops the world, so the callback still runs and
+    /// decides for itself what a frozen turn is worth doing.
+    std::function<void(bool worldRuns)> onTick;
 };
 
 /// A 20 TPS heartbeat on its own thread, which is what drives every world's turn.

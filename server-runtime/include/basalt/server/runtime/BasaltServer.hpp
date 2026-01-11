@@ -104,7 +104,9 @@ public:
 
 private:
     /// Everything the world itself owes per tick, plus the termination check.
-    void tickWorlds();
+    /// `worldRuns` is false on a turn `/tick freeze` is holding. Then only the queued tasks run, so
+    /// the console keeps working, and nothing that belongs to the world's clock moves.
+    void tickWorlds(bool worldRuns);
 
     /// Ticks the entities that are not players, items or falling blocks.
     void tickEntities(world::LoadedWorld& world, const sched::Region& region);

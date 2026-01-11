@@ -151,8 +151,8 @@ void TickLoop::runTicks() {
         }
         tick++;
         ticksCounted_.store(tick, std::memory_order_relaxed);
-        if (!skip && options_.onTick) {
-            options_.onTick();
+        if (options_.onTick) {
+            options_.onTick(!skip);
         }
         if (options_.saveIntervalSeconds > 0 && --ticksUntilSave <= 0) {
             // parity: `MinecraftServer.autoSave`, which recomputes the interval each time from the
