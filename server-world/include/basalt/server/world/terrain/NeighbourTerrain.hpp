@@ -60,6 +60,9 @@ public:
     /// Installs the lookup for writes waiting on a chunk that has not generated yet.
     void setQueuedAt(QueuedAt queuedAt);
 
+    /// Installs the lookup for a neighbour that already decorated and is in the world.
+    void setInstalledAt(QueuedAt installedAt);
+
     /// A view bounded to `radius` chunks around the one being decorated. The view borrows this
     /// cache, so it must not outlive it.
     [[nodiscard]] std::unique_ptr<NeighbourTerrain> around(std::int32_t chunkX, std::int32_t chunkZ);
@@ -95,6 +98,7 @@ private:
 
     Generate generateTerrain_;
     QueuedAt queuedAt_;
+    QueuedAt installedAt_;
     std::int32_t radius_;
     std::size_t capacity_;
     std::mutex mutex_;

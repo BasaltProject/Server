@@ -58,6 +58,7 @@ public:
         /// Installs the lookup that lets a neighbour read see what another chunk already queued for
         /// it, the way vanilla's proto chunk already holds that write.
         std::function<void(server::world::terrain::NeighbourTerrainCache::QueuedAt)> useQueuedWrites;
+        std::function<void(server::world::terrain::NeighbourTerrainCache::QueuedAt)> useInstalledChunks;
     };
 
     /// What the structure caches hold across every world built by this factory.

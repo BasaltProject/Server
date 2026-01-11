@@ -93,6 +93,12 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
         entry->second.useQueuedWrites([holder = world.get()](std::int32_t worldX, std::int32_t y, std::int32_t worldZ) {
             return holder->queuedWriteAt(worldX, y, worldZ);
         });
+        if (entry->second.useInstalledChunks) {
+            entry->second.useInstalledChunks(
+                [holder = world.get()](std::int32_t worldX, std::int32_t y, std::int32_t worldZ) {
+                    return holder->installedBlockAt(worldX, y, worldZ);
+                });
+        }
     }
     return world;
 }

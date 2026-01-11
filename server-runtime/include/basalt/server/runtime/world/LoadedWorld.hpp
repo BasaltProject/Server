@@ -85,6 +85,14 @@ public:
         return state_.queuedWriteAt(worldX, y, worldZ);
     }
 
+    /// parity: what a neighbour that has already decorated really has at a cell. Vanilla reads the
+    /// neighbour's proto chunk, decoration included; the terrain cache only ever serves the chunk as
+    /// it was before decorating.
+    [[nodiscard]] std::optional<std::int32_t> installedBlockAt(std::int32_t worldX, std::int32_t y,
+                                                               std::int32_t worldZ) const {
+        return state_.blockState(worldX, y, worldZ);
+    }
+
     [[nodiscard]] const config::WorldDeclaration& declaration() const noexcept { return declaration_; }
 
     [[nodiscard]] const config::WorldSettings& settings() const noexcept { return settings_; }
