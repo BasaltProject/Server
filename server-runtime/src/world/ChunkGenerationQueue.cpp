@@ -24,6 +24,18 @@ constexpr std::int32_t kIdleSpinsBeforeBackoff = 20;
 constexpr std::chrono::milliseconds kIdleBackoff{20};
 constexpr std::chrono::milliseconds kBetweenChunks{1};
 
+// A forceload asks for every chunk with priority 0, so most picks are ties. Left to the map they
+// were resolved by hash iteration order, which depends on how the requests happened to interleave:
+// same seed, different world. Ties go to the chunk that decorates first.
+[[nodiscard]] bool rasterBefore(const std::int64_t key, const std::int64_t other) {
+    const std::int32_t x = ChunkGenerationQueue::unpackX(key);
+    const std::int32_t otherX = ChunkGenerationQueue::unpackX(other);
+    if (x != otherX) {
+        return x < otherX;
+    }
+    return ChunkGenerationQueue::unpackZ(key) < ChunkGenerationQueue::unpackZ(other);
+}
+
 } // namespace
 
 std::int32_t ChunkGenerationQueue::defaultWorkers() {
@@ -42,13 +54,23 @@ std::int32_t ChunkGenerationQueue::unpackZ(std::int64_t key) { return static_cas
 ChunkGenerationQueue::ChunkGenerationQueue(WorldState& world, std::string dimension, std::int32_t workerCount,
                                            std::int64_t awaitTimeoutMillis)
     : awaitTimeoutMillis_(awaitTimeoutMillis), world_(&world), dimension_(std::move(dimension)) {
+    live_->queue = this;
     workers_.reserve(static_cast<std::size_t>(std::max(workerCount, 0)));
     for (std::int32_t worker = 0; worker < workerCount; ++worker) {
         workers_.emplace_back([this] { runWorker(); });
     }
 }
 
+void ChunkGenerationQueue::markInstalled(const std::int64_t key) {
+    const std::lock_guard<std::mutex> lock{mutex_};
+    inProgress_.erase(key);
+}
+
 ChunkGenerationQueue::~ChunkGenerationQueue() {
+    {
+        const std::lock_guard<std::mutex> lock{live_->mutex};
+        live_->queue = nullptr;
+    }
     stop();
     // The Kotlin let its threads outlive the queue: nothing here can, because the world they write
     // into is destroyed right after this.
@@ -105,7 +127,13 @@ void ChunkGenerationQueue::request(std::int32_t chunkX, std::int32_t chunkZ, std
         // so without a ceiling this grows without bound, and every extra entry makes picking the
         // next one slower, which makes it grow faster still. Past the ceiling the farthest pending
         // request is the one worth losing.
-        const auto worst = std::ranges::max_element(queued_, {}, [](const auto& entry) { return entry.second; });
+        // Ties as in takeNext: among equals the one that decorates last is the one dropped.
+        const auto worst = std::ranges::max_element(queued_, [](const auto& left, const auto& right) {
+            if (left.second != right.second) {
+                return left.second < right.second;
+            }
+            return rasterBefore(right.first, left.first);
+        });
         if (worst == queued_.end() || worst->second <= priority) {
             return;
         }
@@ -232,11 +260,15 @@ std::optional<std::int64_t> ChunkGenerationQueue::takeNext() {
         if (!earlierNeighboursDone(queued_, inProgress_, unpackX(key), unpackZ(key))) {
             continue;
         }
-        if (priority < bestPriority) {
-            bestPriority = priority;
-            bestKey = key;
-            found = true;
+        if (priority > bestPriority) {
+            continue;
         }
+        if (found && priority == bestPriority && !rasterBefore(key, bestKey)) {
+            continue;
+        }
+        bestPriority = priority;
+        bestKey = key;
+        found = true;
     }
     if (!found) {
         return std::nullopt;
@@ -253,15 +285,23 @@ bool ChunkGenerationQueue::generateNext() {
     }
     const std::int64_t key = *next;
 
+    // A chunk stays in progress until it is really in the world, not until it is generated. The
+    // barrier below is what makes a neighbour wait, and installing is a task the world owner runs
+    // later: releasing the key here let the next chunk start while this one was still in flight, and
+    // then its cross border write landed either on the chunk or in the queue depending on timing.
     struct Finally {
         ChunkGenerationQueue* queue;
         std::int64_t key;
+        bool handedOff = false;
 
         ~Finally() {
+            if (handedOff) {
+                return;
+            }
             const std::lock_guard<std::mutex> lock{queue->mutex_};
             queue->inProgress_.erase(key);
         }
-    } const finish{this, key};
+    } finish{this, key};
 
     // Generated here, installed by whoever owns the world: the set of chunks is that owner's state,
     // and a worker that put its own chunk in it was the last thing keeping the world's lock in the
@@ -271,7 +311,13 @@ bool ChunkGenerationQueue::generateNext() {
     if (!chunk.has_value()) {
         return true;
     }
-    world_->installLater(*std::move(chunk));
+    finish.handedOff = true;
+    world_->installLater(*std::move(chunk), [live = live_, key]() {
+        const std::lock_guard<std::mutex> lock{live->mutex};
+        if (live->queue != nullptr) {
+            live->queue->markInstalled(key);
+        }
+    });
     return true;
 }
 

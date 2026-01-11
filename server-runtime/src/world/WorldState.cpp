@@ -347,21 +347,27 @@ Chunk& WorldState::install(Chunk chunk) {
     return installLocked(std::move(chunk));
 }
 
-void WorldState::installLater(Chunk chunk) {
+void WorldState::installLater(Chunk chunk, std::function<void()> installed) {
     sched::Owner* target = installOwner_ != nullptr ? installOwner_ : owner_;
     if (target == nullptr) {
-        Chunk& installed = install(std::move(chunk));
+        Chunk& placed = install(std::move(chunk));
         if (const std::function<void(Chunk&)> handler = chunkInstalledHandler()) {
-            handler(installed);
+            handler(placed);
+        }
+        if (installed) {
+            installed();
         }
         return;
     }
     // Moved into the task rather than captured by reference: whoever asked for the chunk is not
     // waiting for it, and by the time the owner runs this their own copy is gone.
-    target->submit([this, moved = std::make_shared<Chunk>(std::move(chunk))]() mutable {
-        Chunk& installed = install(std::move(*moved));
+    target->submit([this, moved = std::make_shared<Chunk>(std::move(chunk)), installed = std::move(installed)]() {
+        Chunk& placed = install(std::move(*moved));
         if (const std::function<void(Chunk&)> handler = chunkInstalledHandler()) {
-            handler(installed);
+            handler(placed);
+        }
+        if (installed) {
+            installed();
         }
     });
 }

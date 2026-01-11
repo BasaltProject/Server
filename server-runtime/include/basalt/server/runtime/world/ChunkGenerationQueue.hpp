@@ -7,6 +7,7 @@
 #include <atomic>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -97,6 +98,16 @@ private:
     WorldState* world_;
     std::string dimension_;
 
+    /// Lets an install that outlives this queue find out, under a lock, that it has nothing to tell.
+    /// The install runs on the world owner long after the worker that asked for it moved on.
+    struct Live {
+        std::mutex mutex;
+        ChunkGenerationQueue* queue = nullptr;
+    };
+
+    void markInstalled(std::int64_t key);
+
+    std::shared_ptr<Live> live_ = std::make_shared<Live>();
     mutable std::mutex mutex_;
     std::unordered_map<std::int64_t, std::int32_t> queued_;
     std::unordered_set<std::int64_t> inProgress_;
