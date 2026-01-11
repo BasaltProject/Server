@@ -1,5 +1,6 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/PendingChunkDecorations.hpp>
+#include <basalt/server/world/GeneratedBlockWrites.hpp>
 #include <basalt/server/world/terrain/decoration/OreBlockRules.hpp>
 #include <basalt/server/world/terrain/decoration/VegetationBlockRules.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeBlockRules.hpp>
@@ -31,60 +32,12 @@ using server::world::GeneratedBlockWritePolicy;
     return chunkX != otherX ? chunkX < otherX : chunkZ < otherZ;
 }
 
-/// A queued write was issued while its target did not exist yet. parity: in vanilla the target is
-/// always there as a proto chunk, so the write lands before that chunk decorates itself and whatever
-/// its own decoration puts on top wins. Only the batch's earlier writes may be overwritten, because
-/// among themselves they keep the order they were issued in.
-using BatchWritten = std::unordered_set<std::int64_t>;
+using server::world::generatedBlockWrites::BatchWritten;
+using server::world::generatedBlockWrites::cellKey;
 
-[[nodiscard]] std::int64_t cellKey(const ChunkGeneratedBlockWrite& write) {
-    return (static_cast<std::int64_t>(write.x & 15) << 40) | (static_cast<std::int64_t>(write.z & 15) << 32) |
-           (static_cast<std::int64_t>(write.y) & 0xFFFFFFFFLL);
-}
-
-/// `sourceGoesOnTop` is whether the writing chunk decorates after this one. When it does the write
-/// lands over whatever is here, subject to the feature's own target test, which is what vanilla does
-/// with a chunk already carved and decorated next to it. When it does not, the receiver's decoration
-/// came later and would have covered the write, so only a cell nobody else touched takes it.
 bool applyGeneratedBlockWrite(Chunk& chunk, const ChunkGeneratedBlockWrite& write, bool sourceGoesOnTop,
                               const BatchWritten* queued = nullptr) {
-    if (!insideChunk(chunk, write.y)) {
-        return false;
-    }
-    const std::int32_t localX = write.x & 15;
-    const std::int32_t localZ = write.z & 15;
-    const std::int32_t current = chunk.blockStateId(localX, write.y, localZ);
-    // Earlier writes of this same batch are not the receiver's decoration: among themselves they
-    // keep the order they were issued in, so a later one may still cover them.
-    const bool untouched = current == write.expectedStateId || (queued != nullptr && queued->contains(cellKey(write)));
-    // A chunk that decorates later covers this write only with a feature that could have replaced
-    // it. Nothing after an ore targets a geode, a dirt vein or an ore, so those land regardless.
-    const bool onTop =
-        sourceGoesOnTop || untouched ||
-        server::world::terrain::decoration::oreBlockRules::survivesLaterDecoration(write.policy, write.stateId);
-    const bool loosely =
-        onTop && server::world::terrain::decoration::oreBlockRules::canReplaceDeferred(write.policy, current);
-    const bool canReplace =
-        write.replaceAnyState || current == write.expectedStateId ||
-        (onTop && write.policy == GeneratedBlockWritePolicy::Tree &&
-         server::world::terrain::decoration::tree::treeBlockRules::canReplaceDeferred(current, write.stateId)) ||
-        loosely;
-    if (!canReplace) {
-        return false;
-    }
-    const std::int32_t stateId =
-        write.policy == GeneratedBlockWritePolicy::Tree
-            ? server::world::terrain::decoration::tree::treeBlockRules::resolveDeferredState(current, write.stateId)
-            : write.stateId;
-    // The ground this plant was validated against may have been refused, or replaced by whatever the
-    // receiving chunk generated. A plant with nothing under it breaks on the first block update.
-    const std::int32_t below = write.y > chunk.verticalBounds().minY() ? chunk.blockStateId(localX, write.y - 1, localZ)
-                                                                       : registry::blocks::air().stateId;
-    if (!server::world::terrain::decoration::vegetationBlockRules::survivesDeferred(stateId, below)) {
-        return false;
-    }
-    chunk.setBlockStateId(localX, write.y, localZ, stateId);
-    return true;
+    return server::world::generatedBlockWrites::apply(chunk, write, sourceGoesOnTop, queued);
 }
 
 void applyGeneratedBlockEntityWrite(Chunk& chunk, const ChunkGeneratedBlockEntityWrite& write) {

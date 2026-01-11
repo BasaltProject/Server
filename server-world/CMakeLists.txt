@@ -1,6 +1,7 @@
 basalt_module(server-world
     SOURCES
         src/Chunk.cpp
+        src/GeneratedBlockWrites.cpp
         src/ChunkTracker.cpp
         src/WorldTypes.cpp
         src/GenerationMetrics.cpp
