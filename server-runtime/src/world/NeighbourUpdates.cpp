@@ -288,19 +288,52 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     scheduledBlocks::scheduleHatch(world, x, y, z, context.random.nextLong());
     // parity: the neighbour update every redstone component listens to: the dust settles at once and
     // the components book their own turn, which is what their delay is.
-    for (const BlockChange& change : redstone::settle(world, context.worldName, x, y, z)) {
+    // parity: `Level.setBlock` updates the shapes around what changed before anything reads the
+    // power off them, and a dust with its connection still unset points nowhere: a lamp at the end
+    // of a line asked the dust next to it, saw `east=none` with power already at fifteen, and stayed
+    // dark. The shapes go first, then the signal.
+    const Walk walk{.context = context, .scaffolding = scaffolding, .onReshaped = reshaped, .onBroken = broken};
+    std::deque<Position> pending;
+    pending.push_back({x, y, z});
+    std::int32_t examined = 0;
+    while (!pending.empty() && examined < kMaxCascade) {
+        const Position at = pending.front();
+        pending.pop_front();
+        examined += kDirections;
+        visit(walk, pending, at[0], at[1] - 1, at[2]);
+        visit(walk, pending, at[0], at[1] + 1, at[2]);
+        visit(walk, pending, at[0], at[1], at[2] - 1);
+        visit(walk, pending, at[0], at[1], at[2] + 1);
+        visit(walk, pending, at[0] - 1, at[1], at[2]);
+        visit(walk, pending, at[0] + 1, at[1], at[2]);
+    }
+    const std::vector<BlockChange> settled = redstone::settle(world, context.worldName, x, y, z);
+    for (const BlockChange& change : settled) {
         reshaped(change.stateId, change.x, change.y, change.z);
     }
     redstoneComponents::scheduleAround(world, x, y, z);
+    // parity: `RedStoneWireBlock.updatePowerStrength` ends with `updateNeighborsAt` on **every**
+    // piece of dust whose strength moved, not only on the block that started it. Without this a
+    // lamp at the end of a line of dust never heard that the dust had lit up, because it is two
+    // blocks away from whatever was placed.
+    for (const BlockChange& change : settled) {
+        redstoneComponents::scheduleAround(world, change.x, change.y, change.z);
+    }
     // parity: `ObserverBlock.neighborChanged`, which fires only for the block it is watching.
     redstoneComponents::watchFor(world, x, y, z);
     // parity: every `neighborChanged` that reads the power: doors, lamps, bulbs and the rest.
-    for (const BlockChange& change :
-         redstoneReactors::update(world, context.worldName, x, y, z, context.random, context.reactorHooks)) {
-        reshaped(change.stateId, change.x, change.y, change.z);
-        if (!change.effects.empty()) {
-            effects.push_back(change);
+    const auto reactAround = [&](std::int32_t atX, std::int32_t atY, std::int32_t atZ) {
+        for (const BlockChange& change :
+             redstoneReactors::update(world, context.worldName, atX, atY, atZ, context.random, context.reactorHooks)) {
+            reshaped(change.stateId, change.x, change.y, change.z);
+            if (!change.effects.empty()) {
+                effects.push_back(change);
+            }
         }
+    };
+    reactAround(x, y, z);
+    for (const BlockChange& change : settled) {
+        reactAround(change.x, change.y, change.z);
     }
     // parity: `RailBlock.updateState`, the one case a rail re-bends on a neighbour change: a
     // three-way junction with a signal arriving at it.
@@ -360,22 +393,6 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     sponges::dryIfEvaporating(world, x, y, z, reshaped, context.evaporates);
     // parity: `FrogspawnBlock.onPlace`, the same idea on a longer and rougher clock.
     scheduledBlocks::scheduleFrogspawn(world, x, y, z, context.random.nextLong());
-
-    const Walk walk{.context = context, .scaffolding = scaffolding, .onReshaped = reshaped, .onBroken = broken};
-    std::deque<Position> pending;
-    pending.push_back({x, y, z});
-    std::int32_t examined = 0;
-    while (!pending.empty() && examined < kMaxCascade) {
-        const Position at = pending.front();
-        pending.pop_front();
-        examined += kDirections;
-        visit(walk, pending, at[0], at[1] - 1, at[2]);
-        visit(walk, pending, at[0], at[1] + 1, at[2]);
-        visit(walk, pending, at[0], at[1], at[2] - 1);
-        visit(walk, pending, at[0], at[1], at[2] + 1);
-        visit(walk, pending, at[0] - 1, at[1], at[2]);
-        visit(walk, pending, at[0] + 1, at[1], at[2]);
-    }
 }
 
 } // namespace basalt::server::runtime::world::neighbourUpdates
