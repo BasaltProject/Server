@@ -49,6 +49,15 @@ struct Loaded {
     }
 };
 
+/// What the world's block event tick does with what a piston booked. parity: `runBlockEvents`.
+[[nodiscard]] std::vector<BlockChange> fireEvents(Loaded& loaded) {
+    std::vector<BlockChange> effects;
+    for (const BlockEvent& event : loaded.state.takeBlockEvents()) {
+        pistons::runEvent(loaded.context(), event.x, event.y, event.z, event.first, event.second, effects);
+    }
+    return effects;
+}
+
 [[nodiscard]] std::string propertyOf(std::int32_t stateId, const std::string& name) {
     const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
     const auto found = properties.find(name);
@@ -339,7 +348,8 @@ TEST_CASE("a powered piston books its move and says so with a sound") {
     REQUIRE(world.setBlockState(8, 65, 8, registry::blocks::named("redstone_block")->stateId));
     std::vector<BlockChange> effects;
 
-    pistons::trigger(loaded.context(), 8, 64, 8, effects);
+    pistons::trigger(loaded.context(), 8, 64, 8);
+    effects = fireEvents(loaded);
 
     REQUIRE(effects.size() == 1);
     REQUIRE(effects[0].effects.size() == 2);
@@ -370,7 +380,8 @@ TEST_CASE("a piston cannot be powered by what it is about to push") {
     REQUIRE(world.setBlockState(9, 64, 8, registry::blocks::named("redstone_block")->stateId));
     std::vector<BlockChange> effects;
 
-    pistons::trigger(loaded.context(), 8, 64, 8, effects);
+    pistons::trigger(loaded.context(), 8, 64, 8);
+    effects = fireEvents(loaded);
 
     CHECK(effects.empty());
 }
@@ -383,7 +394,8 @@ TEST_CASE("a signal two blocks up fires the piston too") {
     REQUIRE(world.setBlockState(8, 66, 8, registry::blocks::named("redstone_block")->stateId));
     std::vector<BlockChange> effects;
 
-    pistons::trigger(loaded.context(), 8, 64, 8, effects);
+    pistons::trigger(loaded.context(), 8, 64, 8);
+    effects = fireEvents(loaded);
 
     CHECK(effects.size() == 1);
 }
@@ -395,7 +407,8 @@ TEST_CASE("the move landing puts the head down and the blocks one along") {
     REQUIRE(world.setBlockState(9, 64, 8, stateOf("stone")));
     REQUIRE(world.setBlockState(8, 65, 8, registry::blocks::named("redstone_block")->stateId));
     std::vector<BlockChange> effects;
-    pistons::trigger(loaded.context(), 8, 64, 8, effects);
+    pistons::trigger(loaded.context(), 8, 64, 8);
+    effects = fireEvents(loaded);
     // Mid-slide the block is a moving_piston carrying what it will become.
     CHECK(registry::blockStateDefinitions::blockOf(*world.blockState(9, 64, 8))->path() == "moving_piston");
 
@@ -423,7 +436,8 @@ TEST_CASE("a piston pointing up lands its blocks from the top down") {
     REQUIRE(world.setBlockState(8, 66, 8, stateOf("dirt")));
     REQUIRE(world.setBlockState(9, 64, 8, registry::blocks::named("redstone_block")->stateId));
     std::vector<BlockChange> effects;
-    pistons::trigger(loaded.context(), 8, 64, 8, effects);
+    pistons::trigger(loaded.context(), 8, 64, 8);
+    effects = fireEvents(loaded);
 
     const std::vector<BlockChange> changes = pistons::finish(loaded.context(), 8, 64, 8);
 
@@ -502,25 +516,26 @@ TEST_CASE("a sticky piston brings one block back with it and a plain one does no
         REQUIRE(world.setBlockState(9, 64, 8, *head));
         REQUIRE(world.setBlockState(10, 64, 8, stateOf("stone")));
 
+        // The pull back starts at the event, like the push, and lands two ticks later.
+        pistons::trigger(loaded.context(), 8, 64, 8);
+        static_cast<void>(fireEvents(loaded));
         return pistons::finish(loaded.context(), 8, 64, 8);
     };
 
-    // parity: the arm goes, the block takes its place, and the body loses its own `extended`.
+    // parity: the arm goes, the block takes its place, and the body loses its own `extended`. Both
+    // land where their `moving_piston` already stands.
     const std::vector<BlockChange> sticky = pulled("sticky_piston");
-    REQUIRE(sticky.size() == 4);
-    CHECK(sticky[0] == BlockChange{.x = 9, .y = 64, .z = 8, .stateId = air()});
-    CHECK(sticky[1] == BlockChange{.x = 9, .y = 64, .z = 8, .stateId = stateOf("stone")});
-    CHECK(sticky[2] == BlockChange{.x = 10, .y = 64, .z = 8, .stateId = air()});
-    CHECK(sticky[3].x == 8);
-    CHECK(sticky[3].y == 64);
-    CHECK(sticky[3].z == 8);
-    CHECK(propertyOf(sticky[3].stateId, "extended") == "false");
+    REQUIRE(sticky.size() == 2);
+    CHECK(sticky[0] == BlockChange{.x = 9, .y = 64, .z = 8, .stateId = stateOf("stone")});
+    CHECK(sticky[1].x == 8);
+    CHECK(sticky[1].y == 64);
+    CHECK(sticky[1].z == 8);
+    CHECK(propertyOf(sticky[1].stateId, "extended") == "false");
 
     const std::vector<BlockChange> plain = pulled("piston");
-    REQUIRE(plain.size() == 2);
-    CHECK(plain[0] == BlockChange{.x = 9, .y = 64, .z = 8, .stateId = air()});
-    CHECK(plain[1].x == 8);
-    CHECK(propertyOf(plain[1].stateId, "extended") == "false");
+    REQUIRE(plain.size() == 1);
+    CHECK(plain[0].x == 8);
+    CHECK(propertyOf(plain[0].stateId, "extended") == "false");
 }
 
 TEST_CASE("the blocks a piston moves shove what they sweep over") {
@@ -568,7 +583,8 @@ TEST_CASE("anything that is not a piston is left alone") {
     REQUIRE(world.setBlockState(8, 64, 8, stateOf("stone")));
     std::vector<BlockChange> effects;
 
-    pistons::trigger(loaded.context(), 8, 64, 8, effects);
+    pistons::trigger(loaded.context(), 8, 64, 8);
+    effects = fireEvents(loaded);
     CHECK(effects.empty());
     CHECK(pistons::finish(loaded.context(), 8, 64, 8).empty());
     CHECK(pistons::finish(loaded.context(), 300, 64, 300).empty());
@@ -632,6 +648,8 @@ TEST_CASE("a sticky piston cannot pull glazed terracotta back") {
     REQUIRE(world.setBlockState(9, 64, 8, *head));
     REQUIRE(world.setBlockState(10, 64, 8, stateOf("white_glazed_terracotta")));
 
+    pistons::trigger(loaded.context(), 8, 64, 8);
+    static_cast<void>(fireEvents(loaded));
     static_cast<void>(pistons::finish(loaded.context(), 8, 64, 8));
 
     CHECK(world.blockState(9, 64, 8) == air());
@@ -681,6 +699,8 @@ TEST_CASE("a sticky piston with nothing to pull just takes its head back") {
         REQUIRE(world.setBlockState(9, 64, 8, *head));
         REQUIRE(world.setBlockState(10, 64, 8, stateOf(facing)));
 
+        pistons::trigger(loaded.context(), 8, 64, 8);
+        static_cast<void>(fireEvents(loaded));
         static_cast<void>(pistons::finish(loaded.context(), 8, 64, 8));
         return world.blockState(9, 64, 8);
     };
@@ -699,7 +719,8 @@ TEST_CASE("the blocks mid-slide land furthest along first") {
     REQUIRE(world.setBlockState(10, 64, 8, stateOf("dirt")));
     REQUIRE(world.setBlockState(8, 65, 8, registry::blocks::named("redstone_block")->stateId));
     std::vector<BlockChange> effects;
-    pistons::trigger(loaded.context(), 8, 64, 8, effects);
+    pistons::trigger(loaded.context(), 8, 64, 8);
+    effects = fireEvents(loaded);
 
     const std::vector<BlockChange> changes = pistons::finish(loaded.context(), 8, 64, 8);
 
@@ -721,7 +742,8 @@ TEST_CASE("a block mid-slide carries the state it is about to become") {
     REQUIRE(world.setBlockState(8, 65, 8, registry::blocks::named("redstone_block")->stateId));
     std::vector<BlockChange> effects;
 
-    pistons::trigger(loaded.context(), 8, 64, 8, effects);
+    pistons::trigger(loaded.context(), 8, 64, 8);
+    effects = fireEvents(loaded);
 
     const Chunk* chunk = world.chunkIfLoaded(0, 0);
     REQUIRE(chunk != nullptr);
@@ -808,7 +830,8 @@ TEST_CASE("a piston is fired from any side but the one it faces") {
         REQUIRE(world.setBlockState(8, 64, 8, piston("east", "false")));
         REQUIRE(world.setBlockState(x, y, z, registry::blocks::named("redstone_block")->stateId));
         std::vector<BlockChange> effects;
-        pistons::trigger(loaded.context(), 8, 64, 8, effects);
+        pistons::trigger(loaded.context(), 8, 64, 8);
+        effects = fireEvents(loaded);
         return !effects.empty();
     };
 
@@ -890,7 +913,8 @@ TEST_CASE("a piston pulling back says so with its own event and sound") {
     REQUIRE(world.setBlockState(8, 64, 8, piston("east", "true")));
     std::vector<BlockChange> effects;
 
-    pistons::trigger(loaded.context(), 8, 64, 8, effects);
+    pistons::trigger(loaded.context(), 8, 64, 8);
+    effects = fireEvents(loaded);
 
     REQUIRE(effects.size() == 1);
     REQUIRE(effects[0].effects.size() == 2);
@@ -915,7 +939,8 @@ TEST_CASE("a push that crosses into the next chunk still finds its blocks") {
     REQUIRE(world.setBlockState(16, 64, 8, stateOf("dirt")));
     REQUIRE(world.setBlockState(14, 65, 8, registry::blocks::named("redstone_block")->stateId));
     std::vector<BlockChange> effects;
-    pistons::trigger(loaded.context(), 14, 64, 8, effects);
+    pistons::trigger(loaded.context(), 14, 64, 8);
+    effects = fireEvents(loaded);
 
     // Los dos destinos caen en el chunk siguiente, cada uno en sus coordenadas locales: la piedra
     // que sale de 15 aterriza en 16 y la tierra que sale de 16 en 17.

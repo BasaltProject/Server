@@ -13,6 +13,7 @@ class PlayerSession;
 } // namespace basalt::server::runtime::player
 
 namespace basalt::server::runtime::world {
+struct BlockEvent;
 class LoadedWorld;
 class RealLootTables;
 } // namespace basalt::server::runtime::world
@@ -56,6 +57,11 @@ public:
     /// Sends a block that redstone moved to everyone watching, and lets its neighbours react.
     void announceRedstone(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                           const world::BlockChange& change) const;
+
+    /// One booked piston move starting. parity: `PistonBaseBlock.triggerEvent`, run from
+    /// `ServerLevel.runBlockEvents` rather than where the signal arrived.
+    void runPistonEvent(world::LoadedWorld& world, const world::BlockEvent& event,
+                        const std::vector<player::PlayerSession*>& watchers);
 
     /// The piston half of a scheduled tick, with the players close enough to be shoved by it.
     ///

@@ -80,9 +80,15 @@ struct Context {
 /// parity: `PistonBaseBlock.checkIfExtend`: a piston extends when it is powered from anywhere but its
 /// own face, and pulls back when that power goes.
 ///
-/// The move itself lands two ticks later, which is when vanilla's `moving_piston` finishes its slide.
-/// The head sliding is the client's own half, from the block event this appends to `effects`.
-void trigger(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z, std::vector<BlockChange>& effects);
+/// It books the move and nothing else. Vanilla runs `blockEvent` here, and the event is what moves
+/// the piston, once a tick and only while the world runs.
+void trigger(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z);
+
+/// The booked move starting: the arm and what it pushes turn into `moving_piston`, the body takes
+/// `extended`, the landing is booked two ticks out. parity: `PistonBaseBlock.triggerEvent`. The
+/// signal is read again here, so a pulse already gone by leaves the piston where it stands.
+void runEvent(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t b0, std::int32_t b1,
+              std::vector<BlockChange>& effects);
 
 /// The move landing: the blocks go one along, the head appears or goes, and a sticky piston takes the
 /// block in front of it back with it.

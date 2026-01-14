@@ -160,6 +160,9 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             step("Pressure plate tick", [this, &world, &region] { redstone_->tickPressurePlates(world, region); });
             step("Tripwire tick", [this, &world, &region] { redstone_->tickTripwires(world, region); });
             step("Scheduled block tick", [this, &world, &region] { redstone_->tickScheduledBlocks(world, region); });
+            // parity: `ServerLevel.tick` runs its block events after the block ticks and before the
+            // entities, and skips them altogether while the world is frozen.
+            step("Block event tick", [this, &world, &region] { redstone_->tickBlockEvents(world, region); });
             step("Block entity tick", [this, &world, &region] { redstone_->tickBlockEntities(world, region); });
             step("Falling block tick", [this, &world, &region] { redstone_->tickFallingBlocks(world, region); });
             step("Entity tick", [this, &world, &region] { tickEntities(world, region); });

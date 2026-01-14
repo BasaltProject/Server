@@ -201,6 +201,16 @@ std::optional<std::int32_t> WorldState::queuedWriteAt(const std::int32_t worldX,
     return pendingDecorations_.queuedWriteAt(worldX, y, worldZ);
 }
 
+void WorldState::queueBlockEvent(BlockEvent event) {
+    const WorldWriteLock lock{mutex_};
+    blockEvents_.push_back(std::move(event));
+}
+
+std::vector<BlockEvent> WorldState::takeBlockEvents() {
+    const WorldWriteLock lock{mutex_};
+    return std::exchange(blockEvents_, {});
+}
+
 void WorldState::applyPendingWritesTo(Chunk& chunk) {
     const WorldWriteLock lock{mutex_};
     pendingDecorations_.applyPendingGeneratedBlockWrites(chunk, PendingChunkDecorations::WritePhase::BeforeDecoration);
