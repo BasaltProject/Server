@@ -453,13 +453,33 @@ TEST_CASE("a piston pointing up lands its blocks from the top down") {
 
 namespace {
 
+/// The state a `moving_piston` is carrying. parity: `PistonMovingBlockEntity` saves it by name and
+/// properties, the way a chunk palette does, not as a state id.
+[[nodiscard]] std::int32_t carriedIn(const basalt::wire::nbt::NbtCompound& data) {
+    const basalt::wire::nbt::NbtCompound* state = data.getCompound("blockState");
+    REQUIRE(state != nullptr);
+    std::map<std::string, std::string> properties;
+    if (const basalt::wire::nbt::NbtCompound* tag = state->getCompound("Properties"); tag != nullptr) {
+        for (std::size_t index = 0; index < tag->size(); ++index) {
+            properties.emplace(tag->names()[index], *tag->values()[index].get<std::string>());
+        }
+    }
+    const std::optional<std::int32_t> stateId = registry::blockStateDefinitions::stateIdOf(
+        *basalt::wire::common::Identifier::parse(state->getString("Name")), properties, std::nullopt);
+    REQUIRE(stateId.has_value());
+    return *stateId;
+}
+
 /// Puts a leftover `moving_piston` block entity at a world position, as somebody else's push would.
 void stale(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
     REQUIRE(chunk != nullptr);
+    basalt::wire::nbt::NbtCompound state;
+    state.putString("Name", "minecraft:dirt");
     basalt::wire::nbt::NbtCompound data;
-    data.putInt("blockState", stateOf("dirt"));
-    data.putString("facing", "east");
+    data.set("blockState", basalt::wire::nbt::NbtTag::ofCompound(std::move(state)));
+    data.putInt("facing", static_cast<std::int32_t>(registry::BlockFace::East));
+    data.putFloat("progress", 0.0F);
     data.putBoolean("extending", true);
     data.putBoolean("source", false);
     chunk->setBlockEntity(
@@ -760,12 +780,14 @@ TEST_CASE("a block mid-slide carries the state it is about to become") {
     const basalt::server::world::ChunkBlockEntity& carried = at(10);
     CHECK(carried.y() == 64);
     CHECK(carried.localZ() == 8);
-    CHECK(carried.data().getInt("blockState") == stateOf("dirt"));
-    CHECK(carried.data().getString("facing") == "east");
+    CHECK(carriedIn(carried.data()) == stateOf("dirt"));
+    // parity: the direction goes in as its own 3D value, which is what vanilla writes.
+    CHECK(carried.data().getInt("facing") == static_cast<std::int32_t>(registry::BlockFace::East));
+    CHECK(carried.data().getFloat("progress") == doctest::Approx(0.0F));
     CHECK(carried.data().getBoolean("extending"));
     CHECK_FALSE(carried.data().getBoolean("source"));
     const basalt::server::world::ChunkBlockEntity& arm = at(9);
-    CHECK(registry::blockStateDefinitions::blockOf(arm.data().getInt("blockState"))->path() == "piston_head");
+    CHECK(registry::blockStateDefinitions::blockOf(carriedIn(arm.data()))->path() == "piston_head");
     CHECK(arm.data().getBoolean("source"));
     CHECK(propertyOf(*world.blockState(9, 64, 8), "type") == "sticky");
 }
@@ -952,7 +974,7 @@ TEST_CASE("a push that crosses into the next chunk still finds its blocks") {
         const auto found = std::ranges::find_if(
             entities, [localX](const basalt::server::world::ChunkBlockEntity& one) { return one.localX() == localX; });
         REQUIRE(found != entities.end());
-        return found->data().getInt("blockState");
+        return carriedIn(found->data());
     };
     CHECK(carried(0) == stateOf("stone"));
     CHECK(carried(1) == stateOf("dirt"));

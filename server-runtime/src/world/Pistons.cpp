@@ -281,6 +281,58 @@ private:
     return x >= minX && x < maxX && y >= minY && y < maxY && z >= minZ && z < maxZ;
 }
 
+/// parity: `PistonMovingBlockEntity.saveAdditional` writes the state it carries the way a chunk
+/// palette does, by name and properties, so a world of ours opens in vanilla with the block mid
+/// slide intact. `facing` is the direction's own 3D value, which is what our `BlockFace` counts in.
+[[nodiscard]] wire::nbt::NbtCompound carriedTag(std::int32_t stateId, BlockFace direction, bool extending,
+                                                bool source) {
+    wire::nbt::NbtCompound state;
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    state.putString("Name", block == nullptr ? "minecraft:air" : block->toString());
+    if (const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
+        !properties.empty()) {
+        wire::nbt::NbtCompound tag;
+        for (const auto& [name, value] : properties) {
+            tag.putString(name, value);
+        }
+        state.set("Properties", wire::nbt::NbtTag::ofCompound(std::move(tag)));
+    }
+    wire::nbt::NbtCompound data;
+    data.set("blockState", wire::nbt::NbtTag::ofCompound(std::move(state)));
+    data.putInt("facing", static_cast<std::int32_t>(direction));
+    // parity: what is saved is `progressO`, and a slide is only ever written out before it has moved.
+    data.putFloat("progress", 0.0F);
+    data.putBoolean("extending", extending);
+    data.putBoolean("source", source);
+    return data;
+}
+
+/// The state a `moving_piston` is carrying, read back out of its block entity.
+[[nodiscard]] std::optional<std::int32_t> carriedState(const wire::nbt::NbtCompound& data) {
+    const wire::nbt::NbtCompound* state = data.getCompound("blockState");
+    if (state == nullptr) {
+        return std::nullopt;
+    }
+    const std::string_view name = state->getString("Name");
+    if (name.empty()) {
+        return std::nullopt;
+    }
+    std::map<std::string, std::string> properties;
+    if (const wire::nbt::NbtCompound* tag = state->getCompound("Properties"); tag != nullptr) {
+        for (std::size_t index = 0; index < tag->size(); ++index) {
+            if (const auto* value = tag->values()[index].get<std::string>(); value != nullptr) {
+                properties.emplace(tag->names()[index], *value);
+            }
+        }
+    }
+    const std::expected<wire::common::Identifier, wire::common::IdentifierError> block =
+        wire::common::Identifier::parse(name);
+    if (!block.has_value()) {
+        return std::nullopt;
+    }
+    return registry::blockStateDefinitions::stateIdOf(*block, properties, std::nullopt);
+}
+
 /// parity: `checkIfExtend`'s test for a head that has not finished going out yet: the square two along
 /// is a `moving_piston` facing our way that is still extending. Vanilla also lets it through on
 /// progress or on the tick it last moved, which inside a tick is always true.
@@ -343,12 +395,8 @@ void slide(const Context& context, const Push& push, BlockFace moving, BlockFace
             continue;
         }
         destinations.insert(to);
-        wire::nbt::NbtCompound data;
-        data.putInt("blockState", entry->second);
-        data.putString("facing", std::string{nameOf(facing)});
-        data.putBoolean("extending", extending);
-        data.putBoolean("source", false);
-        chunk->setBlockEntity(server::world::ChunkBlockEntity{to[0] & 15, to[1], to[2] & 15, block(), std::move(data)});
+        chunk->setBlockEntity(server::world::ChunkBlockEntity{to[0] & 15, to[1], to[2] & 15, block(),
+                                                              carriedTag(entry->second, facing, extending, false)});
     }
     // parity: `deleteAfterMove`, the squares nobody landed on. A block that moved into where its
     // neighbour stood must not be wiped by that neighbour leaving.
@@ -377,13 +425,8 @@ void beginMove(const Context& context, const Push& push, BlockFace direction, bo
     server::world::Chunk* armChunk = context.world.chunkIfLoaded(head[0] >> 4, head[2] >> 4);
     if (arm.has_value() && movingArm.has_value() && armChunk != nullptr &&
         context.world.setBlockState(head[0], head[1], head[2], *movingArm)) {
-        wire::nbt::NbtCompound data;
-        data.putInt("blockState", *arm);
-        data.putString("facing", std::string{nameOf(direction)});
-        data.putBoolean("extending", true);
-        data.putBoolean("source", true);
-        armChunk->setBlockEntity(
-            server::world::ChunkBlockEntity{head[0] & 15, head[1], head[2] & 15, block(), std::move(data)});
+        armChunk->setBlockEntity(server::world::ChunkBlockEntity{head[0] & 15, head[1], head[2] & 15, block(),
+                                                                 carriedTag(*arm, direction, true, true)});
     }
     // parity: the body reads `extended` from the moment the slide starts, not when it ends. It is
     // built from the piston that is standing there, or it would come back facing whichever way the
@@ -418,12 +461,8 @@ void beginRetract(const Context& context, std::int32_t x, std::int32_t y, std::i
     if (!context.world.setBlockState(x, y, z, *bodyMoving)) {
         return;
     }
-    wire::nbt::NbtCompound data;
-    data.putInt("blockState", *resting);
-    data.putString("facing", std::string{nameOf(direction)});
-    data.putBoolean("extending", false);
-    data.putBoolean("source", true);
-    chunk->setBlockEntity(server::world::ChunkBlockEntity{x & 15, y, z & 15, block(), std::move(data)});
+    chunk->setBlockEntity(
+        server::world::ChunkBlockEntity{x & 15, y, z & 15, block(), carriedTag(*resting, direction, false, true)});
 
     const Position head = step(Position{x, y, z}, direction);
     static_cast<void>(context.world.setBlockState(head[0], head[1], head[2], air()));
@@ -474,10 +513,11 @@ struct Carried {
                 if (entity.type() != block()) {
                     continue;
                 }
-                if (!entity.data().contains("blockState")) {
+                const std::optional<std::int32_t> carriedStateId = carriedState(entity.data());
+                if (!carriedStateId.has_value()) {
                     continue;
                 }
-                const std::int32_t state = entity.data().getInt("blockState");
+                const std::int32_t state = *carriedStateId;
                 const std::int32_t x = (chunk->chunkX() << 4) + entity.localX();
                 const std::int32_t z = (chunk->chunkZ() << 4) + entity.localZ();
                 if (std::abs(x - pistonX) > kPushLimit + 1 || std::abs(entity.y() - pistonY) > kPushLimit + 1 ||
