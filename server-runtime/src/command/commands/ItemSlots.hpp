@@ -14,15 +14,16 @@ namespace basalt::server::runtime::command::commands::itemSlots {
 
 /// This server's own index for a vanilla slot name, or nothing when nothing here has that slot.
 ///
-/// parity: `SlotArgument`'s names. Only a player's own slots are here, because a container's slots
-/// need block entities with inventories, which do not exist yet.
-[[nodiscard]] std::optional<std::int32_t> resolve(const std::string& name);
+/// parity: `SlotArgument`'s names. `container.N` means two different things and `container` says
+/// which: for a block it is the container's own slot, and for a player it is vanilla's inventory
+/// order, where the hotbar comes first and this server keeps it after the storage rows.
+[[nodiscard]] std::optional<std::int32_t> resolve(const std::string& name, bool container = false);
 
 /// Every name `resolve` answers, for completions. The numbered ones are listed in full.
 [[nodiscard]] const std::vector<std::string>& names();
 
-/// The slot a named argument holds, or why the name is not one.
-[[nodiscard]] Parsed<std::int32_t> slotOf(const CommandContext& context, std::string_view name);
+/// The slot a named argument holds, or why the name is not one. `container` as in `resolve`.
+[[nodiscard]] Parsed<std::int32_t> slotOf(const CommandContext& context, std::string_view name, bool container = false);
 
 /// What a container holds, by slot. An empty answer covers both "no container" and "empty one":
 /// every caller treats them the same way, as a slot that is not there.

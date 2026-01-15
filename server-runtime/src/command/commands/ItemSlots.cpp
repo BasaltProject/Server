@@ -19,6 +19,9 @@ constexpr std::int32_t kOffhand = 40;
 constexpr std::int32_t kHotbarSize = 9;
 constexpr std::int32_t kMainSize = 27;
 
+/// parity: `SlotRanges`' own `container.0` to `container.53`, a double chest's worth.
+constexpr std::int32_t kContainerSlots = 54;
+
 /// The number after a `hotbar.`/`inventory.` prefix, when the whole tail is one and it is in range.
 [[nodiscard]] std::optional<std::int32_t> indexIn(std::string_view tail, std::int32_t count) {
     std::int32_t value = 0;
@@ -46,15 +49,33 @@ constexpr std::int32_t kMainSize = 27;
     return entries;
 }
 
+/// parity: `ItemStackWithSlot`'s codec reads `Slot` as an unsigned byte, and that is what every
+/// other reader in this server expects too: writing it as an int leaves a container that `/item`
+/// filled looking empty to the dispenser that owns it.
 [[nodiscard]] std::int32_t slotIn(const NbtCompound& entry) {
-    const NbtTag* slot = entry.find("Slot");
-    const auto* value = slot == nullptr ? nullptr : slot->get<std::int32_t>();
-    return value == nullptr ? -1 : *value;
+    return entry.contains("Slot") ? entry.getByte("Slot", -1) : -1;
 }
 
 } // namespace
 
-std::optional<std::int32_t> resolve(const std::string& name) {
+std::optional<std::int32_t> resolve(const std::string& name, const bool container) {
+    if (name.starts_with("container.")) {
+        const std::optional<std::int32_t> index = indexIn(std::string_view{name}.substr(10), kContainerSlots);
+        if (!index.has_value()) {
+            return std::nullopt;
+        }
+        if (container) {
+            return *index;
+        }
+        // parity: on a player `container.N` is `Inventory` slot N, whose hotbar is the first nine.
+        if (*index < kHotbarSize) {
+            return player::PlayerInventory::kHotbarStart + *index;
+        }
+        if (*index < kArmourStart) {
+            return *index - kHotbarSize;
+        }
+        return *index > kOffhand ? std::nullopt : std::optional{*index};
+    }
     if (name.starts_with("hotbar.")) {
         const std::optional<std::int32_t> index = indexIn(std::string_view{name}.substr(7), kHotbarSize);
         return index.has_value() ? std::optional{player::PlayerInventory::kHotbarStart + *index} : std::nullopt;
@@ -91,15 +112,18 @@ const std::vector<std::string>& names() {
         for (std::int32_t i = 0; i < kMainSize; i++) {
             built.push_back("inventory." + std::to_string(i));
         }
+        for (std::int32_t i = 0; i < kContainerSlots; i++) {
+            built.push_back("container." + std::to_string(i));
+        }
         built.insert(built.end(), {"armor.feet", "armor.legs", "armor.chest", "armor.head", "weapon.offhand"});
         return built;
     }();
     return all;
 }
 
-Parsed<std::int32_t> slotOf(const CommandContext& context, std::string_view name) {
+Parsed<std::int32_t> slotOf(const CommandContext& context, std::string_view name, const bool container) {
     const auto* named = context.get<std::string>(std::string{name});
-    const std::optional<std::int32_t> slot = named == nullptr ? std::nullopt : resolve(*named);
+    const std::optional<std::int32_t> slot = named == nullptr ? std::nullopt : resolve(*named, container);
     if (!slot.has_value()) {
         return std::unexpected{CommandSyntaxError{
             .component =
@@ -164,7 +188,7 @@ writeContainer(const CommandContext& context, const std::array<std::int32_t, 3>&
     }
     for (const auto& [slot, stack] : written) {
         NbtCompound entry;
-        entry.set("Slot", NbtTag::ofInt(slot));
+        entry.putByte("Slot", static_cast<std::int8_t>(slot));
         entry.set("id", NbtTag::ofString(stack.id));
         entry.set("count", NbtTag::ofInt(stack.count));
         entries.push_back(NbtTag::ofCompound(entry));

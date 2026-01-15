@@ -80,7 +80,8 @@ ItemCommand::ItemCommand() : Command("item", permissionLevel::kGamemasters) {}
 void ItemCommand::build(const CommandNodeBuilder& root) const {
     /// The stack this form reads from, whether that is a container or another player.
     const auto readSource = [](const CommandContext& context) -> Parsed<storage::StoredItemStack> {
-        const Parsed<std::int32_t> slot = itemSlots::slotOf(context, "sourceSlot");
+        const Parsed<std::int32_t> slot =
+            itemSlots::slotOf(context, "sourceSlot", context.get<BlockCoordinates>("source") != nullptr);
         if (!slot.has_value()) {
             return std::unexpected{slot.error()};
         }
@@ -109,7 +110,7 @@ void ItemCommand::build(const CommandNodeBuilder& root) const {
         if (!source.has_value()) {
             return std::unexpected{source.error()};
         }
-        const Parsed<std::int32_t> slot = itemSlots::slotOf(context, "slot");
+        const Parsed<std::int32_t> slot = itemSlots::slotOf(context, "slot", !entityTargets);
         if (!slot.has_value()) {
             return std::unexpected{slot.error()};
         }
@@ -161,7 +162,7 @@ void ItemCommand::build(const CommandNodeBuilder& root) const {
     };
 
     const auto replaceInBlock = [](const CommandContext& context, std::int32_t count) -> Parsed<std::int32_t> {
-        const Parsed<std::int32_t> slot = itemSlots::slotOf(context, "slot");
+        const Parsed<std::int32_t> slot = itemSlots::slotOf(context, "slot", true);
         if (!slot.has_value()) {
             return std::unexpected{slot.error()};
         }
