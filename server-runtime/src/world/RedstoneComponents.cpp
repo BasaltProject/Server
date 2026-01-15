@@ -234,10 +234,16 @@ void storeOutput(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
         return std::nullopt;
     }
     const bool powered = valueOf(registry::blockStateDefinitions::propertiesOf(*stateId), "powered") == "true";
+    // parity: `ObserverBlock.tick` writes its new state and only *then* books its own next turn, so
+    // a neighbour that the write wakes goes into the queue ahead of it. Measured with the jar
+    // patched to say when a turn is booked: that order is the whole difference between a chain of
+    // observers that alternates and one that answers a turn late.
+    const std::optional<BlockChange> moved = turn(world, x, y, z, *stateId, "powered", powered ? "false" : "true");
+    watchFor(world, x, y, z);
     if (!powered) {
         world.scheduleBlockTick(x, y, z, observer(), kObserverDelay);
     }
-    return turn(world, x, y, z, *stateId, "powered", powered ? "false" : "true");
+    return moved;
 }
 
 /// parity: `RedstoneTorchBlock.tick`: lit while the block it hangs on is not powered, out while it
@@ -341,6 +347,17 @@ void scheduleAround(WorldState& world, std::int32_t x, std::int32_t y, std::int3
     }
 }
 
+void watchOnPlace(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value() || pathOf(*stateId) != "observer") {
+        return;
+    }
+    if (valueOf(registry::blockStateDefinitions::propertiesOf(*stateId), "powered") == "true") {
+        return;
+    }
+    world.scheduleBlockTick(x, y, z, observer(), kObserverDelay);
+}
+
 void watchFor(WorldState& world, std::int32_t changedX, std::int32_t changedY, std::int32_t changedZ) {
     for (const BlockFace face : kFaces) {
         const std::int32_t x = changedX + registry::stepX(face);
@@ -358,6 +375,11 @@ void watchFor(WorldState& world, std::int32_t changedX, std::int32_t changedY, s
         }
         if (x + registry::stepX(*watching) != changedX || y + registry::stepY(*watching) != changedY ||
             z + registry::stepZ(*watching) != changedZ) {
+            continue;
+        }
+        // parity: `ObserverBlock.updateShape` only books a turn while the observer is off. One that
+        // is already pulsing ignores what it sees, and that is what keeps a chain of them in step.
+        if (valueOf(registry::blockStateDefinitions::propertiesOf(*stateId), "powered") == "true") {
             continue;
         }
         world.scheduleBlockTick(x, y, z, observer(), kObserverDelay);

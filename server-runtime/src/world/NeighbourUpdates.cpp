@@ -339,8 +339,14 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     for (const BlockChange& change : settled) {
         redstoneComponents::scheduleAround(world, change.x, change.y, change.z);
     }
-    // parity: `ObserverBlock.neighborChanged`, which fires only for the block it is watching.
+    // parity: `ObserverBlock.updateShape`, which fires for the block it is watching. Every write
+    // updates the shapes around it, so a piece of dust that lit up wakes an observer looking at it
+    // just as much as a block somebody placed.
     redstoneComponents::watchFor(world, x, y, z);
+    redstoneComponents::watchOnPlace(world, x, y, z);
+    for (const BlockChange& change : settled) {
+        redstoneComponents::watchFor(world, change.x, change.y, change.z);
+    }
     // parity: every `neighborChanged` that reads the power: doors, lamps, bulbs and the rest.
     //
     // parity: a reactor writes with `UPDATE_ALL`, so whatever it changed goes on to tell its own
@@ -362,6 +368,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             if (!change.effects.empty()) {
                 effects.push_back(change);
             }
+            redstoneComponents::watchFor(world, change.x, change.y, change.z);
             reacting.push_back({change.x, change.y, change.z});
         }
     }
