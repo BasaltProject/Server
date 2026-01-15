@@ -200,6 +200,8 @@ public:
     /// a forced chunk stays generated whether or not a player is anywhere near it.
     [[nodiscard]] std::set<std::int64_t>& forcedChunks() noexcept { return forcedChunks_; }
 
+    [[nodiscard]] const std::set<std::int64_t>& forcedChunks() const noexcept { return forcedChunks_; }
+
     /// Ticks this world has been running, which is not the same as its clock: `/time set` moves
     /// one, not the other.
     [[nodiscard]] std::int64_t gameTime() const noexcept { return gameTime_; }

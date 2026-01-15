@@ -100,17 +100,19 @@ TEST_CASE("a hopper on cooldown counts down and moves nothing") {
     placeContainer(world, 8, 63, 8, empty(27), "chest");
     dataAt(world, 8, 64, 8).putInt(kCooldownKey, 3);
 
-    CHECK(hoppers::tick(world, 8, 64, 8));
+    // parity: contar hacia atras no llama a `setChanged`, asi que el turno no ensucia el chunk.
+    CHECK_FALSE(hoppers::tick(world, 8, 64, 8));
 
     CHECK(cooldownOf(world, 8, 64, 8) == 2);
     CHECK(slotsOf(world, 8, 64, 8, hoppers::kSize)[0]->count == 3);
     CHECK_FALSE(slotsOf(world, 8, 63, 8, 27)[0].has_value());
 
-    // The last tick of the cooldown is spent counting down, not moving.
+    // parity: medido contra el jar. `pushItemsTick` descuenta primero y pregunta despues, asi que
+    // el turno en que el contador llega a cero es el turno en que se mueve, no uno mas tarde.
     dataAt(world, 8, 64, 8).putInt(kCooldownKey, 1);
     CHECK(hoppers::tick(world, 8, 64, 8));
-    CHECK(cooldownOf(world, 8, 64, 8) == 0);
-    CHECK_FALSE(slotsOf(world, 8, 63, 8, 27)[0].has_value());
+    CHECK(cooldownOf(world, 8, 64, 8) == 8);
+    CHECK(slotsOf(world, 8, 63, 8, 27)[0]->count == 1);
 }
 
 TEST_CASE("a hopper gives one item to what it faces and books eight ticks") {
@@ -248,7 +250,7 @@ TEST_CASE("the last item out of the container above leaves its slot empty") {
     CHECK(slotsOf(world, 8, 64, 8, hoppers::kSize)[0]->count == 8);
 }
 
-TEST_CASE("pushing comes before pulling") {
+TEST_CASE("a hopper gives and takes on the same turn") {
     Loaded loaded;
     WorldState& world = loaded.state;
     placeHopper(world, 8, 64, 8, oneStack(hoppers::kSize, 0, "stone", 1));
@@ -257,10 +259,11 @@ TEST_CASE("pushing comes before pulling") {
 
     CHECK(hoppers::tick(world, 8, 64, 8));
 
+    // parity: medido contra el jar. `tryMoveItems` pone las dos mitades con `moved |=`: da uno si
+    // tiene algo y coge uno si le queda hueco, y las dos pasan en el mismo turno.
     CHECK(slotsOf(world, 8, 63, 8, 27)[0]->count == 1);
-    // The chest on top is left alone, because one move a turn is all a hopper gets.
-    CHECK(slotsOf(world, 8, 65, 8, 27)[0]->count == 4);
-    CHECK_FALSE(slotsOf(world, 8, 64, 8, hoppers::kSize)[0].has_value());
+    CHECK(slotsOf(world, 8, 65, 8, 27)[0]->count == 3);
+    CHECK(slotsOf(world, 8, 64, 8, hoppers::kSize)[0]->item.path() == "dirt");
 }
 
 TEST_CASE("a hopper whose slots are all taken pulls nothing") {
