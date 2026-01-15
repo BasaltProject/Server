@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
+#include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/Dispensers.hpp>
@@ -204,6 +205,16 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             }
         }
         world::scheduledBlocks::frogspawn(world.state(), x, y, z, scheduled);
+        // parity: `SugarCaneBlock.tick`, the turn a cane books when it loses what it was drinking.
+        world::scheduledBlocks::sugarCane(
+            world.state(), x, y, z,
+            world::blockSurvival::isSupported(
+                world.state(), x, y, z, std::nullopt,
+                [&world](const world::WorldState&, std::int32_t sx, std::int32_t sy, std::int32_t sz) {
+                    return world::scheduledBlocks::scaffoldingHasFallen(world.state(), sx, sy, sz);
+                },
+                hasSkylight),
+            scheduled);
         world::geysers::tick(world.state(), world.metadata().seed, world.gameTime(), x, y, z, scheduled);
         world::scheduledBlocks::snifferEgg(world.state(), x, y, z, random, scheduled);
         if (!scheduled.empty()) {

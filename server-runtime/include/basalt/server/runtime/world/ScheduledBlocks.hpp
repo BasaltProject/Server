@@ -29,6 +29,8 @@ namespace scheduledBlocks {
 
 [[nodiscard]] const wire::common::Identifier& bubbleColumnTickType();
 
+[[nodiscard]] const wire::common::Identifier& sugarCaneTickType();
+
 /// parity: `FarmlandBlock.turnToDirt` and `DirtPathBlock.tick`, both of which give way to plain dirt
 /// when something solid lands on top rather than breaking.
 [[nodiscard]] std::optional<std::int32_t> coveredSoil(WorldState& world, std::int32_t x, std::int32_t y,
@@ -61,6 +63,14 @@ void scheduleHatch(WorldState& world, std::int32_t x, std::int32_t y, std::int32
 
 /// parity: `FrogspawnBlock.onPlace`, an hour or so away and never the same twice.
 void scheduleFrogspawn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t seed);
+
+/// parity: `SugarCaneBlock.updateShape`, which books a turn one tick out rather than breaking the
+/// cane on the spot. `supported` is the answer `canSurvive` would give.
+void scheduleSugarCane(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool supported);
+
+/// parity: `SugarCaneBlock.tick`, the turn the cane booked: it breaks only if it still cannot stand.
+void sugarCane(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool supported,
+               std::vector<BlockChange>& changes);
 
 /// parity: `FrogspawnBlock.tick`, which either breaks the spawn or hatches it away.
 ///
