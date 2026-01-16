@@ -46,9 +46,14 @@ struct Hooks {
 
 /// Lets every reactive block around a change look again. Answers what moved, so the caller can tell
 /// the clients.
+///
+/// `itself` says whether the square that changed is asked too. parity: `Level.updateNeighborsAt`
+/// tells the six around a square and never the square itself, and a redstone lamp has no `onPlace`:
+/// one put down by command next to a lit torch stays dark until something pokes it. Only a diode
+/// asks the square in front of it directly, through `neighborChanged`.
 [[nodiscard]] std::vector<BlockChange> update(WorldState& world, std::string_view worldName, std::int32_t x,
                                               std::int32_t y, std::int32_t z, random::RandomSource& random,
-                                              const Hooks& hooks = {});
+                                              const Hooks& hooks = {}, bool itself = true);
 
 /// The scheduled half of the lamp: it only goes dark if the signal is still gone.
 [[nodiscard]] std::optional<BlockChange> lampTick(WorldState& world, std::string_view worldName, std::int32_t x,

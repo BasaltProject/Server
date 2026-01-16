@@ -181,4 +181,35 @@ std::optional<std::int32_t> reshape(WorldState& world, std::int32_t x, std::int3
     return *turned;
 }
 
+std::vector<std::array<std::int32_t, 3>> acrossSteps(WorldState& world, std::int32_t x, std::int32_t y,
+                                                     std::int32_t z) {
+    std::vector<std::array<std::int32_t, 3>> reach;
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value() || !isWire(*stateId)) {
+        return reach;
+    }
+    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*stateId);
+    for (const BlockFace face : kSides) {
+        const auto found = properties.find(std::string{nameOf(face)});
+        if (found == properties.end() || found->second == kNone) {
+            continue;
+        }
+        const std::int32_t nx = x + registry::stepX(face);
+        const std::int32_t nz = z + registry::stepZ(face);
+        // Only across something that is not dust itself: two dusts side by side already see each
+        // other through their own six sides.
+        const std::optional<std::int32_t> beside = world.blockState(nx, y, nz);
+        if (beside.has_value() && isWire(*beside)) {
+            continue;
+        }
+        for (const std::int32_t step : {-1, 1}) {
+            const std::optional<std::int32_t> other = world.blockState(nx, y + step, nz);
+            if (other.has_value() && isWire(*other)) {
+                reach.push_back({nx, y + step, nz});
+            }
+        }
+    }
+    return reach;
+}
+
 } // namespace basalt::server::runtime::world::redstoneWire

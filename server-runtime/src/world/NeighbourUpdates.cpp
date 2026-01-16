@@ -297,6 +297,17 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             reshaped(change.stateId, change.x, change.y, change.z);
         }
     }
+    // parity: `RedStoneWireBlock.updateIndirectNeighbourShapes`, the one place a dust reaches past
+    // its own six sides: the dust one below and one above the square it connects to are told to look
+    // again. It runs on the state the block ends up with, not the one it arrived as, so it goes
+    // after the reshape above; without it a line up a staircase is drawn as if the steps were flat.
+    for (const std::array<std::int32_t, 3>& at : redstoneWire::acrossSteps(world, x, y, z)) {
+        if (const std::optional<std::int32_t> drawn =
+                redstoneWire::reshape(world, at[0], at[1], at[2], world.blockState(at[0], at[1], at[2]).value_or(0));
+            drawn.has_value()) {
+            reshaped(*drawn, at[0], at[1], at[2]);
+        }
+    }
     // parity: `FallingBlock.onPlace` and its `updateShape`, which both do nothing but ask to be
     // looked at again in two ticks. The block that just arrived counts: sand put down in mid air
     // used to sit there for good, because only its neighbours were ever asked.
@@ -363,7 +374,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         reacting.pop_front();
         ++reacted;
         for (const BlockChange& change : redstoneReactors::update(world, context.worldName, at[0], at[1], at[2],
-                                                                  context.random, context.reactorHooks)) {
+                                                                  context.random, context.reactorHooks, false)) {
             reshaped(change.stateId, change.x, change.y, change.z);
             if (!change.effects.empty()) {
                 effects.push_back(change);

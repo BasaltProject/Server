@@ -280,9 +280,11 @@ const wire::common::Identifier& lamp() {
 }
 
 std::vector<BlockChange> update(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
-                                std::int32_t z, random::RandomSource& random, const Hooks& hooks) {
+                                std::int32_t z, random::RandomSource& random, const Hooks& hooks, const bool itself) {
     std::vector<BlockChange> changes;
-    react(world, worldName, x, y, z, changes, random, hooks);
+    if (itself) {
+        react(world, worldName, x, y, z, changes, random, hooks);
+    }
     for (const BlockFace face : kFaces) {
         react(world, worldName, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face),
               changes, random, hooks);
