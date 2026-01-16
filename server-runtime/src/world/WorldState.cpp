@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <map>
 #include <utility>
@@ -571,7 +572,17 @@ std::vector<entity::ServerEntity*> WorldState::entitiesIn(std::int32_t chunkX, s
 }
 
 std::vector<std::pair<std::int32_t, std::int32_t>> WorldState::chunksWithEntities() const {
-    return entityRegistry_.chunksWithEntities();
+    std::vector<std::pair<std::int32_t, std::int32_t>> chunks = entityRegistry_.chunksWithEntities();
+    // An item on the floor is an entity too. Leaving it out meant a chunk whose only change was a
+    // stack rolling across it was never written down, and what came back was where it used to be.
+    for (const DroppedItem& item : itemPhysics_.items()) {
+        const std::pair<std::int32_t, std::int32_t> at{static_cast<std::int32_t>(std::floor(item.x)) >> 4,
+                                                       static_cast<std::int32_t>(std::floor(item.z)) >> 4};
+        if (std::ranges::find(chunks, at) == chunks.end()) {
+            chunks.push_back(at);
+        }
+    }
+    return chunks;
 }
 
 void WorldState::forgetEntitiesIn(std::int32_t chunkX, std::int32_t chunkZ) {

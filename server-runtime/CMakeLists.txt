@@ -226,6 +226,7 @@ basalt_module(server-runtime-core
         src/world/NaturalSpawnPredicates.cpp
         src/world/BiomeTagLoader.cpp
         src/world/Dispensers.cpp
+        src/world/DroppedItemNbt.cpp
         src/world/PortalIndex.cpp
         src/world/RealTimelines.cpp
         src/world/StructureTemplates.cpp

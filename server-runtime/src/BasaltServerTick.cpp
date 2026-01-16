@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/entity/PrimedTnt.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
+#include <basalt/server/runtime/world/DroppedItemNbt.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
@@ -210,6 +211,13 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
     // The mobs a chunk brought back from disk: they wait for the tick loop because an entity id is
     // the server's to hand out, and a chunk is loaded on a generation thread.
     for (const wire::nbt::NbtCompound& tag : world.state().takePendingEntities()) {
+        // An item on the floor is its own thing here, not a `ServerEntity`, so it comes back its
+        // own way. parity: to vanilla they are both just entities saved with the chunk.
+        if (const std::optional<world::DroppedItem> item = world::droppedItemNbt::decode(tag, allocateEntityId);
+            item.has_value()) {
+            static_cast<void>(world.state().spawnItem(*item));
+            continue;
+        }
         for (std::unique_ptr<entity::ServerEntity>& restored :
              entity::entityNbt::decodeTree(tag, allocateEntityId, protocolTypeOf)) {
             static_cast<void>(world.state().spawnEntity(std::move(restored)));
