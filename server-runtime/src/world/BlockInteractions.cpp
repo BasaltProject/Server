@@ -299,4 +299,39 @@ std::optional<std::string> redstoneSound(std::int32_t stateId, bool open) {
     return soundFor(*block, kind, open);
 }
 
+std::optional<std::array<std::int32_t, 3>> attachmentOf(std::int32_t stateId, std::int32_t x, std::int32_t y,
+                                                        std::int32_t z) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    if (block == nullptr) {
+        return std::nullopt;
+    }
+    const std::string_view path = block->path();
+    if (path != "lever" && !path.ends_with("_button")) {
+        return std::nullopt;
+    }
+    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
+    const auto face = properties.find("face");
+    if (face == properties.end()) {
+        return std::nullopt;
+    }
+    if (face->second == "floor") {
+        return std::array<std::int32_t, 3>{x, y - 1, z};
+    }
+    if (face->second == "ceiling") {
+        return std::array<std::int32_t, 3>{x, y + 1, z};
+    }
+    const auto facing = properties.find("facing");
+    if (facing == properties.end()) {
+        return std::nullopt;
+    }
+    static constexpr std::array<std::pair<std::string_view, std::array<std::int32_t, 3>>, 4> kBehind{
+        {{"north", {0, 0, 1}}, {"south", {0, 0, -1}}, {"west", {1, 0, 0}}, {"east", {-1, 0, 0}}}};
+    for (const auto& [name, step] : kBehind) {
+        if (facing->second == name) {
+            return std::array<std::int32_t, 3>{x + step[0], y + step[1], z + step[2]};
+        }
+    }
+    return std::nullopt;
+}
+
 } // namespace basalt::server::runtime::world::blockInteractions

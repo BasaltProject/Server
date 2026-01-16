@@ -331,13 +331,13 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     for (const BlockChange& change : settled) {
         reshaped(change.stateId, change.x, change.y, change.z);
     }
-    redstoneComponents::scheduleAround(world, x, y, z);
+    redstoneComponents::scheduleAround(world, context.worldName, x, y, z);
     // parity: `RedStoneWireBlock.updatePowerStrength` ends with `updateNeighborsAt` on **every**
     // piece of dust whose strength moved, not only on the block that started it. Without this a
     // lamp at the end of a line of dust never heard that the dust had lit up, because it is two
     // blocks away from whatever was placed.
     for (const BlockChange& change : settled) {
-        redstoneComponents::scheduleAround(world, change.x, change.y, change.z);
+        redstoneComponents::scheduleAround(world, context.worldName, change.x, change.y, change.z);
     }
     // parity: `ObserverBlock.updateShape`, which fires for the block it is watching. Every write
     // updates the shapes around it, so a piece of dust that lit up wakes an observer looking at it

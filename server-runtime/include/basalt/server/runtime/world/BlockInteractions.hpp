@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -87,6 +88,14 @@ struct BlockRelease {
 ///
 /// This is the shape `redstoneReactors::Hooks::openSound` expects.
 [[nodiscard]] std::optional<std::string> redstoneSound(std::int32_t stateId, bool open);
+
+/// Where a lever or a button is stuck: the floor under it, the ceiling over it, or the wall behind.
+///
+/// parity: `LeverBlock.updateNeighbours` tells that block's own neighbours as well as its own, which
+/// is how a torch on the far side of the wall hears the flip. Only *using* the lever does this: a
+/// `/setblock` of the same state updates the six squares around the lever and nothing more.
+[[nodiscard]] std::optional<std::array<std::int32_t, 3>> attachmentOf(std::int32_t stateId, std::int32_t x,
+                                                                      std::int32_t y, std::int32_t z);
 
 } // namespace blockInteractions
 

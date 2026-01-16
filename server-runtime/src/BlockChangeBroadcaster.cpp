@@ -145,7 +145,7 @@ void BlockChangeBroadcaster::announceRedstone(world::LoadedWorld& world,
             announceBlock(watchers, reacted);
         }
     }
-    world::redstoneComponents::scheduleAround(world.state(), change.x, change.y, change.z);
+    world::redstoneComponents::scheduleAround(world.state(), world.name(), change.x, change.y, change.z);
 }
 
 void BlockChangeBroadcaster::runPistonEvent(world::LoadedWorld& world, const world::BlockEvent& event,

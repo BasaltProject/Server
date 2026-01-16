@@ -102,13 +102,23 @@ using Properties = std::map<std::string, std::string>;
     return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};
 }
 
-void schedule(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+[[nodiscard]] bool torchIsFed(const WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
+                              std::int32_t z, const Properties& properties);
+
+void schedule(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return;
     }
     const std::string path = pathOf(*stateId);
     if (path == "redstone_torch" || path == "redstone_wall_torch") {
+        // parity: `RedstoneTorchBlock.neighborChanged` books a turn only while the torch and what it
+        // is stuck to say the same thing, which is the torch's way of saying it is in the wrong
+        // state. Booking on every nudge left a torch flicking along with a lever it never heard.
+        const Properties properties = registry::blockStateDefinitions::propertiesOf(*stateId);
+        if ((valueOf(properties, "lit") == "true") != torchIsFed(world, worldName, x, y, z, properties)) {
+            return;
+        }
         world.scheduleBlockTick(x, y, z, torch(), kTorchDelay);
         return;
     }
@@ -339,11 +349,39 @@ const wire::common::Identifier& observer() {
 
 bool isComponent(std::int32_t stateId) { return std::ranges::find(kComponents, pathOf(stateId)) != kComponents.end(); }
 
-void scheduleAround(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
-    // The same reach the dust settles over: a torch sitting on the far side of the block a lever is
-    // attached to is two steps away, and it has to hear about the lever.
-    for (const std::array<std::int32_t, 3>& position : redstone::reachOf(world, x, y, z)) {
-        schedule(world, position[0], position[1], position[2]);
+/// parity: `Level.updateNeighborsAt`, which is the six neighbours of one square and nothing else.
+void scheduleNeighbours(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z) {
+    schedule(world, worldName, x, y, z);
+    for (const BlockFace face : kFaces) {
+        schedule(world, worldName, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face));
+    }
+}
+
+void scheduleAround(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z) {
+    scheduleNeighbours(world, worldName, x, y, z);
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value()) {
+        return;
+    }
+    // Two steps is not the general rule: only a handful of blocks tell the neighbours of their own
+    // neighbours, and each of them does it its own way. Reaching two steps for everything made a
+    // torch answer a lever put down by command two blocks away, which the jar never does.
+    const std::string path = pathOf(*stateId);
+    const Properties properties = registry::blockStateDefinitions::propertiesOf(*stateId);
+    // parity: `RedstoneTorchBlock.notifyNeighbors`, which updates around each of its six sides.
+    if (path == "redstone_torch" || path == "redstone_wall_torch") {
+        for (const BlockFace face : kFaces) {
+            scheduleNeighbours(world, worldName, x + registry::stepX(face), y + registry::stepY(face),
+                               z + registry::stepZ(face));
+        }
+        return;
+    }
+    // parity: `DiodeBlock.updateNeighborsInFront`, the square it points at and that square's own.
+    if (path == "repeater" || path == "comparator") {
+        if (const std::optional<BlockFace> facing = faceNamed(valueOf(properties, "facing")); facing.has_value()) {
+            scheduleNeighbours(world, worldName, x + registry::stepX(*facing), y + registry::stepY(*facing),
+                               z + registry::stepZ(*facing));
+        }
     }
 }
 

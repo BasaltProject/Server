@@ -192,7 +192,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             const std::vector<world::BlockChange> settled =
                 world::redstone::settle(world.state(), world.name(), moved->x, moved->y, moved->z);
             scheduled.insert(scheduled.end(), settled.begin(), settled.end());
-            world::redstoneComponents::scheduleAround(world.state(), moved->x, moved->y, moved->z);
+            world::redstoneComponents::scheduleAround(world.state(), world.name(), moved->x, moved->y, moved->z);
             // parity: a component writes its own state and the shapes around it are updated, which
             // is what an observer watching a repeater or another observer is waiting for.
             world::redstoneComponents::watchFor(world.state(), moved->x, moved->y, moved->z);
@@ -236,6 +236,19 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         // the signal with it, or whatever it powered stays on for good.
         broadcaster_->announceRedstone(world, watchers,
                                        world::BlockChange{.x = x, .y = y, .z = z, .stateId = released->stateId});
+        // parity: the same `updateNeighbours` the press did, so the wall the button is on hears it
+        // come back up too.
+        if (const std::optional<std::array<std::int32_t, 3>> wall =
+                world::blockInteractions::attachmentOf(released->stateId, x, y, z);
+            wall.has_value()) {
+            broadcaster_->announceRedstone(
+                world, watchers,
+                world::BlockChange{.x = (*wall)[0],
+                                   .y = (*wall)[1],
+                                   .z = (*wall)[2],
+                                   .stateId =
+                                       world.state().blockState((*wall)[0], (*wall)[1], (*wall)[2]).value_or(0)});
+        }
         sendBlockUpdates(watchers, {world::BlockChange{.x = x, .y = y, .z = z, .stateId = released->stateId}});
         for (PlayerSession* player : watchers) {
             if (!player->connection().sendPlayPacket) {
