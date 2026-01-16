@@ -14,6 +14,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <map>
 #include <memory>
@@ -23,6 +24,16 @@
 #include <vector>
 
 namespace basalt::server::runtime::world {
+
+/// parity: `RedstoneTorchBlock.RECENT_TOGGLES`, one list per world of every time a torch went out.
+/// Eight at the same square inside sixty ticks and it burns out. The list belongs to the world and
+/// not to the torch, so whichever one happens to tick is the one that clears out the old entries.
+struct TorchToggle {
+    std::int32_t x = 0;
+    std::int32_t y = 0;
+    std::int32_t z = 0;
+    std::int64_t when = 0;
+};
 
 /// parity: `ServerLevel.blockEvents`. A piston does not move when the signal reaches it: it books an
 /// event, and the event is what moves it, once a tick and only while the world runs. That is why a
@@ -162,6 +173,16 @@ public:
     /// Everything booked since the last call, in the order it was booked.
     [[nodiscard]] std::vector<BlockEvent> takeBlockEvents();
 
+    /// One more time a torch went out here.
+    void addTorchToggle(TorchToggle toggle);
+
+    /// Drops the toggles at the front that are older than `keepFor` ticks, which is the only place
+    /// they ever leave the list.
+    void pruneTorchToggles(std::int64_t now, std::int64_t keepFor);
+
+    /// How many of the toggles still in the list happened at this square.
+    [[nodiscard]] std::int32_t torchToggleCount(std::int32_t x, std::int32_t y, std::int32_t z) const;
+
     /// What a neighbour already queued for a cell of a chunk that has not generated yet.
     [[nodiscard]] std::optional<std::int32_t> queuedWriteAt(std::int32_t worldX, std::int32_t y,
                                                             std::int32_t worldZ) const;
@@ -290,6 +311,7 @@ private:
     PrimedTntQueue primedTntQueue_;
     PendingChunkDecorations pendingDecorations_;
     std::vector<BlockEvent> blockEvents_;
+    std::deque<TorchToggle> torchToggles_;
     SculkSensorTracker sculkSensors_;
     EntityRegistry entityRegistry_;
     DroppedItemPhysics itemPhysics_;

@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/server/world/NoiseWorldGenerator.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <map>
@@ -209,6 +210,24 @@ void WorldState::queueBlockEvent(BlockEvent event) {
 std::vector<BlockEvent> WorldState::takeBlockEvents() {
     const WorldWriteLock lock{mutex_};
     return std::exchange(blockEvents_, {});
+}
+
+void WorldState::addTorchToggle(TorchToggle toggle) {
+    const WorldWriteLock lock{mutex_};
+    torchToggles_.push_back(toggle);
+}
+
+void WorldState::pruneTorchToggles(const std::int64_t now, const std::int64_t keepFor) {
+    const WorldWriteLock lock{mutex_};
+    while (!torchToggles_.empty() && now - torchToggles_.front().when > keepFor) {
+        torchToggles_.pop_front();
+    }
+}
+
+std::int32_t WorldState::torchToggleCount(const std::int32_t x, const std::int32_t y, const std::int32_t z) const {
+    const WorldReadLock lock{mutex_};
+    return static_cast<std::int32_t>(std::ranges::count_if(
+        torchToggles_, [x, y, z](const TorchToggle& one) { return one.x == x && one.y == y && one.z == z; }));
 }
 
 void WorldState::applyPendingWritesTo(Chunk& chunk) {

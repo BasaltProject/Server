@@ -186,13 +186,13 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         // parity: `RedstoneTorchBlock.tick` and `DiodeBlock.tick`, which is where a component's delay
         // is actually spent. What it changes then settles the dust around it.
         if (const std::optional<world::BlockChange> moved =
-                world::redstoneComponents::tick(world.state(), world.name(), x, y, z);
+                world::redstoneComponents::tick(world.state(), world.name(), x, y, z, world.gameTime());
             moved.has_value()) {
             scheduled.push_back(*moved);
             const std::vector<world::BlockChange> settled =
                 world::redstone::settle(world.state(), world.name(), moved->x, moved->y, moved->z);
             scheduled.insert(scheduled.end(), settled.begin(), settled.end());
-            world::redstoneComponents::scheduleAround(world.state(), world.name(), moved->x, moved->y, moved->z);
+            world::redstoneComponents::scheduleAround(world.state(), world.name(), moved->x, moved->y, moved->z, false);
             // parity: a component writes its own state and the shapes around it are updated, which
             // is what an observer watching a repeater or another observer is waiting for.
             world::redstoneComponents::watchFor(world.state(), moved->x, moved->y, moved->z);
