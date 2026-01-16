@@ -76,6 +76,12 @@ public:
         std::int32_t maxPlayers = 20;
         wire::common::Logger logger{"Command"};
         std::function<void()> stopServer;
+        /// parity: a block that a command's change knocks down drops its own items, the same as
+        /// breaking it by hand: `Block.updateOrDestroy` ends in `destroyBlock(pos, true)`. Null
+        /// where there is nothing to drop into, which is how the dispatcher's own tests run.
+        std::function<void(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                           std::int32_t destroyedState)>
+            dropBrokenBlock;
         /// What the console reads messages with. Clients resolve translation keys themselves
         /// against their own language, so this exists only so the log shows sentences instead of
         /// keys; an empty table degrades to printing the keys rather than failing.

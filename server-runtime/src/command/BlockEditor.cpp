@@ -96,11 +96,15 @@ void BlockEditor::notifyNeighbours() {
         bool unsupported = false;
         neighbourUpdates::afterChange(
             context, at[0], at[1], at[2], effects_,
-            [this, &at, &unsupported](std::int32_t, std::int32_t x, std::int32_t y, std::int32_t z) {
+            [this, &at, &unsupported](std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) {
                 if (x == at[0] && y == at[1] && z == at[2]) {
                     unsupported = true;
                 }
                 static_cast<void>(set(x, y, z, reg::blocks::air().stateId));
+                // parity: knocking a block down drops it, whether a hand or a command did it.
+                if (environment_->options().dropBrokenBlock) {
+                    environment_->options().dropBrokenBlock(*world_, x, y, z, stateId);
+                }
             },
             [this, &at, &shapedToAir](std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) {
                 if (stateId == reg::blocks::air().stateId && x == at[0] && y == at[1] && z == at[2]) {

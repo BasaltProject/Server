@@ -113,24 +113,14 @@ using Properties = std::map<std::string, std::string>;
 }
 
 /// parity: the blocks whose `isSignalSource` is true, whatever they are giving off right now.
-constexpr std::array<std::string_view, 18> kSignalSources{"redstone_block",
-                                                          "redstone_torch",
-                                                          "redstone_wall_torch",
-                                                          "repeater",
-                                                          "comparator",
-                                                          "observer",
-                                                          "lever",
-                                                          "daylight_detector",
-                                                          "detector_rail",
-                                                          "lectern",
-                                                          "tripwire_hook",
-                                                          "lightning_rod",
-                                                          "sculk_sensor",
-                                                          "calibrated_sculk_sensor",
-                                                          "trapped_chest",
-                                                          "light_weighted_pressure_plate",
-                                                          "heavy_weighted_pressure_plate",
-                                                          "target"};
+constexpr std::array<std::string_view, 19> kSignalSources{
+    "redstone_block", "redstone_torch", "redstone_wall_torch", "repeater", "comparator", "observer", "lever",
+    "daylight_detector", "detector_rail", "lectern", "tripwire_hook", "lightning_rod", "sculk_sensor",
+    "calibrated_sculk_sensor", "trapped_chest",
+    // parity: `JukeboxBlock.isSignalSource` is
+    // always true, playing or not, and that is
+    // what makes a dust reach out to it.
+    "jukebox", "light_weighted_pressure_plate", "heavy_weighted_pressure_plate", "target"};
 
 [[nodiscard]] bool conducts(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);

@@ -74,7 +74,7 @@ void BlockChangeBroadcaster::notifyAround(world::LoadedWorld& world,
         context, x, y, z, effects,
         [this, &world, &watchers](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
             sendBlock(watchers, bx, by, bz, reg::blocks::air().stateId);
-            dropWashedAwayBlock(world, bx, by, bz, stateId);
+            dropBrokenBlock(world, bx, by, bz, stateId);
         },
         [&watchers](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
             sendBlock(watchers, bx, by, bz, stateId);
@@ -204,8 +204,18 @@ void BlockChangeBroadcaster::dropWashedAwayBlock(world::LoadedWorld& world, std:
     if (destroyedState <= 0 || world::fluidFlow::kindOf(destroyedState).has_value()) {
         return;
     }
+    // parity: `LavaFluid.beforeDestroyingBlock` only plays the fizz, so only water drops what it
+    // washed away.
     const std::optional<std::int32_t> now = world.state().blockState(x, y, z);
     if (!now.has_value() || world::fluidFlow::kindOf(*now) != world::FluidKind::Water) {
+        return;
+    }
+    dropBrokenBlock(world, x, y, z, destroyedState);
+}
+
+void BlockChangeBroadcaster::dropBrokenBlock(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                             std::int32_t destroyedState) {
+    if (destroyedState <= 0) {
         return;
     }
     const std::optional<reg::BlockState> state = reg::blocks::byStateId(destroyedState);

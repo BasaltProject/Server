@@ -310,6 +310,10 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     wiring.lang = options_.lang;
     wiring.pluginEvents = [this] { return plugins_ == nullptr ? nullptr : &plugins_->events(); };
     wiring.stopServer = [this] { shutdown(); };
+    wiring.dropBrokenBlock = [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                    std::int32_t destroyedState) {
+        broadcaster_->dropBrokenBlock(world, x, y, z, destroyedState);
+    };
     wiring.requestRestart = [this] { requestRestart(); };
     wiring.onConfigsReloaded = [this] { worldRegistry_->onConfigsReloaded(); };
     wiring.nowNanos = [this] {
