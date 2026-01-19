@@ -145,7 +145,7 @@ TEST_CASE("a torch that goes out eight times in sixty ticks burns out") {
     CHECK(propertyOf(*world.blockState(8, 65, 8), "lit") == "true");
 }
 
-TEST_CASE("a repeater turns on from what it faces and books its own turn off") {
+TEST_CASE("a repeater turns on from what it faces, and off with nothing booked") {
     WorldState world = emptyWorld();
     world.getOrGenerateChunk(0, 0);
     // A repeater facing east reads the block to its east.
@@ -155,15 +155,35 @@ TEST_CASE("a repeater turns on from what it faces and books its own turn off") {
     const std::optional<BlockChange> on = redstoneComponents::tick(world, "world", 8, 64, 8, 0);
     REQUIRE(on.has_value());
     CHECK(propertyOf(on->stateId, "powered") == "true");
-    // Already on: nothing to report.
+    // Already on and still fed: nothing to report.
     CHECK_FALSE(redstoneComponents::tick(world, "world", 8, 64, 8, 0).has_value());
 
-    // The source goes and the repeater turns off, booking a turn as it does.
+    // parity: `DiodeBlock.tick` books a turn when it goes **on** while it should not stay on, never
+    // when it goes off. Turning off is the end of it.
     REQUIRE(world.setBlockState(9, 64, 8, registry::blocks::air().stateId));
     const std::optional<BlockChange> off = redstoneComponents::tick(world, "world", 8, 64, 8, 0);
     REQUIRE(off.has_value());
     CHECK(propertyOf(off->stateId, "powered") == "false");
+    CHECK_FALSE(world.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("repeater")));
+}
+
+TEST_CASE("a repeater whose turn comes with the input already gone still goes on, then off") {
+    WorldState world = emptyWorld();
+    world.getOrGenerateChunk(0, 0);
+    // Off, with nothing feeding it: this is the turn a one-tick pulse leaves behind, and vanilla's
+    // `else if (!on)` fires it anyway. That is what stretches a pulse to the repeater's own delay;
+    // measured in the bench circuit `pulsocorto`.
+    REQUIRE(world.setBlockState(8, 64, 8, repeaterState("east", "1", "false")));
+
+    const std::optional<BlockChange> on = redstoneComponents::tick(world, "world", 8, 64, 8, 0);
+    REQUIRE(on.has_value());
+    CHECK(propertyOf(on->stateId, "powered") == "true");
+    // And it books the turn that will take it back off.
     CHECK(world.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("repeater")));
+
+    const std::optional<BlockChange> off = redstoneComponents::tick(world, "world", 8, 64, 8, 0);
+    REQUIRE(off.has_value());
+    CHECK(propertyOf(off->stateId, "powered") == "false");
 }
 
 TEST_CASE("a repeater held by another one does not move") {

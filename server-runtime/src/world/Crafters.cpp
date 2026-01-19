@@ -20,6 +20,7 @@ constexpr std::int32_t kMaxStack = 64;
 
 constexpr std::string_view kCraftingTicksKey = "crafting_ticks_remaining";
 constexpr std::string_view kDisabledSlotsKey = "disabled_slots";
+constexpr std::string_view kTriggeredKey = "triggered";
 
 [[nodiscard]] std::string propertyOf(std::int32_t stateId, const std::string& name) {
     const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
@@ -132,6 +133,11 @@ std::optional<BlockChange> onNeighbourChange(WorldState& world, std::string_view
     const bool signal = redstone::bestNeighbourSignal(world, worldName, x, y, z) > 0;
     if (signal == triggered) {
         return std::nullopt;
+    }
+    // parity: `CrafterBlockEntity` keeps its own `triggered` beside the state's, and the jar writes
+    // it down. Measured in the bench circuit `crafter`.
+    if (server::world::ChunkBlockEntity* entity = entityAt(world, x, y, z); entity != nullptr) {
+        entity->data().putInt(kTriggeredKey, signal ? 1 : 0);
     }
     std::map<std::string, std::string> wanted;
     if (signal) {

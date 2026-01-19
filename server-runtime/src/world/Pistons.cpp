@@ -662,8 +662,14 @@ std::optional<Push> resolve(const Context& context, std::int32_t pistonX, std::i
 std::vector<BlockChange> apply(const Context& context, const Push& push, registry::BlockFace pushing) {
     std::vector<BlockChange> changes;
     for (const Position& position : push.destroyed) {
+        const std::optional<std::int32_t> broken = context.world.blockState(position[0], position[1], position[2]);
         if (!context.world.setBlockState(position[0], position[1], position[2], air())) {
             continue;
+        }
+        // parity: `Block.dropResources` before the square goes to air, so what it was is still there
+        // to be read.
+        if (context.onDestroyed && broken.has_value()) {
+            context.onDestroyed(*broken, position[0], position[1], position[2]);
         }
         changes.push_back(BlockChange{.x = position[0], .y = position[1], .z = position[2], .stateId = air()});
     }

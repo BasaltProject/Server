@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <map>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace basalt::server::runtime::command {
@@ -37,6 +38,14 @@ public:
     /// gone.
     bool set(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
 
+    /// The properties the command actually named for the block last written here.
+    ///
+    /// parity: `BlockInput.place` shapes the state against the neighbours and then runs
+    /// `overwriteWithDefinedProperties`, so what the command wrote wins over what the shaping
+    /// decided. Measured in the bench circuit `instrumento`: a note block placed with
+    /// `instrument=harp` over glass stays a harp, and only changes when the block below does.
+    void keepWritten(std::int32_t x, std::int32_t y, std::int32_t z, std::map<std::string, std::string> properties);
+
     /// Sends everything written since the last flush to whoever is in this world.
     void flush();
 
@@ -57,6 +66,8 @@ private:
     void notifyNeighbours();
 
     bool adjustToNeighbours_ = true;
+    /// What the command named, by position, until the next flush.
+    std::map<std::array<std::int32_t, 3>, std::map<std::string, std::string>> written_properties_;
 
     const CommandEnvironment* environment_;
     world::LoadedWorld* world_;

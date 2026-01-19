@@ -412,17 +412,22 @@ void storeOutput(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
     if (isLocked(world, x, y, z, properties)) {
         return std::nullopt;
     }
-    const bool powered = valueOf(properties, "powered") == "true";
-    const bool shouldPower = repeaterInput(world, worldName, x, y, z, properties) > 0;
-    if (powered == shouldPower) {
-        return std::nullopt;
+    const bool on = valueOf(properties, "powered") == "true";
+    const bool shouldTurnOn = repeaterInput(world, worldName, x, y, z, properties) > 0;
+    if (on) {
+        // On and still fed: nothing to do. On and no longer fed: off it goes.
+        return shouldTurnOn ? std::nullopt : turn(world, x, y, z, *stateId, "powered", "false");
     }
-    if (!shouldPower) {
-        // Turning off is booked one delay later in vanilla, which this reaches by scheduling.
-        // parity: `DiodeBlock.tick` books that one very high, so it beats whatever it feeds.
+    // parity: `DiodeBlock.tick`'s `else if (!on)`, which turns a repeater **on whatever the input
+    // says**, and books its own turning off when the input has already gone. That is what stretches a
+    // pulse shorter than the delay to the delay's own length, and without it a one-tick pulse into a
+    // repeater vanished: measured in `pulsocorto`, where the jar holds the lamp lit for eight ticks
+    // and we never lit it at all.
+    if (!shouldTurnOn) {
+        // parity: booked very high, so it beats whatever it feeds.
         world.scheduleBlockTick(x, y, z, repeater(), numberOf(properties, "delay", 1) * 2, kVeryHigh);
     }
-    return turn(world, x, y, z, *stateId, "powered", shouldPower ? "true" : "false");
+    return turn(world, x, y, z, *stateId, "powered", "true");
 }
 
 /// parity: `ComparatorBlock.tick` and its `shouldTurnOn`: a comparator is on while its rear input

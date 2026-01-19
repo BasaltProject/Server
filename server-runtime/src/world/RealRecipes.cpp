@@ -183,6 +183,16 @@ const crafting::Recipe* RealRecipes::smithingFor(const server::world::loot::Item
 
 std::optional<RealRecipes::Match> RealRecipes::recipeMatching(const crafting::CraftingInput& input) const {
     for (std::size_t index = 0; index < recipes_.size(); ++index) {
+        // parity: `RecipeManager.getRecipeFor(RecipeType.CRAFTING, ...)`. Everything the jar ships
+        // lives in one folder, cooking and stonecutting included, and only the grid's own types may
+        // answer here. Without the filter a log in a crafting grid came out as **charcoal**, because
+        // `charcoal.json` sorts before `oak_planks.json` and a smelting recipe takes one ingredient
+        // just as happily. Found by the bench circuit `crafter`.
+        const crafting::RecipeKind kind = recipes_[index].kind;
+        if (kind != crafting::RecipeKind::Shaped && kind != crafting::RecipeKind::Shapeless &&
+            kind != crafting::RecipeKind::Special) {
+            continue;
+        }
         if (recipes_[index].matches(input)) {
             return Match{.id = parsedIds_[index], .recipe = &recipes_[index]};
         }
