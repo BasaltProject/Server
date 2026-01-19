@@ -36,7 +36,17 @@ struct Readers {
         shelf;
     /// Answers the crafter's own reading from its tag.
     std::function<std::int32_t(const wire::nbt::NbtCompound& data)> crafter;
+    /// Answers what the container minecart standing on a detector rail reads. It takes entities, so
+    /// it comes from outside like the other two.
+    std::function<std::int32_t(std::int32_t x, std::int32_t y, std::int32_t z)> cart;
 };
+
+/// Whether writing one slot from outside (a command, a player's menu) tells the comparators.
+///
+/// parity: `Container.setItem`. `BaseContainerBlockEntity` ends its in `setChanged`, so a chest or a
+/// dispenser says so, but a hopper and a lectern override that away and a furnace only speaks up for
+/// its input slot, and only when the item there really changed.
+[[nodiscard]] bool setItemTellsComparators(std::string_view path, std::int32_t slot, bool sameItem);
 
 /// The comparator reading of the container at these coordinates, or nothing when the block is not
 /// one this build keeps contents for.

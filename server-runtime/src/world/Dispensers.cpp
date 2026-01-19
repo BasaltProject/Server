@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
+#include <basalt/server/runtime/world/RedstoneComponents.hpp>
 
 #include <cstdint>
 #include <map>
@@ -213,6 +214,7 @@ struct Target {
         }
         blockInventory::write(blockEntity->data(), slots);
         chunk->markDirty();
+        redstoneComponents::scheduleComparatorsAround(world, into.x, into.y, into.z);
         return true;
     }
     return false;
@@ -331,6 +333,7 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
         slots[*slot] = minusOne(stack);
         blockInventory::write(blockEntity->data(), slots);
         chunk->markDirty();
+        redstoneComponents::scheduleComparatorsAround(world, x, y, z);
         result.fired = true;
         return result;
     }
@@ -342,6 +345,7 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
         slots[*slot] = special.left;
         blockInventory::write(blockEntity->data(), slots);
         chunk->markDirty();
+        redstoneComponents::scheduleComparatorsAround(world, x, y, z);
         result.fired = true;
         return result;
     }
@@ -357,6 +361,7 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
     slots[*slot] = minusOne(stack);
     blockInventory::write(blockEntity->data(), slots);
     chunk->markDirty();
+    redstoneComponents::scheduleComparatorsAround(world, x, y, z);
     result.fired = true;
     return result;
 }

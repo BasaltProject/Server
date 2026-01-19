@@ -220,6 +220,22 @@ TEST_CASE("the two blocks that read themselves are asked to") {
     CHECK_FALSE(containers::analogSignal(world, 4, 64, 4, "south", readers).has_value());
 }
 
+TEST_CASE("only some containers tell the comparators when a slot is written from outside") {
+    // parity: `BaseContainerBlockEntity.setItem` ends in `setChanged`, but a hopper overrides it
+    // away: `/item replace block` into a hopper leaves the comparator beside it reading nothing.
+    CHECK(containers::setItemTellsComparators("chest", 0, false));
+    CHECK(containers::setItemTellsComparators("dispenser", 4, true));
+    CHECK_FALSE(containers::setItemTellsComparators("hopper", 0, false));
+    CHECK_FALSE(containers::setItemTellsComparators("lectern", 0, false));
+    CHECK_FALSE(containers::setItemTellsComparators("chiseled_bookshelf", 2, false));
+
+    // parity: `AbstractFurnaceBlockEntity.setItem` speaks only for the slot it cooks from, and only
+    // when what is in it really changed.
+    CHECK(containers::setItemTellsComparators("furnace", 0, false));
+    CHECK_FALSE(containers::setItemTellsComparators("furnace", 0, true));
+    CHECK_FALSE(containers::setItemTellsComparators("smoker", 1, false));
+}
+
 TEST_CASE("a lectern with no book reads nothing, whatever page it remembers") {
     Loaded loaded;
     WorldState& world = loaded.state;

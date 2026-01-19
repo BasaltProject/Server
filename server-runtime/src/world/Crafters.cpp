@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
+#include <basalt/server/runtime/world/RedstoneComponents.hpp>
 
 #include <cstdint>
 #include <map>
@@ -84,6 +85,7 @@ constexpr std::string_view kDisabledSlotsKey = "disabled_slots";
                 : stack;
         blockInventory::write(entity->data(), slots);
         world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
+        redstoneComponents::scheduleComparatorsAround(world, x, y, z);
         return true;
     }
     return false;
@@ -176,6 +178,7 @@ std::optional<BlockChange> craft(WorldState& world, std::int32_t x, std::int32_t
     blockInventory::write(entity->data(), slots);
     entity->data().putInt(kCraftingTicksKey, kCraftingTicks);
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
+    redstoneComponents::scheduleComparatorsAround(world, x, y, z);
     const std::optional<std::int32_t> crafting =
         registry::blockStateDefinitions::stateIdOf(*id, {{"crafting", "true"}}, *stateId);
     if (!crafting.has_value() || !world.setBlockState(x, y, z, *crafting)) {

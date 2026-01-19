@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/Hoppers.hpp>
+#include <basalt/server/runtime/world/RedstoneComponents.hpp>
 
 #include <algorithm>
 #include <array>
@@ -76,6 +77,9 @@ struct Container {
     std::string_view path;
     std::int32_t size = 0;
     wire::nbt::NbtCompound* data = nullptr;
+    std::int32_t x = 0;
+    std::int32_t y = 0;
+    std::int32_t z = 0;
 };
 
 [[nodiscard]] std::optional<Container> containerAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
@@ -96,7 +100,7 @@ struct Container {
     if (entity == nullptr) {
         return std::nullopt;
     }
-    return Container{.path = path, .size = *size, .data = &entity->data()};
+    return Container{.path = path, .size = *size, .data = &entity->data(), .x = x, .y = y, .z = z};
 }
 
 /// parity: `WorldlyContainer.getSlotsForFace`: a furnace takes fuel from the side, ingredients
@@ -140,8 +144,8 @@ void add(Slots& slots, const wire::common::Identifier& item) {
 }
 
 /// Puts one of `stack` into the container, answering whether it went in.
-[[nodiscard]] bool insert(WorldState& world, std::int32_t x, std::int32_t z, const Container& target,
-                          const ItemStack& stack, registry::BlockFace from) {
+[[nodiscard]] bool insert(WorldState& world, const Container& target, const ItemStack& stack,
+                          registry::BlockFace from) {
     Slots slots = blockInventory::read(*target.data, target.size);
     const std::vector<std::int32_t> allowed = slotsFor(target.path, target.size, from);
     for (const std::int32_t slot : allowed) {
@@ -155,7 +159,8 @@ void add(Slots& slots, const wire::common::Identifier& item) {
         *there = there->has_value() ? ItemStack{.item = (*there)->item, .count = (*there)->count + 1}
                                     : ItemStack{.item = stack.item, .count = 1};
         blockInventory::write(*target.data, slots);
-        world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
+        world.chunkIfLoaded(target.x >> 4, target.z >> 4)->markDirty();
+        redstoneComponents::scheduleComparatorsAround(world, target.x, target.y, target.z);
         return true;
     }
     return false;
@@ -186,7 +191,7 @@ void add(Slots& slots, const wire::common::Identifier& item) {
         if (!slot.has_value()) {
             continue;
         }
-        if (!insert(world, tx, tz, *target, *slot, registry::opposite(out))) {
+        if (!insert(world, *target, *slot, registry::opposite(out))) {
             continue;
         }
         slot = slot->count <= 1 ? std::nullopt : std::optional{ItemStack{.item = slot->item, .count = slot->count - 1}};
@@ -196,7 +201,7 @@ void add(Slots& slots, const wire::common::Identifier& item) {
 }
 
 /// parity: `suckInItems` for the container half: one item out of whatever sits on top.
-[[nodiscard]] bool pullFrom(const Container& above, Slots& slots) {
+[[nodiscard]] bool pullFrom(WorldState& world, const Container& above, Slots& slots) {
     Slots source = blockInventory::read(*above.data, above.size);
     const std::vector<std::int32_t> takeable = slotsFor(above.path, above.size, registry::BlockFace::Down);
     for (const std::int32_t slot : takeable) {
@@ -211,6 +216,7 @@ void add(Slots& slots, const wire::common::Identifier& item) {
         *stack = (*stack)->count <= 1 ? std::nullopt
                                       : std::optional{ItemStack{.item = (*stack)->item, .count = (*stack)->count - 1}};
         blockInventory::write(*above.data, source);
+        redstoneComponents::scheduleComparatorsAround(world, above.x, above.y, above.z);
         return true;
     }
     return false;
@@ -296,7 +302,7 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     if (!isFull(slots)) {
         // parity: `suckInItems` looks at what is lying above only when there is no container there.
         const std::optional<Container> above = containerAt(world, x, y + 1, z);
-        const bool taken = above.has_value() ? pullFrom(*above, slots) : suckIn(world, x, y, z, slots);
+        const bool taken = above.has_value() ? pullFrom(world, *above, slots) : suckIn(world, x, y, z, slots);
         moved = taken || moved;
     }
     if (!moved) {
@@ -304,6 +310,7 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     }
     blockInventory::write(entity->data(), slots);
     entity->data().putInt(kCooldownKey, kCooldown);
+    redstoneComponents::scheduleComparatorsAround(world, x, y, z);
     return true;
 }
 

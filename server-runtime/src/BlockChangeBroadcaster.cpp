@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
+#include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
@@ -155,7 +156,8 @@ void BlockChangeBroadcaster::announceRedstone(world::LoadedWorld& world,
             announceBlock(watchers, reacted);
         }
     }
-    world::redstoneComponents::scheduleAround(world.state(), world.name(), change.x, change.y, change.z);
+    world::redstoneComponents::scheduleAround(world.state(), world.name(), change.x, change.y, change.z, true,
+                                              world::comparatorReading::of(world.state()));
 }
 
 void BlockChangeBroadcaster::runPistonEvent(world::LoadedWorld& world, const world::BlockEvent& event,

@@ -3,6 +3,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
+#include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/Dispensers.hpp>
 #include <basalt/server/runtime/world/FallingBlocks.hpp>
@@ -342,13 +343,14 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     for (const BlockChange& change : settled) {
         reshaped(change.stateId, change.x, change.y, change.z);
     }
-    redstoneComponents::scheduleAround(world, context.worldName, x, y, z);
+    redstoneComponents::scheduleAround(world, context.worldName, x, y, z, true, comparatorReading::of(world));
     // parity: `RedStoneWireBlock.updatePowerStrength` ends with `updateNeighborsAt` on **every**
     // piece of dust whose strength moved, not only on the block that started it. Without this a
     // lamp at the end of a line of dust never heard that the dust had lit up, because it is two
     // blocks away from whatever was placed.
     for (const BlockChange& change : settled) {
-        redstoneComponents::scheduleAround(world, context.worldName, change.x, change.y, change.z);
+        redstoneComponents::scheduleAround(world, context.worldName, change.x, change.y, change.z, true,
+                                           comparatorReading::of(world));
     }
     // parity: `ObserverBlock.updateShape`, which fires for the block it is watching. Every write
     // updates the shapes around it, so a piece of dust that lit up wakes an observer looking at it

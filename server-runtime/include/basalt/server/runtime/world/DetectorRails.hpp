@@ -33,6 +33,13 @@ inline constexpr std::int32_t kRecheckTicks = 20;
 [[nodiscard]] std::optional<BlockChange> check(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                std::span<entity::ServerEntity* const> entities);
 
+/// What a comparator beside the rail reads: how full the container minecart standing on it is.
+///
+/// parity: `DetectorRailBlock.getAnalogOutputSignal`, which answers only while the rail is pressed.
+/// The command block minecart's success count is not here: this build has no command block minecart.
+[[nodiscard]] std::int32_t comparatorSignal(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                            std::span<entity::ServerEntity* const> entities);
+
 } // namespace detectorRails
 
 } // namespace basalt::server::runtime::world

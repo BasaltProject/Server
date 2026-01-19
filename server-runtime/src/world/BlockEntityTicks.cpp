@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/world/DaylightDetectors.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/Hoppers.hpp>
+#include <basalt/server/runtime/world/RedstoneComponents.hpp>
 
 #include <cstdint>
 #include <map>
@@ -150,6 +151,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                     });
                 campfires::write(fire, entity->data());
                 chunk->markDirty();
+                redstoneComponents::scheduleComparatorsAround(world, x, y, z);
                 for (const server::world::loot::ItemStack& result : done) {
                     if (hooks.onDropped) {
                         hooks.onDropped(Dropped{.x = x, .y = y, .z = z, .stack = result});
@@ -175,6 +177,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 }
                 brewingStands::write(stand, entity->data());
                 chunk->markDirty();
+                redstoneComponents::scheduleComparatorsAround(world, x, y, z);
                 const std::optional<std::int32_t> turned =
                     bottleChange(world, x, y, z, brewingStands::bottleBits(stand));
                 if (turned.has_value()) {
@@ -199,6 +202,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
             }
             furnaces::write(state, entity->data());
             chunk->markDirty();
+            redstoneComponents::scheduleComparatorsAround(world, x, y, z);
             const std::optional<std::int32_t> turned = litChange(world, x, y, z, state.lit());
             if (turned.has_value()) {
                 changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *turned});

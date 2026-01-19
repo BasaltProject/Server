@@ -1,7 +1,9 @@
 #include "ItemSlots.hpp"
 
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/RedstoneComponents.hpp>
 
 #include <algorithm>
 #include <charconv>
@@ -195,7 +197,19 @@ writeContainer(const CommandContext& context, const std::array<std::int32_t, 3>&
     }
     NbtCompound data = existing->data();
     data.set("Items", NbtTag::ofList(wire::nbt::NbtList{wire::nbt::NbtType::Compound, std::move(entries)}));
+    // Only the containers that say so: a hopper filled by command leaves its comparator none the
+    // wiser, and a furnace speaks only for the slot it cooks from.
+    const std::vector<NbtCompound> before = itemsOf(existing->data());
+    const std::string_view path = existing->type().path();
+    const bool tells = std::ranges::any_of(written, [&](const auto& one) {
+        const auto was = std::ranges::find_if(before, [&](const NbtCompound& e) { return slotIn(e) == one.first; });
+        const bool sameItem = was != before.end() && was->getString("id", std::string{}) == one.second.id;
+        return world::containers::setItemTellsComparators(path, one.first, sameItem);
+    });
     chunk->setBlockEntity(existing->withData(std::move(data)));
+    if (tells) {
+        world::redstoneComponents::scheduleComparatorsAround((*world)->state(), at[0], at[1], at[2]);
+    }
     return std::nullopt;
 }
 
