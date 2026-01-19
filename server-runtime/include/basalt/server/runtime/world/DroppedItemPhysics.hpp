@@ -22,8 +22,11 @@ public:
     static constexpr double kAirDrag = 0.98;
     static constexpr double kBounceDamping = -0.5;
 
-    /// parity: `mergeWithNeighbours`' own box, half a block out sideways and none at all up.
-    static constexpr double kMergeRange = 0.5;
+    /// parity: `mergeWithNeighbours` inflates the item's **box** half a block sideways and nothing
+    /// up, and then asks the two boxes to touch. Two half widths of an eighth each ride on top of
+    /// that half block, so the centres can be three quarters apart; comparing the centres against
+    /// half a block merged too little, and the bench caught it in `sensor`.
+    static constexpr double kMergeRange = 0.75;
     static constexpr double kMergeHeight = 0.25;
     static constexpr std::int32_t kMergeMovingInterval = 2;
     static constexpr std::int32_t kMergeRestingInterval = 40;

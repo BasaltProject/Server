@@ -341,7 +341,8 @@ TEST_CASE("the dust is asked to redraw itself where it sits") {
     const std::int32_t drawn = stateOf(
         "redstone_wire", {{"north", "side"}, {"south", "side"}, {"east", "none"}, {"west", "none"}, {"power", "0"}});
     context.wireReshape = [&asked, drawn](WorldState&, std::int32_t x, std::int32_t y, std::int32_t z,
-                                          std::int32_t stateId) -> std::optional<std::int32_t> {
+                                          std::int32_t stateId,
+                                          std::optional<registry::BlockFace>) -> std::optional<std::int32_t> {
         asked = {x, y, z, stateId};
         return drawn;
     };
@@ -493,13 +494,14 @@ TEST_CASE("everything the block held up comes down, whichever side it was on") {
     neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, report.effects, report.onBroken());
 
     // Pinned in order, not merely counted: a neighbour reached the long way round still comes down,
-    // so only the order says the six faces are the six faces.
+    // so only the order says the six faces are the six faces. parity:
+    // `BlockBehaviour.UPDATE_SHAPE_ORDER`, west first and up last.
     std::vector<std::array<std::int32_t, 3>> where;
     for (const std::array<std::int32_t, 4>& gone : report.broken) {
         where.push_back({gone[1], gone[2], gone[3]});
     }
     CHECK(where == std::vector<std::array<std::int32_t, 3>>{
-                       {8, 63, 8}, {8, 65, 8}, {8, 64, 7}, {8, 64, 9}, {7, 64, 8}, {9, 64, 8}});
+                       {7, 64, 8}, {9, 64, 8}, {8, 64, 7}, {8, 64, 9}, {8, 63, 8}, {8, 65, 8}});
 }
 
 TEST_CASE("a block that only changed shape carries the walk on to the next one") {

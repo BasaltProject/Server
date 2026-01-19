@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/random/RandomSource.hpp>
+#include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/RedstoneReactors.hpp>
 #include <basalt/server/runtime/world/Reshapes.hpp>
@@ -55,8 +56,9 @@ using WallShape = std::function<std::optional<std::map<std::string, std::string>
 ///
 /// A callback so a caller can answer it differently; left unset, `RedstoneWire` answers it, which is
 /// vanilla.
-using WireReshape = std::function<std::optional<std::int32_t>(WorldState& world, std::int32_t x, std::int32_t y,
-                                                              std::int32_t z, std::int32_t stateId)>;
+using WireReshape =
+    std::function<std::optional<std::int32_t>(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                              std::int32_t stateId, std::optional<registry::BlockFace> towards)>;
 
 /// Everything a neighbour update needs besides the blocks themselves.
 ///
@@ -99,8 +101,11 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
 /// how a block looks rather than whether it stays.
 ///
 /// A column is more than one block, so what a bubble column did is reported through `bubbles`.
+///
+/// `towards` is the side the news arrives from, seen from this block, and only the dust reads it.
 [[nodiscard]] std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std::int32_t y,
-                                                  std::int32_t z, std::vector<BlockChange>& bubbles);
+                                                  std::int32_t z, std::vector<BlockChange>& bubbles,
+                                                  std::optional<registry::BlockFace> towards = std::nullopt);
 
 /// Joins a block to what is beside it: a fence to a fence, a wall to a wall, a staircase to its
 /// corner, and leaves to their trunk.

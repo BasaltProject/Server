@@ -114,26 +114,32 @@ constexpr std::array<BlockFace, 4> kSides{BlockFace::North, BlockFace::South, Bl
     return std::string{connectsTo(*below, nullptr) ? kSide : kNone};
 }
 
-} // namespace
-
-const wire::common::Identifier& block() {
-    static const wire::common::Identifier instance = wire::common::Identifier::vanilla("redstone_wire");
-    return instance;
-}
-
-bool isWire(std::int32_t stateId) {
-    const wire::common::Identifier* id = registry::blockStateDefinitions::blockOf(stateId);
-    return id != nullptr && *id == block();
-}
-
-std::map<std::string, std::string> connectionsFor(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                                  std::int32_t stateId) {
-    const std::map<std::string, std::string> was = registry::blockStateDefinitions::propertiesOf(stateId);
-    bool wasDot = true;
+/// parity: `isDot`, and its mirror. Both read the sides of a state, not of the world.
+[[nodiscard]] bool isDot(const std::map<std::string, std::string>& properties) {
     for (const BlockFace face : kSides) {
-        const auto found = was.find(std::string{nameOf(face)});
-        wasDot = wasDot && (found == was.end() || found->second == kNone);
+        const auto found = properties.find(std::string{nameOf(face)});
+        if (found != properties.end() && found->second != kNone) {
+            return false;
+        }
     }
+    return true;
+}
+
+[[nodiscard]] bool isCross(const std::map<std::string, std::string>& properties) {
+    for (const BlockFace face : kSides) {
+        const auto found = properties.find(std::string{nameOf(face)});
+        if (found == properties.end() || found->second == kNone) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/// parity: `getConnectionState`, which always works the four sides out again from the world and
+/// only uses the state it came from to answer one question: was it a dot. A dot that finds nothing
+/// stays a dot; anything else straightens out.
+[[nodiscard]] std::map<std::string, std::string> drawnFrom(WorldState& world, std::int32_t x, std::int32_t y,
+                                                           std::int32_t z, bool wasDot) {
     // parity: `canConnectUp`, which is one question asked once: is the way up clear at all.
     const bool canGoUp = !conducts(world, x, y + 1, z);
     std::map<std::string, std::string> sides;
@@ -168,12 +174,10 @@ std::map<std::string, std::string> connectionsFor(WorldState& world, std::int32_
     return sides;
 }
 
-std::optional<std::int32_t> reshape(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                    std::int32_t stateId) {
-    if (!isWire(stateId)) {
-        return std::nullopt;
-    }
-    const std::map<std::string, std::string> wanted = connectionsFor(world, x, y, z, stateId);
+/// Writes the shape if it moved, and answers what it became.
+[[nodiscard]] std::optional<std::int32_t> written(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                                  std::int32_t stateId,
+                                                  const std::map<std::string, std::string>& wanted) {
     const std::optional<std::int32_t> turned = registry::blockStateDefinitions::stateIdOf(block(), wanted, stateId);
     if (!turned.has_value() || *turned == stateId || !world.setBlockState(x, y, z, *turned)) {
         return std::nullopt;
@@ -181,9 +185,64 @@ std::optional<std::int32_t> reshape(WorldState& world, std::int32_t x, std::int3
     return *turned;
 }
 
-std::vector<std::array<std::int32_t, 3>> acrossSteps(WorldState& world, std::int32_t x, std::int32_t y,
-                                                     std::int32_t z) {
-    std::vector<std::array<std::int32_t, 3>> reach;
+} // namespace
+
+const wire::common::Identifier& block() {
+    static const wire::common::Identifier instance = wire::common::Identifier::vanilla("redstone_wire");
+    return instance;
+}
+
+bool isWire(std::int32_t stateId) {
+    const wire::common::Identifier* id = registry::blockStateDefinitions::blockOf(stateId);
+    return id != nullptr && *id == block();
+}
+
+std::map<std::string, std::string> connectionsFor(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                                  std::int32_t stateId) {
+    return drawnFrom(world, x, y, z, isDot(registry::blockStateDefinitions::propertiesOf(stateId)));
+}
+
+std::optional<std::int32_t> reshape(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                    std::int32_t stateId, std::optional<BlockFace> towards) {
+    if (!isWire(stateId)) {
+        return std::nullopt;
+    }
+    // parity: from below `updateShape` only asks whether the dust still has something to sit on,
+    // which is the survival check and not a drawing, so the shape is left alone.
+    if (towards == BlockFace::Down) {
+        return std::nullopt;
+    }
+    const std::map<std::string, std::string> was = registry::blockStateDefinitions::propertiesOf(stateId);
+    std::map<std::string, std::string> wanted;
+    if (towards.has_value() && *towards != BlockFace::Up) {
+        const std::string side = connectingSide(world, x, y, z, *towards, !conducts(world, x, y + 1, z));
+        const auto found = was.find(std::string{nameOf(*towards)});
+        const bool wasConnected = found != was.end() && found->second != kNone;
+        // parity: a side whose connection did not move is written on its own, without the
+        // straightening rule, so a line stays a line. A cross always starts over.
+        if ((side != kNone) == wasConnected && !isCross(was)) {
+            wanted = was;
+            wanted[std::string{nameOf(*towards)}] = side;
+        } else {
+            // parity: the restart is `getConnectionState` over `crossState`, so it is never a dot.
+            wanted = drawnFrom(world, x, y, z, false);
+        }
+    } else {
+        wanted = drawnFrom(world, x, y, z, isDot(was));
+    }
+    return written(world, x, y, z, stateId, wanted);
+}
+
+std::optional<std::int32_t> shapeOnPlacement(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                             std::int32_t stateId) {
+    if (!isWire(stateId)) {
+        return std::nullopt;
+    }
+    return written(world, x, y, z, stateId, drawnFrom(world, x, y, z, false));
+}
+
+std::vector<Step> acrossSteps(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    std::vector<Step> reach;
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value() || !isWire(*stateId)) {
         return reach;
@@ -205,7 +264,7 @@ std::vector<std::array<std::int32_t, 3>> acrossSteps(WorldState& world, std::int
         for (const std::int32_t step : {-1, 1}) {
             const std::optional<std::int32_t> other = world.blockState(nx, y + step, nz);
             if (other.has_value() && isWire(*other)) {
-                reach.push_back({nx, y + step, nz});
+                reach.push_back({nx, y + step, nz, registry::opposite(face)});
             }
         }
     }
