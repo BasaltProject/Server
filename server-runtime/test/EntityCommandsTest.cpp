@@ -201,7 +201,7 @@ TEST_CASE("summon refuses a player and a type nobody registered") {
     CHECK(fixture.source.lastAsText().find("commands.summon.failed") != std::string::npos);
 }
 
-TEST_CASE("summon takes the two NBT keys it models and names the rest") {
+TEST_CASE("summon acts on the two NBT keys it models, keeps the tag, and names the rest") {
     Fixture fixture{scratch("entity-summon-nbt")};
     fixture.dispatcher.registerCommand(std::make_shared<commands::SummonCommand>(fixture.registry));
 
@@ -217,7 +217,11 @@ TEST_CASE("summon takes the two NBT keys it models and names the rest") {
     for (const Component& line : fixture.source.said) {
         all += flatten(line);
     }
-    CHECK(all.find("Ignored, not modelled yet: Glowing") != std::string::npos);
+    CHECK(all.find("Kept in the tag but not acted on here: Glowing") != std::string::npos);
+    // The whole tag stays on the entity even so: it is where a reader that knows a field looks, and
+    // a chest minecart's `Items` is read from exactly there.
+    REQUIRE(pig->sourceNbt.has_value());
+    CHECK(pig->sourceNbt->getByte("Glowing", 0) == 1);
 }
 
 TEST_CASE("damage takes health off an entity and kills it at zero") {

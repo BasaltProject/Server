@@ -151,8 +151,8 @@ void BlockChangeBroadcaster::announceRedstone(world::LoadedWorld& world,
     // parity: every piece of dust that moved tells its own neighbours, so a lamp at the end of the
     // line lights rather than waiting for something to touch it.
     for (const world::BlockChange& moved : settled) {
-        for (const world::BlockChange& reacted :
-             world::redstoneReactors::update(world.state(), world.name(), moved.x, moved.y, moved.z, random)) {
+        for (const world::BlockChange& reacted : world::redstoneReactors::updateAroundWire(
+                 world.state(), world.name(), moved.x, moved.y, moved.z, random)) {
             announceBlock(watchers, reacted);
         }
     }
