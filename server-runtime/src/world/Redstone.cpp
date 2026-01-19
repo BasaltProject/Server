@@ -1,6 +1,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/runtime/world/ContainerOpeners.hpp>
+#include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/wire/protocol/play/BlockPos.hpp>
 
@@ -205,7 +206,7 @@ constexpr std::array<std::string_view, 19> kSignalSources{
 } // namespace
 
 std::int32_t signalOf(std::int32_t stateId, BlockFace from, std::int32_t openers, std::int32_t comparatorOutput,
-                      bool mutedWire) {
+                      bool mutedWire, bool playing) {
     const std::string path = pathOf(stateId);
     if (path.empty()) {
         return 0;
@@ -265,9 +266,10 @@ std::int32_t signalOf(std::int32_t stateId, BlockFace from, std::int32_t openers
     if (path == "trapped_chest") {
         return std::clamp(openers, 0, kMaxSignal);
     }
-    // parity: `JukeboxBlock.ownSignal`, fifteen while a disc is playing.
+    // parity: `JukeboxBlock.ownSignal`, fifteen while a disc is *playing*, not while one is in: a
+    // song that has run out leaves its disc in the block and the signal goes.
     if (path == "jukebox") {
-        return valueOf(properties, "has_record") == "true" ? kMaxSignal : 0;
+        return valueOf(properties, "has_record") == "true" && playing ? kMaxSignal : 0;
     }
     return 0;
 }
@@ -333,6 +335,21 @@ std::int32_t comparatorOutputAt(const WorldState& world, std::int32_t x, std::in
     return value == nullptr ? kMaxSignal : *value;
 }
 
+namespace {
+
+/// parity: `JukeboxSongPlayer.isPlaying`, which lives in the block entity and not in the state.
+[[nodiscard]] bool jukeboxPlayingAt(const WorldState& world, const std::int32_t x, const std::int32_t y,
+                                    const std::int32_t z) {
+    const server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
+    if (chunk == nullptr) {
+        return false;
+    }
+    const server::world::ChunkBlockEntity* entity = chunk->blockEntityAt(x & 15, y, z & 15);
+    return entity != nullptr && jukeboxes::isPlaying(entity->data());
+}
+
+} // namespace
+
 std::int32_t signalFrom(const WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
                         std::int32_t z, BlockFace from, bool mutedWire) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
@@ -340,7 +357,7 @@ std::int32_t signalFrom(const WorldState& world, std::string_view worldName, std
         return 0;
     }
     const std::int32_t own = signalOf(*stateId, from, containerOpeners::count(worldName, x, y, z),
-                                      comparatorOutputAt(world, x, y, z), mutedWire);
+                                      comparatorOutputAt(world, x, y, z), mutedWire, jukeboxPlayingAt(world, x, y, z));
     if (!registry::blockSupport::conductsRedstone(*stateId)) {
         return own;
     }

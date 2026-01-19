@@ -41,6 +41,15 @@ namespace jukeboxes {
 /// What is playing here, or nothing when the jukebox is empty.
 [[nodiscard]] std::optional<std::string> songAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
+/// parity: `JukeboxSongPlayer.isPlaying`: a disc that has finished is still in the block, so the
+/// state cannot say this and the block entity has to.
+[[nodiscard]] bool isPlaying(const wire::nbt::NbtCompound& data);
+
+/// One turn of the song. parity: `JukeboxSongPlayer.tick`, which stops the song once it has run its
+/// length plus a second. Answers whether it stopped on this turn, because that is when the block
+/// stops feeding the redstone around it.
+[[nodiscard]] bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t lengthTicks);
+
 /// parity: `JukeboxBlock.getAnalogOutputSignal`, the playing song's own number.
 [[nodiscard]] std::int32_t comparatorOutputAt(const wire::nbt::NbtCompound& data);
 
@@ -57,9 +66,19 @@ public:
     /// parity: `JukeboxSong.comparatorOutput`, what a comparator reads while this disc plays.
     [[nodiscard]] std::int32_t of(const std::string& song);
 
+    /// parity: `JukeboxSong.lengthInTicks`, how long the song runs before the jukebox goes quiet.
+    [[nodiscard]] std::int64_t lengthOf(const std::string& song);
+
 private:
+    struct Song {
+        std::int32_t comparatorOutput = 0;
+        std::int64_t lengthTicks = 0;
+    };
+
+    const Song& read(const std::string& song);
+
     ReadText readText_;
-    std::map<std::string, std::int32_t, std::less<>> cached_;
+    std::map<std::string, Song, std::less<>> cached_;
 };
 
 } // namespace jukeboxes

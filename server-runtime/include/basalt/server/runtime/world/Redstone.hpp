@@ -37,9 +37,10 @@ inline constexpr std::string_view kComparatorOutputKey = "OutputSignal";
 /// below is asked with `Down`. Getting that backwards silently powers everything from the wrong side.
 ///
 /// `mutedWire` is `RedStoneWireBlock.shouldSignal`, the flag vanilla turns off while dust works out
-/// its own strength.
+/// its own strength. `playing` is the jukebox's, which no state property carries.
 [[nodiscard]] std::int32_t signalOf(std::int32_t stateId, registry::BlockFace from, std::int32_t openers = 0,
-                                    std::int32_t comparatorOutput = kMaxSignal, bool mutedWire = false);
+                                    std::int32_t comparatorOutput = kMaxSignal, bool mutedWire = false,
+                                    bool playing = true);
 
 /// The *strong* signal a block pushes into the one at `from`: what travels through a solid block and
 /// out the other side.

@@ -3,6 +3,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
+#include <basalt/server/runtime/world/Redstone.hpp>
 
 #include <doctest.h>
 
@@ -167,4 +168,44 @@ TEST_CASE("with no jar to read, every song is nothing") {
 
     CHECK(outputs.of("13") == 0);
     CHECK(outputs.of("cat") == 0);
+}
+
+TEST_CASE("a song runs out and the jukebox stops feeding the redstone, disc still in") {
+    Loaded loaded;
+    WorldState& world = loaded.state;
+    const std::int32_t playing = stateOf("jukebox", {{"has_record", "true"}});
+    REQUIRE(world.setBlockState(8, 64, 8, stateOf("jukebox", {{"has_record", "false"}})));
+    REQUIRE(jukeboxes::insert(world, 8, 64, 8, item("music_disc_13"), 1).has_value());
+    CHECK(jukeboxes::isPlaying(dataAt(world, 8, 64, 8)));
+
+    // parity: `JukeboxSong.hasFinished` waits the song's own length plus a second of padding, and
+    // `JukeboxSongPlayer.tick` asks before it counts, so a three-tick song ends on the twenty-fourth.
+    constexpr std::int64_t kLength = 3;
+    for (std::int64_t turn = 0; turn < kLength + 20; ++turn) {
+        CHECK_FALSE(jukeboxes::tick(world, 8, 64, 8, kLength));
+        CHECK(jukeboxes::isPlaying(dataAt(world, 8, 64, 8)));
+    }
+    CHECK(jukeboxes::tick(world, 8, 64, 8, kLength));
+
+    CHECK_FALSE(jukeboxes::isPlaying(dataAt(world, 8, 64, 8)));
+    // The disc stays where it is: it is the song that ended, not the record that popped.
+    CHECK(world.blockState(8, 64, 8) == playing);
+    CHECK(jukeboxes::songAt(world, 8, 64, 8) == "13");
+    CHECK(jukeboxes::comparatorOutputAt(dataAt(world, 8, 64, 8)) == 1);
+    // And a jukebox that already stopped has nothing left to do.
+    CHECK_FALSE(jukeboxes::tick(world, 8, 64, 8, kLength));
+}
+
+TEST_CASE("a jukebox gives fifteen while the song plays and nothing once it has run out") {
+    Loaded loaded;
+    WorldState& world = loaded.state;
+    REQUIRE(world.setBlockState(8, 64, 8, stateOf("jukebox", {{"has_record", "false"}})));
+    REQUIRE(jukeboxes::insert(world, 8, 64, 8, item("music_disc_13"), 1).has_value());
+    CHECK(redstone::signalFrom(world, "overworld", 8, 64, 8, registry::BlockFace::Up) == redstone::kMaxSignal);
+
+    constexpr std::int64_t kLength = 1;
+    for (std::int64_t turn = 0; turn <= kLength + 20; ++turn) {
+        static_cast<void>(jukeboxes::tick(world, 8, 64, 8, kLength));
+    }
+    CHECK(redstone::signalFrom(world, "overworld", 8, 64, 8, registry::BlockFace::Up) == 0);
 }

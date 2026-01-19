@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 
 #include <charconv>
+#include <cmath>
 #include <cstdint>
 #include <utility>
 
@@ -13,6 +14,13 @@ constexpr std::string_view kSongKey = "BasaltSong";
 
 /// The song's own comparator number, kept beside it so a comparator needs no lookup.
 constexpr std::string_view kOutputKey = "BasaltSongOutput";
+
+/// parity: `JukeboxBlockEntity.TICKS_SINCE_SONG_STARTED_TAG_ID`, written only while a song plays. A
+/// disc that has finished stays in the block, so this is the only thing that says it is still going.
+constexpr std::string_view kTicksKey = "ticks_since_song_started";
+
+/// parity: `JukeboxSong.SONG_END_PADDING_TICKS`, a second of silence after the last note.
+constexpr std::int64_t kEndPadding = 20;
 
 constexpr std::string_view kDiscPrefix = "music_disc_";
 
@@ -78,6 +86,7 @@ std::optional<BlockChange> insert(WorldState& world, std::int32_t x, std::int32_
     }
     entity->data().putString(kSongKey, songOf(disc));
     entity->data().putInt(kOutputKey, comparatorOutput);
+    entity->data().putLong(kTicksKey, 0);
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
     redstoneComponents::scheduleComparatorsAround(world, x, y, z);
     return BlockChange{.x = x, .y = y, .z = z, .stateId = *playing};
@@ -107,6 +116,7 @@ std::optional<std::pair<BlockChange, wire::common::Identifier>> eject(WorldState
     }
     entity->data().remove(kSongKey);
     entity->data().remove(kOutputKey);
+    entity->data().remove(kTicksKey);
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
     redstoneComponents::scheduleComparatorsAround(world, x, y, z);
     return std::pair{BlockChange{.x = x, .y = y, .z = z, .stateId = *quiet},
@@ -122,32 +132,72 @@ std::optional<std::string> songAt(WorldState& world, std::int32_t x, std::int32_
     return song.empty() ? std::nullopt : std::optional{std::string{song}};
 }
 
+bool isPlaying(const wire::nbt::NbtCompound& data) { return data.find(kTicksKey) != nullptr; }
+
+bool tick(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+          const std::int64_t lengthTicks) {
+    server::world::ChunkBlockEntity* entity = entityAt(world, x, y, z, false);
+    if (entity == nullptr || !isPlaying(entity->data())) {
+        return false;
+    }
+    const std::int64_t elapsed = entity->data().getLong(kTicksKey, 0);
+    // parity: `JukeboxSongPlayer.tick` checks whether the song is over **before** counting, so the
+    // last turn is spent on the check and not on the counter.
+    if (elapsed >= lengthTicks + kEndPadding) {
+        entity->data().remove(kTicksKey);
+        return true;
+    }
+    entity->data().putLong(kTicksKey, elapsed + 1);
+    return false;
+}
+
 std::int32_t comparatorOutputAt(const wire::nbt::NbtCompound& data) { return data.getInt(kOutputKey, 0); }
 
-std::int32_t SongOutputs::of(const std::string& song) {
+namespace {
+
+/// The number after `"<field>":` in a song's own JSON. Two fields, both numbers, no nesting: a whole
+/// JSON reader here would be more machinery than the file has.
+[[nodiscard]] std::optional<double> numberIn(const std::string& json, const std::string_view field) {
+    const std::size_t at = json.find('"' + std::string{field} + '"');
+    const std::size_t colon = at == std::string::npos ? std::string::npos : json.find(':', at);
+    if (colon == std::string::npos) {
+        return std::nullopt;
+    }
+    std::size_t start = json.find_first_not_of(' ', colon + 1);
+    if (start == std::string::npos) {
+        return std::nullopt;
+    }
+    std::size_t end = start;
+    while (end < json.size() && (std::isdigit(static_cast<unsigned char>(json[end])) != 0 || json[end] == '.')) {
+        ++end;
+    }
+    double value = 0.0;
+    if (std::from_chars(json.data() + start, json.data() + end, value).ec != std::errc{}) {
+        return std::nullopt;
+    }
+    return value;
+}
+
+} // namespace
+
+const SongOutputs::Song& SongOutputs::read(const std::string& song) {
     if (const auto found = cached_.find(song); found != cached_.end()) {
         return found->second;
     }
-    std::int32_t value = 0;
+    Song value;
     const std::optional<std::string> json =
         readText_ ? readText_("data/minecraft/jukebox_song/" + song + ".json") : std::nullopt;
     if (json.has_value()) {
-        const std::size_t at = json->find("\"comparator_output\"");
-        const std::size_t colon = at == std::string::npos ? std::string::npos : json->find(':', at);
-        if (colon != std::string::npos) {
-            std::size_t start = colon + 1;
-            while (start < json->size() && (*json)[start] == ' ') {
-                ++start;
-            }
-            std::size_t end = start;
-            while (end < json->size() && std::isdigit(static_cast<unsigned char>((*json)[end])) != 0) {
-                ++end;
-            }
-            std::from_chars(json->data() + start, json->data() + end, value);
-        }
+        value.comparatorOutput = static_cast<std::int32_t>(numberIn(*json, "comparator_output").value_or(0.0));
+        // parity: `JukeboxSong.lengthInTicks`, seconds rounded up, and the float is the jar's.
+        const auto seconds = static_cast<float>(numberIn(*json, "length_in_seconds").value_or(0.0));
+        value.lengthTicks = static_cast<std::int64_t>(std::ceil(seconds * 20.0F));
     }
-    cached_.emplace(song, value);
-    return value;
+    return cached_.emplace(song, value).first->second;
 }
+
+std::int32_t SongOutputs::of(const std::string& song) { return read(song).comparatorOutput; }
+
+std::int64_t SongOutputs::lengthOf(const std::string& song) { return read(song).lengthTicks; }
 
 } // namespace basalt::server::runtime::world::jukeboxes
