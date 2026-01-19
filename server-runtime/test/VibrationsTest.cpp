@@ -110,7 +110,10 @@ TEST_CASE("a sensor wakes on the event's own frequency and books its thirty tick
     REQUIRE(changes.size() == 1);
     CHECK(changes[0].x == 8);
     CHECK(propertyOf(changes[0].stateId, "sculk_sensor_phase") == "active");
-    CHECK(propertyOf(changes[0].stateId, "power") == "8");
+    // parity: `power` is **how close** the noise was, not what it was:
+    // `VibrationSystem.getRedstoneStrengthForDistance` over the block distance, so two squares away
+    // is fifteen less three. What it was goes in the block entity, and only a comparator reads it.
+    CHECK(propertyOf(changes[0].stateId, "power") == "12");
     CHECK(world.hasScheduledBlockTick(8, 64, 8, kSensor));
 }
 
@@ -124,7 +127,8 @@ TEST_CASE("a sensor already awake takes no second vibration") {
     vibrations::emit(world, "explode", 8.5, 64.5, 8.5, changes);
 
     CHECK(changes.size() == 1);
-    CHECK(propertyOf(*world.blockState(8, 64, 8), "power") == "8");
+    // Right on top of it, so the distance is nothing and the strength is full.
+    CHECK(propertyOf(*world.blockState(8, 64, 8), "power") == "15");
 }
 
 TEST_CASE("an event nothing listens to reaches no sensor") {
@@ -179,7 +183,8 @@ TEST_CASE("a calibrated sensor listens the same way") {
 
     REQUIRE(changes.size() == 1);
     CHECK(propertyOf(changes[0].stateId, "sculk_sensor_phase") == "active");
-    CHECK(propertyOf(changes[0].stateId, "power") == "1");
+    // Right on top of it again, so full strength whatever the noise was.
+    CHECK(propertyOf(changes[0].stateId, "power") == "15");
     // The face it was placed on is not touched.
     CHECK(propertyOf(changes[0].stateId, "facing") == "north");
     CHECK(world.hasScheduledBlockTick(8, 64, 8, basalt::wire::common::Identifier::vanilla("calibrated_sculk_sensor")));

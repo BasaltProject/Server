@@ -436,12 +436,22 @@ void storeOutput(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
     }
     const Properties properties = registry::blockStateDefinitions::propertiesOf(*stateId);
     const std::int32_t output = comparatorOutput(world, worldName, x, y, z, properties, containerSignal);
+    const std::int32_t before = storedOutput(world, x, y, z);
     // parity: `ComparatorBlockEntity.setOutputSignal`, which is where the level lives: the state
     // only says whether there is one, so without this every comparator fed a flat fifteen.
     storeOutput(world, x, y, z, output);
+    // parity: `ComparatorBlock.refreshOutputState` does the rest only when the **level** moved or the
+    // comparator is comparing, so one that compares tells the square in front on every turn it takes,
+    // changed or not. Measured in `comparadornivel`: one going from one to three never changes
+    // `powered` and the dust in front follows it anyway.
+    if (output == before && valueOf(properties, "mode") == "subtract") {
+        return std::nullopt;
+    }
     const bool shouldPower = output > 0;
     if ((valueOf(properties, "powered") == "true") == shouldPower) {
-        return std::nullopt;
+        // The state did not move, so the caller sends nothing out: what it needs is the settle and
+        // the neighbour updates.
+        return BlockChange{.x = x, .y = y, .z = z, .stateId = *stateId};
     }
     return turn(world, x, y, z, *stateId, "powered", shouldPower ? "true" : "false");
 }

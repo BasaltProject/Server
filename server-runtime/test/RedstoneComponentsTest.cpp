@@ -237,10 +237,14 @@ TEST_CASE("a comparator compares its rear input against its sides") {
     // The strength it settled on is kept where a reader looks for it.
     CHECK(redstone::comparatorOutputAt(world, 8, 64, 8) == 15);
 
-    // parity: a block of redstone at the side is not a side input at all. Only a diode or dust
-    // counts, which is why a lever or a block beside a comparator does nothing to it.
+    // parity: for a comparator a block of redstone at the side counts, and it is worth fifteen. That
+    // ties the fifteen behind, and comparing lets a tie through, so the level does not move.
     REQUIRE(world.setBlockState(8, 64, 7, stateOf("redstone_block")));
-    CHECK_FALSE(redstoneComponents::tick(world, "world", 8, 64, 8, 0).has_value());
+    const std::optional<BlockChange> still = redstoneComponents::tick(world, "world", 8, 64, 8, 0);
+    // parity: `ComparatorBlock.refreshOutputState` tells the square in front on every turn while it
+    // is comparing, so the answer is not "nothing happened" but "nothing moved, and say so anyway".
+    REQUIRE(still.has_value());
+    CHECK(still->stateId == world.blockState(8, 64, 8));
     CHECK(redstone::comparatorOutputAt(world, 8, 64, 8) == 15);
 }
 

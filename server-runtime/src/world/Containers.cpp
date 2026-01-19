@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/Reshapes.hpp>
 #include <basalt/server/runtime/world/Shulkers.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 
 #include <algorithm>
 #include <charconv>
@@ -118,12 +119,6 @@ constexpr std::array<std::string_view, 4> kGolemPoses{"standing", "sitting", "ru
         return static_cast<std::int32_t>(charges / static_cast<float>(kMaxCharges) *
                                          static_cast<float>(redstone::kMaxSignal));
     }
-    // parity: `SculkSensorBlock.getAnalogOutputSignal`, the frequency of the last thing it heard,
-    // and only while it is awake. The state carries that number here for the same reason vanilla's
-    // `ownSignal` reads it off the state: it is the sensor's own signal too.
-    if (path == "sculk_sensor" || path == "calibrated_sculk_sensor") {
-        return textOf(properties, "sculk_sensor_phase") == "active" ? numberOf(properties, "power").value_or(0) : 0;
-    }
     if (path == "end_portal_frame") {
         return textOf(properties, "eye") == "true" ? redstone::kMaxSignal : 0;
     }
@@ -195,6 +190,18 @@ std::optional<std::int32_t> analogSignal(WorldState& world, std::int32_t x, std:
         if (const std::optional<std::int32_t> shelf = readers.shelf(x, y, z, *stateId, from); shelf.has_value()) {
             return shelf;
         }
+    }
+    // parity: `SculkSensorBlock.getAnalogOutputSignal`, the **frequency** of the last thing it heard
+    // and only while it is awake. Not the state's `power`, which says how close the noise was:
+    // measured in `sensormuerte`, a pig dying leaves the state at ten and the comparator at fifteen.
+    if (path == "sculk_sensor" || path == "calibrated_sculk_sensor") {
+        if (textOf(properties, "sculk_sensor_phase") != "active") {
+            return 0;
+        }
+        const server::world::Chunk* awake = world.chunkIfLoaded(x >> 4, z >> 4);
+        const server::world::ChunkBlockEntity* heard =
+            awake == nullptr ? nullptr : awake->blockEntityAt(x & 15, y, z & 15);
+        return heard == nullptr ? 0 : heard->data().getInt(std::string{vibrations::kFrequencyKey}, 0);
     }
     // parity: `DetectorRailBlock.getAnalogOutputSignal`, which is a reading like any other even
     // though what it reads is not in the block: it answers zero, never nothing.

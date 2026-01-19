@@ -4,6 +4,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 
 #include <doctest.h>
 
@@ -246,13 +247,20 @@ TEST_CASE("a comparator reads the two halves of a double chest as one container"
     CHECK(containers::analogSignal(world, 9, 64, 8) == 2);
 }
 
-TEST_CASE("a comparator reads a sculk sensor only while it is awake") {
+TEST_CASE("a comparator reads the frequency a sculk sensor heard, not how close it was") {
     Loaded loaded;
     WorldState& world = loaded.state;
+    // parity: `SculkSensorBlock.getAnalogOutputSignal` answers `getLastVibrationFrequency`, which
+    // lives in the block entity. The state's `power` is the distance and has nothing to do with it:
+    // eleven here, and the comparator still says fifteen.
     REQUIRE(world.setBlockState(
         8, 64, 8,
         stateOf("sculk_sensor", {{"sculk_sensor_phase", "active"}, {"power", "11"}, {"waterlogged", "false"}})));
-    CHECK(containers::analogSignal(world, 8, 64, 8) == 11);
+    nbt::NbtCompound heard;
+    heard.putInt(std::string{vibrations::kFrequencyKey}, 15);
+    world.chunkIfLoaded(0, 0)->setBlockEntity(basalt::server::world::ChunkBlockEntity{
+        8, 64, 8, basalt::wire::common::Identifier::vanilla("sculk_sensor"), heard});
+    CHECK(containers::analogSignal(world, 8, 64, 8) == 15);
 
     REQUIRE(world.setBlockState(
         8, 64, 8,
