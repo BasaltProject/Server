@@ -68,6 +68,9 @@ TEST_CASE("every container this build keeps says how many slots it has") {
     CHECK(containers::sizeOf("brewing_stand") == 5);
     CHECK(containers::sizeOf("crafter") == 9);
     CHECK(containers::sizeOf("chiseled_bookshelf") == 6);
+    // Not blocks, but a comparator beside a detector rail reads them the same way.
+    CHECK(containers::sizeOf("chest_minecart") == 27);
+    CHECK(containers::sizeOf("hopper_minecart") == 5);
     CHECK(containers::sizeOf("decorated_pot") == 1);
     CHECK_FALSE(containers::sizeOf("stone").has_value());
 }
@@ -218,6 +221,29 @@ TEST_CASE("the two blocks that read themselves are asked to") {
     REQUIRE(world.setBlockState(4, 64, 4, stateOf("stone")));
     CHECK(containers::analogSignal(world, 4, 64, 4, "north", readers) == 4);
     CHECK_FALSE(containers::analogSignal(world, 4, 64, 4, "south", readers).has_value());
+}
+
+TEST_CASE("a comparator reads the two halves of a double chest as one container") {
+    Loaded loaded;
+    WorldState& world = loaded.state;
+    // parity: `ChestBlock.getConnectedDirection`, so with `facing=north` the left half joins east.
+    REQUIRE(world.setBlockState(8, 64, 8, stateOf("chest", {{"facing", "north"}, {"type", "left"}})));
+    REQUIRE(world.setBlockState(9, 64, 8, stateOf("chest", {{"facing", "north"}, {"type", "right"}})));
+
+    blockInventory::Slots four(27);
+    for (std::size_t at = 0; at < 4; ++at) {
+        four[at] = ItemStack{.item = basalt::wire::common::Identifier::vanilla("stone"), .count = 64};
+    }
+    nbt::NbtCompound data;
+    blockInventory::write(data, four);
+    world.chunkIfLoaded(0, 0)->setBlockEntity(
+        basalt::server::world::ChunkBlockEntity{8, 64, 8, basalt::wire::common::Identifier::vanilla("chest"), data});
+    world.chunkIfLoaded(0, 0)->setBlockEntity(basalt::server::world::ChunkBlockEntity{
+        9, 64, 8, basalt::wire::common::Identifier::vanilla("chest"), nbt::NbtCompound{}});
+
+    // Four stacks in fifty-four slots is two; the same four in a single chest is three.
+    CHECK(containers::analogSignal(world, 8, 64, 8) == 2);
+    CHECK(containers::analogSignal(world, 9, 64, 8) == 2);
 }
 
 TEST_CASE("a comparator reads a sculk sensor only while it is awake") {

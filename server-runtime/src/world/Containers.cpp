@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
+#include <basalt/server/runtime/world/DoubleChests.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/Lecterns.hpp>
@@ -54,6 +55,10 @@ constexpr std::array<std::string_view, 4> kGolemPoses{"standing", "sitting", "ru
             {"decorated_pot", decoratedPots::kSize},
             // parity: `ChiseledBookShelfBlockEntity`, six slots read by which was touched last.
             {"chiseled_bookshelf", chiseledBookshelves::kSize},
+            // The two container minecarts. They are not blocks, but a comparator beside a detector
+            // rail reads one the same way it reads a chest, so the size lives in the same table.
+            {"chest_minecart", kChestSize},
+            {"hopper_minecart", 5},
         };
         for (const std::string_view chest : reshapes::chestBlocks()) {
             built.emplace(chest, kChestSize);
@@ -225,13 +230,29 @@ std::optional<std::int32_t> analogSignal(WorldState& world, std::int32_t x, std:
     if (path == "lectern") {
         return textOf(properties, "has_book") == "true" ? lecterns::comparatorSignal(entity->data()) : 0;
     }
-    const blockInventory::Slots slots = blockInventory::read(entity->data(), *size);
+    // parity: `ChestBlock.getAnalogOutputSignal` reads the **pair**, so the same four stacks give
+    // three in a single chest and two in a double one.
+    std::int32_t seen = *size;
+    blockInventory::Slots slots = blockInventory::read(entity->data(), *size);
+    if (const std::optional<std::pair<doubleChests::Half, doubleChests::Half>> pair =
+            doubleChests::halves(world, x, y, z);
+        pair.has_value()) {
+        const doubleChests::Half& other = pair->first == doubleChests::Half{x, y, z} ? pair->second : pair->first;
+        const server::world::Chunk* half = world.chunkIfLoaded(other[0] >> 4, other[2] >> 4);
+        const server::world::ChunkBlockEntity* beyond =
+            half == nullptr ? nullptr : half->blockEntityAt(other[0] & 15, other[1], other[2] & 15);
+        if (beyond != nullptr) {
+            const blockInventory::Slots rest = blockInventory::read(beyond->data(), *size);
+            slots.insert(slots.end(), rest.begin(), rest.end());
+            seen += *size;
+        }
+    }
     std::vector<std::pair<std::int32_t, std::int32_t>> counts;
     counts.reserve(slots.size());
     for (const std::optional<server::world::loot::ItemStack>& slot : slots) {
         counts.emplace_back(slot.has_value() ? slot->count : 0, kDefaultMaxStack);
     }
-    return redstone::containerSignal(counts, *size);
+    return redstone::containerSignal(counts, seen);
 }
 
 } // namespace basalt::server::runtime::world::containers

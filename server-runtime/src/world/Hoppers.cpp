@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
+#include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/Hoppers.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
@@ -73,7 +74,9 @@ constexpr auto kFurnaceSlotsForSides = std::to_array({furnaces::kFuelSlot});
     return chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
 }
 
-/// A container this build keeps contents for, with the block entity that holds them.
+/// A container this build keeps contents for, with the tag that holds them. It is a block most of
+/// the time and a minecart the rest, and the two are the same thing from here: a name, a number of
+/// slots and somewhere to write.
 struct Container {
     std::string_view path;
     std::int32_t size = 0;
@@ -81,7 +84,32 @@ struct Container {
     std::int32_t x = 0;
     std::int32_t y = 0;
     std::int32_t z = 0;
+    /// parity: only a `BlockEntity` runs `setChanged`, so a minecart tells no comparator.
+    bool isBlock = true;
 };
+
+/// parity: `HopperBlockEntity.getEntityContainer`, the square's own cube against the cart's box. It
+/// only runs when there is no container block there, which is what `getContainerAt` does.
+[[nodiscard]] std::optional<Container> cartAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    for (entity::ServerEntity* cart : world.entities()) {
+        if (cart == nullptr || cart->removed || !cart->sourceNbt.has_value()) {
+            continue;
+        }
+        const std::string_view path = cart->type().path();
+        const std::optional<std::int32_t> size = containers::sizeOf(path);
+        if (!size.has_value() || !detectorRails::isMinecart(cart->type())) {
+            continue;
+        }
+        if (cart->x + detectorRails::kCartHalfWidth <= x || cart->x - detectorRails::kCartHalfWidth >= x + 1 ||
+            cart->z + detectorRails::kCartHalfWidth <= z || cart->z - detectorRails::kCartHalfWidth >= z + 1 ||
+            cart->y + detectorRails::kCartHeight <= y || cart->y >= y + 1) {
+            continue;
+        }
+        return Container{
+            .path = path, .size = *size, .data = &*cart->sourceNbt, .x = x, .y = y, .z = z, .isBlock = false};
+    }
+    return std::nullopt;
+}
 
 [[nodiscard]] std::optional<Container> containerAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
@@ -94,12 +122,9 @@ struct Container {
     }
     const std::string_view path = block->path();
     const std::optional<std::int32_t> size = path == "hopper" ? std::optional{kSize} : containers::sizeOf(path);
-    if (!size.has_value()) {
-        return std::nullopt;
-    }
-    server::world::ChunkBlockEntity* entity = entityAt(world, x, y, z);
+    server::world::ChunkBlockEntity* entity = size.has_value() ? entityAt(world, x, y, z) : nullptr;
     if (entity == nullptr) {
-        return std::nullopt;
+        return cartAt(world, x, y, z);
     }
     return Container{.path = path, .size = *size, .data = &entity->data(), .x = x, .y = y, .z = z};
 }
@@ -161,8 +186,10 @@ void add(Slots& slots, const wire::common::Identifier& item) {
                                     : ItemStack{.item = stack.item, .count = 1};
         blockInventory::write(*target.data, slots);
         world.chunkIfLoaded(target.x >> 4, target.z >> 4)->markDirty();
-        redstoneComponents::scheduleComparatorsAround(world, {}, target.x, target.y, target.z,
-                                                      comparatorReading::of(world));
+        if (target.isBlock) {
+            redstoneComponents::scheduleComparatorsAround(world, {}, target.x, target.y, target.z,
+                                                          comparatorReading::of(world));
+        }
         return true;
     }
     return false;
@@ -218,8 +245,10 @@ void add(Slots& slots, const wire::common::Identifier& item) {
         *stack = (*stack)->count <= 1 ? std::nullopt
                                       : std::optional{ItemStack{.item = (*stack)->item, .count = (*stack)->count - 1}};
         blockInventory::write(*above.data, source);
-        redstoneComponents::scheduleComparatorsAround(world, {}, above.x, above.y, above.z,
-                                                      comparatorReading::of(world));
+        if (above.isBlock) {
+            redstoneComponents::scheduleComparatorsAround(world, {}, above.x, above.y, above.z,
+                                                          comparatorReading::of(world));
+        }
         return true;
     }
     return false;
