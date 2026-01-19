@@ -2,12 +2,14 @@
 
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
+#include <basalt/wire/common/Uuid.hpp>
 
 #include <doctest.h>
 
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -275,13 +277,29 @@ TEST_CASE("a trapped skeleton horse remembers that it is one") {
 
 TEST_CASE("a leashed mob remembers who is holding it") {
     ServerEntity cow = entityOf("cow");
-    cow.leashHolderUuid = "0000-holder";
+    // A real uuid and not a label: `Leashable.LeashData.CODEC` writes four ints, so anything that
+    // is not one goes out as nothing at all.
+    const std::string holder = basalt::wire::common::Uuid{0x0123456789abcdefULL, 0xfedcba9876543210ULL}.toString();
+    cow.leashHolderUuid = holder;
 
     const std::unique_ptr<ServerEntity> back = entityNbt::decode(entityNbt::encode(cow), 1, 1);
 
     REQUIRE(back != nullptr);
     REQUIRE(back->leashHolderUuid.has_value());
-    CHECK(*back->leashHolderUuid == "0000-holder");
+    CHECK(*back->leashHolderUuid == holder);
+}
+
+TEST_CASE("an entity's uuid goes out as the four ints vanilla reads") {
+    ServerEntity cow = entityOf("cow");
+    const basalt::wire::nbt::NbtCompound tag = entityNbt::encode(cow);
+    const std::span<const std::int32_t> parts = tag.getIntArray("UUID");
+
+    REQUIRE(parts.size() == 4);
+    const auto word = [parts](std::size_t at) {
+        return static_cast<std::uint64_t>(static_cast<std::uint32_t>(parts[at]));
+    };
+    CHECK(((word(0) << 32) | word(1)) == cow.uuid().high());
+    CHECK(((word(2) << 32) | word(3)) == cow.uuid().low());
 }
 
 TEST_CASE("a villager's own memories go out and come back") {

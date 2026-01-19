@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
+#include <basalt/server/runtime/world/Hoppers.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
@@ -357,6 +358,10 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                 rider->y = entity->y;
                 rider->z = entity->z;
             }
+            // parity: `MinecartHopper.tick` sucks after the movement, and with no cooldown at all:
+            // a cart parked under a chest takes one item every tick it is enabled. It is no block
+            // entity, so nothing it takes tells a comparator; the container it took from does.
+            static_cast<void>(world::hoppers::tickCart(world.state(), *entity));
             // parity: a detector rail looks for carts whose box touches its own, so the cart has to
             // ask every rail its box reaches and not only the one under its middle: it is on the
             // next rail a quarter of a block before its centre gets there.

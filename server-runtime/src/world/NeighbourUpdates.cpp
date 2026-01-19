@@ -41,10 +41,6 @@ constexpr std::int32_t kDirections = 6;
 constexpr std::array<BlockFace, 6> kFaces{BlockFace::Down,  BlockFace::Up,   BlockFace::North,
                                           BlockFace::South, BlockFace::West, BlockFace::East};
 
-/// parity: `NeighborUpdater.UPDATE_ORDER`, which is not `Direction.values()`.
-constexpr std::array<BlockFace, 6> kUpdateOrder{BlockFace::West, BlockFace::East,  BlockFace::Down,
-                                                BlockFace::Up,   BlockFace::North, BlockFace::South};
-
 /// parity: `BlockBehaviour.UPDATE_SHAPE_ORDER`, which is neither of the other two.
 constexpr std::array<BlockFace, 6> kUpdateShapeOrder{BlockFace::West,  BlockFace::East, BlockFace::North,
                                                      BlockFace::South, BlockFace::Down, BlockFace::Up};
@@ -412,12 +408,11 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     reacting.push_back({x, y, z});
     // parity: `DefaultRedstoneWireEvaluator.updatePowerStrength` runs `updateNeighborsAt` on the dust
     // that moved **and on each of its six squares**, so a lamp stuck to a block the dust powers from
-    // above is reached even though nothing touches it.
+    // above is reached even though nothing touches it. The seven go into a `HashSet` first, so the
+    // order is the map's and `wireReach` is what works it out.
     for (const BlockChange& change : settled) {
-        reacting.push_back({change.x, change.y, change.z});
-        for (const BlockFace face : kUpdateOrder) {
-            reacting.push_back(
-                {change.x + registry::stepX(face), change.y + registry::stepY(face), change.z + registry::stepZ(face)});
+        for (const std::array<std::int32_t, 3>& at : redstoneComponents::wireReach(change.x, change.y, change.z)) {
+            reacting.push_back({at[0], at[1], at[2]});
         }
     }
     std::int32_t reacted = 0;

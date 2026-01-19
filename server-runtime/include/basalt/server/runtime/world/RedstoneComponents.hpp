@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -66,6 +67,14 @@ void scheduleAround(WorldState& world, std::string_view worldName, std::int32_t 
 /// to hand; it only reaches a trapped chest's viewer count, which moving an item cannot change.
 void scheduleComparatorsAround(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
                                std::int32_t z, const ContainerSignalAt& containerSignal = {});
+
+/// The dust's own square and its six, in the order the jar walks them.
+///
+/// parity: `DefaultRedstoneWireEvaluator.updatePowerStrength` puts them in a `Sets.newHashSet()` and
+/// then iterates it, so what comes out is the hash map's bucket order and not the order they went
+/// in. Seven entries never grow a table of sixteen, so the order is a pure function of where the
+/// dust is.
+[[nodiscard]] std::vector<std::array<std::int32_t, 3>> wireReach(std::int32_t x, std::int32_t y, std::int32_t z);
 
 /// The turn a component books when a piece of dust beside it changed strength.
 ///

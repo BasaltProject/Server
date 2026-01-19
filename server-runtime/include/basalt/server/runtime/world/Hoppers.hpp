@@ -4,6 +4,10 @@
 
 #include <cstdint>
 
+namespace basalt::server::runtime::entity {
+class ServerEntity;
+}
+
 namespace basalt::server::runtime::world {
 
 /// The block that moves one item at a time, which is where redstone and containers meet.
@@ -21,6 +25,14 @@ inline constexpr std::int32_t kSize = 5;
 /// One hopper's turn. Answers whether anything moved, so the caller marks the chunk and tells
 /// whoever is looking at the two containers.
 [[nodiscard]] bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
+/// One hopper minecart's turn, which is the same suck and nothing else.
+///
+/// parity: `MinecartHopper.tryConsumeItems` over `HopperBlockEntity.suckInItems`. A cart takes one
+/// item a tick with **no cooldown**, never gives anything away, and asks about the square above its
+/// own middle rather than about a grid square, so half over a chest still counts. It also picks up
+/// what is lying in its own box, which a block hopper does not.
+[[nodiscard]] bool tickCart(WorldState& world, entity::ServerEntity& cart);
 
 } // namespace hoppers
 

@@ -1,5 +1,7 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Items.hpp>
+#include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
@@ -7,6 +9,7 @@
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/Hoppers.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
+#include <basalt/wire/common/Mth.hpp>
 
 #include <algorithm>
 #include <array>
@@ -32,8 +35,23 @@ constexpr double kSuckTop = 2.0;
 
 constexpr std::string_view kCooldownKey = "TransferCooldown";
 
-/// parity: `Item.getMaxStackSize`, which this build does not read yet.
-constexpr std::int32_t kMaxStack = 64;
+/// parity: `MinecartHopper.readAdditionalSaveData`, whose default is on.
+constexpr std::string_view kEnabledKey = "Enabled";
+
+/// parity: `MinecartHopper.getLevelY`, half a block over the cart's own middle.
+constexpr double kCartLevelRise = 0.5;
+
+/// parity: `MinecartHopper.suckInItems`, whose second box is its own widened a quarter sideways.
+constexpr double kCartReach = 0.25;
+
+/// parity: `Container.getMaxStackSize()`, whose default nothing that holds items overrides.
+constexpr std::int32_t kContainerMaxStack = 99;
+
+/// parity: `Container.getMaxStackSize(stack)`: how high this item stacks here, and in practice the
+/// item's own maximum. A bucket goes sixteen to a slot and a sword one, not sixty-four.
+[[nodiscard]] std::int32_t capOf(const wire::common::Identifier& item) {
+    return std::min(kContainerMaxStack, registry::itemStacking::maxStackSize(item));
+}
 
 /// parity: the sides `AbstractFurnaceBlockEntity.getSlotsForFace` opens to a hopper.
 constexpr auto kFurnaceSlotsForUp = std::to_array({furnaces::kInputSlot});
@@ -88,9 +106,11 @@ struct Container {
     bool isBlock = true;
 };
 
-/// parity: `HopperBlockEntity.getEntityContainer`, the square's own cube against the cart's box. It
-/// only runs when there is no container block there, which is what `getContainerAt` does.
-[[nodiscard]] std::optional<Container> cartAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+/// parity: `HopperBlockEntity.getEntityContainer`, a cube of one block centred on the point the
+/// hopper asks about, against the cart's box. Only a block hopper's point is a square's own middle:
+/// a cart asks half a block over itself, which is why the point is what travels and not the square.
+[[nodiscard]] std::optional<Container> cartAround(WorldState& world, double px, double py, double pz, std::int32_t x,
+                                                  std::int32_t y, std::int32_t z) {
     for (entity::ServerEntity* cart : world.entities()) {
         if (cart == nullptr || cart->removed || !cart->sourceNbt.has_value()) {
             continue;
@@ -100,9 +120,11 @@ struct Container {
         if (!size.has_value() || !detectorRails::isMinecart(cart->type())) {
             continue;
         }
-        if (cart->x + detectorRails::kCartHalfWidth <= x || cart->x - detectorRails::kCartHalfWidth >= x + 1 ||
-            cart->z + detectorRails::kCartHalfWidth <= z || cart->z - detectorRails::kCartHalfWidth >= z + 1 ||
-            cart->y + detectorRails::kCartHeight <= y || cart->y >= y + 1) {
+        if (cart->x + detectorRails::kCartHalfWidth <= px - 0.5 ||
+            cart->x - detectorRails::kCartHalfWidth >= px + 0.5 ||
+            cart->z + detectorRails::kCartHalfWidth <= pz - 0.5 ||
+            cart->z - detectorRails::kCartHalfWidth >= pz + 0.5 || cart->y + detectorRails::kCartHeight <= py - 0.5 ||
+            cart->y >= py + 0.5) {
             continue;
         }
         return Container{
@@ -111,7 +133,11 @@ struct Container {
     return std::nullopt;
 }
 
-[[nodiscard]] std::optional<Container> containerAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+/// parity: `getContainerAt`: the block first, and only where there is none, whatever cart is there.
+[[nodiscard]] std::optional<Container> containerAtPoint(WorldState& world, double px, double py, double pz) {
+    const std::int32_t x = wire::common::mth::floor(px);
+    const std::int32_t y = wire::common::mth::floor(py);
+    const std::int32_t z = wire::common::mth::floor(pz);
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return std::nullopt;
@@ -124,9 +150,14 @@ struct Container {
     const std::optional<std::int32_t> size = path == "hopper" ? std::optional{kSize} : containers::sizeOf(path);
     server::world::ChunkBlockEntity* entity = size.has_value() ? entityAt(world, x, y, z) : nullptr;
     if (entity == nullptr) {
-        return cartAt(world, x, y, z);
+        return cartAround(world, px, py, pz, x, y, z);
     }
     return Container{.path = path, .size = *size, .data = &entity->data(), .x = x, .y = y, .z = z};
+}
+
+[[nodiscard]] std::optional<Container> containerAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    return containerAtPoint(world, static_cast<double>(x) + 0.5, static_cast<double>(y) + 0.5,
+                            static_cast<double>(z) + 0.5);
 }
 
 /// parity: `WorldlyContainer.getSlotsForFace`: a furnace takes fuel from the side, ingredients
@@ -154,13 +185,13 @@ struct Container {
 
 [[nodiscard]] bool accepts(const Slots& slots, const wire::common::Identifier& item) {
     return std::ranges::any_of(slots, [&item](const std::optional<ItemStack>& there) {
-        return !there.has_value() || (there->item == item && there->count < kMaxStack);
+        return !there.has_value() || (there->item == item && there->count < capOf(item));
     });
 }
 
 void add(Slots& slots, const wire::common::Identifier& item) {
     for (std::optional<ItemStack>& there : slots) {
-        if (there.has_value() && (there->item != item || there->count >= kMaxStack)) {
+        if (there.has_value() && (there->item != item || there->count >= capOf(item))) {
             continue;
         }
         there = there.has_value() ? ItemStack{.item = there->item, .count = there->count + 1}
@@ -179,7 +210,7 @@ void add(Slots& slots, const wire::common::Identifier& item) {
         if (there == nullptr) {
             continue;
         }
-        if (there->has_value() && ((*there)->item != stack.item || (*there)->count >= kMaxStack)) {
+        if (there->has_value() && ((*there)->item != stack.item || (*there)->count >= capOf(stack.item))) {
             continue;
         }
         *there = there->has_value() ? ItemStack{.item = (*there)->item, .count = (*there)->count + 1}
@@ -202,8 +233,9 @@ void add(Slots& slots, const wire::common::Identifier& item) {
 }
 
 [[nodiscard]] bool isFull(const Slots& slots) {
-    return std::ranges::all_of(
-        slots, [](const std::optional<ItemStack>& slot) { return slot.has_value() && slot->count >= kMaxStack; });
+    return std::ranges::all_of(slots, [](const std::optional<ItemStack>& slot) {
+        return slot.has_value() && slot->count >= capOf(slot->item);
+    });
 }
 
 /// parity: `ejectItems`: the first slot with something in it gives one item to what it faces.
@@ -254,19 +286,19 @@ void add(Slots& slots, const wire::common::Identifier& item) {
     return false;
 }
 
-/// parity: `suckInItems`' other half: what is lying in the box above the hopper goes in, whole
-/// stack at a time. `Hopper.SUCK_AABB` is the block's own width, from 11/16 up to two blocks.
-[[nodiscard]] bool suckIn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots) {
+/// parity: `getItemsAtAndAbove`: whatever lies in the box goes in, whole stack at a time. The box
+/// travels with the hopper rather than with a square, which is what lets a cart use the same one.
+[[nodiscard]] bool suckInBox(WorldState& world, double minX, double minY, double minZ, double maxX, double maxY,
+                             double maxZ, Slots& slots) {
     bool took = false;
     for (const DroppedItem& item : world.items()) {
         if (item.count <= 0) {
             continue;
         }
-        if (item.x < x || item.x > static_cast<double>(x) + 1.0 || item.z < z ||
-            item.z > static_cast<double>(z) + 1.0) {
+        if (item.x < minX || item.x > maxX || item.z < minZ || item.z > maxZ) {
             continue;
         }
-        if (item.y < static_cast<double>(y) + kSuckBottom || item.y > static_cast<double>(y) + kSuckTop) {
+        if (item.y < minY || item.y > maxY) {
             continue;
         }
         std::int32_t left = item.count;
@@ -287,6 +319,12 @@ void add(Slots& slots, const wire::common::Identifier& item) {
         }
     }
     return took;
+}
+
+/// parity: `Hopper.SUCK_AABB` over a block hopper's own square, from 11/16 up to two blocks.
+[[nodiscard]] bool suckIn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots) {
+    return suckInBox(world, x, static_cast<double>(y) + kSuckBottom, z, static_cast<double>(x) + 1.0,
+                     static_cast<double>(y) + kSuckTop, static_cast<double>(z) + 1.0, slots);
 }
 
 } // namespace
@@ -343,6 +381,43 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     blockInventory::write(entity->data(), slots);
     entity->data().putInt(kCooldownKey, kCooldown);
     redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
+    return true;
+}
+
+bool tickCart(WorldState& world, entity::ServerEntity& cart) {
+    if (cart.removed || !cart.sourceNbt.has_value() || cart.type().path() != "hopper_minecart") {
+        return false;
+    }
+    // parity: `MinecartHopper.isEnabled`, which an activator rail turns off. Missing means on.
+    if (cart.sourceNbt->getByte(kEnabledKey, 1) == 0) {
+        return false;
+    }
+    Slots slots = blockInventory::read(*cart.sourceNbt, kSize);
+    if (isFull(slots)) {
+        return false;
+    }
+    // parity: `getLevelY` is half a block over the cart, and `suckInItems` asks one block over that.
+    const double levelY = cart.y + kCartLevelRise;
+    const std::optional<Container> above = containerAtPoint(world, cart.x, levelY + 1.0, cart.z);
+    // parity: a cart's `isGridAligned` is false, so a full block over it never blocks the suck.
+    bool took = above.has_value() ? pullFrom(world, *above, slots)
+                                  : suckInBox(world, cart.x - 0.5, levelY - 0.5 + kSuckBottom, cart.z - 0.5,
+                                              cart.x + 0.5, levelY - 0.5 + kSuckTop, cart.z + 0.5, slots);
+    if (!took) {
+        // parity: `MinecartHopper.suckInItems`' own half, which a block hopper has no equivalent of.
+        constexpr double kSide = detectorRails::kCartHalfWidth + kCartReach;
+        took = suckInBox(world, cart.x - kSide, cart.y, cart.z - kSide, cart.x + kSide,
+                         cart.y + detectorRails::kCartHeight, cart.z + kSide, slots);
+    }
+    if (!took) {
+        return false;
+    }
+    blockInventory::write(*cart.sourceNbt, slots);
+    if (server::world::Chunk* chunk =
+            world.chunkIfLoaded(wire::common::mth::floor(cart.x) >> 4, wire::common::mth::floor(cart.z) >> 4);
+        chunk != nullptr) {
+        chunk->markDirty();
+    }
     return true;
 }
 

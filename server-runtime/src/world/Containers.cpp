@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/BrewingStands.hpp>
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
@@ -24,8 +25,9 @@
 namespace basalt::server::runtime::world::containers {
 namespace {
 
-/// parity: `Item.getMaxStackSize`, which this build does not read yet: everything stacks to 64.
-constexpr std::int32_t kDefaultMaxStack = 64;
+/// parity: `Container.getMaxStackSize()`, whose default nothing that holds items overrides, so what
+/// decides the divisor is the item and only the item.
+constexpr std::int32_t kContainerMaxStack = 99;
 
 /// parity: `CakeBlock`'s seven slices, which is what `getOutputSignal` counts down from.
 constexpr std::int32_t kFullCake = 7;
@@ -257,7 +259,12 @@ std::optional<std::int32_t> analogSignal(WorldState& world, std::int32_t x, std:
     std::vector<std::pair<std::int32_t, std::int32_t>> counts;
     counts.reserve(slots.size());
     for (const std::optional<server::world::loot::ItemStack>& slot : slots) {
-        counts.emplace_back(slot.has_value() ? slot->count : 0, kDefaultMaxStack);
+        // parity: `getRedstoneSignalFromContainer` divides each stack by
+        // `container.getMaxStackSize(stack)`, so a chest with one bucket in it reads far higher than
+        // a chest with one stone. Reading 64 for everything was a full fifteen out on a shulker box.
+        const std::int32_t cap =
+            slot.has_value() ? std::min(kContainerMaxStack, registry::itemStacking::maxStackSize(slot->item)) : 1;
+        counts.emplace_back(slot.has_value() ? slot->count : 0, cap);
     }
     return redstone::containerSignal(counts, seen);
 }
