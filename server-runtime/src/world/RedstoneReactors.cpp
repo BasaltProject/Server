@@ -16,8 +16,11 @@ namespace {
 using registry::BlockFace;
 using Properties = std::map<std::string, std::string>;
 
-constexpr std::array<BlockFace, 6> kFaces{BlockFace::Down,  BlockFace::Up,   BlockFace::North,
-                                          BlockFace::South, BlockFace::West, BlockFace::East};
+/// parity: `NeighborUpdater.UPDATE_ORDER`, the order `updateNeighborsAt` tells the six squares in.
+/// It is not `Direction.values()`, and with the turns now sorted by when they were booked it decides
+/// which of two components on the same turn goes first.
+constexpr std::array<BlockFace, 6> kUpdateOrder{BlockFace::West, BlockFace::East,  BlockFace::Down,
+                                                BlockFace::Up,   BlockFace::North, BlockFace::South};
 
 [[nodiscard]] std::string pathOf(std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
@@ -285,7 +288,7 @@ std::vector<BlockChange> update(WorldState& world, std::string_view worldName, s
     if (itself) {
         react(world, worldName, x, y, z, changes, random, hooks);
     }
-    for (const BlockFace face : kFaces) {
+    for (const BlockFace face : kUpdateOrder) {
         react(world, worldName, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face),
               changes, random, hooks);
     }

@@ -196,6 +196,12 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             scheduled.insert(scheduled.end(), settled.begin(), settled.end());
             world::redstoneComponents::scheduleAround(world.state(), world.name(), moved->x, moved->y, moved->z, false,
                                                       containerSignal);
+            // parity: every piece of dust that moved reaches two squares out, which is what tells the
+            // next repeater in a chain that the dust in between lit up.
+            for (const world::BlockChange& change : settled) {
+                world::redstoneComponents::scheduleAroundWire(world.state(), world.name(), change.x, change.y, change.z,
+                                                              containerSignal);
+            }
             // parity: a component writes its own state and the shapes around it are updated, which
             // is what an observer watching a repeater or another observer is waiting for.
             world::redstoneComponents::watchFor(world.state(), moved->x, moved->y, moved->z);

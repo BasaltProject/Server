@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/UiStateSync.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
+#include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
@@ -202,8 +203,9 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
     }
     chunk->markDirty();
     if (cooking != nullptr && world::containers::setItemTellsComparators(cooking->path(), half->second, sameItem)) {
-        world::redstoneComponents::scheduleComparatorsAround(world->state(), half->first.x, half->first.y,
-                                                             half->first.z);
+        world::redstoneComponents::scheduleComparatorsAround(world->state(), world->name(), half->first.x,
+                                                             half->first.y, half->first.z,
+                                                             world::comparatorReading::of(world->state()));
     }
 }
 

@@ -71,6 +71,10 @@ struct ChunkScheduledTick {
     std::int32_t delay = 0;
     /// parity: `TickPriority`, which runs from -3 to 3.
     std::int32_t priority = 0;
+    /// parity: `ScheduledTick.subTickOrder`, the count of everything booked before this one. It
+    /// breaks ties between two turns of the same priority, and it counts across the whole world, so
+    /// it cannot live in the chunk. Not written to disk: vanilla does not write it either.
+    std::int64_t order = 0;
 
     friend bool operator==(const ChunkScheduledTick&, const ChunkScheduledTick&) = default;
 };

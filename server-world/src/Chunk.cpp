@@ -172,8 +172,12 @@ void Chunk::increaseInhabitedTime(std::int64_t delta) {
     if (delta == 0) {
         return;
     }
+    // parity: `ChunkAccess.incrementInhabitedTime` adds and nothing else. Marking the chunk dirty
+    // here made **every simulated chunk dirty on every tick**, so each save rewrote the whole
+    // region: that is what made a comparator's level reach the disk two ticks before the jar's did,
+    // and it is the answer to why a tolva's chunk was written every tick. What the jar risks losing
+    // is the local difficulty gained since the last real write, and it accepts that.
     inhabitedTime_ += delta;
-    dirty_ = true;
 }
 
 void Chunk::restoreInhabitedTime(std::int64_t value) { inhabitedTime_ = std::max<std::int64_t>(value, 0); }
@@ -271,7 +275,11 @@ void Chunk::scheduleTick(std::vector<ChunkScheduledTick>& ticks, const ChunkSche
         return;
     }
     ticks.push_back(tick);
-    dirty_ = true;
+    // parity: `LevelChunkTicks.schedule` does not mark the chunk unsaved, and nothing listens to its
+    // `onTickAdded` for that either. Marking it here rewrote the region on every turn a component
+    // booked, so the level a comparator had just written reached the disk when the jar's had not:
+    // measured as a two-tick difference in `comparadorcofre` that was never a difference in the game.
+    // What causes a tick to be booked is almost always a block change, and that does mark it.
 }
 
 void Chunk::advanceBlockTicks(std::vector<ChunkScheduledTick>& due) { advance(blockTicks_, due); }

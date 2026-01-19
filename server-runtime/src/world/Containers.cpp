@@ -113,6 +113,12 @@ constexpr std::array<std::string_view, 4> kGolemPoses{"standing", "sitting", "ru
         return static_cast<std::int32_t>(charges / static_cast<float>(kMaxCharges) *
                                          static_cast<float>(redstone::kMaxSignal));
     }
+    // parity: `SculkSensorBlock.getAnalogOutputSignal`, the frequency of the last thing it heard,
+    // and only while it is awake. The state carries that number here for the same reason vanilla's
+    // `ownSignal` reads it off the state: it is the sensor's own signal too.
+    if (path == "sculk_sensor" || path == "calibrated_sculk_sensor") {
+        return textOf(properties, "sculk_sensor_phase") == "active" ? numberOf(properties, "power").value_or(0) : 0;
+    }
     if (path == "end_portal_frame") {
         return textOf(properties, "eye") == "true" ? redstone::kMaxSignal : 0;
     }

@@ -16,8 +16,21 @@ using registry::BlockFace;
 constexpr std::array<BlockFace, 6> kFaces{BlockFace::Down,  BlockFace::Up,   BlockFace::North,
                                           BlockFace::South, BlockFace::West, BlockFace::East};
 
+/// parity: `NeighborUpdater.UPDATE_ORDER`, the order `updateNeighborsAt` tells the six squares in.
+/// It is not `Direction.values()`, and with the turns now sorted by when they were booked it decides
+/// which of two components on the same turn goes first.
+constexpr std::array<BlockFace, 6> kUpdateOrder{BlockFace::West, BlockFace::East,  BlockFace::Down,
+                                                BlockFace::Up,   BlockFace::North, BlockFace::South};
+
 constexpr std::array<std::string_view, 5> kComponents{"redstone_torch", "redstone_wall_torch", "repeater", "comparator",
                                                       "observer"};
+
+/// parity: `TickPriority`. Only the diodes use anything but the plain one, and what they use it for
+/// is to run before the diode they feed on the same turn.
+constexpr std::int32_t kExtremelyHigh = -3;
+constexpr std::int32_t kVeryHigh = -2;
+constexpr std::int32_t kHigh = -1;
+constexpr std::int32_t kNormal = 0;
 
 using Properties = std::map<std::string, std::string>;
 
@@ -108,6 +121,24 @@ using Properties = std::map<std::string, std::string>;
                                             std::int32_t y, std::int32_t z, const Properties& properties,
                                             const ContainerSignalAt& containerSignal);
 [[nodiscard]] std::int32_t storedOutput(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+[[nodiscard]] std::int32_t repeaterInput(const WorldState& world, std::string_view worldName, std::int32_t x,
+                                         std::int32_t y, std::int32_t z, const Properties& properties);
+[[nodiscard]] bool feedsAnotherDiode(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                     const Properties& properties);
+
+/// parity: `ComparatorBlock.checkTickOnNeighbor` books a turn only when the reading or the state
+/// would actually move. Booking on every nudge left turns pending from the build of a circuit that
+/// fired later and read a world that had changed underneath them, a tick early every time.
+void scheduleComparator(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
+                        std::int32_t stateId, const ContainerSignalAt& containerSignal) {
+    const Properties properties = registry::blockStateDefinitions::propertiesOf(stateId);
+    const std::int32_t output = comparatorOutput(world, worldName, x, y, z, properties, containerSignal);
+    if (output == storedOutput(world, x, y, z) && (valueOf(properties, "powered") == "true") == (output > 0)) {
+        return;
+    }
+    world.scheduleBlockTick(x, y, z, comparator(), kComparatorDelay,
+                            feedsAnotherDiode(world, x, y, z, properties) ? kHigh : kNormal);
+}
 
 void schedule(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
               const ContainerSignalAt& containerSignal) {
@@ -128,22 +159,24 @@ void schedule(WorldState& world, std::string_view worldName, std::int32_t x, std
         return;
     }
     if (path == "repeater") {
-        // A repeater already on its way to turning off keeps that appointment, which is what
-        // `hasScheduledTick` guards in vanilla.
-        const std::int32_t delay = numberOf(registry::blockStateDefinitions::propertiesOf(*stateId), "delay", 1) * 2;
-        world.scheduleBlockTick(x, y, z, repeater(), delay);
+        // parity: `DiodeBlock.checkTickOnNeighbor` books nothing while the repeater already says what
+        // its input says. Booking anyway left turns pending that fired on a world that had moved on.
+        const Properties properties = registry::blockStateDefinitions::propertiesOf(*stateId);
+        const bool on = valueOf(properties, "powered") == "true";
+        if (on == (repeaterInput(world, worldName, x, y, z, properties) > 0)) {
+            return;
+        }
+        std::int32_t priority = kHigh;
+        if (feedsAnotherDiode(world, x, y, z, properties)) {
+            priority = kExtremelyHigh;
+        } else if (on) {
+            priority = kVeryHigh;
+        }
+        world.scheduleBlockTick(x, y, z, repeater(), numberOf(properties, "delay", 1) * 2, priority);
         return;
     }
     if (path == "comparator") {
-        // parity: `ComparatorBlock.checkTickOnNeighbor` books a turn only when the reading or the
-        // state would actually move. Booking on every nudge left turns pending from the build that
-        // fired later and read a world that had changed underneath them, a tick early every time.
-        const Properties properties = registry::blockStateDefinitions::propertiesOf(*stateId);
-        const std::int32_t output = comparatorOutput(world, worldName, x, y, z, properties, containerSignal);
-        if (output == storedOutput(world, x, y, z) && (valueOf(properties, "powered") == "true") == (output > 0)) {
-            return;
-        }
-        world.scheduleBlockTick(x, y, z, comparator(), kComparatorDelay);
+        scheduleComparator(world, worldName, x, y, z, *stateId, containerSignal);
     }
 }
 
@@ -160,27 +193,67 @@ void schedule(WorldState& world, std::string_view worldName, std::int32_t x, std
                                 z + registry::stepZ(behind), behind) > 0;
 }
 
-/// parity: `DiodeBlock.getAlternateSignal`, the two sides a diode listens to.
+/// parity: `DiodeBlock.shouldPrioritize`: the square this diode feeds holds another diode that is
+/// not pointing away, so that one reads this one and has to go second.
+[[nodiscard]] bool feedsAnotherDiode(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                     const Properties& properties) {
+    const std::optional<BlockFace> facing = faceNamed(valueOf(properties, "facing"));
+    if (!facing.has_value()) {
+        return false;
+    }
+    const BlockFace out = registry::opposite(*facing);
+    const std::optional<std::int32_t> ahead =
+        world.blockState(x + registry::stepX(out), y + registry::stepY(out), z + registry::stepZ(out));
+    if (!ahead.has_value()) {
+        return false;
+    }
+    const std::string path = pathOf(*ahead);
+    if (path != "repeater" && path != "comparator") {
+        return false;
+    }
+    return valueOf(registry::blockStateDefinitions::propertiesOf(*ahead), "facing") != nameOf(out);
+}
+
+/// parity: `SignalGetter.getControlInputSignal`. Measured in `ladodiodo`: a repeater with a lit line
+/// of dust running along its side is **not** locked, because only another diode counts for it; and a
+/// comparator subtracting with a block of redstone at its side comes out at zero, because for a
+/// comparator everything counts.
+[[nodiscard]] std::int32_t controlInput(const WorldState& world, const std::int32_t x, const std::int32_t y,
+                                        const std::int32_t z, const BlockFace side, const bool onlyDiodes) {
+    const std::int32_t nx = x + registry::stepX(side);
+    const std::int32_t ny = y + registry::stepY(side);
+    const std::int32_t nz = z + registry::stepZ(side);
+    const std::optional<std::int32_t> neighbour = world.blockState(nx, ny, nz);
+    if (!neighbour.has_value()) {
+        return 0;
+    }
+    const std::string path = pathOf(*neighbour);
+    const std::int32_t output = redstone::comparatorOutputAt(world, nx, ny, nz);
+    if (onlyDiodes) {
+        return path == "repeater" || path == "comparator" ? redstone::directSignalOf(*neighbour, side, 0, output) : 0;
+    }
+    if (path == "redstone_block") {
+        return redstone::kMaxSignal;
+    }
+    // parity: dust answers its own strength here rather than the strong signal it gives off, which
+    // is the only place the two are asked apart.
+    if (redstone::isWire(*neighbour)) {
+        return numberOf(registry::blockStateDefinitions::propertiesOf(*neighbour), "power", 0);
+    }
+    return redstone::isSignalSource(*neighbour) ? redstone::directSignalOf(*neighbour, side, 0, output) : 0;
+}
+
+/// parity: `DiodeBlock.getAlternateSignal`, the two sides a diode listens to. `onlyDiodes` is
+/// `sideInputDiodesOnly`, true for a repeater and false for a comparator.
 [[nodiscard]] std::int32_t alternateSignal(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                           const Properties& properties) {
+                                           const Properties& properties, const bool onlyDiodes) {
     const std::optional<BlockFace> facing = faceNamed(valueOf(properties, "facing"));
     if (!facing.has_value()) {
         return 0;
     }
     std::int32_t best = 0;
     for (const BlockFace side : sidesOf(*facing)) {
-        const std::optional<std::int32_t> neighbour =
-            world.blockState(x + registry::stepX(side), y + registry::stepY(side), z + registry::stepZ(side));
-        if (!neighbour.has_value()) {
-            continue;
-        }
-        const std::string path = pathOf(*neighbour);
-        // parity: `getControlInputSignal` with `sideInputDiodesOnly`: only a diode or dust on the
-        // side counts, which is why a lever beside a comparator does nothing to it.
-        if (path != "repeater" && path != "comparator" && !redstone::isWire(*neighbour)) {
-            continue;
-        }
-        best = std::max(best, redstone::signalOf(*neighbour, side));
+        best = std::max(best, controlInput(world, x, y, z, side, onlyDiodes));
     }
     return best;
 }
@@ -208,32 +281,13 @@ void schedule(WorldState& world, std::string_view worldName, std::int32_t x, std
 
 /// parity: `RepeaterBlock.isLocked` over `DiodeBlock.getAlternateSignal`: a repeater pointed at from
 /// either side by another powered repeater is held where it is.
+/// parity: `RepeaterBlock.isLocked` is `getAlternateSignal(...) > 0` with the diodes-only rule, and
+/// nothing else. What locks a repeater is a diode at its side **feeding** it, which in vanilla's
+/// terms is one whose `facing` equals the direction from here to it: its own output then points back
+/// this way. The condition written here before was the mirror of that.
 [[nodiscard]] bool isLocked(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                             const Properties& properties) {
-    const std::optional<BlockFace> facing = faceNamed(valueOf(properties, "facing"));
-    if (!facing.has_value()) {
-        return false;
-    }
-    for (const BlockFace side : sidesOf(*facing)) {
-        const std::optional<std::int32_t> neighbour =
-            world.blockState(x + registry::stepX(side), y + registry::stepY(side), z + registry::stepZ(side));
-        if (!neighbour.has_value()) {
-            continue;
-        }
-        const std::string path = pathOf(*neighbour);
-        if (path != "repeater" && path != "comparator") {
-            continue;
-        }
-        const Properties theirs = registry::blockStateDefinitions::propertiesOf(*neighbour);
-        if (valueOf(theirs, "powered") != "true") {
-            continue;
-        }
-        // Only a diode pointing *at* this one locks it.
-        if (valueOf(theirs, "facing") == nameOf(registry::opposite(side))) {
-            return true;
-        }
-    }
-    return false;
+    return alternateSignal(world, x, y, z, properties, true) > 0;
 }
 
 /// parity: `ComparatorBlock.calculateOutputSignal`: nothing at all when the sides win, and otherwise
@@ -242,7 +296,7 @@ void schedule(WorldState& world, std::string_view worldName, std::int32_t x, std
                                             std::int32_t y, std::int32_t z, const Properties& properties,
                                             const ContainerSignalAt& containerSignal) {
     const std::int32_t input = comparatorInput(world, worldName, x, y, z, properties, containerSignal);
-    const std::int32_t sides = alternateSignal(world, x, y, z, properties);
+    const std::int32_t sides = alternateSignal(world, x, y, z, properties, false);
     if (input == 0 || sides > input) {
         return 0;
     }
@@ -353,7 +407,8 @@ void storeOutput(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
     }
     if (!shouldPower) {
         // Turning off is booked one delay later in vanilla, which this reaches by scheduling.
-        world.scheduleBlockTick(x, y, z, repeater(), numberOf(properties, "delay", 1) * 2);
+        // parity: `DiodeBlock.tick` books that one very high, so it beats whatever it feeds.
+        world.scheduleBlockTick(x, y, z, repeater(), numberOf(properties, "delay", 1) * 2, kVeryHigh);
     }
     return turn(world, x, y, z, *stateId, "powered", shouldPower ? "true" : "false");
 }
@@ -403,7 +458,8 @@ const wire::common::Identifier& observer() {
 
 bool isComponent(std::int32_t stateId) { return std::ranges::find(kComponents, pathOf(stateId)) != kComponents.end(); }
 
-void scheduleComparatorsAround(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+void scheduleComparatorsAround(WorldState& world, const std::string_view worldName, const std::int32_t x,
+                               const std::int32_t y, const std::int32_t z, const ContainerSignalAt& containerSignal) {
     constexpr std::array<BlockFace, 4> kHorizontal{BlockFace::North, BlockFace::South, BlockFace::West,
                                                    BlockFace::East};
     for (const BlockFace face : kHorizontal) {
@@ -428,17 +484,30 @@ void scheduleComparatorsAround(WorldState& world, const std::int32_t x, const st
                 continue;
             }
         }
-        world.scheduleBlockTick(bx, by, bz, comparator(), kComparatorDelay);
+        // The same guard the rest of the neighbour updates go through: `neighborChanged` on a
+        // comparator is `checkTickOnNeighbor`, which reads before it books.
+        scheduleComparator(world, worldName, bx, by, bz, *stateId, containerSignal);
     }
 }
 
-/// parity: `Level.updateNeighborsAt`, which is the six neighbours of one square and nothing else.
+/// parity: `Level.updateNeighborsAt`, which is the six neighbours of one square and **not that
+/// square**. Telling it too left a repeater put down by command with a state it could not have
+/// correcting itself, and the jar leaves it lying: measured in `repetidormentira`, ten ticks with a
+/// block of redstone in its input and the repeater still off.
 void scheduleNeighbours(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
                         const ContainerSignalAt& containerSignal) {
-    schedule(world, worldName, x, y, z, containerSignal);
-    for (const BlockFace face : kFaces) {
+    for (const BlockFace face : kUpdateOrder) {
         schedule(world, worldName, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face),
                  containerSignal);
+    }
+}
+
+void scheduleAroundWire(WorldState& world, const std::string_view worldName, const std::int32_t x, const std::int32_t y,
+                        const std::int32_t z, const ContainerSignalAt& containerSignal) {
+    scheduleNeighbours(world, worldName, x, y, z, containerSignal);
+    for (const BlockFace face : kUpdateOrder) {
+        scheduleNeighbours(world, worldName, x + registry::stepX(face), y + registry::stepY(face),
+                           z + registry::stepZ(face), containerSignal);
     }
 }
 
@@ -458,19 +527,30 @@ void scheduleAround(WorldState& world, std::string_view worldName, std::int32_t 
     // only runs when the torch arrives or leaves: flicking on its own turn writes with `UPDATE_ALL`
     // and stops at its six squares like anything else.
     if (arrived && (path == "redstone_torch" || path == "redstone_wall_torch")) {
+        // This outer loop really is `Direction.values()`: `notifyNeighbors` writes it out by hand
+        // rather than going through `updateNeighborsAt`, which is the one that uses `UPDATE_ORDER`.
         for (const BlockFace face : kFaces) {
             scheduleNeighbours(world, worldName, x + registry::stepX(face), y + registry::stepY(face),
                                z + registry::stepZ(face), containerSignal);
         }
         return;
     }
-    // parity: `DiodeBlock.updateNeighborsInFront`, the square it points at and that square's own.
-    if (path == "repeater" || path == "comparator") {
+    // parity: `ObserverBlock.updateNeighborsInFront` does two things where a diode does one: a
+    // `neighborChanged` on the square behind it and an `updateNeighborsAtExceptFromFacing` on that
+    // same square. So an observer reaches two steps backwards, and a repeater on the far side of the
+    // block it feeds hears it. Measured: the jar fires that repeater, and with one step we did not.
+    if (path == "observer") {
         if (const std::optional<BlockFace> facing = faceNamed(valueOf(properties, "facing")); facing.has_value()) {
-            scheduleNeighbours(world, worldName, x + registry::stepX(*facing), y + registry::stepY(*facing),
-                               z + registry::stepZ(*facing), containerSignal);
+            const BlockFace back = registry::opposite(*facing);
+            scheduleNeighbours(world, worldName, x + registry::stepX(back), y + registry::stepY(back),
+                               z + registry::stepZ(back), containerSignal);
         }
+        return;
     }
+    // parity: `DiodeBlock.updateNeighborsInFront` is a single `neighborChanged` on the square the
+    // diode feeds, which is `opposite(facing)` and already one of the six above. There is nothing
+    // else: the reach this used to add was on the **input** side, which the jar never touches, and
+    // it only looked right because the bench had every repeater built backwards.
 }
 
 void watchOnPlace(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {

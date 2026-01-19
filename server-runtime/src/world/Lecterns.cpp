@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Lecterns.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 
@@ -89,7 +90,7 @@ std::optional<BlockChange> placeBook(WorldState& world, std::int32_t x, std::int
     entity->data().putInt(kPageKey, 0);
     entity->data().putInt(kPagesKey, std::max(1, pages));
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
-    redstoneComponents::scheduleComparatorsAround(world, x, y, z);
+    redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
     return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};
 }
 
@@ -118,7 +119,7 @@ std::optional<std::pair<BlockChange, wire::common::Identifier>> takeBook(WorldSt
     entity->data().remove(kPageKey);
     entity->data().remove(kPagesKey);
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
-    redstoneComponents::scheduleComparatorsAround(world, x, y, z);
+    redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
     return std::pair{BlockChange{.x = x, .y = y, .z = z, .stateId = *turned}, *book};
 }
 
@@ -141,7 +142,7 @@ std::optional<BlockChange> turnPage(WorldState& world, std::int32_t x, std::int3
     }
     entity->data().putInt(kPageKey, std::clamp(page, 0, std::max(0, pages - 1)));
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
-    redstoneComponents::scheduleComparatorsAround(world, x, y, z);
+    redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
     world.scheduleBlockTick(x, y, z, block(), kPulseTicks);
     return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};
 }

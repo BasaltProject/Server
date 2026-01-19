@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 
@@ -88,7 +89,7 @@ std::optional<BlockChange> insert(WorldState& world, std::int32_t x, std::int32_
     entity->data().putInt(kOutputKey, comparatorOutput);
     entity->data().putLong(kTicksKey, 0);
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
-    redstoneComponents::scheduleComparatorsAround(world, x, y, z);
+    redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
     return BlockChange{.x = x, .y = y, .z = z, .stateId = *playing};
 }
 
@@ -118,7 +119,7 @@ std::optional<std::pair<BlockChange, wire::common::Identifier>> eject(WorldState
     entity->data().remove(kOutputKey);
     entity->data().remove(kTicksKey);
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
-    redstoneComponents::scheduleComparatorsAround(world, x, y, z);
+    redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
     return std::pair{BlockChange{.x = x, .y = y, .z = z, .stateId = *quiet},
                      wire::common::Identifier::vanilla(std::string{kDiscPrefix} + song)};
 }
