@@ -436,7 +436,8 @@ entity::entityCollision::BlockAt WorldState::lockedBlockAccessor() const {
     return [this](std::int32_t x, std::int32_t y, std::int32_t z) { return blockStateLocked(x, y, z); };
 }
 
-bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
+bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
+                               SideEffects sideEffects) {
     mine("A block");
     const WorldWriteLock lock{mutex_};
     Chunk* chunk = chunkAtLocked(key(x >> 4, z >> 4));
@@ -449,21 +450,19 @@ bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, s
     if (y < chunk->verticalBounds().minY() || y > chunk->verticalBounds().maxY()) {
         return false;
     }
-    // parity: `BlockEntity.preRemoveSideEffects`, which every block entity that is a container runs
-    // when its block goes: what it held falls out. It is queued here rather than spawned because
-    // this call already holds the world's lock, and it is done **before** the write, because the
-    // write is what takes the block entity away.
+    // parity: `BlockEntity.preRemoveSideEffects`, which every container runs when its block goes.
+    // Queued rather than spawned because this call already holds the world's lock, and done before
+    // the write, which is what takes the block entity away. Skipped when the flags carry 256.
     //
-    // The cheap tests come first on purpose: this is the hottest write in the server, and the common
-    // case is a state that did not move at all. A block entity is only looked up once the block
-    // itself is known to be changing.
+    // Cheap tests first: this is the hottest write in the server and usually the state did not move.
     const std::int32_t was = chunk->blockStateId(x & 15, y, z & 15);
     const auto blockChanges = [](std::int32_t before, std::int32_t after) {
         const wire::common::Identifier* from = registry::blockStateDefinitions::blockOf(before);
         const wire::common::Identifier* to = registry::blockStateDefinitions::blockOf(after);
         return from != nullptr && to != nullptr && *from != *to;
     };
-    if (was != stateId && chunk->blockEntityCount() > 0 && blockChanges(was, stateId)) {
+    if (sideEffects == SideEffects::kRun && was != stateId && chunk->blockEntityCount() > 0 &&
+        blockChanges(was, stateId)) {
         const server::world::ChunkBlockEntity* held = chunk->blockEntityAt(x & 15, y, z & 15);
         const std::optional<std::int32_t> size =
             held == nullptr ? std::nullopt : containers::sizeOf(held->type().path());

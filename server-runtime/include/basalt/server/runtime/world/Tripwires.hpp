@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
@@ -28,6 +29,18 @@ inline constexpr std::int32_t kMaxLength = 42;
 [[nodiscard]] bool isWire(std::int32_t stateId);
 
 [[nodiscard]] bool isHook(std::int32_t stateId);
+
+/// parity: `TripWireBlock.updateShape`, which is what draws a line of string as a line: each
+/// horizontal side is set from `shouldConnectTo`, which is another string or a hook facing back.
+/// Answers the new state, or nothing when this is not a string or nothing moved.
+[[nodiscard]] std::optional<std::int32_t> reshape(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                                  std::int32_t stateId, std::optional<registry::BlockFace> towards);
+
+/// parity: `TripWireHookBlock.updateShape`: a hook only falls when the news arrives **from the side
+/// it hangs on**, and `canSurvive` wants a sturdy face there. From any other side it is left alone,
+/// which is why one placed in mid air by command stays until something touches its wall.
+[[nodiscard]] bool hookFalls(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                             std::int32_t stateId, registry::BlockFace towards);
 
 /// What is standing on a wire, as its own box: the whole block, since a wire is walked into.
 [[nodiscard]] bool isStandingOn(std::int32_t x, std::int32_t y, std::int32_t z, double entityX, double entityY,

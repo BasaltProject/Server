@@ -132,9 +132,11 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
                 }
                 static_cast<void>(region.owner().runPending(onTaskFailure));
             });
-            // Whatever those commands killed dies now, frozen or not: this is where vanilla's own
-            // command phase sits, and `die()` is part of the command and not of the world's turn.
+            // Whatever those commands killed or lit goes off now, frozen or not: this is where
+            // vanilla's own command phase sits, and neither `die()` nor `prime()` is part of the
+            // world's turn.
             tickDeaths(world, region);
+            tickPrimedTnt(world);
             if (!worldRuns) {
                 return;
             }
@@ -187,6 +189,35 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
     shutdownIfSignalled();
 }
 
+void BasaltServer::tickPrimedTnt(world::LoadedWorld& world) {
+    std::vector<player::PlayerSession*> watchers;
+    for (player::PlayerSession* player : playerRegistry_.snapshot()) {
+        if (player->worldName == world.name()) {
+            watchers.push_back(player);
+        }
+    }
+    // parity: `TntBlock.prime` builds the entity **inside** the neighbour update that lit the block,
+    // so the fuse is heard on that very turn. The block half of it can run on a client's thread, so
+    // what it does is queue the square; this is where the queue becomes an entity, and it runs before
+    // the world's own turn so the two land together.
+    const registry::EntityTypeEntry* tntType = registry::entityTypes::of(entity::primedTnt::type());
+    if (tntType != nullptr) {
+        for (const std::array<std::int32_t, 3>& position : world.state().takePrimedTnt()) {
+            static_cast<void>(entity::primedTnt::prime(world.state(), position[0], position[1], position[2],
+                                                       playerRegistry_.allocateEntityId(), tntType->protocolId));
+            // parity: `TntBlock.prime` raises `PRIME_FUSE` from the block's own square, so a sculk
+            // sensor hears the tnt being lit at ten and not only the bang at fifteen.
+            if (world.state().hasSculkSensorNear(position[0], position[1], position[2], world::vibrations::kRange)) {
+                world::vibrations::emit(world.state(), "prime_fuse", position[0] + 0.5, position[1] + 0.5,
+                                        position[2] + 0.5, world.gameTime());
+            }
+            broadcaster_->sendEffects(watchers, position[0], position[1], position[2], registry::blocks::air().stateId,
+                                      {world::blockEffect::Sound{.name = std::string{kTntPrimedSound},
+                                                                 .source = wire::protocol::play::SoundSource::Blocks}});
+        }
+    }
+}
+
 void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& region) {
     for (entity::ServerEntity* dead : world.state().entities()) {
         if (!dead->killed || !region.ownsPosition(dead->x, dead->z)) {
@@ -235,25 +266,6 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                                                                          .velocityX = random.triangle(0.0, kSpread),
                                                                          .velocityY = random.triangle(0.2, kSpread),
                                                                          .velocityZ = random.triangle(0.0, kSpread)}));
-        }
-    }
-
-    // parity: `TntBlock.explode`, which spawns the entity as the block goes. It is done here because
-    // the block half runs wherever a neighbour changed, which may be a client's thread.
-    const registry::EntityTypeEntry* tntType = registry::entityTypes::of(entity::primedTnt::type());
-    if (tntType != nullptr) {
-        for (const std::array<std::int32_t, 3>& position : world.state().takePrimedTnt()) {
-            static_cast<void>(entity::primedTnt::prime(world.state(), position[0], position[1], position[2],
-                                                       playerRegistry_.allocateEntityId(), tntType->protocolId));
-            // parity: `TntBlock.prime` raises `PRIME_FUSE` from the block's own square, so a sculk
-            // sensor hears the tnt being lit at ten and not only the bang at fifteen.
-            if (world.state().hasSculkSensorNear(position[0], position[1], position[2], world::vibrations::kRange)) {
-                world::vibrations::emit(world.state(), "prime_fuse", position[0] + 0.5, position[1] + 0.5,
-                                        position[2] + 0.5, world.gameTime());
-            }
-            broadcaster_->sendEffects(watchers, position[0], position[1], position[2], registry::blocks::air().stateId,
-                                      {world::blockEffect::Sound{.name = std::string{kTntPrimedSound},
-                                                                 .source = wire::protocol::play::SoundSource::Blocks}});
         }
     }
 

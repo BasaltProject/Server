@@ -46,7 +46,7 @@ enum class Mode : std::uint8_t { Replace, Destroy, Keep, Outline, Hollow };
         return std::unexpected{CommandSyntaxError{.component = Component::translatable("commands.setblock.failed")}};
     }
     if (mode == Mode::Destroy) {
-        static_cast<void>(editor->set(at[0], at[1], at[2], reg::blocks::air().stateId));
+        static_cast<void>(editor->destroy(at[0], at[1], at[2]));
     }
     editor->keepWritten(at[0], at[1], at[2], block->properties);
     if (!editor->set(at[0], at[1], at[2], block->stateId) && mode != Mode::Destroy) {
@@ -65,7 +65,7 @@ enum class Mode : std::uint8_t { Replace, Destroy, Keep, Outline, Hollow };
 [[nodiscard]] bool writeOne(BlockEditor& editor, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
                             Mode mode) {
     if (mode == Mode::Destroy) {
-        const bool cleared = editor.set(x, y, z, reg::blocks::air().stateId);
+        const bool cleared = editor.destroy(x, y, z);
         return editor.set(x, y, z, stateId) || cleared;
     }
     return editor.set(x, y, z, stateId);
