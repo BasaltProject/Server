@@ -30,13 +30,15 @@ inline constexpr std::int32_t kMaxLength = 42;
 
 /// parity: `checkPressed`: the wire follows whether anything is on it, books its own recheck, and
 /// tells the hooks at both ends.
-void press(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool occupied,
+void press(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool occupied, std::int64_t gameTime,
            std::vector<BlockChange>& changes);
 
 /// parity: `TripWireHookBlock.calculateState`: it looks along the way it faces for the hook pointing
 /// back at it. Attached means it found one with unbroken string in between; powered means one of
 /// those strings has something on it.
-void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+/// `gameTime` is the world's clock: a hook that catches, lets go, clicks on or clicks off raises one
+/// of four game events, and a vibration is stamped with the turn it was heard on.
+void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t gameTime,
                    std::vector<BlockChange>& changes);
 
 } // namespace tripwires

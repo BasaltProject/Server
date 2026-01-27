@@ -217,6 +217,12 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         for (const std::array<std::int32_t, 3>& position : world.state().takePrimedTnt()) {
             static_cast<void>(entity::primedTnt::prime(world.state(), position[0], position[1], position[2],
                                                        playerRegistry_.allocateEntityId(), tntType->protocolId));
+            // parity: `TntBlock.prime` raises `PRIME_FUSE` from the block's own square, so a sculk
+            // sensor hears the tnt being lit at ten and not only the bang at fifteen.
+            if (world.state().hasSculkSensorNear(position[0], position[1], position[2], world::vibrations::kRange)) {
+                world::vibrations::emit(world.state(), "prime_fuse", position[0] + 0.5, position[1] + 0.5,
+                                        position[2] + 0.5, world.gameTime());
+            }
             broadcaster_->sendEffects(watchers, position[0], position[1], position[2], registry::blocks::air().stateId,
                                       {world::blockEffect::Sound{.name = std::string{kTntPrimedSound},
                                                                  .source = wire::protocol::play::SoundSource::Blocks}});

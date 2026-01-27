@@ -26,10 +26,9 @@ using Position = std::array<std::int32_t, 3>;
     return block->stateId;
 }
 
-[[nodiscard]] std::int32_t rod(const std::string& powered) {
+[[nodiscard]] std::int32_t rod(const std::string& powered, const std::string& path = "lightning_rod") {
     const std::optional<std::int32_t> stateId = registry::blockStateDefinitions::stateIdOf(
-        Identifier::vanilla("lightning_rod"), {{"powered", powered}, {"facing", "up"}, {"waterlogged", "false"}},
-        stateOf("lightning_rod"));
+        Identifier::vanilla(path), {{"powered", powered}, {"facing", "up"}, {"waterlogged", "false"}}, stateOf(path));
     REQUIRE(stateId.has_value());
     return *stateId;
 }
@@ -331,4 +330,37 @@ TEST_CASE("a strike is the roll landing on zero, and on nothing else") {
     CHECK(lightning::shouldStrike(lucky));
     rng::RandomSource nearly = rng::RandomSource::legacy(*misses);
     CHECK_FALSE(lightning::shouldStrike(nearly));
+}
+
+TEST_CASE("a rod that has oxidised is still a rod, and stays the one it is") {
+    // parity: the tag `lightning_rods` holds **eight** blocks: the rod oxidises like any other
+    // copper, and waxing it makes yet another. Matching only `minecraft:lightning_rod` left seven
+    // of them deaf to a storm, and writing the plain block back would have un-weathered them.
+    for (const std::string& path : {std::string{"exposed_lightning_rod"}, std::string{"weathered_lightning_rod"},
+                                    std::string{"oxidized_lightning_rod"}, std::string{"waxed_lightning_rod"},
+                                    std::string{"waxed_oxidized_lightning_rod"}}) {
+        Loaded loaded;
+        loaded.put(8, 64, 8, rod("false", path));
+        rng::RandomSource random = rng::RandomSource::legacy(1);
+        std::vector<BlockChange> changes;
+
+        lightning::strike(loaded.state, 8, 64, 8, false, random, changes);
+
+        REQUIRE(changes.size() == 1);
+        CHECK(propertyAt(loaded.state, 8, 64, 8, "powered") == "true");
+        const std::optional<std::int32_t> after = loaded.state.blockState(8, 64, 8);
+        REQUIRE(after.has_value());
+        const Identifier* block = registry::blockStateDefinitions::blockOf(*after);
+        REQUIRE(block != nullptr);
+        CHECK(block->path() == path);
+        CHECK(loaded.state.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla(path)));
+
+        // And it lets the signal go again, still as itself.
+        const std::optional<BlockChange> released = lightning::releaseRod(loaded.state, 8, 64, 8);
+        REQUIRE(released.has_value());
+        CHECK(propertyAt(loaded.state, 8, 64, 8, "powered") == "false");
+        const std::optional<std::int32_t> quiet = loaded.state.blockState(8, 64, 8);
+        REQUIRE(quiet.has_value());
+        CHECK(registry::blockStateDefinitions::blockOf(*quiet)->path() == path);
+    }
 }

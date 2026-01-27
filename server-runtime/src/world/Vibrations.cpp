@@ -1,8 +1,10 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/entity/BlockRay.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <map>
@@ -11,6 +13,12 @@
 
 namespace basalt::server::runtime::world::vibrations {
 namespace {
+
+/// parity: `Direction.values()`, which is what `isOccluded` walks. The order does not decide anything
+/// here (all six have to be blocked), but the set does.
+constexpr std::array<registry::BlockFace, 6> kFaces{registry::BlockFace::Down,  registry::BlockFace::Up,
+                                                    registry::BlockFace::North, registry::BlockFace::South,
+                                                    registry::BlockFace::West,  registry::BlockFace::East};
 
 [[nodiscard]] const wire::common::Identifier& sensor() {
     static const wire::common::Identifier instance = wire::common::Identifier::vanilla("sculk_sensor");
@@ -197,6 +205,41 @@ void wake(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, con
     world.scheduleBlockTick(x, y, z, block, 1);
 }
 
+/// parity: the tag `occludes_vibration_signals`, which is `#minecraft:wool` and nothing else. Every
+/// wool block is named for its colour, so the name is the whole test.
+[[nodiscard]] bool occludesVibrations(std::int32_t stateId) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    return block != nullptr && block->path().ends_with("_wool");
+}
+
+/// parity: `VibrationSystem.Listener.isOccluded`. Six lines from the middle of the noise's square to
+/// the middle of the sensor's, each nudged a hundred-thousandth of a block in one of the six
+/// directions, and it counts as blocked only when **all six** meet wool.
+///
+/// The six are not six routes: the nudge is a hundred-thousandth, so they all cross the same squares
+/// unless the line runs exactly along a face, and that boundary case is the whole reason they exist.
+/// One block of wool in the way does hide the noise.
+[[nodiscard]] bool occluded(WorldState& world, double x, double y, double z, std::int32_t sensorX, std::int32_t sensorY,
+                            std::int32_t sensorZ) {
+    const double fromX = std::floor(x) + 0.5;
+    const double fromY = std::floor(y) + 0.5;
+    const double fromZ = std::floor(z) + 0.5;
+    const double toX = static_cast<double>(sensorX) + 0.5;
+    const double toY = static_cast<double>(sensorY) + 0.5;
+    const double toZ = static_cast<double>(sensorZ) + 0.5;
+    // parity: `Vec3.relative(direction, 1.0E-5F)`, a float widened to a double and not `1.0e-5`.
+    constexpr double kNudge = static_cast<double>(1.0e-5F);
+    for (const registry::BlockFace face : kFaces) {
+        const double nudgedX = fromX + (static_cast<double>(registry::stepX(face)) * kNudge);
+        const double nudgedY = fromY + (static_cast<double>(registry::stepY(face)) * kNudge);
+        const double nudgedZ = fromZ + (static_cast<double>(registry::stepZ(face)) * kNudge);
+        if (!entity::blockRay::crosses(world, nudgedX, nudgedY, nudgedZ, toX, toY, toZ, occludesVibrations)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 /// parity: `VibrationSystem.Listener.handleGameEvent` over `VibrationSelector.addCandidate`. Nothing
 /// lights up here: the sensor writes the noise down and waits its turn.
 void hear(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::int32_t sensorZ, std::int32_t stateId,
@@ -211,6 +254,10 @@ void hear(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::in
     // a sensor does not hear its own square being placed or broken.
     if (static_cast<std::int32_t>(std::floor(x)) == sensorX && static_cast<std::int32_t>(std::floor(y)) == sensorY &&
         static_cast<std::int32_t>(std::floor(z)) == sensorZ && (event == "block_destroy" || event == "block_place")) {
+        return;
+    }
+    // parity: `handleGameEvent` asks this last of all, after the sensor has said it can hear it.
+    if (occluded(world, x, y, z, sensorX, sensorY, sensorZ)) {
         return;
     }
     wire::nbt::NbtCompound* data = dataOf(world, sensorX, sensorY, sensorZ, block);
@@ -386,10 +433,6 @@ std::optional<BlockChange> tick(WorldState& world, std::int32_t x, std::int32_t 
         wake(world, x, y, z, *block);
     }
     return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};
-}
-
-bool isInRange(std::int32_t sensorX, std::int32_t sensorY, std::int32_t sensorZ, double x, double y, double z) {
-    return std::abs(sensorX - x) <= kRange && std::abs(sensorY - y) <= kRange && std::abs(sensorZ - z) <= kRange;
 }
 
 } // namespace basalt::server::runtime::world::vibrations

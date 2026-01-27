@@ -299,7 +299,8 @@ void RedstoneTickSystem::tickTripwires(world::LoadedWorld& world, const sched::R
         }
     }
     for (const std::int64_t packed : crossed) {
-        world::tripwires::press(world.state(), unpackX(packed), unpackY(packed), unpackZ(packed), true, changes);
+        world::tripwires::press(world.state(), unpackX(packed), unpackY(packed), unpackZ(packed), true,
+                                world.gameTime(), changes);
     }
     for (const world::BlockChange& change : changes) {
         broadcaster_->announceRedstone(world, watchers, change);

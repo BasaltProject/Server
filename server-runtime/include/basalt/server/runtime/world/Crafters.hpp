@@ -40,8 +40,6 @@ struct Hooks {
         resultFor;
     /// A free entity id for the item it throws when there is nowhere to put the result.
     std::function<std::int32_t()> allocateEntityId;
-    /// How many slots the container at these coordinates has, or nothing when it is not one.
-    std::function<std::optional<std::int32_t>(std::string_view path)> containerSize;
 };
 
 /// The turn itself. Answers what changed, so the caller can tell the clients.

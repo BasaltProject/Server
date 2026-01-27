@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 namespace basalt::server::runtime::entity {
@@ -31,6 +32,15 @@ inline constexpr std::int32_t kMaxSteps = 256;
 
 [[nodiscard]] std::optional<BlockHit> cast(world::WorldState& world, double fromX, double fromY, double fromZ,
                                            double toX, double toY, double toZ);
+
+/// Whether the line meets a block the caller is looking for, ignoring shapes: it is the block itself
+/// that stops it, not its collision box.
+///
+/// parity: `BlockGetter.isBlockInLine` over a `ClipBlockStateContext`, which walks the same squares
+/// as `clip` but asks a predicate about each state instead of clipping its boxes. A pane of wool
+/// stops a vibration whatever shape it has.
+[[nodiscard]] bool crosses(world::WorldState& world, double fromX, double fromY, double fromZ, double toX, double toY,
+                           double toZ, const std::function<bool(std::int32_t stateId)>& matches);
 
 } // namespace blockRay
 

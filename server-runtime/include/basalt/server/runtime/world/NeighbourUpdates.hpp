@@ -90,7 +90,9 @@ struct Context {
     WallShape wallShape;
     WireReshape wireReshape;
     reshapes::GeyserReshape geyser;
-    redstoneReactors::Hooks reactorHooks;
+    /// The world's clock, which the game events a reactor raises are stamped with: a door swinging
+    /// is a `BLOCK_OPEN`, and a vibration knows which turn it was heard on.
+    std::int64_t gameTime = 0;
 };
 
 /// Breaks whatever `x`, `y`, `z` stopped holding up, and whatever that in turn stopped holding.

@@ -91,14 +91,16 @@ void BlockEditor::notifyNeighbours() {
         .hasSkylight = facts.hasSkylight,
         // parity: a `/setblock` of water is a block change like any other, and what makes water
         // flow is a block change. Without this it stood where the command put it for ever.
-        .wakeFluids = [this, &random](std::int32_t x, std::int32_t y, std::int32_t z) {
-            const world::fluidFlow::Context flow{.world = world_->state(),
-                                                 .gameRules = world_->gameRules(),
-                                                 .random = random,
-                                                 .ultrawarm =
-                                                     world_->declaration().dimension == config::WorldDimension::Nether};
-            static_cast<void>(world::fluidFlow::onBlockChanged(flow, x, y, z));
-        }};
+        .wakeFluids =
+            [this, &random](std::int32_t x, std::int32_t y, std::int32_t z) {
+                const world::fluidFlow::Context flow{.world = world_->state(),
+                                                     .gameRules = world_->gameRules(),
+                                                     .random = random,
+                                                     .ultrawarm = world_->declaration().dimension ==
+                                                                  config::WorldDimension::Nether};
+                static_cast<void>(world::fluidFlow::onBlockChanged(flow, x, y, z));
+            },
+        .gameTime = world_->gameTime()};
     for (const std::array<std::int32_t, 3>& at : positions) {
         const std::optional<std::int32_t> written = world_->state().blockState(at[0], at[1], at[2]);
         // parity: `BlockInput.place` keeps what the command wrote when the **shape** update leaves

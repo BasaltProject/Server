@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <string_view>
 
 namespace basalt::server::runtime::world {
 namespace {
@@ -35,6 +36,28 @@ void SculkSensorTracker::remember(std::int32_t x, std::int32_t y, std::int32_t z
     } else if (at != sculkSensors_.end()) {
         sculkSensors_.erase(at);
     }
+}
+
+void SculkSensorTracker::rememberChunk(const server::world::Chunk& chunk) {
+    const std::int32_t baseX = chunk.chunkX() << 4;
+    const std::int32_t baseZ = chunk.chunkZ() << 4;
+    for (const server::world::ChunkBlockEntity& entity : chunk.blockEntities()) {
+        const std::string_view path = entity.type().path();
+        if (path != "sculk_sensor" && path != "calibrated_sculk_sensor") {
+            continue;
+        }
+        const std::int64_t position = blockKey(baseX + entity.localX(), entity.y(), baseZ + entity.localZ());
+        if (std::ranges::find(sculkSensors_, position) == sculkSensors_.end()) {
+            sculkSensors_.push_back(position);
+        }
+    }
+}
+
+void SculkSensorTracker::forgetChunk(std::int32_t chunkX, std::int32_t chunkZ) {
+    const auto gone = std::ranges::remove_if(sculkSensors_, [chunkX, chunkZ](std::int64_t position) {
+        return (unpackBlockX(position) >> 4) == chunkX && (unpackBlockZ(position) >> 4) == chunkZ;
+    });
+    sculkSensors_.erase(gone.begin(), gone.end());
 }
 
 bool SculkSensorTracker::hasNear(double x, double y, double z, std::int32_t range) const {

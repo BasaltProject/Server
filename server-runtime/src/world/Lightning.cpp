@@ -11,9 +11,12 @@
 namespace basalt::server::runtime::world::lightning {
 namespace {
 
+/// parity: the tag `lightning_rods`, which is **eight** blocks and not one: the rod oxidises like
+/// any other copper, and each stage is its own block. Every one of the eight ends in `lightning_rod`,
+/// and nothing else does, so the name is the whole test.
 [[nodiscard]] bool isRod(std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    return block != nullptr && *block == rod();
+    return block != nullptr && block->path().ends_with("lightning_rod");
 }
 
 void powerRod(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::vector<BlockChange>& changes) {
@@ -21,15 +24,21 @@ void powerRod(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
     if (!stateId.has_value() || !isRod(*stateId)) {
         return;
     }
+    // The rod's **own** block, not the plain one: writing the plain one here would turn a weathered
+    // rod into a fresh one every time it was struck.
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
+    if (block == nullptr) {
+        return;
+    }
     const std::optional<std::int32_t> turned =
-        registry::blockStateDefinitions::stateIdOf(rod(), {{"powered", "true"}}, *stateId);
+        registry::blockStateDefinitions::stateIdOf(*block, {{"powered", "true"}}, *stateId);
     if (!turned.has_value()) {
         return;
     }
     if (world.setBlockState(x, y, z, *turned)) {
         changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *turned});
     }
-    world.scheduleBlockTick(x, y, z, rod(), kRodTicks);
+    world.scheduleBlockTick(x, y, z, *block, kRodTicks);
 }
 
 /// parity: `findLightningRod`, which takes the closest rod whose tip is the top of its own column.
@@ -118,8 +127,12 @@ std::optional<BlockChange> releaseRod(WorldState& world, std::int32_t x, std::in
     if (powered == properties.end() || powered->second != "true") {
         return std::nullopt;
     }
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
+    if (block == nullptr) {
+        return std::nullopt;
+    }
     const std::optional<std::int32_t> turned =
-        registry::blockStateDefinitions::stateIdOf(rod(), {{"powered", "false"}}, *stateId);
+        registry::blockStateDefinitions::stateIdOf(*block, {{"powered", "false"}}, *stateId);
     if (!turned.has_value() || !world.setBlockState(x, y, z, *turned)) {
         return std::nullopt;
     }

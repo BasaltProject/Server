@@ -112,7 +112,8 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
                                                    .minY = facts.chunkHeight.minY(),
                                                    .maxY = facts.chunkHeight.maxY(),
                                                    .random = random,
-                                                   .hasSkylight = facts.hasSkylight};
+                                                   .hasSkylight = facts.hasSkylight,
+                                                   .gameTime = world.gameTime()};
     std::vector<world::BlockChange> effects;
     for (const world::explosions::Broken& block : broken) {
         world::neighbourUpdates::afterChange(

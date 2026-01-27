@@ -1,6 +1,7 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/world/Tripwires.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 
 #include <algorithm>
 #include <array>
@@ -44,6 +45,16 @@ constexpr double kCrossingSlack = 0.0625;
     return stateId.has_value() ? registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
 }
 
+/// parity: `Level.gameEvent(source, event, pos)`, from the middle of the square. The index of sensors
+/// is asked first because a tripwire on a busy corridor raises one of these on every crossing.
+void heard(WorldState& world, std::string_view event, std::int32_t x, std::int32_t y, std::int32_t z,
+           std::int64_t gameTime) {
+    if (event.empty() || !world.hasSculkSensorNear(x, y, z, vibrations::kRange)) {
+        return;
+    }
+    vibrations::emit(world, event, x + 0.5, y + 0.5, z + 0.5, gameTime);
+}
+
 void write(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
            const wire::common::Identifier& block, bool attached, std::optional<bool> powered,
            std::vector<BlockChange>& changes) {
@@ -62,7 +73,7 @@ void write(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, st
 
 /// Walks the line from a wire to the hook at either end and recalculates it.
 void recalculateFrom(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, BlockFace face,
-                     std::vector<BlockChange>& changes) {
+                     std::int64_t gameTime, std::vector<BlockChange>& changes) {
     for (std::int32_t step = 1; step < kMaxLength; ++step) {
         const std::int32_t hx = x + (registry::stepX(face) * step);
         const std::int32_t hz = z + (registry::stepZ(face) * step);
@@ -76,7 +87,7 @@ void recalculateFrom(WorldState& world, std::int32_t x, std::int32_t y, std::int
         if (*block != hookBlock()) {
             return;
         }
-        calculateHook(world, hx, y, hz, changes);
+        calculateHook(world, hx, y, hz, gameTime, changes);
         return;
     }
 }
@@ -98,7 +109,7 @@ bool isStandingOn(std::int32_t x, std::int32_t y, std::int32_t z, double entityX
            entityY <= y + 1;
 }
 
-void press(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool occupied,
+void press(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool occupied, std::int64_t gameTime,
            std::vector<BlockChange>& changes) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
@@ -119,7 +130,7 @@ void press(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bo
             changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *turned});
         }
         for (const BlockFace face : kHorizontal) {
-            recalculateFrom(world, x, y, z, face, changes);
+            recalculateFrom(world, x, y, z, face, gameTime, changes);
         }
     }
     if (occupied) {
@@ -127,7 +138,7 @@ void press(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bo
     }
 }
 
-void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t gameTime,
                    std::vector<BlockChange>& changes) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
@@ -177,6 +188,22 @@ void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32
     attached = attached && receiver > 1;
     powered = powered && attached;
 
+    // parity: `TripWireHookBlock.emitState`, an else-if chain, so a hook raises **one** event even
+    // when both its properties moved: the click wins over the catch. Both ends of the line raise it,
+    // and both read the near hook's own old state, which is what vanilla passes them.
+    const bool wasAttached = valueOf(properties, "attached") == "true";
+    const bool wasPowered = valueOf(properties, "powered") == "true";
+    std::string_view event;
+    if (powered && !wasPowered) {
+        event = "block_activate";
+    } else if (!powered && wasPowered) {
+        event = "block_deactivate";
+    } else if (attached && !wasAttached) {
+        event = "block_attach";
+    } else if (!attached && wasAttached) {
+        event = "block_detach";
+    }
+
     write(world, x, y, z, *stateId, *block, attached, powered, changes);
     if (receiver > 0) {
         const std::int32_t ox = x + (registry::stepX(*direction) * receiver);
@@ -190,7 +217,9 @@ void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32
             return;
         }
         write(world, ox, y, oz, *otherId, *other, attached, powered, changes);
+        heard(world, event, ox, y, oz, gameTime);
     }
+    heard(world, event, x, y, z, gameTime);
     // parity: the wires themselves follow the pair, which is what draws them taut.
     for (std::int32_t step = 1; step < std::max(receiver, 1); ++step) {
         const std::int32_t tx = x + (registry::stepX(*direction) * step);
