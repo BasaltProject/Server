@@ -59,12 +59,21 @@ void sendBlock(const std::vector<player::PlayerSession*>& watchers, std::int32_t
 /// The world's own neighbour-update context, which is what the cascade reads off a world.
 [[nodiscard]] world::neighbourUpdates::Context contextOf(world::LoadedWorld& world, random::RandomSource& random) {
     const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
-    return world::neighbourUpdates::Context{.world = world.state(),
-                                            .worldName = world.name(),
-                                            .minY = facts.chunkHeight.minY(),
-                                            .maxY = facts.chunkHeight.maxY(),
-                                            .random = random,
-                                            .hasSkylight = facts.hasSkylight};
+    return world::neighbourUpdates::Context{
+        .world = world.state(),
+        .worldName = world.name(),
+        .minY = facts.chunkHeight.minY(),
+        .maxY = facts.chunkHeight.maxY(),
+        .random = random,
+        .hasSkylight = facts.hasSkylight,
+        .wakeFluids = [&world, &random](std::int32_t x, std::int32_t y, std::int32_t z) {
+            const world::fluidFlow::Context flow{.world = world.state(),
+                                                 .gameRules = world.gameRules(),
+                                                 .random = random,
+                                                 .ultrawarm =
+                                                     world.declaration().dimension == config::WorldDimension::Nether};
+            static_cast<void>(world::fluidFlow::onBlockChanged(flow, x, y, z));
+        }};
 }
 
 } // namespace

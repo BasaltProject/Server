@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/command/WorldArguments.hpp>
 #include <basalt/server/runtime/command/commands/EntityCommands.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/world/DroppedItemNbt.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
@@ -121,6 +122,33 @@ void SummonCommand::build(const CommandNodeBuilder& root) const {
         const auto* coordinates = positioned ? context.get<Coordinates>("pos") : nullptr;
         const std::array<double, 3> at =
             coordinates == nullptr ? context.source().position() : coordinates->resolve(context.source().position());
+        // parity: an item on the floor is an `ItemEntity`, not something generic. Here it is its own
+        // kind, so summoning one has to build that kind: as a plain entity it never fell, never
+        // merged and no plate or hopper saw it, because those all read the world's item list.
+        // Measured in `placas`, where the jar's items landed on the plate and ours hung in the air.
+        if (*id == wire::common::Identifier::vanilla("item")) {
+            wire::nbt::NbtCompound tag;
+            if (withNbt) {
+                if (const auto* given = context.get<wire::nbt::NbtCompound>("nbt"); given != nullptr) {
+                    tag = *given;
+                }
+            }
+            tag.putString("id", id->toString());
+            tag.set("Pos", wire::nbt::NbtTag::ofList(wire::nbt::NbtList{wire::nbt::NbtType::Double,
+                                                                        {wire::nbt::NbtTag::ofDouble(at[0]),
+                                                                         wire::nbt::NbtTag::ofDouble(at[1]),
+                                                                         wire::nbt::NbtTag::ofDouble(at[2])}}));
+            const std::optional<world::DroppedItem> dropped =
+                world::droppedItemNbt::decode(tag, [this] { return players_->allocateEntityId(); });
+            if (!dropped.has_value()) {
+                return std::unexpected{
+                    CommandSyntaxError{.component = Component::translatable("commands.summon.failed")}};
+            }
+            static_cast<void>((*world)->state().spawnItem(*dropped));
+            context.success(Component::translatable("commands.summon.success", {Component::text(id->toString())}),
+                            true);
+            return 1;
+        }
         auto entity = std::make_unique<entity::ServerEntity>(players_->allocateEntityId(), wire::common::Uuid::random(),
                                                              *id, type->protocolId, at[0], at[1], at[2]);
         if (withNbt) {

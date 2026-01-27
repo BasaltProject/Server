@@ -299,6 +299,10 @@ public:
     /// for its last twenty ticks is nothing, but it is still there while it does it.
     bool dying = false;
 
+    /// parity: `Entity.NoGravity`, the tag that makes something hang in the air. `/summon` writes it
+    /// and it decides where a projectile goes, so it is not decoration.
+    bool noGravity = false;
+
     /// Whether it has already announced itself. parity: `Projectile.tick` sends `PROJECTILE_SHOOT`
     /// on the projectile's **first** turn and never again, whoever fired it and even when nobody
     /// did: one summoned by command announces itself just the same.

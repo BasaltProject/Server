@@ -423,7 +423,11 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
     }
     const std::vector<PlayerSession*> watchers = watchersOf(world);
     for (const world::BlockChange& change : changes) {
-        sendBlockUpdate(watchers, BlockPos{change.x, change.y, change.z}, change.stateId);
+        // parity: a block entity that rewrites its own block does it with `setBlock(..., 3)`, which
+        // is `UPDATE_NEIGHBORS | UPDATE_CLIENTS`. Telling only the clients left the dust beside a
+        // daylight detector reading nothing while the detector itself said eleven, which is what
+        // `detectorluz` measured; the same held for anything else that changes on its own turn.
+        broadcaster_->announceRedstone(world, watchers, change);
     }
 }
 

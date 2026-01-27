@@ -163,6 +163,71 @@ TEST_CASE("an entity type resolves both ways") {
     CHECK(entityTypes::of(Identifier::vanilla("not_a_mob")) == nullptr);
 }
 
+TEST_CASE("a closed trapdoor at the top of its block holds a dust up") {
+    // parity: `RedStoneWireBlock.canSurviveOn` asks `isFaceSturdy(UP)`, and a trapdoor at the top of
+    // its block is a full slab whose top face is the whole square. Measured in `polvotrampilla`: the
+    // jar leaves the dust standing on it and this build swept it away the moment it was placed.
+    const std::optional<std::int32_t> top = blockStateDefinitions::stateIdOf(
+        Identifier::vanilla("oak_trapdoor"),
+        {{"facing", "east"}, {"half", "top"}, {"open", "false"}, {"powered", "false"}, {"waterlogged", "false"}},
+        std::nullopt);
+    REQUIRE(top.has_value());
+    CHECK(blockShapes::isFaceSturdy(*top, BlockFace::Up));
+
+    // And the same trapdoor at the bottom of its block does not: there is nothing up there.
+    const std::optional<std::int32_t> bottom = blockStateDefinitions::stateIdOf(
+        Identifier::vanilla("oak_trapdoor"),
+        {{"facing", "east"}, {"half", "bottom"}, {"open", "false"}, {"powered", "false"}, {"waterlogged", "false"}},
+        std::nullopt);
+    REQUIRE(bottom.has_value());
+    CHECK_FALSE(blockShapes::isFaceSturdy(*bottom, BlockFace::Up));
+
+    // Y la regla generica **no** sabe contestarlo, que es el motivo de que el polvo tenga su propio
+    // caso en `blockSurvival::isSupported`: la regla del polvo es un conjunto de bloques sacado de la
+    // sonda, y la sonda prueba cada bloque en su estado por defecto, asi que una trampilla solo
+    // cuenta como suelo cerrada y arriba, y eso un conjunto de ids no lo puede decir.
+    const std::int32_t dust =
+        blockStateDefinitions::stateIdOf(Identifier::vanilla("redstone_wire"), {}, std::nullopt).value_or(0);
+    const std::int32_t air = blocks::air().stateId;
+    CHECK(blockSupport::canSurvive(dust, blocks::stone().stateId, air, air, air, air, air, false));
+    CHECK_FALSE(blockSupport::canSurvive(dust, *top, air, air, air, air, air, false));
+}
+
+TEST_CASE("the generic support rule cannot answer a state question, and these are the ones it gets wrong") {
+    const std::optional<std::int32_t> top = blockStateDefinitions::stateIdOf(
+        Identifier::vanilla("oak_trapdoor"),
+        {{"facing", "east"}, {"half", "top"}, {"open", "false"}, {"powered", "false"}, {"waterlogged", "false"}},
+        std::nullopt);
+    REQUIRE(top.has_value());
+    const std::int32_t air = blocks::air().stateId;
+
+    // A trapdoor closed at the top of its block is sturdy, so in the jar it holds all of these up.
+    // The generated rule is a set of block ids taken from a probe of default states, and a trapdoor
+    // in its default state does not support, so it never made any of those sets.
+    //
+    // These four have their own case in `blockSurvival::isSupported` because of it. The list is the
+    // point: it is what a reader needs to know before trusting the table for a fifth block.
+    for (const std::string& name : {std::string{"redstone_wire"}, std::string{"stone_pressure_plate"},
+                                    std::string{"oak_pressure_plate"}, std::string{"light_weighted_pressure_plate"}}) {
+        const std::optional<std::int32_t> state =
+            blockStateDefinitions::stateIdOf(Identifier::vanilla(name), {}, std::nullopt);
+        REQUIRE(state.has_value());
+        CHECK(blockSupport::canSurvive(*state, blocks::stone().stateId, air, air, air, air, air, false));
+        CHECK_FALSE(blockSupport::canSurvive(*state, *top, air, air, air, air, air, false));
+    }
+
+    // And these ones the table does get right, so they need no case of their own.
+    for (const std::string& name :
+         {std::string{"repeater"}, std::string{"comparator"}, std::string{"redstone_torch"}, std::string{"rail"},
+          std::string{"powered_rail"}, std::string{"detector_rail"}, std::string{"activator_rail"},
+          std::string{"tripwire"}, std::string{"sculk_sensor"}, std::string{"lectern"}, std::string{"target"}}) {
+        const std::optional<std::int32_t> state =
+            blockStateDefinitions::stateIdOf(Identifier::vanilla(name), {}, std::nullopt);
+        REQUIRE(state.has_value());
+        CHECK(blockSupport::canSurvive(*state, *top, air, air, air, air, air, false));
+    }
+}
+
 TEST_CASE("a shape answers the questions a fluid and a torch ask of it") {
     const std::int32_t stone = blocks::stone().stateId;
     CHECK(blockShapes::isFullCube(stone));
