@@ -253,10 +253,10 @@ void bell(WorldState& world, std::string_view worldName, std::int32_t x, std::in
 /// parity: `TntBlock.neighborChanged`, which lights it and takes the block away. What is left is the
 /// entity, which the caller spawns when it sees the block go.
 void tnt(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
-         const Properties& properties, std::vector<BlockChange>& changes) {
-    if (valueOf(properties, "unstable") == "true") {
-        return;
-    }
+         std::vector<BlockChange>& changes) {
+    // parity: `neighborChanged` does not look at `unstable`. That property is read in one place only,
+    // `playerWillDestroy`, where it decides whether breaking the block by hand lights it: a signal
+    // lights an unstable block exactly as it lights any other.
     if (redstone::bestNeighbourSignal(world, worldName, x, y, z) <= 0) {
         return;
     }
@@ -319,7 +319,7 @@ void react(WorldState& world, std::string_view worldName, std::int32_t x, std::i
         return;
     }
     if (path == "tnt") {
-        tnt(world, worldName, x, y, z, properties, changes);
+        tnt(world, worldName, x, y, z, changes);
         return;
     }
     if (path == "powered_rail" || path == "activator_rail") {

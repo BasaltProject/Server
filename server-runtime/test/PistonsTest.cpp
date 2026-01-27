@@ -515,6 +515,9 @@ namespace {
     return *stateId;
 }
 
+/// parity: `PistonStructureResolver`'s twelve, which is how far a line of moving squares can reach.
+constexpr std::int32_t kPushReach = 12;
+
 /// Puts a leftover `moving_piston` block entity at a world position, as somebody else's push would.
 void stale(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
@@ -533,39 +536,34 @@ void stale(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
 
 } // namespace
 
-TEST_CASE("a block mid-slide is carried up to thirteen away and no further") {
+TEST_CASE("the slide a piston lands is its own, however long, and nobody else's") {
+    // parity: what one piston moves is face-connected to it, arm included, so the squares mid-slide
+    // are found by walking out from the piston and not by sweeping the chunks around it. Sweeping
+    // also caught a second piston's slide, and once a slide is written down half way through, that
+    // leak made one piston land the other's blocks a tick early. Measured in `piston`, where the two
+    // rows go at once.
     Loaded loaded;
     WorldState& world = loaded.state;
     world.getOrGenerateChunk(1, 0);
-    world.getOrGenerateChunk(0, -1);
-    world.getOrGenerateChunk(-1, -1);
-    world.getOrGenerateChunk(1, 1);
     REQUIRE(world.setBlockState(8, 64, 8, piston("east", "false")));
     REQUIRE(world.setBlockState(8, 65, 8, registry::blocks::named("redstone_block")->stateId));
 
-    // parity: the twelve blocks a push reaches, plus the one it lands on, measured on each axis.
-    stale(world, 8, 77, 8);
-    stale(world, 8, 78, 8);
-    stale(world, 21, 64, 8);
-    stale(world, 22, 64, 8);
-    stale(world, 8, 64, -5);
-    stale(world, 8, 64, -6);
-    // And the corners of the nine chunks the scan covers, which are well within reach.
-    stale(world, -1, 64, -1);
-    stale(world, 16, 64, 16);
+    // A line of moving squares reaching the twelve a push is allowed, each touching the last.
+    for (std::int32_t along = 1; along <= kPushReach; ++along) {
+        REQUIRE(world.setBlockState(8 + along, 64, 8, stateOf("moving_piston")));
+        stale(world, 8 + along, 64, 8);
+    }
+    // And one on its own, four squares clear of the line, as another piston's slide would be.
+    REQUIRE(world.setBlockState(8, 64, 13, stateOf("moving_piston")));
+    stale(world, 8, 64, 13);
 
     static_cast<void>(finishSlide(loaded, 8, 64, 8));
 
-    // Cada uno aterriza donde ya estaba su moving_piston, que es lo que hace `finalTick`. Lo que
-    // mide este caso es el alcance del barrido, no el desplazamiento.
-    CHECK(world.blockState(8, 77, 8) == stateOf("dirt"));
-    CHECK(world.blockState(8, 78, 8) == air());
-    CHECK(world.blockState(21, 64, 8) == stateOf("dirt"));
-    CHECK(world.blockState(22, 64, 8) == air());
-    CHECK(world.blockState(8, 64, -5) == stateOf("dirt"));
-    CHECK(world.blockState(8, 64, -6) == air());
-    CHECK(world.blockState(-1, 64, -1) == stateOf("dirt"));
-    CHECK(world.blockState(16, 64, 16) == stateOf("dirt"));
+    // Each lands where its own moving square already stood, which is what `finalTick` does.
+    for (std::int32_t along = 1; along <= kPushReach; ++along) {
+        CHECK(world.blockState(8 + along, 64, 8) == stateOf("dirt"));
+    }
+    CHECK(registry::blockStateDefinitions::blockOf(*world.blockState(8, 64, 13))->path() == "moving_piston");
 }
 
 TEST_CASE("a sticky piston brings one block back with it and a plain one does not") {
@@ -797,6 +795,41 @@ TEST_CASE("the blocks mid-slide land furthest along first") {
     CHECK(changes[1].stateId == stateOf("stone"));
     CHECK(world.blockState(11, 64, 8) == stateOf("dirt"));
     CHECK(world.blockState(10, 64, 8) == stateOf("stone"));
+}
+
+TEST_CASE("a string a piston crushes fires the line it was part of") {
+    // parity: `PistonBaseBlock.moveBlocks` runs `affectNeighborsAfterRemoval` on every square it
+    // clears, and passes `movedByPiston` **false**, so a crushed string hands its line the state it
+    // had, powered, exactly as a cut one does.
+    Loaded loaded;
+    WorldState& world = loaded.state;
+    const auto wire = [](const std::string& powered) {
+        const std::optional<std::int32_t> id = registry::blockStateDefinitions::stateIdOf(
+            basalt::wire::common::Identifier::vanilla("tripwire"),
+            {{"attached", "false"}, {"disarmed", "false"}, {"powered", powered}}, std::nullopt);
+        REQUIRE(id.has_value());
+        return *id;
+    };
+    const auto hook = [](const std::string& facing) {
+        const std::optional<std::int32_t> id = registry::blockStateDefinitions::stateIdOf(
+            basalt::wire::common::Identifier::vanilla("tripwire_hook"),
+            {{"facing", facing}, {"attached", "false"}, {"powered", "false"}}, std::nullopt);
+        REQUIRE(id.has_value());
+        return *id;
+    };
+    REQUIRE(world.setBlockState(8, 64, 8, piston("east", "false")));
+    REQUIRE(world.setBlockState(8, 65, 8, registry::blocks::named("redstone_block")->stateId));
+    // The line runs north to south so the piston pushing east crushes only the middle of it.
+    REQUIRE(world.setBlockState(9, 64, 6, hook("south")));
+    REQUIRE(world.setBlockState(9, 64, 7, wire("false")));
+    REQUIRE(world.setBlockState(9, 64, 8, wire("false")));
+    REQUIRE(world.setBlockState(9, 64, 9, hook("north")));
+
+    pistons::trigger(loaded.context(), 8, 64, 8);
+    static_cast<void>(fireEvents(loaded));
+
+    CHECK(propertyOf(*world.blockState(9, 64, 6), "powered") == "true");
+    CHECK(propertyOf(*world.blockState(9, 64, 9), "powered") == "true");
 }
 
 TEST_CASE("a block mid-slide carries the state it is about to become") {

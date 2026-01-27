@@ -4,11 +4,13 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/Pistons.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
+#include <basalt/server/runtime/world/Tripwires.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <deque>
 #include <map>
 #include <set>
 
@@ -414,7 +416,7 @@ void slide(const Context& context, const Push& push, BlockFace moving, BlockFace
 /// parity: `PistonBaseBlock.moveBlocks` walks what it breaks **backwards**, drops it and only then
 /// puts air there. Doing it before the slide matters: the arm lands on that square next, and reading
 /// what it was afterwards would read the arm.
-void destroyPushed(const Context& context, const Push& push) {
+void destroyPushed(const Context& context, const Push& push, std::vector<BlockChange>& changes) {
     for (auto position = push.destroyed.rbegin(); position != push.destroyed.rend(); ++position) {
         const std::optional<std::int32_t> broken =
             context.world.blockState((*position)[0], (*position)[1], (*position)[2]);
@@ -430,12 +432,22 @@ void destroyPushed(const Context& context, const Push& push) {
         vibrations::emit(context.world, "block_destroy", static_cast<double>((*position)[0]) + 0.5,
                          static_cast<double>((*position)[1]) + 0.5, static_cast<double>((*position)[2]) + 0.5,
                          context.gameTime);
+        // parity: `moveBlocks` runs `affectNeighborsAfterRemoval` on every square it clears, and with
+        // `movedByPiston` **false**, so a crushed string fires its line exactly as a cut one does.
+        if (tripwires::isWire(*broken)) {
+            if (const std::optional<std::int32_t> live =
+                    registry::blockStateDefinitions::stateIdOf(tripwires::wireBlock(), {{"powered", "true"}}, *broken);
+                live.has_value()) {
+                tripwires::updateSource(context.world, (*position)[0], (*position)[1], (*position)[2], *live,
+                                        context.gameTime, changes);
+            }
+        }
     }
 }
 
 void beginMove(const Context& context, const Push& push, BlockFace direction, bool sticky, std::int32_t pistonX,
-               std::int32_t pistonY, std::int32_t pistonZ, const std::string& path) {
-    destroyPushed(context, push);
+               std::int32_t pistonY, std::int32_t pistonZ, const std::string& path, std::vector<BlockChange>& changes) {
+    destroyPushed(context, push, changes);
     slide(context, push, direction, direction, true);
     const std::optional<std::int32_t> movingArm = registry::blockStateDefinitions::stateIdOf(
         wire::common::Identifier::vanilla("moving_piston"),
@@ -524,39 +536,42 @@ struct Carried {
     float progress = 0.0F;
 };
 
-/// The blocks mid-slide: every `moving_piston` around the piston, furthest along first so nothing
-/// lands on a block that has not moved yet.
+/// The blocks mid-slide: this piston's own `moving_piston` squares, furthest along first so nothing
+/// lands on a block that has not moved yet. Found by walking out from the piston, not by sweeping
+/// the chunks around it: what one piston moves is face-connected, and sweeping also picked up a
+/// second piston's slide four squares away, landing its blocks a tick early.
 [[nodiscard]] std::vector<Carried> carriedBlocks(const Context& context, std::int32_t pistonX, std::int32_t pistonY,
                                                  std::int32_t pistonZ, BlockFace direction) {
-    // A push reaches twelve blocks plus its branches, so the chunk the piston is in and the eight
-    // around it hold every block that is on the move.
     std::vector<Carried> carried;
-    for (std::int32_t offsetZ = -1; offsetZ <= 1; ++offsetZ) {
-        for (std::int32_t offsetX = -1; offsetX <= 1; ++offsetX) {
-            const server::world::Chunk* chunk =
-                context.world.chunkIfLoaded((pistonX >> 4) + offsetX, (pistonZ >> 4) + offsetZ);
-            if (chunk == nullptr) {
+    std::set<Position> seen;
+    std::deque<Position> pending;
+    pending.push_back(Position{pistonX, pistonY, pistonZ});
+    seen.insert(Position{pistonX, pistonY, pistonZ});
+    while (!pending.empty()) {
+        const Position at = pending.front();
+        pending.pop_front();
+        const server::world::Chunk* chunk = context.world.chunkIfLoaded(at[0] >> 4, at[2] >> 4);
+        const server::world::ChunkBlockEntity* entity =
+            chunk == nullptr ? nullptr : chunk->blockEntityAt(at[0] & 15, at[1], at[2] & 15);
+        const bool moving = entity != nullptr && entity->type() == block();
+        const std::optional<std::int32_t> carriedStateId =
+            moving ? carriedState(entity->data()) : std::optional<std::int32_t>{};
+        if (moving && carriedStateId.has_value()) {
+            carried.push_back(Carried{.at = at,
+                                      .stateId = *carriedStateId,
+                                      .extending = entity->data().getBoolean("extending"),
+                                      .progress = entity->data().getFloat("progress")});
+        } else if (at != Position{pistonX, pistonY, pistonZ}) {
+            continue;
+        }
+        for (const BlockFace face : kAllFaces) {
+            const Position next = step(at, face);
+            if (std::abs(next[0] - pistonX) > kPushLimit + 1 || std::abs(next[1] - pistonY) > kPushLimit + 1 ||
+                std::abs(next[2] - pistonZ) > kPushLimit + 1) {
                 continue;
             }
-            for (const server::world::ChunkBlockEntity& entity : chunk->blockEntities()) {
-                if (entity.type() != block()) {
-                    continue;
-                }
-                const std::optional<std::int32_t> carriedStateId = carriedState(entity.data());
-                if (!carriedStateId.has_value()) {
-                    continue;
-                }
-                const std::int32_t state = *carriedStateId;
-                const std::int32_t x = (chunk->chunkX() << 4) + entity.localX();
-                const std::int32_t z = (chunk->chunkZ() << 4) + entity.localZ();
-                if (std::abs(x - pistonX) > kPushLimit + 1 || std::abs(entity.y() - pistonY) > kPushLimit + 1 ||
-                    std::abs(z - pistonZ) > kPushLimit + 1) {
-                    continue;
-                }
-                carried.push_back(Carried{.at = Position{x, entity.y(), z},
-                                          .stateId = state,
-                                          .extending = entity.data().getBoolean("extending"),
-                                          .progress = entity.data().getFloat("progress")});
+            if (seen.insert(next).second) {
+                pending.push_back(next);
             }
         }
     }
@@ -789,7 +804,7 @@ void runEvent(const Context& context, std::int32_t x, std::int32_t y, std::int32
         if (!push.has_value()) {
             return;
         }
-        beginMove(context, *push, *direction, path == "sticky_piston", x, y, z, path);
+        beginMove(context, *push, *direction, path == "sticky_piston", x, y, z, path, effects);
     } else {
         beginRetract(context, x, y, z, *stateId, *direction, path == "sticky_piston", path, b0 == kContractSliding);
     }

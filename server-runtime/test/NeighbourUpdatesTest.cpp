@@ -112,11 +112,34 @@ TEST_CASE("a torch comes down with what held it up") {
 
     loaded.put(8, 64, 8, air());
     Report report;
-    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, report.effects, report.onBroken(), report.onReshaped());
+    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, std::nullopt, report.effects, report.onBroken(),
+                                  report.onReshaped());
 
     REQUIRE(report.broken.size() == 1);
     CHECK(report.broken[0] == std::array<std::int32_t, 4>{torch, 8, 65, 8});
     CHECK(loaded.state.blockState(8, 65, 8) == air());
+}
+
+TEST_CASE("a cut string fires the line it was part of") {
+    // parity: `TripWireBlock.affectNeighborsAfterRemoval`, which the cascade runs for the block that
+    // has gone. `updateSource` was written and right, and until this nobody called it on a removal:
+    // measured in `cabletrampa`, where cutting the middle string left both hooks loose here and made
+    // the jar's line fire.
+    Loaded loaded;
+    const std::int32_t wire = stateOf("tripwire", {{"attached", "false"}, {"disarmed", "false"}, {"powered", "false"}});
+    loaded.put(4, 64, 8, stateOf("tripwire_hook", {{"facing", "east"}, {"attached", "false"}, {"powered", "false"}}));
+    loaded.put(5, 64, 8, wire);
+    loaded.put(6, 64, 8, wire);
+    loaded.put(7, 64, 8, stateOf("tripwire_hook", {{"facing", "west"}, {"attached", "false"}, {"powered", "false"}}));
+
+    loaded.put(5, 64, 8, air());
+    std::vector<BlockChange> effects;
+    neighbourUpdates::afterChange(loaded.context(), 5, 64, 8, wire, effects, {});
+
+    CHECK(propertyAt(loaded.state, 4, 64, 8, "attached") == "true");
+    CHECK(propertyAt(loaded.state, 4, 64, 8, "powered") == "true");
+    CHECK(propertyAt(loaded.state, 7, 64, 8, "attached") == "true");
+    CHECK(propertyAt(loaded.state, 7, 64, 8, "powered") == "true");
 }
 
 TEST_CASE("a cascade with no callbacks at all still breaks what it must") {
@@ -126,7 +149,7 @@ TEST_CASE("a cascade with no callbacks at all still breaks what it must") {
 
     loaded.put(8, 64, 8, air());
     std::vector<BlockChange> effects;
-    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, effects, {});
+    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, std::nullopt, effects, {});
 
     CHECK(loaded.state.blockState(8, 65, 8) == air());
 }
@@ -140,7 +163,7 @@ TEST_CASE("the vertical bounds are the last word on what can break") {
         neighbourUpdates::Context context = loaded.context();
         context.maxY = 65;
         Report report;
-        neighbourUpdates::afterChange(context, 8, 64, 8, report.effects, report.onBroken());
+        neighbourUpdates::afterChange(context, 8, 64, 8, std::nullopt, report.effects, report.onBroken());
         CHECK(report.broken.size() == 1);
     }
 
@@ -150,7 +173,7 @@ TEST_CASE("the vertical bounds are the last word on what can break") {
         neighbourUpdates::Context context = loaded.context();
         context.maxY = 64;
         Report report;
-        neighbourUpdates::afterChange(context, 8, 64, 8, report.effects, report.onBroken());
+        neighbourUpdates::afterChange(context, 8, 64, 8, std::nullopt, report.effects, report.onBroken());
         CHECK(report.broken.empty());
         CHECK(loaded.state.blockState(8, 65, 8) == torch);
     }
@@ -161,7 +184,7 @@ TEST_CASE("the vertical bounds are the last word on what can break") {
         neighbourUpdates::Context context = loaded.context();
         context.minY = 65;
         Report report;
-        neighbourUpdates::afterChange(context, 8, 64, 8, report.effects, report.onBroken());
+        neighbourUpdates::afterChange(context, 8, 64, 8, std::nullopt, report.effects, report.onBroken());
         CHECK(report.broken.size() == 1);
     }
 
@@ -171,7 +194,7 @@ TEST_CASE("the vertical bounds are the last word on what can break") {
         neighbourUpdates::Context context = loaded.context();
         context.minY = 66;
         Report report;
-        neighbourUpdates::afterChange(context, 8, 64, 8, report.effects, report.onBroken());
+        neighbourUpdates::afterChange(context, 8, 64, 8, std::nullopt, report.effects, report.onBroken());
         CHECK(report.broken.empty());
         CHECK(loaded.state.blockState(8, 65, 8) == torch);
     }
@@ -191,7 +214,7 @@ TEST_CASE("the cascade gives up after a thousand and twenty four neighbours") {
     neighbourUpdates::Context context = loaded.context();
     context.minY = 64;
     Report report;
-    neighbourUpdates::afterChange(context, 8, 64, 8, report.effects, report.onBroken());
+    neighbourUpdates::afterChange(context, 8, 64, 8, std::nullopt, report.effects, report.onBroken());
 
     // The budget is spent six at a time, so a hundred and seventy one positions come off the queue
     // and each of them takes the cactus above it with it.
@@ -241,7 +264,7 @@ TEST_CASE("reshaping the block that was written is the caller's choice") {
         loaded.put(8, 64, 9, stateOf("stone"));
         loaded.put(8, 64, 8, fence);
         Report report;
-        neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, report.effects, report.onBroken(),
+        neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, std::nullopt, report.effects, report.onBroken(),
                                       report.onReshaped(), true);
         CHECK(propertyAt(loaded.state, 8, 64, 8, "south") == "true");
         CHECK_FALSE(report.reshaped.empty());
@@ -252,7 +275,7 @@ TEST_CASE("reshaping the block that was written is the caller's choice") {
         loaded.put(8, 64, 9, stateOf("stone"));
         loaded.put(8, 64, 8, fence);
         Report report;
-        neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, report.effects, report.onBroken(),
+        neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, std::nullopt, report.effects, report.onBroken(),
                                       report.onReshaped(), false);
         CHECK(propertyAt(loaded.state, 8, 64, 8, "south") == "false");
     }
@@ -363,7 +386,7 @@ TEST_CASE("a dispenser is asked about the change and about every face of it") {
     };
 
     std::vector<BlockChange> effects;
-    neighbourUpdates::afterChange(context, 8, 64, 8, effects, {});
+    neighbourUpdates::afterChange(context, 8, 64, 8, std::nullopt, effects, {});
 
     REQUIRE(asked.size() == 7);
     CHECK(asked[0] == std::array<std::int32_t, 3>{8, 63, 8});
@@ -386,7 +409,8 @@ TEST_CASE("what a dispenser answers is reported like any other change") {
     };
 
     Report report;
-    neighbourUpdates::afterChange(context, 8, 64, 8, report.effects, report.onBroken(), report.onReshaped());
+    neighbourUpdates::afterChange(context, 8, 64, 8, std::nullopt, report.effects, report.onBroken(),
+                                  report.onReshaped());
 
     REQUIRE(report.reshaped.size() == 1);
     CHECK(report.reshaped[0] == std::array<std::int32_t, 4>{77, 8, 64, 8});
@@ -399,7 +423,7 @@ TEST_CASE("a block that can fall books its two ticks, and so does an egg its hat
     loaded.put(8, 65, 8, stateOf("sand"));
 
     std::vector<BlockChange> effects;
-    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, effects, {});
+    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, std::nullopt, effects, {});
 
     CHECK(loaded.state.hasScheduledBlockTick(8, 65, 8, fallingBlocks::entityType()));
     CHECK(loaded.state.hasScheduledBlockTick(8, 64, 8, scheduledBlocks::snifferEggTickType()));
@@ -410,7 +434,7 @@ TEST_CASE("frogspawn books its own long wait") {
     loaded.put(8, 64, 8, stateOf("frogspawn"));
 
     std::vector<BlockChange> effects;
-    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, effects, {});
+    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, std::nullopt, effects, {});
 
     CHECK(loaded.state.hasScheduledBlockTick(8, 64, 8, scheduledBlocks::frogspawnTickType()));
 }
@@ -422,7 +446,8 @@ TEST_CASE("a sponge drinks what is around it the moment it lands") {
     loaded.put(8, 64, 9, stateOf("water"));
 
     Report report;
-    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, report.effects, report.onBroken(), report.onReshaped());
+    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, std::nullopt, report.effects, report.onBroken(),
+                                  report.onReshaped());
 
     CHECK(pathAt(loaded.state, 8, 64, 8) == "wet_sponge");
     CHECK(loaded.state.blockState(8, 65, 8) == air());
@@ -436,14 +461,14 @@ TEST_CASE("a wet sponge dries out where water boils") {
 
     SUBCASE("in a world that keeps its water") {
         std::vector<BlockChange> effects;
-        neighbourUpdates::afterChange(context, 8, 64, 8, effects, {});
+        neighbourUpdates::afterChange(context, 8, 64, 8, std::nullopt, effects, {});
         CHECK(pathAt(loaded.state, 8, 64, 8) == "wet_sponge");
     }
 
     SUBCASE("in one that does not") {
         context.evaporates = true;
         std::vector<BlockChange> effects;
-        neighbourUpdates::afterChange(context, 8, 64, 8, effects, {});
+        neighbourUpdates::afterChange(context, 8, 64, 8, std::nullopt, effects, {});
         CHECK(pathAt(loaded.state, 8, 64, 8) == "sponge");
     }
 }
@@ -454,7 +479,8 @@ TEST_CASE("a lamp lights when the change powers it") {
     loaded.put(8, 64, 8, stateOf("redstone_block"));
 
     Report report;
-    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, report.effects, report.onBroken(), report.onReshaped());
+    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, std::nullopt, report.effects, report.onBroken(),
+                                  report.onReshaped());
 
     CHECK(propertyAt(loaded.state, 8, 65, 8, "lit") == "true");
 }
@@ -491,7 +517,7 @@ TEST_CASE("everything the block held up comes down, whichever side it was on") {
 
     loaded.put(8, 64, 8, air());
     Report report;
-    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, report.effects, report.onBroken());
+    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, std::nullopt, report.effects, report.onBroken());
 
     // Pinned in order, not merely counted: a neighbour reached the long way round still comes down,
     // so only the order says the six faces are the six faces. parity:
@@ -512,7 +538,8 @@ TEST_CASE("a block that only changed shape carries the walk on to the next one")
     }
 
     Report report;
-    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, report.effects, report.onBroken(), report.onReshaped());
+    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, std::nullopt, report.effects, report.onBroken(),
+                                  report.onReshaped());
 
     // The last fence of the row is three steps from the change and only reachable through the two
     // that merely reshaped on the way.
@@ -572,7 +599,8 @@ TEST_CASE("a column of bubbles carries the walk on as much as a block that moved
     loaded.put(7, 65, 8, stateOf("torch"));
 
     Report report;
-    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, report.effects, report.onBroken(), report.onReshaped());
+    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, std::nullopt, report.effects, report.onBroken(),
+                                  report.onReshaped());
 
     CHECK(pathAt(loaded.state, 8, 65, 8) == "bubble_column");
     CHECK(pathAt(loaded.state, 8, 68, 8) == "bubble_column");
@@ -587,7 +615,7 @@ TEST_CASE("a lone neighbour east of the change is reached, and nothing beyond it
 
     loaded.put(8, 64, 8, air());
     Report report;
-    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, report.effects, report.onBroken());
+    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, std::nullopt, report.effects, report.onBroken());
 
     // The torch two blocks out is unsupported too, and stays up: the walk only ever steps one.
     REQUIRE(report.broken.size() == 1);

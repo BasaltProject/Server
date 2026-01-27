@@ -103,6 +103,31 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
 
 } // namespace
 
+bool loosenedBy(std::int32_t stateId, std::optional<registry::BlockFace> towards) {
+    if (!towards.has_value()) {
+        return true;
+    }
+    const std::string path = pathOf(stateId);
+    // parity: the wall-hung family, whose `updateShape` is one line apiece and all the same:
+    // `directionToNeighbour.getOpposite() == state.getValue(FACING)`. The block hangs on the square
+    // behind its face, and nothing else that happens around it can take it down.
+    static constexpr std::array<std::string_view, 6> kWallHungSuffixes{"tripwire_hook",     "wall_torch",  "wall_sign",
+                                                                       "wall_hanging_sign", "wall_banner", "wall_fan"};
+    const bool wallHung = path == "ladder" || std::ranges::any_of(kWallHungSuffixes, [&path](std::string_view suffix) {
+                              return path.ends_with(suffix);
+                          });
+    if (!wallHung) {
+        return true;
+    }
+    const std::string facing = valueOf(stateId, "facing");
+    static constexpr std::array<std::pair<std::string_view, BlockFace>, 4> kHorizontal{{{"north", BlockFace::North},
+                                                                                        {"south", BlockFace::South},
+                                                                                        {"west", BlockFace::West},
+                                                                                        {"east", BlockFace::East}}};
+    const auto named = std::ranges::find_if(kHorizontal, [&facing](const auto& one) { return one.first == facing; });
+    return named != kHorizontal.end() && *towards == registry::opposite(named->second);
+}
+
 bool isSupported(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::optional<std::int32_t> stateId,
                  const ScaffoldingHasFallen& scaffoldingHasFallen, bool hasSkylight) {
     const std::int32_t state = stateId.value_or(stateAt(world, x, y, z));

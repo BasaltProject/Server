@@ -43,8 +43,12 @@ public:
                            Options options);
 
     /// The neighbour update any block written by the world itself owes the blocks around it.
+    ///
+    /// `removed` is what stood there before, for the half of the cascade that belongs to the block
+    /// that has gone. Nothing means the caller does not know, which is not the same as nothing having
+    /// been removed, so it has no default.
     void notifyAround(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
-                      std::int32_t y, std::int32_t z);
+                      std::int32_t y, std::int32_t z, std::optional<std::int32_t> removed);
 
     /// One block, its new state, and whatever it asked the clients to hear or see while they are at
     /// it: a note, a bell, a door swinging, a dispenser clicking at nothing.

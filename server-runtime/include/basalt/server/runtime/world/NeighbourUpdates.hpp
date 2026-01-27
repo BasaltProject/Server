@@ -96,22 +96,18 @@ struct Context {
 };
 
 /// Breaks whatever `x`, `y`, `z` stopped holding up, and whatever that in turn stopped holding.
-/// `onBroken` sees each block as it goes; `effects` collects what the blocks that reacted asked to
-/// be heard.
 ///
-/// parity: `BlockState.updateNeighbourShapes` reshapes the neighbours, never the block, so
-/// `reshapeSelf` is false for a command that writes half a door and true for a hand-placed block.
+/// parity: `updateNeighbourShapes` reshapes the neighbours, never the block, so `reshapeSelf` is
+/// false for a command that writes half a door. `removed` is the state before the write, with no
+/// default on purpose: a caller that does not know has to say so.
 void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
-                 std::vector<BlockChange>& effects, const OnBroken& onBroken, const OnReshaped& onReshaped = {},
-                 bool reshapeSelf = true);
+                 std::optional<std::int32_t> removed, std::vector<BlockChange>& effects, const OnBroken& onBroken,
+                 const OnReshaped& onReshaped = {}, bool reshapeSelf = true);
 
 /// Puts back to zero the signal a target or a sculk sensor arrived carrying with no turn booked to
-/// spend it, reporting the new state through `reshaped`.
-///
-/// parity: `SculkSensorBlock.onPlace` and `TargetBlock.onPlace`, which are the same four lines. It
-/// is separate because `onPlace` runs **after** `BlockInput.overwriteWithDefinedProperties`, so a
-/// command that names `power=15` still loses to it: a caller that replays what the command named has
-/// to ask for this again afterwards. Doing it twice costs nothing, since the second call sees a zero.
+/// spend it. parity: `SculkSensorBlock.onPlace` and `TargetBlock.onPlace`. Separate because
+/// `onPlace` runs after `overwriteWithDefinedProperties`, so a command naming `power=15` still loses
+/// to it and has to ask again. Doing it twice costs nothing: the second call sees a zero.
 void settleArrivedSignal(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                          const OnReshaped& reshaped = {});
 

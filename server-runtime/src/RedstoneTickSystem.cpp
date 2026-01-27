@@ -127,7 +127,8 @@ void RedstoneTickSystem::tickFluids(world::LoadedWorld& world, const sched::Regi
             // parity: `Level.setBlock` from the fluid tick updates the neighbours like any other
             // block change. Without it, water that washed a snow layer away left the grass under it
             // wearing its white top for ever, since nothing ever asked it to look again.
-            broadcaster_->notifyAround(world, watchers, pos.x, pos.y, pos.z);
+            broadcaster_->notifyAround(world, watchers, pos.x, pos.y, pos.z,
+                                       change.washedAway == 0 ? std::nullopt : std::optional{change.washedAway});
         }
     }
 }
@@ -463,7 +464,7 @@ void RedstoneTickSystem::tickRandomBlocks(world::LoadedWorld& world, const sched
         broadcaster_->announceRedstone(world, watchers, change);
         // parity: `setBlock` again: what a random tick changed reshapes what is around it, which is
         // how the grass under a snow layer that melted stops wearing snow.
-        broadcaster_->notifyAround(world, watchers, change.x, change.y, change.z);
+        broadcaster_->notifyAround(world, watchers, change.x, change.y, change.z, std::nullopt);
     }
 }
 
@@ -495,7 +496,7 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
         },
         .songStopped =
             [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z) {
-                broadcaster_->notifyAround(world, watchersOf(world), x, y, z);
+                broadcaster_->notifyAround(world, watchersOf(world), x, y, z, std::nullopt);
             }};
     const std::vector<world::BlockChange> changes =
         world::blockEntityTicks::tick(world.state(), world.name(), world.clock(), world.weather(), chunks, hooks,

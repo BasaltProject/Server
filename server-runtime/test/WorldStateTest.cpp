@@ -460,6 +460,25 @@ TEST_CASE("a write that skips the block entity side effects spills nothing") {
     CHECK(world.takeSpilledContents().empty());
 }
 
+TEST_CASE("a shulker box takes what it held with it") {
+    // parity: `ShulkerBoxBlockEntity.preRemoveSideEffects` is empty, which is the whole point of the
+    // block: the contents ride in the item. Every other container in the game runs the base one.
+    WorldState world = emptyWorld();
+    world.getOrGenerateChunk(0, 0);
+    REQUIRE(world.setBlockState(8, 64, 8, stateOf("shulker_box")));
+    Chunk* chunk = world.chunkIfLoaded(0, 0);
+    REQUIRE(chunk != nullptr);
+    basalt::wire::nbt::NbtCompound data;
+    blockInventory::Slots slots(27);
+    slots[0] = basalt::server::world::loot::ItemStack{.item = Identifier::vanilla("stone"), .count = 5};
+    blockInventory::write(data, slots);
+    chunk->setBlockEntity(basalt::server::world::ChunkBlockEntity{8, 64, 8, Identifier::vanilla("shulker_box"), data});
+
+    REQUIRE(world.setBlockState(8, 64, 8, registry::blocks::air().stateId));
+
+    CHECK(world.takeSpilledContents().empty());
+}
+
 TEST_CASE("a block with no container behind it spills nothing") {
     WorldState world = emptyWorld();
     world.getOrGenerateChunk(0, 0);

@@ -25,6 +25,7 @@
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/Shulkers.hpp>
+#include <basalt/server/runtime/world/Tripwires.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
@@ -165,7 +166,15 @@ void BlockInteractionHandler::notifyNeighbours(const BlockPos& pos) {
     BlockChangeBroadcaster* blocks = owner_->options().blocks;
     world::LoadedWorld* world = owner_->currentWorld();
     if (blocks != nullptr && world != nullptr) {
-        blocks->notifyAround(*world, owner_->playersInSameWorld(), pos.x, pos.y, pos.z);
+        blocks->notifyAround(*world, owner_->playersInSameWorld(), pos.x, pos.y, pos.z, std::nullopt);
+    }
+}
+
+void BlockInteractionHandler::notifyNeighboursAfterRemoval(const BlockPos& pos, std::int32_t removedStateId) {
+    BlockChangeBroadcaster* blocks = owner_->options().blocks;
+    world::LoadedWorld* world = owner_->currentWorld();
+    if (blocks != nullptr && world != nullptr) {
+        blocks->notifyAround(*world, owner_->playersInSameWorld(), pos.x, pos.y, pos.z, removedStateId);
     }
 }
 
@@ -512,6 +521,23 @@ void BlockInteractionHandler::handlePlayerAction(const play::ServerboundPlayerAc
             carried = world::shulkers::contentsOf(entity->data());
         }
     }
+    // parity: `TripWireBlock.playerWillDestroy`, which writes `disarmed` before the string goes and
+    // raises `GameEvent.SHEAR`. It is what makes shears the way to cut a trap without setting it off:
+    // the line is handed a disarmed string, so it comes loose instead of firing.
+    std::optional<std::int32_t> removed = broken;
+    if (session != nullptr && broken.has_value() && world::tripwires::isWire(*broken)) {
+        const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session->inventory.heldSlot();
+        const std::optional<storage::StoredItemStack> held = session->inventory.at(heldSlot);
+        if (held.has_value() && held->id == Identifier::vanilla("shears").toString()) {
+            if (const std::optional<std::int32_t> disarmed = reg::blockStateDefinitions::stateIdOf(
+                    world::tripwires::wireBlock(), {{"disarmed", "true"}}, *broken);
+                disarmed.has_value()) {
+                static_cast<void>(owner_->world().setBlockState(action.pos.x, action.pos.y, action.pos.z, *disarmed));
+                removed = *disarmed;
+                heardBySculk("shear", action.pos);
+            }
+        }
+    }
     const std::int32_t leaves = meltedIce(broken, action.pos).value_or(reg::blocks::air().stateId);
     const bool changed = owner_->world().setBlockState(action.pos.x, action.pos.y, action.pos.z, leaves);
     ack();
@@ -547,7 +573,11 @@ void BlockInteractionHandler::handlePlayerAction(const play::ServerboundPlayerAc
     }
     stopDigging();
     refreshSnowUnder(action.pos);
-    notifyNeighbours(action.pos);
+    if (removed.has_value()) {
+        notifyNeighboursAfterRemoval(action.pos, *removed);
+    } else {
+        notifyNeighbours(action.pos);
+    }
     // parity: `GameEvent.BLOCK_DESTROY`, which a sculk sensor hears as twelve.
     heardBySculk("block_destroy", action.pos);
     if (world != nullptr) {

@@ -63,12 +63,16 @@ bool BlockEditor::write(std::int32_t x, std::int32_t y, std::int32_t z, std::int
     if (y < bounds_.minY() || y > bounds_.maxY()) {
         return false;
     }
-    if (world_->state().blockState(x, y, z) == stateId) {
+    const std::optional<std::int32_t> before = world_->state().blockState(x, y, z);
+    if (before == stateId) {
         return false;
     }
     if (!world_->state().setBlockState(x, y, z, stateId, sideEffects)) {
         return false;
     }
+    // parity: `Level.updateNeighboursOnBlockSet` runs `affectNeighborsAfterRemoval` on what was here,
+    // so the cascade needs the old state and not only the new one.
+    replaced_.insert_or_assign(std::array<std::int32_t, 3>{x, y, z}, before);
     record(x, y, z, stateId);
     written_.push_back({x, y, z});
     createBlockEntity(x, y, z, stateId);
@@ -138,13 +142,25 @@ void BlockEditor::notifyNeighbours() {
         .gameTime = world_->gameTime()};
     for (const std::array<std::int32_t, 3>& at : positions) {
         const std::optional<std::int32_t> written = world_->state().blockState(at[0], at[1], at[2]);
+        // parity: `onPlace` runs inside the write, and everything `Level.setBlock` does afterwards is
+        // behind `newState == blockState`: if what ended up there is not what was asked for, the
+        // neighbours are never told at all. A target put down with `power=15` zeroes itself as it
+        // lands, so the dust beside it stays the dot it was instead of drawing a line to it.
+        neighbourUpdates::settleArrivedSignal(
+            world_->state(), at[0], at[1], at[2],
+            [this](std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) { record(x, y, z, stateId); });
+        if (world_->state().blockState(at[0], at[1], at[2]) != written) {
+            written_properties_.erase(at);
+            continue;
+        }
         // parity: `BlockInput.place` keeps what the command wrote when the **shape** update leaves
         // air, but a block that nothing holds up is a real removal and stays removed. That is the
         // difference between half a door, which stays, and a dust with nothing under it, which goes.
         bool shapedToAir = false;
         bool unsupported = false;
+        const auto wasHere = replaced_.find(at);
         neighbourUpdates::afterChange(
-            context, at[0], at[1], at[2], effects_,
+            context, at[0], at[1], at[2], wasHere == replaced_.end() ? std::nullopt : wasHere->second, effects_,
             [this, &at, &unsupported](std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) {
                 if (x == at[0] && y == at[1] && z == at[2]) {
                     unsupported = true;
@@ -185,14 +201,10 @@ void BlockEditor::notifyNeighbours() {
                 reg::blockStateDefinitions::stateIdOf(*block, named->second, *shaped);
             kept.has_value() && *kept != *shaped) {
             static_cast<void>(set(at[0], at[1], at[2], *kept));
-            // parity: `onPlace` runs after `overwriteWithDefinedProperties`, so a target or a sensor
-            // whose `power` the command named still lands at zero.
-            neighbourUpdates::settleArrivedSignal(world_->state(), at[0], at[1], at[2],
-                                                  [this](std::int32_t stateId, std::int32_t x, std::int32_t y,
-                                                         std::int32_t z) { record(x, y, z, stateId); });
         }
     }
     written_properties_.clear();
+    replaced_.clear();
     // A reaction can move a block of its own, and those go out with everything else.
     written_.clear();
 }
