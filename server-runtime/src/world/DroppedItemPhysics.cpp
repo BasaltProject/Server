@@ -27,6 +27,10 @@ namespace {
 
 DroppedItem& DroppedItemPhysics::spawnItem(DroppedItem dropped) {
     const WorldWriteLock lock{*mutex_};
+    // It has not moved yet, so where it was and where it is are the same square.
+    dropped.previousX = dropped.x;
+    dropped.previousY = dropped.y;
+    dropped.previousZ = dropped.z;
     droppedItems_.push_back(std::move(dropped));
     return droppedItems_.back();
 }
@@ -88,6 +92,9 @@ std::vector<std::int32_t> DroppedItemPhysics::tickItems(const sched::Region* reg
             ++index;
             continue;
         }
+        item.previousX = item.x;
+        item.previousY = item.y;
+        item.previousZ = item.z;
         ++item.age;
         if (item.pickupDelay > 0) {
             --item.pickupDelay;

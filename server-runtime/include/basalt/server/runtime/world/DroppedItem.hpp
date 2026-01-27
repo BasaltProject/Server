@@ -39,6 +39,16 @@ struct DroppedItem {
     /// there travels this way today, which is enough for a box picked up and put back down.
     wire::nbt::NbtCompound components;
 
+    /// Where it was when this tick began.
+    ///
+    /// parity: vanilla presses a plate from inside `Entity.move`, so the count it takes is of who is
+    /// on the plate **at that instant**: whoever has not taken their turn yet is still where they
+    /// were. Four items landing together therefore read one and not four, until the plate's own turn
+    /// ten ticks later reads all of them. Measured in `placas`. Never saved.
+    double previousX = 0.0;
+    double previousY = 0.0;
+    double previousZ = 0.0;
+
     /// Whether this settled: once true the server stops sending movement for it, as vanilla does.
     bool resting = false;
     /// parity: `ItemEntity.tick`'s `moved`, which is not "is it moving" but "did it change block this

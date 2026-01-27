@@ -111,6 +111,13 @@ private:
     /// Ticks the entities that are not players, items or falling blocks.
     void tickEntities(world::LoadedWorld& world, const sched::Region& region);
 
+    /// parity: `LivingEntity.die` is not a sweep: it runs where the damage happened, so the loot and
+    /// the `ENTITY_DIE` a sculk sensor hears come out on that very tick. Here the kill leaves a flag,
+    /// so this is run wherever a kill can have been made: after the queued commands, which is where
+    /// vanilla's command phase is and the only thing that runs while `/tick freeze` holds, and again
+    /// after the entities have moved, which is where a mob killed by another one dies.
+    void tickDeaths(world::LoadedWorld& world, const sched::Region& region);
+
     /// The bridge between a signal and an orderly stop: the handler only sets a flag, and this is
     /// what notices, once per tick.
     void shutdownIfSignalled();

@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
 #include <basalt/server/runtime/world/Hoppers.hpp>
+#include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
@@ -131,6 +132,9 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
                 }
                 static_cast<void>(region.owner().runPending(onTaskFailure));
             });
+            // Whatever those commands killed dies now, frozen or not: this is where vanilla's own
+            // command phase sits, and `die()` is part of the command and not of the world's turn.
+            tickDeaths(world, region);
             if (!worldRuns) {
                 return;
             }
@@ -183,6 +187,21 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
     shutdownIfSignalled();
 }
 
+void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& region) {
+    for (entity::ServerEntity* dead : world.state().entities()) {
+        if (!dead->killed || !region.ownsPosition(dead->x, dead->z)) {
+            continue;
+        }
+        dead->killed = false;
+        // parity: `Entity.die` drops the entity's own loot table where it stood.
+        mobActions_->dropDeathLoot(world, *dead);
+        // parity: `GameEvent.ENTITY_DIE`, the loudest thing a sculk sensor hears. Measured in
+        // `sensormuerte`: waiting for the next turn to raise it made the sensor wake a tick late,
+        // because a `/kill` runs while the world is frozen and the jar stamps it with that turn.
+        world::vibrations::emit(world.state(), "entity_die", dead->x, dead->y, dead->z, world.gameTime());
+    }
+}
+
 void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& region) {
     std::vector<player::PlayerSession*> watchers;
     for (player::PlayerSession* player : playerRegistry_.snapshot()) {
@@ -233,18 +252,6 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
              entity::entityNbt::decodeGeneratedTree(descriptor, allocateEntityId, protocolTypeOf)) {
             static_cast<void>(world.state().spawnEntity(std::move(generated)));
         }
-    }
-
-    // parity: `Entity.die`, which drops the entity's own loot table where it stood. Whatever was
-    // killed since the last tick is dealt with here, once, before anything else moves.
-    for (entity::ServerEntity* dead : world.state().entities()) {
-        if (!dead->killed) {
-            continue;
-        }
-        dead->killed = false;
-        mobActions_->dropDeathLoot(world, *dead);
-        // parity: `GameEvent.ENTITY_DIE`, the loudest thing a sculk sensor hears.
-        world::vibrations::emit(world.state(), "entity_die", dead->x, dead->y, dead->z, world.gameTime());
     }
 
     // parity: `LivingEntity.tickDeath`, which is the whole of what a dead mob does: count to twenty
@@ -318,6 +325,27 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         // region during its own turn: that is fine, the next tick asks again, and the repartition
         // that could change the answer only happens between ticks.
         if (!region.ownsPosition(entity->x, entity->z)) {
+            continue;
+        }
+        // parity: `LightningBolt.tick` does everything on the turn its life is still two: it powers
+        // the rod under it, lights the ground on normal and hard, and is heard as fourteen. Nothing
+        // of it is saved, so the bench sees the rod and never the bolt. Measured in `pararrayos`,
+        // where a summoned bolt did nothing at all here.
+        if (entity->type() == world::lightning::bolt()) {
+            entity->removed = true;
+            // parity: `getStrikePosition`, which nudges down by a millionth so a bolt standing on a
+            // whole number hits the block under its feet and not the air it is in.
+            const auto strikeX = static_cast<std::int32_t>(std::floor(entity->x));
+            const auto strikeY = static_cast<std::int32_t>(std::floor(entity->y - 1.0e-6));
+            const auto strikeZ = static_cast<std::int32_t>(std::floor(entity->z));
+            std::vector<world::BlockChange> struck;
+            const bool lightFires = world.difficulty() == "normal" || world.difficulty() == "hard";
+            world::lightning::strike(world.state(), strikeX, strikeY, strikeZ, lightFires, random, struck);
+            world::vibrations::emit(world.state(), "lightning_strike", entity->x, entity->y, entity->z,
+                                    world.gameTime());
+            for (const world::BlockChange& change : struck) {
+                broadcaster_->announceRedstone(world, watchers, change);
+            }
             continue;
         }
         if (entity->type() == entity::primedTnt::type()) {
@@ -403,6 +431,9 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             mobTicks_->tickPassengers(world, *entity, watchers, views, living, random, visited);
         }
     }
+    // What died while the entities were moving dies on this turn and not the next one: an arrow that
+    // lands in a pig kills it here, and vanilla's sensor hears that on the very tick.
+    tickDeaths(world, region);
 }
 
 } // namespace basalt::server::runtime

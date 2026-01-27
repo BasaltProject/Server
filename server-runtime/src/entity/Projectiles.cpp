@@ -24,6 +24,13 @@ constexpr double kDegrees = 180.0 / std::numbers::pi;
                 .sticks = sticks};
 }
 
+/// parity: `AbstractArrow.onHitBlock` scales by a `0.05F`, and the float widened to a double is not
+/// the same number as `0.05`. The arrow ends up a fraction off otherwise.
+constexpr double kStuckBackoff = static_cast<double>(0.05F);
+
+/// parity: `Math.signum`, which is what vanilla backs the arrow off along and not the direction.
+[[nodiscard]] double signum(double value) { return value > 0.0 ? 1.0 : (value < 0.0 ? -1.0 : 0.0); }
+
 /// parity: the two `atan2` calls that turn the movement into a yaw and a pitch.
 void aimAlongMovement(ServerEntity& entity) {
     const double horizontal = std::sqrt((entity.velocityX * entity.velocityX) + (entity.velocityZ * entity.velocityZ));
@@ -129,6 +136,13 @@ std::optional<BlockHit> tick(world::WorldState& world, ServerEntity& entity, con
         entity.y = hit->y;
         entity.z = hit->z;
         if (kind.sticks) {
+            // parity: `AbstractArrow.onHitBlock` backs the arrow off by a twentieth of a block along
+            // each axis it was moving on, **signum and not the normalized direction**, so it ends up
+            // in the square in front of what it hit rather than on its face. Measured in
+            // `flechavibra`, where ours stuck one square further along than the jar's.
+            entity.x -= signum(entity.velocityX) * kStuckBackoff;
+            entity.y -= signum(entity.velocityY) * kStuckBackoff;
+            entity.z -= signum(entity.velocityZ) * kStuckBackoff;
             // parity: `AbstractArrow.setInGround`, which zeroes the movement and leaves it stuck.
             entity.velocityX = 0.0;
             entity.velocityY = 0.0;

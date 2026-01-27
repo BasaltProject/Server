@@ -30,6 +30,10 @@ inline constexpr std::int32_t kRodTicks = 8;
 
 [[nodiscard]] const wire::common::Identifier& rod();
 
+/// The bolt itself, which is an entity: `/summon minecraft:lightning_bolt` makes one and a storm
+/// makes one, and both do the same thing on their first turn.
+[[nodiscard]] const wire::common::Identifier& bolt();
+
 /// Where a strike aimed at this column actually lands: a rod nearby, or the top of the column.
 [[nodiscard]] std::optional<std::array<std::int32_t, 3>> targetFor(WorldState& world, std::int32_t x, std::int32_t z);
 
