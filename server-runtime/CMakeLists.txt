@@ -217,6 +217,7 @@ basalt_module(server-runtime-core
         src/world/BlockInteractions.cpp
         src/world/ProjectileHits.cpp
         src/world/Furnaces.cpp
+        src/world/ArrowButtons.cpp
         src/world/Hoppers.cpp
         src/world/EndPortals.cpp
         src/world/EnchantmentAttributes.cpp
@@ -1619,6 +1620,12 @@ target_compile_definitions(server-runtime-loaded-world-test
 basalt_test(server-runtime-local-mob-caps-test
     SOURCES
         test/LocalMobCapsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-arrow-buttons-test
+    SOURCES
+        test/ArrowButtonsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

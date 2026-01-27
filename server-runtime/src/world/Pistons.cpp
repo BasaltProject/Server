@@ -410,8 +410,26 @@ void slide(const Context& context, const Push& push, BlockFace moving, BlockFace
 
 /// The push going out: the blocks slide, the arm turns into the head it is about to be, and the body
 /// takes `extended` from the moment the slide starts.
+/// parity: `PistonBaseBlock.moveBlocks` walks what it breaks **backwards**, drops it and only then
+/// puts air there. Doing it before the slide matters: the arm lands on that square next, and reading
+/// what it was afterwards would read the arm.
+void destroyPushed(const Context& context, const Push& push) {
+    for (auto position = push.destroyed.rbegin(); position != push.destroyed.rend(); ++position) {
+        const std::optional<std::int32_t> broken =
+            context.world.blockState((*position)[0], (*position)[1], (*position)[2]);
+        if (!broken.has_value()) {
+            continue;
+        }
+        if (context.onDestroyed) {
+            context.onDestroyed(*broken, (*position)[0], (*position)[1], (*position)[2]);
+        }
+        static_cast<void>(context.world.setBlockState((*position)[0], (*position)[1], (*position)[2], air()));
+    }
+}
+
 void beginMove(const Context& context, const Push& push, BlockFace direction, bool sticky, std::int32_t pistonX,
                std::int32_t pistonY, std::int32_t pistonZ, const std::string& path) {
+    destroyPushed(context, push);
     slide(context, push, direction, direction, true);
     const std::optional<std::int32_t> movingArm = registry::blockStateDefinitions::stateIdOf(
         wire::common::Identifier::vanilla("moving_piston"),
@@ -657,38 +675,6 @@ std::optional<Push> resolve(const Context& context, std::int32_t pistonX, std::i
         }
     }
     return Push{.moved = resolver.toPush, .destroyed = resolver.destroyed};
-}
-
-std::vector<BlockChange> apply(const Context& context, const Push& push, registry::BlockFace pushing) {
-    std::vector<BlockChange> changes;
-    for (const Position& position : push.destroyed) {
-        const std::optional<std::int32_t> broken = context.world.blockState(position[0], position[1], position[2]);
-        if (!context.world.setBlockState(position[0], position[1], position[2], air())) {
-            continue;
-        }
-        // parity: `Block.dropResources` before the square goes to air, so what it was is still there
-        // to be read.
-        if (context.onDestroyed && broken.has_value()) {
-            context.onDestroyed(*broken, position[0], position[1], position[2]);
-        }
-        changes.push_back(BlockChange{.x = position[0], .y = position[1], .z = position[2], .stateId = air()});
-    }
-    for (auto position = push.moved.rbegin(); position != push.moved.rend(); ++position) {
-        const std::optional<std::int32_t> stateId =
-            context.world.blockState((*position)[0], (*position)[1], (*position)[2]);
-        if (!stateId.has_value()) {
-            continue;
-        }
-        const Position to = step(*position, pushing);
-        if (context.world.setBlockState(to[0], to[1], to[2], *stateId)) {
-            changes.push_back(BlockChange{.x = to[0], .y = to[1], .z = to[2], .stateId = *stateId});
-        }
-        if (context.world.setBlockState((*position)[0], (*position)[1], (*position)[2], air())) {
-            changes.push_back(
-                BlockChange{.x = (*position)[0], .y = (*position)[1], .z = (*position)[2], .stateId = air()});
-        }
-    }
-    return changes;
 }
 
 void trigger(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z) {

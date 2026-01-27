@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/ProjectileHits.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
 
@@ -72,12 +73,29 @@ CombatSystem::CombatSystem(BlockChangeBroadcaster& broadcaster, ExplosionSystem&
                            Options options)
     : broadcaster_(broadcaster), explosions_(explosions), hooks_(std::move(hooks)), options_(std::move(options)) {}
 
+/// parity: `Level.gameEvent`, which is what a sculk sensor is listening to. The caller tells the
+/// watchers about whatever the sensor did with it.
+void CombatSystem::emitVibration(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                                 std::string_view event, double x, double y, double z) {
+    std::vector<world::BlockChange> heard;
+    world::vibrations::emit(world.state(), event, x, y, z, heard);
+    for (const world::BlockChange& change : heard) {
+        broadcaster_.announceRedstone(world, watchers, change);
+    }
+}
+
 void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                   const std::vector<ServerEntity*>& living, ServerEntity& entity,
                                   const entity::projectiles::Kind& kind) {
     const double fromX = entity.x;
     const double fromY = entity.y;
     const double fromZ = entity.z;
+    // parity: `Projectile.tick` announces the shot on the first turn, before anything else, and a
+    // sculk sensor hears it at frequency three whether anybody fired it or not.
+    if (!entity.announced) {
+        entity.announced = true;
+        emitVibration(world, watchers, "projectile_shoot", entity.x, entity.y, entity.z);
+    }
     const std::optional<entity::BlockHit> hit = entity::projectiles::tick(world.state(), entity, kind);
     const std::string_view path = kind.type.path();
 
@@ -135,7 +153,11 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     if (!hit.has_value()) {
         return;
     }
-    const std::optional<world::BlockChange> change = world::projectileHits::onHit(world.state(), *hit, kind.sticks);
+    // parity: `Projectile.onHitBlock` sends `PROJECTILE_LAND` where it landed.
+    emitVibration(world, watchers, "projectile_land", hit->x, hit->y, hit->z);
+    // parity: `Entity.isOnFire`, which is what `TntBlock.onProjectileHit` asks the arrow.
+    const std::optional<world::BlockChange> change =
+        world::projectileHits::onHit(world.state(), *hit, kind.sticks, entity.fireTicks > 0);
     if (change.has_value()) {
         broadcaster_.announceRedstone(world, watchers, *change);
     }
@@ -368,7 +390,7 @@ void CombatSystem::announceEntityHit(const std::vector<PlayerSession*>& watchers
         return;
     }
     entity.killed = true;
-    entity.removed = true;
+    entity.dying = true;
 }
 
 } // namespace basalt::server::runtime

@@ -1,3 +1,4 @@
+#include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/CommandTarget.hpp>
@@ -164,7 +165,8 @@ void DamageCommand::build(const CommandNodeBuilder& root) const {
             what->health -= static_cast<double>(*amount);
             if (what->health <= 0.0) {
                 what->killed = true;
-                what->removed = true;
+                // parity: only a `LivingEntity` has a `tickDeath` to play out.
+                (reg::entityAttributes::isLiving(what->type()) ? what->dying : what->removed) = true;
             }
         }
         // parity: an item entity takes damage from fire and explosions, neither of which this

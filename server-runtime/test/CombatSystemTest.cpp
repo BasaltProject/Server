@@ -187,13 +187,15 @@ TEST_CASE("a splash potion reaches less far than four blocks and no further") {
     CHECK(bottle.removed);
 }
 
-TEST_CASE("a killing hit tells everyone watching and takes the entity out of the world") {
+TEST_CASE("a killing hit tells everyone watching and starts the death the entity plays out") {
     CombatFixture fixture{scratch("combat-death")};
     ServerEntity& cow = spawnAt(fixture.base, 40, "cow", 8.0, 64.0, 10.0);
 
     fixture.combat.announceEntityHit(fixture.base.watchers(), cow, Identifier::vanilla("arrow"), 1, true);
     CHECK(cow.killed);
-    CHECK(cow.removed);
+    // parity: `LivingEntity.tickDeath` keeps the body for twenty ticks before it goes.
+    CHECK(cow.dying);
+    CHECK_FALSE(cow.removed);
     CHECK(fixture.base.sentCount(play::EntityEventPacket::kId) == 1);
     CHECK(fixture.base.sentCount(play::DamageEventPacket::kId) == 1);
 }

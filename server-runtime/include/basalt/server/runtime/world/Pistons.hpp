@@ -77,10 +77,6 @@ struct Context {
 [[nodiscard]] std::optional<Push> resolve(const Context& context, std::int32_t pistonX, std::int32_t pistonY,
                                           std::int32_t pistonZ, registry::BlockFace facing, bool extending);
 
-/// Carries the push out: every block moves one along, back to front so nothing overwrites the one
-/// behind it, and what the push destroyed goes.
-[[nodiscard]] std::vector<BlockChange> apply(const Context& context, const Push& push, registry::BlockFace pushing);
-
 /// parity: `PistonBaseBlock.checkIfExtend`: a piston extends when it is powered from anywhere but its
 /// own face, and pulls back when that power goes.
 ///

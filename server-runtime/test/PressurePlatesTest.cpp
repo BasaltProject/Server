@@ -49,7 +49,8 @@ TEST_CASE("standing on a plain plate presses it, and leaving lets it up") {
     world.getOrGenerateChunk(0, 0);
     REQUIRE(world.setBlockState(3, 64, 3, stateOf("stone_pressure_plate")));
 
-    const std::optional<BlockChange> pressed = pressurePlates::update(world, 3, 64, 3, 1);
+    const std::optional<BlockChange> pressed =
+        pressurePlates::update(world, 3, 64, 3, pressurePlates::Trigger::Touched, 1);
     REQUIRE(pressed.has_value());
     CHECK(pressed->x == 3);
     CHECK(pressed->y == 64);
@@ -61,12 +62,34 @@ TEST_CASE("standing on a plain plate presses it, and leaving lets it up") {
     CHECK(world.hasScheduledBlockTick(3, 64, 3, Identifier::vanilla("stone_pressure_plate")));
 
     // Still standing on it: nothing changed, so nothing is reported.
-    CHECK_FALSE(pressurePlates::update(world, 3, 64, 3, 4).has_value());
+    CHECK_FALSE(pressurePlates::update(world, 3, 64, 3, pressurePlates::Trigger::Scheduled, 4).has_value());
 
-    const std::optional<BlockChange> released = pressurePlates::update(world, 3, 64, 3, 0);
+    const std::optional<BlockChange> released =
+        pressurePlates::update(world, 3, 64, 3, pressurePlates::Trigger::Scheduled, 0);
     REQUIRE(released.has_value());
     CHECK(propertyOf(released->stateId, "powered") == "false");
-    CHECK_FALSE(pressurePlates::update(world, 3, 64, 3, 0).has_value());
+    CHECK_FALSE(pressurePlates::update(world, 3, 64, 3, pressurePlates::Trigger::Scheduled, 0).has_value());
+}
+
+TEST_CASE("a plate that is already on stops counting until its turn comes") {
+    WorldState world = oneChunk();
+    world.getOrGenerateChunk(0, 0);
+    REQUIRE(world.setBlockState(4, 64, 4, stateOf("light_weighted_pressure_plate")));
+
+    // parity: `entityInside` only asks while the plate reads zero. Four items landing on the same
+    // tick are ticked one at a time, so the first one in presses it and the plate stops looking:
+    // measured in `placas`, where the jar reads one for ten ticks and four after that.
+    const std::optional<BlockChange> first =
+        pressurePlates::update(world, 4, 64, 4, pressurePlates::Trigger::Touched, 1);
+    REQUIRE(first.has_value());
+    CHECK(propertyOf(first->stateId, "power") == "1");
+    CHECK_FALSE(pressurePlates::update(world, 4, 64, 4, pressurePlates::Trigger::Touched, 4).has_value());
+
+    // Its own turn is the one that counts them all.
+    const std::optional<BlockChange> later =
+        pressurePlates::update(world, 4, 64, 4, pressurePlates::Trigger::Scheduled, 4);
+    REQUIRE(later.has_value());
+    CHECK(propertyOf(later->stateId, "power") == "4");
 }
 
 TEST_CASE("a weighted plate counts what is on it against its own limit") {
@@ -75,30 +98,34 @@ TEST_CASE("a weighted plate counts what is on it against its own limit") {
     REQUIRE(world.setBlockState(1, 64, 1, stateOf("light_weighted_pressure_plate")));
 
     // parity: rounded up, so one item already reads one rather than nothing.
-    const std::optional<BlockChange> one = pressurePlates::update(world, 1, 64, 1, 1);
+    const std::optional<BlockChange> one = pressurePlates::update(world, 1, 64, 1, pressurePlates::Trigger::Touched, 1);
     REQUIRE(one.has_value());
     CHECK(propertyOf(one->stateId, "power") == "1");
 
-    const std::optional<BlockChange> eight = pressurePlates::update(world, 1, 64, 1, 8);
+    const std::optional<BlockChange> eight =
+        pressurePlates::update(world, 1, 64, 1, pressurePlates::Trigger::Scheduled, 8);
     REQUIRE(eight.has_value());
     CHECK(propertyOf(eight->stateId, "power") == "8");
 
     // Its limit is fifteen, and a hundred items on it read as fifteen rather than as a hundred,
     // which is not a state a plate has.
-    const std::optional<BlockChange> full = pressurePlates::update(world, 1, 64, 1, 100);
+    const std::optional<BlockChange> full =
+        pressurePlates::update(world, 1, 64, 1, pressurePlates::Trigger::Scheduled, 100);
     REQUIRE(full.has_value());
     CHECK(propertyOf(full->stateId, "power") == "15");
-    CHECK_FALSE(pressurePlates::update(world, 1, 64, 1, 15).has_value());
+    CHECK_FALSE(pressurePlates::update(world, 1, 64, 1, pressurePlates::Trigger::Scheduled, 15).has_value());
 
     // The heavy one spreads a hundred and fifty over the same fifteen levels.
     REQUIRE(world.setBlockState(2, 64, 1, stateOf("heavy_weighted_pressure_plate")));
-    const std::optional<BlockChange> heavyOne = pressurePlates::update(world, 2, 64, 1, 1);
+    const std::optional<BlockChange> heavyOne =
+        pressurePlates::update(world, 2, 64, 1, pressurePlates::Trigger::Touched, 1);
     REQUIRE(heavyOne.has_value());
     CHECK(propertyOf(heavyOne->stateId, "power") == "1");
     // Ten of a hundred and fifty is exactly one level, so it is still showing one and there is
     // nothing to report: the rounding up only adds a level once something is left over.
-    CHECK_FALSE(pressurePlates::update(world, 2, 64, 1, 10).has_value());
-    const std::optional<BlockChange> heavyEleven = pressurePlates::update(world, 2, 64, 1, 11);
+    CHECK_FALSE(pressurePlates::update(world, 2, 64, 1, pressurePlates::Trigger::Scheduled, 10).has_value());
+    const std::optional<BlockChange> heavyEleven =
+        pressurePlates::update(world, 2, 64, 1, pressurePlates::Trigger::Scheduled, 11);
     REQUIRE(heavyEleven.has_value());
     CHECK(propertyOf(heavyEleven->stateId, "power") == "2");
 }
@@ -107,7 +134,7 @@ TEST_CASE("a weighted plate books a shorter turn than a plain one") {
     WorldState world = oneChunk();
     world.getOrGenerateChunk(0, 0);
     REQUIRE(world.setBlockState(5, 64, 5, stateOf("light_weighted_pressure_plate")));
-    static_cast<void>(pressurePlates::update(world, 5, 64, 5, 1));
+    static_cast<void>(pressurePlates::update(world, 5, 64, 5, pressurePlates::Trigger::Touched, 1));
 
     // Ten ticks, not twenty: it comes due on the tenth call and not before.
     for (std::int32_t at = 0; at < 9; ++at) {
@@ -120,12 +147,12 @@ TEST_CASE("a weighted plate books a shorter turn than a plain one") {
 TEST_CASE("what is not a plate, and what is not there") {
     WorldState world = oneChunk();
     // No chunk at all.
-    CHECK_FALSE(pressurePlates::update(world, 0, 64, 0, 1).has_value());
+    CHECK_FALSE(pressurePlates::update(world, 0, 64, 0, pressurePlates::Trigger::Touched, 1).has_value());
 
     world.getOrGenerateChunk(0, 0);
     // A chunk, but the block is not a plate.
     REQUIRE(world.setBlockState(0, 64, 0, stateOf("stone")));
-    CHECK_FALSE(pressurePlates::update(world, 0, 64, 0, 1).has_value());
+    CHECK_FALSE(pressurePlates::update(world, 0, 64, 0, pressurePlates::Trigger::Touched, 1).has_value());
 }
 
 TEST_CASE("the box that presses a plate is narrower than the block") {

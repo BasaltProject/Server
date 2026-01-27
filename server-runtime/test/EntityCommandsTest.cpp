@@ -239,7 +239,10 @@ TEST_CASE("damage takes health off an entity and kills it at zero") {
 
     CHECK(fixture.dispatcher.execute(fixture.source, "damage @e[type=minecraft:pig] 1000") == 1);
     CHECK(pig->killed);
-    CHECK(pig->removed);
+    // parity: `LivingEntity.tickDeath`, twenty ticks of lying there. The body is not gone yet, and
+    // everything that can feel an entity keeps feeling it until it is.
+    CHECK(pig->dying);
+    CHECK_FALSE(pig->removed);
 }
 
 TEST_CASE("ride mounts and dismounts, and refuses riding yourself") {

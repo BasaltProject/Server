@@ -77,7 +77,7 @@ constexpr std::int32_t kMaxSignal = 15;
 
 bool isPlate(std::int32_t stateId) { return plateAt(stateId) != nullptr; }
 
-std::optional<BlockChange> update(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+std::optional<BlockChange> update(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Trigger from,
                                   std::int32_t standing) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
@@ -89,10 +89,16 @@ std::optional<BlockChange> update(WorldState& world, std::int32_t x, std::int32_
     }
     const std::string_view path = block->path();
     const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*stateId);
-    const std::int32_t wanted = signalFor(path, standing);
     const auto powered = properties.find("powered");
     const std::int32_t showing =
         number(properties, "power", powered != properties.end() && powered->second == "true" ? kMaxSignal : 0);
+    // parity: `entityInside` asks only while the plate reads zero and `tick` only while it reads
+    // more than zero. That is what leaves a weighted plate counting one when four items land on the
+    // same tick: the first one in presses it, and by the time the others move it has stopped asking.
+    if ((from == Trigger::Touched) != (showing == 0)) {
+        return std::nullopt;
+    }
+    const std::int32_t wanted = signalFor(path, standing);
     if (wanted > 0) {
         world.scheduleBlockTick(x, y, z, *block, pressedTicks(path));
     }

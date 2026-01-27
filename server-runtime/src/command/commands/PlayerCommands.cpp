@@ -1,3 +1,4 @@
+#include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/CommandTarget.hpp>
 #include <basalt/server/runtime/command/commands/PlayerCommands.hpp>
@@ -9,6 +10,8 @@
 #include <vector>
 
 namespace basalt::server::runtime::command::commands {
+namespace reg = server::registry;
+
 namespace {
 
 using wire::protocol::play::Gamemode;
@@ -117,10 +120,16 @@ void KillCommand::build(const CommandNodeBuilder& root) const {
                 continue;
             }
             if (entity::ServerEntity* entity = target.entity(); entity != nullptr) {
-                // parity: `/kill` kills, so what it kills drops what it would have dropped. A
-                // summoned entity has no death animation to play, so it simply stops existing.
+                // parity: `/kill` kills, so what it kills drops what it would have dropped. Only a
+                // living thing then lies there for the twenty ticks of `tickDeath`: `Entity.kill`
+                // removes a minecart or a boat on the spot, and `LivingEntity.kill` does not.
+                entity->health = 0.0;
                 entity->killed = true;
-                entity->removed = true;
+                if (reg::entityAttributes::isLiving(entity->type())) {
+                    entity->dying = true;
+                } else {
+                    entity->removed = true;
+                }
                 continue;
             }
             // parity: an item entity is discarded rather than killed: it leaves nothing behind.

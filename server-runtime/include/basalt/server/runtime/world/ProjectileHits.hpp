@@ -19,9 +19,13 @@ namespace projectileHits {
 inline constexpr std::int32_t kArrowHoldTicks = 20;
 inline constexpr std::int32_t kThrownHoldTicks = 8;
 
-/// Answers what changed, if anything. `byArrow` decides how long a target holds its signal, which
-/// is the only thing the kind of projectile changes here.
-[[nodiscard]] std::optional<BlockChange> onHit(WorldState& world, const entity::BlockHit& hit, bool byArrow);
+/// Answers what changed, if anything. `byArrow` decides how long a target holds its signal, and
+/// `burning` is what lets a flaming arrow light the tnt it lands in.
+///
+/// parity: `TntBlock.onProjectileHit`, which asks the projectile whether it is on fire and nothing
+/// else: a plain arrow sticks in the block and leaves it standing.
+[[nodiscard]] std::optional<BlockChange> onHit(WorldState& world, const entity::BlockHit& hit, bool byArrow,
+                                               bool burning = false);
 
 /// parity: `TargetBlock.getRedstoneStrength`: the distance from the middle of the face that was
 /// hit, over the half block that face is wide, is what decides the signal.

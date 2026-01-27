@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/ChunkSimulationView.hpp>
 #include <basalt/server/runtime/RedstoneTickSystem.hpp>
@@ -8,7 +9,9 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
+#include <basalt/server/runtime/world/ArrowButtons.hpp>
 #include <basalt/server/runtime/world/BlockEntityTicks.hpp>
+#include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/FallingBlocks.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
@@ -129,25 +132,100 @@ void RedstoneTickSystem::tickFluids(world::LoadedWorld& world, const sched::Regi
 
 void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sched::Region& region) {
     const std::vector<PlayerSession*> watchers = watchersOf(world);
-    if (watchers.empty()) {
-        return;
-    }
-    for (const PlayerSession* player : watchers) {
-        if (player->gamemode == Gamemode::Spectator || !region.ownsPosition(player->x, player->z)) {
-            continue;
+    // parity: `entityInside` is the entity's doing, not the player's. An item lying on a wooden
+    // plate presses it with nobody around, so this cannot start by asking whether anybody is here.
+    const auto touch = [this, &world, &region, &watchers](double atX, double atY, double atZ) {
+        if (!region.ownsPosition(atX, atZ)) {
+            return;
         }
-        const auto x = static_cast<std::int32_t>(std::floor(player->x));
-        const auto z = static_cast<std::int32_t>(std::floor(player->z));
-        const std::int32_t y = world::pressurePlates::blockUnder(player->y);
+        const auto x = static_cast<std::int32_t>(std::floor(atX));
+        const auto z = static_cast<std::int32_t>(std::floor(atZ));
+        const std::int32_t y = world::pressurePlates::blockUnder(atY);
         const std::optional<std::int32_t> stateId = world.state().blockState(x, y, z);
         if (!stateId.has_value() || !world::pressurePlates::isPlate(*stateId) ||
-            !world::pressurePlates::isStandingOn(x, y, z, player->x, player->y, player->z)) {
+            !world::pressurePlates::isStandingOn(x, y, z, atX, atY, atZ)) {
+            return;
+        }
+        if (const std::optional<world::BlockChange> change = world::pressurePlates::update(
+                world.state(), x, y, z, world::pressurePlates::Trigger::Touched, standingOn(world, x, y, z, watchers));
+            change.has_value()) {
+            broadcaster_->announceRedstone(world, watchers, *change);
+        }
+    };
+    for (const PlayerSession* player : watchers) {
+        if (player->gamemode != Gamemode::Spectator) {
+            touch(player->x, player->y, player->z);
+        }
+    }
+    for (const world::DroppedItem& item : world.state().items()) {
+        touch(item.x, item.y, item.z);
+    }
+}
+
+void RedstoneTickSystem::tickArrowButtons(world::LoadedWorld& world, const sched::Region& region) {
+    const std::vector<PlayerSession*> watchers = watchersOf(world);
+    const wire::common::Identifier arrowType = wire::common::Identifier::vanilla("arrow");
+    const double half = server::registry::entityTypeShapes::widthOf(arrowType) / 2.0;
+    const double height = server::registry::entityTypeShapes::heightOf(arrowType);
+    for (const entity::ServerEntity* arrow : world.state().entities()) {
+        if (arrow == nullptr || arrow->removed || arrow->type() != arrowType ||
+            !region.ownsPosition(arrow->x, arrow->z)) {
             continue;
         }
-        const std::optional<world::BlockChange> change =
-            world::pressurePlates::update(world.state(), x, y, z, standingOn(world, x, y, z, watchers));
-        if (change.has_value()) {
-            broadcaster_->announceRedstone(world, watchers, *change);
+        // parity: `entityInside` runs for every square the entity's box touches, and an arrow's box
+        // straddles two of them more often than not.
+        for (std::int32_t x = wire::common::mth::floor(arrow->x - half); x <= wire::common::mth::floor(arrow->x + half);
+             ++x) {
+            for (std::int32_t y = wire::common::mth::floor(arrow->y); y <= wire::common::mth::floor(arrow->y + height);
+                 ++y) {
+                for (std::int32_t z = wire::common::mth::floor(arrow->z - half);
+                     z <= wire::common::mth::floor(arrow->z + half); ++z) {
+                    pressArrowButton(world, watchers, x, y, z, arrow->x, arrow->y, arrow->z, half, height);
+                }
+            }
+        }
+    }
+}
+
+void RedstoneTickSystem::pressArrowButton(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                                          std::int32_t x, std::int32_t y, std::int32_t z, double arrowX, double arrowY,
+                                          double arrowZ, double half, double height) {
+    const std::optional<std::int32_t> stateId = world.state().blockState(x, y, z);
+    if (!stateId.has_value()) {
+        return;
+    }
+    const wire::common::Identifier* block = server::registry::blockStateDefinitions::blockOf(*stateId);
+    if (block == nullptr || !world::arrowButtons::acceptsArrows(block->path())) {
+        return;
+    }
+    // parity: `entityInside` gives up on a button that is already down; its own turn is what looks
+    // again.
+    if (!world::arrowButtons::reaches(x, y, z, *stateId, arrowX, arrowY, arrowZ, half, height)) {
+        return;
+    }
+    const std::optional<world::blockInteractions::BlockToggle> toggled =
+        world::blockInteractions::toggle(world.state(), x, y, z);
+    if (!toggled.has_value()) {
+        return;
+    }
+    // parity: `ButtonBlock.checkPressed` books the release, and books it again every turn an arrow
+    // is still there.
+    if (const std::optional<std::int32_t> pressed = world::blockInteractions::pressedTicks(*stateId);
+        pressed.has_value()) {
+        world.state().scheduleBlockTick(x, y, z, wire::common::Identifier::vanilla("button"), *pressed);
+    }
+    for (const world::BlockChange& change : toggled->changes) {
+        broadcaster_->announceRedstone(world, watchers, change);
+        if (const std::optional<std::array<std::int32_t, 3>> wall =
+                world::blockInteractions::attachmentOf(change.stateId, change.x, change.y, change.z);
+            wall.has_value()) {
+            broadcaster_->announceRedstone(
+                world, watchers,
+                world::BlockChange{.x = (*wall)[0],
+                                   .y = (*wall)[1],
+                                   .z = (*wall)[2],
+                                   .stateId =
+                                       world.state().blockState((*wall)[0], (*wall)[1], (*wall)[2]).value_or(0)});
         }
     }
 }

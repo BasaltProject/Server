@@ -350,7 +350,7 @@ void CombatHandler::killEntity(ServerEntity& entity) {
                            SoundSource::Hostile);
     broadcastEntityEvent(entity.entityId(), wire::protocol::play::EntityEventPacket::kLivingDeath);
     entity.killed = true;
-    entity.removed = true;
+    entity.dying = true;
 }
 
 void CombatHandler::broadcastEntityEvent(std::int32_t entityId, std::int32_t event) {
