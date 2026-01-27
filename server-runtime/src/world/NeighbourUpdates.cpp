@@ -18,6 +18,7 @@
 #include <basalt/server/runtime/world/SnowyBlocks.hpp>
 #include <basalt/server/runtime/world/Sponges.hpp>
 #include <basalt/server/runtime/world/Tripwires.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/Walls.hpp>
 
 #include <algorithm>
@@ -319,6 +320,37 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             shapeAround(context, change.x, change.y, change.z, reshaped);
         }
         static_cast<void>(breakIfUnsupported(context, x, y, z, scaffolding, broken));
+    }
+    // parity: `SculkSensorBlock.onPlace` and `TargetBlock.onPlace`, which are the same four lines:
+    // a block that arrives already carrying a signal and with no turn booked to spend it puts that
+    // signal back to zero. A `/setblock` of a target with `power=15` reads fifteen here and nothing
+    // in the jar, because a signal with no clock behind it is a signal that would never go out.
+    if (const std::optional<std::int32_t> arrived = world.blockState(x, y, z); arrived.has_value()) {
+        const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*arrived);
+        const std::string_view path = block == nullptr ? std::string_view{} : block->path();
+        // parity: `PotentSulfurBlock.onPlace` raises `BLOCK_ACTIVATE` for a geyser that arrives
+        // already going, which is the noise of it starting.
+        if (path == "potent_sulfur") {
+            const std::map<std::string, std::string> properties =
+                registry::blockStateDefinitions::propertiesOf(*arrived);
+            const auto state = properties.find("potent_sulfur_state");
+            if (state != properties.end() && (state->second == "erupting" || state->second == "continuous") &&
+                world.hasSculkSensorNear(x, y, z, vibrations::kRange)) {
+                vibrations::emit(world, "block_activate", x + 0.5, y + 0.5, z + 0.5, context.gameTime);
+            }
+        }
+        if (path == "target" || path == "sculk_sensor" || path == "calibrated_sculk_sensor") {
+            const std::map<std::string, std::string> properties =
+                registry::blockStateDefinitions::propertiesOf(*arrived);
+            const auto power = properties.find("power");
+            if (power != properties.end() && power->second != "0" && !world.hasScheduledBlockTick(x, y, z, *block)) {
+                if (const std::optional<std::int32_t> quiet =
+                        registry::blockStateDefinitions::stateIdOf(*block, {{"power", "0"}}, *arrived);
+                    quiet.has_value() && world.setBlockState(x, y, z, *quiet)) {
+                    reshaped(*quiet, x, y, z);
+                }
+            }
+        }
     }
     // parity: `SugarCaneBlock.updateShape` runs on the cane itself as it lands, and that is where a
     // cane with nothing to drink books the turn that breaks it.

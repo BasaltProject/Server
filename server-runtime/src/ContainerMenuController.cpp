@@ -16,6 +16,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 #include <basalt/server/runtime/world/Shulkers.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/protocol/play/BlockEntityPackets.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
 #include <basalt/wire/text/ComponentNbt.hpp>
@@ -202,6 +203,13 @@ void ContainerMenuController::announceOpeners(const BlockPos& pos, const std::st
         sound = "block." + family + ".close";
     } else {
         return;
+    }
+    // parity: `ContainerOpenersCounter` raises `CONTAINER_OPEN` on the first one in and
+    // `CONTAINER_CLOSE` on the last one out, on the same edges as the sound. A sculk sensor beside a
+    // chest hears somebody open it, and here it heard nothing at all.
+    if (world->state().hasSculkSensorNear(pos.x, pos.y, pos.z, world::vibrations::kRange)) {
+        world::vibrations::emit(world->state(), openers == 1 ? "container_open" : "container_close", pos.x + 0.5,
+                                pos.y + 0.5, pos.z + 0.5, world->gameTime());
     }
     const float roll = options_.nextFloat ? options_.nextFloat() : 0.5F;
     for (PlayerSession* player : owner_->playersInSameWorld()) {

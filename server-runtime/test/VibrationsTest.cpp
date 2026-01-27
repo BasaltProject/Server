@@ -467,3 +467,21 @@ TEST_CASE("a chunk that arrives with a sensor in it is known before anybody touc
     // A sensor sixteen squares away is out of the eight the listener reaches.
     CHECK_FALSE(world.hasSculkSensorNear(30.5, 64.5, 8.5, vibrations::kRange));
 }
+
+TEST_CASE("a sensor the terrain wrote counts too, block entity or not") {
+    // The deep dark's sensors are written straight into the section by the generator and carry no
+    // block entity, so reading only the block entity list missed every one of them. The palette says
+    // cheaply which sections can hold one, and only those are walked.
+    WorldState world{{}, [](std::int32_t chunkX, std::int32_t chunkZ) {
+                         Chunk chunk{chunkX, chunkZ};
+                         if (chunkX == 0 && chunkZ == 0) {
+                             chunk.setBlockStateId(8, 64, 8, sleepingSensor());
+                         }
+                         return chunk;
+                     }};
+
+    world.getOrGenerateChunk(0, 0);
+
+    CHECK(world.hasSculkSensorNear(8.5, 64.5, 8.5, vibrations::kRange));
+    CHECK_FALSE(world.hasSculkSensorNear(30.5, 64.5, 8.5, vibrations::kRange));
+}

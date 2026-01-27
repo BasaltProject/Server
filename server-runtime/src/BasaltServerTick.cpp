@@ -210,6 +210,34 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         }
     }
 
+    // parity: `BlockEntity.preRemoveSideEffects` over `Containers.dropItemStack`: what a container
+    // held falls out where its block stood. The block write queues it because it holds the world's
+    // lock; this is where it becomes items, on the same thread that owns them.
+    for (const world::WorldState::Spilled& spilled : world.state().takeSpilledContents()) {
+        random::RandomSource random = random::RandomSource::legacy(scratchSeed());
+        for (const server::world::loot::ItemStack& stack : spilled.stacks) {
+            // parity: the scatter is the item's own width taken off each side, and the drop is
+            // **not** centred on the square: `dropItemStack` adds half a width on x and z and none
+            // on y.
+            constexpr double kItemWidth = 0.25;
+            constexpr double kRange = 1.0 - kItemWidth;
+            const double x = spilled.x + (random.nextDouble() * kRange) + (kItemWidth / 2.0);
+            const double y = spilled.y + (random.nextDouble() * kRange);
+            const double z = spilled.z + (random.nextDouble() * kRange) + (kItemWidth / 2.0);
+            constexpr double kSpread = 0.11485000171139836;
+            static_cast<void>(world.state().spawnItem(world::DroppedItem{.entityId = playerRegistry_.allocateEntityId(),
+                                                                         .uuid = wire::common::Uuid::random(),
+                                                                         .item = stack.item,
+                                                                         .count = stack.count,
+                                                                         .x = x,
+                                                                         .y = y,
+                                                                         .z = z,
+                                                                         .velocityX = random.triangle(0.0, kSpread),
+                                                                         .velocityY = random.triangle(0.2, kSpread),
+                                                                         .velocityZ = random.triangle(0.0, kSpread)}));
+        }
+    }
+
     // parity: `TntBlock.explode`, which spawns the entity as the block goes. It is done here because
     // the block half runs wherever a neighbour changed, which may be a client's thread.
     const registry::EntityTypeEntry* tntType = registry::entityTypes::of(entity::primedTnt::type());
