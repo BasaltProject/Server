@@ -29,21 +29,27 @@ inline constexpr std::string_view kFrequencyKey = "last_vibration_frequency";
 /// parity: `SculkSensorBlockEntity`'s own listener range.
 inline constexpr std::int32_t kRange = 8;
 
+/// parity: `VibrationSystem.Data.NBT_TAG_KEY`, where the sensor keeps the noise it is still waiting
+/// for. A vibration is not heard where it happens: it travels one block per tick.
+inline constexpr std::string_view kListenerKey = "listener";
+
 /// The signal this event is worth, or zero for one nothing listens to.
 [[nodiscard]] std::int32_t frequencyOf(std::string_view event);
 
-/// Tells every sensor in range that something happened. Answers what changed, which the caller sends
-/// out and settles the redstone around.
+/// Tells every sensor in range that something happened. Nothing lights up here: the sensor only
+/// writes the noise down and books itself a turn, because a vibration takes a tick per block to
+/// arrive.
 ///
-/// parity: `VibrationSystem.Listener.handleGameEvent`: the sensor takes the vibration only while it
-/// is inactive, and the signal it gives is the event's own frequency.
-void emit(WorldState& world, std::string_view event, double x, double y, double z, std::vector<BlockChange>& changes);
+/// parity: `VibrationSystem.Listener.handleGameEvent`, which adds a candidate and returns. The
+/// sensor takes it only while it is inactive and has nothing already on the way.
+void emit(WorldState& world, std::string_view event, double x, double y, double z, std::int64_t gameTime);
 
-/// The scheduled half: an active sensor goes to cooldown and gives up its signal, and one already
-/// cooling down goes quiet.
+/// The scheduled half, and the sensor's whole clock: an active sensor goes to cooldown, one cooling
+/// down goes quiet, and an inactive one moves whatever vibration is travelling towards it.
 ///
-/// parity: `SculkSensorBlock.tick` over `deactivate`.
-[[nodiscard]] std::optional<BlockChange> tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+/// parity: `SculkSensorBlock.tick` over `deactivate`, plus `VibrationSystem.Ticker.tick`.
+[[nodiscard]] std::optional<BlockChange> tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                              std::int64_t gameTime);
 
 /// How far a vibration reaches, for the callers that filter before they emit.
 [[nodiscard]] bool isInRange(std::int32_t sensorX, std::int32_t sensorY, std::int32_t sensorZ, double x, double y,

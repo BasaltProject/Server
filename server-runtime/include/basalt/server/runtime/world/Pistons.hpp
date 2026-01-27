@@ -55,6 +55,9 @@ struct Context {
     std::int32_t minY = 0;
     std::int32_t maxY = 0;
     random::RandomSource& random;
+    /// The world's own clock, which a game event needs: a vibration is stamped with the turn it was
+    /// heard on. Only the paths that raise one read it, so `trigger` can be called without it.
+    std::int64_t gameTime = 0;
     /// What a block the piston broke leaves on the floor. parity: `PistonBaseBlock.moveBlocks` runs
     /// `Block.dropResources` on everything it destroys, so a torch or a piece of dust in the way is
     /// picked up afterwards rather than gone. Measured in the bench circuit `pistonrompe`.

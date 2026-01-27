@@ -244,11 +244,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         dead->killed = false;
         mobActions_->dropDeathLoot(world, *dead);
         // parity: `GameEvent.ENTITY_DIE`, the loudest thing a sculk sensor hears.
-        std::vector<world::BlockChange> heard;
-        world::vibrations::emit(world.state(), "entity_die", dead->x, dead->y, dead->z, heard);
-        for (const world::BlockChange& change : heard) {
-            broadcaster_->announceRedstone(world, watchers, change);
-        }
+        world::vibrations::emit(world.state(), "entity_die", dead->x, dead->y, dead->z, world.gameTime());
     }
 
     // parity: `LivingEntity.tickDeath`, which is the whole of what a dead mob does: count to twenty
@@ -332,11 +328,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             explosions_->blowUp(world, watchers, entity->x, entity->y + entity::primedTnt::kExplosionOffset, entity->z,
                                 entity::primedTnt::kExplosionPower, "tnt", entity->entityId());
             // parity: `GameEvent.EXPLODE`, which is fifteen: the top of the scale.
-            std::vector<world::BlockChange> heard;
-            world::vibrations::emit(world.state(), "explode", entity->x, entity->y, entity->z, heard);
-            for (const world::BlockChange& change : heard) {
-                broadcaster_->announceRedstone(world, watchers, change);
-            }
+            world::vibrations::emit(world.state(), "explode", entity->x, entity->y, entity->z, world.gameTime());
             continue;
         }
         const entity::projectiles::Kind* projectile = entity::projectiles::kindOf(entity->type());

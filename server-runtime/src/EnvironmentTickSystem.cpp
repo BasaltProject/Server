@@ -343,7 +343,7 @@ void EnvironmentTickSystem::strikeLightning(world::LoadedWorld& world) {
         world::lightning::strike(world.state(), (*target)[0], (*target)[1], (*target)[2], lightFires, random, changes);
         // parity: `GameEvent.LIGHTNING_STRIKE`, which a sculk sensor hears as fourteen.
         world::vibrations::emit(world.state(), "lightning_strike", static_cast<double>((*target)[0]),
-                                static_cast<double>((*target)[1]), static_cast<double>((*target)[2]), changes);
+                                static_cast<double>((*target)[1]), static_cast<double>((*target)[2]), world.gameTime());
         for (const world::BlockChange& change : changes) {
             broadcaster_->announceRedstone(world, watchers, change);
         }

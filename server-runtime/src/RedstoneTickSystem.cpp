@@ -256,7 +256,7 @@ void RedstoneTickSystem::tickFootsteps(world::LoadedWorld& world) {
         if (!world.state().hasSculkSensorNear(player->x, player->y, player->z, world::vibrations::kRange)) {
             continue;
         }
-        world::vibrations::emit(world.state(), "step", player->x, player->y, player->z, changes);
+        world::vibrations::emit(world.state(), "step", player->x, player->y, player->z, world.gameTime());
     }
     for (const world::BlockChange& change : changes) {
         broadcaster_->announceRedstone(world, watchers, change);
