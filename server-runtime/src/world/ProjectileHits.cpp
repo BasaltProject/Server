@@ -1,13 +1,17 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/world/Dripleaves.hpp>
 #include <basalt/server/runtime/world/ProjectileHits.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <map>
 #include <string>
+#include <utility>
 
 namespace basalt::server::runtime::world::projectileHits {
 namespace {
@@ -62,23 +66,80 @@ constexpr double kMaxSignal = 15.0;
     return BlockChange{hit.blockX, hit.blockY, hit.blockZ, air, {}};
 }
 
-/// parity: `BigDripleafBlock.onProjectileHit`, which tips it right over.
-[[nodiscard]] std::optional<BlockChange> tiltDripleaf(WorldState& world, const entity::BlockHit& hit,
-                                                      std::int32_t stateId, const wire::common::Identifier& block) {
-    const std::map<std::string, std::string> properties{{"tilt", "full"}};
-    const std::optional<std::int32_t> turned = registry::blockStateDefinitions::stateIdOf(block, properties, stateId);
-    if (!turned.has_value() || *turned == stateId) {
+/// parity: `AbstractCandleBlock.onProjectileHit` and `CampfireBlock.onProjectileHit`: both want a
+/// projectile that is **alight** and a block that is not lit already. A candle also refuses while it
+/// is waterlogged, and so does a campfire.
+[[nodiscard]] std::optional<BlockChange> light(WorldState& world, const entity::BlockHit& hit, std::int32_t stateId,
+                                               const wire::common::Identifier& block) {
+    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
+    const auto value = [&properties](const std::string& key) {
+        const auto found = properties.find(key);
+        return found == properties.end() ? std::string_view{} : std::string_view{found->second};
+    };
+    if (value("lit") == "true" || value("waterlogged") == "true") {
         return std::nullopt;
     }
-    if (!world.setBlockState(hit.blockX, hit.blockY, hit.blockZ, *turned)) {
+    const std::optional<std::int32_t> turned =
+        registry::blockStateDefinitions::stateIdOf(block, {{"lit", "true"}}, stateId);
+    if (!turned.has_value() || !world.setBlockState(hit.blockX, hit.blockY, hit.blockZ, *turned)) {
         return std::nullopt;
     }
     return BlockChange{hit.blockX, hit.blockY, hit.blockZ, *turned, {}};
 }
 
+/// The face that name stands for, or nothing for a name that is not one.
+[[nodiscard]] std::optional<registry::BlockFace> faceNamed(std::string_view name) {
+    static constexpr std::array<std::pair<std::string_view, registry::BlockFace>, 6> kNames{
+        {{"down", registry::BlockFace::Down},
+         {"up", registry::BlockFace::Up},
+         {"north", registry::BlockFace::North},
+         {"south", registry::BlockFace::South},
+         {"west", registry::BlockFace::West},
+         {"east", registry::BlockFace::East}}};
+    for (const auto& [named, face] : kNames) {
+        if (named == name) {
+            return face;
+        }
+    }
+    return std::nullopt;
+}
+
+/// parity: `isProperHit`'s own `0.8124F`: the top fifth of the bell does not ring it.
+constexpr double kBellTopEdge = static_cast<double>(0.8124F);
+
+/// parity: `BellBlock.isProperHit`. A bell only rings when it is struck on the right side, and which
+/// side that is depends on how it hangs: a floor bell along the axis it faces, a wall bell across it,
+/// a ceiling bell from anywhere. Never from above or below, and never on the top fifth of it.
+[[nodiscard]] bool properBellHit(const std::map<std::string, std::string>& properties, const entity::BlockHit& hit) {
+    if (registry::axisOf(hit.face) == 1) {
+        return false;
+    }
+    if (hit.y - std::floor(hit.y) > kBellTopEdge) {
+        return false;
+    }
+    const auto value = [&properties](const std::string& key) {
+        const auto found = properties.find(key);
+        return found == properties.end() ? std::string_view{} : std::string_view{found->second};
+    };
+    const std::optional<registry::BlockFace> facing = faceNamed(value("facing"));
+    if (!facing.has_value()) {
+        return false;
+    }
+    const std::string_view attachment = value("attachment");
+    if (attachment == "ceiling") {
+        return true;
+    }
+    const bool sameAxis = registry::axisOf(*facing) == registry::axisOf(hit.face);
+    if (attachment == "floor") {
+        return sameAxis;
+    }
+    return (attachment == "single_wall" || attachment == "double_wall") && !sameAxis;
+}
+
 } // namespace
 
-std::optional<BlockChange> onHit(WorldState& world, const entity::BlockHit& hit, bool byArrow, bool burning) {
+std::optional<BlockChange> onHit(WorldState& world, std::int64_t gameTime, const entity::BlockHit& hit, bool byArrow,
+                                 bool burning) {
     const std::optional<std::int32_t> stateId = world.blockState(hit.blockX, hit.blockY, hit.blockZ);
     if (!stateId.has_value()) {
         return std::nullopt;
@@ -100,8 +161,28 @@ std::optional<BlockChange> onHit(WorldState& world, const entity::BlockHit& hit,
     if (path == "chorus_flower" || path == "decorated_pot") {
         return shatter(world, hit);
     }
+    // parity: a lit candle or campfire is a light source and a block state, so a flaming arrow that
+    // sets one going is as visible as one that sets off tnt.
+    if (burning && (path.ends_with("candle") || path.ends_with("candle_cake") || path.ends_with("campfire"))) {
+        return light(world, hit, *stateId, *block);
+    }
+    // parity: `BellBlock.onProjectileHit`, which rings it through the same `onHit` a hand uses and
+    // with the same "was it a proper hit" rule. The block state does not move; what comes out is the
+    // ring itself, which a sculk sensor hears as eleven.
+    if (path == "bell") {
+        const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*stateId);
+        if (!properBellHit(properties, hit)) {
+            return std::nullopt;
+        }
+        if (world.hasSculkSensorNear(hit.blockX, hit.blockY, hit.blockZ, vibrations::kRange)) {
+            vibrations::emit(world, "block_change", hit.blockX + 0.5, hit.blockY + 0.5, hit.blockZ + 0.5, gameTime);
+        }
+        return BlockChange{hit.blockX, hit.blockY, hit.blockZ, *stateId, {}};
+    }
     if (path == "big_dripleaf") {
-        return tiltDripleaf(world, hit, *stateId, *block);
+        // parity: `BigDripleafBlock.onProjectileHit` tips it right over **and books the hundred
+        // ticks it lies flat**, which is what brings it back up.
+        return dripleaves::setTilt(world, hit.blockX, hit.blockY, hit.blockZ, "full", gameTime);
     }
     return std::nullopt;
 }

@@ -373,6 +373,79 @@ TEST_CASE("the source block is the one the position falls in, negative or not") 
     CHECK(bench.changes.empty());
 }
 
+TEST_CASE("a step taken on the sensor gets in while one is already travelling, and waits its turn") {
+    // parity: `SculkSensorBlock.stepOn` goes through `forceScheduleVibration`, which adds the
+    // candidate straight away: no wool check and no "one already on the way" refusal. What it does
+    // **not** do is jump the queue: the selector is only read once the sensor is carrying nothing.
+    Bench bench;
+    bench.world.getOrGenerateChunk(0, 0);
+    REQUIRE(bench.world.setBlockState(8, 64, 8, sleepingSensor()));
+
+    // Something loud six squares away is already travelling towards it.
+    vibrations::emit(bench.world, "explode", 14.5, 64.5, 8.5, bench.now);
+    bench.advance();
+    REQUIRE(bench.changes.empty());
+
+    // A step taken on the sensor itself is taken in even so, and sits in the selector.
+    CHECK(vibrations::stoodOn(bench.world, 8, 64, 8, 8.5, 65.0, 8.5, bench.now));
+
+    bench.advance(5);
+    REQUIRE(bench.changes.size() == 1);
+    CHECK(bench.frequencyAt(8, 64, 8) == 15);
+
+    // parity: the block entity keeps ticking while the sensor is awake, so the step is picked, it
+    // travels, it lands and `onReceiveVibration` throws it away because `canActivate` says no. What
+    // it must not do is wait forty ticks and ring the sensor a second time.
+    bench.advance(20);
+    CHECK(bench.changes.size() == 1);
+    CHECK(bench.frequencyAt(8, 64, 8) == 15);
+}
+
+TEST_CASE("a sensor already awake takes no step from being stood on") {
+    Bench bench;
+    bench.world.getOrGenerateChunk(0, 0);
+    REQUIRE(bench.world.setBlockState(8, 64, 8, sleepingSensor()));
+    vibrations::emit(bench.world, "eat", 8.5, 64.5, 8.5, bench.now);
+    bench.advance();
+    REQUIRE(bench.changes.size() == 1);
+
+    // parity: `canActivate` still gates it, so an awake sensor is not stepped on into ringing again.
+    CHECK_FALSE(vibrations::stoodOn(bench.world, 8, 64, 8, 8.5, 65.0, 8.5, bench.now));
+}
+
+TEST_CASE("an amethyst block beside a sensor carries the reading on to the next one") {
+    // parity: `SculkSensorBlock.tryResonateVibration`, which sends the same frequency out again from
+    // the amethyst's own square. It is how a sculk farm reaches past the eight squares a sensor
+    // hears, and none of it was here.
+    Bench bench;
+    bench.world.getOrGenerateChunk(0, 0);
+    REQUIRE(bench.world.setBlockState(2, 64, 8, sleepingSensor()));
+    REQUIRE(bench.world.setBlockState(3, 64, 8, stateOf("amethyst_block", {})));
+    // Far enough from the first noise that only the amethyst can reach it.
+    REQUIRE(bench.world.setBlockState(9, 64, 8, sleepingSensor()));
+
+    vibrations::emit(bench.world, "eat", 2.5, 64.5, 8.5, bench.now);
+    bench.advance();
+    REQUIRE(bench.changes.size() == 1);
+    CHECK(bench.frequencyAt(2, 64, 8) == 8);
+
+    // The amethyst repeats it as `resonate_8`, six squares from the second sensor.
+    bench.advance(6);
+    CHECK(propertyOf(*bench.world.blockState(9, 64, 8), "sculk_sensor_phase") == "active");
+    CHECK(bench.frequencyAt(9, 64, 8) == 8);
+}
+
+TEST_CASE("a resonance event is worth the number in its name") {
+    // parity: the tail of `VIBRATION_FREQUENCY_FOR_EVENT`, fifteen entries put in by a loop.
+    CHECK(vibrations::frequencyOf("resonate_1") == 1);
+    CHECK(vibrations::frequencyOf("resonate_8") == 8);
+    CHECK(vibrations::frequencyOf("resonate_15") == 15);
+    CHECK(vibrations::frequencyOf("resonate_0") == 0);
+    CHECK(vibrations::frequencyOf("resonate_16") == 0);
+    CHECK(vibrations::frequencyOf("resonate_x") == 0);
+    CHECK(vibrations::frequencyOf("resonate_") == 0);
+}
+
 TEST_CASE("a chunk that arrives with a sensor in it is known before anybody touches it") {
     // The tracker is what a footstep asks before it looks around, so a sensor it does not know about
     // is a sensor that hears nobody walk. Until this, only sensors placed or broken at runtime were

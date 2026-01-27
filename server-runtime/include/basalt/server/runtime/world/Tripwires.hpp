@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 namespace basalt::server::runtime::world {
@@ -24,6 +25,10 @@ inline constexpr std::int32_t kMaxLength = 42;
 [[nodiscard]] const wire::common::Identifier& wireBlock();
 [[nodiscard]] const wire::common::Identifier& hookBlock();
 
+[[nodiscard]] bool isWire(std::int32_t stateId);
+
+[[nodiscard]] bool isHook(std::int32_t stateId);
+
 /// What is standing on a wire, as its own box: the whole block, since a wire is walked into.
 [[nodiscard]] bool isStandingOn(std::int32_t x, std::int32_t y, std::int32_t z, double entityX, double entityY,
                                 double entityZ);
@@ -36,10 +41,23 @@ void press(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bo
 /// parity: `TripWireHookBlock.calculateState`: it looks along the way it faces for the hook pointing
 /// back at it. Attached means it found one with unbroken string in between; powered means one of
 /// those strings has something on it.
-/// `gameTime` is the world's clock: a hook that catches, lets go, clicks on or clicks off raises one
-/// of four game events, and a vibration is stamped with the turn it was heard on.
+/// parity: `TripWireHookBlock`'s own ten ticks: a hook told by a wire that changed looks again that
+/// much later, which is what keeps it attached for a moment after the string is cut.
+inline constexpr std::int32_t kHookRecheckTicks = 10;
+
+/// `gameTime` is the world's clock, which a hook's game events and vibrations are stamped with.
+/// `wireSource` is the square whose state to read from `wireSourceState` instead of the world, `-1`
+/// for none: that is how vanilla tells a hook about a wire that has already gone, handing the
+/// removed string over as still there and powered so the line fires.
 void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t gameTime,
-                   std::vector<BlockChange>& changes);
+                   std::vector<BlockChange>& changes, std::int32_t wireSource = -1,
+                   std::optional<std::int32_t> wireSourceState = std::nullopt);
+
+/// parity: `TripWireBlock.updateSource`, which a wire runs when it is placed, when it goes and when
+/// it is stepped on. It walks **south and west only**, because `calculateHook` writes both ends of
+/// the line, so the hook at the lower end is the only one that has to be found.
+void updateSource(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t wireStateId,
+                  std::int64_t gameTime, std::vector<BlockChange>& changes);
 
 } // namespace tripwires
 

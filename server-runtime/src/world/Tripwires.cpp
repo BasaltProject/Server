@@ -39,12 +39,6 @@ constexpr double kCrossingSlack = 0.0625;
     return found == properties.end() ? std::string{} : found->second;
 }
 
-[[nodiscard]] const wire::common::Identifier* blockAt(const WorldState& world, std::int32_t x, std::int32_t y,
-                                                      std::int32_t z) {
-    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
-    return stateId.has_value() ? registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
-}
-
 /// parity: `Level.gameEvent(source, event, pos)`, from the middle of the square. The index of sensors
 /// is asked first because a tripwire on a busy corridor raises one of these on every crossing.
 void heard(WorldState& world, std::string_view event, std::int32_t x, std::int32_t y, std::int32_t z,
@@ -71,27 +65,6 @@ void write(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, st
     }
 }
 
-/// Walks the line from a wire to the hook at either end and recalculates it.
-void recalculateFrom(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, BlockFace face,
-                     std::int64_t gameTime, std::vector<BlockChange>& changes) {
-    for (std::int32_t step = 1; step < kMaxLength; ++step) {
-        const std::int32_t hx = x + (registry::stepX(face) * step);
-        const std::int32_t hz = z + (registry::stepZ(face) * step);
-        const wire::common::Identifier* block = blockAt(world, hx, y, hz);
-        if (block == nullptr) {
-            return;
-        }
-        if (*block == wireBlock()) {
-            continue;
-        }
-        if (*block != hookBlock()) {
-            return;
-        }
-        calculateHook(world, hx, y, hz, gameTime, changes);
-        return;
-    }
-}
-
 } // namespace
 
 const wire::common::Identifier& wireBlock() {
@@ -107,6 +80,16 @@ const wire::common::Identifier& hookBlock() {
 bool isStandingOn(std::int32_t x, std::int32_t y, std::int32_t z, double entityX, double entityY, double entityZ) {
     return entityX >= x && entityX <= x + 1 && entityZ >= z && entityZ <= z + 1 && entityY >= y - kCrossingSlack &&
            entityY <= y + 1;
+}
+
+bool isWire(std::int32_t stateId) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    return block != nullptr && *block == wireBlock();
+}
+
+bool isHook(std::int32_t stateId) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    return block != nullptr && *block == hookBlock();
 }
 
 void press(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool occupied, std::int64_t gameTime,
@@ -129,9 +112,9 @@ void press(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bo
         if (world.setBlockState(x, y, z, *turned)) {
             changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *turned});
         }
-        for (const BlockFace face : kHorizontal) {
-            recalculateFrom(world, x, y, z, face, gameTime, changes);
-        }
+        // parity: `TripWireBlock.checkPressed` ends in `updateSource` with the wire's **new** state,
+        // which is how the hook learns what happened without reading the square again.
+        updateSource(world, x, y, z, *turned, gameTime, changes);
     }
     if (occupied) {
         world.scheduleBlockTick(x, y, z, wireBlock(), kRecheckTicks);
@@ -139,7 +122,8 @@ void press(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bo
 }
 
 void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t gameTime,
-                   std::vector<BlockChange>& changes) {
+                   std::vector<BlockChange>& changes, std::int32_t wireSource,
+                   std::optional<std::int32_t> wireSourceState) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return;
@@ -174,14 +158,23 @@ void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32
             }
             break;
         }
-        if (along == nullptr || *along != wireBlock()) {
+        // parity: the square the caller named is read from the state it handed over, whatever the
+        // world says is there now. That is how a string already gone still counts on this pass.
+        const bool isSource = step == wireSource;
+        if (!isSource && (along == nullptr || *along != wireBlock())) {
             attached = false;
             continue;
         }
-        const Properties wire = registry::blockStateDefinitions::propertiesOf(*alongId);
+        const std::int32_t readId = isSource ? wireSourceState.value_or(*alongId) : *alongId;
+        const Properties wire = registry::blockStateDefinitions::propertiesOf(readId);
         // parity: a wire cut with shears is disarmed, and a disarmed wire never powers.
-        if (valueOf(wire, "disarmed") != "true" && valueOf(wire, "powered") == "true") {
+        const bool armed = valueOf(wire, "disarmed") != "true";
+        if (armed && valueOf(wire, "powered") == "true") {
             powered = true;
+        }
+        if (isSource) {
+            world.scheduleBlockTick(x, y, z, hookBlock(), kHookRecheckTicks);
+            attached = attached && armed;
         }
     }
     // parity: `attached &= receiverPos > 1`, so two hooks side by side are not a line.
@@ -233,6 +226,37 @@ void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32
             continue;
         }
         write(world, tx, y, tz, *alongId, *along, attached, std::nullopt, changes);
+    }
+}
+
+void updateSource(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t wireStateId,
+                  std::int64_t gameTime, std::vector<BlockChange>& changes) {
+    // parity: `TripWireBlock.updateSource` walks **south and west** and nothing else. It does not
+    // need the other two: `calculateHook` writes both ends of the line, so finding the hook at the
+    // lower end is finding both.
+    for (const BlockFace face : {BlockFace::South, BlockFace::West}) {
+        for (std::int32_t step = 1; step < kMaxLength; ++step) {
+            const std::int32_t tx = x + (registry::stepX(face) * step);
+            const std::int32_t tz = z + (registry::stepZ(face) * step);
+            const std::optional<std::int32_t> alongId = world.blockState(tx, y, tz);
+            if (!alongId.has_value()) {
+                break;
+            }
+            const wire::common::Identifier* along = registry::blockStateDefinitions::blockOf(*alongId);
+            if (along == nullptr) {
+                break;
+            }
+            if (*along == hookBlock()) {
+                const Properties theirs = registry::blockStateDefinitions::propertiesOf(*alongId);
+                if (valueOf(theirs, "facing") == nameOf(registry::opposite(face))) {
+                    calculateHook(world, tx, y, tz, gameTime, changes, step, wireStateId);
+                }
+                break;
+            }
+            if (*along != wireBlock()) {
+                break;
+            }
+        }
     }
 }
 

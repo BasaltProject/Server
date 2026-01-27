@@ -227,6 +227,7 @@ basalt_module(server-runtime-core
         src/world/NaturalSpawnPredicates.cpp
         src/world/BiomeTagLoader.cpp
         src/world/Dispensers.cpp
+        src/world/Dripleaves.cpp
         src/world/DroppedItemNbt.cpp
         src/world/PortalIndex.cpp
         src/world/RealTimelines.cpp
@@ -1716,6 +1717,12 @@ basalt_test(server-runtime-double-chests-test
 basalt_test(server-runtime-dripstone-growth-test
     SOURCES
         test/DripstoneGrowthTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-dripleaves-test
+    SOURCES
+        test/DripleavesTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

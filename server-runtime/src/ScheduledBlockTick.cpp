@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/Dispensers.hpp>
+#include <basalt/server/runtime/world/Dripleaves.hpp>
 #include <basalt/server/runtime/world/FallingBlocks.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
 #include <basalt/server/runtime/world/Geysers.hpp>
@@ -137,6 +138,11 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             }
             world::tripwires::press(world.state(), x, y, z, stillOn, world.gameTime(), scheduled);
         }
+        // parity: `TripWireHookBlock.tick`, the look the hook booked when a wire told it something.
+        // Ten ticks later the string it was handed is gone for real, and the hook lets go.
+        if (here != 0 && world::tripwires::isHook(here)) {
+            world::tripwires::calculateHook(world.state(), x, y, z, world.gameTime(), scheduled);
+        }
         // parity: `LecternBlock.tick`, the two ticks a page turn pulses for.
         if (const std::optional<world::BlockChange> lectern = world::lecterns::endPulse(world.state(), x, y, z);
             lectern.has_value()) {
@@ -163,6 +169,13 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             const std::vector<world::BlockChange> under = world::redstoneReactors::update(
                 world.state(), world.name(), x, y - 1, z, world.gameTime(), sensorRandom);
             scheduled.insert(scheduled.end(), under.begin(), under.end());
+        }
+        // parity: `BigDripleafBlock.tick`, the stage it takes next: ten ticks each on the way down
+        // and a hundred lying flat before it comes back up.
+        if (const std::optional<world::BlockChange> leaf =
+                world::dripleaves::tick(world.state(), world.name(), x, y, z, world.gameTime());
+            leaf.has_value()) {
+            scheduled.push_back(*leaf);
         }
         // parity: `LightningRodBlock`'s own scheduled tick, eight after the strike.
         if (const std::optional<world::BlockChange> rod = world::lightning::releaseRod(world.state(), x, y, z);

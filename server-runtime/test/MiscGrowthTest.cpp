@@ -353,3 +353,24 @@ TEST_CASE("a dried ghast asks to be looked at in five thousand ticks") {
     }
     CHECK(world.dueBlockTicks().size() == 1);
 }
+
+TEST_CASE("walking over redstone ore lights it, and only while it is dark") {
+    // parity: `RedStoneOreBlock.interact`, which is what `stepOn`, `attack` and `useItemOn` all end
+    // in. The random tick that puts the light out again was already modelled; nothing ever put it on,
+    // so an ore lit in a vanilla world went dark here and never came back.
+    WorldState world = emptyWorld();
+    world.getOrGenerateChunk(0, 0);
+    const std::optional<std::int32_t> dark = registry::blockStateDefinitions::stateIdOf(
+        basalt::wire::common::Identifier::vanilla("redstone_ore"), {{"lit", "false"}}, std::nullopt);
+    REQUIRE(dark.has_value());
+    REQUIRE(world.setBlockState(8, 64, 8, *dark));
+
+    const std::optional<BlockChange> lit = miscGrowth::lightRedstoneOre(world, 8, 64, 8);
+    REQUIRE(lit.has_value());
+    CHECK(propertyOf(*world.blockState(8, 64, 8), "lit") == "true");
+
+    // Already lit, so walking over it again says nothing.
+    CHECK_FALSE(miscGrowth::lightRedstoneOre(world, 8, 64, 8).has_value());
+    // And anything that is not an ore is left alone.
+    CHECK_FALSE(miscGrowth::lightRedstoneOre(world, 8, 63, 8).has_value());
+}

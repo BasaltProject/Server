@@ -17,6 +17,7 @@
 #include <basalt/server/runtime/world/ScheduledBlocks.hpp>
 #include <basalt/server/runtime/world/SnowyBlocks.hpp>
 #include <basalt/server/runtime/world/Sponges.hpp>
+#include <basalt/server/runtime/world/Tripwires.hpp>
 #include <basalt/server/runtime/world/Walls.hpp>
 
 #include <algorithm>
@@ -481,6 +482,12 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     pistons::trigger(piston, x, y, z);
     for (const BlockFace face : kFaces) {
         pistons::trigger(piston, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face));
+    }
+    // parity: `TripWireBlock.onPlace`, which tells the hooks at the ends of its line. Without it a
+    // tripwire built by hand or by command hung there unattached until something stepped on it.
+    if (const std::optional<std::int32_t> laid = world.blockState(x, y, z);
+        laid.has_value() && tripwires::isWire(*laid)) {
+        tripwires::updateSource(world, x, y, z, *laid, context.gameTime, effects);
     }
     // parity: `LiquidBlock`'s three hooks, which all end in the same `scheduleTick`: water only
     // notices there is somewhere to go when something around it changes. Measured in `aguapolvo`,
