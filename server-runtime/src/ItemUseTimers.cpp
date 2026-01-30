@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
 #include <basalt/wire/protocol/play/SimplePackets.hpp>
 
@@ -86,7 +87,7 @@ bool ItemUseTimers::startEating(PlayerSession& session, const Identifier& item, 
     }
     eatingSlot_ = slot;
     eatingTicks_ = food->consumeTicks();
-    setUsingItem(true);
+    setUsingItem(true, item);
     return true;
 }
 
@@ -116,6 +117,15 @@ void ItemUseTimers::tickEating(PlayerSession& session) {
     }
     const std::int32_t slot = eatingSlot_;
     const storage::StoredItemStack eaten = *held;
+    // parity: `Consumable.onConsume` raises `DRINK` for the four the jar builds with the drinking
+    // animation and `EAT` for everything else, and it runs before `stopUsingItem`, which is the one
+    // that raises `ITEM_INTERACT_FINISH`.
+    if (const std::optional<Identifier> id = parsedOrNothing(eaten.id); id.has_value()) {
+        static constexpr std::array<std::string_view, 4> kDrunk{"milk_bucket", "potion", "honey_bottle",
+                                                                "ominous_bottle"};
+        const bool drunk = std::ranges::find(kDrunk, id->path()) != kDrunk.end();
+        emitAt(drunk ? "drink" : "eat");
+    }
     stopEating();
     session.food.eat(food->nutrition, food->saturation);
     owner_->applyConsumeEffects(session, food->effects);
@@ -162,7 +172,7 @@ bool ItemUseTimers::startDrawing(PlayerSession& session, const Identifier& item,
     }
     drawingSlot_ = slot;
     drawingTicks_ = 0;
-    setUsingItem(true);
+    setUsingItem(true, item);
     return true;
 }
 
@@ -316,11 +326,38 @@ void ItemUseTimers::startCooldown(const Identifier& item) {
     });
 }
 
-void ItemUseTimers::setUsingItem(bool usingItem) {
+void ItemUseTimers::emitAt(std::string_view event) {
+    PlayerSession* session = owner_->playerSession();
+    world::LoadedWorld* world = owner_->currentWorld();
+    if (session == nullptr || world == nullptr) {
+        return;
+    }
+    world::vibrations::emit(world->state(), event, session->x, session->y, session->z, world->gameTime());
+}
+
+void ItemUseTimers::raiseUseVibration(std::string_view event, const Identifier& item) {
+    // parity: `Item.Properties.spear` is the one builder that turns `interact_vibrations` off; every
+    // other item carries the common component, whose default is on.
+    if (item.path().ends_with("spear")) {
+        return;
+    }
+    emitAt(event);
+}
+
+void ItemUseTimers::setUsingItem(bool usingItem, std::optional<Identifier> item) {
     if (usingItem_ == usingItem) {
         return;
     }
     usingItem_ = usingItem;
+    // parity: `startUsingItem` and `stopUsingItem` each end in `causeUseVibration`, and the second
+    // only when something really was being used, which is what the check above already is.
+    if (usingItem && item.has_value()) {
+        usedItem_ = item;
+        raiseUseVibration("item_interact_start", *item);
+    } else if (!usingItem && usedItem_.has_value()) {
+        raiseUseVibration("item_interact_finish", *usedItem_);
+        usedItem_.reset();
+    }
     PlayerSession* session = owner_->playerSession();
     if (session == nullptr) {
         return;

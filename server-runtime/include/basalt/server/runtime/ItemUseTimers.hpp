@@ -70,7 +70,7 @@ public:
     void startCooldown(const wire::common::Identifier& item);
 
     /// The "this one is using an item" flag, sent to everybody including its owner.
-    void setUsingItem(bool usingItem);
+    void setUsingItem(bool usingItem, std::optional<wire::common::Identifier> item = std::nullopt);
 
     /// parity: `BowItem.getPowerForTime`.
     [[nodiscard]] static float bowPower(std::int32_t ticks);
@@ -79,8 +79,19 @@ private:
     ClientSession* owner_;
     Hooks hooks_;
     Options options_;
+    /// parity: `ItemStack.causeUseVibration`, which raises `ITEM_INTERACT_START` when a use begins and
+    /// `ITEM_INTERACT_FINISH` when it ends, at the user's own position. The item is remembered because
+    /// the end of a use has to know what was being used, and a spear is the one item the jar builds
+    /// with `interact_vibrations` off.
+    void raiseUseVibration(std::string_view event, const wire::common::Identifier& item);
+
+    /// A game event at the player's own position, which is where every one of these is raised.
+    void emitAt(std::string_view event);
+
     /// Which slot is being eaten from, and how many ticks of the mouthful are left.
     bool usingItem_ = false;
+    /// What the using-item bit is set for, so the end of the use can name it.
+    std::optional<wire::common::Identifier> usedItem_;
     std::int32_t eatingSlot_ = -1;
     std::int32_t eatingTicks_ = 0;
     /// What cannot be used again yet, by item path and the tick it frees up on.
