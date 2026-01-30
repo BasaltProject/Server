@@ -175,7 +175,14 @@ std::optional<BlockChange> craft(WorldState& world, std::int32_t x, std::int32_t
     const std::optional<server::world::loot::ItemStack> result =
         hooks.resultFor(server::world::crafting::CraftingInput::of(kGrid, kGrid, slots));
     if (!result.has_value() || result->count <= 0) {
-        return std::nullopt;
+        // parity: `CrafterBlock.dispenseFrom` raises `levelEvent(1050, pos, 0)` when what is in it is
+        // not a recipe, which is the click a crafter makes at nothing. The block does not move, so the
+        // change carries the same state it already had and only the effect is new.
+        return BlockChange{.x = x,
+                           .y = y,
+                           .z = z,
+                           .stateId = *stateId,
+                           .effects = {blockEffect::Effect{.type = blockEffect::Effect::kCrafterFail, .data = 0}}};
     }
     deliver(world, x, y, z, *stateId, *result, hooks);
     for (std::optional<server::world::loot::ItemStack>& slot : slots) {

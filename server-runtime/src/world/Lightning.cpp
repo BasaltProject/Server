@@ -36,7 +36,20 @@ void powerRod(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
         return;
     }
     if (world.setBlockState(x, y, z, *turned)) {
-        changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *turned});
+        // parity: `LightningRodBlock.onLightningStrike` ends in `levelEvent(3002, pos, axis)`, the
+        // sparks running along the rod, and the axis is the ordinal of its facing's own axis.
+        const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*turned);
+        const auto facing = properties.find("facing");
+        const std::int32_t axis = facing == properties.end()                                 ? 1
+                                  : (facing->second == "up" || facing->second == "down")     ? 1
+                                  : (facing->second == "north" || facing->second == "south") ? 2
+                                                                                             : 0;
+        changes.push_back(BlockChange{
+            .x = x,
+            .y = y,
+            .z = z,
+            .stateId = *turned,
+            .effects = {blockEffect::Effect{.type = blockEffect::Effect::kLightningRodSparks, .data = axis}}});
     }
     world.scheduleBlockTick(x, y, z, *block, kRodTicks);
 }

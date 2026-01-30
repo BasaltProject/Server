@@ -218,7 +218,15 @@ TEST_CASE("a result of nothing at all is no result") {
         return std::optional{ItemStack{.item = item("oak_planks"), .count = 0}};
     };
 
-    CHECK_FALSE(crafters::craft(world, 8, 64, 8, nothing).has_value());
+    // parity: `dispenseFrom` raises `levelEvent(1050)` and nothing else: the block stays as it was and
+    // the click is the whole of what the crafter does.
+    const std::optional<BlockChange> clicked = crafters::craft(world, 8, 64, 8, nothing);
+    REQUIRE(clicked.has_value());
+    CHECK(clicked->stateId == crafter("true", "false"));
+    REQUIRE(clicked->effects.size() == 1);
+    const auto* click = std::get_if<blockEffect::Effect>(&clicked->effects.front());
+    REQUIRE(click != nullptr);
+    CHECK(click->type == blockEffect::Effect::kCrafterFail);
     CHECK(world.items().empty());
 }
 
@@ -239,7 +247,9 @@ TEST_CASE("a grid that makes nothing crafts nothing") {
     fill(world, 8, 64, 8, blockInventory::Slots(9));
     std::int32_t asked = 0;
 
-    CHECK_FALSE(crafters::craft(world, 8, 64, 8, planks(&asked)).has_value());
+    const std::optional<BlockChange> clicked = crafters::craft(world, 8, 64, 8, planks(&asked));
+    REQUIRE(clicked.has_value());
+    CHECK(std::get_if<blockEffect::Effect>(&clicked->effects.front()) != nullptr);
 
     CHECK(asked == 1);
     CHECK(world.blockState(8, 64, 8) == crafter("true", "false"));

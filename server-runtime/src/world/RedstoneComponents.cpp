@@ -375,7 +375,7 @@ void storeOutput(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
 }
 
 /// parity: `RedstoneTorchBlock.tick`: lit while the block it hangs on is not powered, out while it
-/// is. The burn-out after eight flicks in sixty ticks is not modelled.
+/// is, and burnt out after eight flicks inside sixty ticks.
 [[nodiscard]] std::optional<BlockChange> torchTick(WorldState& world, std::string_view worldName, std::int32_t x,
                                                    std::int32_t y, std::int32_t z, std::int64_t gameTime) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
@@ -391,12 +391,17 @@ void storeOutput(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
         if (!fed) {
             return std::nullopt;
         }
-        const std::optional<BlockChange> moved = turn(world, x, y, z, *stateId, "lit", "false");
+        std::optional<BlockChange> moved = turn(world, x, y, z, *stateId, "lit", "false");
         // parity: `isToggledTooFrequently(add = true)` puts the toggle in and then counts, so the
         // eighth one is the one that burns the torch out and books its long wait.
         world.addTorchToggle(TorchToggle{.x = x, .y = y, .z = z, .when = gameTime});
         if (world.torchToggleCount(x, y, z) >= kMaxTorchToggles) {
             world.scheduleBlockTick(x, y, z, torch(), kTorchRestartDelay);
+            // parity: `level.levelEvent(1502, pos, 0)`, the puff of smoke that says it burnt out.
+            if (moved.has_value()) {
+                moved->effects.push_back(
+                    blockEffect::Effect{.type = blockEffect::Effect::kRedstoneTorchBurnout, .data = 0});
+            }
         }
         return moved;
     }
