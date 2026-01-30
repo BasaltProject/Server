@@ -99,7 +99,7 @@ TEST_CASE("an arrow in the middle of a target turns it up to fifteen for twenty 
     REQUIRE(world.setBlockState(8, 64, 8, targetOf(0)));
 
     const std::optional<BlockChange> change =
-        projectileHits::onHit(world, 1, hitAt(8.5, 65.0, 8.5, registry::BlockFace::Up), true);
+        projectileHits::onHit(world, 1, hitAt(8.5, 65.0, 8.5, registry::BlockFace::Up), true, false, true);
     REQUIRE(change.has_value());
     CHECK(change->x == 8);
     CHECK(change->y == 64);
@@ -116,7 +116,7 @@ TEST_CASE("anything but an arrow only holds the signal for eight ticks") {
     REQUIRE(world.setBlockState(8, 64, 8, targetOf(0)));
 
     const std::optional<BlockChange> change =
-        projectileHits::onHit(world, 1, hitAt(8.0, 65.0, 8.5, registry::BlockFace::Up), false);
+        projectileHits::onHit(world, 1, hitAt(8.0, 65.0, 8.5, registry::BlockFace::Up), false, false, true);
     REQUIRE(change.has_value());
     CHECK(change->stateId == targetOf(1));
     CHECK(ticksUntilDue(world, 40) == 8);
@@ -126,10 +126,12 @@ TEST_CASE("a target already counting down keeps the signal it has") {
     WorldState world = emptyWorld();
     world.getOrGenerateChunk(0, 0);
     REQUIRE(world.setBlockState(8, 64, 8, targetOf(0)));
-    REQUIRE(projectileHits::onHit(world, 1, hitAt(8.5, 65.0, 8.5, registry::BlockFace::Up), true).has_value());
+    REQUIRE(
+        projectileHits::onHit(world, 1, hitAt(8.5, 65.0, 8.5, registry::BlockFace::Up), true, false, true).has_value());
 
     // A second hit on the rim would be one, and is ignored while the first is still held.
-    CHECK_FALSE(projectileHits::onHit(world, 1, hitAt(8.0, 65.0, 8.5, registry::BlockFace::Up), true).has_value());
+    CHECK_FALSE(
+        projectileHits::onHit(world, 1, hitAt(8.0, 65.0, 8.5, registry::BlockFace::Up), true, false, true).has_value());
     CHECK(world.blockState(8, 64, 8) == targetOf(15));
 }
 
@@ -168,13 +170,13 @@ TEST_CASE("a chorus flower and a decorated pot break where they are hit") {
 
     REQUIRE(world.setBlockState(8, 64, 8, stateOf("chorus_flower", {{"age", "3"}})));
     std::optional<BlockChange> change =
-        projectileHits::onHit(world, 1, hitAt(8.5, 64.5, 8.0, registry::BlockFace::North), false);
+        projectileHits::onHit(world, 1, hitAt(8.5, 64.5, 8.0, registry::BlockFace::North), false, false, true);
     REQUIRE(change.has_value());
     CHECK(change->stateId == air);
     CHECK(world.blockState(8, 64, 8) == air);
 
     REQUIRE(world.setBlockState(8, 64, 8, stateOf("decorated_pot", {{"facing", "north"}})));
-    change = projectileHits::onHit(world, 1, hitAt(8.5, 64.5, 8.0, registry::BlockFace::North), true);
+    change = projectileHits::onHit(world, 1, hitAt(8.5, 64.5, 8.0, registry::BlockFace::North), true, false, true);
     REQUIRE(change.has_value());
     CHECK(change->stateId == air);
     CHECK(world.blockState(8, 64, 8) == air);
@@ -188,7 +190,7 @@ TEST_CASE("a big dripleaf tips right over, and only once") {
     REQUIRE(world.setBlockState(8, 64, 8, upright));
 
     const std::optional<BlockChange> change =
-        projectileHits::onHit(world, 1, hitAt(8.5, 65.0, 8.5, registry::BlockFace::Up), false);
+        projectileHits::onHit(world, 1, hitAt(8.5, 65.0, 8.5, registry::BlockFace::Up), false, false, true);
     REQUIRE(change.has_value());
     CHECK(change->stateId != upright);
     CHECK(propertyAt(world, 8, 64, 8, "tilt") == "full");
@@ -196,7 +198,8 @@ TEST_CASE("a big dripleaf tips right over, and only once") {
     CHECK(propertyAt(world, 8, 64, 8, "facing") == "east");
     CHECK(propertyAt(world, 8, 64, 8, "waterlogged") == "true");
 
-    CHECK_FALSE(projectileHits::onHit(world, 1, hitAt(8.5, 65.0, 8.5, registry::BlockFace::Up), false).has_value());
+    CHECK_FALSE(projectileHits::onHit(world, 1, hitAt(8.5, 65.0, 8.5, registry::BlockFace::Up), false, false, true)
+                    .has_value());
 }
 
 TEST_CASE("everything else takes a hit and does nothing") {
@@ -205,12 +208,13 @@ TEST_CASE("everything else takes a hit and does nothing") {
     const std::int32_t stone = registry::blocks::stone().stateId;
     REQUIRE(world.setBlockState(8, 64, 8, stone));
 
-    CHECK_FALSE(projectileHits::onHit(world, 1, hitAt(8.5, 65.0, 8.5, registry::BlockFace::Up), true).has_value());
+    CHECK_FALSE(
+        projectileHits::onHit(world, 1, hitAt(8.5, 65.0, 8.5, registry::BlockFace::Up), true, false, true).has_value());
     CHECK(world.blockState(8, 64, 8) == stone);
 
     // Nothing loaded there, so there is nothing to ask about.
     const BlockHit far{.x = 4000.5, .y = 64.5, .z = 4000.5, .blockX = 4000, .blockY = 64, .blockZ = 4000};
-    CHECK_FALSE(projectileHits::onHit(world, 1, far, true).has_value());
+    CHECK_FALSE(projectileHits::onHit(world, 1, far, true, false, true).has_value());
 }
 
 TEST_CASE("a flaming arrow lights a candle and a campfire, a plain one does not") {
@@ -224,13 +228,13 @@ TEST_CASE("a flaming arrow lights a candle and a campfire, a plain one does not"
         REQUIRE(world.setBlockState(8, 64, 8,
                                     stateOf("candle", {{"candles", "1"}, {"lit", "false"}, {"waterlogged", "false"}})));
 
-        CHECK_FALSE(projectileHits::onHit(world, 1, side, true).has_value());
+        CHECK_FALSE(projectileHits::onHit(world, 1, side, true, false, true).has_value());
         CHECK(propertyAt(world, 8, 64, 8, "lit") == "false");
 
-        REQUIRE(projectileHits::onHit(world, 1, side, true, true).has_value());
+        REQUIRE(projectileHits::onHit(world, 1, side, true, true, true).has_value());
         CHECK(propertyAt(world, 8, 64, 8, "lit") == "true");
         // Already lit, so a second flaming arrow changes nothing.
-        CHECK_FALSE(projectileHits::onHit(world, 1, side, true, true).has_value());
+        CHECK_FALSE(projectileHits::onHit(world, 1, side, true, true, true).has_value());
     }
 
     SUBCASE("a candle under water refuses") {
@@ -239,7 +243,7 @@ TEST_CASE("a flaming arrow lights a candle and a campfire, a plain one does not"
         REQUIRE(world.setBlockState(8, 64, 8,
                                     stateOf("candle", {{"candles", "1"}, {"lit", "false"}, {"waterlogged", "true"}})));
 
-        CHECK_FALSE(projectileHits::onHit(world, 1, side, true, true).has_value());
+        CHECK_FALSE(projectileHits::onHit(world, 1, side, true, true, true).has_value());
         CHECK(propertyAt(world, 8, 64, 8, "lit") == "false");
     }
 
@@ -251,8 +255,8 @@ TEST_CASE("a flaming arrow lights a candle and a campfire, a plain one does not"
             stateOf("campfire",
                     {{"facing", "north"}, {"lit", "false"}, {"signal_fire", "false"}, {"waterlogged", "false"}})));
 
-        CHECK_FALSE(projectileHits::onHit(world, 1, side, true).has_value());
-        REQUIRE(projectileHits::onHit(world, 1, side, true, true).has_value());
+        CHECK_FALSE(projectileHits::onHit(world, 1, side, true, false, true).has_value());
+        REQUIRE(projectileHits::onHit(world, 1, side, true, true, true).has_value());
         CHECK(propertyAt(world, 8, 64, 8, "lit") == "true");
     }
 }
@@ -270,15 +274,18 @@ TEST_CASE("a bell rings only when it is struck on the side it hangs to face") {
         world.getOrGenerateChunk(0, 0);
         REQUIRE(world.setBlockState(8, 64, 8, bellOf("floor")));
 
-        CHECK(projectileHits::onHit(world, 1, hitAt(8.5, 64.5, 8.0, registry::BlockFace::North), true).has_value());
+        CHECK(projectileHits::onHit(world, 1, hitAt(8.5, 64.5, 8.0, registry::BlockFace::North), true, false, true)
+                  .has_value());
         // Across its axis it does not ring.
-        CHECK_FALSE(
-            projectileHits::onHit(world, 1, hitAt(8.0, 64.5, 8.5, registry::BlockFace::West), true).has_value());
+        CHECK_FALSE(projectileHits::onHit(world, 1, hitAt(8.0, 64.5, 8.5, registry::BlockFace::West), true, false, true)
+                        .has_value());
         // From above it never rings.
-        CHECK_FALSE(projectileHits::onHit(world, 1, hitAt(8.5, 65.0, 8.5, registry::BlockFace::Up), true).has_value());
+        CHECK_FALSE(projectileHits::onHit(world, 1, hitAt(8.5, 65.0, 8.5, registry::BlockFace::Up), true, false, true)
+                        .has_value());
         // Nor on the top fifth of it.
         CHECK_FALSE(
-            projectileHits::onHit(world, 1, hitAt(8.5, 64.9, 8.0, registry::BlockFace::North), true).has_value());
+            projectileHits::onHit(world, 1, hitAt(8.5, 64.9, 8.0, registry::BlockFace::North), true, false, true)
+                .has_value());
     }
 
     SUBCASE("a wall bell across its axis") {
@@ -286,9 +293,11 @@ TEST_CASE("a bell rings only when it is struck on the side it hangs to face") {
         world.getOrGenerateChunk(0, 0);
         REQUIRE(world.setBlockState(8, 64, 8, bellOf("single_wall")));
 
-        CHECK(projectileHits::onHit(world, 1, hitAt(8.0, 64.5, 8.5, registry::BlockFace::West), true).has_value());
+        CHECK(projectileHits::onHit(world, 1, hitAt(8.0, 64.5, 8.5, registry::BlockFace::West), true, false, true)
+                  .has_value());
         CHECK_FALSE(
-            projectileHits::onHit(world, 1, hitAt(8.5, 64.5, 8.0, registry::BlockFace::North), true).has_value());
+            projectileHits::onHit(world, 1, hitAt(8.5, 64.5, 8.0, registry::BlockFace::North), true, false, true)
+                .has_value());
     }
 
     SUBCASE("a ceiling bell from any side") {
@@ -296,7 +305,9 @@ TEST_CASE("a bell rings only when it is struck on the side it hangs to face") {
         world.getOrGenerateChunk(0, 0);
         REQUIRE(world.setBlockState(8, 64, 8, bellOf("ceiling")));
 
-        CHECK(projectileHits::onHit(world, 1, hitAt(8.0, 64.5, 8.5, registry::BlockFace::West), true).has_value());
-        CHECK(projectileHits::onHit(world, 1, hitAt(8.5, 64.5, 8.0, registry::BlockFace::North), true).has_value());
+        CHECK(projectileHits::onHit(world, 1, hitAt(8.0, 64.5, 8.5, registry::BlockFace::West), true, false, true)
+                  .has_value());
+        CHECK(projectileHits::onHit(world, 1, hitAt(8.5, 64.5, 8.0, registry::BlockFace::North), true, false, true)
+                  .has_value());
     }
 }

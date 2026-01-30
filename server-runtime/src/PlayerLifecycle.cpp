@@ -7,11 +7,13 @@
 #include <basalt/server/runtime/ItemUseTimers.hpp>
 #include <basalt/server/runtime/PlayerLifecycle.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
+#include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
 #include <basalt/wire/protocol/play/PlayerStatePackets.hpp>
@@ -57,6 +59,33 @@ player::Difficulty difficultyOf(std::string_view name) {
 
 PlayerLifecycle::PlayerLifecycle(ClientSession& owner, Hooks hooks) : owner_(&owner), hooks_(std::move(hooks)) {}
 
+void PlayerLifecycle::checkEquipment(player::PlayerSession& session) {
+    std::array<std::optional<storage::StoredItemStack>, 4> worn;
+    for (std::int32_t slot = 0; slot < 4; ++slot) {
+        worn[static_cast<std::size_t>(slot)] = session.inventory.at(player::PlayerInventory::kArmourStart + slot);
+    }
+    const std::optional<std::array<std::optional<storage::StoredItemStack>, 4>> before = worn_;
+    worn_ = worn;
+    if (!before.has_value() || session.gamemode == Gamemode::Spectator) {
+        return;
+    }
+    world::LoadedWorld* world = owner_->currentWorld();
+    if (world == nullptr) {
+        return;
+    }
+    for (std::size_t slot = 0; slot < worn.size(); ++slot) {
+        if ((*before)[slot] == worn[slot]) {
+            continue;
+        }
+        // parity: the jar asks the **new** stack for its `equippable` component, so taking a piece
+        // off is `UNEQUIP` and putting one on is `EQUIP`. An item that is not wearable at all in an
+        // armour slot, which only a command or creative can manage, is `UNEQUIP` there and `EQUIP`
+        // here: this build has no equippable component to ask.
+        world::vibrations::emit(world->state(), worn[slot].has_value() ? "equip" : "unequip", session.x, session.y,
+                                session.z, world->gameTime());
+    }
+}
+
 void PlayerLifecycle::tickPlayer() {
     PlayerSession* session = owner_->playerSession();
     if (session == nullptr) {
@@ -76,6 +105,7 @@ void PlayerLifecycle::tickPlayer() {
         return;
     }
     owner_->tryPickupNearbyItems();
+    checkEquipment(*session);
     owner_->itemUseTimers().tickEating(*session);
     owner_->itemUseTimers().tickDrawing(*session);
     if (session->sleepingBed.has_value()) {

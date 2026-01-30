@@ -39,9 +39,11 @@ inline constexpr std::int32_t kLampOffDelay = 4;
 /// `gameTime` is the world's clock, which the game events a reactor raises are stamped with: a door
 /// swinging is a `BLOCK_OPEN` and a sculk sensor hears it. It is a parameter and not a default so
 /// that a caller cannot forget it and leave a vibration stamped with turn zero.
+/// `tntExplodes` is the game rule of the same name: with it off `TntBlock.prime` answers false and the
+/// caller leaves the block alone, so a signal neither lights the tnt nor takes it away.
 [[nodiscard]] std::vector<BlockChange> update(WorldState& world, std::string_view worldName, std::int32_t x,
                                               std::int32_t y, std::int32_t z, std::int64_t gameTime,
-                                              random::RandomSource& random, bool itself = true);
+                                              random::RandomSource& random, bool tntExplodes, bool itself = true);
 
 /// The same for a piece of dust whose strength moved, whose reach is two squares.
 ///
@@ -50,7 +52,7 @@ inline constexpr std::int32_t kLampOffDelay = 4;
 /// steps away, and with one it never heard: measured in the bench circuit `lamparalejos`.
 [[nodiscard]] std::vector<BlockChange> updateAroundWire(WorldState& world, std::string_view worldName, std::int32_t x,
                                                         std::int32_t y, std::int32_t z, std::int64_t gameTime,
-                                                        random::RandomSource& random);
+                                                        random::RandomSource& random, bool tntExplodes);
 
 /// The scheduled half of the lamp: it only goes dark if the signal is still gone.
 [[nodiscard]] std::optional<BlockChange> lampTick(WorldState& world, std::string_view worldName, std::int32_t x,

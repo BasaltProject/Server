@@ -70,7 +70,7 @@ constexpr std::array kAll = {
     GameRule::boolean("spawner_blocks_work", true),
     GameRule::boolean("spectators_generate_chunks", true),
     gameRules::kSpreadVines,
-    GameRule::boolean("tnt_explodes", true),
+    gameRules::kTntExplodes,
     GameRule::boolean("tnt_explosion_drop_decay", false),
     GameRule::boolean("universal_anger", false),
     gameRules::kWaterSourceConversion,

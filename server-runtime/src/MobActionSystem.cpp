@@ -13,6 +13,7 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
@@ -226,6 +227,8 @@ void MobActionSystem::hurtMob(ServerEntity& mob, ServerEntity& target, float dam
     target.hurtBy = mob.entityId();
     target.panicTicks = kPanicTicks;
     combat_->announceEntityHit(watchersOf(*world), target, world::damageTypes::kMobAttack, mob.entityId(), result.died);
+    // parity: `LivingEntity.hurtServer` raises `ENTITY_DAMAGE` at whoever took the hit.
+    world::vibrations::emit(world->state(), "entity_damage", target.x, target.y, target.z, world->gameTime());
 }
 
 void MobActionSystem::breed(ServerEntity& mob, ServerEntity& partner) {

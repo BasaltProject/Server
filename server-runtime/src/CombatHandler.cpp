@@ -14,6 +14,7 @@
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
@@ -169,6 +170,15 @@ void CombatHandler::trackFall(PlayerSession& session, double y, bool onGround,
         fallDistance += session.y - y;
     }
     if (onGround && !session.onGround) {
+        // parity: `Entity.checkFallDamage` raises `HIT_GROUND` at the landing whenever anything was
+        // fallen, before the damage and whatever the fall-damage rule says. A landing that this build
+        // cancelled the fall for (flying, creative, water, a ladder) has nothing counted and so makes
+        // no event, where the jar counts the distance for everyone and only spares the damage.
+        if (fallDistance > 0.0) {
+            if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
+                world::vibrations::emit(world->state(), "hit_ground", session.x, y, session.z, world->gameTime());
+            }
+        }
         applyFallDamage(session);
         fallDistance = 0.0;
     }
@@ -286,6 +296,11 @@ void CombatHandler::hurt(float amount, std::string_view deathMessageId, const st
         return;
     }
     session->stats.addDamageTaken(damage);
+    // parity: `LivingEntity.hurtServer` raises `ENTITY_DAMAGE` right where the health comes off, so
+    // absorption alone makes none. A player is an entity too and this is their half of that line.
+    if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
+        world::vibrations::emit(world->state(), "entity_damage", session->x, session->y, session->z, world->gameTime());
+    }
     session->setHealth(std::max(session->health() - damage, 0.0F));
     if (session->health() <= 0.0F) {
         die(deathMessageId, source.has_value() ? source->name : std::nullopt);

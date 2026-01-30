@@ -21,6 +21,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WorldLight.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
 
@@ -65,6 +66,8 @@ void MobActionSystem::tickFire(world::LoadedWorld& world, const std::vector<Play
                 mob, entity::sunBurn::kFireDamage, std::nullopt, std::nullopt, hooks_.combat, "fire");
             if (result.landed) {
                 combat_->announceEntityHit(watchers, mob, world::damageTypes::kOnFire, -1, result.died);
+                // parity: `LivingEntity.hurtServer` raises `ENTITY_DAMAGE` at whoever took the hit.
+                world::vibrations::emit(world.state(), "entity_damage", mob.x, mob.y, mob.z, world.gameTime());
             }
         }
     }
