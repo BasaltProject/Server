@@ -502,9 +502,13 @@ bool isComponent(std::int32_t stateId) { return std::ranges::find(kComponents, p
 
 void scheduleComparatorsAround(WorldState& world, const std::string_view worldName, const std::int32_t x,
                                const std::int32_t y, const std::int32_t z, const ContainerSignalAt& containerSignal) {
-    constexpr std::array<BlockFace, 4> kHorizontal{BlockFace::North, BlockFace::South, BlockFace::West,
-                                                   BlockFace::East};
-    for (const BlockFace face : kHorizontal) {
+    // parity: `Level.updateNeighbourForOutputSignal` walks `Direction.Plane.HORIZONTAL`, which is
+    // **north, east, south, west**, and not the horizontal half of `Direction.values()`, which is
+    // north, south, west, east. It decides which of two comparators around the same container books
+    // its turn first, and two turns booked on the same tick at the same priority run in that order.
+    constexpr std::array<BlockFace, 4> kPlaneHorizontal{BlockFace::North, BlockFace::East, BlockFace::South,
+                                                        BlockFace::West};
+    for (const BlockFace face : kPlaneHorizontal) {
         std::int32_t bx = x + registry::stepX(face);
         std::int32_t by = y + registry::stepY(face);
         std::int32_t bz = z + registry::stepZ(face);

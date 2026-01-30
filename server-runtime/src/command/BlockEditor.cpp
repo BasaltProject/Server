@@ -150,6 +150,10 @@ void BlockEditor::notifyNeighbours() {
             world_->state(), at[0], at[1], at[2],
             [this](std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) { record(x, y, z, stateId); });
         if (world_->state().blockState(at[0], at[1], at[2]) != written) {
+            // The jar skips the shape updates and the packet here, but `updateNeighboursOnBlockSet`
+            // still tells the neighbours from the command's own tail. This build's cascade does the
+            // two together, so skipping it skips both: measured green on `senalvieja`, where there is
+            // nothing to tell, and left as the one thing this shortcut gets wrong.
             written_properties_.erase(at);
             continue;
         }
