@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
+#include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
@@ -220,6 +221,12 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         // parity: `LecternBlock.useItemOn`, which takes a book, and `useWithoutItem`, which opens
         // the one already there.
         if (path == "lectern" && useLectern(*session, hit.pos)) {
+            ack();
+            return;
+        }
+        // parity: `ComposterBlock.useItemOn` and `useWithoutItem`: one compostable item in, or the
+        // bone meal out once it is ready.
+        if (path == "composter" && useComposter(*session, hit.pos)) {
             ack();
             return;
         }
@@ -486,8 +493,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         server::world::Chunk* chunk = world->state().chunkIfLoaded(placeAt.x >> 4, placeAt.z >> 4);
         if (chunk != nullptr) {
             const std::optional<world::commandBlocks::Mode> mode = world::commandBlocks::modeOf(placedBlock.path());
-            wire::nbt::NbtCompound data =
-                mode.has_value() ? world::commandBlocks::defaults() : wire::nbt::NbtCompound{};
+            wire::nbt::NbtCompound data = world::blockEntityDefaults::of(placedBlock);
             // parity: `CommandBlock.setPlacedBy`, which is the placing half and not the command one:
             // a repeating block put down **by hand** comes out already automatic, and `TrackOutput`
             // starts as whatever `sendCommandFeedback` says. A `/setblock` runs none of this.

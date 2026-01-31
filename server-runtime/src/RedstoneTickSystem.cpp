@@ -512,9 +512,10 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
             [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z) {
                 broadcaster_->notifyAround(world, watchersOf(world), x, y, z, std::nullopt);
             }};
+    random::RandomSource random = freshRandom();
     const std::vector<world::BlockChange> changes =
-        world::blockEntityTicks::tick(world.state(), world.name(), world.clock(), world.weather(), chunks, hooks,
-                                      config::dimensionFacts(world.declaration().dimension).hasSkylight);
+        world::blockEntityTicks::tick(world.state(), world.name(), world.clock(), world.weather(), chunks, random,
+                                      hooks, config::dimensionFacts(world.declaration().dimension).hasSkylight);
     if (changes.empty()) {
         return;
     }

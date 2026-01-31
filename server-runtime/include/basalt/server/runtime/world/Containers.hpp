@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <cstdint>
@@ -7,6 +8,7 @@
 #include <optional>
 #include <span>
 #include <string_view>
+#include <vector>
 
 namespace basalt::server::runtime::world {
 
@@ -47,6 +49,28 @@ struct Readers {
 /// dispenser says so, but a hopper and a lectern override that away and a furnace only speaks up for
 /// its input slot, and only when the item there really changed.
 [[nodiscard]] bool setItemTellsComparators(std::string_view path, std::int32_t slot, bool sameItem);
+
+/// How high one item stacks **in this container**, which is not always how high it stacks in a hand.
+///
+/// parity: `Container.getMaxStackSize(stack)`: three block entities cut it to one, and two of them
+/// are within a hopper's reach: a chiseled bookshelf and a jukebox.
+[[nodiscard]] std::int32_t maxStackFor(std::string_view path, const wire::common::Identifier& item);
+
+/// The slots a container opens to whoever asks from `from`. parity:
+/// `WorldlyContainer.getSlotsForFace`: a furnace and a brewing stand each open different slots per
+/// face; everything else opens every slot to every side.
+[[nodiscard]] std::vector<std::int32_t> slotsForFace(std::string_view path, std::int32_t size,
+                                                     registry::BlockFace from);
+
+/// Whether this item may go into that slot from that side, with `there` being what the slot already
+/// holds. parity: `canPlaceItemThroughFace` over each container's own `canPlaceItem`.
+[[nodiscard]] bool acceptsThroughFace(std::string_view path, std::int32_t slot, const wire::common::Identifier& item,
+                                      bool slotIsEmpty);
+
+/// Whether this item may be taken out of that slot from that side. parity: `canTakeItemThroughFace`,
+/// which is what stops a hopper draining a furnace's fuel or a brewing stand's ingredient.
+[[nodiscard]] bool givesThroughFace(std::string_view path, std::int32_t slot, const wire::common::Identifier& item,
+                                    registry::BlockFace from);
 
 /// The comparator reading of the container at these coordinates, or nothing when the block is not
 /// one this build keeps contents for.

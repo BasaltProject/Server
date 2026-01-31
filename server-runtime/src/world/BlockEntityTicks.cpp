@@ -92,7 +92,7 @@ namespace crafting = server::world::crafting;
 
 std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, const WorldClock& clock,
                               const WorldWeather& weather, const std::vector<std::array<std::int32_t, 2>>& chunks,
-                              const Hooks& hooks, bool hasSkylight) {
+                              random::RandomSource& random, const Hooks& hooks, bool hasSkylight) {
     std::vector<BlockChange> changes;
     // parity: `DaylightDetectorBlock`'s own ticker, which looks once every twenty ticks.
     if (clock.totalTicks() % daylightDetectors::kIntervalTicks == 0) {
@@ -146,7 +146,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 if (hooks.allowHopperMove && !hooks.allowHopperMove(worldName, x, y, z)) {
                     continue;
                 }
-                if (hoppers::tick(world, x, y, z)) {
+                if (hoppers::tick(world, x, y, z, random)) {
                     chunk->markDirty();
                 }
                 continue;

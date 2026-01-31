@@ -152,3 +152,57 @@ TEST_CASE("an entry with no count is one item, and one with no name is nothing")
     CHECK(slots[0]->count == 1);
     CHECK_FALSE(slots[1].has_value());
 }
+
+TEST_CASE("what an item carries travels with it") {
+    // parity: `ItemStack.CODEC` is `{id, count, components}`. Without the third an enchanted book in
+    // a chest came back a plain one, and a written book on a lectern lost its pages.
+    nbt::NbtCompound enchantments;
+    enchantments.putInt("minecraft:sharpness", 3);
+    nbt::NbtCompound components;
+    components.set("minecraft:enchantments", nbt::NbtTag::ofCompound(std::move(enchantments)));
+
+    blockInventory::Slots slots(3);
+    slots[1] = ItemStack{.item = item("diamond_sword"), .count = 1, .components = components};
+    nbt::NbtCompound data;
+    blockInventory::write(data, slots);
+
+    const blockInventory::Slots back = blockInventory::read(data, 3);
+    REQUIRE(back[1].has_value());
+    const nbt::NbtCompound* kept = back[1]->components.getCompound("minecraft:enchantments");
+    REQUIRE(kept != nullptr);
+    CHECK(kept->getInt("minecraft:sharpness") == 3);
+
+    // An item that carries nothing writes no field at all, which is what vanilla does.
+    blockInventory::Slots plain(1);
+    plain[0] = ItemStack{.item = item("stone"), .count = 1};
+    nbt::NbtCompound bare;
+    blockInventory::write(bare, plain);
+    const nbt::NbtList* items = bare.getList("Items");
+    REQUIRE(items != nullptr);
+    REQUIRE(items->size() == 1);
+    CHECK((*items)[0].get<nbt::NbtCompound>()->find("components") == nullptr);
+}
+
+TEST_CASE("a pot keeps its one stack under vanilla's own key") {
+    // parity: `DecoratedPotBlockEntity` is a `ContainerSingleItem`: one stack under `item`, and no
+    // list at all. Everything else keeps the list.
+    blockInventory::Slots one(1);
+    one[0] = ItemStack{.item = item("emerald"), .count = 3};
+    nbt::NbtCompound pot;
+    blockInventory::writeFor("decorated_pot", pot, one);
+    CHECK(pot.find("Items") == nullptr);
+    REQUIRE(pot.find("item") != nullptr);
+
+    const blockInventory::Slots back = blockInventory::readFor("decorated_pot", pot, 1);
+    REQUIRE(back[0].has_value());
+    CHECK(back[0]->count == 3);
+
+    // Emptying it takes the key away rather than leaving an empty one.
+    blockInventory::writeFor("decorated_pot", pot, blockInventory::Slots(1));
+    CHECK(pot.find("item") == nullptr);
+
+    // And a chest still writes a list.
+    nbt::NbtCompound chest;
+    blockInventory::writeFor("chest", chest, one);
+    CHECK(chest.find("Items") != nullptr);
+}

@@ -117,3 +117,25 @@ TEST_CASE("a hopper takes one item at a time until the pot is empty") {
 
     CHECK_FALSE(decoratedPots::takeOne(data).has_value());
 }
+
+TEST_CASE("a pot keeps its one stack where vanilla keeps it") {
+    // parity: `DecoratedPotBlockEntity.TAG_ITEM`. A pot is a `ContainerSingleItem`, so what it holds
+    // is an `ItemStack.CODEC` compound under `item` and never a list of one: written as a list, a
+    // world of ours opens in vanilla with an empty pot and a tag nobody reads.
+    basalt::wire::nbt::NbtCompound data;
+    static_cast<void>(decoratedPots::insert(data, basalt::wire::common::Identifier::vanilla("emerald")));
+    static_cast<void>(decoratedPots::insert(data, basalt::wire::common::Identifier::vanilla("emerald")));
+
+    const basalt::wire::nbt::NbtTag* held = data.find("item");
+    REQUIRE(held != nullptr);
+    const basalt::wire::nbt::NbtCompound* stack = held->get<basalt::wire::nbt::NbtCompound>();
+    REQUIRE(stack != nullptr);
+    CHECK(stack->getString("id") == "minecraft:emerald");
+    CHECK(stack->getInt("count") == 2);
+    CHECK(data.find("Items") == nullptr);
+
+    const std::optional<basalt::server::world::loot::ItemStack> back = decoratedPots::contents(data);
+    REQUIRE(back.has_value());
+    CHECK(back->item.path() == "emerald");
+    CHECK(back->count == 2);
+}

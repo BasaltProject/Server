@@ -95,6 +95,10 @@ public:
 
     void writeSign(const wire::protocol::play::SignUpdatePacket& update);
 
+    /// parity: `ComposterBlock.useItemOn` and `useWithoutItem`: one compostable item in, or the bone
+    /// meal out of a composter that is ready. Answers whether the click was the composter's.
+    bool useComposter(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
+
     /// parity: `handleSetCommandBlock`, the screen a command block opens. Refused outright for anyone
     /// who is not an operator in creative, which is what `canUseGameMasterBlocks` asks.
     void programCommandBlock(const wire::protocol::play::SetCommandBlockPacket& packet);
@@ -251,6 +255,9 @@ private:
     ClientSession* owner_;
     Hooks hooks_;
     [[nodiscard]] bool mayUseGameMasterBlocks(player::PlayerSession& session) const;
+
+    /// parity: `updateNeighbourForOutputSignal`, the half of a block change that a comparator hears.
+    void notifyComparators(const wire::protocol::play::BlockPos& pos);
 
     /// One block entity's data to everyone watching, which is how a client is told what to put in
     /// the screen it is about to open.

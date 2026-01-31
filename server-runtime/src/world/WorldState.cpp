@@ -473,7 +473,7 @@ bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, s
         if (size.has_value()) {
             Spilled falling{.x = x, .y = y, .z = z, .stacks = {}};
             for (const std::optional<server::world::loot::ItemStack>& slot :
-                 blockInventory::read(held->data(), *size)) {
+                 blockInventory::readFor(held->type().path(), held->data(), *size)) {
                 if (slot.has_value() && slot->count > 0) {
                     falling.stacks.push_back(*slot);
                 }

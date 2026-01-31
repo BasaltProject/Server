@@ -23,18 +23,18 @@ const wire::common::Identifier& block() {
 bool isPot(std::string_view path) { return path == block().path(); }
 
 std::optional<server::world::loot::ItemStack> contents(const wire::nbt::NbtCompound& data) {
-    return blockInventory::read(data, kSize)[0];
+    return blockInventory::readFor(block().path(), data, kSize)[0];
 }
 
 std::optional<std::vector<BlockEffect>> insert(wire::nbt::NbtCompound& data, const wire::common::Identifier& item) {
-    blockInventory::Slots slots = blockInventory::read(data, kSize);
+    blockInventory::Slots slots = blockInventory::readFor(block().path(), data, kSize);
     const std::optional<server::world::loot::ItemStack>& held = slots[0];
     if (held.has_value() && (held->item != item || held->count >= kMaxStack)) {
         return std::nullopt;
     }
     slots[0] = held.has_value() ? server::world::loot::ItemStack{.item = held->item, .count = held->count + 1}
                                 : server::world::loot::ItemStack{.item = item, .count = 1};
-    blockInventory::write(data, slots);
+    blockInventory::writeFor(block().path(), data, slots);
     // parity: the pitch rises with how full it is, which is what makes filling one audible.
     const float bend = static_cast<float>(slots[0]->count) / static_cast<float>(kMaxStack);
     return std::vector<BlockEffect>{blockEffect::Event{.b0 = 1, .b1 = kWobblePositive},
@@ -53,7 +53,7 @@ std::vector<BlockEffect> rebuff() {
 }
 
 std::optional<server::world::loot::ItemStack> takeOne(wire::nbt::NbtCompound& data) {
-    blockInventory::Slots slots = blockInventory::read(data, kSize);
+    blockInventory::Slots slots = blockInventory::readFor(block().path(), data, kSize);
     if (!slots[0].has_value()) {
         return std::nullopt;
     }
@@ -61,7 +61,7 @@ std::optional<server::world::loot::ItemStack> takeOne(wire::nbt::NbtCompound& da
     slots[0] = held.count <= 1
                    ? std::nullopt
                    : std::optional{server::world::loot::ItemStack{.item = held.item, .count = held.count - 1}};
-    blockInventory::write(data, slots);
+    blockInventory::writeFor(block().path(), data, slots);
     return server::world::loot::ItemStack{.item = held.item, .count = 1};
 }
 

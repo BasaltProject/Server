@@ -20,6 +20,7 @@
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
+#include <basalt/server/runtime/world/Composters.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
 #include <basalt/server/runtime/world/Explosions.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
@@ -633,6 +634,68 @@ bool BlockInteractionHandler::placeOnCampfire(PlayerSession& session, const Bloc
         owner_->sendInventorySlot(heldSlot);
     }
     return true;
+}
+
+bool BlockInteractionHandler::useComposter(PlayerSession& session, const BlockPos& pos) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    const std::optional<std::int32_t> level =
+        world == nullptr ? std::nullopt : world::composters::levelAt(world->state(), pos.x, pos.y, pos.z);
+    if (!level.has_value()) {
+        return false;
+    }
+    // parity: `useWithoutItem` on a ready composter hands out the bone meal whatever is in the hand,
+    // and `useItemOn` only looks at the item while there is room. Both end in a level change, which
+    // is what the comparator beside it reads.
+    if (*level == world::composters::kReady) {
+        const std::optional<world::BlockChange> emptied = world::composters::empty(world->state(), pos.x, pos.y, pos.z);
+        if (!emptied.has_value()) {
+            return false;
+        }
+        broadcastBlockUpdate(pos, emptied->stateId);
+        // parity: `extractProduce` pops the bone meal a hair above the block and a little to a side.
+        spawnDroppedItem(Identifier::vanilla("bone_meal"), 1, pos.x + 0.5 + popJitter(), pos.y + 1.01,
+                         pos.z + 0.5 + popJitter());
+        broadcastEffects(pos, emptied->stateId,
+                         {world::blockEffect::Sound{.name = "block.composter.empty",
+                                                    .source = wire::protocol::play::SoundSource::Blocks,
+                                                    .volume = 1.0F,
+                                                    .pitch = 1.0F}});
+        notifyComparators(pos);
+        return true;
+    }
+    const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session.inventory.heldSlot();
+    const std::optional<storage::StoredItemStack> held = session.inventory.at(heldSlot);
+    const std::optional<Identifier> item = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
+    if (!item.has_value() || !world::composters::chanceOf(*item).has_value() || *level >= world::composters::kFull) {
+        return false;
+    }
+    random::RandomSource random = random::RandomSource::legacy(nextSeed());
+    const std::optional<world::BlockChange> filled =
+        world::composters::addItem(world->state(), pos.x, pos.y, pos.z, *item, random);
+    // parity: `levelEvent(1500, pos, changed ? 1 : 0)`, which is what makes the client play the
+    // success sound and the sparkles rather than the plain fill.
+    broadcastEffects(pos, filled.has_value() ? filled->stateId : 0,
+                     {world::blockEffect::Effect{.type = world::blockEffect::Effect::kComposterFill,
+                                                 .data = filled.has_value() ? 1 : 0}});
+    if (filled.has_value()) {
+        broadcastBlockUpdate(pos, filled->stateId);
+        notifyComparators(pos);
+    }
+    if (session.gamemode != Gamemode::Creative) {
+        session.inventory.set(heldSlot,
+                              held->count <= 1 ? std::nullopt : std::optional{withCount(*held, held->count - 1)});
+        owner_->sendInventorySlot(heldSlot);
+    }
+    return true;
+}
+
+void BlockInteractionHandler::notifyComparators(const BlockPos& pos) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    if (world == nullptr) {
+        return;
+    }
+    world::redstoneComponents::scheduleComparatorsAround(world->state(), world->name(), pos.x, pos.y, pos.z,
+                                                         world::comparatorReading::of(world->state()));
 }
 
 void BlockInteractionHandler::refreshSnowUnder(const BlockPos& pos) {
