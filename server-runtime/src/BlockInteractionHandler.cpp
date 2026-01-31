@@ -227,6 +227,12 @@ void BlockInteractionHandler::spawnDroppedItem(const Identifier& item, std::int3
 
 void BlockInteractionHandler::dropLootFor(const Identifier& block, const BlockPos& pos,
                                           const wire::nbt::NbtCompound* carried) {
+    // parity: `Block.popResource` reads the `block_drops` rule, so with it off a block broken by hand
+    // leaves nothing behind either.
+    const world::LoadedWorld* world = owner_->currentWorld();
+    if (world != nullptr && !world->gameRules().get(world::gameRules::kBlockDrops)) {
+        return;
+    }
     world::RealLootTables* tables = owner_->options().lootTables;
     const server::world::loot::LootTable* table = tables == nullptr ? nullptr : tables->forBlock(block);
     if (table == nullptr) {

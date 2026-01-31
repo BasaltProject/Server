@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <optional>
 #include <utility>
 
 namespace basalt::server::runtime {
@@ -75,7 +76,8 @@ void sendBlock(const std::vector<player::PlayerSession*>& watchers, std::int32_t
                                                                      config::WorldDimension::Nether};
                                                     static_cast<void>(world::fluidFlow::onBlockChanged(flow, x, y, z));
                                                 },
-                                            .gameTime = world.gameTime()};
+                                            .gameTime = world.gameTime(),
+                                            .tntExplodes = world.gameRules().get(world::gameRules::kTntExplodes)};
 }
 
 } // namespace
@@ -149,15 +151,27 @@ void BlockChangeBroadcaster::announceRedstone(world::LoadedWorld& world,
                                               const std::vector<player::PlayerSession*>& watchers,
                                               const world::BlockChange& change) const {
     announceBlock(watchers, change);
+    settleFrom(world, watchers, change.x, change.y, change.z, true);
+    // parity: a rod and a hook reach one square further than their own write does, and what is on
+    // the far side of the wall they hang on only hears them through that second update.
+    const std::optional<registry::BlockFace> behind = world::redstone::alsoTells(change.stateId);
+    if (behind.has_value()) {
+        settleFrom(world, watchers, change.x + registry::stepX(*behind), change.y + registry::stepY(*behind),
+                   change.z + registry::stepZ(*behind), false);
+    }
+}
+
+void BlockChangeBroadcaster::settleFrom(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                                        const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                                        const bool arrived) const {
     random::RandomSource random = random::RandomSource::legacy(nextSeed());
-    const std::vector<world::BlockChange> settled =
-        world::redstone::settle(world.state(), world.name(), change.x, change.y, change.z);
+    const std::vector<world::BlockChange> settled = world::redstone::settle(world.state(), world.name(), x, y, z);
     for (const world::BlockChange& moved : settled) {
         announceBlock(watchers, moved);
     }
     for (const world::BlockChange& reacted :
-         world::redstoneReactors::update(world.state(), world.name(), change.x, change.y, change.z, world.gameTime(),
-                                         random, world.gameRules().get(world::gameRules::kTntExplodes))) {
+         world::redstoneReactors::update(world.state(), world.name(), x, y, z, world.gameTime(), random,
+                                         world.gameRules().get(world::gameRules::kTntExplodes))) {
         announceBlock(watchers, reacted);
     }
     // parity: every piece of dust that moved tells its own neighbours, so a lamp at the end of the
@@ -170,7 +184,7 @@ void BlockChangeBroadcaster::announceRedstone(world::LoadedWorld& world,
         }
     }
     const world::redstoneComponents::ContainerSignalAt reading = world::comparatorReading::of(world.state());
-    world::redstoneComponents::scheduleAround(world.state(), world.name(), change.x, change.y, change.z, true, reading);
+    world::redstoneComponents::scheduleAround(world.state(), world.name(), x, y, z, arrived, reading);
     // parity: every piece of dust that moved reaches two squares out, so the component past it hears.
     for (const world::BlockChange& moved : settled) {
         world::redstoneComponents::scheduleAroundWire(world.state(), world.name(), moved.x, moved.y, moved.z, reading);
@@ -254,7 +268,9 @@ void BlockChangeBroadcaster::dropWashedAwayBlock(world::LoadedWorld& world, std:
 
 void BlockChangeBroadcaster::dropBrokenBlock(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                              std::int32_t destroyedState) {
-    if (destroyedState <= 0) {
+    // parity: `Block.popResource` puts nothing in the world with the `block_drops` rule off, so the
+    // block still goes and leaves nothing behind.
+    if (destroyedState <= 0 || !world.gameRules().get(world::gameRules::kBlockDrops)) {
         return;
     }
     const std::optional<reg::BlockState> state = reg::blocks::byStateId(destroyedState);

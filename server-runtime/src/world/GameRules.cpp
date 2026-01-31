@@ -18,7 +18,7 @@ constexpr std::array kAll = {
     gameRules::kAdvanceTime,
     gameRules::kAdvanceWeather,
     gameRules::kAllowEnteringNetherUsingPortals,
-    GameRule::boolean("block_drops", true),
+    gameRules::kBlockDrops,
     GameRule::boolean("block_explosion_drop_decay", true),
     GameRule::boolean("command_block_output", true),
     gameRules::kCommandBlocksWork,

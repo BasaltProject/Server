@@ -113,11 +113,17 @@ using Properties = std::map<std::string, std::string>;
     return std::nullopt;
 }
 
-/// parity: the blocks whose `isSignalSource` is true, whatever they are giving off right now.
-constexpr std::array<std::string_view, 20> kSignalSources{
+/// parity: the tag `lightning_rods` is eight blocks and not one, because the rod oxidises like any
+/// other copper and every stage is its own block, all of them a `LightningRodBlock`. Matching the
+/// plain name left an exposed rod struck by lightning feeding nothing at all.
+[[nodiscard]] bool isLightningRod(std::string_view path) { return path.ends_with("lightning_rod"); }
+
+/// parity: the blocks whose `isSignalSource` is true, whatever they are giving off right now. The
+/// rods are not here: they are matched by suffix above.
+constexpr std::array<std::string_view, 19> kSignalSources{
     "redstone_block", "redstone_torch", "redstone_wall_torch", "repeater", "comparator", "observer", "lever",
-    "daylight_detector", "detector_rail", "lectern", "tripwire_hook", "lightning_rod", "sculk_sensor",
-    "calibrated_sculk_sensor", "trapped_chest",
+    "daylight_detector", "detector_rail", "lectern", "tripwire_hook", "sculk_sensor", "calibrated_sculk_sensor",
+    "trapped_chest",
     // parity: `JukeboxBlock.isSignalSource` is
     // always true, playing or not, and that is
     // what makes a dust reach out to it.
@@ -259,7 +265,7 @@ std::int32_t signalOf(std::int32_t stateId, BlockFace from, std::int32_t openers
     }
     // parity: `DetectorRailBlock`, `LecternBlock`, `TripWireHookBlock` and `LightningRodBlock`, all
     // fifteen or nothing.
-    if (path == "detector_rail" || path == "lectern" || path == "tripwire_hook" || path == "lightning_rod") {
+    if (path == "detector_rail" || path == "lectern" || path == "tripwire_hook" || isLightningRod(path)) {
         return powered ? kMaxSignal : 0;
     }
     // parity: `TargetBlock` and `SculkSensorBlock`, both of which carry their strength in `power`
@@ -317,7 +323,7 @@ std::int32_t directSignalOf(std::int32_t stateId, BlockFace from, std::int32_t o
         return from == BlockFace::Up ? signalOf(stateId, from, openers) : 0;
     }
     // parity: `TripWireHookBlock` and `LightningRodBlock`, which feed the side they face.
-    if (path == "tripwire_hook" || path == "lightning_rod") {
+    if (path == "tripwire_hook" || isLightningRod(path)) {
         return valueOf(properties, "facing") == nameOf(from) ? signalOf(stateId, from) : 0;
     }
     return 0;
@@ -442,7 +448,22 @@ bool isSignalSource(std::int32_t stateId) {
     }
     // The buttons and the plates are one per wood, so they are matched rather than listed.
     return std::ranges::find(kSignalSources, path) != kSignalSources.end() || path.ends_with("_button") ||
-           path.ends_with("_pressure_plate");
+           path.ends_with("_pressure_plate") || isLightningRod(path);
+}
+
+std::optional<registry::BlockFace> alsoTells(std::int32_t stateId) {
+    const std::string path = pathOf(stateId);
+    if (path != "tripwire_hook" && !isLightningRod(path)) {
+        return std::nullopt;
+    }
+    const Properties properties = registry::blockStateDefinitions::propertiesOf(stateId);
+    const std::string_view facing = valueOf(properties, "facing");
+    for (const BlockFace candidate : kFaces) {
+        if (nameOf(candidate) == facing) {
+            return registry::opposite(candidate);
+        }
+    }
+    return std::nullopt;
 }
 
 std::vector<std::array<std::int32_t, 3>> reachOf(const WorldState& world, std::int32_t x, std::int32_t y,

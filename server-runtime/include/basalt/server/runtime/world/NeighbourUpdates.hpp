@@ -93,6 +93,10 @@ struct Context {
     /// The world's clock, which the game events a reactor raises are stamped with: a door swinging
     /// is a `BLOCK_OPEN`, and a vibration knows which turn it was heard on.
     std::int64_t gameTime = 0;
+    /// parity: the `tnt_explodes` rule, which `TntBlock.prime` reads before it lights anything. The
+    /// default is the rule's own so that a site which forgets it still behaves like vanilla: passed
+    /// as a hardcoded false, no signal ever lit a tnt at all.
+    bool tntExplodes = true;
 };
 
 /// Breaks whatever `x`, `y`, `z` stopped holding up, and whatever that in turn stopped holding.

@@ -277,6 +277,38 @@ TEST_CASE("which blocks can feed a circuit at all") {
     CHECK_FALSE(redstone::isWire(stateOf("redstone_block")));
 }
 
+TEST_CASE("a rod that has oxidised is still a rod") {
+    // parity: the tag `lightning_rods` is eight blocks, one per copper stage. They share
+    // `LightningRodBlock`, so the seven that are not the plain name feed a circuit exactly the same.
+    for (const std::string& path :
+         {std::string{"lightning_rod"}, std::string{"exposed_lightning_rod"}, std::string{"weathered_lightning_rod"},
+          std::string{"oxidized_lightning_rod"}, std::string{"waxed_lightning_rod"},
+          std::string{"waxed_exposed_lightning_rod"}, std::string{"waxed_weathered_lightning_rod"},
+          std::string{"waxed_oxidized_lightning_rod"}}) {
+        CAPTURE(path);
+        const std::int32_t struck = stateOf(path, {{"facing", "up"}, {"powered", "true"}, {"waterlogged", "false"}});
+        CHECK(redstone::isSignalSource(struck));
+        CHECK(redstone::signalOf(struck, BlockFace::Down) == redstone::kMaxSignal);
+        // A rod feeds strongly only the side it points at, which is where it is stuck.
+        CHECK(redstone::directSignalOf(struck, BlockFace::Up) == redstone::kMaxSignal);
+        CHECK(redstone::directSignalOf(struck, BlockFace::North) == 0);
+    }
+}
+
+TEST_CASE("the square a rod and a hook tell on top of their own six") {
+    // parity: `LightningRodBlock.updateNeighbours` and `TripWireHookBlock.notifyNeighbors`, both an
+    // `updateNeighborsAt` on the square the block hangs on. Nothing else in the game does this.
+    CHECK(redstone::alsoTells(stateOf(
+              "lightning_rod", {{"facing", "up"}, {"powered", "false"}, {"waterlogged", "false"}})) == BlockFace::Down);
+    CHECK(redstone::alsoTells(
+              stateOf("waxed_lightning_rod", {{"facing", "north"}, {"powered", "false"}, {"waterlogged", "false"}})) ==
+          BlockFace::South);
+    CHECK(redstone::alsoTells(stateOf(
+              "tripwire_hook", {{"facing", "east"}, {"powered", "false"}, {"attached", "false"}})) == BlockFace::West);
+    CHECK_FALSE(redstone::alsoTells(stateOf("lever")).has_value());
+    CHECK_FALSE(redstone::alsoTells(stateOf("stone")).has_value());
+}
+
 TEST_CASE("the reach of a change is two blocks through anything solid") {
     WorldState world = emptyWorld();
     world.getOrGenerateChunk(0, 0);

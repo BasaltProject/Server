@@ -113,7 +113,9 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
                                                    .maxY = facts.chunkHeight.maxY(),
                                                    .random = random,
                                                    .hasSkylight = facts.hasSkylight,
-                                                   .gameTime = world.gameTime()};
+                                                   .gameTime = world.gameTime(),
+                                                   .tntExplodes =
+                                                       world.gameRules().get(world::gameRules::kTntExplodes)};
     std::vector<world::BlockChange> effects;
     for (const world::explosions::Broken& block : broken) {
         world::neighbourUpdates::afterChange(
@@ -178,6 +180,11 @@ void ExplosionSystem::collectExplodedBlock(const Identifier& block, std::int32_t
 }
 
 void ExplosionSystem::popResource(world::LoadedWorld& world, const Drop& drop) const {
+    // parity: `Block.popResource` reads the `block_drops` rule before it puts anything in the world,
+    // and what a blast knocked loose is dropped through that same call.
+    if (!world.gameRules().get(world::gameRules::kBlockDrops)) {
+        return;
+    }
     const double spreadX = (options_.nextDouble ? options_.nextDouble() : 0.5) * kPopSpread - kPopSpread / 2.0;
     const double spreadZ = (options_.nextDouble ? options_.nextDouble() : 0.5) * kPopSpread - kPopSpread / 2.0;
     static_cast<void>(world.state().spawnItem(world::DroppedItem{.entityId = players_->allocateEntityId(),
