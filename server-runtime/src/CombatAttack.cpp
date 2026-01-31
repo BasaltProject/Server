@@ -93,6 +93,12 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
         breakVehicle(*session, *target);
         return;
     }
+    // parity: `ItemFrame.hurtServer`, which is not a hit point of damage: it either empties the
+    // frame or takes it off the wall.
+    if (world::itemFrames::isFrame(target->type())) {
+        breakFrame(*session, *target);
+        return;
+    }
     if (!server::registry::entityAttributes::isLiving(target->type())) {
         return;
     }
@@ -414,6 +420,36 @@ void CombatHandler::breakVehicle(PlayerSession& session, ServerEntity& vehicle) 
         }
     }
     vehicle.removed = true;
+}
+
+void CombatHandler::breakFrame(PlayerSession& session, ServerEntity& frame) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    // parity: a fixed frame takes nothing from a plain hit.
+    if (world == nullptr || (frame.sourceNbt.has_value() && frame.sourceNbt->getBoolean("Fixed"))) {
+        return;
+    }
+    const std::optional<server::world::loot::ItemStack> shown = world::itemFrames::shownIn(frame);
+    // parity: `dropItem` puts nothing in the world for a creative player or with `entity_drops` off,
+    // and the frame is emptied either way.
+    const bool drops = session.gamemode != Gamemode::Creative && world->gameRules().get(world::gameRules::kEntityDrops);
+    if (shown.has_value()) {
+        static_cast<void>(frame.sourceNbt->remove("Item"));
+        broadcastFrame(frame);
+        if (drops) {
+            owner_->blockInteraction().spawnDroppedItem(shown->item, shown->count, frame.x, frame.y, frame.z);
+        }
+    } else {
+        frame.removed = true;
+        if (drops) {
+            owner_->blockInteraction().spawnDroppedItem(frame.type(), 1, frame.x, frame.y, frame.z);
+        }
+    }
+    // parity: both halves raise `GameEvent.BLOCK_CHANGE`, and a comparator reading the frame has to
+    // hear that it is empty now.
+    const std::array<std::int32_t, 3> square = world::itemFrames::squareOf(frame);
+    world::redstoneComponents::scheduleComparatorsAround(world->state(), world->name(), square[0], square[1], square[2],
+                                                         world::comparatorReading::of(world->state()));
+    return;
 }
 
 void CombatHandler::killEntity(ServerEntity& entity) {

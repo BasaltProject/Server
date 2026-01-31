@@ -4,6 +4,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
+#include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
 #include <basalt/server/runtime/world/Hoppers.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 
@@ -22,6 +23,12 @@ namespace nbt = basalt::wire::nbt;
 namespace {
 
 constexpr std::string_view kCooldownKey = "TransferCooldown";
+
+[[nodiscard]] std::string propertyOf(std::int32_t stateId, const std::string& name) {
+    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
+    const auto found = properties.find(name);
+    return found == properties.end() ? std::string{} : found->second;
+}
 
 [[nodiscard]] basalt::wire::common::Identifier item(const std::string& path) {
     return basalt::wire::common::Identifier::vanilla(path);
@@ -632,4 +639,81 @@ TEST_CASE("a container that is not a hopper never takes a hopper's turn") {
 
     CHECK(slotsOf(world, 8, 64, 8, 27)[0]->count == 4);
     CHECK_FALSE(slotsOf(world, 8, 64, 7, 27)[0].has_value());
+}
+
+TEST_CASE("what a stack carries survives the move, and two of a kind do not share a slot") {
+    Loaded loaded;
+    WorldState& world = loaded.state;
+    nbt::NbtCompound sharp;
+    sharp.putInt("minecraft:sharpness", 3);
+    nbt::NbtCompound enchanted;
+    enchanted.set("minecraft:enchantments", nbt::NbtTag::ofCompound(sharp));
+    blockInventory::Slots above(27);
+    above[0] = ItemStack{.item = item("diamond_sword"), .count = 1, .components = enchanted};
+    above[1] = ItemStack{.item = item("diamond_sword"), .count = 1};
+    placeContainer(world, 8, 65, 8, above, "chest");
+    placeHopper(world, 8, 64, 8, blockInventory::Slots(hoppers::kSize), "down");
+
+    REQUIRE(hoppers::tick(world, 8, 64, 8, hopperRandom));
+    const blockInventory::Slots first = slotsOf(world, 8, 64, 8, hoppers::kSize);
+    REQUIRE(first[0].has_value());
+    // parity: `ItemStack.CODEC` carries the components, and the hopper moves the stack whole.
+    CHECK(first[0]->components == enchanted);
+
+    // parity: `isSameItemSameComponents`: the plain sword is the same item and not the same stack,
+    // so it takes a slot of its own instead of piling on the enchanted one. The second move waits
+    // out the cooldown the first one booked.
+    bool moved = false;
+    for (std::int32_t turn = 0; turn < 12 && !moved; ++turn) {
+        moved = hoppers::tick(world, 8, 64, 8, hopperRandom);
+    }
+    REQUIRE(moved);
+    const blockInventory::Slots both = slotsOf(world, 8, 64, 8, hoppers::kSize);
+    REQUIRE(both[0].has_value());
+    CHECK(both[0]->count == 1);
+    REQUIRE(both[1].has_value());
+    CHECK(both[1]->count == 1);
+    CHECK(both[1]->components.size() == 0);
+}
+
+TEST_CASE("a hopper fills a chiseled bookshelf through its own door") {
+    Loaded loaded;
+    WorldState& world = loaded.state;
+    const std::optional<std::int32_t> shelf = registry::blockStateDefinitions::stateIdOf(item("chiseled_bookshelf"),
+                                                                                         {{"facing", "north"},
+                                                                                          {"slot_0_occupied", "false"},
+                                                                                          {"slot_1_occupied", "false"},
+                                                                                          {"slot_2_occupied", "false"},
+                                                                                          {"slot_3_occupied", "false"},
+                                                                                          {"slot_4_occupied", "false"},
+                                                                                          {"slot_5_occupied", "false"}},
+                                                                                         std::nullopt);
+    REQUIRE(shelf.has_value());
+    REQUIRE(world.setBlockState(8, 64, 8, *shelf));
+    blockInventory::Slots held(hoppers::kSize);
+    held[0] = ItemStack{.item = item("book"), .count = 1};
+    held[1] = ItemStack{.item = item("cobblestone"), .count = 1};
+    placeHopper(world, 8, 65, 8, held, "down");
+    std::vector<BlockChange> changes;
+    const hoppers::Around around{
+        .isBookshelfBook = [](const basalt::wire::common::Identifier& what) { return what.path() == "book"; },
+        .changes = &changes};
+
+    REQUIRE(hoppers::tick(world, 8, 65, 8, hopperRandom, around));
+
+    // parity: `setItem` runs `updateState`, which lights the slot on the block and is what the
+    // comparator beside it reads.
+    CHECK(propertyOf(*world.blockState(8, 64, 8), "slot_0_occupied") == "true");
+    CHECK(chiseledBookshelves::comparatorSignal(dataAt(world, 8, 64, 8)) == 1);
+    REQUIRE(changes.size() == 1);
+    CHECK(changes[0].x == 8);
+
+    // parity: `acceptsItemType` asks the `bookshelf_books` tag, so the cobblestone stays where it is
+    // however many turns pass.
+    for (std::int32_t turn = 0; turn < 20; ++turn) {
+        static_cast<void>(hoppers::tick(world, 8, 65, 8, hopperRandom, around));
+    }
+    const blockInventory::Slots left = slotsOf(world, 8, 65, 8, hoppers::kSize);
+    REQUIRE(left[1].has_value());
+    CHECK(left[1]->item == item("cobblestone"));
 }

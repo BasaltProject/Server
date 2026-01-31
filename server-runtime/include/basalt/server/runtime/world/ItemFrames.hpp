@@ -19,6 +19,19 @@ namespace itemFrames {
 
 [[nodiscard]] bool isFrame(const wire::common::Identifier& type);
 
+/// parity: `HangingEntity.survives` for a frame: the block behind it holds it up, its own square is
+/// clear, and no other hanging entity is already there facing the same way.
+[[nodiscard]] bool canHang(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                           server::registry::BlockFace facing);
+
+/// parity: the tag `addAdditionalSaveData` writes for a frame nobody has touched yet.
+[[nodiscard]] wire::nbt::NbtCompound freshTag(server::registry::BlockFace facing);
+
+/// parity: `ItemFrame.createBoundingBox`, whose middle is the square's own centre moved back against
+/// the way the frame faces. Answers the three numbers a spawned frame stands at.
+[[nodiscard]] std::array<double, 3> hangingAt(std::int32_t x, std::int32_t y, std::int32_t z,
+                                              server::registry::BlockFace facing);
+
 /// What clicking one did. parity: `ItemFrame.interact`, which puts an item in an empty frame and
 /// turns the one already in a full one.
 enum class Touched : std::uint8_t { Nothing, Took, Rotated };

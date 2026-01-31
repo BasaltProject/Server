@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/command/WorldArguments.hpp>
 #include <basalt/server/runtime/command/commands/DataCommand.hpp>
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
+#include <basalt/server/runtime/world/Lecterns.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/nbt/Snbt.hpp>
 
@@ -202,6 +203,10 @@ void DataCommand::buildModify(const CommandNodeBuilder& root) const {
                                                                   *written});
             world::commandBlocks::onDataLoaded((*world)->state(), block->pos[0], block->pos[1], block->pos[2],
                                                wasAutomatic);
+            // parity: `LecternBlockEntity.loadAdditional` resolves the book it was handed, which is
+            // what marks a written one `resolved` even when it never went through a player's hand.
+            static_cast<void>(
+                world::lecterns::resolveBook((*world)->state(), block->pos[0], block->pos[1], block->pos[2]));
         }
 
         if (const auto* named = holder->as<DataHolderRef::Storage>(); named != nullptr) {

@@ -47,6 +47,9 @@ struct Hooks {
     std::function<bool(std::string_view world, std::int32_t x, std::int32_t y, std::int32_t z, std::string_view cooker,
                        const server::world::loot::ItemStack* input, const server::world::loot::ItemStack* result)>
         allowSmelt;
+    /// parity: `ChiseledBookShelfBlockEntity.acceptsItemType`, which asks the `bookshelf_books`
+    /// item tag: the tags are the datapack's, and this file has no business loading one.
+    std::function<bool(const wire::common::Identifier& item)> isBookshelfBook;
     /// parity: `JukeboxSong.lengthInTicks`, which is data in the operator's own jar.
     std::function<std::int64_t(const std::string& song)> songLength;
     /// The turn a song ran out on: the block keeps its disc but stops feeding the redstone, so

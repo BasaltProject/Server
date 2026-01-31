@@ -237,6 +237,7 @@ basalt_module(server-runtime-core
         src/world/BlockPlacement.cpp
         src/world/RealRecipes.cpp
         src/world/PlacementVariants.cpp
+        src/world/PistonSlide.cpp
         src/world/Pistons.cpp
         src/world/NeighbourUpdates.cpp
         src/world/RealVillagerTrades.cpp

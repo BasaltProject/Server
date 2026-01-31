@@ -1,3 +1,5 @@
+#include <basalt/server/registry/BlockShapes.hpp>
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ItemFrames.hpp>
@@ -10,10 +12,66 @@ namespace {
 /// parity: `ItemFrame.NUM_ROTATIONS`.
 constexpr std::int32_t kRotations = 8;
 
+/// parity: `createBoundingBox`'s own `0.46875`, which is what puts the frame against the wall rather
+/// than in the middle of its square.
+constexpr double kAgainstTheWall = 0.46875;
+
 } // namespace
 
 bool isFrame(const wire::common::Identifier& type) {
     return type.path() == "item_frame" || type.path() == "glow_item_frame";
+}
+
+bool canHang(const WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+             const server::registry::BlockFace facing) {
+    // parity: `calculateSupportBox` is the frame's own box pushed half a block back, which lands in
+    // the square behind it, and every block in it has to be solid or a diode.
+    const std::optional<std::int32_t> behind =
+        world.blockState(x - registry::stepX(facing), y - registry::stepY(facing), z - registry::stepZ(facing));
+    if (!behind.has_value()) {
+        return false;
+    }
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*behind);
+    const std::string_view path = block == nullptr ? std::string_view{} : block->path();
+    const bool holds = registry::blockShapes::isSolidState(*behind) || path == "repeater" || path == "comparator";
+    if (!holds) {
+        return false;
+    }
+    // parity: `hasLevelCollision(getPopBox())`, and the pop box lies inside the frame's own square.
+    const std::optional<std::int32_t> here = world.blockState(x, y, z);
+    if (!here.has_value() || !registry::blockShapes::collisionBoxes(*here).empty()) {
+        return false;
+    }
+    // parity: `canCoexist(false)`, which refuses another hanging entity of the same kind and any
+    // hanging entity facing the same way.
+    for (const entity::ServerEntity* other : world.entities()) {
+        if (other == nullptr || !isFrame(other->type()) || other->removed) {
+            continue;
+        }
+        const std::array<std::int32_t, 3> square = squareOf(*other);
+        if (square != std::array<std::int32_t, 3>{x, y, z}) {
+            continue;
+        }
+        return false;
+    }
+    return true;
+}
+
+wire::nbt::NbtCompound freshTag(const server::registry::BlockFace facing) {
+    wire::nbt::NbtCompound tag;
+    tag.putByte("Facing", static_cast<std::int8_t>(facing));
+    tag.putByte("ItemRotation", 0);
+    tag.putFloat("ItemDropChance", 1.0F);
+    tag.putBoolean("Invisible", false);
+    tag.putBoolean("Fixed", false);
+    return tag;
+}
+
+std::array<double, 3> hangingAt(const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                                const server::registry::BlockFace facing) {
+    return {x + 0.5 - (registry::stepX(facing) * kAgainstTheWall),
+            y + 0.5 - (registry::stepY(facing) * kAgainstTheWall),
+            z + 0.5 - (registry::stepZ(facing) * kAgainstTheWall)};
 }
 
 std::array<std::int32_t, 3> squareOf(const entity::ServerEntity& frame) {

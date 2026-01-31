@@ -105,6 +105,10 @@ inline constexpr GameRule kTntExplodes = GameRule::boolean("tnt_explodes", true)
 /// With this off a block still breaks and still goes: what it drops is what stops.
 inline constexpr GameRule kBlockDrops = GameRule::boolean("block_drops", true);
 
+/// parity: `Entity.spawnAtLocation` answers nothing with this off, so a mob still dies and an item
+/// frame still comes off the wall: what they leave behind is what stops.
+inline constexpr GameRule kEntityDrops = GameRule::boolean("entity_drops", true);
+
 /// parity: off in vanilla, which is why lava has no infinite pools.
 inline constexpr GameRule kLavaSourceConversion = GameRule::boolean("lava_source_conversion", false);
 

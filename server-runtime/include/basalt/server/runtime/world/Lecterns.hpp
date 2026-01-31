@@ -30,6 +30,12 @@ inline constexpr std::int32_t kPulseTicks = 2;
 [[nodiscard]] std::optional<BlockChange> placeBook(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                    const server::world::loot::ItemStack& book);
 
+/// parity: `LecternBlockEntity.resolveBook`, which runs from `setBook` **and** from
+/// `loadAdditional`: a written book on a stand comes back with its `written_book_content` marked
+/// `resolved`, because the lectern resolved its pages once and for all. Answers whether it changed
+/// anything, so a caller that has to save the block entity knows.
+bool resolveBook(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
 /// parity: `resetBookState(false)` plus the book itself, which is what taking it back gives.
 [[nodiscard]] std::optional<std::pair<BlockChange, server::world::loot::ItemStack>>
 takeBook(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);

@@ -4,6 +4,8 @@
 #include <basalt/server/runtime/command/DataPaths.hpp>
 #include <basalt/server/runtime/command/WorldArguments.hpp>
 #include <basalt/server/runtime/command/commands/DataCommand.hpp>
+#include <basalt/server/runtime/world/CommandBlocks.hpp>
+#include <basalt/server/runtime/world/Lecterns.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/nbt/Snbt.hpp>
 
@@ -154,8 +156,15 @@ void DataCommand::build(const CommandNodeBuilder& root) const {
         if (existing == nullptr) {
             return CommandSyntaxError{.component = Component::translatable("commands.data.block.invalid")};
         }
+        // parity: `loadAdditional` runs on what a command writes, and two block entities do
+        // something with it: a command block that has just become automatic books a turn, and a
+        // lectern resolves the book it was handed.
+        const bool wasAutomatic = existing->data().getBoolean("auto");
         chunk->setBlockEntity(server::world::ChunkBlockEntity{existing->localX(), existing->y(), existing->localZ(),
                                                               existing->type(), value});
+        world::commandBlocks::onDataLoaded((*world)->state(), block->pos[0], block->pos[1], block->pos[2],
+                                           wasAutomatic);
+        static_cast<void>(world::lecterns::resolveBook((*world)->state(), block->pos[0], block->pos[1], block->pos[2]));
         return std::nullopt;
     };
 

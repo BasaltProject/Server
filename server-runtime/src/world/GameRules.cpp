@@ -25,7 +25,7 @@ constexpr std::array kAll = {
     GameRule::boolean("drowning_damage", true),
     GameRule::boolean("elytra_movement_check", true),
     GameRule::boolean("ender_pearls_vanish_on_death", true),
-    GameRule::boolean("entity_drops", true),
+    gameRules::kEntityDrops,
     gameRules::kFallDamage,
     GameRule::boolean("fire_damage", true),
     GameRule::integer("fire_spread_radius_around_player", 128, -1),
