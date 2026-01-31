@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/RandomTicks.hpp>
 #include <basalt/server/world/loot/Loot.hpp>
@@ -59,9 +60,12 @@ public:
         world::jukeboxes::SongOutputs* jukeboxes = nullptr;
     };
 
+    /// `runCommand` is what a command block runs its command with. It is a constructor parameter and
+    /// not a field of `Options` on purpose: an unset one would leave every command block silently
+    /// doing nothing, and this way the compiler names the site that forgot it.
     RedstoneTickSystem(player::PlayerRegistry& players, world::RealRecipes& recipes,
-                       BlockChangeBroadcaster& broadcaster, ChunkSimulationView& chunkSimulation, Hooks hooks,
-                       Options options);
+                       BlockChangeBroadcaster& broadcaster, ChunkSimulationView& chunkSimulation,
+                       world::commandBlocks::RunCommand runCommand, Hooks hooks, Options options);
 
     /// parity: `AbstractMinecart.getDefaultGravity`, the same 0.04 as anything else that is not
     /// alive.
@@ -130,6 +134,8 @@ private:
     ChunkSimulationView* chunkSimulation_;
     Hooks hooks_;
     Options options_;
+    /// What a command block runs its command with.
+    world::commandBlocks::RunCommand runCommand_;
     /// Which block each player was last heard stepping in, so one step is one vibration.
     std::map<std::int32_t, std::int64_t> lastFootstep_;
     /// The block ticks vanilla schedules at random per chunk: crops growing, ice melting and so on.

@@ -17,6 +17,7 @@
 #include <basalt/server/runtime/world/Buckets.hpp>
 #include <basalt/server/runtime/world/Campfires.hpp>
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
+#include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
@@ -473,8 +474,21 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
     if (world != nullptr && reg::blockEntityTypes::ofBlock(placedBlock) != nullptr) {
         server::world::Chunk* chunk = world->state().chunkIfLoaded(placeAt.x >> 4, placeAt.z >> 4);
         if (chunk != nullptr) {
-            chunk->setBlockEntity(
-                server::world::ChunkBlockEntity{placeAt.x & 15, placeAt.y, placeAt.z & 15, placedBlock, {}});
+            const std::optional<world::commandBlocks::Mode> mode = world::commandBlocks::modeOf(placedBlock.path());
+            wire::nbt::NbtCompound data =
+                mode.has_value() ? world::commandBlocks::defaults() : wire::nbt::NbtCompound{};
+            // parity: `CommandBlock.setPlacedBy`, which is the placing half and not the command one:
+            // a repeating block put down **by hand** comes out already automatic, and `TrackOutput`
+            // starts as whatever `sendCommandFeedback` says. A `/setblock` runs none of this.
+            if (mode.has_value()) {
+                data.putBoolean("auto", *mode == world::commandBlocks::Mode::Repeating);
+                data.putBoolean("TrackOutput", world->gameRules().get(world::gameRules::kSendCommandFeedback));
+            }
+            chunk->setBlockEntity(server::world::ChunkBlockEntity{placeAt.x & 15, placeAt.y, placeAt.z & 15,
+                                                                  placedBlock, std::move(data)});
+            if (mode.has_value()) {
+                world::commandBlocks::onDataLoaded(world->state(), placeAt.x, placeAt.y, placeAt.z, false);
+            }
         }
     }
     const Identifier* placedPath = reg::blockStateDefinitions::blockOf(blockStateId);

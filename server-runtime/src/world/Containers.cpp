@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/BrewingStands.hpp>
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
+#include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
 #include <basalt/server/runtime/world/DoubleChests.hpp>
@@ -204,6 +205,14 @@ std::optional<std::int32_t> analogSignal(WorldState& world, std::int32_t x, std:
         const server::world::ChunkBlockEntity* heard =
             awake == nullptr ? nullptr : awake->blockEntityAt(x & 15, y, z & 15);
         return heard == nullptr ? 0 : heard->data().getInt(std::string{vibrations::kFrequencyKey}, 0);
+    }
+    // parity: `CommandBlock.getAnalogOutputSignal`, which is the `SuccessCount` of the last command it
+    // ran and nothing else. Like the rail it answers zero rather than nothing.
+    if (commandBlocks::modeOf(path).has_value()) {
+        const server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
+        const server::world::ChunkBlockEntity* entity =
+            chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+        return entity == nullptr ? 0 : commandBlocks::comparatorSignal(entity->data()).value_or(0);
     }
     // parity: `DetectorRailBlock.getAnalogOutputSignal`, which is a reading like any other even
     // though what it reads is not in the block: it answers zero, never nothing.

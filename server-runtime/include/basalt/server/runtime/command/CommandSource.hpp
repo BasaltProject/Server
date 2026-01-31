@@ -142,4 +142,36 @@ private:
     const config::GroupsConfig* groups_;
 };
 
+/// A command block running its own command. parity: `BaseCommandBlock.createCommandSourceStack`,
+/// permission two, named by `CustomName` or `@`. What it says reaches the operators only while
+/// `commandBlockOutput` is on, which is what `speaks` stands for.
+class CommandBlockSource final : public CommandSource {
+public:
+    CommandBlockSource(std::array<double, 3> at, std::string name, bool speaks, wire::common::Logger logger,
+                       wire::text::LangTable lang = wire::text::LangTable{});
+
+    [[nodiscard]] std::string name() const override { return name_; }
+
+    [[nodiscard]] wire::text::Component displayName() const override;
+
+    [[nodiscard]] std::int32_t permissionLevel() const override { return permissionLevel::kGamemasters; }
+
+    [[nodiscard]] std::array<double, 3> position() const override { return at_; }
+
+    [[nodiscard]] player::PlayerSession* player() const override { return nullptr; }
+
+    void sendSystemMessage(const wire::text::Component& message) const override;
+
+    /// parity: a command block is granted whatever level two is granted, and this build asks the same
+    /// question every other source does rather than inventing a second answer.
+    [[nodiscard]] bool hasPermission(std::optional<std::string_view> node) const override;
+
+private:
+    std::array<double, 3> at_;
+    std::string name_;
+    bool speaks_;
+    wire::common::Logger logger_;
+    wire::text::LangTable lang_;
+};
+
 } // namespace basalt::server::runtime::command

@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/command/DataPaths.hpp>
 #include <basalt/server/runtime/command/WorldArguments.hpp>
 #include <basalt/server/runtime/command/commands/DataCommand.hpp>
+#include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/nbt/Snbt.hpp>
 
@@ -193,9 +194,14 @@ void DataCommand::buildModify(const CommandNodeBuilder& root) const {
                 return std::unexpected{
                     CommandSyntaxError{.component = Component::translatable("commands.data.block.invalid")}};
             }
+            // parity: `loadAdditional` ends in `setAutomatic`, which books a turn when `auto` has just
+            // come on. Writing the data is what starts a repeating command block nobody has powered.
+            const bool wasAutomatic = existingEntity->data().getBoolean("auto");
             chunk->setBlockEntity(server::world::ChunkBlockEntity{existingEntity->localX(), existingEntity->y(),
                                                                   existingEntity->localZ(), existingEntity->type(),
                                                                   *written});
+            world::commandBlocks::onDataLoaded((*world)->state(), block->pos[0], block->pos[1], block->pos[2],
+                                               wasAutomatic);
         }
 
         if (const auto* named = holder->as<DataHolderRef::Storage>(); named != nullptr) {
