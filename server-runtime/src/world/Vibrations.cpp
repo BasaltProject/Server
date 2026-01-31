@@ -25,6 +25,23 @@ constexpr std::array<registry::BlockFace, 6> kFaces{registry::BlockFace::Down,  
     return instance;
 }
 
+/// The four horizontal names a `facing` can hold, which is all a calibrated sensor ever has.
+[[nodiscard]] std::optional<registry::BlockFace> faceNamed(std::string_view name) {
+    if (name == "north") {
+        return registry::BlockFace::North;
+    }
+    if (name == "south") {
+        return registry::BlockFace::South;
+    }
+    if (name == "west") {
+        return registry::BlockFace::West;
+    }
+    if (name == "east") {
+        return registry::BlockFace::East;
+    }
+    return std::nullopt;
+}
+
 [[nodiscard]] const wire::common::Identifier& calibrated() {
     static const wire::common::Identifier instance = wire::common::Identifier::vanilla("calibrated_sculk_sensor");
     return instance;
@@ -274,6 +291,26 @@ void hear(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::in
     if (static_cast<std::int32_t>(std::floor(x)) == sensorX && static_cast<std::int32_t>(std::floor(y)) == sensorY &&
         static_cast<std::int32_t>(std::floor(z)) == sensorZ && (event == "block_destroy" || event == "block_place")) {
         return;
+    }
+    // parity: `CalibratedSculkSensorBlockEntity.VibrationUser.canReceiveVibration`. A calibrated
+    // sensor reads the signal on its **back** and, when that is not zero, hears only the noise whose
+    // frequency is that number. A zero back leaves it hearing everything, like a plain sensor.
+    if (block == calibrated()) {
+        const auto named = properties.find("facing");
+        const std::optional<registry::BlockFace> facing =
+            named == properties.end() ? std::nullopt : faceNamed(named->second);
+        if (facing.has_value()) {
+            const registry::BlockFace behind = registry::opposite(*facing);
+            // The world's name is what `containerOpeners` is keyed by and a vibration never carries
+            // one, so a **trapped chest** tuned into the back of a calibrated sensor reads here as
+            // if nobody had it open. Everything else that can sit there answers from the block alone.
+            const std::int32_t back =
+                redstone::signalFrom(world, {}, sensorX + registry::stepX(behind), sensorY + registry::stepY(behind),
+                                     sensorZ + registry::stepZ(behind), behind);
+            if (back != 0 && frequencyOf(event) != back) {
+                return;
+            }
+        }
     }
     // parity: `handleGameEvent` asks this last of all, after the sensor has said it can hear it.
     if (occluded(world, x, y, z, sensorX, sensorY, sensorZ)) {

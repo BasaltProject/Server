@@ -2,7 +2,9 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 
+#include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -86,6 +88,33 @@ constexpr std::int32_t kDelay = 1;
     return met;
 }
 
+/// parity: `"Searge".equalsIgnoreCase(this.command)`, matched without regard to case.
+[[nodiscard]] bool isSearge(std::string_view command) {
+    static constexpr std::string_view kName = "Searge";
+    if (command.size() != kName.size()) {
+        return false;
+    }
+    for (std::size_t at = 0; at < command.size(); ++at) {
+        if (std::tolower(static_cast<unsigned char>(command[at])) !=
+            std::tolower(static_cast<unsigned char>(kName[at]))) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/// parity: the tail of `performCommand`: the turn is marked unless the block was told not to, and a
+/// -1 is written as nothing at all.
+void markExecuted(server::world::ChunkBlockEntity& entity, WorldState& world, std::int32_t x, std::int32_t z,
+                  std::int64_t gameTime) {
+    if (entity.data().getBoolean(std::string{kUpdateLastKey}, true)) {
+        entity.data().putLong(std::string{kLastExecutionKey}, gameTime);
+    } else {
+        static_cast<void>(entity.data().remove(std::string{kLastExecutionKey}));
+    }
+    world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
+}
+
 /// parity: `BaseCommandBlock.performCommand`. The guard at the top is what stops a chain running
 /// twice on one tick, and it is the only thing that does.
 [[nodiscard]] bool performCommand(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
@@ -97,22 +126,25 @@ constexpr std::int32_t kDelay = 1;
     if (entity->data().getLong(std::string{kLastExecutionKey}, -1) == gameTime) {
         return false;
     }
-    entity->data().putInt(std::string{kSuccessKey}, 0);
     const std::string command{entity->data().getString(std::string{kCommandKey})};
-    if (commandBlocksWork && !command.empty() && run && run(x, y, z, command)) {
+    // parity: `performCommand` answers a command block whose command is the word `Searge` before it
+    // looks at anything else: it counts one, writes `#itzlipofutzli` as its output and runs nothing,
+    // whatever the `command_blocks_work` rule says. Left in since 1.9 and readable from a comparator.
+    if (isSearge(command)) {
         entity->data().putInt(std::string{kSuccessKey}, 1);
+        markExecuted(*entity, world, x, z, gameTime);
+        return true;
+    }
+    entity->data().putInt(std::string{kSuccessKey}, 0);
+    if (commandBlocksWork && !command.empty() && run) {
+        entity->data().putInt(std::string{kSuccessKey}, std::max(0, run(x, y, z, command)));
     }
     // parity: `updateLastExecution` off leaves the mark at -1, which is what lets the same block run
     // again inside one tick. It reads **true** when absent: `BaseCommandBlock.load` is
     // `getBooleanOr("UpdateLastExecution", true)` and the field starts true, so a block placed by
     // command and never told otherwise marks its turn. A -1 is not written at all, which is what
     // `saveAdditional` does with it.
-    if (entity->data().getBoolean(std::string{kUpdateLastKey}, true)) {
-        entity->data().putLong(std::string{kLastExecutionKey}, gameTime);
-    } else {
-        static_cast<void>(entity->data().remove(std::string{kLastExecutionKey}));
-    }
-    world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
+    markExecuted(*entity, world, x, z, gameTime);
     return true;
 }
 

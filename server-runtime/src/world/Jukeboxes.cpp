@@ -6,15 +6,15 @@
 #include <charconv>
 #include <cmath>
 #include <cstdint>
+#include <expected>
 #include <utility>
 
 namespace basalt::server::runtime::world::jukeboxes {
 namespace {
 
-constexpr std::string_view kSongKey = "BasaltSong";
-
-/// The song's own comparator number, kept beside it so a comparator needs no lookup.
-constexpr std::string_view kOutputKey = "BasaltSongOutput";
+/// parity: `JukeboxBlockEntity.SONG_ITEM_TAG_ID`, an `ItemStack.CODEC` compound: the disc itself,
+/// written under vanilla's own name so a world of ours opens in vanilla still playing.
+constexpr std::string_view kRecordKey = "RecordItem";
 
 /// parity: `JukeboxBlockEntity.TICKS_SINCE_SONG_STARTED_TAG_ID`, written only while a song plays. A
 /// disc that has finished stays in the block, so this is the only thing that says it is still going.
@@ -40,6 +40,22 @@ constexpr std::string_view kDiscPrefix = "music_disc_";
     }
     chunk->setBlockEntity(server::world::ChunkBlockEntity{x & 15, y, z & 15, block(), wire::nbt::NbtCompound{}});
     return chunk->blockEntityAt(x & 15, y, z & 15);
+}
+
+/// The disc a jukebox holds, read the way vanilla writes it.
+[[nodiscard]] std::optional<wire::common::Identifier> discIn(const wire::nbt::NbtCompound& data) {
+    const wire::nbt::NbtTag* record = data.find(std::string{kRecordKey});
+    const wire::nbt::NbtCompound* held = record == nullptr ? nullptr : record->get<wire::nbt::NbtCompound>();
+    if (held == nullptr) {
+        return std::nullopt;
+    }
+    const std::string_view id = held->getString("id");
+    if (id.empty()) {
+        return std::nullopt;
+    }
+    const std::expected<wire::common::Identifier, wire::common::IdentifierError> parsed =
+        wire::common::Identifier::parse(std::string{id});
+    return parsed.has_value() ? std::optional{*parsed} : std::nullopt;
 }
 
 [[nodiscard]] std::optional<std::int32_t> turned(std::int32_t stateId, const wire::common::Identifier& id,
@@ -68,7 +84,7 @@ std::string songOf(const wire::common::Identifier& disc) {
 bool isDisc(const wire::common::Identifier& item) { return item.path().starts_with(kDiscPrefix); }
 
 std::optional<BlockChange> insert(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                  const wire::common::Identifier& disc, std::int32_t comparatorOutput) {
+                                  const wire::common::Identifier& disc) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return std::nullopt;
@@ -85,8 +101,10 @@ std::optional<BlockChange> insert(WorldState& world, std::int32_t x, std::int32_
     if (!playing.has_value() || !world.setBlockState(x, y, z, *playing)) {
         return std::nullopt;
     }
-    entity->data().putString(kSongKey, songOf(disc));
-    entity->data().putInt(kOutputKey, comparatorOutput);
+    wire::nbt::NbtCompound record;
+    record.putString("id", disc.toString());
+    record.putInt("count", 1);
+    entity->data().set(std::string{kRecordKey}, wire::nbt::NbtTag::ofCompound(std::move(record)));
     entity->data().putLong(kTicksKey, 0);
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
     redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
@@ -107,21 +125,19 @@ std::optional<std::pair<BlockChange, wire::common::Identifier>> eject(WorldState
     if (entity == nullptr) {
         return std::nullopt;
     }
-    const std::string song{entity->data().getString(kSongKey)};
-    if (song.empty()) {
+    const std::optional<wire::common::Identifier> disc = discIn(entity->data());
+    if (!disc.has_value()) {
         return std::nullopt;
     }
     const std::optional<std::int32_t> quiet = turned(*stateId, *found, "false");
     if (!quiet.has_value() || !world.setBlockState(x, y, z, *quiet)) {
         return std::nullopt;
     }
-    entity->data().remove(kSongKey);
-    entity->data().remove(kOutputKey);
-    entity->data().remove(kTicksKey);
+    static_cast<void>(entity->data().remove(std::string{kRecordKey}));
+    static_cast<void>(entity->data().remove(std::string{kTicksKey}));
     world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
     redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
-    return std::pair{BlockChange{.x = x, .y = y, .z = z, .stateId = *quiet},
-                     wire::common::Identifier::vanilla(std::string{kDiscPrefix} + song)};
+    return std::pair{BlockChange{.x = x, .y = y, .z = z, .stateId = *quiet}, *disc};
 }
 
 std::optional<std::string> songAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
@@ -129,8 +145,8 @@ std::optional<std::string> songAt(WorldState& world, std::int32_t x, std::int32_
     if (entity == nullptr) {
         return std::nullopt;
     }
-    const std::string_view song = entity->data().getString(kSongKey);
-    return song.empty() ? std::nullopt : std::optional{std::string{song}};
+    const std::optional<wire::common::Identifier> disc = discIn(entity->data());
+    return disc.has_value() ? std::optional{songOf(*disc)} : std::nullopt;
 }
 
 bool isPlaying(const wire::nbt::NbtCompound& data) { return data.find(kTicksKey) != nullptr; }
@@ -152,7 +168,10 @@ bool tick(WorldState& world, const std::int32_t x, const std::int32_t y, const s
     return false;
 }
 
-std::int32_t comparatorOutputAt(const wire::nbt::NbtCompound& data) { return data.getInt(kOutputKey, 0); }
+std::int32_t comparatorOutputAt(const WorldState& world, const wire::nbt::NbtCompound& data) {
+    const std::optional<wire::common::Identifier> disc = discIn(data);
+    return disc.has_value() ? world.songOutput(songOf(*disc)) : 0;
+}
 
 namespace {
 

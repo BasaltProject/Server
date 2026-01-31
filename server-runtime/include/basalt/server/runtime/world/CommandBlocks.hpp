@@ -25,7 +25,11 @@ enum class Mode : std::uint8_t { Impulse, Chain, Repeating };
 /// What running a command costs the caller: the text, and whether it succeeded. It is a required
 /// parameter everywhere below, never a defaulted hook: a command block that cannot run its command is
 /// not a command block, and an empty callback would make one silently.
-using RunCommand = std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z, const std::string& command)>;
+/// Runs one command block's line, answering **how many times it succeeded**: one for an ordinary
+/// command, and one per branch for a `/execute` that forks. parity: `BaseCommandBlock.performCommand`
+/// counts the callbacks brigadier raises, so `SuccessCount` is a count and not a result.
+using RunCommand =
+    std::function<std::int32_t(std::int32_t x, std::int32_t y, std::int32_t z, const std::string& command)>;
 
 /// parity: `CommandBlock.setPoweredAndUpdate`. Only a **change** in the signal does anything, and only
 /// a rising one books a turn: a repeating or a chain block never starts itself from redstone.

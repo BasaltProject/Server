@@ -107,6 +107,17 @@ public:
         onChunkInstalled_ = std::move(handler);
     }
 
+    /// What a comparator reads off a jukebox playing this song.
+    ///
+    /// parity: `JukeboxSong.comparatorOutput`, a number that lives in the jar's own data and not in
+    /// the world, so it arrives as a callback the same way the chunk source does. Without one every
+    /// jukebox reads zero, which is what a world with no jar installed can honestly say.
+    using SongOutput = std::function<std::int32_t(const std::string& song)>;
+
+    void setSongOutput(SongOutput songOutput) { songOutput_ = std::move(songOutput); }
+
+    [[nodiscard]] std::int32_t songOutput(const std::string& song) const { return songOutput_ ? songOutput_(song) : 0; }
+
     [[nodiscard]] std::vector<server::world::Chunk*> chunks() const;
 
     [[nodiscard]] std::size_t loadedChunkCount() const;
@@ -310,6 +321,7 @@ private:
 
     mutable WorldMutex mutex_;
     LoadOrGenerate loadOrGenerate_;
+    SongOutput songOutput_;
     sched::Owner* owner_ = nullptr;
     sched::Owner* installOwner_ = nullptr;
     std::function<std::int32_t()> regionCount_;

@@ -60,16 +60,20 @@ TEST_CASE("a disc is named after the song it plays") {
 TEST_CASE("a disc goes in, plays, and comes back out") {
     Loaded loaded;
     WorldState& world = loaded.state;
+    // parity: the number lives in the jar's own `jukebox_song/13.json` (`comparator_output`, which
+    // for `13` really is one), not in the world, so the state is handed a reader for it exactly as
+    // the server hands it one.
+    world.setSongOutput([](const std::string& song) { return song == "13" ? 1 : 0; });
     const std::int32_t quiet = stateOf("jukebox", {{"has_record", "false"}});
     const std::int32_t playing = stateOf("jukebox", {{"has_record", "true"}});
     REQUIRE(world.setBlockState(8, 64, 8, quiet));
 
-    const std::optional<BlockChange> started = jukeboxes::insert(world, 8, 64, 8, item("music_disc_13"), 13);
+    const std::optional<BlockChange> started = jukeboxes::insert(world, 8, 64, 8, item("music_disc_13"));
     REQUIRE(started.has_value());
     CHECK(started->stateId == playing);
     CHECK(world.blockState(8, 64, 8) == playing);
     CHECK(jukeboxes::songAt(world, 8, 64, 8) == "13");
-    CHECK(jukeboxes::comparatorOutputAt(dataAt(world, 8, 64, 8)) == 13);
+    CHECK(jukeboxes::comparatorOutputAt(world, dataAt(world, 8, 64, 8)) == 1);
 
     const std::optional<std::pair<BlockChange, basalt::wire::common::Identifier>> stopped =
         jukeboxes::eject(world, 8, 64, 8);
@@ -78,16 +82,16 @@ TEST_CASE("a disc goes in, plays, and comes back out") {
     CHECK(stopped->second == item("music_disc_13"));
     CHECK(world.blockState(8, 64, 8) == quiet);
     CHECK_FALSE(jukeboxes::songAt(world, 8, 64, 8).has_value());
-    CHECK(jukeboxes::comparatorOutputAt(dataAt(world, 8, 64, 8)) == 0);
+    CHECK(jukeboxes::comparatorOutputAt(world, dataAt(world, 8, 64, 8)) == 0);
 }
 
 TEST_CASE("a jukebox that is already playing takes no second disc") {
     Loaded loaded;
     WorldState& world = loaded.state;
     REQUIRE(world.setBlockState(8, 64, 8, stateOf("jukebox", {{"has_record", "false"}})));
-    REQUIRE(jukeboxes::insert(world, 8, 64, 8, item("music_disc_cat"), 1).has_value());
+    REQUIRE(jukeboxes::insert(world, 8, 64, 8, item("music_disc_cat")).has_value());
 
-    CHECK_FALSE(jukeboxes::insert(world, 8, 64, 8, item("music_disc_13"), 13).has_value());
+    CHECK_FALSE(jukeboxes::insert(world, 8, 64, 8, item("music_disc_13")).has_value());
     CHECK(jukeboxes::songAt(world, 8, 64, 8) == "cat");
 }
 
@@ -98,27 +102,28 @@ TEST_CASE("an empty jukebox has nothing to eject, and neither has anything else"
     CHECK_FALSE(jukeboxes::eject(world, 8, 64, 8).has_value());
 
     REQUIRE(world.setBlockState(4, 64, 4, registry::blocks::named("stone")->stateId));
-    CHECK_FALSE(jukeboxes::insert(world, 4, 64, 4, item("music_disc_13"), 13).has_value());
+    CHECK_FALSE(jukeboxes::insert(world, 4, 64, 4, item("music_disc_13")).has_value());
     CHECK_FALSE(jukeboxes::eject(world, 4, 64, 4).has_value());
     CHECK_FALSE(jukeboxes::songAt(world, 4, 64, 4).has_value());
 
     // And a position with no chunk under it answers no rather than reaching for one.
-    CHECK_FALSE(jukeboxes::insert(world, 300, 64, 300, item("music_disc_13"), 13).has_value());
+    CHECK_FALSE(jukeboxes::insert(world, 300, 64, 300, item("music_disc_13")).has_value());
 }
 
 TEST_CASE("a jukebox away from the middle chunk is found where it stands") {
     Loaded loaded;
     WorldState& world = loaded.state;
     world.getOrGenerateChunk(1, 1);
+    world.setSongOutput([](const std::string& song) { return song == "cat" ? 1 : 0; });
     const std::int32_t quiet = stateOf("jukebox", {{"has_record", "false"}});
     // Twenty-one is in the next chunk over and its low bits are odd, so both halves of the split
     // have to be right for the block entity to land on the block.
     REQUIRE(world.setBlockState(21, 64, 21, quiet));
 
-    REQUIRE(jukeboxes::insert(world, 21, 64, 21, item("music_disc_cat"), 1).has_value());
+    REQUIRE(jukeboxes::insert(world, 21, 64, 21, item("music_disc_cat")).has_value());
 
     CHECK(jukeboxes::songAt(world, 21, 64, 21) == "cat");
-    CHECK(jukeboxes::comparatorOutputAt(dataAt(world, 21, 64, 21)) == 1);
+    CHECK(jukeboxes::comparatorOutputAt(world, dataAt(world, 21, 64, 21)) == 1);
     CHECK(jukeboxes::eject(world, 21, 64, 21).has_value());
 }
 
@@ -173,9 +178,10 @@ TEST_CASE("with no jar to read, every song is nothing") {
 TEST_CASE("a song runs out and the jukebox stops feeding the redstone, disc still in") {
     Loaded loaded;
     WorldState& world = loaded.state;
+    world.setSongOutput([](const std::string& song) { return song == "13" ? 1 : 0; });
     const std::int32_t playing = stateOf("jukebox", {{"has_record", "true"}});
     REQUIRE(world.setBlockState(8, 64, 8, stateOf("jukebox", {{"has_record", "false"}})));
-    REQUIRE(jukeboxes::insert(world, 8, 64, 8, item("music_disc_13"), 1).has_value());
+    REQUIRE(jukeboxes::insert(world, 8, 64, 8, item("music_disc_13")).has_value());
     CHECK(jukeboxes::isPlaying(dataAt(world, 8, 64, 8)));
 
     // parity: `JukeboxSong.hasFinished` waits the song's own length plus a second of padding, and
@@ -191,7 +197,9 @@ TEST_CASE("a song runs out and the jukebox stops feeding the redstone, disc stil
     // The disc stays where it is: it is the song that ended, not the record that popped.
     CHECK(world.blockState(8, 64, 8) == playing);
     CHECK(jukeboxes::songAt(world, 8, 64, 8) == "13");
-    CHECK(jukeboxes::comparatorOutputAt(dataAt(world, 8, 64, 8)) == 1);
+    // parity: `JukeboxBlockEntity.getComparatorOutput` reads the **disc**, not the song player, so a
+    // record that has finished still answers its own number until somebody takes it out.
+    CHECK(jukeboxes::comparatorOutputAt(world, dataAt(world, 8, 64, 8)) == 1);
     // And a jukebox that already stopped has nothing left to do.
     CHECK_FALSE(jukeboxes::tick(world, 8, 64, 8, kLength));
 }
@@ -200,7 +208,7 @@ TEST_CASE("a jukebox gives fifteen while the song plays and nothing once it has 
     Loaded loaded;
     WorldState& world = loaded.state;
     REQUIRE(world.setBlockState(8, 64, 8, stateOf("jukebox", {{"has_record", "false"}})));
-    REQUIRE(jukeboxes::insert(world, 8, 64, 8, item("music_disc_13"), 1).has_value());
+    REQUIRE(jukeboxes::insert(world, 8, 64, 8, item("music_disc_13")).has_value());
     CHECK(redstone::signalFrom(world, "overworld", 8, 64, 8, registry::BlockFace::Up) == redstone::kMaxSignal);
 
     constexpr std::int64_t kLength = 1;

@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/ChunkSimulationView.hpp>
 #include <basalt/server/runtime/RedstoneTickSystem.hpp>
+#include <basalt/server/runtime/entity/BlockTriggers.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
@@ -166,7 +167,7 @@ void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sch
     // parity: `entityInside` runs for whoever is inside the square, and a mob is inside it just the
     // same. Only players and items ever asked here.
     for (const entity::ServerEntity* standing : world.state().entities()) {
-        if (!standing->removed) {
+        if (!standing->removed && !entity::blockTriggers::ignored(standing->type())) {
             touch(standing->x, standing->y, standing->z, items.size());
         }
     }
@@ -358,6 +359,16 @@ void RedstoneTickSystem::tickTripwires(world::LoadedWorld& world, const sched::R
             crossingsOf(world, item.x, item.y, item.z, crossed);
         }
     }
+    // parity: `TripWireBlock.entityInside` runs for whatever is inside the square, and `checkPressed`
+    // counts anything that is not `isIgnoringBlockTriggers`. A mob walking a string sets it off, and
+    // only players and items ever asked here.
+    for (const entity::ServerEntity* crossing : world.state().entities()) {
+        if (crossing->removed || entity::blockTriggers::ignored(crossing->type()) ||
+            !region.ownsPosition(crossing->x, crossing->z)) {
+            continue;
+        }
+        crossingsOf(world, crossing->x, crossing->y, crossing->z, crossed);
+    }
     for (const std::int64_t packed : crossed) {
         world::tripwires::press(world.state(), unpackX(packed), unpackY(packed), unpackZ(packed), true,
                                 world.gameTime(), changes);
@@ -388,7 +399,10 @@ std::int32_t RedstoneTickSystem::standingOn(world::LoadedWorld& world, std::int3
     // A mob, an arrow, a boat or a lit tnt is an entity like any other, and none of them was counted:
     // this sweep only knew about players and items, so a cow never pressed anything.
     for (const entity::ServerEntity* standing : world.state().entities()) {
-        if (standing->removed || (livingOnly && !server::registry::entityAttributes::isLiving(standing->type()))) {
+        // parity: `BasePressurePlateBlock.getEntityCount` filters with
+        // `EntitySelector.NO_SPECTATORS.and(e -> !e.isIgnoringBlockTriggers())` before it counts.
+        if (standing->removed || entity::blockTriggers::ignored(standing->type()) ||
+            (livingOnly && !server::registry::entityAttributes::isLiving(standing->type()))) {
             continue;
         }
         if (world::pressurePlates::isStandingOn(x, y, z, standing->x, standing->y, standing->z)) {

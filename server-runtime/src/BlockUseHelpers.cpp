@@ -276,10 +276,8 @@ bool BlockInteractionHandler::useJukebox(PlayerSession& session, const BlockPos&
     if (!item.has_value() || !world::jukeboxes::isDisc(*item)) {
         return false;
     }
-    world::jukeboxes::SongOutputs* songs = owner_->options().jukeboxes;
-    const std::int32_t output = songs == nullptr ? 0 : songs->of(world::jukeboxes::songOf(*item));
     const std::optional<world::BlockChange> change =
-        world::jukeboxes::insert(world->state(), pos.x, pos.y, pos.z, *item, output);
+        world::jukeboxes::insert(world->state(), pos.x, pos.y, pos.z, *item);
     if (!change.has_value()) {
         return false;
     }
