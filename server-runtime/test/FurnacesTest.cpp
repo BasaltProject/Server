@@ -62,7 +62,7 @@ TEST_CASE("an idle furnace answers that nothing moved") {
     furnaces::State state;
     const Recipe recipe = cooking("cooked_beef");
 
-    CHECK_FALSE(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK_FALSE(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.litTimeRemaining == 0);
     CHECK(state.cookingTimer == 0);
     CHECK_FALSE(state.lit());
@@ -74,11 +74,11 @@ TEST_CASE("the fire burns down whether or not anything is cooking") {
     state.litTotalTime = 2;
     const Recipe recipe = cooking("cooked_beef");
 
-    CHECK(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.litTimeRemaining == 1);
     CHECK(state.lit());
 
-    CHECK(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.litTimeRemaining == 0);
     CHECK_FALSE(state.lit());
     // The total stays put: it is what the burning bar is drawn against.
@@ -94,13 +94,13 @@ TEST_CASE("the tick that puts the fire out is the first one that does not cook")
     state.items[furnaces::kInputSlot] = stack("beef");
 
     // Two ticks of fire left, so this one still counts as lit and the progress goes up.
-    CHECK(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.litTimeRemaining == 1);
     CHECK(state.cookingTimer == 6);
 
     // The one that takes it to zero is not lit any more, and with no fuel under it the progress
     // cools instead of climbing.
-    CHECK(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.litTimeRemaining == 0);
     CHECK(state.cookingTimer == 4);
 }
@@ -112,7 +112,7 @@ TEST_CASE("fuel with nothing to cook still lets the progress cool") {
     state.cookingTimer = 5;
     state.cookingTotalTime = 200;
 
-    CHECK(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.cookingTimer == 3);
     CHECK(state.items[furnaces::kFuelSlot]->count == 1);
 }
@@ -122,7 +122,7 @@ TEST_CASE("fuel is only eaten when there is something to cook") {
     state.items[furnaces::kFuelSlot] = stack("coal", 2);
     const Recipe recipe = cooking("cooked_beef");
 
-    CHECK_FALSE(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK_FALSE(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.items[furnaces::kFuelSlot]->count == 2);
     CHECK(state.litTimeRemaining == 0);
 }
@@ -131,7 +131,7 @@ TEST_CASE("the fuel lights the furnace and the first tick of progress goes on") 
     furnaces::State state = beefAndCoal();
     const Recipe recipe = cooking("cooked_beef");
 
-    CHECK(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.litTimeRemaining == kCoalTicks);
     CHECK(state.litTotalTime == kCoalTicks);
     CHECK_FALSE(state.items[furnaces::kFuelSlot].has_value());
@@ -144,7 +144,7 @@ TEST_CASE("a stack of fuel loses exactly one") {
     state.items[furnaces::kFuelSlot] = stack("coal", 3);
     const Recipe recipe = cooking("cooked_beef");
 
-    CHECK(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     REQUIRE(state.items[furnaces::kFuelSlot].has_value());
     CHECK(state.items[furnaces::kFuelSlot]->item == item("coal"));
     CHECK(state.items[furnaces::kFuelSlot]->count == 2);
@@ -155,7 +155,7 @@ TEST_CASE("a bucket of lava leaves the bucket behind") {
     state.items[furnaces::kFuelSlot] = stack("lava_bucket");
     const Recipe recipe = cooking("cooked_beef");
 
-    CHECK(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.litTimeRemaining == kLavaTicks);
     REQUIRE(state.items[furnaces::kFuelSlot].has_value());
     CHECK(state.items[furnaces::kFuelSlot]->item == item("bucket"));
@@ -169,14 +169,14 @@ TEST_CASE("something in the fuel slot that does not burn puts the counters back 
     state.cookingTimer = 5;
     const Recipe recipe = cooking("cooked_beef");
 
-    CHECK(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.litTimeRemaining == 0);
     CHECK(state.litTotalTime == 0);
     CHECK(state.cookingTimer == 0);
     CHECK(state.items[furnaces::kFuelSlot]->count == 1);
 
     // With no progress to lose there is nothing to write back either.
-    CHECK_FALSE(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK_FALSE(furnaces::tick(state, bookOf(recipe, "beef")).moved);
 }
 
 TEST_CASE("a full result slot stops the fuel being eaten") {
@@ -185,12 +185,12 @@ TEST_CASE("a full result slot stops the fuel being eaten") {
     state.cookingTimer = 5;
     const Recipe recipe = cooking("cooked_beef");
 
-    CHECK(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.cookingTimer == 0);
     CHECK(state.litTimeRemaining == 0);
     CHECK(state.items[furnaces::kFuelSlot]->count == 1);
 
-    CHECK_FALSE(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK_FALSE(furnaces::tick(state, bookOf(recipe, "beef")).moved);
 }
 
 TEST_CASE("the result slot takes it while it fits") {
@@ -198,13 +198,13 @@ TEST_CASE("the result slot takes it while it fits") {
     furnaces::State state = beefAndCoal();
     state.items[furnaces::kResultSlot] = stack("cooked_beef", 63);
 
-    CHECK(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.litTimeRemaining == kCoalTicks);
 
     // One more in the slot and the same stack no longer fits.
     furnaces::State full = beefAndCoal();
     full.items[furnaces::kResultSlot] = stack("cooked_beef", 64);
-    CHECK_FALSE(furnaces::tick(full, bookOf(recipe, "beef")));
+    CHECK_FALSE(furnaces::tick(full, bookOf(recipe, "beef")).moved);
 }
 
 TEST_CASE("the furnace's own ceiling caps the result") {
@@ -212,11 +212,11 @@ TEST_CASE("the furnace's own ceiling caps the result") {
     furnaces::State state = beefAndCoal();
     state.items[furnaces::kResultSlot] = stack("cooked_beef", 3);
 
-    CHECK_FALSE(furnaces::tick(state, bookOf(recipe, "beef"), 3));
+    CHECK_FALSE(furnaces::tick(state, bookOf(recipe, "beef"), 3).moved);
 
     furnaces::State roomy = beefAndCoal();
     roomy.items[furnaces::kResultSlot] = stack("cooked_beef", 3);
-    CHECK(furnaces::tick(roomy, bookOf(recipe, "beef"), 4));
+    CHECK(furnaces::tick(roomy, bookOf(recipe, "beef"), 4).moved);
 }
 
 TEST_CASE("the result item's own ceiling caps it too") {
@@ -225,12 +225,12 @@ TEST_CASE("the result item's own ceiling caps it too") {
     furnaces::State state = beefAndCoal();
     state.items[furnaces::kResultSlot] = stack("water_bucket", 1);
 
-    CHECK_FALSE(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK_FALSE(furnaces::tick(state, bookOf(recipe, "beef")).moved);
 
     const Recipe buckets = cooking("bucket");
     furnaces::State stacking = beefAndCoal();
     stacking.items[furnaces::kResultSlot] = stack("bucket", 1);
-    CHECK(furnaces::tick(stacking, bookOf(buckets, "beef")));
+    CHECK(furnaces::tick(stacking, bookOf(buckets, "beef")).moved);
 }
 
 TEST_CASE("a result slot holding the same item with different components refuses it") {
@@ -240,7 +240,7 @@ TEST_CASE("a result slot holding the same item with different components refuses
     held.components.putString("mark", "somebody else's");
     state.items[furnaces::kResultSlot] = held;
 
-    CHECK_FALSE(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK_FALSE(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.litTimeRemaining == 0);
 }
 
@@ -249,7 +249,7 @@ TEST_CASE("a result slot holding another item entirely refuses it") {
     furnaces::State state = beefAndCoal();
     state.items[furnaces::kResultSlot] = stack("cooked_porkchop", 1);
 
-    CHECK_FALSE(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK_FALSE(furnaces::tick(state, bookOf(recipe, "beef")).moved);
 }
 
 TEST_CASE("a recipe that makes nothing cooks nothing") {
@@ -257,7 +257,7 @@ TEST_CASE("a recipe that makes nothing cooks nothing") {
     furnaces::State state = beefAndCoal();
     state.cookingTimer = 5;
 
-    CHECK(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.cookingTimer == 0);
     CHECK(state.litTimeRemaining == 0);
 }
@@ -270,7 +270,7 @@ TEST_CASE("an input nothing cooks leaves the progress where it stands") {
     state.items[furnaces::kInputSlot] = stack("stone");
     state.cookingTimer = 5;
 
-    CHECK_FALSE(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK_FALSE(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.cookingTimer == 5);
     CHECK(state.items[furnaces::kFuelSlot]->count == 1);
 }
@@ -278,7 +278,7 @@ TEST_CASE("an input nothing cooks leaves the progress where it stands") {
 TEST_CASE("without a recipe book nothing cooks at all") {
     furnaces::State state = beefAndCoal();
 
-    CHECK_FALSE(furnaces::tick(state, furnaces::RecipeFor{}));
+    CHECK_FALSE(furnaces::tick(state, furnaces::RecipeFor{}).moved);
     CHECK(state.litTimeRemaining == 0);
     CHECK(furnaces::cookTimeFor(state, furnaces::RecipeFor{}) == furnaces::kDefaultCookTime);
 }
@@ -289,7 +289,7 @@ TEST_CASE("an empty input slot on a lit furnace loses the progress") {
     state.litTimeRemaining = 10;
     state.cookingTimer = 5;
 
-    CHECK(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.cookingTimer == 0);
     CHECK(state.litTimeRemaining == 9);
 }
@@ -302,12 +302,12 @@ TEST_CASE("the cook lands on the tick the timer meets the total") {
     state.cookingTotalTime = 200;
     state.items[furnaces::kInputSlot] = stack("beef", 2);
 
-    CHECK(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.cookingTimer == 199);
     CHECK(state.cookingTotalTime == 200);
     CHECK_FALSE(state.items[furnaces::kResultSlot].has_value());
 
-    CHECK(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.cookingTimer == 0);
     // The next item's time comes from the recipe that just finished.
     CHECK(state.cookingTotalTime == 120);
@@ -326,7 +326,7 @@ TEST_CASE("the last item of the input leaves the slot empty") {
     state.items[furnaces::kInputSlot] = stack("beef");
     state.items[furnaces::kResultSlot] = stack("cooked_beef", 5);
 
-    CHECK(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK_FALSE(state.items[furnaces::kInputSlot].has_value());
     CHECK(state.items[furnaces::kResultSlot]->count == 7);
 }
@@ -339,7 +339,7 @@ TEST_CASE("a wet sponge fills the bucket standing next to it") {
     state.items[furnaces::kInputSlot] = stack("wet_sponge");
     state.items[furnaces::kFuelSlot] = stack("bucket");
 
-    CHECK(furnaces::tick(state, bookOf(recipe, "wet_sponge")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "wet_sponge")).moved);
     REQUIRE(state.items[furnaces::kFuelSlot].has_value());
     CHECK(state.items[furnaces::kFuelSlot]->item == item("water_bucket"));
     CHECK(state.items[furnaces::kFuelSlot]->count == 1);
@@ -353,7 +353,7 @@ TEST_CASE("the bucket a lava bucket left behind is filled by the same tick's spo
     state.items[furnaces::kInputSlot] = stack("wet_sponge");
     state.items[furnaces::kFuelSlot] = stack("lava_bucket");
 
-    CHECK(furnaces::tick(state, bookOf(recipe, "wet_sponge")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "wet_sponge")).moved);
     CHECK(state.litTimeRemaining == kLavaTicks);
     REQUIRE(state.items[furnaces::kFuelSlot].has_value());
     CHECK(state.items[furnaces::kFuelSlot]->item == item("water_bucket"));
@@ -367,7 +367,7 @@ TEST_CASE("anything else in the fuel slot is left alone by a drying sponge") {
     state.items[furnaces::kInputSlot] = stack("wet_sponge");
     state.items[furnaces::kFuelSlot] = stack("coal", 4);
 
-    CHECK(furnaces::tick(state, bookOf(recipe, "wet_sponge")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "wet_sponge")).moved);
     CHECK(state.items[furnaces::kFuelSlot]->item == item("coal"));
     CHECK(state.items[furnaces::kFuelSlot]->count == 4);
 }
@@ -379,7 +379,7 @@ TEST_CASE("an empty fuel slot is left alone by a drying sponge") {
     state.cookingTotalTime = 1;
     state.items[furnaces::kInputSlot] = stack("wet_sponge");
 
-    CHECK(furnaces::tick(state, bookOf(recipe, "wet_sponge")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "wet_sponge")).moved);
     CHECK_FALSE(state.items[furnaces::kFuelSlot].has_value());
 }
 
@@ -389,14 +389,14 @@ TEST_CASE("a fire that went out walks the progress back two ticks at a time") {
     state.cookingTimer = 5;
     state.cookingTotalTime = 200;
 
-    CHECK(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.cookingTimer == 3);
-    CHECK(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.cookingTimer == 1);
-    CHECK(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.cookingTimer == 0);
     // At zero it has nothing left to give back.
-    CHECK_FALSE(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK_FALSE(furnaces::tick(state, bookOf(recipe, "beef")).moved);
 }
 
 TEST_CASE("the progress a cooling furnace keeps never passes its own total") {
@@ -405,7 +405,7 @@ TEST_CASE("the progress a cooling furnace keeps never passes its own total") {
     state.cookingTimer = 10;
     state.cookingTotalTime = 4;
 
-    CHECK(furnaces::tick(state, bookOf(recipe, "beef")));
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).moved);
     CHECK(state.cookingTimer == 4);
 }
 
@@ -462,4 +462,21 @@ TEST_CASE("a furnace that was never saved reads as a cold empty one") {
     CHECK(state.cookingTotalTime == 0);
     REQUIRE(state.items.size() == 3);
     CHECK_FALSE(state.items[furnaces::kInputSlot].has_value());
+}
+
+TEST_CASE("only the fuel, the smelt and the fire flipping count as a change") {
+    const Recipe recipe = cooking("cooked_beef");
+    furnaces::State state = beefAndCoal();
+
+    // parity: lighting the fire consumes the fuel and flips `lit`, both of which set `changed`.
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).changed);
+
+    // A furnace merely counting down moves its numbers and changes nothing vanilla would save.
+    const furnaces::Ticked counting = furnaces::tick(state, bookOf(recipe, "beef"));
+    CHECK(counting.moved);
+    CHECK_FALSE(counting.changed);
+
+    // The tick the smelt finishes on is a change again.
+    state.cookingTimer = state.cookingTotalTime - 1;
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef")).changed);
 }

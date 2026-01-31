@@ -403,8 +403,12 @@ TEST_CASE("a powered piston books its move and says so with a sound") {
     CHECK(sound->pitch >= 0.6F);
     CHECK(sound->pitch < 0.85F);
 
-    // parity: the move lands two ticks later, and every call to dueBlockTicks is one tick.
-    CHECK(world.dueBlockTicks().empty());
+    // parity: the move lands two ticks later, and every call to dueBlockTicks is one tick. The turn
+    // in between belongs to the sliding square itself, which is where `PistonMovingBlockEntity.tick`
+    // moves its progress along.
+    const std::vector<std::array<std::int32_t, 3>> sliding = world.dueBlockTicks();
+    REQUIRE(sliding.size() == 1);
+    CHECK(sliding[0] == std::array<std::int32_t, 3>{9, 64, 8});
     const std::vector<std::array<std::int32_t, 3>> due = world.dueBlockTicks();
     REQUIRE(due.size() == 1);
     CHECK(due[0] == std::array<std::int32_t, 3>{8, 64, 8});

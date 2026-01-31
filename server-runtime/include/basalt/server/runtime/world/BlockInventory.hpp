@@ -19,6 +19,13 @@ namespace blockInventory {
 
 using Slots = std::vector<std::optional<server::world::loot::ItemStack>>;
 
+/// One stack in the shape `ItemStack.CODEC` writes it: `{id, count, components}`, with the
+/// components left out when the item carries nothing of its own. Anything that keeps a single stack
+/// in its own key (a decorated pot's `item`, a lectern's `Book`) reads and writes it through these.
+[[nodiscard]] std::optional<server::world::loot::ItemStack> readStack(const wire::nbt::NbtCompound& stack);
+
+[[nodiscard]] wire::nbt::NbtCompound writeStack(const server::world::loot::ItemStack& stack);
+
 /// Reads `size` slots out of `data`, leaving the ones it does not mention empty.
 [[nodiscard]] Slots read(const wire::nbt::NbtCompound& data, std::int32_t size);
 

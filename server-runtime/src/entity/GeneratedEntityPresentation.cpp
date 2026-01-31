@@ -1,4 +1,5 @@
 #include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
@@ -98,6 +99,27 @@ void addRegistryMetadata(Entries& into, const NbtCompound& data, std::string_vie
     if (id.has_value() && *id != 0) {
         into.push_back(
             Entry{.index = index, .value = SetEntityDataPacket::RegistryIdValue{.value = *id, .registry = registry}});
+    }
+}
+
+/// parity: `ItemFrame`'s own two fields, the stack behind the glass and the eighth of a turn it is
+/// drawn at. Both are read off the entity's saved tag, so a frame from a structure and one somebody
+/// just put something in are drawn the same way.
+void addItemFrameMetadata(Entries& into, const NbtCompound& data) {
+    if (const NbtCompound* held = data.getCompound("Item"); held != nullptr) {
+        const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
+            wire::common::Identifier::parse(std::string{held->getString("id")});
+        const server::registry::Item* item = id.has_value() ? server::registry::items::registry().byName(*id) : nullptr;
+        if (item != nullptr) {
+            into.push_back(Entry{.index = SetEntityDataPacket::kItemFrameStackIndex,
+                                 .value = SetEntityDataPacket::ItemValue{
+                                     .stack = wire::protocol::play::WireItemStack{.itemId = item->protocolId,
+                                                                                  .count = held->getInt("count", 1)}}});
+        }
+    }
+    if (const std::int32_t rotation = data.getByte("ItemRotation", 0); rotation != 0) {
+        into.push_back(Entry{.index = SetEntityDataPacket::kItemFrameStackIndex + 1,
+                             .value = SetEntityDataPacket::IntValue{.value = rotation}});
     }
 }
 
@@ -235,6 +257,9 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
                                 .value = SetEntityDataPacket::IntValue{.value = data.getInt("Size") + 1}});
     }
 
+    if (type == "item_frame" || type == "glow_item_frame") {
+        addItemFrameMetadata(entries, data);
+    }
     if (type == "armor_stand") {
         addArmorStandMetadata(entries, data);
     } else if (type == "axolotl") {

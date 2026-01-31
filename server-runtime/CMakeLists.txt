@@ -292,6 +292,7 @@ basalt_module(server-runtime-core
         src/world/FallingBlocks.cpp
         src/world/Fires.cpp
         src/world/GrowthSupport.cpp
+        src/world/ItemFrames.cpp
         src/world/Jukeboxes.cpp
         src/world/LavaGrowth.cpp
         src/world/Lecterns.cpp

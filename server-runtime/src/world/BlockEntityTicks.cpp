@@ -163,13 +163,27 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                     continue;
                 }
                 campfires::State fire = campfires::read(entity->data());
-                const std::vector<server::world::loot::ItemStack> done = campfires::tick(
-                    fire, campfires::isLitCampfire(*stateId), [&hooks](const server::world::loot::ItemStack& stack) {
+                // parity: `changed` in both halves of the campfire's tick, which is a slot with
+                // something in it while it burns and a slot with progress left while it does not.
+                const bool lit = campfires::isLitCampfire(*stateId);
+                bool moved = false;
+                for (std::size_t slot = 0; slot < fire.items.size(); ++slot) {
+                    moved = moved || (lit ? fire.items[slot].has_value() : fire.progress[slot] > 0);
+                }
+                const std::vector<server::world::loot::ItemStack> done =
+                    campfires::tick(fire, lit, [&hooks](const server::world::loot::ItemStack& stack) {
                         return hooks.recipeFor ? hooks.recipeFor(crafting::Cooker::Campfire, stack) : nullptr;
                     });
                 campfires::write(fire, entity->data());
-                chunk->markDirty();
-                redstoneComponents::scheduleComparatorsAround(world, worldName, x, y, z, comparatorReading::of(world));
+                // parity: `cookTick` and `cooldownTick` both only call `setChanged` when a slot
+                // actually moved, so an empty campfire does not rewrite its region file every turn.
+                if (moved) {
+                    chunk->markDirty();
+                    // parity: `setChanged` is also what tells a comparator, and nothing reads a
+                    // campfire, but the square beside it may hold one over something else.
+                    redstoneComponents::scheduleComparatorsAround(world, worldName, x, y, z,
+                                                                  comparatorReading::of(world));
+                }
                 for (const server::world::loot::ItemStack& result : done) {
                     if (hooks.onDropped) {
                         hooks.onDropped(Dropped{.x = x, .y = y, .z = z, .stack = result});
@@ -190,12 +204,14 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
             // block itself.
             if (path == "brewing_stand") {
                 brewingStands::State stand = brewingStands::read(entity->data());
-                if (!brewingStands::tick(stand)) {
-                    continue;
+                if (brewingStands::tick(stand)) {
+                    brewingStands::write(stand, entity->data());
+                    chunk->markDirty();
+                    redstoneComponents::scheduleComparatorsAround(world, worldName, x, y, z,
+                                                                  comparatorReading::of(world));
                 }
-                brewingStands::write(stand, entity->data());
-                chunk->markDirty();
-                redstoneComponents::scheduleComparatorsAround(world, worldName, x, y, z, comparatorReading::of(world));
+                // parity: the bottle bits are compared **every** turn, outside everything the brew
+                // does, so a bottle put into a stand with no fuel in it still shows on the block.
                 const std::optional<std::int32_t> turned =
                     bottleChange(world, x, y, z, brewingStands::bottleBits(stand));
                 if (turned.has_value()) {
@@ -212,15 +228,20 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 !hooks.allowSmelt(worldName, x, y, z, nameOf(*cooker), slotOf(state, 0), slotOf(state, 2))) {
                 continue;
             }
-            const bool moved = furnaces::tick(state, [&hooks, cooker](const server::world::loot::ItemStack& stack) {
-                return hooks.recipeFor ? hooks.recipeFor(*cooker, stack) : nullptr;
-            });
-            if (!moved) {
+            const furnaces::Ticked turn =
+                furnaces::tick(state, [&hooks, cooker](const server::world::loot::ItemStack& stack) {
+                    return hooks.recipeFor ? hooks.recipeFor(*cooker, stack) : nullptr;
+                });
+            if (!turn.moved) {
                 continue;
             }
             furnaces::write(state, entity->data());
-            chunk->markDirty();
-            redstoneComponents::scheduleComparatorsAround(world, worldName, x, y, z, comparatorReading::of(world));
+            // parity: `serverTick` only calls `setChanged` on its own `changed`, so a furnace merely
+            // counting down neither dirties its chunk nor tells the comparator anything.
+            if (turn.changed) {
+                chunk->markDirty();
+                redstoneComponents::scheduleComparatorsAround(world, worldName, x, y, z, comparatorReading::of(world));
+            }
             const std::optional<std::int32_t> turned = litChange(world, x, y, z, state.lit());
             if (turned.has_value()) {
                 changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *turned});

@@ -13,10 +13,13 @@
 #include <basalt/server/runtime/player/Combat.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
+#include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
+#include <basalt/server/runtime/world/ItemFrames.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
+#include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WeaponDamage.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
@@ -240,6 +243,10 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
     if (entity == nullptr || entity->removed) {
         return;
     }
+    // parity: `ItemFrame.interact`, which comes before anything a mob would do with the click.
+    if (world::itemFrames::isFrame(entity->type()) && useItemFrame(*session, *entity)) {
+        return;
+    }
     // parity: `Villager.mobInteract` opens its trades whatever is in the player's hand.
     if (entity->type() == entity::villagers::type()) {
         owner_->trades().openTrades(*entity);
@@ -273,6 +280,66 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
             session->inventory.set(heldSlot, left);
         }
         owner_->sendInventorySlot(heldSlot);
+    }
+}
+
+bool CombatHandler::useItemFrame(PlayerSession& session, ServerEntity& frame) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    if (world == nullptr) {
+        return false;
+    }
+    const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session.inventory.heldSlot();
+    const std::optional<storage::StoredItemStack>& held = session.inventory.at(heldSlot);
+    const std::optional<Identifier> item = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
+    const std::optional<server::world::loot::ItemStack> hand =
+        item.has_value() ? std::optional{server::world::loot::ItemStack{
+                               .item = *item, .count = held->count, .components = held->components}}
+                         : std::nullopt;
+    const world::itemFrames::Touched touched = world::itemFrames::interact(frame, hand);
+    if (touched == world::itemFrames::Touched::Nothing) {
+        return false;
+    }
+    broadcastFrame(frame);
+    // parity: both halves of `interact` end in `updateNeighbourForOutputSignal`, which is what tells
+    // the comparator reading the frame that its number moved.
+    const std::array<std::int32_t, 3> square = world::itemFrames::squareOf(frame);
+    world::redstoneComponents::scheduleComparatorsAround(world->state(), world->name(), square[0], square[1], square[2],
+                                                         world::comparatorReading::of(world->state()));
+    if (touched == world::itemFrames::Touched::Took && session.gamemode != Gamemode::Creative && held.has_value()) {
+        if (held->count <= 1) {
+            session.inventory.set(heldSlot, std::nullopt);
+        } else {
+            storage::StoredItemStack left = *held;
+            left.count = held->count - 1;
+            session.inventory.set(heldSlot, left);
+        }
+        owner_->sendInventorySlot(heldSlot);
+    }
+    return true;
+}
+
+void CombatHandler::broadcastFrame(const ServerEntity& frame) {
+    const std::optional<server::world::loot::ItemStack> shown = world::itemFrames::shownIn(frame);
+    std::optional<wire::protocol::play::WireItemStack> drawn;
+    if (shown.has_value()) {
+        const server::registry::Item* entry = server::registry::items::registry().byName(shown->item);
+        if (entry != nullptr) {
+            drawn = wire::protocol::play::WireItemStack{.itemId = entry->protocolId, .count = shown->count};
+        }
+    }
+    // parity: `DATA_ITEM` is the frame's own first field and `DATA_ROTATION` the one after it.
+    const SetEntityDataPacket packet{
+        .entityId = frame.entityId(),
+        .entries = {SetEntityDataPacket::Entry{.index = SetEntityDataPacket::kItemFrameStackIndex,
+                                               .value = SetEntityDataPacket::ItemValue{.stack = drawn}},
+                    SetEntityDataPacket::Entry{
+                        .index = SetEntityDataPacket::kItemFrameStackIndex + 1,
+                        .value = SetEntityDataPacket::IntValue{.value = world::itemFrames::rotationOf(frame)}}}};
+    for (PlayerSession* player : owner_->playersInSameWorld()) {
+        if (player->connection().sendPlayPacket) {
+            player->connection().sendPlayPacket(SetEntityDataPacket::kId,
+                                                [packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+        }
     }
 }
 

@@ -292,8 +292,11 @@ bool BlockInteractionHandler::useLectern(PlayerSession& session, const BlockPos&
     if (!item.has_value() || !world::lecterns::isBook(*item)) {
         return false;
     }
-    const std::optional<world::BlockChange> change =
-        world::lecterns::placeBook(world->state(), pos.x, pos.y, pos.z, *item);
+    // parity: `tryPlaceBook` takes the whole stack, and the pages a comparator counts are one of its
+    // components.
+    const std::optional<world::BlockChange> change = world::lecterns::placeBook(
+        world->state(), pos.x, pos.y, pos.z,
+        server::world::loot::ItemStack{.item = *item, .count = 1, .components = held->components});
     if (!change.has_value()) {
         return false;
     }

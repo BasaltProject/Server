@@ -2,12 +2,14 @@
 
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 
 #include <doctest.h>
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -427,4 +429,40 @@ TEST_CASE("a change asks the components around it to look again") {
         }
     }
     CHECK(world.dueBlockTicks().size() == 1);
+}
+
+TEST_CASE("a comparator reads the item frame hanging behind the block in front of it") {
+    WorldState world = emptyWorld();
+    world.getOrGenerateChunk(0, 0);
+    REQUIRE(world.setBlockState(8, 64, 8, comparatorState("east", "compare", "false")));
+    REQUIRE(world.setBlockState(9, 64, 8, stateOf("stone")));
+    const std::map<std::string, std::string> properties =
+        registry::blockStateDefinitions::propertiesOf(*world.blockState(8, 64, 8));
+
+    /// A frame at 10/64/8 facing the way the comparator does. Five is east in
+    /// `Direction.LEGACY_ID_CODEC`, which is what `Facing` is written with.
+    const auto hang = [&world](std::int32_t entityId, bool holding, std::int8_t rotation) {
+        basalt::wire::nbt::NbtCompound data;
+        data.putByte("Facing", 5);
+        data.putByte("ItemRotation", rotation);
+        if (holding) {
+            basalt::wire::nbt::NbtCompound held;
+            held.putString("id", "minecraft:stone");
+            held.putInt("count", 1);
+            data.set("Item", basalt::wire::nbt::NbtTag::ofCompound(std::move(held)));
+        }
+        auto frame = std::make_unique<basalt::server::runtime::entity::ServerEntity>(
+            entityId, basalt::wire::common::Uuid::random(), Identifier::vanilla("item_frame"), 0, 10.03125, 64.5, 8.5);
+        frame->sourceNbt = std::move(data);
+        static_cast<void>(world.spawnEntity(std::move(frame)));
+    };
+
+    // parity: `getAnalogOutput` is the rotation plus one, so the fourth turn of eight reads four.
+    hang(7, true, 3);
+    CHECK(redstoneComponents::comparatorInput(world, "world", 8, 64, 8, properties) == 4);
+
+    // parity: `getItemFrame` answers only when the square holds one, so a second frame silences both
+    // and the comparator falls back to the plain signal.
+    hang(8, true, 3);
+    CHECK(redstoneComponents::comparatorInput(world, "world", 8, 64, 8, properties) == 0);
 }
