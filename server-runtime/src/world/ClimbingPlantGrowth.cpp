@@ -145,7 +145,12 @@ void weather(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, 
         }
     }
     const float share = static_cast<float>(older + 1) / static_cast<float>(older + same + 1);
-    if (random.nextFloat() >= share * share) {
+    // parity: `ChangeOverTimeBlock.getNextState` is `chance * chance * getChanceModifier()`, and
+    // `WeatheringCopper.getChanceModifier` is **three quarters while the block is unaffected** and one
+    // afterwards. Without it a fresh block of copper weathered a third too fast, which is what a
+    // lightning rod turning `exposed` inside twenty ticks on the bench said.
+    const float modifier = *stage == 0 ? kUnaffectedChanceModifier : 1.0F;
+    if (random.nextFloat() >= share * share * modifier) {
         return;
     }
     const std::optional<std::string_view> next = registry::weathering::next(block->path());

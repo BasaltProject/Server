@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <cstdint>
@@ -22,12 +23,10 @@ enum class Mode : std::uint8_t { Impulse, Chain, Repeating };
 
 [[nodiscard]] std::optional<Mode> modeOf(std::string_view path);
 
-/// What running a command costs the caller: the text, and whether it succeeded. It is a required
-/// parameter everywhere below, never a defaulted hook: a command block that cannot run its command is
-/// not a command block, and an empty callback would make one silently.
-/// Runs one command block's line, answering **how many times it succeeded**: one for an ordinary
-/// command, and one per branch for a `/execute` that forks. parity: `BaseCommandBlock.performCommand`
-/// counts the callbacks brigadier raises, so `SuccessCount` is a count and not a result.
+/// Runs one command block's line, answering how many times it succeeded: one for an ordinary
+/// command, one per branch for a `/execute` that forks. parity: `BaseCommandBlock.performCommand`
+/// counts brigadier's callbacks, so `SuccessCount` is a count and not a result. Required everywhere
+/// below rather than defaulted: an empty callback would make a command block that runs nothing.
 using RunCommand =
     std::function<std::int32_t(std::int32_t x, std::int32_t y, std::int32_t z, const std::string& command)>;
 
@@ -35,22 +34,23 @@ using RunCommand =
 /// a rising one books a turn: a repeating or a chain block never starts itself from redstone.
 void onSignal(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool powered);
 
-/// One booked turn. Answers whether this was a command block's turn at all, which is when the
-/// comparators around it have to be told.
-///
-/// parity: `CommandBlock.tick` ends in `updateNeighbourForOutputSignal` whatever it did, not only
-/// when something ran: a conditional block whose condition failed puts its `SuccessCount` back to zero
-/// and the comparator has to hear that too. A repeating block books its next turn from inside this
-/// one, which is what makes it run every tick while it has a signal.
+/// One booked turn. Answers whether it was a command block's turn at all, which is when the
+/// comparators around it have to be told. parity: `CommandBlock.tick` ends in
+/// `updateNeighbourForOutputSignal` whatever it did, so a failed condition zeroes `SuccessCount` and
+/// the comparator hears that too. A repeating block books its next turn from inside this one.
 [[nodiscard]] bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t gameTime,
                         bool commandBlocksWork, std::int32_t maxChainLength, const RunCommand& run);
 
-/// What a command block's block entity holds the moment it is put down.
-///
-/// parity: `BaseCommandBlock` and `CommandBlockEntity` write **every** one of these on save whether or
-/// not anybody set them, so a block entity that only holds what a command wrote into it is not the
-/// same block entity: a world of ours would open in vanilla missing them. `LastExecution` is the one
-/// that is left out, and only while it is -1.
+/// Writes what a player typed into a command block's screen, answering the block change when the
+/// mode asked for a different block. parity: `handleSetCommandBlock` swaps the block for the mode
+/// and keeps the facing. The permission check belongs to the caller.
+[[nodiscard]] std::optional<BlockChange> program(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                                 const std::string& command, Mode mode, bool trackOutput,
+                                                 bool conditional, bool automatic);
+
+/// What a command block's block entity holds the moment it is put down. parity: vanilla writes every
+/// one of these on save whether or not anybody set them, so without them a world of ours opens in
+/// vanilla missing them. `LastExecution` is left out, and only while it is -1.
 [[nodiscard]] wire::nbt::NbtCompound defaults();
 
 /// parity: `CommandBlockEntity.setAutomatic`, which books a turn the moment `auto` goes from off to

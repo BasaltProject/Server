@@ -50,6 +50,23 @@ struct Loaded {
         chunk->setBlockEntity(ChunkBlockEntity{x & 15, y, z & 15, Identifier::vanilla("command_block"), data});
     }
 
+    /// The block's own name and one of its properties, for the mode swap.
+    [[nodiscard]] std::string pathAt(std::int32_t x, std::int32_t y, std::int32_t z) {
+        const std::optional<std::int32_t> stateId = state.blockState(x, y, z);
+        REQUIRE(stateId.has_value());
+        const Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
+        REQUIRE(block != nullptr);
+        return std::string{block->path()};
+    }
+
+    [[nodiscard]] std::string propertyAt(std::int32_t x, std::int32_t y, std::int32_t z, const std::string& name) {
+        const std::optional<std::int32_t> stateId = state.blockState(x, y, z);
+        REQUIRE(stateId.has_value());
+        const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*stateId);
+        const auto found = properties.find(name);
+        return found == properties.end() ? std::string{} : found->second;
+    }
+
     [[nodiscard]] nbt::NbtCompound& dataAt(std::int32_t x, std::int32_t y, std::int32_t z) {
         Chunk* chunk = state.chunkIfLoaded(x >> 4, z >> 4);
         REQUIRE(chunk != nullptr);
@@ -273,4 +290,29 @@ TEST_CASE("a command that forks counts every branch that worked") {
     CHECK(commandBlocks::tick(loaded.state, 8, 64, 8, 1, true, 8, loaded.runner(3)));
     CHECK(loaded.dataAt(8, 64, 8).getInt("SuccessCount") == 3);
     CHECK(commandBlocks::comparatorSignal(loaded.dataAt(8, 64, 8)) == 3);
+}
+
+TEST_CASE("what a player types in changes the block as well as the command") {
+    // parity: `handleSetCommandBlock`. The mode is the block, so switching to repeating puts a
+    // repeating block down with the same facing, keeps the block entity, and the new conditional
+    // flag comes from the same packet.
+    Loaded loaded;
+    loaded.put(8, 64, 8, blockOf("command_block", "west"), "say old");
+
+    const std::optional<BlockChange> moved =
+        commandBlocks::program(loaded.state, 8, 64, 8, "say new", commandBlocks::Mode::Repeating, false, true, false);
+    REQUIRE(moved.has_value());
+    CHECK(loaded.pathAt(8, 64, 8) == "repeating_command_block");
+    CHECK(loaded.propertyAt(8, 64, 8, "facing") == "west");
+    CHECK(loaded.propertyAt(8, 64, 8, "conditional") == "true");
+    CHECK(loaded.dataAt(8, 64, 8).getString("Command") == "say new");
+    CHECK(loaded.dataAt(8, 64, 8).getInt("SuccessCount") == 0);
+    CHECK_FALSE(loaded.dataAt(8, 64, 8).getBoolean("TrackOutput"));
+
+    // parity: `CommandBlockEntity.setAutomatic` books a turn the moment a block with nothing powering
+    // it is switched to `auto`, and a chain block books none.
+    CHECK_FALSE(loaded.state.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("command_block")));
+    static_cast<void>(
+        commandBlocks::program(loaded.state, 8, 64, 8, "say new", commandBlocks::Mode::Repeating, false, true, true));
+    CHECK(loaded.state.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("command_block")));
 }

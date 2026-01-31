@@ -6,6 +6,8 @@
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
+#include <basalt/server/runtime/command/CommandDispatcher.hpp>
+#include <basalt/server/runtime/command/CommandSource.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
@@ -16,6 +18,7 @@
 #include <basalt/server/runtime/world/Buckets.hpp>
 #include <basalt/server/runtime/world/Campfires.hpp>
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
+#include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
 #include <basalt/server/runtime/world/Explosions.hpp>
@@ -206,6 +209,68 @@ void BlockInteractionHandler::writeSign(const play::SignUpdatePacket& update) {
         }
         player->connection().sendPlayPacket(play::BlockEntityDataPacket::kId,
                                             [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+    }
+}
+
+bool BlockInteractionHandler::mayUseGameMasterBlocks(PlayerSession& session) const {
+    // parity: `Player.canUseGameMasterBlocks`, which is permission two **and** creative. Here the
+    // permission is the admin group, which is what a player's command source resolves to.
+    const command::CommandDispatcher* dispatcher = owner_->options().commands;
+    if (dispatcher == nullptr || session.gamemode != Gamemode::Creative) {
+        return false;
+    }
+    // Asked through the player's own command source, so "operator" means here exactly what it means
+    // when they type a command.
+    const command::PlayerCommandSource source{session, dispatcher->environment().groups()};
+    return source.permissionLevel() >= command::permissionLevel::kGamemasters;
+}
+
+void BlockInteractionHandler::programCommandBlock(const play::SetCommandBlockPacket& packet) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    PlayerSession* session = owner_->playerSession();
+    if (world == nullptr || session == nullptr) {
+        return;
+    }
+    if (!mayUseGameMasterBlocks(*session)) {
+        session->sendSystemMessage(wire::text::Component::translatable("advMode.notAllowed"));
+        return;
+    }
+    using PacketMode = play::SetCommandBlockPacket::Mode;
+    const world::commandBlocks::Mode mode = packet.mode == PacketMode::Sequence ? world::commandBlocks::Mode::Chain
+                                            : packet.mode == PacketMode::Auto   ? world::commandBlocks::Mode::Repeating
+                                                                                : world::commandBlocks::Mode::Impulse;
+    const std::optional<world::BlockChange> moved =
+        world::commandBlocks::program(world->state(), packet.pos.x, packet.pos.y, packet.pos.z, packet.command, mode,
+                                      packet.trackOutput, packet.conditional, packet.automatic);
+    if (moved.has_value()) {
+        broadcastBlockUpdate(BlockPos{moved->x, moved->y, moved->z}, moved->stateId);
+    }
+    sendBlockEntity(packet.pos);
+    // parity: the line is echoed back to whoever typed it, and says so when the rule is off.
+    if (!packet.command.empty()) {
+        const bool works = world->gameRules().get(world::gameRules::kCommandBlocksWork);
+        session->sendSystemMessage(
+            wire::text::Component::translatable(works ? "advMode.setCommand.success" : "advMode.setCommand.disabled",
+                                                {wire::text::Component::text(packet.command)}));
+    }
+}
+
+void BlockInteractionHandler::sendBlockEntity(const BlockPos& pos) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    server::world::Chunk* chunk = world == nullptr ? nullptr : world->state().chunkIfLoaded(pos.x >> 4, pos.z >> 4);
+    const server::world::ChunkBlockEntity* entity =
+        chunk == nullptr ? nullptr : chunk->blockEntityAt(pos.x & 15, pos.y, pos.z & 15);
+    const std::optional<std::int32_t> typeId =
+        entity == nullptr ? std::nullopt : reg::blockEntityTypes::idOf(entity->type());
+    if (!typeId.has_value()) {
+        return;
+    }
+    const play::BlockEntityDataPacket packet{.pos = pos, .typeId = *typeId, .tag = entity->data()};
+    for (const PlayerSession* player : owner_->playersInSameWorld()) {
+        if (player->connection().sendPlayPacket) {
+            player->connection().sendPlayPacket(play::BlockEntityDataPacket::kId,
+                                                [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+        }
     }
 }
 

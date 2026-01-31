@@ -655,6 +655,13 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         }
         return;
     }
+    if (packetId == play::SetCommandBlockPacket::kId) {
+        const std::optional<play::SetCommandBlockPacket> packet = play::SetCommandBlockPacket::read(body);
+        if (packet.has_value()) {
+            blockInteraction_->programCommandBlock(*packet);
+        }
+        return;
+    }
     if (packetId == play::SignUpdatePacket::kId) {
         const std::optional<play::SignUpdatePacket> packet = play::SignUpdatePacket::read(body);
         if (packet.has_value()) {

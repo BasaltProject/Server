@@ -281,6 +281,24 @@ TEST_CASE("clear that found nothing is refused rather than reporting a clear of 
     CHECK(fixture.source.lastAsText().find("clear.failed.single") != std::string::npos);
 }
 
+TEST_CASE("item replace refuses more of something than fits in one slot") {
+    // parity: `ItemInput.createItemStack` throws `arguments.item.overstacked` when the count is above
+    // the item's own stack size. `/item replace` writes one slot and does not split, so three cakes
+    // in one slot is not a thing any vanilla server would leave behind.
+    Fixture fixture{scratch("item-replace-overstacked")};
+    PlayerSession& steve = fixture.add("Steve");
+    fixture.dispatcher.registerCommand(std::make_shared<commands::ItemCommand>());
+
+    CHECK(fixture.dispatcher.execute(fixture.source, "item replace entity Steve hotbar.0 with minecraft:cake 3") == 0);
+    CHECK(fixture.source.lastAsText().find("arguments.item.overstacked") != std::string::npos);
+    CHECK_FALSE(steve.inventory.at(basalt::server::runtime::player::PlayerInventory::kHotbarStart).has_value());
+
+    // One of the same cake is fine, and so is a stack of something that stacks.
+    CHECK(fixture.dispatcher.execute(fixture.source, "item replace entity Steve hotbar.0 with minecraft:cake") == 1);
+    CHECK(fixture.dispatcher.execute(fixture.source, "item replace entity Steve hotbar.1 with minecraft:stone 64") ==
+          1);
+}
+
 TEST_CASE("item replace writes into a player's slot by its vanilla name") {
     Fixture fixture{scratch("item-replace-entity")};
     PlayerSession& steve = fixture.add("Steve");

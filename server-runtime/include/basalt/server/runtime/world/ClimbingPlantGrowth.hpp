@@ -27,6 +27,10 @@ namespace weatheringGrowth {
 /// parity: `ChangeOverTimeBlock`'s own "each block once per day" figure.
 inline constexpr float kDailyChance = 0.05688889F;
 
+/// parity: `WeatheringCopper.getChanceModifier`, which is this while the block is unaffected and one
+/// for every stage after it: fresh copper takes the first step more slowly than the rest.
+inline constexpr float kUnaffectedChanceModifier = 0.75F;
+
 /// How far a neighbour counts from, measured the way vanilla measures it.
 inline constexpr std::int32_t kRange = 4;
 

@@ -179,6 +179,40 @@ TEST_CASE("copper weathers one step at a time") {
     CHECK(pathAt(loaded.state, 8, 64, 8) == "exposed_copper");
 }
 
+TEST_CASE("fresh copper takes the first step more slowly than the ones after it") {
+    // parity: `WeatheringCopper.getChanceModifier`, three quarters while the block is unaffected and
+    // one afterwards. The seed is searched for rather than remembered: what it has to give is a first
+    // draw inside the daily chance and a second one between the two thresholds, which is the only
+    // place the modifier can be seen.
+    const auto weathers = [](const std::string& path, rng::RandomSource random) {
+        Loaded loaded;
+        const std::int32_t stateId = stateOf(path);
+        loaded.put(8, 64, 8, stateId);
+        std::vector<BlockChange> changes;
+        weatheringGrowth::weather(loaded.state, 8, 64, 8, stateId, random, changes);
+        return !changes.empty();
+    };
+
+    // One source walked forward rather than a search over seeds: two `java.util.Random` seeds a few
+    // apart give almost the same first draw, so searching seeds for a low one never finds it.
+    rng::RandomSource walking = rng::RandomSource::legacy(1);
+    bool checked = false;
+    for (std::int32_t skip = 0; skip < 4000 && !checked; ++skip) {
+        rng::RandomSource peek = walking;
+        const float daily = peek.nextFloat();
+        const float step = peek.nextFloat();
+        if (daily < weatheringGrowth::kDailyChance && step >= weatheringGrowth::kUnaffectedChanceModifier &&
+            step < 1.0F) {
+            // The same two draws: the exposed block takes the step and the fresh one does not.
+            CHECK_FALSE(weathers("copper_block", walking));
+            CHECK(weathers("exposed_copper", walking));
+            checked = true;
+        }
+        static_cast<void>(walking.nextFloat());
+    }
+    CHECK(checked);
+}
+
 TEST_CASE("a block that does not weather is left alone, however often it is asked") {
     Loaded loaded;
     loaded.put(8, 64, 8, stateOf("stone"));
