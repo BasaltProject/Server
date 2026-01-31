@@ -4,6 +4,8 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace basalt::server::runtime::world {
@@ -16,15 +18,27 @@ class PrimedTntQueue {
 public:
     explicit PrimedTntQueue(WorldMutex& mutex) : mutex_(&mutex) {}
 
+    /// One square whose tnt was lit, and the game event that lighting it raised.
+    ///
+    /// parity: the two paths do not raise the same one. `TntBlock.prime` raises `PRIME_FUSE`, and a
+    /// dispenser builds the entity itself and raises `ENTITY_PLACE`, so a sculk sensor beside the two
+    /// hears different frequencies.
+    struct Primed {
+        std::int32_t x = 0;
+        std::int32_t y = 0;
+        std::int32_t z = 0;
+        std::string event;
+    };
+
     /// parity: `TntBlock.explode`, which spawns the entity where the block stood.
-    void primeTnt(std::int32_t x, std::int32_t y, std::int32_t z);
+    void primeTnt(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view event);
 
     /// Takes what was lit, leaving the queue empty.
-    [[nodiscard]] std::vector<std::array<std::int32_t, 3>> takePrimedTnt();
+    [[nodiscard]] std::vector<Primed> takePrimedTnt();
 
 private:
     WorldMutex* mutex_;
-    std::vector<std::array<std::int32_t, 3>> primedTnt_;
+    std::vector<Primed> primedTnt_;
 };
 
 } // namespace basalt::server::runtime::world

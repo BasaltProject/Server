@@ -167,12 +167,18 @@ TEST_CASE("the tnt that was lit waits one tick for an entity id") {
     PrimedTntQueue queue{mutex};
     CHECK(queue.takePrimedTnt().empty());
 
-    queue.primeTnt(1, 64, 2);
-    queue.primeTnt(3, 65, 4);
-    const std::vector<std::array<std::int32_t, 3>> lit = queue.takePrimedTnt();
+    // parity: the two ways a tnt is lit raise different game events, so the queue carries the event
+    // along with the square: a block lit by a signal is a `prime_fuse` and a dispenser's is an
+    // `entity_place`.
+    queue.primeTnt(1, 64, 2, "prime_fuse");
+    queue.primeTnt(3, 65, 4, "entity_place");
+    const std::vector<PrimedTntQueue::Primed> lit = queue.takePrimedTnt();
     REQUIRE(lit.size() == 2);
-    CHECK(lit[0] == std::array<std::int32_t, 3>{1, 64, 2});
-    CHECK(lit[1] == std::array<std::int32_t, 3>{3, 65, 4});
+    CHECK(lit[0].x == 1);
+    CHECK(lit[0].y == 64);
+    CHECK(lit[0].z == 2);
+    CHECK(lit[0].event == "prime_fuse");
+    CHECK(lit[1].event == "entity_place");
     // Taking empties it, so the same block does not go off twice.
     CHECK(queue.takePrimedTnt().empty());
 }

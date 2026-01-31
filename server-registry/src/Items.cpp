@@ -278,13 +278,14 @@ namespace {
 
 struct Table {
     std::unordered_map<std::string_view, std::string_view> next;
+    std::unordered_map<std::string_view, std::string_view> previous;
     std::unordered_map<std::string_view, std::int32_t> stages;
 };
 
 [[nodiscard]] const Table& table() {
     static const Table built = [] {
         Table table;
-        std::unordered_map<std::string_view, std::string_view> previous;
+        std::unordered_map<std::string_view, std::string_view>& previous = table.previous;
         for (const auto& [from, to] : weatheringStepsTable()) {
             table.next.emplace(from, to);
             previous.emplace(to, from);
@@ -318,12 +319,26 @@ std::optional<std::string_view> next(std::string_view block) {
     return found == table().next.end() ? std::nullopt : std::optional{found->second};
 }
 
+std::optional<std::string_view> previous(std::string_view block) {
+    const auto found = table().previous.find(block);
+    return found == table().previous.end() ? std::nullopt : std::optional{found->second};
+}
+
 std::optional<std::int32_t> stageOf(std::string_view block) {
     const auto found = table().stages.find(block);
     return found == table().stages.end() ? std::nullopt : std::optional{found->second};
 }
 
 bool weathers(std::string_view block) { return table().stages.contains(block); }
+
+bool keepsBlockEntity(std::string_view from, std::string_view to) {
+    for (const std::string_view family : {std::string_view{"copper_chest"}, std::string_view{"copper_golem_statue"}}) {
+        if (from.ends_with(family) && to.ends_with(family)) {
+            return true;
+        }
+    }
+    return false;
+}
 
 } // namespace weathering
 

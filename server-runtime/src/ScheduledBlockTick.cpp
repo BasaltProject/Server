@@ -257,6 +257,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                 broadcaster_->sendEffects(watchers, x, y, z, world.state().blockState(x, y, z).value_or(0),
                                           result.effects);
             }
+            scheduled.insert(scheduled.end(), result.changes.begin(), result.changes.end());
         }
         // parity: `CrafterBlock.tick`, four ticks after the signal arrived.
         if (const std::optional<world::BlockChange> crafted = world::crafters::craft(

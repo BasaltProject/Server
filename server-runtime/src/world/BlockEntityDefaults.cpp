@@ -35,6 +35,35 @@ wire::nbt::NbtCompound of(const wire::common::Identifier& block) {
         data.putInt("TransferCooldown", 0);
         return data;
     }
+    // parity: `ComparatorBlockEntity.saveAdditional`, one line and always written.
+    if (path == "comparator") {
+        data.putInt("OutputSignal", 0);
+        return data;
+    }
+    // parity: `SculkSensorBlockEntity.saveAdditional`. The `listener` beside it is the vibration
+    // queue's own bookkeeping, which this build does not model and vanilla fills in on read.
+    if (path == "sculk_sensor" || path == "calibrated_sculk_sensor") {
+        data.putInt("last_vibration_frequency", 0);
+        return data;
+    }
+    // parity: `CrafterBlockEntity.saveAdditional` plus its two helpers, three fields every time.
+    if (path == "crafter") {
+        data.putInt("crafting_ticks_remaining", 0);
+        data.putIntArray("disabled_slots", {});
+        data.putInt("triggered", 0);
+        return data;
+    }
+    // parity: `BeehiveBlockEntity.saveAdditional`, whose list goes out even when nobody is home.
+    if (path == "beehive" || path == "bee_nest") {
+        data.set("bees", wire::nbt::NbtTag::ofList(wire::nbt::NbtList{wire::nbt::NbtType::Compound, {}}));
+        return data;
+    }
+    // parity: `ChiseledBookShelfBlockEntity.saveAdditional`, whose slot is -1 until somebody touches
+    // one, which is what makes an untouched shelf read nothing on a comparator.
+    if (path == "chiseled_bookshelf") {
+        data.putInt("last_interacted_slot", -1);
+        return data;
+    }
     return data;
 }
 

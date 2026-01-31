@@ -154,6 +154,25 @@ private:
     void igniteAt(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos, std::int32_t heldSlot,
                   const storage::StoredItemStack& held);
 
+    /// Grows what was clicked, when bone meal does anything to it. Answers whether it did.
+    [[nodiscard]] bool useBoneMeal(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos,
+                                   std::int32_t heldSlot, const storage::StoredItemStack& held);
+
+    /// Puts one piece of glowstone into a respawn anchor. Answers whether it took it.
+    [[nodiscard]] bool chargeAnchor(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos,
+                                    std::int32_t heldSlot, const storage::StoredItemStack& held);
+
+    /// Waxes what was clicked. Answers whether the block took the wax.
+    [[nodiscard]] bool useHoneycomb(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos,
+                                    std::int32_t heldSlot, const storage::StoredItemStack& held);
+
+    /// Strips a log, scrapes a step of oxidation, or takes the wax off. Answers whether it did one.
+    [[nodiscard]] bool useAxe(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos,
+                              std::int32_t heldSlot, const storage::StoredItemStack& held);
+
+    /// Writes what a tool turned a block into, and tells the clients and the neighbours about it.
+    void reshapeBlock(const wire::protocol::play::BlockPos& pos, std::int32_t stateId, std::int32_t effect);
+
     /// Arms an end portal frame, and opens the portal when that was the twelfth eye.
     void placeEnderEye(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos, std::int32_t heldSlot,
                        const storage::StoredItemStack& held);

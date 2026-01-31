@@ -1,0 +1,84 @@
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/world/BoneMeal.hpp>
+
+#include <algorithm>
+#include <array>
+#include <charconv>
+#include <map>
+#include <string>
+#include <string_view>
+
+namespace basalt::server::runtime::world::boneMeal {
+namespace {
+
+/// parity: `CropBlock.getBonemealAgeIncrease`, `Mth.nextInt(random, 2, 5)`, both ends included. The
+/// stems use the same two numbers written out by hand.
+constexpr std::int32_t kLeastAges = 2;
+constexpr std::int32_t kMostAges = 5;
+
+/// The blocks this grows: the crop family and the two stems. parity: they share `performBonemeal`,
+/// which is "add two to five ages and stop at the last one".
+constexpr std::array<std::string_view, 7> kByAge{
+    "wheat", "carrots", "potatoes", "beetroots", "torchflower_crop", "melon_stem", "pumpkin_stem"};
+
+[[nodiscard]] std::string pathOf(std::int32_t stateId) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    return block == nullptr ? std::string{} : std::string{block->path()};
+}
+
+[[nodiscard]] std::optional<std::int32_t> ageOf(std::int32_t stateId) {
+    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
+    const auto found = properties.find("age");
+    if (found == properties.end()) {
+        return std::nullopt;
+    }
+    std::int32_t value = 0;
+    const char* first = found->second.data();
+    const char* last = first + found->second.size();
+    const std::from_chars_result result = std::from_chars(first, last, value);
+    return result.ec == std::errc{} && result.ptr == last ? std::optional{value} : std::nullopt;
+}
+
+/// The last age this block has, read off its own definition rather than written down per block.
+[[nodiscard]] std::int32_t maxAgeOf(const wire::common::Identifier& block) {
+    const registry::blockStateDefinitions::Definition* definition = registry::blockStateDefinitions::of(block);
+    return definition == nullptr ? 0 : static_cast<std::int32_t>(definition->valuesOf("age").size()) - 1;
+}
+
+} // namespace
+
+bool grows(const std::int32_t stateId) {
+    const std::string path = pathOf(stateId);
+    if (std::ranges::find(kByAge, path) == kByAge.end()) {
+        return false;
+    }
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    const std::optional<std::int32_t> age = ageOf(stateId);
+    // parity: `isValidBonemealTarget` for a crop is `!isMaxAge`, so bone meal on a grown one is not
+    // spent at all.
+    return block != nullptr && age.has_value() && *age < maxAgeOf(*block);
+}
+
+std::optional<BlockChange> apply(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                                 random::RandomSource& random) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value() || !grows(*stateId)) {
+        return std::nullopt;
+    }
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
+    const std::optional<std::int32_t> age = ageOf(*stateId);
+    if (block == nullptr || !age.has_value()) {
+        return std::nullopt;
+    }
+    const std::int32_t grown = std::min(maxAgeOf(*block), *age + random.nextIntBetweenInclusive(kLeastAges, kMostAges));
+    const std::optional<std::int32_t> turned =
+        registry::blockStateDefinitions::stateIdOf(*block, {{"age", std::to_string(grown)}}, *stateId);
+    // parity: `setBlock(pos, state, 2)`, which tells the clients and not the neighbours: growing a
+    // crop is not a block update anybody is waiting for.
+    if (!turned.has_value() || !world.setBlockState(x, y, z, *turned, WorldState::SideEffects::kSkip)) {
+        return std::nullopt;
+    }
+    return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};
+}
+
+} // namespace basalt::server::runtime::world::boneMeal
