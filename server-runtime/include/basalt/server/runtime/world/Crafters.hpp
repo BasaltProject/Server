@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/world/BlockChange.hpp>
+#include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/server/world/crafting/Crafting.hpp>
 
@@ -59,9 +60,17 @@ struct Hooks {
 
 [[nodiscard]] std::set<std::int32_t> disabledSlots(const wire::nbt::NbtCompound& data);
 
-/// parity: `CrafterBlockEntity.canPlaceItem`, which is what stops a hopper filling a slot that is
-/// off.
-[[nodiscard]] bool accepts(const wire::nbt::NbtCompound& data, std::int32_t slot);
+/// parity: `CrafterBlockEntity.setSlotState` over `slotCanBeDisabled`: only a slot that is **empty**
+/// can be switched off, and the switch is what a comparator counts as a full slot. Answers whether
+/// anything moved, so the caller knows to tell the clients and the comparators.
+bool setSlotState(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t slot, bool enabled);
+
+/// parity: `CrafterBlockEntity.canPlaceItem`, all three parts of it: a slot that is switched off
+/// takes nothing, a full one takes nothing, and a slot takes nothing while a **later** enabled slot
+/// is empty or holds fewer of the same thing (`smallerStackExist`). That last one is what spreads
+/// what a hopper feeds a crafter across the nine slots instead of piling it into the first.
+[[nodiscard]] bool accepts(const wire::nbt::NbtCompound& data, const blockInventory::Slots& slots, std::int32_t slot,
+                           const server::world::loot::ItemStack& stack);
 
 } // namespace crafters
 

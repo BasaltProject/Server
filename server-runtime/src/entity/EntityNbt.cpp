@@ -313,6 +313,16 @@ NbtCompound encode(const ServerEntity& entity) {
         // parity: `PrimedTnt.TAG_FUSE` is lowercase; `Fuse` is a creeper's own swell time.
         tag.putShort("fuse", static_cast<std::int16_t>(entity.fuse));
     }
+    // parity: `MinecartTNT.addAdditionalSaveData` writes the same name as an **int**, and writes it
+    // whether the fuse is lit or not: an untouched cart saves a minus one.
+    if (path == "tnt_minecart") {
+        tag.putInt("fuse", entity.fuse);
+    }
+    // parity: `MinecartHopper.addAdditionalSaveData` writes `Enabled` whether anything has touched
+    // it or not, so a cart that has never crossed an activator rail still saves a true.
+    if (path == "hopper_minecart" && !tag.contains("Enabled")) {
+        tag.putBoolean("Enabled", true);
+    }
     if (cubeMobs::isCube(entity.type())) {
         tag.putInt("Size", std::max(entity.cubeSize, 1) - 1);
     }

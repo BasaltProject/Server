@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
+#include <basalt/server/runtime/world/RealRecipes.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -40,9 +41,14 @@ public:
 /// accepting one would copy the stack unchanged and report a success that never happened.
 class ItemCommand final : public Command {
 public:
-    ItemCommand();
+    /// `recipes` is only for the furnace: writing its input slot sets the cooking time, which is what
+    /// `setItem` does in the jar. Without one a furnace keeps whatever time it had.
+    explicit ItemCommand(world::RealRecipes* recipes = nullptr);
 
     void build(const CommandNodeBuilder& root) const override;
+
+private:
+    world::RealRecipes* recipes_ = nullptr;
 };
 
 /// parity: `LootCommand`: four destinations and four sources, each pairing the same way.

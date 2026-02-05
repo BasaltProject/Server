@@ -655,6 +655,14 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         }
         return;
     }
+    if (packetId == play::ContainerSlotStateChangedPacket::kId) {
+        const std::optional<play::ContainerSlotStateChangedPacket> packet =
+            play::ContainerSlotStateChangedPacket::read(body);
+        if (packet.has_value()) {
+            menus_->setSlotState(packet->slotId, packet->newState);
+        }
+        return;
+    }
     if (packetId == play::SetCommandBlockPacket::kId) {
         const std::optional<play::SetCommandBlockPacket> packet = play::SetCommandBlockPacket::read(body);
         if (packet.has_value()) {

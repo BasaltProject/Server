@@ -122,7 +122,7 @@ std::vector<std::shared_ptr<const Command>> vanillaCommands(const VanillaCommand
         add(std::make_shared<commands::RecipeCommand>(*hooks.progress, *hooks.recipes));
     }
     add(std::make_shared<commands::WaypointCommand>());
-    add(std::make_shared<commands::ItemCommand>());
+    add(std::make_shared<commands::ItemCommand>(hooks.recipes));
     if (hooks.lootTables != nullptr && hooks.worldSeed) {
         add(std::make_shared<commands::LootCommand>(*hooks.lootTables, hooks.worldSeed));
     }

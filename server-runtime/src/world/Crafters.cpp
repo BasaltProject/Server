@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
@@ -248,6 +249,67 @@ std::set<std::int32_t> disabledSlots(const wire::nbt::NbtCompound& data) {
     return std::set<std::int32_t>{stored.begin(), stored.end()};
 }
 
-bool accepts(const wire::nbt::NbtCompound& data, std::int32_t slot) { return !disabledSlots(data).contains(slot); }
+bool setSlotState(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                  const std::int32_t slot, const bool enabled) {
+    if (slot < 0 || slot >= kSize) {
+        return false;
+    }
+    server::world::ChunkBlockEntity* entity = entityAt(world, x, y, z);
+    if (entity == nullptr) {
+        return false;
+    }
+    // parity: `slotCanBeDisabled`, which is the slot being empty. A slot with something in it keeps
+    // its switch wherever it was.
+    const blockInventory::Slots slots = blockInventory::read(entity->data(), kSize);
+    if (slots[static_cast<std::size_t>(slot)].has_value()) {
+        return false;
+    }
+    std::set<std::int32_t> off = disabledSlots(entity->data());
+    const bool changed = enabled ? off.erase(slot) > 0 : off.insert(slot).second;
+    if (!changed) {
+        return false;
+    }
+    const std::vector<std::int32_t> written{off.begin(), off.end()};
+    entity->data().putIntArray(std::string{kDisabledSlotsKey}, written);
+    if (server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4); chunk != nullptr) {
+        chunk->markDirty();
+    }
+    return true;
+}
+
+bool accepts(const wire::nbt::NbtCompound& data, const blockInventory::Slots& slots, const std::int32_t slot,
+             const server::world::loot::ItemStack& stack) {
+    const std::set<std::int32_t> off = disabledSlots(data);
+    if (off.contains(slot)) {
+        return false;
+    }
+    const auto index = static_cast<std::size_t>(slot);
+    if (index >= slots.size()) {
+        return false;
+    }
+    const std::optional<server::world::loot::ItemStack>& here = slots[index];
+    if (!here.has_value()) {
+        return true;
+    }
+    if (here->count >= registry::itemStacking::maxStackSize(here->item)) {
+        return false;
+    }
+    // parity: `smallerStackExist` only looks **forward**, so the grid fills left to right and then
+    // starts again rather than topping up the first slot it finds.
+    for (std::int32_t later = slot + 1; later < kSize; ++later) {
+        if (off.contains(later)) {
+            continue;
+        }
+        const std::optional<server::world::loot::ItemStack>& other = slots[static_cast<std::size_t>(later)];
+        if (!other.has_value()) {
+            return false;
+        }
+        if (other->count < here->count && other->item == here->item && other->components == here->components) {
+            return false;
+        }
+    }
+    static_cast<void>(stack);
+    return true;
+}
 
 } // namespace basalt::server::runtime::world::crafters

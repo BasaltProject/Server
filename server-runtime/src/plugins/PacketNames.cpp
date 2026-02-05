@@ -139,6 +139,7 @@ constexpr std::array kEntries{
     Entry{wire::protocol::ProtocolState::Play, true, 0x11, "container_button_click"},
     Entry{wire::protocol::ProtocolState::Play, true, 0x12, "container_click"},
     Entry{wire::protocol::ProtocolState::Play, true, 0x13, "container_close"},
+    Entry{wire::protocol::ProtocolState::Play, true, 0x14, "container_slot_state_changed"},
     Entry{wire::protocol::ProtocolState::Play, true, 0x1a, "interact"},
     Entry{wire::protocol::ProtocolState::Play, true, 0x1c, "play_keep_alive"},
     Entry{wire::protocol::ProtocolState::Play, true, 0x1e, "position"},

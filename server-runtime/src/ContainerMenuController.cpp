@@ -9,12 +9,15 @@
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
+#include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/ContainerOpeners.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
+#include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/DoubleChests.hpp>
 #include <basalt/server/runtime/world/Lecterns.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
+#include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/Shulkers.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/protocol/play/BlockEntityPackets.hpp>
@@ -363,6 +366,36 @@ void ContainerMenuController::openCrafter(PlayerSession& session, const BlockPos
             .write(buffer);
     });
     sendInventory();
+}
+
+void ContainerMenuController::setSlotState(const std::int32_t slot, const bool enabled) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    if (world == nullptr || !openBlock.has_value()) {
+        return;
+    }
+    const std::optional<std::int32_t> stateId = world->state().blockState(openBlock->x, openBlock->y, openBlock->z);
+    const Identifier* block =
+        stateId.has_value() ? server::registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
+    // parity: the packet reaches `CrafterBlockEntity` and nothing else, so a window over anything
+    // else says nothing.
+    if (block == nullptr || *block != world::crafters::block()) {
+        return;
+    }
+    if (!world::crafters::setSlotState(world->state(), openBlock->x, openBlock->y, openBlock->z, slot, enabled)) {
+        return;
+    }
+    // parity: `setChanged` is what tells the comparator, and the window draws the cross from its own
+    // data slot.
+    world::redstoneComponents::scheduleComparatorsAround(world->state(), world->name(), openBlock->x, openBlock->y,
+                                                         openBlock->z, world::comparatorReading::of(world->state()));
+    const std::int32_t containerId = openMenu.containerId();
+    using wire::protocol::play::ContainerSetDataPacket;
+    owner_->sendCompressed(ContainerSetDataPacket::kId, [containerId, slot, enabled](wire::io::ByteBuffer& buffer) {
+        ContainerSetDataPacket{.containerId = containerId,
+                               .id = static_cast<std::int16_t>(slot),
+                               .value = static_cast<std::int16_t>(enabled ? 0 : 1)}
+            .write(buffer);
+    });
 }
 
 void ContainerMenuController::closeOpenMenu(PlayerSession& session) {

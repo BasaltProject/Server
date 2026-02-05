@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Composters.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
+#include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/Hoppers.hpp>
@@ -230,6 +231,11 @@ void add(Slots& slots, const ItemStack& stack) {
         // takes only fuel, a brewing stand's three slots each take their own thing, and a shulker
         // box takes anything but another shulker box.
         if (!containers::acceptsThroughFace(target.path, slot, stack.item, !there->has_value())) {
+            continue;
+        }
+        // parity: `CrafterBlockEntity.canPlaceItem` is more than a face rule: it refuses a slot that
+        // is switched off and spreads what it is fed across the grid rather than piling it up.
+        if (target.path == crafters::block().path() && !crafters::accepts(*target.data, slots, slot, stack)) {
             continue;
         }
         if (there->has_value()) {
@@ -544,7 +550,9 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, ran
     // a hopper that just moved waits eight ticks and not nine.
     // parity: only a move calls `setChanged`. Counting down is not a change worth saving, and
     // marking the chunk for it would rewrite every hopper's region file every single tick.
-    const std::int32_t was = entity->data().getInt(kCooldownKey, 0);
+    // parity: `getIntOr("TransferCooldown", -1)`, and a hopper with no cooldown written down is one
+    // that has never moved anything.
+    const std::int32_t was = entity->data().getInt(kCooldownKey, -1);
     if (was - 1 > 0) {
         entity->data().putInt(kCooldownKey, was - 1);
         return false;

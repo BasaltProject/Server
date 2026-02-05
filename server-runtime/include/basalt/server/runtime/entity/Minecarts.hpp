@@ -48,6 +48,21 @@ bool moveAlongTrack(world::WorldState& world, ServerEntity& cart, double intentX
 /// and what is left of it is air drag.
 void comeOffTrack(world::WorldState& world, ServerEntity& cart, double gravity);
 
+/// parity: `MinecartTNT.primeFuse`'s own eighty ticks.
+inline constexpr std::int32_t kTntCartFuse = 80;
+
+/// parity: `MinecartTNT.explode`: four of power plus what the speed adds, and the speed counts up to
+/// five however fast the cart was really going.
+inline constexpr double kTntCartPower = 4.0;
+inline constexpr double kTntCartSpeedCap = 5.0;
+
+/// parity: the `activateMinecart` call at the end of a cart's turn, which every kind of cart reads
+/// its own way: a hopper cart is **off** while the rail is powered, and a tnt cart lights its fuse.
+/// It happens every turn the cart is on an activator rail, not only the turn it arrives.
+///
+/// `tntExplodes` is the game rule, which is what stops a fuse being lit at all.
+void activateOnRail(world::WorldState& world, ServerEntity& cart, bool tntExplodes);
+
 /// The direction the keys a rider is holding point, in the world.
 ///
 /// parity: `ServerPlayer.getLastClientMoveIntent` over `Entity.getInputVector`: the keys make a

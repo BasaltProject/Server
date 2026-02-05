@@ -323,6 +323,36 @@ bool moveAlongTrack(world::WorldState& world, ServerEntity& cart, const double i
     return true;
 }
 
+void activateOnRail(world::WorldState& world, ServerEntity& cart, const bool tntExplodes) {
+    const std::optional<std::array<std::int32_t, 3>> rail = railUnder(world, cart);
+    if (!rail.has_value()) {
+        return;
+    }
+    const std::optional<std::int32_t> stateId = world.blockState((*rail)[0], (*rail)[1], (*rail)[2]);
+    const wire::common::Identifier* block =
+        stateId.has_value() ? registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
+    if (block == nullptr || block->path() != "activator_rail") {
+        return;
+    }
+    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*stateId);
+    const auto powered = properties.find("powered");
+    const bool on = powered != properties.end() && powered->second == "true";
+    const std::string_view path = cart.type().path();
+    if (path == "hopper_minecart") {
+        // parity: `MinecartHopper.activateMinecart`, `enabled = !powered`, written down as `Enabled`.
+        if (!cart.sourceNbt.has_value()) {
+            cart.sourceNbt = wire::nbt::NbtCompound{};
+        }
+        cart.sourceNbt->putBoolean("Enabled", !on);
+        return;
+    }
+    // parity: `MinecartTNT.activateMinecart`, which lights a fuse that is not lit already, and
+    // `primeFuse`, which does nothing at all with the `tnt_explodes` rule off.
+    if (path == "tnt_minecart" && on && cart.fuse < 0 && tntExplodes) {
+        cart.fuse = kTntCartFuse;
+    }
+}
+
 void comeOffTrack(world::WorldState& world, ServerEntity& cart, const double gravity) {
     cart.velocityX = std::clamp(cart.velocityX, -kMaxSpeed, kMaxSpeed);
     cart.velocityZ = std::clamp(cart.velocityZ, -kMaxSpeed, kMaxSpeed);
