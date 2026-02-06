@@ -148,6 +148,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 }
                 const hoppers::Around around{
                     .isBookshelfBook = hooks.isBookshelfBook,
+                    .recipeFor = hooks.recipeFor,
                     .changes = &changes,
                 };
                 if (hoppers::tick(world, x, y, z, random, around)) {

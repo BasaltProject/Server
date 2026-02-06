@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
+#include <basalt/server/runtime/world/Rails.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
@@ -78,9 +79,31 @@ bool BlockEditor::write(std::int32_t x, std::int32_t y, std::int32_t z, std::int
     // so the cascade needs the old state and not only the new one.
     replaced_.insert_or_assign(std::array<std::int32_t, 3>{x, y, z}, before);
     record(x, y, z, stateId);
+    bendRail(x, y, z, stateId, before);
     written_.push_back({x, y, z});
     createBlockEntity(x, y, z, stateId);
     return true;
+}
+
+void BlockEditor::bendRail(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
+                           std::optional<std::int32_t> before) {
+    // parity: `BaseRailBlock.onPlace`, which runs on **every** write and not only on a player's, so a
+    // rail dropped by command bends towards its neighbours there and then. Its guard is the block and
+    // not the state: a rail rewritten with another shape is left alone.
+    if (!world::rails::isRail(stateId)) {
+        return;
+    }
+    const wire::common::Identifier* now = reg::blockStateDefinitions::blockOf(stateId);
+    const wire::common::Identifier* was = before.has_value() ? reg::blockStateDefinitions::blockOf(*before) : nullptr;
+    if (now == nullptr || (was != nullptr && *was == *now)) {
+        return;
+    }
+    const std::optional<std::int32_t> bent = world::rails::place(
+        world_->state(), world_->name(), x, y, z,
+        [this](std::int32_t bx, std::int32_t by, std::int32_t bz, std::int32_t id) { record(bx, by, bz, id); });
+    if (bent.has_value()) {
+        record(x, y, z, *bent);
+    }
 }
 
 void BlockEditor::record(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
@@ -191,11 +214,19 @@ void BlockEditor::notifyNeighbours() {
                 }
                 static_cast<void>(set(x, y, z, stateId));
             },
-            adjustToNeighbours_);
-        if (shapedToAir && !unsupported && written.has_value() && *written != reg::blocks::air().stateId &&
-            world_->state().blockState(at[0], at[1], at[2]) == reg::blocks::air().stateId) {
-            static_cast<void>(set(at[0], at[1], at[2], *written));
-        }
+            adjustToNeighbours_,
+            // parity: `BlockInput.place` settles the state it is going to write, shaping and named
+            // properties both, and only then does the block land and set off whatever it sets off.
+            // Doing this after the reactions instead undid them: a hopper written `enabled=true`
+            // beside a lit block came back enabled, and a tnt that had already primed itself was put
+            // back on the ground.
+            [this, &at, &written, &shapedToAir, &unsupported] {
+                if (shapedToAir && !unsupported && written.has_value() && *written != reg::blocks::air().stateId &&
+                    world_->state().blockState(at[0], at[1], at[2]) == reg::blocks::air().stateId) {
+                    static_cast<void>(set(at[0], at[1], at[2], *written));
+                }
+                keepNamedProperties(at);
+            });
         // parity: `Level.updateNeighboursOnBlockSet` ends in `updateNeighbourForOutputSignal` for a
         // block that has an analog output, and that one reaches **two** squares through anything that
         // conducts. Without it a chest or a command block put down by command never told the
@@ -204,31 +235,33 @@ void BlockEditor::notifyNeighbours() {
             world::redstoneComponents::scheduleComparatorsAround(world_->state(), world_->name(), at[0], at[1], at[2],
                                                                  world::comparatorReading::of(world_->state()));
         }
-        // parity: `BlockInput.place` ends in `overwriteWithDefinedProperties`, so a property the
-        // command named beats whatever the shape update decided. Without it a note block placed as a
-        // harp over glass came out a hat, and the jar leaves it a harp until the block below changes.
-        const auto named = written_properties_.find(at);
-        if (named == written_properties_.end() || named->second.empty()) {
-            continue;
-        }
-        const std::optional<std::int32_t> shaped = world_->state().blockState(at[0], at[1], at[2]);
-        if (!shaped.has_value()) {
-            continue;
-        }
-        const wire::common::Identifier* block = reg::blockStateDefinitions::blockOf(*shaped);
-        if (block == nullptr) {
-            continue;
-        }
-        if (const std::optional<std::int32_t> kept =
-                reg::blockStateDefinitions::stateIdOf(*block, named->second, *shaped);
-            kept.has_value() && *kept != *shaped) {
-            static_cast<void>(set(at[0], at[1], at[2], *kept));
-        }
     }
     written_properties_.clear();
     replaced_.clear();
     // A reaction can move a block of its own, and those go out with everything else.
     written_.clear();
+}
+
+void BlockEditor::keepNamedProperties(const std::array<std::int32_t, 3>& at) {
+    // parity: `BlockInput.place` ends in `overwriteWithDefinedProperties`, so a property the command
+    // named beats whatever the shape update decided. Without it a note block placed as a harp over
+    // glass came out a hat, and the jar leaves it a harp until the block below changes.
+    const auto named = written_properties_.find(at);
+    if (named == written_properties_.end() || named->second.empty()) {
+        return;
+    }
+    const std::optional<std::int32_t> shaped = world_->state().blockState(at[0], at[1], at[2]);
+    if (!shaped.has_value()) {
+        return;
+    }
+    const wire::common::Identifier* block = reg::blockStateDefinitions::blockOf(*shaped);
+    if (block == nullptr) {
+        return;
+    }
+    if (const std::optional<std::int32_t> kept = reg::blockStateDefinitions::stateIdOf(*block, named->second, *shaped);
+        kept.has_value() && *kept != *shaped) {
+        static_cast<void>(set(at[0], at[1], at[2], *kept));
+    }
 }
 
 void BlockEditor::keepWritten(const std::int32_t x, const std::int32_t y, const std::int32_t z,

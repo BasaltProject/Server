@@ -102,11 +102,18 @@ struct Context {
 /// Breaks whatever `x`, `y`, `z` stopped holding up, and whatever that in turn stopped holding.
 ///
 /// parity: `updateNeighbourShapes` reshapes the neighbours, never the block, so `reshapeSelf` is
-/// false for a command that writes half a door. `removed` is the state before the write, with no
-/// default on purpose: a caller that does not know has to say so.
+/// false for a command writing half a door. `removed` has no default on purpose. `afterShapes` runs
+/// after the shapes and before anything reacts: a command's own properties beat the shape update.
 void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                  std::optional<std::int32_t> removed, std::vector<BlockChange>& effects, const OnBroken& onBroken,
-                 const OnReshaped& onReshaped = {}, bool reshapeSelf = true);
+                 const OnReshaped& onReshaped = {}, bool reshapeSelf = true,
+                 const std::function<void()>& afterShapes = {});
+
+/// Redraws the six squares around a change and drops whatever they no longer hold up, and nothing
+/// else: nobody re-reads the power. parity: `moveBlocks` writes with `UPDATE_MOVE_BY_PISTON` and
+/// without `UPDATE_NEIGHBORS`, so a lever on a block the piston took away falls but tells nobody.
+void reshapeOnly(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z, const OnBroken& onBroken,
+                 const OnReshaped& onReshaped = {});
 
 /// Puts back to zero the signal a target or a sculk sensor arrived carrying with no turn booked to
 /// spend it. parity: `SculkSensorBlock.onPlace` and `TargetBlock.onPlace`. Separate because

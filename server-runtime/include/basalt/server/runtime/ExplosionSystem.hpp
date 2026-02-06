@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/world/Explosions.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 
 #include <cstdint>
@@ -49,8 +50,10 @@ public:
     ///
     /// `sourceEntityId` is 0 for a blast with nothing behind it, which is what a bed in the Nether
     /// and a command-driven explosion both are.
+    /// `spares` is what the source entity refuses to break, and only a primed tnt cart has one.
     void blowUp(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, double x, double y,
-                double z, float power, std::string_view cause = "explosion", std::int32_t sourceEntityId = 0);
+                double z, float power, std::string_view cause = "explosion", std::int32_t sourceEntityId = 0,
+                const world::explosions::Spares& spares = {});
 
 private:
     /// One stack the blast is holding on to until it decides where it lands.

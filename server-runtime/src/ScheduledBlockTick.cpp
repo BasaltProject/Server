@@ -261,7 +261,12 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                                                     .ultrawarm = world.declaration().dimension ==
                                                                  config::WorldDimension::Nether};
             const world::dispensers::Result result = world::dispensers::fire(
-                context, x, y, z, {.allocateEntityId = [this] { return players_->allocateEntityId(); }});
+                context, x, y, z,
+                {.allocateEntityId = [this] { return players_->allocateEntityId(); },
+                 .recipeFor =
+                     [this](server::world::crafting::Cooker cooker, const server::world::loot::ItemStack& stack) {
+                         return recipes_ == nullptr ? nullptr : recipes_->cookingFor(cooker, stack);
+                     }});
             if (!result.effects.empty()) {
                 broadcaster_->sendEffects(watchers, x, y, z, world.state().blockState(x, y, z).value_or(0),
                                           result.effects);
@@ -315,6 +320,24 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                 world.state(), world.name(), moved->x, moved->y, moved->z, world.gameTime(), random,
                 world.gameRules().get(world::gameRules::kTntExplodes));
             scheduled.insert(scheduled.end(), reacted.begin(), reacted.end());
+            // parity: a diode and an observer tell the square they feed **and its own neighbours**,
+            // and a torch does that in all six directions. Without the second step a lamp stuck to
+            // the block a repeater feeds is two squares away and never hears.
+            // parity: a torch flicking on its own turn writes with `UPDATE_ALL` and stops at its six
+            // squares; only a diode and an observer reach past the block they feed, and only as far
+            // as that block's own neighbours.
+            for (const world::redstoneComponents::Reach& at :
+                 world::redstoneComponents::outputReach(moved->stateId, moved->x, moved->y, moved->z)) {
+                if (!at.skip.has_value()) {
+                    continue;
+                }
+                world::redstoneComponents::scheduleInFront(world.state(), world.name(), at.x, at.y, at.z, *at.skip,
+                                                           containerSignal);
+                const std::vector<world::BlockChange> ahead = world::redstoneReactors::updateInFront(
+                    world.state(), world.name(), at.x, at.y, at.z, *at.skip, world.gameTime(), random,
+                    world.gameRules().get(world::gameRules::kTntExplodes));
+                scheduled.insert(scheduled.end(), ahead.begin(), ahead.end());
+            }
             for (const world::BlockChange& change : settled) {
                 const std::vector<world::BlockChange> around = world::redstoneReactors::updateAroundWire(
                     world.state(), world.name(), change.x, change.y, change.z, world.gameTime(), random,

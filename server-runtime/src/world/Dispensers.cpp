@@ -14,6 +14,7 @@
 #include <basalt/server/runtime/world/Dispensers.hpp>
 #include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
+#include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/Rails.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
@@ -442,7 +443,8 @@ struct Target {
 }
 
 /// Puts one item of the stack into the container, answering whether a slot took it.
-[[nodiscard]] bool insertOne(WorldState& world, const Target& into, const ItemStack& stack, BlockFace from) {
+[[nodiscard]] bool insertOne(WorldState& world, const Target& into, const ItemStack& stack, BlockFace from,
+                             const Hooks& hooks) {
     server::world::Chunk* chunk = world.chunkIfLoaded(into.x >> 4, into.z >> 4);
     server::world::ChunkBlockEntity* blockEntity =
         chunk == nullptr ? nullptr : chunk->blockEntityAt(into.x & 15, into.y, into.z & 15);
@@ -468,12 +470,17 @@ struct Target {
         if (into.path == crafters::block().path() && !crafters::accepts(blockEntity->data(), slots, slot, stack)) {
             continue;
         }
+        const bool wasEmpty = !there.has_value();
         if (there.has_value()) {
             there->count += 1;
         } else {
             there = ItemStack{.item = stack.item, .count = 1, .components = stack.components};
         }
         blockInventory::writeFor(into.path, blockEntity->data(), slots);
+        // parity: `tryMoveInItem` reaches `setItem` only when the slot it lands in was empty.
+        if (wasEmpty && slot == furnaces::kInputSlot) {
+            furnaces::inputChanged(into.path, blockEntity->data(), hooks.recipeFor);
+        }
         chunk->markDirty();
         redstoneComponents::scheduleComparatorsAround(world, {}, into.x, into.y, into.z, comparatorReading::of(world));
         return true;
@@ -629,7 +636,7 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
     }
     const std::optional<Target> into = containerInFront(world, x, y, z, *out, hooks);
     if (into.has_value()) {
-        if (!insertOne(world, *into, stack, registry::opposite(*out))) {
+        if (!insertOne(world, *into, stack, registry::opposite(*out), hooks)) {
             return result;
         }
     } else {

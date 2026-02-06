@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/random/RandomSource.hpp>
+#include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
@@ -29,21 +30,31 @@ inline constexpr std::int32_t kLampOffDelay = 4;
 
 [[nodiscard]] const wire::common::Identifier& lamp();
 
-/// Lets every reactive block around a change look again. Answers what moved, so the caller can tell
-/// the clients.
-///
-/// `itself` says whether the square that changed is asked too. parity: `Level.updateNeighborsAt`
-/// tells the six around a square and never the square itself, and a redstone lamp has no `onPlace`:
-/// one put down by command next to a lit torch stays dark until something pokes it. Only a diode
-/// asks the square in front of it directly, through `neighborChanged`.
-/// `gameTime` is the world's clock, which the game events a reactor raises are stamped with: a door
-/// swinging is a `BLOCK_OPEN` and a sculk sensor hears it. It is a parameter and not a default so
-/// that a caller cannot forget it and leave a vibration stamped with turn zero.
-/// `tntExplodes` is the game rule of the same name: with it off `TntBlock.prime` answers false and the
-/// caller leaves the block alone, so a signal neither lights the tnt nor takes it away.
+/// Lets every reactive block around a change look again, answering what moved. parity:
+/// `Level.updateNeighborsAt` tells the six around a square and never the square itself, so `itself`
+/// exists for the diode, which asks the square in front directly. `gameTime` stamps the game events
+/// raised, a parameter so a caller cannot leave a vibration at turn zero; `tntExplodes` is the game
+/// rule, and with it off a signal leaves the tnt alone.
 [[nodiscard]] std::vector<BlockChange> update(WorldState& world, std::string_view worldName, std::int32_t x,
                                               std::int32_t y, std::int32_t z, std::int64_t gameTime,
                                               random::RandomSource& random, bool tntExplodes, bool itself = true);
+
+/// The half of a write only the block itself can answer, which is its `onPlace`. parity:
+/// `Level.updateNeighborsAt` never tells the square that changed, so a block landing on a powered
+/// square reacts only if its own `onPlace` reads the power. Four do: tnt primes, a hopper comes out
+/// disabled, a copper bulb lights and a shelf joins its chain. A lamp, a door or a bell have none.
+[[nodiscard]] std::vector<BlockChange> placed(WorldState& world, std::string_view worldName, std::int32_t x,
+                                              std::int32_t y, std::int32_t z, std::int64_t gameTime,
+                                              random::RandomSource& random, bool tntExplodes);
+
+/// The reactors on and around the square a diode feeds, less the way back to the diode.
+///
+/// parity: `DiodeBlock.updateNeighborsInFront`: a `neighborChanged` on that square and an
+/// `updateNeighborsAtExceptFromFacing` on it, which is its six less one.
+[[nodiscard]] std::vector<BlockChange> updateInFront(WorldState& world, std::string_view worldName, std::int32_t x,
+                                                     std::int32_t y, std::int32_t z, server::registry::BlockFace back,
+                                                     std::int64_t gameTime, random::RandomSource& random,
+                                                     bool tntExplodes);
 
 /// The same for a piece of dust whose strength moved, whose reach is two squares.
 ///

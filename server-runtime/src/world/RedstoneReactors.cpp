@@ -358,6 +358,25 @@ const wire::common::Identifier& lamp() {
     return instance;
 }
 
+/// parity: the blocks whose `onPlace` reads `hasNeighborSignal`. Everything else that reacts to a
+/// signal does it only from `neighborChanged`, which never reaches the square that changed.
+[[nodiscard]] bool readsPowerOnPlace(const std::string_view path) {
+    return path == "tnt" || path == "hopper" || path.ends_with("copper_bulb") || path == "powered_rail" ||
+           path == "activator_rail" || path == "detector_rail" || shelves::isShelf(path);
+}
+
+std::vector<BlockChange> placed(WorldState& world, const std::string_view worldName, const std::int32_t x,
+                                const std::int32_t y, const std::int32_t z, const std::int64_t gameTime,
+                                random::RandomSource& random, const bool tntExplodes) {
+    std::vector<BlockChange> changes;
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value() || !readsPowerOnPlace(pathOf(*stateId))) {
+        return changes;
+    }
+    react(world, worldName, x, y, z, gameTime, tntExplodes, changes, random);
+    return changes;
+}
+
 std::vector<BlockChange> update(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
                                 std::int32_t z, std::int64_t gameTime, random::RandomSource& random,
                                 const bool tntExplodes, const bool itself) {
@@ -366,6 +385,22 @@ std::vector<BlockChange> update(WorldState& world, std::string_view worldName, s
         react(world, worldName, x, y, z, gameTime, tntExplodes, changes, random);
     }
     for (const BlockFace face : kUpdateOrder) {
+        react(world, worldName, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face),
+              gameTime, tntExplodes, changes, random);
+    }
+    return changes;
+}
+
+std::vector<BlockChange> updateInFront(WorldState& world, const std::string_view worldName, const std::int32_t x,
+                                       const std::int32_t y, const std::int32_t z, const BlockFace back,
+                                       const std::int64_t gameTime, random::RandomSource& random,
+                                       const bool tntExplodes) {
+    std::vector<BlockChange> changes;
+    react(world, worldName, x, y, z, gameTime, tntExplodes, changes, random);
+    for (const BlockFace face : kUpdateOrder) {
+        if (face == back) {
+            continue;
+        }
         react(world, worldName, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face),
               gameTime, tntExplodes, changes, random);
     }

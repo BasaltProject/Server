@@ -56,6 +56,19 @@ using Position = std::array<std::int32_t, 3>;
 
 void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
 
+[[nodiscard]] bool sameBlock(const std::int32_t one, const std::int32_t other) {
+    const wire::common::Identifier* first = registry::blockStateDefinitions::blockOf(one);
+    const wire::common::Identifier* second = registry::blockStateDefinitions::blockOf(other);
+    return first != nullptr && second != nullptr && *first == *second;
+}
+
+/// parity: `ObserverBlock.onPlace` only reaches out for one that arrives **powered**, and one that
+/// arrives powered clears itself first, so an observer that has just landed tells nobody from here.
+[[nodiscard]] bool isObserverState(const std::int32_t stateId) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    return block != nullptr && block->path() == "observer";
+}
+
 [[nodiscard]] std::int32_t stateAt(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     return world.blockState(x, y, z).value_or(registry::blocks::air().stateId);
 }
@@ -348,9 +361,33 @@ void settleArrivedSignal(WorldState& world, std::int32_t x, std::int32_t y, std:
     }
 }
 
+void reshapeOnly(const Context& context, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                 const OnBroken& onBroken, const OnReshaped& onReshaped) {
+    WorldState& world = context.world;
+    const OnReshaped reshaped = onReshaped ? onReshaped : OnReshaped{noop};
+    const OnBroken broken = onBroken ? onBroken : OnBroken{noop};
+    const blockSurvival::ScaffoldingHasFallen scaffolding = [&world](const WorldState&, std::int32_t sx,
+                                                                     std::int32_t sy, std::int32_t sz) {
+        return scheduledBlocks::scaffoldingHasFallen(world, sx, sy, sz);
+    };
+    const Walk walk{.context = context, .scaffolding = scaffolding, .onReshaped = reshaped, .onBroken = broken};
+    std::deque<Position> pending;
+    pending.push_back({x, y, z});
+    std::int32_t examined = 0;
+    while (!pending.empty() && examined < kMaxCascade) {
+        const Position at = pending.front();
+        pending.pop_front();
+        examined += kDirections;
+        for (const BlockFace face : kUpdateShapeOrder) {
+            visit(walk, pending, at[0] + registry::stepX(face), at[1] + registry::stepY(face),
+                  at[2] + registry::stepZ(face), registry::opposite(face));
+        }
+    }
+}
+
 void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                  std::optional<std::int32_t> removed, std::vector<BlockChange>& effects, const OnBroken& onBroken,
-                 const OnReshaped& onReshaped, bool reshapeSelf) {
+                 const OnReshaped& onReshaped, bool reshapeSelf, const std::function<void()>& afterShapes) {
     WorldState& world = context.world;
     const OnReshaped reshaped = onReshaped ? onReshaped : OnReshaped{noop};
     const OnBroken broken = onBroken ? onBroken : OnBroken{noop};
@@ -478,8 +515,61 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // parity: a reactor writes with `UPDATE_ALL`, so whatever it changed goes on to tell its own
     // neighbours. That is what carries a signal down a line of powered rails past the first one:
     // `PoweredRailBlock.updateState` only ever looks at the rail it is asked about.
+    if (afterShapes) {
+        afterShapes();
+    }
     std::deque<Position> reacting;
     reacting.push_back({x, y, z});
+    // parity: `DiodeBlock.updateNeighborsInFront` from `onPlace` and from
+    // `affectNeighborsAfterRemoval`, plus `RedstoneTorchBlock.notifyNeighbors`, which tell the square
+    // they feed **and its own neighbours**. The state that has just gone is what says where a
+    // component that somebody took out was feeding, so both states are asked.
+    const std::optional<std::int32_t> standing = world.blockState(x, y, z);
+    std::vector<redstoneComponents::Reach> reach;
+    if (standing.has_value() && !isObserverState(*standing)) {
+        for (const redstoneComponents::Reach& at : redstoneComponents::outputReach(*standing, x, y, z)) {
+            reach.push_back(at);
+        }
+    }
+    if (removed.has_value() && (!standing.has_value() || !sameBlock(*removed, *standing))) {
+        for (const redstoneComponents::Reach& at : redstoneComponents::outputReach(*removed, x, y, z)) {
+            reach.push_back(at);
+        }
+    }
+    for (const redstoneComponents::Reach& at : reach) {
+        std::vector<BlockChange> ahead;
+        if (at.skip.has_value()) {
+            redstoneComponents::scheduleInFront(world, context.worldName, at.x, at.y, at.z, *at.skip, reading);
+            ahead = redstoneReactors::updateInFront(world, context.worldName, at.x, at.y, at.z, *at.skip,
+                                                    context.gameTime, context.random, context.tntExplodes);
+        } else {
+            // parity: `RedstoneTorchBlock.notifyNeighbors` is a plain `updateNeighborsAt` on each of
+            // the six, so nothing is left out and the square itself is not asked.
+            redstoneComponents::scheduleAround(world, context.worldName, at.x, at.y, at.z, false, reading);
+            ahead = redstoneReactors::update(world, context.worldName, at.x, at.y, at.z, context.gameTime,
+                                             context.random, context.tntExplodes, false);
+        }
+        for (const BlockChange& change : ahead) {
+            reshaped(change.stateId, change.x, change.y, change.z);
+            if (!change.effects.empty()) {
+                effects.push_back(change);
+            }
+            redstoneComponents::watchFor(world, change.x, change.y, change.z);
+            reacting.push_back({change.x, change.y, change.z});
+        }
+    }
+    // parity: `onPlace`, the only half of a write the square that changed can answer for itself.
+    // Everything else reacts from `neighborChanged`, and `Level.updateNeighborsAt` never tells the
+    // square it is called for: a lamp put down beside a lit torch stays dark until something pokes it.
+    for (const BlockChange& change : redstoneReactors::placed(world, context.worldName, x, y, z, context.gameTime,
+                                                              context.random, context.tntExplodes)) {
+        reshaped(change.stateId, change.x, change.y, change.z);
+        if (!change.effects.empty()) {
+            effects.push_back(change);
+        }
+        redstoneComponents::watchFor(world, change.x, change.y, change.z);
+        reacting.push_back({change.x, change.y, change.z});
+    }
     // parity: `DefaultRedstoneWireEvaluator.updatePowerStrength` runs `updateNeighborsAt` on the dust
     // that moved **and on each of its six squares**, so a lamp stuck to a block the dust powers from
     // above is reached even though nothing touches it. The seven go into a `HashSet` first, so the
@@ -496,7 +586,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         ++reacted;
         for (const BlockChange& change :
              redstoneReactors::update(world, context.worldName, at[0], at[1], at[2], context.gameTime, context.random,
-                                      context.tntExplodes)) {
+                                      context.tntExplodes, false)) {
             reshaped(change.stateId, change.x, change.y, change.z);
             if (!change.effects.empty()) {
                 effects.push_back(change);

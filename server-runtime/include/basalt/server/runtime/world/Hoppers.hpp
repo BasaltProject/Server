@@ -3,6 +3,7 @@
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
+#include <basalt/server/world/crafting/Crafting.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -31,6 +32,12 @@ struct Around {
     /// parity: `ChiseledBookShelfBlockEntity.acceptsItemType`, the one container door that asks an
     /// item **tag**. The tags come from the datapack, so the caller answers.
     std::function<bool(const wire::common::Identifier& item)> isBookshelfBook;
+    /// parity: `AbstractFurnaceBlockEntity.setItem`, which is what a hopper filling an **empty**
+    /// slot of a furnace goes through: the cooking time is set from what went in. The recipe book
+    /// belongs to the world, so the caller answers it.
+    std::function<const server::world::crafting::Recipe*(server::world::crafting::Cooker,
+                                                         const server::world::loot::ItemStack&)>
+        recipeFor;
     /// The blocks whose state a move changed, for whoever tells the clients: a jukebox that has just
     /// been loaded and a bookshelf whose slot has just filled both look different afterwards.
     std::vector<BlockChange>* changes = nullptr;
@@ -42,8 +49,8 @@ struct Around {
 /// `random` is the world's, and it is a required parameter rather than something this reaches for:
 /// a hopper feeding a **composter** rolls the item's own chance, which is the one place a hopper is
 /// not deterministic.
-[[nodiscard]] bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                        random::RandomSource& random, const Around& around = {});
+[[nodiscard]] bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random,
+                        const Around& around = {});
 
 /// One hopper minecart's turn, which is the same suck and nothing else.
 ///

@@ -57,14 +57,10 @@ struct State {
     [[nodiscard]] bool lit() const noexcept { return litTimeRemaining > 0; }
 };
 
-/// What one turn did.
-///
-/// The two answers are not the same question. `moved` is whether any number changed, and here the
-/// state lives in NBT, so it has to be written back whenever it did. `changed` is vanilla's own
-/// `changed`, which it only sets when the fuel is spent, a smelt finishes or the fire flips: that is
-/// what calls `setChanged`, and `setChanged` is what dirties the chunk **and** what tells the
-/// comparator. A furnace counting down does neither, so its saved numbers lag behind the live ones
-/// exactly as in the jar.
+/// What one turn did. `moved` is whether any number changed, which the NBT has to be written back
+/// for. `changed` is vanilla's own, set only when the fuel is spent, a smelt finishes or the fire
+/// flips: that is what calls `setChanged`, which dirties the chunk and tells the comparator. A
+/// furnace counting down does neither, so its saved numbers lag the live ones as in the jar.
 struct Ticked {
     bool moved = false;
     bool changed = false;
@@ -76,6 +72,13 @@ struct Ticked {
 /// What the next item will take, which vanilla asks for whenever the input slot changes rather than
 /// every tick. parity: `AbstractFurnaceBlockEntity.getTotalCookTime`.
 [[nodiscard]] std::int32_t cookTimeFor(const State& state, const RecipeFor& recipeFor);
+
+/// What a cooker owes whoever writes its input slot: the time comes from what is in there now and
+/// the progress goes back to zero. parity: `AbstractFurnaceBlockEntity.setItem`, which every write
+/// goes through. A call on anything that does not cook is free; the recipe book is the caller's.
+void inputChanged(std::string_view block, wire::nbt::NbtCompound& data,
+                  const std::function<const server::world::crafting::Recipe*(
+                      server::world::crafting::Cooker, const server::world::loot::ItemStack&)>& recipeFor);
 
 /// Reads the counters and slots a saved furnace left behind.
 [[nodiscard]] State read(const wire::nbt::NbtCompound& data);

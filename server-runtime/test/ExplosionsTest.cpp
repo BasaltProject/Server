@@ -303,3 +303,29 @@ TEST_CASE("the rays go out in every direction, not only one") {
     CHECK(northOfIt);
     CHECK(southOfIt);
 }
+
+TEST_CASE("a primed cart spares the rails it ran on and what holds them up") {
+    // parity: `MinecartTNT.shouldBlockExplode` leaves the rail standing, and its resistance twin
+    // charges the ray nothing for crossing it.
+    Loaded track;
+    track.fill("stone", 0, 15);
+    for (std::int32_t z = 0; z <= 15; ++z) {
+        REQUIRE(track.state.setBlockState(8, 9, z, stateOf("rail")));
+    }
+    rng::RandomSource random = rng::RandomSource::legacy(3);
+    static_cast<void>(explosions::explode(track.state, -64, 319, 8.5, 9.5, 8.5, 5.0F, random, explosions::sparesRails));
+    for (std::int32_t z = 0; z <= 15; ++z) {
+        CHECK(track.state.blockState(8, 9, z) == stateOf("rail"));
+        CHECK(track.state.blockState(8, 8, z) == stateOf("stone"));
+    }
+
+    // With nobody sparing them, the same blast takes the rail out.
+    Loaded loose;
+    loose.fill("stone", 0, 15);
+    for (std::int32_t z = 0; z <= 15; ++z) {
+        REQUIRE(loose.state.setBlockState(8, 9, z, stateOf("rail")));
+    }
+    rng::RandomSource other = rng::RandomSource::legacy(3);
+    static_cast<void>(explosions::explode(loose.state, -64, 319, 8.5, 9.5, 8.5, 5.0F, other));
+    CHECK(loose.state.blockState(8, 9, 8) == registry::blocks::air().stateId);
+}
