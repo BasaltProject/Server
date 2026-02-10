@@ -554,7 +554,7 @@ bool WorldState::hasScheduledBlockTick(std::int32_t x, std::int32_t y, std::int3
 }
 
 std::vector<std::array<std::int32_t, 3>>
-WorldState::dueTicks(const std::function<void(Chunk&, std::vector<ChunkScheduledTick>&)>& advance) {
+WorldState::dueTicks(const std::function<void(Chunk&, std::vector<ChunkScheduledTick>&)>& advance, bool remember) {
     std::vector<ChunkScheduledTick> due;
     std::vector<std::array<std::int32_t, 4>> found;
     const WorldWriteLock lock{mutex_};
@@ -582,20 +582,47 @@ WorldState::dueTicks(const std::function<void(Chunk&, std::vector<ChunkScheduled
             const ChunkScheduledTick& other = due[static_cast<std::size_t>(right[3])];
             return one.priority != other.priority ? one.priority < other.priority : one.order < other.order;
         });
+    if (remember) {
+        collectedBlockTicks_.clear();
+        collectedBlockTicks_.reserve(found.size());
+    }
     std::vector<std::array<std::int32_t, 3>> positions;
     positions.reserve(found.size());
     for (const std::array<std::int32_t, 4>& one : found) {
         positions.push_back(std::array<std::int32_t, 3>{one[0], one[1], one[2]});
+        if (remember) {
+            collectedBlockTicks_.push_back(CollectedTick{
+                .x = one[0], .y = one[1], .z = one[2], .type = due[static_cast<std::size_t>(one[3])].type});
+        }
     }
     return positions;
 }
 
 std::vector<std::array<std::int32_t, 3>> WorldState::dueFluidTicks() {
-    return dueTicks([](Chunk& chunk, std::vector<ChunkScheduledTick>& due) { chunk.advanceFluidTicks(due); });
+    return dueTicks([](Chunk& chunk, std::vector<ChunkScheduledTick>& due) { chunk.advanceFluidTicks(due); }, false);
 }
 
 std::vector<std::array<std::int32_t, 3>> WorldState::dueBlockTicks() {
-    return dueTicks([](Chunk& chunk, std::vector<ChunkScheduledTick>& due) { chunk.advanceBlockTicks(due); });
+    return dueTicks([](Chunk& chunk, std::vector<ChunkScheduledTick>& due) { chunk.advanceBlockTicks(due); }, true);
+}
+
+bool WorldState::willTickThisTick(std::int32_t x, std::int32_t y, std::int32_t z,
+                                  const wire::common::Identifier& type) const {
+    const WorldReadLock lock{mutex_};
+    return std::ranges::any_of(collectedBlockTicks_, [&](const CollectedTick& one) {
+        return one.x == x && one.y == y && one.z == z && one.type == type;
+    });
+}
+
+void WorldState::endBlockTicks() {
+    const WorldWriteLock lock{mutex_};
+    collectedBlockTicks_.clear();
+}
+
+void WorldState::beginBlockTick(std::int32_t x, std::int32_t y, std::int32_t z) {
+    const WorldWriteLock lock{mutex_};
+    std::erase_if(collectedBlockTicks_,
+                  [&](const CollectedTick& one) { return one.x == x && one.y == y && one.z == z; });
 }
 
 std::vector<GeneratedWorldEntity> WorldState::generatedEntities(const std::function<std::int32_t()>& allocateEntityId,

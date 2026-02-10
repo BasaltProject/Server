@@ -5,9 +5,11 @@
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
+#include <basalt/server/runtime/world/Composters.hpp>
 #include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/Dispensers.hpp>
 #include <basalt/server/runtime/world/FallingBlocks.hpp>
+#include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/NoteBlocks.hpp>
 #include <basalt/server/runtime/world/Pistons.hpp>
@@ -346,6 +348,42 @@ void settleArrivedSignal(WorldState& world, std::int32_t x, std::int32_t y, std:
         return;
     }
     const std::string_view path = block->path();
+    // parity: `LightningRodBlock.onPlace`, the same idea with the other answer: a rod that arrives
+    // powered keeps its signal and books the eight turns that spend it, instead of dropping it.
+    if (path.ends_with("lightning_rod")) {
+        const std::map<std::string, std::string> rod = registry::blockStateDefinitions::propertiesOf(*arrived);
+        const auto powered = rod.find("powered");
+        if (powered != rod.end() && powered->second == "true" && !world.hasScheduledBlockTick(x, y, z, *block)) {
+            world.scheduleBlockTick(x, y, z, *block, lightning::kRodTicks);
+        }
+        return;
+    }
+    // parity: `ComposterBlock.onPlace`, which books the twenty turns that finish a composter that
+    // arrives one layer short of ready. This one books without asking whether a turn is already
+    // there: two of the same never fit anyway.
+    if (path == "composter") {
+        const std::map<std::string, std::string> heap = registry::blockStateDefinitions::propertiesOf(*arrived);
+        const auto level = heap.find("level");
+        if (level != heap.end() && level->second == std::to_string(composters::kFull)) {
+            world.scheduleBlockTick(x, y, z, *block, composters::kReadyDelay);
+        }
+        return;
+    }
+    // parity: `ObserverBlock.onPlace`, which drops the signal like the sensor does and then tells
+    // what it was feeding, because an observer's pulse does reach two squares.
+    if (path == "observer") {
+        const std::map<std::string, std::string> watcher = registry::blockStateDefinitions::propertiesOf(*arrived);
+        const auto powered = watcher.find("powered");
+        if (powered == watcher.end() || powered->second != "true" || world.hasScheduledBlockTick(x, y, z, *block)) {
+            return;
+        }
+        if (const std::optional<std::int32_t> quiet =
+                registry::blockStateDefinitions::stateIdOf(*block, {{"powered", "false"}}, *arrived);
+            quiet.has_value() && world.setBlockState(x, y, z, *quiet)) {
+            (onReshaped ? onReshaped : OnReshaped{noop})(*quiet, x, y, z);
+        }
+        return;
+    }
     if (path != "target" && path != "sculk_sensor" && path != "calibrated_sculk_sensor") {
         return;
     }
