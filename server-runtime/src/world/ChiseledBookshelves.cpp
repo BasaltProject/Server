@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/SelectableSlots.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 
 #include <cstdint>
 #include <map>
@@ -71,6 +72,40 @@ constexpr std::string_view kLastSlotKey = "last_interacted_slot";
 }
 
 } // namespace
+
+std::optional<std::int32_t> slotsChanged(WorldState& world, const std::int32_t x, const std::int32_t y,
+                                         const std::int32_t z, const std::int32_t touchedSlot,
+                                         const std::int64_t gameTime) {
+    const std::optional<std::int32_t> found = world.blockState(x, y, z);
+    if (!found.has_value()) {
+        return std::nullopt;
+    }
+    const wire::common::Identifier* id = registry::blockStateDefinitions::blockOf(*found);
+    if (id == nullptr || *id != block()) {
+        return std::nullopt;
+    }
+    server::world::ChunkBlockEntity* entity = entityAt(world, x, y, z);
+    if (entity == nullptr) {
+        return std::nullopt;
+    }
+    const blockInventory::Slots slots = blockInventory::read(entity->data(), kSize);
+    std::map<std::string, std::string> wanted;
+    for (std::int32_t slot = 0; slot < kSize; ++slot) {
+        const bool occupied = slots[static_cast<std::size_t>(slot)].has_value();
+        wanted.emplace(occupiedKey(slot), occupied ? "true" : "false");
+    }
+    if (touchedSlot >= 0 && touchedSlot < kSize) {
+        entity->data().putInt("last_interacted_slot", touchedSlot);
+    }
+    const std::optional<std::int32_t> turned = registry::blockStateDefinitions::stateIdOf(block(), wanted, *found);
+    if (!turned.has_value() || *turned == *found || !world.setBlockState(x, y, z, *turned)) {
+        return std::nullopt;
+    }
+    // parity: `updateState` ends in `gameEvent(BLOCK_CHANGE)`, which is what a sculk sensor beside a
+    // shelf hears when a book goes in or comes out.
+    vibrations::emit(world, "block_change", x + 0.5, y + 0.5, z + 0.5, gameTime);
+    return turned;
+}
 
 const wire::common::Identifier& block() {
     static const wire::common::Identifier instance = wire::common::Identifier::vanilla("chiseled_bookshelf");

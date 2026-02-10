@@ -29,6 +29,10 @@ inline constexpr std::string_view kFrequencyKey = "last_vibration_frequency";
 /// parity: `SculkSensorBlockEntity`'s own listener range.
 inline constexpr std::int32_t kRange = 8;
 
+/// parity: `CalibratedSculkSensorBlockEntity.VibrationUser.getListenerRadius`, which is twice the
+/// plain sensor's. It decides both how far it hears and how strong what it hears comes out.
+inline constexpr std::int32_t kCalibratedRange = 16;
+
 /// parity: `VibrationSystem.Data.NBT_TAG_KEY`, where the sensor keeps the noise it is still waiting
 /// for. A vibration is not heard where it happens: it travels one block per tick.
 inline constexpr std::string_view kListenerKey = "listener";

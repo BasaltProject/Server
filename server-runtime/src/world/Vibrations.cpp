@@ -98,9 +98,14 @@ constexpr std::array<registry::BlockFace, 6> kFaces{registry::BlockFace::Down,  
 
 /// parity: `VibrationSystem.getRedstoneStrengthForDistance`, fifteen at the sensor and one at the
 /// edge of what it hears.
-[[nodiscard]] std::int32_t strengthFor(double distance) {
-    const double scale = static_cast<double>(redstone::kMaxSignal) / static_cast<double>(kRange);
+[[nodiscard]] std::int32_t strengthFor(double distance, std::int32_t radius) {
+    const double scale = static_cast<double>(redstone::kMaxSignal) / static_cast<double>(radius);
     return std::max(1, redstone::kMaxSignal - static_cast<std::int32_t>(std::floor(scale * distance)));
+}
+
+/// parity: the two sensors have different radii, and it is the block that says which.
+[[nodiscard]] std::int32_t radiusOf(const wire::common::Identifier& block) {
+    return block == calibrated() ? kCalibratedRange : kRange;
 }
 
 [[nodiscard]] bool isSensor(const wire::common::Identifier& block) {
@@ -182,7 +187,8 @@ struct Noise {
         return std::nullopt;
     }
     const std::optional<std::int32_t> turned = registry::blockStateDefinitions::stateIdOf(
-        block, {{"sculk_sensor_phase", "active"}, {"power", std::to_string(strengthFor(distance))}}, stateId);
+        block, {{"sculk_sensor_phase", "active"}, {"power", std::to_string(strengthFor(distance, radiusOf(block)))}},
+        stateId);
     if (!turned.has_value() || !world.setBlockState(x, y, z, *turned)) {
         return std::nullopt;
     }
@@ -449,12 +455,15 @@ void emit(WorldState& world, std::string_view event, double x, double y, double 
     const auto blockX = static_cast<std::int32_t>(std::floor(x));
     const auto blockY = static_cast<std::int32_t>(std::floor(y));
     const auto blockZ = static_cast<std::int32_t>(std::floor(z));
-    for (std::int32_t offsetY = -kRange; offsetY <= kRange; ++offsetY) {
-        for (std::int32_t offsetZ = -kRange; offsetZ <= kRange; ++offsetZ) {
-            for (std::int32_t offsetX = -kRange; offsetX <= kRange; ++offsetX) {
+    // parity: the calibrated sensor hears twice as far, so the walk is the wider of the two and each
+    // sensor answers for its own radius below.
+    for (std::int32_t offsetY = -kCalibratedRange; offsetY <= kCalibratedRange; ++offsetY) {
+        for (std::int32_t offsetZ = -kCalibratedRange; offsetZ <= kCalibratedRange; ++offsetZ) {
+            for (std::int32_t offsetX = -kCalibratedRange; offsetX <= kCalibratedRange; ++offsetX) {
                 // parity: `EuclideanGameEventListenerRegistry.filterInvalidListeners` measures the
                 // range between the two **blocks**, not between the exact points.
-                if ((offsetX * offsetX) + (offsetY * offsetY) + (offsetZ * offsetZ) > kRange * kRange) {
+                const std::int32_t reach = (offsetX * offsetX) + (offsetY * offsetY) + (offsetZ * offsetZ);
+                if (reach > kCalibratedRange * kCalibratedRange) {
                     continue;
                 }
                 const std::int32_t sensorX = blockX + offsetX;
@@ -466,6 +475,10 @@ void emit(WorldState& world, std::string_view event, double x, double y, double 
                 }
                 const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
                 if (block == nullptr || !isSensor(*block)) {
+                    continue;
+                }
+                const std::int32_t radius = radiusOf(*block);
+                if (reach > radius * radius) {
                     continue;
                 }
                 hear(world, sensorX, sensorY, sensorZ, *stateId, *block, event, x, y, z, gameTime);

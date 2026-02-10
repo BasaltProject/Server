@@ -302,3 +302,19 @@ TEST_CASE("only a plain rail at a real junction re-decides") {
     CHECK_FALSE(rails::onNeighbourChange(line, "world", 8, 64, 8, *lever).has_value());
     CHECK(shapeAt(line, 8, 64, 8) == "east_west");
 }
+
+TEST_CASE("a rail put down beside a rail one block lower climbs down to meet it") {
+    // parity: `RailState.hasRail` looks at the square, the one above it and the one below, so a rail
+    // laid on a step joins the one at the bottom of it: the lower one turns into the ramp and the
+    // upper one takes the axis that points at it.
+    WorldState world = emptyWorld();
+    world.getOrGenerateChunk(0, 0);
+    REQUIRE(world.setBlockState(5, 64, 2, railOf("rail", "north_south")));
+    REQUIRE(world.setBlockState(6, 64, 2, stateOf("stone")));
+    REQUIRE(world.setBlockState(6, 65, 2, railOf("rail", "north_south")));
+
+    static_cast<void>(rails::place(world, {}, 6, 65, 2));
+
+    CHECK(shapeAt(world, 6, 65, 2) == "east_west");
+    CHECK(shapeAt(world, 5, 64, 2) == "ascending_east");
+}

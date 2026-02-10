@@ -79,7 +79,6 @@ bool BlockEditor::write(std::int32_t x, std::int32_t y, std::int32_t z, std::int
     // so the cascade needs the old state and not only the new one.
     replaced_.insert_or_assign(std::array<std::int32_t, 3>{x, y, z}, before);
     record(x, y, z, stateId);
-    bendRail(x, y, z, stateId, before);
     written_.push_back({x, y, z});
     createBlockEntity(x, y, z, stateId);
     return true;
@@ -213,6 +212,14 @@ void BlockEditor::notifyNeighbours() {
                     shapedToAir = true;
                 }
                 static_cast<void>(set(x, y, z, stateId));
+                // parity: `overwriteWithDefinedProperties` only beats the block's **own** shaping.
+                // What the neighbours' cascade changes afterwards stands: that is why a string put
+                // down by command naming `west=false` still ends up joined to the string beside it,
+                // through that neighbour's own reshape coming back around.
+                if (x == at[0] && y == at[1] && z == at[2]) {
+                    keepNamedProperties(at);
+                    written_properties_.erase(at);
+                }
             },
             adjustToNeighbours_,
             // parity: `BlockInput.place` settles the state it is going to write, shaping and named
@@ -220,12 +227,24 @@ void BlockEditor::notifyNeighbours() {
             // Doing this after the reactions instead undid them: a hopper written `enabled=true`
             // beside a lit block came back enabled, and a tnt that had already primed itself was put
             // back on the ground.
-            [this, &at, &written, &shapedToAir, &unsupported] {
+            [this, &at, &written, &shapedToAir, &unsupported, &wasHere] {
                 if (shapedToAir && !unsupported && written.has_value() && *written != reg::blocks::air().stateId &&
                     world_->state().blockState(at[0], at[1], at[2]) == reg::blocks::air().stateId) {
                     static_cast<void>(set(at[0], at[1], at[2], *written));
                 }
+                // The overwrite happens **once**, where vanilla does it: when the block lands. A
+                // second pass over the same square is the cascade coming back, and there the command
+                // has no say: leaving the entry in put the named shape back on top of the rail's own
+                // bend, which is the one thing `onPlace` had just decided.
                 keepNamedProperties(at);
+                written_properties_.erase(at);
+                // parity: `onPlace` runs **after** `overwriteWithDefinedProperties`, so a rail bends
+                // even when the command spelled its shape out: `BaseRailBlock.onPlace` has the last
+                // word. Bending at write time instead let the named shape undo it.
+                if (const std::optional<std::int32_t> now = world_->state().blockState(at[0], at[1], at[2]);
+                    now.has_value()) {
+                    bendRail(at[0], at[1], at[2], *now, wasHere == replaced_.end() ? std::nullopt : wasHere->second);
+                }
             });
         // parity: `Level.updateNeighboursOnBlockSet` ends in `updateNeighbourForOutputSignal` for a
         // block that has an analog output, and that one reaches **two** squares through anything that
