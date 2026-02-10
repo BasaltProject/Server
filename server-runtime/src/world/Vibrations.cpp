@@ -235,20 +235,11 @@ struct Noise {
 /// entity ticks every turn of the world and never has to ask; here the turn is booked by whoever
 /// leaves work behind, which includes a sensor loaded from disk with a noise still on its way.
 void wake(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, const wire::common::Identifier& block) {
-    const wire::nbt::NbtCompound* data = heldBy(world, x, y, z);
-    if (data == nullptr) {
-        return;
-    }
-    const wire::nbt::NbtCompound* listener = data->getCompound(kListenerKey);
-    if (listener == nullptr) {
-        return;
-    }
-    const wire::nbt::NbtCompound* selector = listener->getCompound("selector");
-    if (listener->getCompound("event") == nullptr &&
-        (selector == nullptr || selector->getCompound("event") == nullptr)) {
-        return;
-    }
-    world.scheduleBlockTick(x, y, z, block, 1);
+    static_cast<void>(world);
+    static_cast<void>(x);
+    static_cast<void>(y);
+    static_cast<void>(z);
+    static_cast<void>(block);
 }
 
 /// parity: the tag `occludes_vibration_signals`, which is `#minecraft:wool` and nothing else. Every
@@ -369,7 +360,7 @@ void offer(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::i
     selector.putLong("tick", gameTime);
     listener.set("selector", wire::nbt::NbtTag::ofCompound(std::move(selector)));
     data->set(kListenerKey, wire::nbt::NbtTag::ofCompound(std::move(listener)));
-    world.scheduleBlockTick(sensorX, sensorY, sensorZ, block, 1);
+    static_cast<void>(block);
 }
 
 /// parity: `VibrationSystem.Ticker.tick`: pick what was heard last turn, then move it one block
@@ -397,7 +388,6 @@ void offer(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::i
         // parity: `VibrationSelector.chosenCandidate` answers nothing for a noise heard on this same
         // turn: the sensor is still collecting, and picks on the next one.
         if (selector.getLong("tick", -1) >= gameTime) {
-            world.scheduleBlockTick(x, y, z, block, 1);
             return std::nullopt;
         }
         // parity: `VibrationSystem.User.calculateTravelTimeInTicks`, a tick per whole block.
@@ -413,7 +403,6 @@ void offer(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::i
         listener.set("event", wire::nbt::NbtTag::ofCompound(written(*current)));
         listener.putInt("event_delay", delay);
         data->set(kListenerKey, wire::nbt::NbtTag::ofCompound(std::move(listener)));
-        world.scheduleBlockTick(x, y, z, block, 1);
         return std::nullopt;
     }
     listener.remove("event");
@@ -513,7 +502,7 @@ bool stoodOn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, 
 }
 
 std::optional<BlockChange> tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                std::int64_t gameTime) {
+                                std::int64_t /*gameTime*/) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return std::nullopt;
@@ -548,15 +537,20 @@ std::optional<BlockChange> tick(WorldState& world, std::int32_t x, std::int32_t 
             }
         }
     }
-    // parity: `VibrationSystem.Ticker.tick` is the **block entity's** turn, and a block entity ticks
-    // every turn of the world whatever its block says. So a noise in flight keeps travelling while
-    // the sensor is awake, and simply is not heard when it lands: `receiveVibration` hands it over
-    // and `onReceiveVibration` throws it away because `canActivate` says no. Freezing the countdown
-    // instead kept the noise for forty ticks and rang the sensor a second time with it.
-    if (const std::optional<BlockChange> arrived = travel(world, x, y, z, *block, gameTime); arrived.has_value()) {
-        return arrived;
-    }
     return settled;
+}
+
+std::optional<BlockChange> travelTick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                      std::int64_t gameTime) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value()) {
+        return std::nullopt;
+    }
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
+    if (block == nullptr || !isSensor(*block)) {
+        return std::nullopt;
+    }
+    return travel(world, x, y, z, *block, gameTime);
 }
 
 } // namespace basalt::server::runtime::world::vibrations

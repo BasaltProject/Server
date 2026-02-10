@@ -67,14 +67,15 @@ void sendBlockUpdates(const std::vector<PlayerSession*>& watchers, const std::ve
 } // namespace
 
 void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sched::Region& region) {
-    const std::vector<std::array<std::int32_t, 3>> due = world.state().dueBlockTicks();
+    const std::vector<world::WorldState::DueTick> due = world.state().dueBlockTicksTyped();
     if (due.empty()) {
         return;
     }
     const std::vector<PlayerSession*> watchers = watchersOf(world);
     const bool hasSkylight = config::dimensionFacts(world.declaration().dimension).hasSkylight;
     const world::redstoneComponents::ContainerSignalAt containerSignal = world::comparatorReading::of(world.state());
-    for (const std::array<std::int32_t, 3>& position : due) {
+    for (const world::WorldState::DueTick& tick : due) {
+        const std::array<std::int32_t, 3> position{tick.x, tick.y, tick.z};
         const std::int32_t x = position[0];
         const std::int32_t y = position[1];
         const std::int32_t z = position[2];
@@ -106,10 +107,6 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             }
             continue;
         }
-        // parity: `PistonMovingBlockEntity.tick`, the turn that moves a slide's progress along. It
-        // writes into the block entity and leaves the chunk clean, exactly as the jar does, so what
-        // reaches the disk is the value from the turn before unless something else dirties the chunk.
-        const bool slideTurn = world::pistons::advanceSlide(world.state(), x, y, z);
         std::vector<world::BlockChange> scheduled;
         random::RandomSource random = freshRandom();
         world::scheduledBlocks::frostedIce(world.state(), x, y, z, random, scheduled);
@@ -213,14 +210,9 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         if (const std::optional<world::BlockChange> sensor =
                 world::vibrations::tick(world.state(), x, y, z, world.gameTime());
             sensor.has_value()) {
+            // parity: `SculkSensorBlock.updateNeighbours` tells the square below as well, which is
+            // what `alsoTells` carries for every path that announces a sensor.
             broadcaster_->announceRedstone(world, watchers, *sensor);
-            // parity: `SculkSensorBlock.updateNeighbours` tells the square **below** as well. A
-            // sensor only feeds strongly upwards, so what is under it would never hear it otherwise.
-            random::RandomSource sensorRandom = freshRandom();
-            const std::vector<world::BlockChange> under =
-                world::redstoneReactors::update(world.state(), world.name(), x, y - 1, z, world.gameTime(),
-                                                sensorRandom, world.gameRules().get(world::gameRules::kTntExplodes));
-            scheduled.insert(scheduled.end(), under.begin(), under.end());
         }
         // parity: `BigDripleafBlock.tick`, the stage it takes next: ten ticks each on the way down
         // and a hundred lying flat before it comes back up.
@@ -251,12 +243,6 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                 world.gameRules().number(world::gameRules::kMaxCommandSequenceLength), runCommand_)) {
             world::redstoneComponents::scheduleComparatorsAround(world.state(), world.name(), x, y, z,
                                                                  world::comparatorReading::of(world.state()));
-        }
-        // A slide's own turn is not the landing's: the square that has just moved its progress along
-        // still has a tick to go, and landing it here took `pistonsensor` a tick early.
-        if (!slideTurn) {
-            const std::vector<world::BlockChange> piston = broadcaster_->finishPiston(world, position, watchers);
-            scheduled.insert(scheduled.end(), piston.begin(), piston.end());
         }
         // parity: `DispenserBlock.tick`, the four ticks after the signal arrived.
         if (!hooks_.dispenseAllowed || hooks_.dispenseAllowed(world, x, y, z)) {
@@ -385,15 +371,24 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                     world.state(), world.name(), change.x, change.y, change.z, world.gameTime(), random,
                     world.gameRules().get(world::gameRules::kTntExplodes));
                 scheduled.insert(scheduled.end(), around.begin(), around.end());
-                // parity: the same two squares a dust reaches are where a piston and a dropper hear
-                // it: a dropper fed by a piece of dust that just changed strength has to arm itself.
+                // parity: the dust reaches its own square and its six, and each of those runs an
+                // `updateNeighborsAt` of its own, so what hears the news is **their** neighbours: a
+                // piston stuck to the block the dust is standing on is two steps away and moves.
                 for (const std::array<std::int32_t, 3>& at :
                      world::redstoneComponents::wireReach(change.x, change.y, change.z)) {
-                    world::pistons::trigger(pistonContext, at[0], at[1], at[2]);
-                    if (const std::optional<world::BlockChange> armed =
-                            world::dispensers::onNeighbourChange(world.state(), world.name(), at[0], at[1], at[2]);
-                        armed.has_value()) {
-                        scheduled.push_back(*armed);
+                    for (const server::registry::BlockFace face :
+                         {server::registry::BlockFace::West, server::registry::BlockFace::East,
+                          server::registry::BlockFace::Down, server::registry::BlockFace::Up,
+                          server::registry::BlockFace::North, server::registry::BlockFace::South}) {
+                        const std::int32_t nx = at[0] + server::registry::stepX(face);
+                        const std::int32_t ny = at[1] + server::registry::stepY(face);
+                        const std::int32_t nz = at[2] + server::registry::stepZ(face);
+                        world::pistons::trigger(pistonContext, nx, ny, nz);
+                        if (const std::optional<world::BlockChange> armed =
+                                world::dispensers::onNeighbourChange(world.state(), world.name(), nx, ny, nz);
+                            armed.has_value()) {
+                            scheduled.push_back(*armed);
+                        }
                     }
                 }
             }

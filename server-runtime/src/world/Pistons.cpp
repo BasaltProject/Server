@@ -355,19 +355,17 @@ void runEvent(const Context& context, std::int32_t x, std::int32_t y, std::int32
     // both from the piston's own square and both after whatever it broke on the way.
     vibrations::emit(context.world, extending ? "block_activate" : "block_deactivate", static_cast<double>(x) + 0.5,
                      static_cast<double>(y) + 0.5, static_cast<double>(z) + 0.5, context.gameTime);
+    // parity: every square that has just started sliding sits out this turn's ticker, which is the
+    // one that only moves `progress` and leaves `progressO` where it was.
+    for (const Carried& sliding : carriedBlocks(context, x, y, z, *direction)) {
+        context.world.noteSlideStarted(sliding.at[0], sliding.at[1], sliding.at[2]);
+    }
     const std::optional<std::int32_t> now = context.world.blockState(x, y, z);
     effects.push_back(BlockChange{.x = x,
                                   .y = y,
                                   .z = z,
                                   .stateId = now.value_or(*stateId),
                                   .effects = {blockEffect::Event{.b0 = b0, .b1 = b1}, sound}});
-    context.world.scheduleBlockTick(x, y, z, block(), kMoveTicks);
-    // parity: a `moving_piston` gets its own ticker the moment it lands, and the **next** turn is
-    // the one that moves its progress. Booked as a turn per square rather than run from here, and
-    // booking one does not dirty a chunk, which is what keeps the value off the disk.
-    for (const Carried& sliding : carriedBlocks(context, x, y, z, *direction)) {
-        context.world.scheduleBlockTick(sliding.at[0], sliding.at[1], sliding.at[2], slideTickType(), 1);
-    }
 }
 
 } // namespace basalt::server::runtime::world::pistons

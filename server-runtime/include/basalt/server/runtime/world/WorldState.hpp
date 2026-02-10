@@ -237,8 +237,20 @@ public:
     /// Every fluid tick that comes due this tick, in world coordinates.
     [[nodiscard]] std::vector<std::array<std::int32_t, 3>> dueFluidTicks();
 
+    /// One block turn that comes due, with the block it was booked for.
+    struct DueTick {
+        std::int32_t x = 0;
+        std::int32_t y = 0;
+        std::int32_t z = 0;
+        wire::common::Identifier type = wire::common::Identifier::vanilla("air");
+    };
+
     /// The same for block ticks: a button that has been held down long enough, and later redstone.
     [[nodiscard]] std::vector<std::array<std::int32_t, 3>> dueBlockTicks();
+
+    /// parity: `ServerLevel.tickBlock` runs a turn only on the block it was booked for, so what runs
+    /// has to know which block asked for it.
+    [[nodiscard]] std::vector<DueTick> dueBlockTicksTyped();
 
     /// parity: `LevelTicks.willTickThisTick`, the turns already taken for this tick and still to
     /// run. A diode that hears a neighbour while its own turn is waiting books nothing.
@@ -251,6 +263,15 @@ public:
     /// parity: `LevelTicks.cleanupAfterTick`, which empties the batch when the pass ends. A world
     /// that stops running keeps no turns waiting, and a frozen world books like any other.
     void endBlockTicks();
+
+    /// A square that started sliding in this very turn. parity: a `moving_piston` created now has
+    /// `progress` and `progressO` both at zero, so its first ticker turn only moves `progress` and
+    /// what is written down does not change. We keep one value, so the first turn is skipped instead.
+    void noteSlideStarted(std::int32_t x, std::int32_t y, std::int32_t z);
+
+    [[nodiscard]] bool slideStartedThisTick(std::int32_t x, std::int32_t y, std::int32_t z) const;
+
+    void clearSlidesStarted();
 
     [[nodiscard]] std::vector<GeneratedWorldEntity>
     generatedEntities(const std::function<std::int32_t()>& allocateEntityId, std::int32_t centerChunkX,
@@ -341,6 +362,9 @@ private:
     };
 
     std::vector<CollectedTick> collectedBlockTicks_;
+
+    /// Squares whose slide began in this turn, so the block entity pass leaves them alone once.
+    std::vector<std::array<std::int32_t, 3>> slidesStarted_;
 
     mutable WorldMutex mutex_;
     LoadOrGenerate loadOrGenerate_;

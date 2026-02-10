@@ -458,6 +458,11 @@ bool isSignalSource(std::int32_t stateId) {
 
 std::optional<registry::BlockFace> alsoTells(std::int32_t stateId) {
     const std::string path = pathOf(stateId);
+    // parity: `SculkSensorBlock.updateNeighbours` tells its own square **and the one below**. A
+    // sensor only feeds strongly upwards, so what is under it would never hear it otherwise.
+    if (path == "sculk_sensor" || path == "calibrated_sculk_sensor") {
+        return registry::BlockFace::Down;
+    }
     if (path != "tripwire_hook" && !isLightningRod(path)) {
         return std::nullopt;
     }

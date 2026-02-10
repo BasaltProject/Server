@@ -253,13 +253,29 @@ void destroyPushed(const Context& context, const Push& push, std::vector<BlockCh
 
 /// Puts every carried block down where it already stands, which is what
 /// `PistonMovingBlockEntity.finalTick` does when the slide ends.
+/// parity: `PistonMovingBlockEntity.tick` dries what it lands: a block that arrives waterlogged is
+/// written with `waterlogged` at false, so a slab full of water pushed into the air lands empty and
+/// the water is simply lost. Only the ticker does it; `finalTick` writes the state as it is.
+[[nodiscard]] std::int32_t dried(std::int32_t stateId) {
+    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
+    const auto logged = properties.find("waterlogged");
+    if (logged == properties.end() || logged->second != "true") {
+        return stateId;
+    }
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    if (block == nullptr) {
+        return stateId;
+    }
+    return registry::blockStateDefinitions::stateIdOf(*block, {{"waterlogged", "false"}}, stateId).value_or(stateId);
+}
+
 [[nodiscard]] std::vector<BlockChange> landCarried(const Context& context, const std::vector<Carried>& carried) {
     std::vector<BlockChange> changes;
     std::vector<Position> landed;
     for (const Carried& entry : carried) {
-        if (context.world.setBlockState(entry.at[0], entry.at[1], entry.at[2], entry.stateId)) {
-            changes.push_back(
-                BlockChange{.x = entry.at[0], .y = entry.at[1], .z = entry.at[2], .stateId = entry.stateId});
+        const std::int32_t stateId = dried(entry.stateId);
+        if (context.world.setBlockState(entry.at[0], entry.at[1], entry.at[2], stateId)) {
+            changes.push_back(BlockChange{.x = entry.at[0], .y = entry.at[1], .z = entry.at[2], .stateId = stateId});
             landed.push_back(entry.at);
         }
     }
@@ -486,7 +502,47 @@ bool advanceSlide(WorldState& world, const std::int32_t x, const std::int32_t y,
     // from before, so the square that has just been created still says zero and this turn is the one
     // that makes it a half.
     entity->data().putFloat("progress", kSlideStep);
+    // parity: each `moving_piston` has its own ticker in the jar, and the turn after this one is the
+    // one that lands it. Booking it here rather than only on the piston is what lands a square that
+    // the piston can no longer reach across a gap, and it keeps the turn under the same name so the
+    // rest of the scheduled pass leaves it alone.
+    world.scheduleBlockTick(x, y, z, slideTickType(), 1);
     return true;
+}
+
+std::vector<BlockChange> slideTick(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
+                                   const std::vector<PlayerPosition>& players,
+                                   const std::function<void(const PlayerPosition&)>& onPlayerPushed) {
+    server::world::Chunk* chunk = context.world.chunkIfLoaded(x >> 4, z >> 4);
+    server::world::ChunkBlockEntity* entity = chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+    if (entity == nullptr || entity->type() != block()) {
+        return {};
+    }
+    const std::optional<std::int32_t> stateId = context.world.blockState(x, y, z);
+    if (!stateId.has_value() || pathOf(*stateId) != "moving_piston") {
+        return {};
+    }
+    // parity: a slide that has just been created spends its first ticker turn moving `progress` from
+    // zero to a half, and what is written down is `progressO`, which is still zero. We keep the one
+    // value the jar writes, so that first turn is skipped instead of stored.
+    if (context.world.slideStartedThisTick(x, y, z)) {
+        return {};
+    }
+    // parity: `progressO = progress` and then `progress += 0.5F`. Written without marking the chunk,
+    // exactly as `PistonMovingBlockEntity.tick` does by not calling `setChanged`.
+    if (entity->data().getFloat("progress") <= 0.0F) {
+        entity->data().putFloat("progress", kSlideStep);
+        return {};
+    }
+    const std::optional<std::int32_t> carried = carriedState(entity->data());
+    const std::optional<BlockFace> facing = faceNamed(propertyOf(*stateId, "facing"));
+    if (!carried.has_value() || !facing.has_value()) {
+        return {};
+    }
+    const bool extending = entity->data().getBoolean("extending");
+    const Carried landing{.at = Position{x, y, z}, .stateId = *carried, .extending = extending};
+    dragAlong(context, {landing.at}, extending ? *facing : registry::opposite(*facing), players, onPlayerPushed);
+    return landCarried(context, {landing});
 }
 
 std::vector<BlockChange> finish(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,

@@ -106,6 +106,15 @@ void runEvent(const Context& context, std::int32_t x, std::int32_t y, std::int32
 
 /// The move landing: the blocks go one along, the head appears or goes, and a sticky piston takes the
 /// block in front of it back with it.
+/// One turn of a sliding square, which in the jar is the block entity's own ticker: the first moves
+/// the progress along and the second lands it.
+///
+/// parity: `PistonMovingBlockEntity.tick`. Nothing is booked for it, which is why the jar's chunk
+/// carries no pending tick while a piston slides.
+[[nodiscard]] std::vector<BlockChange> slideTick(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
+                                                 const std::vector<PlayerPosition>& players,
+                                                 const std::function<void(const PlayerPosition&)>& onPlayerPushed);
+
 [[nodiscard]] std::vector<BlockChange> finish(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                                               const std::vector<PlayerPosition>& players = {},
                                               const std::function<void(const PlayerPosition&)>& onPlayerPushed = {});

@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
+#include <basalt/server/runtime/world/Dispensers.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
@@ -189,6 +190,37 @@ void BlockChangeBroadcaster::settleFrom(world::LoadedWorld& world, const std::ve
     for (const world::BlockChange& moved : settled) {
         world::redstoneComponents::scheduleAroundWire(world.state(), world.name(), moved.x, moved.y, moved.z, reading);
     }
+    // parity: `PistonBaseBlock.checkIfExtend` and `DispenserBlock.neighborChanged` are the two that
+    // nobody else asks, and they hear the same `updateNeighborsAt` as the rest: the six squares
+    // around what changed, and the six around each square a dust that moved reaches.
+    const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
+    const world::pistons::Context piston{.world = world.state(),
+                                         .worldName = world.name(),
+                                         .minY = facts.chunkHeight.minY(),
+                                         .maxY = facts.chunkHeight.maxY(),
+                                         .random = random,
+                                         .gameTime = world.gameTime()};
+    const auto tellAround = [&](std::int32_t cx, std::int32_t cy, std::int32_t cz) {
+        for (const registry::BlockFace face :
+             {registry::BlockFace::West, registry::BlockFace::East, registry::BlockFace::Down, registry::BlockFace::Up,
+              registry::BlockFace::North, registry::BlockFace::South}) {
+            const std::int32_t nx = cx + registry::stepX(face);
+            const std::int32_t ny = cy + registry::stepY(face);
+            const std::int32_t nz = cz + registry::stepZ(face);
+            world::pistons::trigger(piston, nx, ny, nz);
+            if (const std::optional<world::BlockChange> armed =
+                    world::dispensers::onNeighbourChange(world.state(), world.name(), nx, ny, nz);
+                armed.has_value()) {
+                announceBlock(watchers, *armed);
+            }
+        }
+    };
+    tellAround(x, y, z);
+    for (const world::BlockChange& moved : settled) {
+        for (const std::array<std::int32_t, 3>& at : world::redstoneComponents::wireReach(moved.x, moved.y, moved.z)) {
+            tellAround(at[0], at[1], at[2]);
+        }
+    }
 }
 
 void BlockChangeBroadcaster::runPistonEvent(world::LoadedWorld& world, const world::BlockEvent& event,
@@ -240,7 +272,7 @@ BlockChangeBroadcaster::finishPiston(world::LoadedWorld& world, const std::array
         .onDestroyed = [this, &world](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
             dropBrokenBlock(world, bx, by, bz, stateId);
         }};
-    return world::pistons::finish(
+    return world::pistons::slideTick(
         context, position[0], position[1], position[2], nearby,
         [&watchers](const world::pistons::PlayerPosition& pushed) {
             for (player::PlayerSession* player : watchers) {

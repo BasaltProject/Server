@@ -49,7 +49,9 @@ struct Bench {
     std::int64_t now = 0;
     std::vector<BlockChange> changes;
 
-    /// One turn of the world: the clock moves, and every tick that came due goes through the sensor.
+    /// One turn of the world: the clock moves, every tick that came due goes through the sensor, and
+    /// then the block entity's own turn moves whatever noise is on its way, which is where
+    /// `VibrationSystem.Ticker.tick` lives.
     void advance() {
         ++now;
         for (const std::array<std::int32_t, 3>& at : world.dueBlockTicks()) {
@@ -58,6 +60,32 @@ struct Bench {
                 changes.push_back(*change);
             }
         }
+        for (const std::array<std::int32_t, 3>& at : sensors()) {
+            if (const std::optional<BlockChange> change = vibrations::travelTick(world, at[0], at[1], at[2], now);
+                change.has_value()) {
+                changes.push_back(*change);
+            }
+        }
+    }
+
+    /// Every sculk sensor with a block entity, which is what the world's block entity pass walks.
+    [[nodiscard]] std::vector<std::array<std::int32_t, 3>> sensors() const {
+        std::vector<std::array<std::int32_t, 3>> found;
+        for (std::int32_t chunkX = -1; chunkX <= 1; ++chunkX) {
+            for (std::int32_t chunkZ = -1; chunkZ <= 1; ++chunkZ) {
+                const Chunk* chunk = world.chunkIfLoaded(chunkX, chunkZ);
+                if (chunk == nullptr) {
+                    continue;
+                }
+                for (const basalt::server::world::ChunkBlockEntity& entity : chunk->blockEntities()) {
+                    if (entity.type().path() == "sculk_sensor" || entity.type().path() == "calibrated_sculk_sensor") {
+                        found.push_back({(chunk->chunkX() << 4) + entity.localX(), entity.y(),
+                                         (chunk->chunkZ() << 4) + entity.localZ()});
+                    }
+                }
+            }
+        }
+        return found;
     }
 
     void advance(std::int32_t turns) {

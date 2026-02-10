@@ -60,12 +60,19 @@ void emit(WorldState& world, std::string_view event, double x, double y, double 
 bool stoodOn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, double entityX, double entityY,
              double entityZ, std::int64_t gameTime);
 
-/// The scheduled half, and the sensor's whole clock: an active sensor goes to cooldown, one cooling
-/// down goes quiet, and an inactive one moves whatever vibration is travelling towards it.
+/// The sensor's booked turn: an active sensor goes to cooldown and one cooling down goes quiet.
 ///
-/// parity: `SculkSensorBlock.tick` over `deactivate`, plus `VibrationSystem.Ticker.tick`.
+/// parity: `SculkSensorBlock.tick` over `deactivate`.
 [[nodiscard]] std::optional<BlockChange> tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                               std::int64_t gameTime);
+
+/// The other half, which is the block entity's and books nothing: a noise on its way moves one block
+/// closer every turn of the world, and lights the sensor on the turn it arrives.
+///
+/// parity: `VibrationSystem.Ticker.tick`, which runs from `SculkSensorBlockEntity`'s ticker and not
+/// from a booked turn. That is why the jar's chunk carries no pending tick while a noise travels.
+[[nodiscard]] std::optional<BlockChange> travelTick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                                    std::int64_t gameTime);
 
 } // namespace vibrations
 
