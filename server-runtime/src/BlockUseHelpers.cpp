@@ -862,6 +862,17 @@ void BlockInteractionHandler::toggleBlock(const BlockPos& pos) {
         }
     }
     broadcastSound(pos, toggled->sound, 1.0F, 1.0F);
+    // parity: the noise a hand makes. `LeverBlock.pull` and `ButtonBlock.press` raise
+    // `BLOCK_ACTIVATE` or `BLOCK_DEACTIVATE` by the new `powered`, and a door, a trapdoor or a gate
+    // raise `BLOCK_OPEN` or `BLOCK_CLOSE` by the new `open`. A sculk sensor beside one hears the flip.
+    if (const std::optional<std::int32_t> after = world->state().blockState(pos.x, pos.y, pos.z); after.has_value()) {
+        const std::map<std::string, std::string> properties = reg::blockStateDefinitions::propertiesOf(*after);
+        if (const auto open = properties.find("open"); open != properties.end()) {
+            heardBySculk(open->second == "true" ? "block_open" : "block_close", pos);
+        } else if (const auto powered = properties.find("powered"); powered != properties.end()) {
+            heardBySculk(powered->second == "true" ? "block_activate" : "block_deactivate", pos);
+        }
+    }
 }
 
 void BlockInteractionHandler::cycleBlock(const BlockPos& pos) {

@@ -120,7 +120,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             broadcaster_->notifyAround(world, watchers, x, y, z, std::nullopt);
         }
         world::scheduledBlocks::frostedIce(world.state(), x, y, z, random, scheduled);
-        world::scheduledBlocks::driedGhast(world.state(), x, y, z, scheduled);
+        world::scheduledBlocks::driedGhast(world.state(), x, y, z, world.gameTime(), scheduled);
         // parity: `RedstoneLampBlock.tick`, the four ticks a lamp waits before going dark.
         if (const std::optional<world::BlockChange> lamp =
                 world::redstoneReactors::lampTick(world.state(), world.name(), x, y, z);

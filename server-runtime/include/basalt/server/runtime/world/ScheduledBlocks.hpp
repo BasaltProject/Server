@@ -66,7 +66,8 @@ void frostedIce(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
 
 /// parity: `DriedGhastBlock.tick`: soaked it fills up, dry it dries out, and it keeps asking for the
 /// next turn while there is anything left to change.
-void driedGhast(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::vector<BlockChange>& changes);
+void driedGhast(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t gameTime,
+                std::vector<BlockChange>& changes);
 
 /// parity: `SnifferEggBlock.onPlace`: three turns of a hatch that halves on moss, each one asked for
 /// as the last one lands, plus its own random spread.

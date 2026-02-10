@@ -308,7 +308,7 @@ TEST_CASE("a dried ghast fills up in water and dries out of it") {
     std::vector<BlockChange> changes;
 
     REQUIRE(world.setBlockState(8, 64, 8, ghast(0, "true")));
-    scheduledBlocks::driedGhast(world, 8, 64, 8, changes);
+    scheduledBlocks::driedGhast(world, 8, 64, 8, 0, changes);
     CHECK(world.blockState(8, 64, 8) == ghast(1, "true"));
     CHECK(world.hasScheduledBlockTick(8, 64, 8, scheduledBlocks::driedGhastTickType()));
 
@@ -316,20 +316,20 @@ TEST_CASE("a dried ghast fills up in water and dries out of it") {
     CHECK(bookedIn(world, 8, 64, 8, 6000) == 5000);
 
     REQUIRE(world.setBlockState(4, 64, 4, ghast(2, "false")));
-    scheduledBlocks::driedGhast(world, 4, 64, 4, changes);
+    scheduledBlocks::driedGhast(world, 4, 64, 4, 0, changes);
     CHECK(world.blockState(4, 64, 4) == ghast(1, "false"));
 
     // Two steps in and still soaking, it keeps filling to the top.
     REQUIRE(world.setBlockState(7, 64, 7, ghast(2, "true")));
-    scheduledBlocks::driedGhast(world, 7, 64, 7, changes);
+    scheduledBlocks::driedGhast(world, 7, 64, 7, 0, changes);
     CHECK(world.blockState(7, 64, 7) == ghast(3, "true"));
 
     // Full in water and empty out of it are both the end of the road.
     REQUIRE(world.setBlockState(5, 64, 5, ghast(3, "true")));
     REQUIRE(world.setBlockState(6, 64, 6, ghast(0, "false")));
     const std::size_t before = changes.size();
-    scheduledBlocks::driedGhast(world, 5, 64, 5, changes);
-    scheduledBlocks::driedGhast(world, 6, 64, 6, changes);
+    scheduledBlocks::driedGhast(world, 5, 64, 5, 0, changes);
+    scheduledBlocks::driedGhast(world, 6, 64, 6, 0, changes);
     CHECK(changes.size() == before);
 }
 
