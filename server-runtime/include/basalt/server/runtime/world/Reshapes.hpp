@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <cstdint>
@@ -31,8 +32,12 @@ using GeyserReshape =
     std::function<std::optional<std::int32_t>(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId)>;
 
 /// Answers the state this block should now be, or nothing when it is none of these.
+///
+/// `towards` is the side the news arrives from, which a couple of them ask about: a door only comes
+/// apart when what changed is the square its other half stands in.
 [[nodiscard]] std::optional<std::int32_t> of(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                             std::int32_t stateId, const GeyserReshape& geyser = {});
+                                             std::int32_t stateId, const GeyserReshape& geyser = {},
+                                             std::optional<registry::BlockFace> towards = std::nullopt);
 
 } // namespace reshapes
 

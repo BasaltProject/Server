@@ -22,6 +22,7 @@
 #include <basalt/server/runtime/world/Lecterns.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/Pistons.hpp>
 #include <basalt/server/runtime/world/PressurePlates.hpp>
 #include <basalt/server/runtime/world/ProjectileHits.hpp>
@@ -109,6 +110,15 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         }
         std::vector<world::BlockChange> scheduled;
         random::RandomSource random = freshRandom();
+        // parity: `LeavesBlock.tick`, which is where the distance really moves: the shape update only
+        // books this turn.
+        if (const std::optional<world::BlockChange> leaves = world::neighbourUpdates::leafTick(world.state(), x, y, z);
+            leaves.has_value()) {
+            // parity: `LeavesBlock.tick` writes with `setBlock(..., 3)`, so what is standing on the
+            // leaves hears it and falls if it cannot hold on there.
+            sendBlockUpdates(watchers, {*leaves});
+            broadcaster_->notifyAround(world, watchers, x, y, z, std::nullopt);
+        }
         world::scheduledBlocks::frostedIce(world.state(), x, y, z, random, scheduled);
         world::scheduledBlocks::driedGhast(world.state(), x, y, z, scheduled);
         // parity: `RedstoneLampBlock.tick`, the four ticks a lamp waits before going dark.

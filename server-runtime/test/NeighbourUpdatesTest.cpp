@@ -299,13 +299,21 @@ TEST_CASE("leaves count their way out from a trunk") {
     CHECK(neighbourUpdates::leafDistance(loaded.state, 8, 66, 8) == 1);
 }
 
-TEST_CASE("leaves take their distance from the trunk that turned up") {
+TEST_CASE("leaves take their distance from the trunk that turned up, on their own turn") {
     Loaded loaded;
     loaded.put(8, 64, 8, stateOf("oak_log"));
     loaded.put(8, 65, 8, stateOf("oak_leaves", {{"distance", "7"}, {"persistent", "false"}, {"waterlogged", "false"}}));
 
+    // parity: `LeavesBlock.updateShape` answers the state it was given and books a turn; the distance
+    // moves in `LeavesBlock.tick`, one tick later.
     const neighbourUpdates::Context context = loaded.context();
-    REQUIRE(neighbourUpdates::connect(context, 8, 65, 8, *loaded.state.blockState(8, 65, 8)).has_value());
+    CHECK_FALSE(neighbourUpdates::connect(context, 8, 65, 8, *loaded.state.blockState(8, 65, 8)).has_value());
+    CHECK(propertyAt(loaded.state, 8, 65, 8, "distance") == "7");
+
+    const std::vector<std::array<std::int32_t, 3>> due = loaded.state.dueBlockTicks();
+    REQUIRE(due.size() == 1);
+    CHECK(due[0] == std::array<std::int32_t, 3>{8, 65, 8});
+    REQUIRE(neighbourUpdates::leafTick(loaded.state, 8, 65, 8).has_value());
     CHECK(propertyAt(loaded.state, 8, 65, 8, "distance") == "1");
 }
 

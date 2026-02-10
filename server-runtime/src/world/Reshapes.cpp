@@ -220,9 +220,17 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
 /// parity: `DoorBlock.updateShape`: each half copies the other's whole state but for its own half,
 /// which is what keeps a door open on both halves and closes it on both.
 [[nodiscard]] std::optional<std::int32_t> door(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                               std::int32_t stateId, const wire::common::Identifier& block) {
+                                               std::int32_t stateId, const wire::common::Identifier& block,
+                                               std::optional<registry::BlockFace> towards) {
     const std::string half = propertyOf(stateId, "half");
     if (half.empty()) {
+        return std::nullopt;
+    }
+    // parity: `DoorBlock.updateShape` only comes apart when the news arrives **along its own axis and
+    // from the side its other half is on**: `half == LOWER` listens up and `half == UPPER` listens
+    // down. From anywhere else a lone half stays put, which is what a command can leave behind.
+    const registry::BlockFace mine = half == "lower" ? registry::BlockFace::Up : registry::BlockFace::Down;
+    if (!towards.has_value() || *towards != mine) {
         return std::nullopt;
     }
     const std::int32_t other = stateAt(world, x, half == "lower" ? y + 1 : y - 1, z);
@@ -454,7 +462,7 @@ std::span<const std::string_view> chestBlocks() {
 }
 
 std::optional<std::int32_t> of(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
-                               const GeyserReshape& geyser) {
+                               const GeyserReshape& geyser, std::optional<registry::BlockFace> towards) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block == nullptr) {
         return std::nullopt;
@@ -467,7 +475,7 @@ std::optional<std::int32_t> of(WorldState& world, std::int32_t x, std::int32_t y
         return bed(world, x, y, z, stateId, *block);
     }
     if (endsWith(path, "_door")) {
-        return door(world, x, y, z, stateId, *block);
+        return door(world, x, y, z, stateId, *block, towards);
     }
     if (std::ranges::find(chestBlocks(), path) != chestBlocks().end()) {
         return chest(world, x, y, z, stateId, *block);

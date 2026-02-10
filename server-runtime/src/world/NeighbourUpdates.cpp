@@ -121,7 +121,16 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
 /// actually drops them.
 [[nodiscard]] std::optional<std::int32_t> retreeLeaves(WorldState& world, std::int32_t x, std::int32_t y,
                                                        std::int32_t z, std::int32_t stateId) {
-    return rewrite(world, x, y, z, stateId, {{"distance", std::to_string(leafDistance(world, x, y, z))}});
+    // parity: `LeavesBlock.updateShape` does **not** rewrite the leaves: it books a turn and answers
+    // the state it was given. The distance moves one tick later, in `LeavesBlock.tick`.
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    if (block == nullptr) {
+        return std::nullopt;
+    }
+    if (leafDistance(world, x, y, z) != distanceOf(stateId)) {
+        world.scheduleBlockTick(x, y, z, *block, 1);
+    }
+    return std::nullopt;
 }
 
 /// parity: `WallBlock.updateShape`, sides and post together.
@@ -218,9 +227,18 @@ void visit(const Walk& walk, std::deque<Position>& pending, std::int32_t x, std:
     fallingBlocks::scheduleIfFalling(walk.context.world, x, y, z);
     bool changed = false;
     std::vector<BlockChange> bubbles;
+    const std::optional<std::int32_t> before = walk.context.world.blockState(x, y, z);
     if (const std::optional<std::int32_t> reshaped = reshape(walk.context, x, y, z, bubbles, towards);
         reshaped.has_value()) {
-        walk.onReshaped(*reshaped, x, y, z);
+        // parity: `Block.updateOrDestroy`, which is what runs a shape update's answer: a state is
+        // written, but **air** is a `destroyBlock` and that one drops what was standing there. Half a
+        // door left alone comes apart and leaves its door on the floor.
+        if (*reshaped == registry::blocks::air().stateId && before.has_value() &&
+            *before != registry::blocks::air().stateId) {
+            walk.onBroken(*before, x, y, z);
+        } else {
+            walk.onReshaped(*reshaped, x, y, z);
+        }
         changed = true;
     }
     for (const BlockChange& change : bubbles) {
@@ -233,6 +251,19 @@ void visit(const Walk& walk, std::deque<Position>& pending, std::int32_t x, std:
 }
 
 } // namespace
+
+std::optional<BlockChange> leafTick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value() || !registry::blockConnections::isLeaves(*stateId)) {
+        return std::nullopt;
+    }
+    const std::optional<std::int32_t> written =
+        rewrite(world, x, y, z, *stateId, {{"distance", std::to_string(leafDistance(world, x, y, z))}});
+    if (!written.has_value()) {
+        return std::nullopt;
+    }
+    return BlockChange{.x = x, .y = y, .z = z, .stateId = *written};
+}
 
 std::int32_t leafDistance(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     std::int32_t nearest = kDecayDistance;
@@ -331,7 +362,7 @@ std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std:
         drawn.has_value()) {
         return drawn;
     }
-    if (const std::optional<std::int32_t> other = reshapes::of(world, x, y, z, *stateId, context.geyser);
+    if (const std::optional<std::int32_t> other = reshapes::of(world, x, y, z, *stateId, context.geyser, towards);
         other.has_value()) {
         return other;
     }
