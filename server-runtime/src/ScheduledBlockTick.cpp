@@ -320,9 +320,39 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                 world.state(), world.name(), moved->x, moved->y, moved->z, world.gameTime(), random,
                 world.gameRules().get(world::gameRules::kTntExplodes));
             scheduled.insert(scheduled.end(), reacted.begin(), reacted.end());
-            // parity: a diode and an observer tell the square they feed **and its own neighbours**,
-            // and a torch does that in all six directions. Without the second step a lamp stuck to
-            // the block a repeater feeds is two squares away and never hears.
+            // parity: a component writes with `UPDATE_ALL`, so a piston beside it runs its own
+            // `neighborChanged`. Nothing else asks a piston, and without this a repeater feeding one
+            // never made it move.
+            const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
+            const world::pistons::Context pistonContext{.world = world.state(),
+                                                        .worldName = world.name(),
+                                                        .minY = facts.chunkHeight.minY(),
+                                                        .maxY = facts.chunkHeight.maxY(),
+                                                        .random = random,
+                                                        .gameTime = world.gameTime()};
+            world::pistons::trigger(pistonContext, moved->x, moved->y, moved->z);
+            // parity: `DispenserBlock.neighborChanged` is the other one nobody else asks: a dropper
+            // fed by a repeater or by a piece of dust that just moved has to remember it was
+            // triggered and book its four ticks.
+            if (const std::optional<world::BlockChange> armed =
+                    world::dispensers::onNeighbourChange(world.state(), world.name(), moved->x, moved->y, moved->z);
+                armed.has_value()) {
+                scheduled.push_back(*armed);
+            }
+            for (const server::registry::BlockFace face :
+                 {server::registry::BlockFace::Down, server::registry::BlockFace::Up,
+                  server::registry::BlockFace::North, server::registry::BlockFace::South,
+                  server::registry::BlockFace::West, server::registry::BlockFace::East}) {
+                world::pistons::trigger(pistonContext, moved->x + server::registry::stepX(face),
+                                        moved->y + server::registry::stepY(face),
+                                        moved->z + server::registry::stepZ(face));
+                if (const std::optional<world::BlockChange> armed = world::dispensers::onNeighbourChange(
+                        world.state(), world.name(), moved->x + server::registry::stepX(face),
+                        moved->y + server::registry::stepY(face), moved->z + server::registry::stepZ(face));
+                    armed.has_value()) {
+                    scheduled.push_back(*armed);
+                }
+            }
             // parity: a torch flicking on its own turn writes with `UPDATE_ALL` and stops at its six
             // squares; only a diode and an observer reach past the block they feed, and only as far
             // as that block's own neighbours.
@@ -343,6 +373,17 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                     world.state(), world.name(), change.x, change.y, change.z, world.gameTime(), random,
                     world.gameRules().get(world::gameRules::kTntExplodes));
                 scheduled.insert(scheduled.end(), around.begin(), around.end());
+                // parity: the same two squares a dust reaches are where a piston and a dropper hear
+                // it: a dropper fed by a piece of dust that just changed strength has to arm itself.
+                for (const std::array<std::int32_t, 3>& at :
+                     world::redstoneComponents::wireReach(change.x, change.y, change.z)) {
+                    world::pistons::trigger(pistonContext, at[0], at[1], at[2]);
+                    if (const std::optional<world::BlockChange> armed =
+                            world::dispensers::onNeighbourChange(world.state(), world.name(), at[0], at[1], at[2]);
+                        armed.has_value()) {
+                        scheduled.push_back(*armed);
+                    }
+                }
             }
         }
         world::scheduledBlocks::frogspawn(world.state(), x, y, z, scheduled);

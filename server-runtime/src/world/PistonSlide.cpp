@@ -1,8 +1,10 @@
 #include "PistonSlide.hpp"
 
 #include <basalt/server/registry/BlockSupport.hpp>
+#include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
+#include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/RedstoneReactors.hpp>
 #include <basalt/server/runtime/world/Tripwires.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
@@ -206,7 +208,38 @@ void destroyPushed(const Context& context, const Push& push, std::vector<BlockCh
                          static_cast<double>((*position)[1]) + 0.5, static_cast<double>((*position)[2]) + 0.5,
                          context.gameTime);
         // parity: `moveBlocks` runs `affectNeighborsAfterRemoval` on every square it clears, and with
-        // `movedByPiston` **false**, so a crushed string fires its line exactly as a cut one does.
+        // `movedByPiston` **false**. `RedStoneWireBlock`'s does three things and the order is the
+        // whole point: first `updateNeighborsAt` on each of its six squares, **while the line still
+        // holds the strength it had**, then its own power update, and then the wires again. That is
+        // why a lamp two squares from the cut lights for its four ticks before going out.
+        const registry::BlockFace kSix[]{registry::BlockFace::Down,  registry::BlockFace::Up,
+                                         registry::BlockFace::North, registry::BlockFace::South,
+                                         registry::BlockFace::West,  registry::BlockFace::East};
+        for (const registry::BlockFace face : kSix) {
+            const std::int32_t nx = (*position)[0] + registry::stepX(face);
+            const std::int32_t ny = (*position)[1] + registry::stepY(face);
+            const std::int32_t nz = (*position)[2] + registry::stepZ(face);
+            redstoneComponents::scheduleAround(context.world, context.worldName, nx, ny, nz, false,
+                                               comparatorReading::of(context.world));
+            for (const BlockChange& told : redstoneReactors::update(context.world, context.worldName, nx, ny, nz,
+                                                                    context.gameTime, context.random, true, false)) {
+                changes.push_back(told);
+            }
+        }
+        const std::vector<BlockChange> settled =
+            redstone::settle(context.world, context.worldName, (*position)[0], (*position)[1], (*position)[2]);
+        for (const BlockChange& change : settled) {
+            changes.push_back(change);
+        }
+        for (const BlockChange& change : settled) {
+            redstoneComponents::scheduleAroundWire(context.world, context.worldName, change.x, change.y, change.z,
+                                                   comparatorReading::of(context.world));
+            for (const BlockChange& told :
+                 redstoneReactors::updateAroundWire(context.world, context.worldName, change.x, change.y, change.z,
+                                                    context.gameTime, context.random, true)) {
+                changes.push_back(told);
+            }
+        }
         if (tripwires::isWire(*broken)) {
             if (const std::optional<std::int32_t> live =
                     registry::blockStateDefinitions::stateIdOf(tripwires::wireBlock(), {{"powered", "true"}}, *broken);

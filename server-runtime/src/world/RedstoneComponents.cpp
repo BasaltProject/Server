@@ -140,6 +140,9 @@ using Properties = std::map<std::string, std::string>;
 /// parity: `ComparatorBlock.checkTickOnNeighbor` books a turn only when the reading or the state
 /// would actually move. Booking on every nudge left turns pending from the build of a circuit that
 /// fired later and read a world that had changed underneath them, a tick early every time.
+[[nodiscard]] bool isLocked(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                            const Properties& properties);
+
 void scheduleComparator(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
                         std::int32_t stateId, const ContainerSignalAt& containerSignal) {
     const Properties properties = registry::blockStateDefinitions::propertiesOf(stateId);
@@ -166,13 +169,23 @@ void schedule(WorldState& world, std::string_view worldName, std::int32_t x, std
         if ((valueOf(properties, "lit") == "true") != torchIsFed(world, worldName, x, y, z, properties)) {
             return;
         }
-        world.scheduleBlockTick(x, y, z, torch(), kTorchDelay);
+        // parity: the turn is stored under the block that booked it, so a wall torch books a
+        // `redstone_wall_torch` and not the standing one: vanilla drops a tick whose block is not
+        // the one standing there.
+        const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
+        world.scheduleBlockTick(x, y, z, block == nullptr ? torch() : *block, kTorchDelay);
         return;
     }
     if (path == "repeater") {
         // parity: `DiodeBlock.checkTickOnNeighbor` books nothing while the repeater already says what
         // its input says. Booking anyway left turns pending that fired on a world that had moved on.
         const Properties properties = registry::blockStateDefinitions::propertiesOf(*stateId);
+        // parity: and it books nothing at all while the repeater is **locked**, which is the first
+        // thing `checkTickOnNeighbor` asks. Without that, a locked repeater whose input disagrees
+        // with it re-books a turn every time anything nudges it, for ever.
+        if (isLocked(world, x, y, z, properties)) {
+            return;
+        }
         const bool on = valueOf(properties, "powered") == "true";
         if (on == (repeaterInput(world, worldName, x, y, z, properties) > 0)) {
             return;
@@ -397,7 +410,8 @@ void storeOutput(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
         // eighth one is the one that burns the torch out and books its long wait.
         world.addTorchToggle(TorchToggle{.x = x, .y = y, .z = z, .when = gameTime});
         if (world.torchToggleCount(x, y, z) >= kMaxTorchToggles) {
-            world.scheduleBlockTick(x, y, z, torch(), kTorchRestartDelay);
+            const wire::common::Identifier* burnt = registry::blockStateDefinitions::blockOf(*stateId);
+            world.scheduleBlockTick(x, y, z, burnt == nullptr ? torch() : *burnt, kTorchRestartDelay);
             // parity: `level.levelEvent(1502, pos, 0)`, the puff of smoke that says it burnt out.
             if (moved.has_value()) {
                 moved->effects.push_back(
