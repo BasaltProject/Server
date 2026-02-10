@@ -4,11 +4,13 @@
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
+#include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/Dispensers.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/Pistons.hpp>
+#include <basalt/server/runtime/world/Rails.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
@@ -201,6 +203,7 @@ void BlockChangeBroadcaster::settleFrom(world::LoadedWorld& world, const std::ve
                                          .random = random,
                                          .gameTime = world.gameTime()};
     const auto tellAround = [&](std::int32_t cx, std::int32_t cy, std::int32_t cz) {
+        const std::optional<std::int32_t> source = world.state().blockState(cx, cy, cz);
         for (const registry::BlockFace face :
              {registry::BlockFace::West, registry::BlockFace::East, registry::BlockFace::Down, registry::BlockFace::Up,
               registry::BlockFace::North, registry::BlockFace::South}) {
@@ -212,6 +215,21 @@ void BlockChangeBroadcaster::settleFrom(world::LoadedWorld& world, const std::ve
                     world::dispensers::onNeighbourChange(world.state(), world.name(), nx, ny, nz);
                 armed.has_value()) {
                 announceBlock(watchers, *armed);
+            }
+            // parity: `CrafterBlock.neighborChanged`, the same rising edge with its own four ticks.
+            if (const std::optional<world::BlockChange> armed =
+                    world::crafters::onNeighbourChange(world.state(), world.name(), nx, ny, nz);
+                armed.has_value()) {
+                announceBlock(watchers, *armed);
+            }
+            // parity: `RailBlock.updateState`, the three-way junction that re-bends when a signal
+            // reaches it.
+            if (source.has_value()) {
+                if (const std::optional<std::int32_t> bent =
+                        world::rails::onNeighbourChange(world.state(), world.name(), nx, ny, nz, *source);
+                    bent.has_value()) {
+                    announceBlock(watchers, world::BlockChange{.x = nx, .y = ny, .z = nz, .stateId = *bent});
+                }
             }
         }
     };

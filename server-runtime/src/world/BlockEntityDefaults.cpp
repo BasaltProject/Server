@@ -1,3 +1,4 @@
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
 #include <basalt/server/runtime/world/BrewingStands.hpp>
 #include <basalt/server/runtime/world/Campfires.hpp>
@@ -5,13 +6,76 @@
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/Shelves.hpp>
 
+#include <cctype>
+#include <map>
+#include <string>
 #include <string_view>
 #include <vector>
 
 namespace basalt::server::runtime::world::blockEntityDefaults {
+namespace {
 
-wire::nbt::NbtCompound of(const wire::common::Identifier& block) {
+/// The block's own `mode` property, which is what the two blocks that carry one copy into their
+/// block entity when they are built.
+[[nodiscard]] std::string modeOf(std::optional<std::int32_t> stateId, std::string_view fallback) {
+    if (!stateId.has_value()) {
+        return std::string{fallback};
+    }
+    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*stateId);
+    const auto mode = properties.find("mode");
+    return mode == properties.end() ? std::string{fallback} : mode->second;
+}
+
+[[nodiscard]] std::string upperModeOf(std::optional<std::int32_t> stateId, std::string_view fallback) {
+    std::string mode = modeOf(stateId, fallback);
+    for (char& letter : mode) {
+        letter = static_cast<char>(std::toupper(static_cast<unsigned char>(letter)));
+    }
+    return mode;
+}
+
+[[nodiscard]] std::string lowerModeOf(std::optional<std::int32_t> stateId, std::string_view fallback) {
+    return modeOf(stateId, fallback);
+}
+
+} // namespace
+
+wire::nbt::NbtCompound of(const wire::common::Identifier& block, std::optional<std::int32_t> stateId) {
     const std::string_view path = block.path();
+    // parity: `StructureBlockEntity.saveAdditional`, the whole nineteen fields whatever they hold, and
+    // `mode` copied from the block's own property when it is built.
+    if (path == "structure_block") {
+        wire::nbt::NbtCompound structure;
+        structure.putString("name", "");
+        structure.putString("author", "");
+        structure.putString("metadata", "");
+        structure.putInt("posX", 0);
+        structure.putInt("posY", 1);
+        structure.putInt("posZ", 0);
+        structure.putInt("sizeX", 0);
+        structure.putInt("sizeY", 0);
+        structure.putInt("sizeZ", 0);
+        structure.putString("rotation", "NONE");
+        structure.putString("mirror", "NONE");
+        structure.putString("mode", upperModeOf(stateId, "DATA"));
+        structure.putBoolean("ignoreEntities", true);
+        structure.putBoolean("strict", false);
+        structure.putBoolean("powered", false);
+        structure.putBoolean("showair", false);
+        structure.putBoolean("showboundingbox", true);
+        structure.putFloat("integrity", 1.0F);
+        structure.putLong("seed", 0);
+        return structure;
+    }
+    // parity: `TestBlockEntity.saveAdditional`: the mode it was built with, its message and whether
+    // it is powered.
+    if (path == "test_block") {
+        wire::nbt::NbtCompound test;
+        test.putString("mode", lowerModeOf(stateId, "start"));
+        test.putString("message", "");
+        test.putBoolean("powered", false);
+        return test;
+    }
     if (commandBlocks::modeOf(path).has_value()) {
         return commandBlocks::defaults();
     }

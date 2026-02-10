@@ -332,6 +332,23 @@ void react(WorldState& world, std::string_view worldName, std::int32_t x, std::i
         commandBlocks::onSignal(world, x, y, z, redstone::bestNeighbourSignal(world, worldName, x, y, z) > 0);
         return;
     }
+    // parity: `StructureBlock.neighborChanged` and `TestBlock.neighborChanged`, which keep their
+    // `powered` in the **block entity** and not in the state. What the rising edge sets off (loading
+    // or saving a structure, starting a test) is not here: those need a structure or a test to run.
+    if (path == "structure_block" || path == "test_block") {
+        server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
+        server::world::ChunkBlockEntity* entity = chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+        if (entity == nullptr) {
+            return;
+        }
+        const bool powered = redstone::bestNeighbourSignal(world, worldName, x, y, z) > 0;
+        if (entity->data().getBoolean("powered") == powered) {
+            return;
+        }
+        entity->data().putBoolean("powered", powered);
+        chunk->markDirty();
+        return;
+    }
     if (path == "tnt") {
         tnt(world, worldName, x, y, z, tntExplodes, changes);
         return;

@@ -652,6 +652,8 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // whole of its own `neighborChanged`: the rail re-bends (`RailBlock.updateState`), the dispenser
     // remembers it was triggered, the crafter does the same with its own four ticks, and the piston
     // books its move (`PistonBaseBlock.checkIfExtend`).
+    const bool wasIce = removed.has_value() && registry::blockStateDefinitions::blockOf(*removed) != nullptr &&
+                        registry::blockStateDefinitions::blockOf(*removed)->path() == "frosted_ice";
     const auto tellAround = [&](std::int32_t cx, std::int32_t cy, std::int32_t cz) {
         const std::optional<std::int32_t> source = world.blockState(cx, cy, cz);
         for (const BlockFace face : kUpdateOrder) {
@@ -674,6 +676,28 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
                 reshaped(armed->stateId, armed->x, armed->y, armed->z);
             }
             pistons::trigger(piston, nx, ny, nz);
+            // parity: `SpongeBlock.neighborChanged` drinks when the **neighbour** changes too, not
+            // only when the sponge itself arrives. A sponge put down before the water stayed dry.
+            sponges::absorb(world, nx, ny, nz, reshaped);
+            // parity: `FrostedIceBlock.neighborChanged`, which only listens to other frosted ice.
+            // Which block the news carries is not the same on both roads: `Level.setBlock` hands the
+            // **old** one (`updateNeighborsAt(pos, oldState.getBlock())`) and a command hands the new
+            // one (`ServerLevel.updateNeighboursOnBlockSet`). Frosted ice is the only block that asks,
+            // and it melts either way, so both are enough here.
+            const bool icy =
+                wasIce || (source.has_value() && registry::blockStateDefinitions::blockOf(*source) != nullptr &&
+                           registry::blockStateDefinitions::blockOf(*source)->path() == "frosted_ice");
+            if (icy) {
+                if (const std::optional<BlockChange> melted = scheduledBlocks::frostedIceHeard(world, nx, ny, nz);
+                    melted.has_value()) {
+                    reshaped(melted->stateId, melted->x, melted->y, melted->z);
+                    std::vector<BlockChange> chained;
+                    scheduledBlocks::frostedIceChain(world, nx, ny, nz, chained);
+                    for (const BlockChange& gone : chained) {
+                        reshaped(gone.stateId, gone.x, gone.y, gone.z);
+                    }
+                }
+            }
         }
     };
     tellAround(x, y, z);

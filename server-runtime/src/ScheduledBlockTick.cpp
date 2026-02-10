@@ -389,6 +389,11 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                             armed.has_value()) {
                             scheduled.push_back(*armed);
                         }
+                        if (const std::optional<world::BlockChange> armed =
+                                world::crafters::onNeighbourChange(world.state(), world.name(), nx, ny, nz);
+                            armed.has_value()) {
+                            scheduled.push_back(*armed);
+                        }
                     }
                 }
             }
