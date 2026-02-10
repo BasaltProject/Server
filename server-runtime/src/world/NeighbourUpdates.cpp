@@ -46,6 +46,11 @@ constexpr std::int32_t kDirections = 6;
 constexpr std::array<BlockFace, 6> kFaces{BlockFace::Down,  BlockFace::Up,   BlockFace::North,
                                           BlockFace::South, BlockFace::West, BlockFace::East};
 
+/// parity: `NeighborUpdater.UPDATE_ORDER`, the order in which the six squares around a change are
+/// told. It is not `Direction.values()`, and it decides who books first when two of them answer.
+constexpr std::array<BlockFace, 6> kUpdateOrder{BlockFace::West, BlockFace::East,  BlockFace::Down,
+                                                BlockFace::Up,   BlockFace::North, BlockFace::South};
+
 /// parity: `BlockBehaviour.UPDATE_SHAPE_ORDER`, which is neither of the other two.
 constexpr std::array<BlockFace, 6> kUpdateShapeOrder{BlockFace::West,  BlockFace::East, BlockFace::North,
                                                      BlockFace::South, BlockFace::Down, BlockFace::Up};
@@ -636,7 +641,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // parity: `RailBlock.updateState`, the one case a rail re-bends on a neighbour change: a
     // three-way junction with a signal arriving at it.
     if (const std::optional<std::int32_t> changed = world.blockState(x, y, z); changed.has_value()) {
-        for (const BlockFace face : kFaces) {
+        for (const BlockFace face : kUpdateOrder) {
             const std::int32_t nx = x + registry::stepX(face);
             const std::int32_t ny = y + registry::stepY(face);
             const std::int32_t nz = z + registry::stepZ(face);
@@ -652,7 +657,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         return context.dispenser ? context.dispenser(world, atX, atY, atZ)
                                  : dispensers::onNeighbourChange(world, context.worldName, atX, atY, atZ);
     };
-    for (const BlockFace face : kFaces) {
+    for (const BlockFace face : kUpdateOrder) {
         if (const std::optional<BlockChange> armed =
                 arm(x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face));
             armed.has_value()) {
@@ -667,7 +672,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         armed.has_value()) {
         reshaped(armed->stateId, armed->x, armed->y, armed->z);
     }
-    for (const BlockFace face : kFaces) {
+    for (const BlockFace face : kUpdateOrder) {
         if (const std::optional<BlockChange> armed =
                 crafters::onNeighbourChange(world, context.worldName, x + registry::stepX(face),
                                             y + registry::stepY(face), z + registry::stepZ(face));
@@ -682,7 +687,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
                                   .maxY = context.maxY,
                                   .random = context.random};
     pistons::trigger(piston, x, y, z);
-    for (const BlockFace face : kFaces) {
+    for (const BlockFace face : kUpdateOrder) {
         pistons::trigger(piston, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face));
     }
     // parity: `TripWireBlock.onPlace`, which tells the hooks at the ends of its line. Without it a

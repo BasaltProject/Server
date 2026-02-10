@@ -154,7 +154,6 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             // What belongs to a piece of the map is done by whoever owns that piece; what belongs to
             // the world as a whole (its clock, its weather, its players) runs once, in the world's
             // first region. With one region the two are the same thing.
-            step("Item tick", [&world, &region] { static_cast<void>(world.state().tickItems(&region)); });
             if (region.isPrimary()) {
                 step("Time tick", [this, &world] { environment_->tickTime(world); });
                 step("Border damage", [this, &world] { environment_->tickBorderDamage(world); });
@@ -163,21 +162,31 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
                 step("Footstep tick", [this, &world] { redstone_->tickFootsteps(world); });
             }
             step("Inhabited-time tick", [this, &world, &region] { redstone_->tickInhabitedTime(world, region); });
+            // parity: `ServerLevel.tick` runs the booked block turns first, the fluids after them and
+            // the random ticks last, inside the chunk source. Doing the water first let it break a
+            // repeater whose own turn was due that very tick, and the pulse the jar gives was lost.
+            step("Scheduled block tick", [this, &world, &region] { redstone_->tickScheduledBlocks(world, region); });
             step("Fluid tick", [this, &world, &region] { redstone_->tickFluids(world, region); });
             step("Random block tick", [this, &world, &region] { redstone_->tickRandomBlocks(world, region); });
-            step("Scheduled block tick", [this, &world, &region] { redstone_->tickScheduledBlocks(world, region); });
-            // parity: `entityInside` is the entity's own turn, and `ServerLevel.tick` runs the
-            // entities **after** the block ticks. A plate that books its release before that pass
-            // loses a tick to it: vanilla writes twenty and this wrote nineteen.
-            step("Pressure plate tick", [this, &world, &region] { redstone_->tickPressurePlates(world, region); });
-            step("Arrow button tick", [this, &world, &region] { redstone_->tickArrowButtons(world, region); });
-            step("Tripwire tick", [this, &world, &region] { redstone_->tickTripwires(world, region); });
             // parity: `ServerLevel.tick` runs its block events after the block ticks and before the
             // entities, and skips them altogether while the world is frozen.
             step("Block event tick", [this, &world, &region] { redstone_->tickBlockEvents(world, region); });
-            step("Block entity tick", [this, &world, &region] { redstone_->tickBlockEntities(world, region); });
             step("Falling block tick", [this, &world, &region] { redstone_->tickFallingBlocks(world, region); });
+            // parity: a dropped item is an entity like any other and moves in the entity pass, not
+            // before the world's own turn: what a block event pushes is where the item was, not
+            // where it is about to be.
+            step("Item tick", [&world, &region] { static_cast<void>(world.state().tickItems(&region)); });
             step("Entity tick", [this, &world, &region] { tickEntities(world, region); });
+            // parity: `entityInside` is part of the entity's own turn, so it reads where the entity
+            // has just moved to. Asking before that pass read the square of the turn before, which a
+            // dropped item hides (they move first of all) and an arrow does not: a tick late.
+            step("Pressure plate tick", [this, &world, &region] { redstone_->tickPressurePlates(world, region); });
+            step("Arrow button tick", [this, &world, &region] { redstone_->tickArrowButtons(world, region); });
+            step("Tripwire tick", [this, &world, &region] { redstone_->tickTripwires(world, region); });
+            // parity: `ServerLevel.tick` leaves `tickBlockEntities` for the **end**, after the
+            // entities. A hopper minecart parked over a hopper is the visible half: the cart takes
+            // the item on its own turn and the hopper below it can already take it that same tick.
+            step("Block entity tick", [this, &world, &region] { redstone_->tickBlockEntities(world, region); });
             step("Mob spawning", [this, &world, &region] { spawning_->tickSpawning(world, region); });
             if (region.isPrimary()) {
                 step("Effect tick", [this, &world] { statusEffects_->tickEffects(world); });

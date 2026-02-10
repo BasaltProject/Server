@@ -388,13 +388,15 @@ TEST_CASE("a dispenser is asked about the change and about every face of it") {
     std::vector<BlockChange> effects;
     neighbourUpdates::afterChange(context, 8, 64, 8, std::nullopt, effects, {});
 
+    // parity: `NeighborUpdater.UPDATE_ORDER`, west, east, down, up, north and south, and the square
+    // itself at the end.
     REQUIRE(asked.size() == 7);
-    CHECK(asked[0] == std::array<std::int32_t, 3>{8, 63, 8});
-    CHECK(asked[1] == std::array<std::int32_t, 3>{8, 65, 8});
-    CHECK(asked[2] == std::array<std::int32_t, 3>{8, 64, 7});
-    CHECK(asked[3] == std::array<std::int32_t, 3>{8, 64, 9});
-    CHECK(asked[4] == std::array<std::int32_t, 3>{7, 64, 8});
-    CHECK(asked[5] == std::array<std::int32_t, 3>{9, 64, 8});
+    CHECK(asked[0] == std::array<std::int32_t, 3>{7, 64, 8});
+    CHECK(asked[1] == std::array<std::int32_t, 3>{9, 64, 8});
+    CHECK(asked[2] == std::array<std::int32_t, 3>{8, 63, 8});
+    CHECK(asked[3] == std::array<std::int32_t, 3>{8, 65, 8});
+    CHECK(asked[4] == std::array<std::int32_t, 3>{8, 64, 7});
+    CHECK(asked[5] == std::array<std::int32_t, 3>{8, 64, 9});
     CHECK(asked[6] == std::array<std::int32_t, 3>{8, 64, 8});
 }
 
