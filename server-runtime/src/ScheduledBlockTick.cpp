@@ -25,6 +25,7 @@
 #include <basalt/server/runtime/world/Pistons.hpp>
 #include <basalt/server/runtime/world/PressurePlates.hpp>
 #include <basalt/server/runtime/world/ProjectileHits.hpp>
+#include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
@@ -268,7 +269,13 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                      [this](server::world::crafting::Cooker cooker, const server::world::loot::ItemStack& stack) {
                          return recipes_ == nullptr ? nullptr : recipes_->cookingFor(cooker, stack);
                      },
-                 .gameTime = world.gameTime()});
+                 .gameTime = world.gameTime(),
+                 .convertsToMud =
+                     [this](const wire::common::Identifier& block) {
+                         return options_.blockTags != nullptr &&
+                                world::realBlockTags::contains(*options_.blockTags, "minecraft:convertable_to_mud",
+                                                               block);
+                     }});
             if (!result.effects.empty()) {
                 broadcaster_->sendEffects(watchers, x, y, z, world.state().blockState(x, y, z).value_or(0),
                                           result.effects);

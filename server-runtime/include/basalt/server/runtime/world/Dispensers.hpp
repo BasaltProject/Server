@@ -52,6 +52,9 @@ struct Hooks {
     /// parity: the bucket entries of `DispenseItemBehavior`, which raise `FLUID_PLACE` and
     /// `FLUID_PICKUP`. A vibration is booked for the turn it arrives, so the turn has to be known.
     std::int64_t gameTime = 0;
+    /// parity: `BlockTags.CONVERTABLE_TO_MUD`, which a dispensed water bottle asks. The tag is the
+    /// datapack's, so the caller answers it.
+    std::function<bool(const wire::common::Identifier& block)> convertsToMud;
 };
 
 /// What a turn did: whether anything went out, and what the clients should hear about it.
