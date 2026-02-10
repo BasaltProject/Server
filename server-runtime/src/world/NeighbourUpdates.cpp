@@ -424,7 +424,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
                 registry::blockStateDefinitions::propertiesOf(*arrived);
             const auto state = properties.find("potent_sulfur_state");
             if (state != properties.end() && (state->second == "erupting" || state->second == "continuous") &&
-                world.hasSculkSensorNear(x, y, z, vibrations::kRange)) {
+                world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
                 vibrations::emit(world, "block_activate", x + 0.5, y + 0.5, z + 0.5, context.gameTime);
             }
         }

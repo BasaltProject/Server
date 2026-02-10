@@ -131,7 +131,7 @@ TEST_CASE("powering a shelf joins it to the ones beside it, up to three") {
     REQUIRE(world.setBlockState(8, 65, 8, registry::blocks::named("redstone_block")->stateId));
     std::vector<BlockChange> changes;
 
-    shelves::reactToSignal(world, "overworld", 8, 64, 8, changes);
+    shelves::reactToSignal(world, "overworld", 8, 64, 8, 0, changes);
 
     REQUIRE_FALSE(changes.empty());
     CHECK(soundOf(changes[0].effects) == "block.shelf.activate");
@@ -139,9 +139,9 @@ TEST_CASE("powering a shelf joins it to the ones beside it, up to three") {
 
     // Now the two beside it, which join onto the chain.
     REQUIRE(world.setBlockState(7, 65, 8, registry::blocks::named("redstone_block")->stateId));
-    shelves::reactToSignal(world, "overworld", 7, 64, 8, changes);
+    shelves::reactToSignal(world, "overworld", 7, 64, 8, 0, changes);
     REQUIRE(world.setBlockState(9, 65, 8, registry::blocks::named("redstone_block")->stateId));
-    shelves::reactToSignal(world, "overworld", 9, 64, 8, changes);
+    shelves::reactToSignal(world, "overworld", 9, 64, 8, 0, changes);
 
     const std::vector<shelves::Position> chain = shelves::chainAt(world, 8, 64, 8);
     CHECK(chain.size() == 3);
@@ -162,7 +162,7 @@ TEST_CASE("a chain lies along the shelf's own sides, whichever way it looks") {
             const std::int32_t z = 8 + (dz * step);
             REQUIRE(world.setBlockState(x, 64, z, shelf(facing, "false", "unconnected")));
             REQUIRE(world.setBlockState(x, 65, z, registry::blocks::named("redstone_block")->stateId));
-            shelves::reactToSignal(world, "overworld", x, 64, z, changes);
+            shelves::reactToSignal(world, "overworld", x, 64, z, 0, changes);
         }
         const std::vector<shelves::Position> chain = shelves::chainAt(world, 8, 64, 8);
         return chain.size() == 2 && chain.front() == shelves::Position{8 + dx, 64, 8 + dz};
@@ -185,7 +185,7 @@ TEST_CASE("a fourth shelf does not join a chain of three") {
     }
     // Powered from the east end westwards, so the fourth one is the last to ask.
     for (std::int32_t x = 9; x >= 6; --x) {
-        shelves::reactToSignal(world, "overworld", x, 64, 8, changes);
+        shelves::reactToSignal(world, "overworld", x, 64, 8, 0, changes);
     }
 
     CHECK(shelves::chainAt(world, 9, 64, 8).size() == 3);
@@ -202,10 +202,10 @@ TEST_CASE("joining a chain says which blocks changed") {
         REQUIRE(world.setBlockState(x, 64, 8, shelf("north", "false", "unconnected")));
         REQUIRE(world.setBlockState(x, 65, 8, registry::blocks::named("redstone_block")->stateId));
     }
-    shelves::reactToSignal(world, "overworld", 7, 64, 8, changes);
+    shelves::reactToSignal(world, "overworld", 7, 64, 8, 0, changes);
     changes.clear();
 
-    shelves::reactToSignal(world, "overworld", 8, 64, 8, changes);
+    shelves::reactToSignal(world, "overworld", 8, 64, 8, 0, changes);
 
     // The shelf itself, and the one it joined onto.
     std::set<std::pair<std::int32_t, std::int32_t>> touched;
@@ -227,13 +227,13 @@ TEST_CASE("a shelf that loses its signal leaves the chain") {
         REQUIRE(world.setBlockState(x, 65, 8, registry::blocks::named("redstone_block")->stateId));
     }
     std::vector<BlockChange> changes;
-    shelves::reactToSignal(world, "overworld", 7, 64, 8, changes);
-    shelves::reactToSignal(world, "overworld", 8, 64, 8, changes);
+    shelves::reactToSignal(world, "overworld", 7, 64, 8, 0, changes);
+    shelves::reactToSignal(world, "overworld", 8, 64, 8, 0, changes);
     REQUIRE(shelves::chainAt(world, 8, 64, 8).size() == 2);
 
     REQUIRE(world.setBlockState(8, 65, 8, registry::blocks::air().stateId));
     changes.clear();
-    shelves::reactToSignal(world, "overworld", 8, 64, 8, changes);
+    shelves::reactToSignal(world, "overworld", 8, 64, 8, 0, changes);
 
     REQUIRE_FALSE(changes.empty());
     CHECK(soundOf(changes[0].effects) == "block.shelf.deactivate");
@@ -285,7 +285,7 @@ TEST_CASE("a chain of three swaps the whole hotbar, in the order it lies") {
         REQUIRE(world.setBlockState(x, 65, 8, registry::blocks::named("redstone_block")->stateId));
     }
     for (std::int32_t x = 9; x >= 7; --x) {
-        shelves::reactToSignal(world, "overworld", x, 64, 8, changes);
+        shelves::reactToSignal(world, "overworld", x, 64, 8, 0, changes);
     }
     REQUIRE(shelves::chainAt(world, 8, 64, 8).size() == 3);
     blockInventory::Slots hotbar(9);

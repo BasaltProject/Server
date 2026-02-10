@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/world/PressurePlates.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
 #include <algorithm>
@@ -78,7 +79,7 @@ constexpr std::int32_t kMaxSignal = 15;
 bool isPlate(std::int32_t stateId) { return plateAt(stateId) != nullptr; }
 
 std::optional<BlockChange> update(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Trigger from,
-                                  std::int32_t standing) {
+                                  std::int32_t standing, const std::int64_t gameTime) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return std::nullopt;
@@ -109,6 +110,12 @@ std::optional<BlockChange> update(WorldState& world, std::int32_t x, std::int32_
         registry::blockStateDefinitions::stateIdOf(*block, stateProperties(path, wanted), *stateId);
     if (!turned.has_value() || !world.setBlockState(x, y, z, *turned)) {
         return std::nullopt;
+    }
+    // parity: `checkPressed` raises the event only when the plate goes from off to on or back, not
+    // every time a weighted plate's count moves.
+    if ((wanted > 0) != (showing > 0) && world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
+        vibrations::emit(world, wanted > 0 ? "block_activate" : "block_deactivate", static_cast<double>(x) + 0.5,
+                         static_cast<double>(y) + 0.5, static_cast<double>(z) + 0.5, gameTime);
     }
     return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};
 }

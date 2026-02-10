@@ -62,8 +62,11 @@ struct Hooks {
 ///
 /// `random` is the world's own, needed by the one block entity that rolls for anything: a hopper
 /// feeding a composter. Required rather than defaulted, so a new caller cannot forget it.
+///
+/// `gameTime` is the world's turn counter, not the clock's time of day: a hopper filling a shelf
+/// raises a game event, and a vibration is booked for the turn it arrives.
 [[nodiscard]] std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, const WorldClock& clock,
-                                            const WorldWeather& weather,
+                                            const WorldWeather& weather, std::int64_t gameTime,
                                             const std::vector<std::array<std::int32_t, 2>>& chunks,
                                             random::RandomSource& random, const Hooks& hooks = {},
                                             bool hasSkylight = true);

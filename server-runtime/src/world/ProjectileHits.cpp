@@ -179,7 +179,7 @@ std::optional<BlockChange> onHit(WorldState& world, std::int64_t gameTime, const
         if (!properBellHit(properties, hit)) {
             return std::nullopt;
         }
-        if (world.hasSculkSensorNear(hit.blockX, hit.blockY, hit.blockZ, vibrations::kRange)) {
+        if (world.hasSculkSensorNear(hit.blockX, hit.blockY, hit.blockZ, vibrations::kCalibratedRange)) {
             vibrations::emit(world, "block_change", hit.blockX + 0.5, hit.blockY + 0.5, hit.blockZ + 0.5, gameTime);
         }
         return BlockChange{hit.blockX, hit.blockY, hit.blockZ, *stateId, {}};

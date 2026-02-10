@@ -19,6 +19,7 @@
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/RespawnAnchors.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/Waxing.hpp>
 
 #include <cstdint>
@@ -247,6 +248,17 @@ struct Special {
     bool refused = false;
 };
 
+/// parity: `Level.gameEvent(null, event, pos)` from a dispenser's behaviour, sent from the middle of
+/// the square it acted on. The tracker is asked first because most turns have nothing listening.
+void heard(WorldState& world, const std::string_view event, const std::int32_t x, const std::int32_t y,
+           const std::int32_t z, const std::int64_t gameTime) {
+    if (!world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
+        return;
+    }
+    vibrations::emit(world, event, static_cast<double>(x) + 0.5, static_cast<double>(y) + 0.5,
+                     static_cast<double>(z) + 0.5, gameTime);
+}
+
 /// The block-changing behaviours: a full bucket pours, an empty one fills, and flint and steel
 /// lights a fire.
 ///
@@ -263,6 +275,10 @@ struct Special {
         if (!result.has_value()) {
             return {};
         }
+        // parity: the filled bucket raises `FLUID_PLACE` from `playEmptySound` and the empty one
+        // raises `FLUID_PICKUP`, both at the square in front rather than at the dispenser.
+        heard(context.world, stack.item.path() == "bucket" ? "fluid_pickup" : "fluid_place", tx, ty, tz,
+              hooks.gameTime);
         // parity: `consumeWithRemainder`, which puts what the bucket became back in the slot.
         const std::optional<ItemStack> left = minusOne(stack);
         if (left.has_value()) {
@@ -310,6 +326,8 @@ struct Special {
         if (!charged.has_value()) {
             return Special{.refused = true};
         }
+        // parity: `RespawnAnchorBlock.charge` raises `BLOCK_CHANGE` beside the sound.
+        heard(context.world, "block_change", tx, ty, tz, hooks.gameTime);
         return Special{.handled = true, .left = minusOne(stack), .change = charged};
     }
     // parity: the honeycomb entry, which waxes the block in front. Not being waxable is a plain
@@ -334,11 +352,13 @@ struct Special {
         if (fires::ignite(context.world, tx, ty, tz, context.random)) {
             const std::optional<std::int32_t> fire = context.world.blockState(tx, ty, tz);
             change = BlockChange{.x = tx, .y = ty, .z = tz, .stateId = fire.value_or(0)};
+            heard(context.world, "block_place", tx, ty, tz, hooks.gameTime);
         } else if (target.has_value() && lightable(*target)) {
             const std::optional<std::int32_t> lit = registry::blockStateDefinitions::stateIdOf(
                 *registry::blockStateDefinitions::blockOf(*target), {{"lit", "true"}}, *target);
             if (lit.has_value() && context.world.setBlockState(tx, ty, tz, *lit)) {
                 change = BlockChange{.x = tx, .y = ty, .z = tz, .stateId = *lit};
+                heard(context.world, "block_change", tx, ty, tz, hooks.gameTime);
             }
         } else if (target.has_value() && isTntBlock(*target)) {
             // parity: `TntBlock.prime` then `removeBlock`, and with `tnt_explodes` off the block
@@ -365,6 +385,7 @@ struct Special {
             return Special{.refused = true};
         }
         popHoneycombs(context, tx, ty, tz, hooks);
+        heard(context.world, "shear", tx, ty, tz, hooks.gameTime);
         return Special{.handled = true,
                        .left = wornOnce(stack, context.random),
                        .change = BlockChange{.x = tx, .y = ty, .z = tz, .stateId = *emptied}};
@@ -551,7 +572,8 @@ std::optional<BlockChange> onNeighbourChange(WorldState& world, std::string_view
         return std::nullopt;
     }
     if (signal) {
-        world.scheduleBlockTick(x, y, z, tickType(), kDelay);
+        // The turn goes under the block's own name: a dropper's is `minecraft:dropper`.
+        world.scheduleBlockTick(x, y, z, *block, kDelay);
     }
     const std::optional<std::int32_t> turned =
         registry::blockStateDefinitions::stateIdOf(*block, {{"triggered", signal ? "true" : "false"}}, *stateId);
@@ -580,8 +602,11 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
     blockInventory::Slots slots = blockInventory::read(blockEntity->data(), kSize);
     const std::optional<std::size_t> slot = randomFullSlot(slots, context.random);
     if (!slot.has_value()) {
-        // parity: `DispenserBlock.dispenseFrom`, which clicks at nothing when it is empty.
+        // parity: `DispenserBlock.dispenseFrom`, which clicks at nothing when it is empty. That
+        // click is the only noise the dispenser itself makes: a turn that dispenses something makes
+        // whatever noise the behaviour makes, and none of its own.
         result.effects.emplace_back(blockEffect::Effect{.type = blockEffect::Effect::kDispenserFail, .data = 0});
+        heard(world, "block_activate", x, y, z, hooks.gameTime);
         return result;
     }
     const std::optional<BlockFace> out = faceOf(propertyOf(*stateId, "facing"));

@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
+#include <basalt/server/runtime/world/Shelves.hpp>
 
 #include <algorithm>
 #include <charconv>
@@ -270,6 +271,8 @@ writeContainer(const CommandContext& context, const std::array<std::int32_t, 3>&
         static_cast<void>(world::chiseledBookshelves::slotsChanged(
             (*world)->state(), at[0], at[1], at[2], written.empty() ? -1 : written.back().first, (*world)->gameTime()));
     }
+    // parity: `ShelfBlockEntity.setChanged()`, which a write by command runs like any other.
+    world::shelves::slotsChanged((*world)->state(), at[0], at[1], at[2], (*world)->gameTime());
     if (tells) {
         world::redstoneComponents::scheduleComparatorsAround((*world)->state(), (*world)->name(), at[0], at[1], at[2],
                                                              world::comparatorReading::of((*world)->state()));

@@ -13,6 +13,8 @@
 #include <basalt/server/runtime/world/Hoppers.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
+#include <basalt/server/runtime/world/Shelves.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
 #include <algorithm>
@@ -253,6 +255,8 @@ void add(Slots& slots, const ItemStack& stack) {
         }
         world.chunkIfLoaded(target.x >> 4, target.z >> 4)->markDirty();
         if (target.isBlock) {
+            // parity: `tryMoveInItem` ends in `setChanged`, and a shelf's raises `BLOCK_ACTIVATE`.
+            shelves::slotsChanged(world, target.x, target.y, target.z, around.gameTime);
             redstoneComponents::scheduleComparatorsAround(world, {}, target.x, target.y, target.z,
                                                           comparatorReading::of(world));
         }
@@ -278,7 +282,7 @@ void add(Slots& slots, const ItemStack& stack) {
 /// something compostable, only through the **top** face and only while there is room. Putting the
 /// item in composts it there and then: `setChanged` is what calls `addItem`.
 [[nodiscard]] bool compost(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, registry::BlockFace face,
-                           Slots& slots, random::RandomSource& random) {
+                           Slots& slots, random::RandomSource& random, const std::int64_t gameTime) {
     if (face != registry::BlockFace::Up || !composters::levelAt(world, x, y, z).has_value()) {
         return false;
     }
@@ -288,7 +292,13 @@ void add(Slots& slots, const ItemStack& stack) {
         }
         // The roll can fail and the item is eaten anyway: `InputContainer.setChanged` shrinks the
         // stack whatever `addItem` answered.
-        static_cast<void>(composters::addItem(world, x, y, z, slot->item, random));
+        // parity: `ComposterBlock.addItem` raises `BLOCK_CHANGE`, and only when the level really
+        // rose: a roll that fails is silent.
+        if (composters::addItem(world, x, y, z, slot->item, random).has_value() &&
+            world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
+            vibrations::emit(world, "block_change", static_cast<double>(x) + 0.5, static_cast<double>(y) + 0.5,
+                             static_cast<double>(z) + 0.5, gameTime);
+        }
         slot = minusOne(*slot);
         redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
         return true;
@@ -298,7 +308,8 @@ void add(Slots& slots, const ItemStack& stack) {
 
 /// parity: `ComposterBlock.OutputContainer`, the bone meal of a composter that is ready, given out
 /// through the **bottom** face only, and taking it empties the composter.
-[[nodiscard]] bool takeCompost(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots) {
+[[nodiscard]] bool takeCompost(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, Slots& slots,
+                               const std::int64_t gameTime) {
     if (composters::levelAt(world, x, y, z) != composters::kReady) {
         return false;
     }
@@ -309,6 +320,11 @@ void add(Slots& slots, const ItemStack& stack) {
     }
     if (!composters::empty(world, x, y, z).has_value()) {
         return false;
+    }
+    // parity: `ComposterBlock.empty` raises `BLOCK_CHANGE` too, so emptying one is heard.
+    if (world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
+        vibrations::emit(world, "block_change", static_cast<double>(x) + 0.5, static_cast<double>(y) + 0.5,
+                         static_cast<double>(z) + 0.5, gameTime);
     }
     add(slots, given);
     redstoneComponents::scheduleComparatorsAround(world, {}, x, y, z, comparatorReading::of(world));
@@ -444,7 +460,7 @@ void noteChange(const Around& around, const BlockChange& change) {
     const std::int32_t tx = x + registry::stepX(out);
     const std::int32_t ty = y + registry::stepY(out);
     const std::int32_t tz = z + registry::stepZ(out);
-    if (compost(world, tx, ty, tz, registry::opposite(out), slots, random) ||
+    if (compost(world, tx, ty, tz, registry::opposite(out), slots, random, around.gameTime) ||
         loadJukebox(world, tx, ty, tz, slots, around) || shelveBook(world, tx, ty, tz, slots, around)) {
         return true;
     }
@@ -466,7 +482,7 @@ void noteChange(const Around& around, const BlockChange& change) {
 }
 
 /// parity: `suckInItems` for the container half: one item out of whatever sits on top.
-[[nodiscard]] bool pullFrom(WorldState& world, const Container& above, Slots& slots) {
+[[nodiscard]] bool pullFrom(WorldState& world, const Container& above, Slots& slots, const std::int64_t gameTime) {
     Slots source = blockInventory::readFor(above.path, *above.data, above.size);
     const std::vector<std::int32_t> takeable = slotsFor(above.path, above.size, registry::BlockFace::Down);
     for (const std::int32_t slot : takeable) {
@@ -486,6 +502,7 @@ void noteChange(const Around& around, const BlockChange& change) {
         *stack = minusOne(**stack);
         blockInventory::writeFor(above.path, *above.data, source);
         if (above.isBlock) {
+            shelves::slotsChanged(world, above.x, above.y, above.z, gameTime);
             redstoneComponents::scheduleComparatorsAround(world, {}, above.x, above.y, above.z,
                                                           comparatorReading::of(world));
         }
@@ -586,9 +603,10 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, ran
         // parity: `suckInItems` looks at what is lying above only when there is no container there,
         // and a composter that is ready **is** one: its bone meal comes out downwards.
         const std::optional<Container> above = containerAt(world, x, y + 1, z);
-        const bool taken = takeCompost(world, x, y + 1, z, slots) || takeDisc(world, x, y + 1, z, slots, around) ||
-                           unshelveBook(world, x, y + 1, z, slots, around) ||
-                           (above.has_value() ? pullFrom(world, *above, slots) : suckIn(world, x, y, z, slots));
+        const bool taken =
+            takeCompost(world, x, y + 1, z, slots, around.gameTime) || takeDisc(world, x, y + 1, z, slots, around) ||
+            unshelveBook(world, x, y + 1, z, slots, around) ||
+            (above.has_value() ? pullFrom(world, *above, slots, around.gameTime) : suckIn(world, x, y, z, slots));
         moved = taken || moved;
     }
     if (!moved) {
@@ -600,7 +618,7 @@ bool tick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, ran
     return true;
 }
 
-bool tickCart(WorldState& world, entity::ServerEntity& cart) {
+bool tickCart(WorldState& world, entity::ServerEntity& cart, const std::int64_t gameTime) {
     if (cart.removed || !cart.sourceNbt.has_value() || cart.type().path() != "hopper_minecart") {
         return false;
     }
@@ -616,7 +634,7 @@ bool tickCart(WorldState& world, entity::ServerEntity& cart) {
     const double levelY = cart.y + kCartLevelRise;
     const std::optional<Container> above = containerAtPoint(world, cart.x, levelY + 1.0, cart.z);
     // parity: a cart's `isGridAligned` is false, so a full block over it never blocks the suck.
-    bool took = above.has_value() ? pullFrom(world, *above, slots)
+    bool took = above.has_value() ? pullFrom(world, *above, slots, gameTime)
                                   : suckInBox(world, cart.x - 0.5, levelY - 0.5 + kSuckBottom, cart.z - 0.5,
                                               cart.x + 0.5, levelY - 0.5 + kSuckTop, cart.z + 0.5, slots);
     if (!took) {

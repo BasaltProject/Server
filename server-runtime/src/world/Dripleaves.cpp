@@ -61,7 +61,7 @@ std::optional<BlockChange> setTilt(WorldState& world, std::int32_t x, std::int32
     if (was == tilt) {
         return std::nullopt;
     }
-    if (causesVibration(tilt) && world.hasSculkSensorNear(x, y, z, vibrations::kRange)) {
+    if (causesVibration(tilt) && world.hasSculkSensorNear(x, y, z, vibrations::kCalibratedRange)) {
         vibrations::emit(world, "block_change", x + 0.5, y + 0.5, z + 0.5, gameTime);
     }
     return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};

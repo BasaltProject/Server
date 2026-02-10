@@ -49,6 +49,9 @@ struct Hooks {
     std::function<const server::world::crafting::Recipe*(server::world::crafting::Cooker,
                                                          const server::world::loot::ItemStack&)>
         recipeFor;
+    /// parity: the bucket entries of `DispenseItemBehavior`, which raise `FLUID_PLACE` and
+    /// `FLUID_PICKUP`. A vibration is booked for the turn it arrives, so the turn has to be known.
+    std::int64_t gameTime = 0;
 };
 
 /// What a turn did: whether anything went out, and what the clients should hear about it.

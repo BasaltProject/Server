@@ -108,6 +108,11 @@ constexpr std::array<registry::BlockFace, 6> kFaces{registry::BlockFace::Down,  
     return block == calibrated() ? kCalibratedRange : kRange;
 }
 
+/// parity: `getActiveTicks`, overridden by the calibrated sensor and by nothing else.
+[[nodiscard]] std::int32_t activeTicksOf(const wire::common::Identifier& block) {
+    return block == calibrated() ? kCalibratedActiveTicks : kActiveTicks;
+}
+
 [[nodiscard]] bool isSensor(const wire::common::Identifier& block) {
     return block == sensor() || block == calibrated();
 }
@@ -196,7 +201,7 @@ struct Noise {
     if (wire::nbt::NbtCompound* data = dataOf(world, x, y, z, block); data != nullptr) {
         data->putInt(kFrequencyKey, frequency);
     }
-    world.scheduleBlockTick(x, y, z, block, kActiveTicks);
+    world.scheduleBlockTick(x, y, z, block, activeTicksOf(block));
     // parity: `SculkSensorBlock.tryResonateVibration`. An amethyst block touching a sensor that has
     // just fired sends the same frequency out again from its own square, and it does it for **every**
     // side that has one: the loop has no `break`. That is how a sculk farm carries a reading past the

@@ -560,6 +560,12 @@ void BlockInteractionHandler::useShelf(PlayerSession& session, const play::Block
                                                                                  .count = result->removed->count}}
                                         : std::nullopt);
     owner_->sendInventorySlot(heldSlot);
+    // parity: `swapSingleItem` ends in `setChanged(ITEM_INTERACT_FINISH)`. Its one exception, an item
+    // whose `use_effects` asks for silence, is a component this server does not carry yet.
+    if (world->state().hasSculkSensorNear(hit.pos.x, hit.pos.y, hit.pos.z, world::vibrations::kCalibratedRange)) {
+        world::vibrations::emit(world->state(), "item_interact_finish", hit.pos.x + 0.5, hit.pos.y + 0.5,
+                                hit.pos.z + 0.5, world->gameTime());
+    }
     broadcastEffects(hit.pos, *stateId, result->effects);
 }
 
@@ -589,6 +595,14 @@ void BlockInteractionHandler::swapHotbarWithShelf(PlayerSession& session, const 
                                                 : std::nullopt);
     }
     owner_->sendInventoryAll();
+    // parity: `swapHotbar` calls `setChanged(ENTITY_INTERACT)` on every shelf of the chain, and each
+    // one is a noise of its own.
+    for (const world::shelves::Position& part : world::shelves::chainAt(world->state(), pos.x, pos.y, pos.z)) {
+        if (world->state().hasSculkSensorNear(part[0], part[1], part[2], world::vibrations::kCalibratedRange)) {
+            world::vibrations::emit(world->state(), "entity_interact", part[0] + 0.5, part[1] + 0.5, part[2] + 0.5,
+                                    world->gameTime());
+        }
+    }
     broadcastEffects(
         pos, stateId,
         {world::blockEffect::Sound{
@@ -773,7 +787,7 @@ void BlockInteractionHandler::useBucketOn(PlayerSession& session, const Identifi
     // an empty bucket is the one that picks up.
     if (!result->changes.empty()) {
         const world::FluidChange& at = result->changes.front();
-        if (world->state().hasSculkSensorNear(at.x, at.y, at.z, world::vibrations::kRange)) {
+        if (world->state().hasSculkSensorNear(at.x, at.y, at.z, world::vibrations::kCalibratedRange)) {
             world::vibrations::emit(world->state(), item.path() == "bucket" ? "fluid_pickup" : "fluid_place",
                                     at.x + 0.5, at.y + 0.5, at.z + 0.5, world->gameTime());
         }
@@ -829,7 +843,9 @@ void BlockInteractionHandler::toggleBlock(const BlockPos& pos) {
     // something touches it again.
     const std::optional<std::int32_t> pressed = world::blockInteractions::pressedTicks(before.value_or(0));
     if (pressed.has_value()) {
-        world->state().scheduleBlockTick(pos.x, pos.y, pos.z, Identifier::vanilla("button"), *pressed);
+        if (const Identifier* button = reg::blockStateDefinitions::blockOf(before.value_or(0)); button != nullptr) {
+            world->state().scheduleBlockTick(pos.x, pos.y, pos.z, *button, *pressed);
+        }
     }
     for (const world::BlockChange& change : toggled->changes) {
         broadcastBlockUpdate(BlockPos{change.x, change.y, change.z}, change.stateId);

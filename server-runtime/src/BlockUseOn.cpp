@@ -770,7 +770,7 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
     // an empty bucket is the one that picks up.
     if (!result->changes.empty()) {
         const world::FluidChange& at = result->changes.front();
-        if (world->state().hasSculkSensorNear(at.x, at.y, at.z, world::vibrations::kRange)) {
+        if (world->state().hasSculkSensorNear(at.x, at.y, at.z, world::vibrations::kCalibratedRange)) {
             world::vibrations::emit(world->state(), item->path() == "bucket" ? "fluid_pickup" : "fluid_place",
                                     at.x + 0.5, at.y + 0.5, at.z + 0.5, world->gameTime());
         }
