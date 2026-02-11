@@ -6,6 +6,9 @@
 namespace basalt::server::runtime::world::decoratedPots {
 namespace {
 
+/// parity: `PotDecorations` is four sides, back, left, right and front.
+constexpr std::size_t kSides = 4;
+
 /// parity: `DecoratedPotBlockEntity.WobbleStyle`, which travels as the second byte.
 constexpr std::int32_t kWobblePositive = 0;
 constexpr std::int32_t kWobbleNegative = 1;
@@ -42,6 +45,27 @@ std::optional<std::vector<BlockEffect>> insert(wire::nbt::NbtCompound& data, con
                                                        .source = wire::protocol::play::SoundSource::Blocks,
                                                        .volume = 1.0F,
                                                        .pitch = 0.7F + (0.5F * bend)}};
+}
+
+std::vector<server::world::loot::ItemStack> sherds(const wire::nbt::NbtCompound& data) {
+    static const wire::common::Identifier brick = wire::common::Identifier::vanilla("brick");
+    const wire::nbt::NbtList* stored = data.getList("sherds");
+    std::vector<server::world::loot::ItemStack> out;
+    out.reserve(kSides);
+    for (std::size_t index = 0; index < kSides; ++index) {
+        wire::common::Identifier side = brick;
+        if (stored != nullptr && index < stored->size()) {
+            if (const std::string* name = (*stored)[index].get<std::string>(); name != nullptr) {
+                if (const std::expected<wire::common::Identifier, wire::common::IdentifierError> parsed =
+                        wire::common::Identifier::parse(*name);
+                    parsed.has_value()) {
+                    side = *parsed;
+                }
+            }
+        }
+        out.push_back(server::world::loot::ItemStack{.item = side, .count = 1});
+    }
+    return out;
 }
 
 std::vector<BlockEffect> rebuff() {

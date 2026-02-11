@@ -3,6 +3,7 @@
 
 #include <charconv>
 #include <cstdint>
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -208,6 +209,40 @@ Parsed<LootCondition> parseCondition(const JsonObject& condition) {
         return *type == "minecraft:any_of" ? LootCondition::anyOf(std::move(*terms))
                                            : LootCondition::allOf(std::move(*terms));
     }
+    // parity: `LootItemBlockStatePropertyCondition`. Every value in a block table is an exact string
+    // (checked against all 1113 of them), so the range form of a state predicate is a gap.
+    if (*type == "minecraft:block_state_property") {
+        const JsonObject* properties = asObject(condition.find("properties"));
+        if (properties == nullptr) {
+            return std::unexpected(missing("block state properties"));
+        }
+        std::map<std::string, std::string> expected;
+        for (std::size_t index = 0; index < properties->names().size(); ++index) {
+            const std::optional<std::string> value = asString(&properties->values()[index]);
+            if (!value.has_value()) {
+                return std::unexpected(missing("block state property value"));
+            }
+            expected.emplace(properties->names()[index], *value);
+        }
+        return LootCondition::blockStateProperty(std::move(expected));
+    }
+    // parity: `LocationCheck`, which this evaluator answers true to; see `LootCondition::test`.
+    if (*type == "minecraft:location_check") {
+        return LootCondition::locationCheck();
+    }
+    // parity: `BonusLevelTableCondition`, whose chance is the entry of its table for the enchantment
+    // level of the tool. No tool reaches here, so the level is zero and the first entry is the one.
+    if (*type == "minecraft:table_bonus") {
+        const std::vector<JsonValue>* chances = asArray(condition.find("chances"));
+        if (chances == nullptr || chances->empty()) {
+            return std::unexpected(missing("table bonus chances"));
+        }
+        const std::optional<double> first = asNumber(&chances->front());
+        if (!first.has_value()) {
+            return std::unexpected(missing("table bonus chance"));
+        }
+        return LootCondition::randomChance(NumberProvider::constant(static_cast<float>(*first)));
+    }
     if (*type == "minecraft:random_chance_with_enchanted_bonus") {
         const std::optional<double> chance = asNumber(condition.find("unenchanted_chance"));
         return LootCondition::randomChanceWithEnchantedBonus(static_cast<float>(chance.value_or(0.0)));
@@ -221,6 +256,18 @@ Parsed<LootFunction> parseFunction(const JsonObject& function) {
     if (!type.has_value()) {
         return std::unexpected(missing("loot function type"));
     }
+    // parity: every loot function is a `LootItemConditionalFunction`, so any of them can carry the
+    // conditions that decide whether it runs at all.
+    Parsed<std::vector<LootCondition>> gates = parseConditions(function.find("conditions"));
+    if (!gates.has_value()) {
+        return std::unexpected(gates.error());
+    }
+    const auto gated = [&gates](Parsed<LootFunction> parsed) {
+        if (parsed.has_value()) {
+            parsed->conditions = std::move(*gates);
+        }
+        return parsed;
+    };
     if (*type == "minecraft:set_count") {
         const JsonValue* count = function.find("count");
         if (count == nullptr) {
@@ -230,13 +277,13 @@ Parsed<LootFunction> parseFunction(const JsonObject& function) {
         if (!provider.has_value()) {
             return std::unexpected(provider.error());
         }
-        return LootFunction::setCount(std::move(*provider), asBool(function.find("add")).value_or(false));
+        return gated(LootFunction::setCount(std::move(*provider), asBool(function.find("add")).value_or(false)));
     }
     // parity: `furnace_smelt`, the cooked drop a mob killed by fire leaves, and the two that only
     // set a component: the item itself is right without them, so they are read and left alone.
     if (*type == "minecraft:furnace_smelt" || *type == "minecraft:set_potion" ||
         *type == "minecraft:set_ominous_bottle_amplifier") {
-        return LootFunction::furnaceSmelt();
+        return gated(LootFunction::furnaceSmelt());
     }
     // parity: `enchanted_count_increase`, the looting bonus every mob's table carries.
     if (*type == "minecraft:enchanted_count_increase") {
@@ -249,21 +296,43 @@ Parsed<LootFunction> parseFunction(const JsonObject& function) {
             return std::unexpected(provider.error());
         }
         const std::optional<double> limit = asNumber(function.find("limit"));
-        return LootFunction::enchantedCountIncrease(
+        return gated(LootFunction::enchantedCountIncrease(
             std::move(*provider),
-            limit.has_value() ? std::optional<std::int32_t>{static_cast<std::int32_t>(*limit)} : std::nullopt);
+            limit.has_value() ? std::optional<std::int32_t>{static_cast<std::int32_t>(*limit)} : std::nullopt));
     }
     // parity: `ApplyExplosionDecay`, which is what leaves a crater with only some of what it broke.
     // Refusing it left every table that carries it dropping nothing at all.
     if (*type == "minecraft:explosion_decay") {
-        return LootFunction::explosionDecay();
+        return gated(LootFunction::explosionDecay());
+    }
+    // parity: `ApplyBonusCount`, which needs the level of the enchantment on the tool that broke the
+    // block. There is none here, and at level zero all three of its formulas leave the count alone.
+    if (*type == "minecraft:apply_bonus") {
+        return gated(LootFunction::applyBonus());
+    }
+    // parity: `LimitCount`, `IntRange` with either end optional.
+    if (*type == "minecraft:limit_count") {
+        const JsonValue* limit = function.find("limit");
+        if (const std::optional<double> exact = asNumber(limit); exact.has_value()) {
+            const auto bound = static_cast<std::int32_t>(*exact);
+            return gated(LootFunction::limitCount(bound, bound));
+        }
+        const JsonObject* range = asObject(limit);
+        if (range == nullptr) {
+            return std::unexpected(missing("limit count range"));
+        }
+        const std::optional<double> least = asNumber(range->find("min"));
+        const std::optional<double> most = asNumber(range->find("max"));
+        return gated(LootFunction::limitCount(
+            least.has_value() ? std::optional{static_cast<std::int32_t>(*least)} : std::nullopt,
+            most.has_value() ? std::optional{static_cast<std::int32_t>(*most)} : std::nullopt));
     }
     // parity: the four that carry something off the block entity onto the stack. What they carry is
     // put on by the caller that knows the block, so the drop itself is right without them, and
     // refusing the whole table left the block dropping nothing.
     if (*type == "minecraft:copy_components" || *type == "minecraft:copy_custom_data" ||
         *type == "minecraft:copy_state" || *type == "minecraft:copy_name") {
-        return LootFunction::copyFromBlock();
+        return gated(LootFunction::copyFromBlock());
     }
     return std::unexpected(LootTableParseError{"Unsupported loot function type: " + *type});
 }
@@ -293,6 +362,24 @@ Parsed<LootEntry> parseEntry(const JsonObject& entry) {
         }
         LootEntry built;
         built.item = *item;
+        built.weight = static_cast<std::int32_t>(asNumber(entry.find("weight")).value_or(1.0));
+        built.quality = static_cast<std::int32_t>(asNumber(entry.find("quality")).value_or(0.0));
+        built.conditions = std::move(*conditions);
+        built.functions = std::move(*functions);
+        return built;
+    }
+    // parity: `DynamicLoot`, whose stacks the block itself provides under this name.
+    if (*type == "minecraft:dynamic") {
+        const std::optional<std::string> name = asString(entry.find("name"));
+        if (!name.has_value()) {
+            return std::unexpected(missing("dynamic drop name"));
+        }
+        Parsed<std::vector<LootFunction>> functions = parseFunctions(entry.find("functions"));
+        if (!functions.has_value()) {
+            return std::unexpected(functions.error());
+        }
+        LootEntry built;
+        built.dynamicName = *name;
         built.weight = static_cast<std::int32_t>(asNumber(entry.find("weight")).value_or(1.0));
         built.quality = static_cast<std::int32_t>(asNumber(entry.find("quality")).value_or(0.0));
         built.conditions = std::move(*conditions);

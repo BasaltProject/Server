@@ -161,6 +161,12 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
         const std::optional<BlockFace> facing = faceNamed(valueOf(stateId, "facing"));
         return facing.has_value() ? std::optional{only(*facing)} : std::nullopt;
     }
+    // parity: `CandleBlock` has a `canSurvive` and no `updateShape` that answers air, and nothing
+    // else takes it down either: its support is asked when one is placed and never again, so a candle
+    // whose block is taken from under it stays hanging. Measured in `caidos`, where the jar left it.
+    if (path.ends_with("candle") && !path.ends_with("candle_cake")) {
+        return std::uint8_t{0};
+    }
     // parity: `BellBlock`. Its support is a floor below, a ceiling above or, on a wall, the square its
     // own face points at, and a bell hung between two walls comes down from nothing at all: the test
     // reads `attachment != DOUBLE_WALL` before it asks whether the bell can stay.

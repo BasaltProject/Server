@@ -153,6 +153,12 @@ wire::nbt::NbtCompound of(const wire::common::Identifier& block, std::optional<s
         data.putInt("last_interacted_slot", -1);
         return data;
     }
+    // parity: `PotentSulfurBlockEntity.saveAdditional`, whose countdown is minus one until the
+    // geyser starts waiting: a dry block of sulfur still carries the field.
+    if (path == "potent_sulfur") {
+        data.putInt("countdown", -1);
+        return data;
+    }
     // parity: `ShelfBlockEntity.saveAdditional`, which writes how it lines its three items up even
     // for a shelf nobody has touched.
     if (shelves::isShelf(path)) {

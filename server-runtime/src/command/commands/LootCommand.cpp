@@ -1,6 +1,7 @@
 #include "ItemSlots.hpp"
 
 #include <basalt/server/random/RandomSource.hpp>
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/CommandTarget.hpp>
@@ -114,7 +115,8 @@ void LootCommand::build(const CommandNodeBuilder& root) const {
         }
         random::RandomSource random = random::RandomSource::legacy(
             worldSeed_() ^ ((static_cast<std::int64_t>(at[0]) << 32) | static_cast<std::uint32_t>(at[2])));
-        return stacksOf(table->generate(random));
+        const server::world::loot::LootContext block{.blockState = reg::blockStateDefinitions::propertiesOf(*stateId)};
+        return stacksOf(table->generate(random, 0.0F, std::nullopt, block));
     };
 
     const auto report = [](const CommandContext& context, const Stacks& stacks) {

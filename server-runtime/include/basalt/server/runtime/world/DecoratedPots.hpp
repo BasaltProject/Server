@@ -24,6 +24,9 @@ namespace decoratedPots {
 /// parity: `ContainerSingleItem`, which is exactly one slot.
 inline constexpr std::int32_t kSize = 1;
 
+/// parity: `DecoratedPotBlock.SHERDS_DYNAMIC_DROP_ID`, the name its loot table asks the block for.
+inline constexpr std::string_view kSherds = "minecraft:sherds";
+
 [[nodiscard]] const wire::common::Identifier& block();
 
 [[nodiscard]] bool isPot(std::string_view path);
@@ -38,6 +41,12 @@ inline constexpr std::int32_t kSize = 1;
 
 /// parity: `DecoratedPotBlock.useWithoutItem`, which is a wobble and a thud and nothing else.
 [[nodiscard]] std::vector<BlockEffect> rebuff();
+
+/// The four sherds a broken pot leaves, back, left, right and front in that order.
+///
+/// parity: `PotDecorations.ordered`, which answers a brick for every side nobody decorated, and
+/// `DecoratedPotBlock.getDrops`, which hands them to the `sherds` dynamic drop of its loot table.
+[[nodiscard]] std::vector<server::world::loot::ItemStack> sherds(const wire::nbt::NbtCompound& data);
 
 /// parity: `RandomizableContainer`, which a hopper empties one item at a time like any other.
 [[nodiscard]] std::optional<server::world::loot::ItemStack> takeOne(wire::nbt::NbtCompound& data);

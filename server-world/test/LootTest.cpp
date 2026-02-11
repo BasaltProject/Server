@@ -190,8 +190,8 @@ TEST_CASE("the loot tables roll what the frozen kotlin rolls") {
 
     SUBCASE("unknownCondition") {
         CHECK(refusal(R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:stone",
-               "conditions":[{"condition":"minecraft:table_bonus"}]}]}]})") ==
-              "Unsupported_loot_condition_type:_minecraft:table_bonus");
+               "conditions":[{"condition":"minecraft:enchantment_active_check"}]}]}]})") ==
+              "Unsupported_loot_condition_type:_minecraft:enchantment_active_check");
     }
 
     SUBCASE("unknownFunction") {
@@ -205,4 +205,82 @@ TEST_CASE("the loot tables roll what the frozen kotlin rolls") {
                {"type":"minecraft:item","name":"minecraft:stone"}]}]})") ==
               "Unsupported_number_provider_type:_minecraft:binomial");
     }
+}
+
+TEST_CASE("a block table rolls by the state of the block that broke") {
+    // parity: the shape every door, slab and bed table in the jar has.
+    const std::expected<LootTable, LootTableParseError> parsed = lootTableJson::parse(
+        R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:oak_door","conditions":[
+           {"condition":"minecraft:block_state_property","block":"minecraft:oak_door",
+            "properties":{"half":"lower"}}]}]}]})");
+    REQUIRE(parsed.has_value());
+
+    rng::RandomSource random = rng::RandomSource::legacy(1234);
+    const LootContext lower{.blockState = {{"facing", "east"}, {"half", "lower"}, {"open", "false"}}};
+    CHECK(parsed->generate(random, 0.0F, std::nullopt, lower).size() == 1);
+
+    const LootContext upper{.blockState = {{"facing", "east"}, {"half", "upper"}, {"open", "false"}}};
+    CHECK(parsed->generate(random, 0.0F, std::nullopt, upper).empty());
+
+    // A roll with no block behind it matches no state, which is what `/loot loot` on a table asks.
+    CHECK(parsed->generate(random).empty());
+}
+
+TEST_CASE("the rest of what a block table carries: a clamp, a fortune bonus and a chance table") {
+    rng::RandomSource random = rng::RandomSource::legacy(1234);
+
+    // parity: `LimitCount` clamps whatever the functions before it left.
+    const std::expected<LootTable, LootTableParseError> clamped = lootTableJson::parse(
+        R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:wheat","functions":[
+           {"function":"minecraft:set_count","count":9},
+           {"function":"minecraft:limit_count","limit":{"min":1,"max":3}}]}]}]})");
+    REQUIRE(clamped.has_value());
+    const std::vector<ItemStack> kept = clamped->generate(random);
+    REQUIRE(kept.size() == 1);
+    CHECK(kept.front().count == 3);
+
+    // parity: `ApplyBonusCount` at enchantment level zero, which is what a block broken with no tool
+    // gets: the count it was already given.
+    const std::expected<LootTable, LootTableParseError> bonus = lootTableJson::parse(
+        R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:redstone","functions":[
+           {"function":"minecraft:set_count","count":4},
+           {"function":"minecraft:apply_bonus","enchantment":"minecraft:fortune",
+            "formula":"minecraft:uniform_bonus_count","parameters":{"bonusMultiplier":1}}]}]}]})");
+    REQUIRE(bonus.has_value());
+    const std::vector<ItemStack> unchanged = bonus->generate(random);
+    REQUIRE(unchanged.size() == 1);
+    CHECK(unchanged.front().count == 4);
+
+    // parity: `BonusLevelTableCondition` reads its table at the level of the tool, which is zero.
+    const std::expected<LootTable, LootTableParseError> never = lootTableJson::parse(
+        R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:apple","conditions":[
+           {"condition":"minecraft:table_bonus","enchantment":"minecraft:fortune",
+            "chances":[0.0,1.0,1.0]}]}]}]})");
+    REQUIRE(never.has_value());
+    CHECK(never->generate(random).empty());
+}
+
+TEST_CASE("a function only runs when its own conditions pass") {
+    // parity: the candle table, three `set_count`s each gated on how many candles the block had.
+    const std::expected<LootTable, LootTableParseError> parsed = lootTableJson::parse(
+        R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:candle","functions":[
+           {"function":"minecraft:set_count","count":2,"conditions":[
+             {"condition":"minecraft:block_state_property","block":"minecraft:candle",
+              "properties":{"candles":"2"}}]},
+           {"function":"minecraft:set_count","count":3,"conditions":[
+             {"condition":"minecraft:block_state_property","block":"minecraft:candle",
+              "properties":{"candles":"3"}}]}]}]}]})");
+    REQUIRE(parsed.has_value());
+
+    rng::RandomSource random = rng::RandomSource::legacy(1234);
+    const LootContext three{.blockState = {{"candles", "3"}, {"lit", "false"}}};
+    const std::vector<ItemStack> lit = parsed->generate(random, 0.0F, std::nullopt, three);
+    REQUIRE(lit.size() == 1);
+    CHECK(lit.front().count == 3);
+
+    // A single candle matches neither, so the stack keeps the one it was made with.
+    const LootContext one{.blockState = {{"candles", "1"}, {"lit", "false"}}};
+    const std::vector<ItemStack> alone = parsed->generate(random, 0.0F, std::nullopt, one);
+    REQUIRE(alone.size() == 1);
+    CHECK(alone.front().count == 1);
 }

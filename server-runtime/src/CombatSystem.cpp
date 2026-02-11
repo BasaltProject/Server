@@ -209,9 +209,12 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     // parity: `Projectile.onHitBlock` sends `PROJECTILE_LAND` where it landed.
     emitVibration(world, "projectile_land", hit->x, hit->y, hit->z);
     // parity: `Entity.isOnFire`, which is what `TntBlock.onProjectileHit` asks the arrow.
-    const std::optional<world::BlockChange> change =
-        world::projectileHits::onHit(world.state(), world.gameTime(), *hit, kind.sticks, entity.fireTicks > 0,
-                                     world.gameRules().get(world::gameRules::kTntExplodes));
+    const std::optional<world::BlockChange> change = world::projectileHits::onHit(
+        world.state(), world.gameTime(), *hit, kind.sticks, entity.fireTicks > 0,
+        world.gameRules().get(world::gameRules::kTntExplodes),
+        [this, &world](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
+            broadcaster_.dropBrokenBlock(world, bx, by, bz, stateId);
+        });
     if (change.has_value()) {
         broadcaster_.announceRedstone(world, watchers, *change);
     }

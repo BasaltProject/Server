@@ -202,8 +202,8 @@ private:
     void heardBySculk(std::string_view event, const wire::protocol::play::BlockPos& pos);
 
     /// Rolls `block`'s loot table and drops each resulting stack where it stood.
-    void dropLootFor(const wire::common::Identifier& block, const wire::protocol::play::BlockPos& pos,
-                     const wire::nbt::NbtCompound* carried = nullptr);
+    void dropLootFor(const wire::common::Identifier& block, std::int32_t stateId,
+                     const wire::protocol::play::BlockPos& pos, const wire::nbt::NbtCompound* carried = nullptr);
 
     /// parity: `Block.popResource`'s own `Mth.nextDouble(random, -0.25, 0.25)`.
     [[nodiscard]] double popJitter() const;
