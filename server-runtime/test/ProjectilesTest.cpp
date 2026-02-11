@@ -164,19 +164,35 @@ TEST_CASE("uncertainty spreads the shot and a direction of nothing is not a shot
     CHECK(still.velocityZ == doctest::Approx(0.0));
 }
 
-TEST_CASE("a tick is drag, then the line, then gravity") {
+// parity: `AbstractArrow.tick` moves with the speed it already had and applies the drag and the
+// gravity **after**, which is the opposite of a thrown projectile.
+TEST_CASE("an arrow flies the whole step first and slows down after") {
     Loaded loaded;
     ServerEntity entity = flying(projectiles::arrow());
     entity.velocityZ = 1.0;
 
     CHECK_FALSE(projectiles::tick(loaded.state, entity, projectiles::arrow()).has_value());
 
-    // Drag first, so the step is already shortened.
-    CHECK(entity.z == doctest::Approx(9.49));
+    CHECK(entity.z == doctest::Approx(9.5));
     CHECK(entity.velocityZ == doctest::Approx(0.99));
-    // And gravity last, so the first tick falls by exactly one step of it.
     CHECK(entity.velocityY == doctest::Approx(-0.05));
     CHECK(entity.age == 1);
+    CHECK(entity.y == doctest::Approx(64.5));
+}
+
+// parity: `ThrowableProjectile.tick` is `applyGravity`, `applyInertia` and only then the move, so a
+// snowball is already falling on the tick it leaves the hand.
+TEST_CASE("a thrown projectile falls and slows down before it moves") {
+    Loaded loaded;
+    ServerEntity entity = flying(projectiles::snowball());
+    entity.velocityZ = 1.0;
+
+    CHECK_FALSE(projectiles::tick(loaded.state, entity, projectiles::snowball()).has_value());
+
+    CHECK(entity.velocityY == doctest::Approx(-0.03 * 0.99));
+    CHECK(entity.velocityZ == doctest::Approx(0.99));
+    CHECK(entity.z == doctest::Approx(8.5 + 0.99));
+    CHECK(entity.y == doctest::Approx(64.5 - (0.03 * 0.99)));
 }
 
 TEST_CASE("a fireball keeps going in a straight line") {

@@ -171,8 +171,10 @@ TEST_CASE("a splash potion reaches less far than four blocks and no further") {
     fixture.base.player->y = 64.0;
     fixture.base.player->z = 9.5;
 
-    // The kind is what decides a potion, not the entity type it travels as.
-    ServerEntity& bottle = spawnAt(fixture.base, 42, "snowball", 8.0, 64.0, 8.0);
+    // The kind is what decides a potion, not the entity type it travels as. It flies half a block
+    // above the player's feet because a thrown projectile falls on the tick it is thrown, and one
+    // started exactly on the bottom face of the box would dip under it before it got there.
+    ServerEntity& bottle = spawnAt(fixture.base, 42, "snowball", 8.0, 64.5, 8.0);
     bottle.potionEffect = "poison";
     bottle.velocityZ = 3.0;
 

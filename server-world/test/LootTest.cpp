@@ -284,3 +284,25 @@ TEST_CASE("a function only runs when its own conditions pass") {
     REQUIRE(alone.size() == 1);
     CHECK(alone.front().count == 1);
 }
+
+TEST_CASE("an empty entity predicate asks only whether somebody is behind the break") {
+    // parity: the snow and chorus flower tables, the two that carry one.
+    const std::expected<LootTable, LootTableParseError> parsed = lootTableJson::parse(
+        R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:snowball"}],
+           "conditions":[{"condition":"minecraft:entity_properties","entity":"this","predicate":{}}]}]})");
+    REQUIRE(parsed.has_value());
+
+    rng::RandomSource random = rng::RandomSource::legacy(1234);
+    const LootContext byHand{.hasEntity = true};
+    CHECK(parsed->generate(random, 0.0F, std::nullopt, byHand).size() == 1);
+    // A block a neighbour knocked down has nobody behind it, and snow broken that way leaves nothing.
+    CHECK(parsed->generate(random).empty());
+
+    // A predicate with anything in it is a question this evaluator cannot answer, and stays a no.
+    const std::expected<LootTable, LootTableParseError> fussy = lootTableJson::parse(
+        R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:snowball"}],
+           "conditions":[{"condition":"minecraft:entity_properties","entity":"this",
+                          "predicate":{"type":"minecraft:player"}}]}]})");
+    REQUIRE(fussy.has_value());
+    CHECK(fussy->generate(random, 0.0F, std::nullopt, byHand).empty());
+}

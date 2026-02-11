@@ -225,6 +225,7 @@ void DroppedItemPhysics::moveItem(DroppedItem& item) {
     // parity: the check that lets vanilla skip a settled item's physics, plus the vertical half of
     // it. Here it also stops the movement packets, which is what makes a floor covered in drops
     // free to look at; an item still bouncing off slime is not settled and keeps moving.
+    item.onGround = onGround;
     item.resting = onGround &&
                    item.velocityX * item.velocityX + item.velocityZ * item.velocityZ <= kRestingSpeedSquared &&
                    std::abs(item.velocityY) <= kRestingSpeed;

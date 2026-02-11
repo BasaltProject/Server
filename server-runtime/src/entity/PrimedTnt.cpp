@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
+#include <cmath>
 #include <cstdint>
 #include <memory>
 
@@ -24,10 +25,17 @@ const wire::common::Identifier& type() {
 }
 
 ServerEntity& prime(world::WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
-                    const std::int32_t entityId, const std::int32_t protocolType, const std::int32_t fuse) {
+                    const std::int32_t entityId, const std::int32_t protocolType, const double angle,
+                    const std::int32_t fuse) {
     // parity: `TntBlock.explode` spawns it at the middle of the block it was.
     auto entity = std::make_unique<ServerEntity>(entityId, wire::common::Uuid::random(), type(), protocolType, x + 0.5,
                                                  static_cast<double>(y), z + 0.5);
+    // parity: `PrimedTnt`'s constructor hops it a fifth of a block up and pushes it a fiftieth to one
+    // side, so a block of tnt that is lit leaves the ground rather than sitting where it was.
+    // Measured in `hojagrande`, where the jar's takes a dozen ticks to come back down on the leaf.
+    entity->velocityX = -std::sin(angle) * kPrimeDrift;
+    entity->velocityY = kPrimeHop;
+    entity->velocityZ = -std::cos(angle) * kPrimeDrift;
     entity->fuse = fuse;
     return world.spawnEntity(std::move(entity));
 }

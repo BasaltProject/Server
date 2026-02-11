@@ -65,6 +65,12 @@ LootCondition LootCondition::entityProperties() {
     return built;
 }
 
+LootCondition LootCondition::thisEntityExists() {
+    LootCondition built;
+    built.kind_ = Kind::ThisEntityExists;
+    return built;
+}
+
 LootCondition LootCondition::killedByPlayer() {
     LootCondition built;
     built.kind_ = Kind::KilledByPlayer;
@@ -126,6 +132,10 @@ bool LootCondition::test(random::RandomSource& random, const LootContext& contex
     case Kind::MatchTool:
     case Kind::EntityProperties:
         return false;
+    // parity: `LootItemEntityPropertyCondition` with an empty predicate, which asks only that the
+    // entity be there: the player mining the block or the arrow that hit it.
+    case Kind::ThisEntityExists:
+        return context.hasEntity;
     // parity: `LootItemBlockStatePropertyCondition`, every named property of the block that broke
     // matching what the table asks for. A roll with no block behind it matches nothing.
     case Kind::BlockStateProperty:

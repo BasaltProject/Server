@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/RedstoneTickSystem.hpp>
 #include <basalt/server/runtime/entity/BlockTriggers.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
+#include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -202,7 +203,19 @@ void RedstoneTickSystem::tickPressurePlates(world::LoadedWorld& world, const sch
         }
     }
     for (const world::DroppedItem& item : items) {
-        stand(item.x, item.y, item.z, item.resting);
+        // parity: `canEntityTilt` asks `onGround()`, and an item still sliding along the leaf is on
+        // the ground: waiting for it to settle started the leaf's clock three ticks late.
+        stand(item.x, item.y, item.z, item.onGround);
+    }
+    // parity: `entityInside` runs for **every** entity standing on the leaf, not only for a player
+    // and a dropped item: a block of tnt that lands on one tips it over just the same. Measured in
+    // `hojagrande`. An arrow is left out because the flag this build calls `onGround` means "stuck"
+    // for one, which is not the `onGround()` vanilla asks about.
+    for (const entity::ServerEntity* one : world.state().entities()) {
+        if (one == nullptr || one->removed || entity::projectiles::kindOf(one->type()) != nullptr) {
+            continue;
+        }
+        stand(one->x, one->y, one->z, one->onGround);
     }
 }
 

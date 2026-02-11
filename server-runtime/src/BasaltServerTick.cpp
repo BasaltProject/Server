@@ -35,6 +35,10 @@ constexpr std::string_view kTntPrimedSound = "entity.tnt.primed";
     return player;
 }
 
+/// parity: `random.nextDouble() * (float)(Math.PI * 2)`, the whole turn a lit block of tnt picks its
+/// little sideways push from.
+constexpr double kFullTurn = 6.283185307179586;
+
 /// The seed of the tick's own random. Nothing here is checked bit for bit against vanilla: what a
 /// mob decides this turn is not part of a seed's world.
 [[nodiscard]] std::int64_t scratchSeed() {
@@ -176,6 +180,11 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             // before the world's own turn: what a block event pushes is where the item was, not
             // where it is about to be.
             step("Item tick", [&world, &region] { static_cast<void>(world.state().tickItems(&region)); });
+            // parity: `TntBlock.prime` builds the entity where the signal reached it, inside the
+            // block's own turn, so it is already in the world for **this** tick's entity pass and
+            // moves with the hop its constructor gave it. Draining the queue only at the top of the
+            // turn left every lit block of tnt a tick behind the jar's. Measured in `hojagrande`.
+            step("Primed tnt", [this, &world] { tickPrimedTnt(world); });
             step("Entity tick", [this, &world, &region] { tickEntities(world, region); });
             // parity: `entityInside` is part of the entity's own turn, so it reads where the entity
             // has just moved to. Asking before that pass read the square of the turn before, which a
@@ -214,10 +223,14 @@ void BasaltServer::tickPrimedTnt(world::LoadedWorld& world) {
     // the world's own turn so the two land together.
     const registry::EntityTypeEntry* tntType = registry::entityTypes::of(entity::primedTnt::type());
     if (tntType != nullptr) {
+        random::RandomSource lighting = random::RandomSource::legacy(scratchSeed());
         for (const world::PrimedTntQueue::Primed& lit : world.state().takePrimedTnt()) {
             const std::array<std::int32_t, 3> position{lit.x, lit.y, lit.z};
+            // parity: the turn of that push comes off the level's random, which this build does not
+            // share with the jar: the hop is the same and the drift is noise.
             static_cast<void>(entity::primedTnt::prime(world.state(), position[0], position[1], position[2],
-                                                       playerRegistry_.allocateEntityId(), tntType->protocolId));
+                                                       playerRegistry_.allocateEntityId(), tntType->protocolId,
+                                                       lighting.nextDouble() * kFullTurn));
             // parity: `TntBlock.prime` raises `PRIME_FUSE` from the block's own square, so a sculk
             // sensor hears the tnt being lit at ten and not only the bang at fifteen.
             if (world.state().hasSculkSensorNear(position[0], position[1], position[2],

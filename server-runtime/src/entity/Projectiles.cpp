@@ -1,3 +1,4 @@
+#include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 
 #include <algorithm>
@@ -6,6 +7,7 @@
 #include <cstdint>
 #include <memory>
 #include <numbers>
+#include <span>
 #include <string_view>
 
 namespace basalt::server::runtime::entity::projectiles {
@@ -24,7 +26,10 @@ constexpr double kAcceleration = 0.1;
                 .gravity = gravity,
                 .drag = drag,
                 .sticks = sticks,
-                .acceleration = acceleration};
+                .acceleration = acceleration,
+                // parity: which of the three `tick` bodies it has. An arrow is the one that sticks,
+                // and a fireball the one that accelerates.
+                .flight = sticks ? Flight::Arrow : (acceleration != 0.0 ? Flight::Hurting : Flight::Thrown)};
 }
 
 /// parity: `AbstractArrow.onHitBlock` scales by a `0.05F`, and the float widened to a double is not
@@ -42,6 +47,61 @@ void aimAlongMovement(ServerEntity& entity) {
     const double horizontal = std::sqrt((entity.velocityX * entity.velocityX) + (entity.velocityZ * entity.velocityZ));
     entity.yaw = static_cast<float>(std::atan2(entity.velocityX, entity.velocityZ) * kDegrees);
     entity.pitch = static_cast<float>(std::atan2(entity.velocityY, horizontal) * kDegrees);
+}
+
+/// parity: `AbstractArrow.tick`'s first block, `aabb.move(blockPos).contains(position)` over every
+/// box of the collision shape. `AABB.contains` is half open on each axis.
+[[nodiscard]] bool insideCollision(world::WorldState& world, double x, double y, double z) {
+    const auto blockX = static_cast<std::int32_t>(std::floor(x));
+    const auto blockY = static_cast<std::int32_t>(std::floor(y));
+    const auto blockZ = static_cast<std::int32_t>(std::floor(z));
+    const std::optional<std::int32_t> stateId = world.blockState(blockX, blockY, blockZ);
+    if (!stateId.has_value() || registry::blockShapes::isEmptyShape(*stateId)) {
+        return false;
+    }
+    constexpr double kUnits = 16.0;
+    const std::span<const std::int32_t> boxes = registry::blockShapes::collisionBoxes(*stateId);
+    for (std::size_t box = 0; box + 5 < boxes.size(); box += 6) {
+        const bool inside = x >= blockX + (boxes[box] / kUnits) && x < blockX + (boxes[box + 3] / kUnits) &&
+                            y >= blockY + (boxes[box + 1] / kUnits) && y < blockY + (boxes[box + 4] / kUnits) &&
+                            z >= blockZ + (boxes[box + 2] / kUnits) && z < blockZ + (boxes[box + 5] / kUnits);
+        if (inside) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/// parity: `AbstractArrow.shouldFall`, `noCollision(new AABB(position, position).inflate(0.06))`: a
+/// stuck arrow lets go the moment nothing collides with the little box around its point.
+[[nodiscard]] bool nothingHolds(world::WorldState& world, double x, double y, double z) {
+    constexpr double kGrip = 0.06;
+    constexpr double kUnits = 16.0;
+    const auto low = [](double value) { return static_cast<std::int32_t>(std::floor(value - kGrip)); };
+    const auto high = [](double value) { return static_cast<std::int32_t>(std::floor(value + kGrip)); };
+    for (std::int32_t blockX = low(x); blockX <= high(x); ++blockX) {
+        for (std::int32_t blockY = low(y); blockY <= high(y); ++blockY) {
+            for (std::int32_t blockZ = low(z); blockZ <= high(z); ++blockZ) {
+                const std::optional<std::int32_t> stateId = world.blockState(blockX, blockY, blockZ);
+                if (!stateId.has_value() || registry::blockShapes::isEmptyShape(*stateId)) {
+                    continue;
+                }
+                const std::span<const std::int32_t> boxes = registry::blockShapes::collisionBoxes(*stateId);
+                for (std::size_t box = 0; box + 5 < boxes.size(); box += 6) {
+                    const bool touches = x + kGrip > blockX + (boxes[box] / kUnits) &&
+                                         x - kGrip < blockX + (boxes[box + 3] / kUnits) &&
+                                         y + kGrip > blockY + (boxes[box + 1] / kUnits) &&
+                                         y - kGrip < blockY + (boxes[box + 4] / kUnits) &&
+                                         z + kGrip > blockZ + (boxes[box + 2] / kUnits) &&
+                                         z - kGrip < blockZ + (boxes[box + 5] / kUnits);
+                    if (touches) {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+    return true;
 }
 
 } // namespace
@@ -164,22 +224,61 @@ void shoot(ServerEntity& entity, double dirX, double dirY, double dirZ, float po
 std::optional<BlockHit> tick(world::WorldState& world, ServerEntity& entity, const Kind& kind) {
     ++entity.age;
     if (entity.onGround) {
+        // parity: `AbstractArrow.tick` asks every turn whether what it is stuck in is still there,
+        // and `startFalling` lets it go: an arrow in a block a piston took away falls rather than
+        // hanging in the air. The movement it leaves with is its own times a random fraction, and
+        // a stuck arrow's is zero, so it drops straight down.
+        if (!kind.sticks || !nothingHolds(world, entity.x, entity.y, entity.z)) {
+            return std::nullopt;
+        }
+        // parity: the whole in-ground branch ends the turn, so the tick an arrow lets go on is a
+        // tick it does not move: it starts falling on the next one.
+        entity.onGround = false;
+        return std::nullopt;
+    }
+    // parity: `AbstractArrow.tick` looks at the block the arrow stands in first, and an arrow whose
+    // point is inside one of its collision boxes stops dead without telling the block: one shot
+    // point blank out of a dispenser sticks in the target and never fires it. Only an arrow does
+    // this; a thrown projectile hits from inside a shape like anything else.
+    if (kind.sticks && insideCollision(world, entity.x, entity.y, entity.z)) {
+        entity.velocityX = 0.0;
+        entity.velocityY = 0.0;
+        entity.velocityZ = 0.0;
+        entity.onGround = true;
         return std::nullopt;
     }
 
-    // parity: `AbstractHurtingProjectile.applyInertia` adds the acceleration back along the way it
-    // is going before the drag, so a fireball settles at a speed rather than stopping. The other two
-    // families have no acceleration and the same line is their plain scale by the inertia.
-    const double speed = std::sqrt((entity.velocityX * entity.velocityX) + (entity.velocityY * entity.velocityY) +
-                                   (entity.velocityZ * entity.velocityZ));
-    if (kind.acceleration != 0.0 && speed >= kNormalizeFloor) {
-        entity.velocityX += (entity.velocityX / speed) * kind.acceleration;
-        entity.velocityY += (entity.velocityY / speed) * kind.acceleration;
-        entity.velocityZ += (entity.velocityZ / speed) * kind.acceleration;
+    const auto slow = [&entity, &kind] {
+        entity.velocityX *= kind.drag;
+        entity.velocityY *= kind.drag;
+        entity.velocityZ *= kind.drag;
+    };
+    // parity: `Entity.applyGravity` returns at once when `isNoGravity`, so a projectile with the tag
+    // flies dead straight. Measured in `botonflecha`, where a flecha that should hang at half a
+    // block fell into the button and pressed it.
+    const auto fall = [&entity, &kind] {
+        if (!entity.noGravity) {
+            entity.velocityY -= kind.gravity;
+        }
+    };
+    // parity: `ThrowableProjectile.tick` is `applyGravity` then `applyInertia` and only then the
+    // move, so the tick it is thrown on already falls.
+    if (kind.flight == Flight::Thrown) {
+        fall();
+        slow();
     }
-    entity.velocityX *= kind.drag;
-    entity.velocityY *= kind.drag;
-    entity.velocityZ *= kind.drag;
+    // parity: `AbstractHurtingProjectile.applyInertia` adds the acceleration back along the way it
+    // is going before the drag, so a fireball settles at a speed rather than stopping.
+    if (kind.flight == Flight::Hurting) {
+        const double speed = std::sqrt((entity.velocityX * entity.velocityX) + (entity.velocityY * entity.velocityY) +
+                                       (entity.velocityZ * entity.velocityZ));
+        if (kind.acceleration != 0.0 && speed >= kNormalizeFloor) {
+            entity.velocityX += (entity.velocityX / speed) * kind.acceleration;
+            entity.velocityY += (entity.velocityY / speed) * kind.acceleration;
+            entity.velocityZ += (entity.velocityZ / speed) * kind.acceleration;
+        }
+        slow();
+    }
 
     const std::optional<BlockHit> hit = blockRay::cast(world, entity.x, entity.y, entity.z, entity.x + entity.velocityX,
                                                        entity.y + entity.velocityY, entity.z + entity.velocityZ);
@@ -207,11 +306,11 @@ std::optional<BlockHit> tick(world::WorldState& world, ServerEntity& entity, con
     entity.x += entity.velocityX;
     entity.y += entity.velocityY;
     entity.z += entity.velocityZ;
-    // parity: `Entity.applyGravity` returns at once when `isNoGravity`, so a projectile with the tag
-    // flies dead straight. Measured in `botonflecha`, where a flecha that should hang at half a
-    // block fell into the button and pressed it.
-    if (!entity.noGravity) {
-        entity.velocityY -= kind.gravity;
+    // parity: an arrow moves with what it had and slows down and falls **after**, which is why the
+    // first tick of its flight goes the whole way the bow sent it.
+    if (kind.flight == Flight::Arrow) {
+        slow();
+        fall();
     }
     aimAlongMovement(entity);
     return std::nullopt;
