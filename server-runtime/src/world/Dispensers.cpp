@@ -2,10 +2,12 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
+#include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/BoneMeal.hpp>
 #include <basalt/server/runtime/world/Buckets.hpp>
@@ -20,6 +22,7 @@
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/RespawnAnchors.hpp>
+#include <basalt/server/runtime/world/Shulkers.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/Waxing.hpp>
 
@@ -48,11 +51,13 @@ constexpr double kDefaultAccuracy = 6.0;
 /// parity: `DispenserBlock.getDispensePosition`'s own 0.7 out of the face, and the drop below the
 /// middle that is smaller out of the top and the bottom.
 constexpr double kDispenseReach = 0.7;
+
+/// parity: `BoatDispenseItemBehavior`'s own `0.5625` clear of the block, plus the `1.125` it rises by
+/// when the dispenser looks up or down.
+constexpr double kBoatClearance = 0.5625;
+constexpr double kBoatLift = 1.125;
 constexpr double kVerticalDrop = 0.125;
 constexpr double kSidewaysDrop = 0.15625;
-
-/// parity: the `(0, 0.1, 0)` offset a projectile leaves with, so it clears the block below.
-constexpr double kProjectileLift = 0.1;
 
 /// parity: the `15` vanilla passes with `LevelEvent.PARTICLES_AND_SOUND_PLANT_GROWTH`.
 constexpr std::int32_t kGrowthSparkles = 15;
@@ -115,6 +120,40 @@ constexpr std::int32_t kGrowthSparkles = 15;
     return instance;
 }
 
+[[nodiscard]] const wire::common::Identifier& armorStand() {
+    static const wire::common::Identifier instance = wire::common::Identifier::vanilla("armor_stand");
+    return instance;
+}
+
+/// parity: the sixteen `BoatDispenseItemBehavior` entries, whose item and entity share a name.
+[[nodiscard]] bool isBoat(std::string_view path) {
+    return path.ends_with("_boat") || path.ends_with("_raft") || path.ends_with("_chest_boat") ||
+           path.ends_with("_chest_raft");
+}
+
+/// parity: `Direction.toYRot`, `(data2d & 3) * 90`: south is zero and, by the way that arithmetic
+/// falls out, so up and down are both two hundred and seventy.
+[[nodiscard]] float yawOf(BlockFace face) {
+    switch (face) {
+    case BlockFace::North:
+        return 180.0F;
+    case BlockFace::South:
+        return 0.0F;
+    case BlockFace::West:
+        return 90.0F;
+    case BlockFace::East:
+    case BlockFace::Down:
+    case BlockFace::Up:
+        break;
+    }
+    return 270.0F;
+}
+
+[[nodiscard]] const wire::common::Identifier& powderSnowBucket() {
+    static const wire::common::Identifier instance = wire::common::Identifier::vanilla("powder_snow_bucket");
+    return instance;
+}
+
 [[nodiscard]] const wire::common::Identifier& flintAndSteel() {
     static const wire::common::Identifier instance = wire::common::Identifier::vanilla("flint_and_steel");
     return instance;
@@ -145,6 +184,24 @@ constexpr std::int32_t kGrowthSparkles = 15;
         return BlockFace::West;
     }
     return facing == "east" ? std::optional{BlockFace::East} : std::nullopt;
+}
+
+[[nodiscard]] std::string_view nameOf(BlockFace face) {
+    switch (face) {
+    case BlockFace::Down:
+        return "down";
+    case BlockFace::Up:
+        return "up";
+    case BlockFace::North:
+        return "north";
+    case BlockFace::South:
+        return "south";
+    case BlockFace::West:
+        return "west";
+    case BlockFace::East:
+        break;
+    }
+    return "east";
 }
 
 /// The two enums are both in vanilla's `Direction` order, which is what the Kotlin matched by name.
@@ -293,6 +350,39 @@ void heard(WorldState& world, const std::string_view event, const std::int32_t x
                      static_cast<double>(z) + 0.5, gameTime);
 }
 
+/// parity: `ShulkerBoxDispenseBehavior` over `BlockItem.place`, whose `DirectionalPlaceContext`
+/// answers the clicked face and nothing else that a shulker box reads.
+[[nodiscard]] Special placeShulkerBox(const fluidFlow::Context& context, std::int32_t tx, std::int32_t ty,
+                                      std::int32_t tz, BlockFace out, const ItemStack& stack, const Hooks& hooks) {
+    const std::optional<std::int32_t> target = context.world.blockState(tx, ty, tz);
+    const registry::BlockState* box = registry::blocks::named(stack.item.path());
+    if (!target.has_value() || box == nullptr || !registry::blockShapes::isReplaceable(*target)) {
+        return Special{.refused = true};
+    }
+    const std::optional<std::int32_t> below = context.world.blockState(tx, ty - 1, tz);
+    const BlockFace face = below.has_value() && registry::blocks::isAir(*below) ? out : BlockFace::Up;
+    const std::optional<std::int32_t> placed =
+        registry::blockStateDefinitions::stateIdOf(stack.item, {{"facing", std::string{nameOf(face)}}}, box->stateId);
+    if (!placed.has_value() || !context.world.setBlockState(tx, ty, tz, *placed)) {
+        return Special{.refused = true};
+    }
+    // parity: `Level.setBlock` gives the box its block entity, and `BlockItem.updateCustomBlockEntityTag`
+    // puts back whatever the item was carrying.
+    server::world::Chunk* chunk = context.world.chunkIfLoaded(tx >> 4, tz >> 4);
+    if (chunk != nullptr) {
+        wire::nbt::NbtCompound data = blockEntityDefaults::of(stack.item, *placed);
+        if (const wire::nbt::NbtCompound* carried = stack.components.getCompound(shulkers::kContainer);
+            carried != nullptr) {
+            shulkers::restore(data, *carried);
+        }
+        chunk->setBlockEntity(server::world::ChunkBlockEntity{tx & 15, ty, tz & 15, stack.item, std::move(data)});
+        chunk->markDirty();
+    }
+    heard(context.world, "block_place", tx, ty, tz, hooks.gameTime);
+    return Special{
+        .handled = true, .left = minusOne(stack), .change = BlockChange{.x = tx, .y = ty, .z = tz, .stateId = *placed}};
+}
+
 /// The block-changing behaviours: a full bucket pours, an empty one fills, and flint and steel
 /// lights a fire.
 ///
@@ -303,6 +393,69 @@ void heard(WorldState& world, const std::string_view event, const std::int32_t x
     const std::int32_t tx = x + registry::stepX(out);
     const std::int32_t ty = y + registry::stepY(out);
     const std::int32_t tz = z + registry::stepZ(out);
+    // parity: the armor stand entry, which stands one in the square in front whatever is there, at
+    // the bottom middle of it and turned the way the dispenser looks.
+    if (stack.item == armorStand()) {
+        const std::optional<std::int32_t> protocolType = protocolTypeOf(hooks, stack.item);
+        if (!protocolType.has_value()) {
+            return {};
+        }
+        auto stand = std::make_unique<entity::ServerEntity>(nextEntityId(hooks), wire::common::Uuid::random(),
+                                                            stack.item, *protocolType, tx + 0.5, ty, tz + 0.5);
+        stand->yaw = yawOf(out);
+        static_cast<void>(context.world.spawnEntity(std::move(stand)));
+        return Special{.handled = true, .left = minusOne(stack)};
+    }
+    // parity: `BoatDispenseItemBehavior`, which wants water in front or water under an empty square
+    // and throws the boat as an item when it finds neither. The boat lands just outside the
+    // dispenser, half its own width past the face.
+    if (isBoat(stack.item.path())) {
+        const std::optional<std::int32_t> front = context.world.blockState(tx, ty, tz);
+        const std::optional<std::int32_t> under = context.world.blockState(tx, ty - 1, tz);
+        double lift = 0.0;
+        if (front.has_value() && fluidFlow::kindOf(*front) == FluidKind::Water) {
+            lift = 1.0;
+        } else if (!front.has_value() || !registry::blocks::isAir(*front) || !under.has_value() ||
+                   fluidFlow::kindOf(*under) != FluidKind::Water) {
+            return {};
+        }
+        const std::optional<std::int32_t> protocolType = protocolTypeOf(hooks, stack.item);
+        if (!protocolType.has_value()) {
+            return {};
+        }
+        const double reach = kBoatClearance + (registry::entityTypeShapes::widthOf(stack.item) / 2.0);
+        auto boat = std::make_unique<entity::ServerEntity>(
+            nextEntityId(hooks), wire::common::Uuid::random(), stack.item, *protocolType,
+            x + 0.5 + (registry::stepX(out) * reach), y + 0.5 + (registry::stepY(out) * kBoatLift) + lift,
+            z + 0.5 + (registry::stepZ(out) * reach));
+        boat->yaw = yawOf(out);
+        static_cast<void>(context.world.spawnEntity(std::move(boat)));
+        return Special{.handled = true, .left = minusOne(stack)};
+    }
+    // parity: `SolidBucketItem.emptyContents` under the dispenser's filled-bucket entry: the powder
+    // snow goes down on an empty square and the bucket comes back empty. Anywhere else the behaviour
+    // answers false and the bucket is thrown, which is what falling through does.
+    if (stack.item == powderSnowBucket()) {
+        const std::optional<std::int32_t> target = context.world.blockState(tx, ty, tz);
+        const registry::BlockState* snow = registry::blocks::named("powder_snow");
+        if (!target.has_value() || !registry::blocks::isAir(*target) || snow == nullptr ||
+            !context.world.setBlockState(tx, ty, tz, snow->stateId)) {
+            return {};
+        }
+        heard(context.world, "fluid_place", tx, ty, tz, hooks.gameTime);
+        const BlockChange change{.x = tx, .y = ty, .z = tz, .stateId = snow->stateId};
+        const std::optional<ItemStack> left = minusOne(stack);
+        return Special{.handled = true,
+                       .left = left.has_value() ? left
+                                                : std::optional{ItemStack{.item = buckets::emptyBucket(), .count = 1}},
+                       .change = change};
+    }
+    // parity: `ShulkerBoxDispenseBehavior`, which places the box rather than throwing it. The face it
+    // lands on is the dispenser's own only when the square under the target is empty; over anything
+    // solid it is `UP`. A box that cannot go down is the click of a refusal, not a throw.
+    if (shulkers::isShulkerBox(stack.item.path())) {
+        return placeShulkerBox(context, tx, ty, tz, out, stack, hooks);
+    }
     if (buckets::isBucket(stack.item)) {
         const std::optional<buckets::Result> result =
             buckets::useOn(context, stack.item, tx, ty, tz, directionOf(out), false);
@@ -614,20 +767,24 @@ void throwOut(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                 .components = stack.components});
 }
 
-/// parity: `ProjectileDispenseBehavior`, which shoots along the face at 1.1 with six degrees of
-/// spread, from `getDispensePosition(source, 0.7, (0, 0.1, 0))`.
+/// parity: `ProjectileDispenseBehavior`, which leaves from where the item's own config says and is
+/// shot along the face with its power and its spread.
 void shoot(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, std::int32_t z, BlockFace out,
-           const entity::projectiles::Kind& kind, const Hooks& hooks) {
-    const std::optional<std::int32_t> protocolType = protocolTypeOf(hooks, kind.type);
+           const entity::projectiles::DispenseShot& config, const ItemStack& stack, const Hooks& hooks) {
+    const std::optional<std::int32_t> protocolType = protocolTypeOf(hooks, config.kind->type);
     if (!protocolType.has_value()) {
         return;
     }
-    entity::projectiles::spawn(context.world, kind, nextEntityId(hooks), *protocolType,
-                               x + 0.5 + (kDispenseReach * registry::stepX(out)),
-                               y + 0.5 + (kDispenseReach * registry::stepY(out)) + kProjectileLift,
-                               z + 0.5 + (kDispenseReach * registry::stepZ(out)), registry::stepX(out),
-                               registry::stepY(out), registry::stepZ(out), entity::projectiles::kDispenserPower,
-                               entity::projectiles::kDispenserUncertainty, context.random);
+    entity::ServerEntity& shot = entity::projectiles::spawn(
+        context.world, *config.kind, nextEntityId(hooks), *protocolType,
+        x + 0.5 + (config.reach * registry::stepX(out)), y + 0.5 + (config.reach * registry::stepY(out)) + config.lift,
+        z + 0.5 + (config.reach * registry::stepZ(out)), registry::stepX(out), registry::stepY(out),
+        registry::stepZ(out), config.power, config.uncertainty, context.random);
+    // parity: `ProjectileItem.asProjectile` hands the stack to the projectile, which saves it as its
+    // `Item`: the fire charge a fireball came from travels with it.
+    if (config.carries) {
+        shot.heldItem = stack.item.path();
+    }
 }
 
 } // namespace
@@ -702,9 +859,10 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
     const bool dropper = block->path() == "dropper";
 
     // parity: `DispenserBlock.registerProjectileBehavior`, which shoots rather than throws.
-    const entity::projectiles::Kind* projectile = dropper ? nullptr : entity::projectiles::dispensed(stack.item);
-    if (projectile != nullptr) {
-        shoot(context, x, y, z, *out, *projectile, hooks);
+    const std::optional<entity::projectiles::DispenseShot> projectile =
+        dropper ? std::nullopt : entity::projectiles::dispensed(stack.item);
+    if (projectile.has_value()) {
+        shoot(context, x, y, z, *out, *projectile, stack, hooks);
         slots[*slot] = minusOne(stack);
         blockInventory::write(blockEntity->data(), slots);
         chunk->markDirty();

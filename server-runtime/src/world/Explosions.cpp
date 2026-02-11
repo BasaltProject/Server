@@ -17,6 +17,9 @@ constexpr float kStep = 0.3F;
 constexpr float kStepCost = 0.22500001F;
 constexpr float kResistanceBias = 0.3F;
 
+/// parity: `SimpleExplosionDamageCalculator.getBlockExplosionResistance` answering its immune list.
+constexpr float kImmuneResistance = 3600000.0F;
+
 /// parity: `Block.getExplosionResistance`, and bedrock's own refusal.
 [[nodiscard]] float resistanceOf(std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
@@ -59,6 +62,69 @@ bool sparesRails(WorldState& world, const std::int32_t x, const std::int32_t y, 
     }
     const std::optional<std::int32_t> above = world.blockState(x, y + 1, z);
     return above.has_value() && rails::isRail(*above);
+}
+
+std::vector<Broken> reaches(WorldState& world, std::int32_t minY, std::int32_t maxY, double x, double y, double z,
+                            float power, random::RandomSource& random, const Spares& stops) {
+    std::set<std::int64_t> hit;
+    for (std::int32_t rayX = 0; rayX < kRays; ++rayX) {
+        for (std::int32_t rayY = 0; rayY < kRays; ++rayY) {
+            for (std::int32_t rayZ = 0; rayZ < kRays; ++rayZ) {
+                const bool onShell =
+                    rayX == 0 || rayX == kRays - 1 || rayY == 0 || rayY == kRays - 1 || rayZ == 0 || rayZ == kRays - 1;
+                if (!onShell) {
+                    continue;
+                }
+                double dx = static_cast<double>((static_cast<float>(rayX) / kLastRay * 2.0F) - 1.0F);
+                double dy = static_cast<double>((static_cast<float>(rayY) / kLastRay * 2.0F) - 1.0F);
+                double dz = static_cast<double>((static_cast<float>(rayZ) / kLastRay * 2.0F) - 1.0F);
+                const double length = std::sqrt((dx * dx) + (dy * dy) + (dz * dz));
+                dx /= length;
+                dy /= length;
+                dz /= length;
+                float remaining = power * (0.7F + (random.nextFloat() * 0.6F));
+                double px = x;
+                double py = y;
+                double pz = z;
+                while (remaining > 0.0F) {
+                    const auto blockX = static_cast<std::int32_t>(std::floor(px));
+                    const auto blockY = static_cast<std::int32_t>(std::floor(py));
+                    const auto blockZ = static_cast<std::int32_t>(std::floor(pz));
+                    if (blockY < minY || blockY > maxY) {
+                        break;
+                    }
+                    const std::optional<std::int32_t> stateId = world.blockState(blockX, blockY, blockZ);
+                    if (!stateId.has_value()) {
+                        break;
+                    }
+                    if (stops && stops(world, blockX, blockY, blockZ, *stateId)) {
+                        remaining -= (kImmuneResistance + kResistanceBias) * kStep;
+                    }
+                    // parity: `shouldBlockExplode` is a plain true for this calculator, so every
+                    // square the ray still has power for is knocked on, air included.
+                    if (remaining > 0.0F) {
+                        hit.insert(packed(blockX, blockY, blockZ));
+                    }
+                    px += dx * static_cast<double>(kStep);
+                    py += dy * static_cast<double>(kStep);
+                    pz += dz * static_cast<double>(kStep);
+                    remaining -= kStepCost;
+                }
+            }
+        }
+    }
+    std::vector<Broken> knocked;
+    knocked.reserve(hit.size());
+    for (const std::int64_t position : hit) {
+        const std::int32_t bx = unpackX(position);
+        const std::int32_t by = unpackY(position);
+        const std::int32_t bz = unpackZ(position);
+        const std::optional<std::int32_t> stateId = world.blockState(bx, by, bz);
+        if (stateId.has_value()) {
+            knocked.push_back(Broken{.x = bx, .y = by, .z = bz, .stateId = *stateId});
+        }
+    }
+    return knocked;
 }
 
 std::vector<Broken> explode(WorldState& world, std::int32_t minY, std::int32_t maxY, double x, double y, double z,

@@ -105,7 +105,8 @@ struct BlockRelease {
 /// than only deciding whether it stays. `towards` is the side the news arrives from, seen from the
 /// bell, and only news along the bell's own axis counts.
 [[nodiscard]] std::optional<std::int32_t> bellShape(const WorldState& world, std::int32_t x, std::int32_t y,
-                                                    std::int32_t z, std::int32_t stateId, registry::BlockFace towards);
+                                                    std::int32_t z, std::int32_t stateId,
+                                                    server::registry::BlockFace towards);
 
 } // namespace blockInteractions
 

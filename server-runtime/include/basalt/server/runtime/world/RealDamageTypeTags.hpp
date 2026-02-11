@@ -65,6 +65,9 @@ inline const wire::common::Identifier kFall = wire::common::Identifier::vanilla(
 /// parity: `DamageTypes.BAD_RESPAWN_POINT`, what a bed in the wrong dimension kills you with.
 inline const wire::common::Identifier kBadRespawnPoint = wire::common::Identifier::vanilla("bad_respawn_point");
 
+/// parity: `DamageTypes.WIND_CHARGE`, the single point a gust deals on its way past.
+inline const wire::common::Identifier kWindCharge = wire::common::Identifier::vanilla("wind_charge");
+
 /// parity: `DamageTypes.EXPLOSION`, what TNT with nobody to blame kills you with.
 inline const wire::common::Identifier kExplosion = wire::common::Identifier::vanilla("explosion");
 

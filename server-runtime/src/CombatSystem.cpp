@@ -1,3 +1,4 @@
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
@@ -6,10 +7,13 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
+#include <basalt/server/runtime/world/BlockInteractions.hpp>
+#include <basalt/server/runtime/world/Fires.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/ProjectileHits.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
+#include <basalt/server/runtime/world/WindBursts.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
 
@@ -31,6 +35,11 @@ using wire::text::Component;
 constexpr float kSmallFireballDamage = 5.0F;
 constexpr std::int32_t kSmallFireballFireTicks = 100;
 constexpr std::string_view kDeathOnFire = "onFire";
+
+/// parity: `AbstractWindCharge.onHitEntity`'s single point, and the death message key of
+/// `DamageTypes.WIND_CHARGE`.
+constexpr float kWindChargeDamage = 1.0F;
+constexpr std::string_view kDeathWindCharge = "mob";
 
 /// parity: `applySplash`, four blocks across and twenty seconds at the centre.
 constexpr double kSplashRange = 4.0;
@@ -98,6 +107,45 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     }
     const std::string_view path = kind.type.path();
 
+    // parity: `AbstractWindCharge.onHitBlock`, whose gust goes off a quarter of a block back along
+    // the face it came in through, and `onHitEntity`, which lets it off where it stands.
+    if (path == "wind_charge") {
+        const std::optional<Target> target = targetAlong(watchers, living, entity, fromX, fromY, fromZ);
+        if (!hit.has_value() && !target.has_value()) {
+            return;
+        }
+        entity.removed = true;
+        // parity: `AbstractWindCharge.onHitEntity` takes one point off whoever it passed through,
+        // and lets the gust off there rather than against a face.
+        if (target.has_value()) {
+            if (target->mob != nullptr) {
+                const entity::entityCombat::Result result =
+                    entity::entityCombat::hurt(*target->mob, kWindChargeDamage, fromX, fromZ, hooks_, "wind_charge");
+                if (result.landed) {
+                    announceEntityHit(watchers, *target->mob, world::damageTypes::kWindCharge, entity.entityId(),
+                                      result.died);
+                    emitVibration(world, "entity_damage", target->mob->x, target->mob->y, target->mob->z);
+                }
+            }
+            if (target->player != nullptr && target->player->connection().hurt) {
+                target->player->connection().hurt(kWindChargeDamage, kDeathWindCharge, world::damageTypes::kWindCharge,
+                                                  entity::DamageSource{.entityId = entity.entityId(),
+                                                                       .x = fromX,
+                                                                       .z = fromZ,
+                                                                       .name = shooterName(watchers, living, entity)});
+            }
+        }
+        if (!hit.has_value()) {
+            gustWhereItLanded(world, watchers, entity.x, entity.y, entity.z);
+            return;
+        }
+        const double back = world::windBursts::kBackOff;
+        gustWhereItLanded(world, watchers, hit->x + (back * server::registry::stepX(hit->face)),
+                          hit->y + (back * server::registry::stepY(hit->face)),
+                          hit->z + (back * server::registry::stepZ(hit->face)));
+        return;
+    }
+
     // parity: `AbstractHurtingProjectile.onHit`: a fireball goes off where it lands, whether that is
     // a block or somebody's face.
     if (path == "fireball" || path == "small_fireball") {
@@ -110,6 +158,9 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
             explosions_.blowUp(world, watchers, entity.x, entity.y, entity.z, entity.explosionPower, "tnt",
                                entity.entityId());
             return;
+        }
+        if (hit.has_value()) {
+            lightWhereItLanded(world, watchers, *hit);
         }
         if (!target.has_value()) {
             return;
@@ -166,6 +217,53 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     }
     if (!kind.sticks) {
         entity.removed = true;
+    }
+}
+
+void CombatSystem::gustWhereItLanded(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers, double x,
+                                     double y, double z) {
+    random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
+    const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
+    const world::explosions::Spares stops = [this](world::WorldState&, std::int32_t, std::int32_t, std::int32_t,
+                                                   std::int32_t stateId) {
+        const Identifier* block = server::registry::blockStateDefinitions::blockOf(stateId);
+        return options_.blockTags != nullptr && block != nullptr &&
+               world::realBlockTags::contains(*options_.blockTags, "minecraft:blocks_wind_charge_explosions", *block);
+    };
+    const std::vector<world::BlockChange> knocked = world::windBursts::burst(
+        world.state(), facts.chunkHeight.minY(), facts.chunkHeight.maxY(), x, y, z, world.gameTime(), random, stops);
+    for (const world::BlockChange& change : knocked) {
+        broadcaster_.announceRedstone(world, watchers, change);
+        // parity: `updateNeighbours` tells the wall a button or a lever is stuck to, which is what
+        // carries the signal into whatever is behind it.
+        if (const std::optional<std::array<std::int32_t, 3>> wall =
+                world::blockInteractions::attachmentOf(change.stateId, change.x, change.y, change.z);
+            wall.has_value()) {
+            broadcaster_.announceRedstone(
+                world, watchers,
+                world::BlockChange{.x = (*wall)[0],
+                                   .y = (*wall)[1],
+                                   .z = (*wall)[2],
+                                   .stateId =
+                                       world.state().blockState((*wall)[0], (*wall)[1], (*wall)[2]).value_or(0)});
+        }
+    }
+}
+
+void CombatSystem::lightWhereItLanded(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                                      const entity::BlockHit& hit) {
+    // parity: `SmallFireball.onHitBlock` lights the square on the face it came in through, and with
+    // no owner there is no `mobGriefing` to ask.
+    const std::int32_t x = hit.blockX + server::registry::stepX(hit.face);
+    const std::int32_t y = hit.blockY + server::registry::stepY(hit.face);
+    const std::int32_t z = hit.blockZ + server::registry::stepZ(hit.face);
+    const std::int32_t delay = world::fires::kMinDelay + options_.nextInt(world::fires::kDelaySpread);
+    if (!world::fires::igniteOnImpact(world.state(), x, y, z, delay)) {
+        return;
+    }
+    const std::optional<std::int32_t> lit = world.state().blockState(x, y, z);
+    if (lit.has_value()) {
+        broadcaster_.announceRedstone(world, watchers, world::BlockChange{x, y, z, *lit, {}});
     }
 }
 

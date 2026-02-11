@@ -51,7 +51,7 @@ TEST_CASE("each kind carries what vanilla gives it") {
 
     CHECK(projectiles::snowball().gravity == doctest::Approx(0.03));
     CHECK_FALSE(projectiles::snowball().sticks);
-    CHECK(projectiles::all().size() == 9);
+    CHECK(projectiles::all().size() == 10);
 }
 
 TEST_CASE("the whole table of kinds, since a wrong number here is a projectile that flies wrong") {
@@ -60,13 +60,21 @@ TEST_CASE("the whole table of kinds, since a wrong number here is a projectile t
         double gravity;
         double drag;
         bool sticks;
+        double acceleration = 0.0;
     };
 
     // parity: `AbstractArrow`, `AbstractHurtingProjectile` and `ThrowableProjectile`'s own defaults.
-    const std::vector<Row> table{
-        {"arrow", 0.05, 0.99, true},   {"spectral_arrow", 0.05, 0.99, true}, {"snowball", 0.03, 0.99, false},
-        {"egg", 0.03, 0.99, false},    {"ender_pearl", 0.03, 0.99, false},   {"experience_bottle", 0.07, 0.99, false},
-        {"potion", 0.05, 0.99, false}, {"fireball", 0.0, 0.95, false},       {"small_fireball", 0.0, 0.95, false}};
+    const std::vector<Row> table{{"arrow", 0.05, 0.99, true},
+                                 {"spectral_arrow", 0.05, 0.99, true},
+                                 {"snowball", 0.03, 0.99, false},
+                                 {"egg", 0.03, 0.99, false},
+                                 {"ender_pearl", 0.03, 0.99, false},
+                                 {"experience_bottle", 0.07, 0.99, false},
+                                 {"potion", 0.05, 0.99, false},
+                                 {"fireball", 0.0, 0.95, false, 0.1},
+                                 {"small_fireball", 0.0, 0.95, false, 0.1},
+                                 // parity: a wind charge keeps all of its speed and adds nothing back.
+                                 {"wind_charge", 0.0, 1.0, false}};
 
     CHECK(table.size() == projectiles::all().size());
     for (const Row& row : table) {
@@ -75,24 +83,31 @@ TEST_CASE("the whole table of kinds, since a wrong number here is a projectile t
         CHECK(kind->gravity == doctest::Approx(row.gravity));
         CHECK(kind->drag == doctest::Approx(row.drag));
         CHECK(kind->sticks == row.sticks);
+        CHECK(kind->acceleration == doctest::Approx(row.acceleration));
     }
 }
 
 TEST_CASE("a dispenser shoots what vanilla registered a behaviour for") {
-    REQUIRE(projectiles::dispensed(item("arrow")) != nullptr);
-    CHECK(projectiles::dispensed(item("arrow"))->type == item("arrow"));
+    REQUIRE(projectiles::dispensed(item("arrow")).has_value());
+    CHECK(projectiles::dispensed(item("arrow"))->kind->type == item("arrow"));
     // A tipped arrow flies as a plain one, and every egg as an egg.
-    CHECK(projectiles::dispensed(item("tipped_arrow"))->type == item("arrow"));
-    CHECK(projectiles::dispensed(item("blue_egg"))->type == item("egg"));
-    CHECK(projectiles::dispensed(item("brown_egg"))->type == item("egg"));
-    CHECK(projectiles::dispensed(item("spectral_arrow"))->type == item("spectral_arrow"));
-    // A splash potion flies as the potion entity.
-    CHECK(projectiles::dispensed(item("splash_potion"))->type == item("potion"));
+    CHECK(projectiles::dispensed(item("tipped_arrow"))->kind->type == item("arrow"));
+    CHECK(projectiles::dispensed(item("blue_egg"))->kind->type == item("egg"));
+    CHECK(projectiles::dispensed(item("brown_egg"))->kind->type == item("egg"));
+    CHECK(projectiles::dispensed(item("spectral_arrow"))->kind->type == item("spectral_arrow"));
+    // A splash potion flies as the potion entity, a quarter harder and half as wide as the rest.
+    CHECK(projectiles::dispensed(item("splash_potion"))->kind->type == item("potion"));
+    CHECK(projectiles::dispensed(item("splash_potion"))->power == doctest::Approx(1.375));
+    CHECK(projectiles::dispensed(item("splash_potion"))->uncertainty == doctest::Approx(3.0));
+    // A fire charge flies as a small fireball, from a whole block out and with no lift.
+    CHECK(projectiles::dispensed(item("fire_charge"))->kind->type == item("small_fireball"));
+    CHECK(projectiles::dispensed(item("fire_charge"))->reach == doctest::Approx(1.0));
+    CHECK(projectiles::dispensed(item("fire_charge"))->lift == doctest::Approx(0.0));
 
     // Anything else is thrown as an item instead.
-    CHECK(projectiles::dispensed(item("stone")) == nullptr);
-    CHECK(projectiles::dispensed(item("firework_rocket")) == nullptr);
-    CHECK(projectiles::dispensed(item("lingering_potion")) == nullptr);
+    CHECK(!projectiles::dispensed(item("stone")).has_value());
+    CHECK(!projectiles::dispensed(item("firework_rocket")).has_value());
+    CHECK(!projectiles::dispensed(item("lingering_potion")).has_value());
 }
 
 TEST_CASE("a flying entity says what it weighs by its own type") {

@@ -279,7 +279,13 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                 broadcaster_->sendEffects(watchers, x, y, z, world.state().blockState(x, y, z).value_or(0),
                                           result.effects);
             }
-            scheduled.insert(scheduled.end(), result.changes.begin(), result.changes.end());
+            // parity: every block a dispenser behaviour writes goes down with `Level.setBlock`'s
+            // flag three, so the square it lands on tells its neighbours: the grass under a bucket
+            // of powder snow is what wears the white top.
+            for (const world::BlockChange& change : result.changes) {
+                broadcaster_->announceRedstone(world, watchers, change);
+                broadcaster_->notifyAround(world, watchers, change.x, change.y, change.z, std::nullopt);
+            }
         }
         // parity: `CrafterBlock.tick`, four ticks after the signal arrived.
         if (const std::optional<world::BlockChange> crafted = world::crafters::craft(

@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
+#include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 
 #include <cstdint>
@@ -34,6 +35,8 @@ public:
     struct Options {
         std::function<std::int32_t(std::int32_t bound)> nextInt;
         std::function<std::int64_t()> nextSeed;
+        /// What the `blocks_wind_charge_explosions` tag holds, the only thing that shortens a gust.
+        const world::realBlockTags::TagMembers* blockTags = nullptr;
     };
 
     CombatSystem(BlockChangeBroadcaster& broadcaster, ExplosionSystem& explosions, Hooks hooks, Options options);
@@ -74,6 +77,14 @@ private:
     bool hitEntityAlong(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                         const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& arrow, double fromX,
                         double fromY, double fromZ);
+
+    /// The gust a wind charge leaves where it landed.
+    void gustWhereItLanded(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, double x,
+                           double y, double z);
+
+    /// The fire a small fireball leaves where it landed.
+    void lightWhereItLanded(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                            const entity::BlockHit& hit);
 
     /// What a bottle leaves where it broke.
     void splashPotion(const std::vector<player::PlayerSession*>& watchers, const entity::ServerEntity& bottle);

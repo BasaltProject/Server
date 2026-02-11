@@ -447,7 +447,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                                         : static_cast<std::int32_t>(scratchRandom()() %
                                                                                     static_cast<std::uint64_t>(bound));
                                   },
-                              .nextSeed = [] { return scratchSeed(); }});
+                              .nextSeed = [] { return scratchSeed(); },
+                              .blockTags = &vanillaData_.blockTags});
     redstone_ = std::make_unique<RedstoneTickSystem>(
         playerRegistry_, vanillaData_.recipes, *broadcaster_, chunkSimulation_,
         // parity: `BaseCommandBlock.performCommand`, which stands the source at the middle of the

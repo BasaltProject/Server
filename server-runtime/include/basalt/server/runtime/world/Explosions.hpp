@@ -47,6 +47,14 @@ using Spares =
                                           double z, float power, random::RandomSource& random,
                                           const Spares& spares = {});
 
+/// Which squares a blast reaches without taking any of them out. parity:
+/// `calculateExplodedPositions` on its own, which is all a `TRIGGER_BLOCK` explosion uses: the wind
+/// burst breaks nothing. A spared block costs the ray `3600000`, which stops it dead; everything
+/// else costs only the step.
+[[nodiscard]] std::vector<Broken> reaches(WorldState& world, std::int32_t minY, std::int32_t maxY, double x, double y,
+                                          double z, float power, random::RandomSource& random,
+                                          const Spares& stops = {});
+
 /// How much damage this explosion does to something `distance` blocks away.
 ///
 /// parity: `ServerExplosion.hurtEntities`' own arithmetic, without the exposure ray cast: the seen

@@ -222,6 +222,20 @@ bool isFire(std::int32_t stateId) {
     return block != nullptr && block->path() == "fire";
 }
 
+bool igniteOnImpact(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t delay) {
+    const std::optional<std::int32_t> existing = world.blockState(x, y, z);
+    if (!existing.has_value() || *existing != registry::blocks::air().stateId) {
+        return false;
+    }
+    const std::optional<std::int32_t> fire = fireFor(world, x, y, z, 0);
+    if (!fire.has_value() || !world.setBlockState(x, y, z, *fire)) {
+        return false;
+    }
+    // parity: `FireBlock.onPlace` books the fire's first turn whoever wrote it.
+    world.scheduleBlockTick(x, y, z, tickType(), delay);
+    return true;
+}
+
 void schedule(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random) {
     world.scheduleBlockTick(x, y, z, tickType(), tickDelay(random));
 }
