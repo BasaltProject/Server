@@ -166,12 +166,8 @@ void connect(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, 
 }
 
 /// parity: `updateNeighborsAfterPoweringDown`, which leaves the shelves either side as they were.
-void disconnect(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::vector<BlockChange>& changes) {
-    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
-    if (!stateId.has_value()) {
-        return;
-    }
-    const std::string facing = propertyOf(*stateId, "facing");
+void disconnectFacing(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, const std::string& facing,
+                      std::vector<BlockChange>& changes) {
     if (facing.empty()) {
         return;
     }
@@ -181,6 +177,14 @@ void disconnect(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
     if (const std::optional<Position> right = neighbour(world, x, y, z, facing, false); right.has_value()) {
         setPart(world, *right, disconnectedFromLeft(partOf(world, *right)), changes);
     }
+}
+
+void disconnect(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::vector<BlockChange>& changes) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value()) {
+        return;
+    }
+    disconnectFacing(world, x, y, z, propertyOf(*stateId, "facing"), changes);
 }
 
 [[nodiscard]] std::string opposite(std::string_view facing) {
@@ -297,6 +301,36 @@ bool swapHotbar(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
                                                       comparatorReading::of(world));
     }
     return swapped;
+}
+
+void leftBehind(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                const std::int32_t wasStateId, std::vector<BlockChange>& changes) {
+    if (!isShelf(pathOf(wasStateId))) {
+        return;
+    }
+    const std::optional<std::int32_t> now = world.blockState(x, y, z);
+    if (now.has_value() && isShelf(pathOf(*now))) {
+        return;
+    }
+    disconnectFacing(world, x, y, z, propertyOf(wasStateId, "facing"), changes);
+}
+
+void arrived(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+             const bool wasConnected, std::vector<BlockChange>& changes) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value() || !isShelf(pathOf(*stateId))) {
+        return;
+    }
+    if (propertyOf(*stateId, "powered") != "true") {
+        disconnect(world, x, y, z, changes);
+        return;
+    }
+    // parity: `isBeingUpdatedByNeighbor`: a shelf that already carries a part, or that carried one
+    // before the write, is being joined by whoever is writing it and does not redo the chain itself.
+    if (propertyOf(*stateId, "side_chain") != kUnconnected || wasConnected) {
+        return;
+    }
+    connect(world, x, y, z, changes);
 }
 
 void reactToSignal(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
