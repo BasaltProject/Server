@@ -80,6 +80,7 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
     weather_.thunderTime = metadata_.thunderTime;
     weather_.clearWeatherTime = metadata_.clearWeatherTime;
     portals_.load(worldRoot_);
+    randomSequences_.load(worldRoot_);
     state_.setOwner(&region_->owner());
     state_.setInstallOwner(&scheduler_.global());
     state_.setRegionCount([this] {
@@ -318,6 +319,7 @@ void LoadedWorld::saveDirty() {
     }
     save(chunks);
     portals_.save(worldRoot_);
+    randomSequences_.save(worldRoot_);
 }
 
 std::size_t LoadedWorld::unloadUnreachable(const std::vector<std::pair<std::int32_t, std::int32_t>>& playerPositions,

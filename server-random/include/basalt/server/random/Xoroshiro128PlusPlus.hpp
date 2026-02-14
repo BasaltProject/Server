@@ -24,6 +24,11 @@ public:
 
     constexpr explicit Xoroshiro128PlusPlus(Seed128bit seed) noexcept : Xoroshiro128PlusPlus(seed.lo, seed.hi) {}
 
+    /// The live state, which is what a saved sequence has to carry.
+    [[nodiscard]] constexpr Seed128bit state() const noexcept {
+        return Seed128bit{static_cast<std::int64_t>(lo_), static_cast<std::int64_t>(hi_)};
+    }
+
     constexpr std::int64_t nextLong() noexcept {
         const std::uint64_t s0 = lo_;
         std::uint64_t s1 = hi_;

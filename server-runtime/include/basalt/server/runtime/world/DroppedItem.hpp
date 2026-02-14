@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/world/StuckSpeed.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/common/Uuid.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
@@ -26,6 +27,12 @@ struct DroppedItem {
     double velocityX = 0.0;
     double velocityY = 0.0;
     double velocityZ = 0.0;
+
+    /// What the next move gets multiplied by, when a cobweb or powder snow has hold of it.
+    ///
+    /// parity: `Entity.stuckSpeedMultiplier`, which is not saved: an item reloaded inside a cobweb
+    /// is caught again by its first move.
+    stuckSpeed::Multiplier stuck;
 
     /// Ticks before anyone may pick this up.
     std::int32_t pickupDelay = kDefaultPickupDelay;
