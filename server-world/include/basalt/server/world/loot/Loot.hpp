@@ -210,6 +210,9 @@ struct LootPool {
 struct LootTable {
     std::vector<LootPool> pools;
     std::vector<LootFunction> functions;
+    /// The named stream this table rolls on. parity: `LootTable.randomSequence`, which is what makes
+    /// the same world drop the same thing in the same order.
+    std::optional<wire::common::Identifier> randomSequence;
 
     [[nodiscard]] std::vector<ItemStack> generate(random::RandomSource& random, float luck = 0.0F,
                                                   std::optional<float> explosionRadius = std::nullopt,

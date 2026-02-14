@@ -342,7 +342,11 @@ void BlockChangeBroadcaster::dropBrokenBlock(world::LoadedWorld& world, std::int
     if (table == nullptr) {
         return;
     }
-    random::RandomSource random = random::RandomSource::legacy(nextSeed());
+    // parity: a table rolls on the stream it names, which is the world's own and carries on between
+    // rolls: the same seed drops the same thing. A table with no name of its own keeps the scratch.
+    random::RandomSource scratch = random::RandomSource::legacy(nextSeed());
+    random::RandomSource& random =
+        table->randomSequence.has_value() ? world.randomSequences().of(*table->randomSequence) : scratch;
     // parity: `LootContextParams.BLOCK_STATE`, which is what a door, a slab or a bed drops by, and
     // `DecoratedPotBlock.getDrops`, which hands the roll the pot's own four sherds.
     server::world::loot::LootContext context{.blockState = reg::blockStateDefinitions::propertiesOf(destroyedState),

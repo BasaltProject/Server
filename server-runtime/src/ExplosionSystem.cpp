@@ -105,7 +105,7 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
     for (const world::explosions::Broken& block : broken) {
         sendBlock(watchers, block.x, block.y, block.z, reg::blocks::air().stateId);
         if (const std::optional<reg::BlockState> state = reg::blocks::byStateId(block.stateId); state.has_value()) {
-            collectExplodedBlock(state->block, block.stateId, block.x, block.y, block.z, power, drops);
+            collectExplodedBlock(world, state->block, block.stateId, block.x, block.y, block.z, power, drops);
         }
     }
 
@@ -122,12 +122,12 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
     for (const world::explosions::Broken& block : broken) {
         world::neighbourUpdates::afterChange(
             context, block.x, block.y, block.z, block.stateId, effects,
-            [this, &watchers, &drops](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
+            [this, &world, &watchers, &drops](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
                 sendBlock(watchers, bx, by, bz, reg::blocks::air().stateId);
                 // What the blast knocked loose afterwards falls as an ordinary break, not as part of
                 // the explosion: parity with `dropResources`, which carries no radius.
                 if (const std::optional<reg::BlockState> state = reg::blocks::byStateId(stateId); state.has_value()) {
-                    collectExplodedBlock(state->block, stateId, bx, by, bz, 0.0F, drops);
+                    collectExplodedBlock(world, state->block, stateId, bx, by, bz, 0.0F, drops);
                 }
             },
             [&watchers](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
@@ -148,8 +148,8 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
     }
 }
 
-void ExplosionSystem::collectExplodedBlock(const Identifier& block, std::int32_t stateId, std::int32_t x,
-                                           std::int32_t y, std::int32_t z, float power,
+void ExplosionSystem::collectExplodedBlock(world::LoadedWorld& world, const Identifier& block, std::int32_t stateId,
+                                           std::int32_t x, std::int32_t y, std::int32_t z, float power,
                                            std::vector<Drop>& drops) const {
     const server::world::loot::LootTable* table = lootTables_->forBlock(block);
     if (table == nullptr) {
@@ -157,7 +157,10 @@ void ExplosionSystem::collectExplodedBlock(const Identifier& block, std::int32_t
     }
     // parity: `LootContextParams.EXPLOSION_RADIUS`, which `explosion_decay` turns into the one in
     // `power` chance each item has of surviving the blast.
-    random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
+    // parity: the blast rolls on the table's own stream like any other break.
+    random::RandomSource scratch = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
+    random::RandomSource& random =
+        table->randomSequence.has_value() ? world.randomSequences().of(*table->randomSequence) : scratch;
     const server::world::loot::LootContext context{.blockState = reg::blockStateDefinitions::propertiesOf(stateId)};
     for (const server::world::loot::ItemStack& stack : table->generate(random, 0.0F, power, context)) {
         if (reg::items::registry().byName(stack.item) == nullptr) {

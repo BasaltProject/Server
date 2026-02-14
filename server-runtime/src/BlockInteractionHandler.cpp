@@ -229,7 +229,7 @@ void BlockInteractionHandler::dropLootFor(const Identifier& block, std::int32_t 
                                           const wire::nbt::NbtCompound* carried) {
     // parity: `Block.popResource` reads the `block_drops` rule, so with it off a block broken by hand
     // leaves nothing behind either.
-    const world::LoadedWorld* world = owner_->currentWorld();
+    world::LoadedWorld* world = owner_->currentWorld();
     if (world != nullptr && !world->gameRules().get(world::gameRules::kBlockDrops)) {
         return;
     }
@@ -238,7 +238,11 @@ void BlockInteractionHandler::dropLootFor(const Identifier& block, std::int32_t 
     if (table == nullptr) {
         return;
     }
-    random::RandomSource random = random::RandomSource::legacy(nextSeed());
+    random::RandomSource scratch = random::RandomSource::legacy(nextSeed());
+    // parity: the stream the table names, so the same world drops the same sapling off the same leaf.
+    random::RandomSource& random = table->randomSequence.has_value() && world != nullptr
+                                       ? world->randomSequences().of(*table->randomSequence)
+                                       : scratch;
     // parity: `LootContextParams.BLOCK_STATE`: the lower half of a door is what carries the drop,
     // and `THIS_ENTITY`, which a block broken by hand always has.
     const server::world::loot::LootContext context{.blockState = reg::blockStateDefinitions::propertiesOf(stateId),

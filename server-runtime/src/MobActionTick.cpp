@@ -182,7 +182,11 @@ void MobActionSystem::dropDeathLoot(world::LoadedWorld& world, const ServerEntit
     if (table == nullptr) {
         return;
     }
-    random::RandomSource random = freshRandom();
+    // parity: an entity's table rolls on the stream it names, `minecraft:entities/<type>`, so the
+    // same world drops the same number of chops off the same pig.
+    random::RandomSource scratch = freshRandom();
+    random::RandomSource& random =
+        table->randomSequence.has_value() ? world.randomSequences().of(*table->randomSequence) : scratch;
     for (const server::world::loot::ItemStack& stack : table->generate(random)) {
         if (server::registry::items::registry().byName(stack.item) == nullptr) {
             continue;
