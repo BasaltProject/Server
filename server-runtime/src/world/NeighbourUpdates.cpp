@@ -184,11 +184,18 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
     if (blockSurvival::isSupported(world, x, y, z, *stateId, scaffolding, context.hasSkylight)) {
         return false;
     }
-    // parity: `SugarCaneBlock.updateShape` books a turn instead of breaking, so a cane left without
-    // its water stands for one more tick.
-    if (registry::blockStateDefinitions::blockOf(*stateId) != nullptr &&
-        registry::blockStateDefinitions::blockOf(*stateId)->path() == "sugar_cane") {
-        scheduledBlocks::scheduleSugarCane(world, x, y, z, false);
+    // parity: `SugarCaneBlock.updateShape` and `CactusBlock.updateShape` book a turn instead of
+    // breaking, so a stalk left without its footing stands for one more tick and the tower over it
+    // comes apart a square at a time.
+    const wire::common::Identifier* breaking = registry::blockStateDefinitions::blockOf(*stateId);
+    const std::string_view breakingPath = breaking == nullptr ? std::string_view{} : breaking->path();
+    if (scheduledBlocks::booksItsOwnBreak(breakingPath)) {
+        scheduledBlocks::scheduleBreakIfLoose(world, x, y, z, false);
+        return false;
+    }
+    // parity: `ScaffoldingBlock.updateShape` never breaks anything either: the turn it booked is
+    // what decides, and that turn has already been booked by the shape walk.
+    if (breakingPath == "scaffolding") {
         return false;
     }
     world.setBlockState(x, y, z, registry::blocks::air().stateId);
@@ -322,19 +329,19 @@ std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std:
     if (!stateId.has_value()) {
         return std::nullopt;
     }
-    // parity: the scheduled ticks that change a block into something else rather than break it.
-    // Vanilla defers these by a tick; the outcome is the same and this is where it is known.
-    if (const std::optional<std::int32_t> soil = scheduledBlocks::coveredSoil(world, x, y, z); soil.has_value()) {
-        return soil;
+    // parity: the blocks whose `updateShape` books a turn and changes nothing now. Doing it here
+    // instead made tilled soil give way a tick early and coral go white on the spot, where the jar
+    // leaves it its three seconds of colour.
+    if (towards == BlockFace::Up) {
+        scheduledBlocks::scheduleCoveredSoil(world, x, y, z);
     }
-    if (const std::optional<std::int32_t> dead = scheduledBlocks::coral(world, x, y, z); dead.has_value()) {
-        return dead;
-    }
-    if (const std::optional<std::int32_t> counted = scheduledBlocks::scaffolding(world, x, y, z); counted.has_value()) {
-        return counted;
-    }
+    scheduledBlocks::scheduleCoralDeath(world, x, y, z, context.random.nextLong());
+    // parity: `ScaffoldingBlock.updateShape` answers the state it was given and books a turn for the
+    // next tick. Counting the distance here made a whole run collapse in one tick instead of walking
+    // out from the footing a square at a time. Measured in `andamio`.
+    scheduledBlocks::scheduleScaffolding(world, x, y, z);
     // A column is more than one block, so it reports through the caller rather than as one state.
-    scheduledBlocks::bubbleColumn(world, x, y, z, bubbles);
+    scheduledBlocks::scheduleBubbleColumn(world, x, y, z);
     if (const std::optional<std::int32_t> tuned = noteBlocks::retune(world, x, y, z, *stateId); tuned.has_value()) {
         return tuned;
     }
@@ -538,8 +545,11 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     settleArrivedSignal(world, x, y, z, reshaped);
     // parity: `SugarCaneBlock.updateShape` runs on the cane itself as it lands, and that is where a
     // cane with nothing to drink books the turn that breaks it.
-    scheduledBlocks::scheduleSugarCane(
+    scheduledBlocks::scheduleBreakIfLoose(
         world, x, y, z, blockSurvival::isSupported(world, x, y, z, std::nullopt, scaffolding, context.hasSkylight));
+    // parity: and `ScaffoldingBlock.updateShape` runs on the piece as it lands too, which is why a
+    // piece put down by hand keeps the `bottom` it was given until its first turn.
+    scheduledBlocks::scheduleScaffolding(world, x, y, z);
 
     // The block that just arrived reaches out to what was already there, which is the other half of
     // `updateShape`: a fence put down beside a fence joins it, not only the other way.

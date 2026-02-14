@@ -415,11 +415,12 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             }
         }
         world::scheduledBlocks::frogspawn(world.state(), x, y, z, scheduled);
-        // parity: `SugarCaneBlock.tick` ends in `level.destroyBlock(pos, true)`, and the `true` is
-        // the drop. What was standing there is read before, because after it is air.
+        // parity: `SugarCaneBlock.tick` and `CactusBlock.tick` both end in
+        // `level.destroyBlock(pos, true)`, and the `true` is the drop. What was standing there is
+        // read before, because after it is air.
         const std::int32_t standing = world.state().blockState(x, y, z).value_or(0);
         const std::size_t before = scheduled.size();
-        world::scheduledBlocks::sugarCane(
+        world::scheduledBlocks::breakIfStillLoose(
             world.state(), x, y, z,
             world::blockSurvival::isSupported(
                 world.state(), x, y, z, std::nullopt,
@@ -430,6 +431,52 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             scheduled);
         if (scheduled.size() != before) {
             broadcaster_->dropBrokenBlock(world, x, y, z, standing);
+            // parity: `destroyBlock` writes air with `Level.setBlock`'s flag three, so the square
+            // over it hears it go and books its own turn. Without this only the bottom of a tower
+            // came down. Measured in `cactuscana`.
+            broadcaster_->notifyAround(world, watchers, x, y, z, std::nullopt);
+        }
+        // parity: `FarmlandBlock.turnToDirt`, which writes with `setBlockAndUpdate` and raises a
+        // `BLOCK_CHANGE`, so a sculk sensor beside a field hears it give way.
+        if (const std::optional<std::int32_t> soil = world::scheduledBlocks::coveredSoil(world.state(), x, y, z);
+            soil.has_value()) {
+            scheduled.push_back(world::BlockChange{.x = x, .y = y, .z = z, .stateId = *soil});
+            broadcaster_->notifyAround(world, watchers, x, y, z, std::nullopt);
+            if (world.state().hasSculkSensorNear(x, y, z, world::vibrations::kCalibratedRange)) {
+                world::vibrations::emit(world.state(), "block_change", static_cast<double>(x) + 0.5,
+                                        static_cast<double>(y) + 0.5, static_cast<double>(z) + 0.5, world.gameTime());
+            }
+        }
+        // parity: `LiquidBlock.tick` and `BubbleColumnBlock.tick`, both of which end in
+        // `BubbleColumnBlock.updateColumn`: the column is built, carried on or taken apart here and
+        // not inside the shape cascade. Measured in `columnaburbujas`.
+        world::scheduledBlocks::bubbleColumn(world.state(), x, y, z, scheduled);
+        // parity: the coral turn, which writes with flag two: it goes white without telling anybody.
+        if (const std::optional<std::int32_t> dead = world::scheduledBlocks::coral(world.state(), x, y, z);
+            dead.has_value()) {
+            scheduled.push_back(world::BlockChange{.x = x, .y = y, .z = z, .stateId = *dead});
+        }
+        // parity: `ScaffoldingBlock.tick`, the turn the shape update booked: it counts the distance
+        // out again and only then decides whether the piece stays, breaks or falls. Both endings
+        // write with `Level.setBlock`'s flag three, so the piece beside it books its own turn and
+        // the count walks out one square per tick. Measured in `andamio`.
+        const world::scheduledBlocks::ScaffoldingTurn scaffold =
+            world::scheduledBlocks::scaffoldingTick(world.state(), x, y, z);
+        if (scaffold.reshaped.has_value()) {
+            scheduled.push_back(world::BlockChange{.x = x, .y = y, .z = z, .stateId = *scaffold.reshaped});
+            broadcaster_->notifyAround(world, watchers, x, y, z, std::nullopt);
+        } else if (scaffold.falls || scaffold.breaks) {
+            const std::int32_t was = world.state().blockState(x, y, z).value_or(0);
+            if (scaffold.falls) {
+                static_cast<void>(world::fallingBlocks::fallFrom(world.state(), x, y, z,
+                                                                 [this] { return players_->allocateEntityId(); }));
+            } else {
+                world.state().setBlockState(x, y, z, server::registry::blocks::air().stateId);
+                broadcaster_->dropBrokenBlock(world, x, y, z, was);
+            }
+            scheduled.push_back(
+                world::BlockChange{.x = x, .y = y, .z = z, .stateId = server::registry::blocks::air().stateId});
+            broadcaster_->notifyAround(world, watchers, x, y, z, std::nullopt);
         }
         world::geysers::tick(world.state(), world.metadata().seed, world.gameTime(), x, y, z, scheduled);
         world::scheduledBlocks::snifferEgg(world.state(), x, y, z, random, scheduled);

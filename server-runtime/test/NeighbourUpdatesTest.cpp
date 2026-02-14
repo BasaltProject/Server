@@ -202,25 +202,26 @@ TEST_CASE("the vertical bounds are the last word on what can break") {
 
 TEST_CASE("the cascade gives up after a thousand and twenty four neighbours") {
     Loaded loaded;
-    loaded.put(8, 64, 8, stateOf("sand"));
-    const std::int32_t cactus = stateOf("cactus");
+    loaded.put(8, 265, 8, stateOf("stone"));
+    // A hanging column, because the budget is what stops a chain that reaches: a cactus tower would
+    // not do any more, since a cactus books a turn instead of breaking on the spot.
+    const std::int32_t spike = stateOf(
+        "pointed_dripstone", {{"thickness", "middle"}, {"vertical_direction", "down"}, {"waterlogged", "false"}});
     for (std::int32_t y = 65; y <= 264; ++y) {
-        loaded.put(8, y, 8, cactus);
+        loaded.put(8, y, 8, spike);
     }
 
-    loaded.put(8, 64, 8, air());
-    // The floor is right under the change, so a position out of bounds must be dropped rather than
-    // queued: queuing it would eat the budget the cactus above needs.
+    loaded.put(8, 265, 8, air());
     neighbourUpdates::Context context = loaded.context();
     context.minY = 64;
     Report report;
-    neighbourUpdates::afterChange(context, 8, 64, 8, std::nullopt, report.effects, report.onBroken());
+    neighbourUpdates::afterChange(context, 8, 265, 8, std::nullopt, report.effects, report.onBroken());
 
     // The budget is spent six at a time, so a hundred and seventy one positions come off the queue
-    // and each of them takes the cactus above it with it.
+    // and each of them takes the one below it with it.
     CHECK(report.broken.size() == 171);
-    CHECK(loaded.state.blockState(8, 235, 8) == air());
-    CHECK(loaded.state.blockState(8, 236, 8) == cactus);
+    CHECK(loaded.state.blockState(8, 94, 8) == air());
+    CHECK(loaded.state.blockState(8, 93, 8) == spike);
 }
 
 TEST_CASE("a fence joins the fence beside it") {
@@ -503,9 +504,13 @@ TEST_CASE("a covered patch of farmland gives way to dirt rather than breaking") 
 
     neighbourUpdates::Context context = loaded.context();
     std::vector<BlockChange> bubbles;
-    const std::optional<std::int32_t> turned = neighbourUpdates::reshape(context, 8, 64, 8, bubbles);
+    // parity: the shape update only books the turn, so the soil is still tilled when it answers.
+    const std::optional<std::int32_t> turned =
+        neighbourUpdates::reshape(context, 8, 64, 8, bubbles, registry::BlockFace::Up);
+    CHECK_FALSE(turned.has_value());
+    CHECK(pathAt(loaded.state, 8, 64, 8) == "farmland");
 
-    REQUIRE(turned.has_value());
+    CHECK(scheduledBlocks::coveredSoil(loaded.state, 8, 64, 8).has_value());
     CHECK(pathAt(loaded.state, 8, 64, 8) == "dirt");
 }
 

@@ -283,6 +283,11 @@ void destroyPushed(const Context& context, const Push& push, std::vector<BlockCh
     // landed on, so a lamp that arrives with nothing powering it any more goes dark. Without it a
     // block kept whatever state it was carrying for ever.
     for (const Position& at : landed) {
+        // parity: the flag is sixty-seven, so the write itself tells the six neighbours before the
+        // block's own `neighborChanged` runs.
+        if (context.onLanded) {
+            context.onLanded(at[0], at[1], at[2]);
+        }
         const std::vector<BlockChange> told = redstoneReactors::update(context.world, context.worldName, at[0], at[1],
                                                                        at[2], context.gameTime, context.random, true);
         changes.insert(changes.end(), told.begin(), told.end());

@@ -31,6 +31,13 @@ inline constexpr std::int32_t kFallDelayTicks = 2;
 /// Asks for this position to be looked at in two ticks, if what stands there can fall at all.
 void scheduleIfFalling(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
+/// Turns the block into an entity wherever it stands, with no questions asked.
+///
+/// parity: `FallingBlockEntity.fall`, which is what `ScaffoldingBlock.tick` calls straight:
+/// scaffolding already out of reach falls whether or not there is anything under it.
+entity::ServerEntity* fallFrom(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                               const std::function<std::int32_t()>& allocateEntityId);
+
 /// Turns the block into an entity if it still has nothing under it. Answers it, or nothing if the
 /// tick came due over something solid after all.
 entity::ServerEntity* beginFalling(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
