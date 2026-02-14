@@ -54,6 +54,9 @@ constexpr double kDispenseReach = 0.7;
 
 /// parity: `BoatDispenseItemBehavior`'s own `0.5625` clear of the block, plus the `1.125` it rises by
 /// when the dispenser looks up or down.
+/// The length of `_spawn_egg`, which is what a spawn egg's name ends with.
+constexpr std::size_t kSpawnEggSuffix = 10;
+
 constexpr double kBoatClearance = 0.5625;
 constexpr double kBoatLift = 1.125;
 constexpr double kVerticalDrop = 0.125;
@@ -123,6 +126,27 @@ constexpr std::int32_t kGrowthSparkles = 15;
 [[nodiscard]] const wire::common::Identifier& armorStand() {
     static const wire::common::Identifier instance = wire::common::Identifier::vanilla("armor_stand");
     return instance;
+}
+
+/// What a bucket with something alive in it lets out, and whether it pours water first.
+///
+/// parity: the ten `MobBucketItem` registrations. All of them carry water except the sulfur cube's,
+/// whose fluid is `Fluids.EMPTY`: `emptyContents` answers true for that one without pouring
+/// anything, so the bucket still comes back empty and the animal still gets out.
+[[nodiscard]] std::optional<std::pair<std::string_view, bool>> caughtIn(std::string_view path) {
+    static constexpr std::array<std::pair<std::string_view, std::string_view>, 7> kBuckets{
+        {{"cod_bucket", "cod"},
+         {"salmon_bucket", "salmon"},
+         {"pufferfish_bucket", "pufferfish"},
+         {"tropical_fish_bucket", "tropical_fish"},
+         {"axolotl_bucket", "axolotl"},
+         {"tadpole_bucket", "tadpole"},
+         {"sulfur_cube_bucket", "sulfur_cube"}}};
+    const auto found = std::ranges::find_if(kBuckets, [path](const auto& one) { return one.first == path; });
+    if (found == kBuckets.end()) {
+        return std::nullopt;
+    }
+    return std::pair{found->second, found->first != "sulfur_cube_bucket"};
 }
 
 /// parity: the sixteen `BoatDispenseItemBehavior` entries, whose item and entity share a name.
@@ -431,6 +455,56 @@ void heard(WorldState& world, const std::string_view event, const std::int32_t x
         boat->yaw = yawOf(out);
         static_cast<void>(context.world.spawnEntity(std::move(boat)));
         return Special{.handled = true, .left = minusOne(stack)};
+    }
+    // parity: `SpawnEggItemBehavior`, which `DispenserBlock.getDefaultDispenseMethod` picks for any
+    // spawn egg: the animal comes out in the square in front. Vanilla reads the type off the item's
+    // `entity_data` component; this build has no default components, and the name carries the same
+    // fact. Measured in `dispensahuevo`.
+    if (stack.item.path().ends_with("_spawn_egg")) {
+        const std::string_view path = stack.item.path();
+        const wire::common::Identifier animal =
+            wire::common::Identifier::vanilla(std::string{path.substr(0, path.size() - kSpawnEggSuffix)});
+        const std::optional<std::int32_t> protocolType = protocolTypeOf(hooks, animal);
+        if (!protocolType.has_value()) {
+            return {};
+        }
+        auto spawned =
+            std::make_unique<entity::ServerEntity>(nextEntityId(hooks), wire::common::Uuid::random(), animal,
+                                                   *protocolType, tx + 0.5, static_cast<double>(ty), tz + 0.5);
+        static_cast<void>(context.world.spawnEntity(std::move(spawned)));
+        // parity: the `ENTITY_PLACE` of this one comes from the **dispenser's** square, not from the
+        // square the animal landed in.
+        heard(context.world, "entity_place", x, y, z, hooks.gameTime);
+        return Special{.handled = true, .left = minusOne(stack)};
+    }
+    // parity: `MobBucketItem`: the water goes down like any full bucket's, the animal comes out at
+    // the bottom middle of the square, and the bucket comes back empty. Measured in `dispensapez`.
+    if (const std::optional<std::pair<std::string_view, bool>> caught = caughtIn(stack.item.path());
+        caught.has_value()) {
+        if (caught->second) {
+            const std::optional<buckets::Result> poured =
+                buckets::useOn(context, buckets::waterBucket(), tx, ty, tz, directionOf(out), false);
+            if (!poured.has_value()) {
+                return {};
+            }
+            heard(context.world, "fluid_place", tx, ty, tz, hooks.gameTime);
+        }
+        const wire::common::Identifier animal = wire::common::Identifier::vanilla(std::string{caught->first});
+        const std::optional<std::int32_t> protocolType = protocolTypeOf(hooks, animal);
+        if (protocolType.has_value()) {
+            // parity: `EntityType.create(..., shouldOffsetY = true)` drops it a block onto whatever is
+            // in the square, and an empty square or one full of water stops nothing: it lands on the
+            // floor of it.
+            auto spawned =
+                std::make_unique<entity::ServerEntity>(nextEntityId(hooks), wire::common::Uuid::random(), animal,
+                                                       *protocolType, tx + 0.5, static_cast<double>(ty), tz + 0.5);
+            static_cast<void>(context.world.spawnEntity(std::move(spawned)));
+            heard(context.world, "entity_place", tx, ty, tz, hooks.gameTime);
+        }
+        const std::optional<ItemStack> left = minusOne(stack);
+        return Special{.handled = true,
+                       .left = left.has_value() ? left
+                                                : std::optional{ItemStack{.item = buckets::emptyBucket(), .count = 1}}};
     }
     // parity: `SolidBucketItem.emptyContents` under the dispenser's filled-bucket entry: the powder
     // snow goes down on an empty square and the bucket comes back empty. Anywhere else the behaviour
