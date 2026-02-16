@@ -31,6 +31,10 @@ namespace {
     return [next = std::make_shared<std::int32_t>(1)]() mutable { return (*next)++; };
 }
 
+/// The survival question the runtime answers from `blockSurvival`; here everything stands.
+[[nodiscard]] fallingBlocks::CanSurvive anythingStands() {
+    return [](std::int32_t, std::int32_t, std::int32_t, std::int32_t) { return true; };
+}
 } // namespace
 
 TEST_CASE("which blocks fall and what gives way under them") {
@@ -38,6 +42,9 @@ TEST_CASE("which blocks fall and what gives way under them") {
     CHECK(fallingBlocks::falls(stateOf("gravel")));
     CHECK(fallingBlocks::falls(stateOf("anvil")));
     CHECK_FALSE(fallingBlocks::falls(stateOf("stone")));
+    // parity: `SpeleothemBlock implements Fallable` but is no `FallingBlock`: it books no fall check
+    // and a dripstone with air under it stays where it is.
+    CHECK_FALSE(fallingBlocks::falls(stateOf("pointed_dripstone")));
     CHECK_FALSE(fallingBlocks::falls(registry::blocks::air().stateId));
 
     // parity: `isFree` is air, anything replaceable and fire.
@@ -84,14 +91,14 @@ TEST_CASE("sand over a hole becomes an entity and lands as sand again") {
     CHECK(falling->z == doctest::Approx(4.5));
     CHECK(falling->y == doctest::Approx(70.0));
 
-    std::optional<BlockChange> landed;
-    for (std::int32_t at = 0; at < 200 && !landed.has_value(); ++at) {
-        landed = fallingBlocks::tick(world, *falling);
+    fallingBlocks::Landing landed;
+    for (std::int32_t at = 0; at < 200 && !landed.placed.has_value(); ++at) {
+        landed = fallingBlocks::tick(world, *falling, anythingStands());
     }
-    REQUIRE(landed.has_value());
+    REQUIRE(landed.placed.has_value());
     // It rests on the block that stopped it, not inside it.
-    CHECK(landed->y == 61);
-    CHECK(landed->stateId == stateOf("sand"));
+    CHECK(landed.placed->y == 61);
+    CHECK(landed.placed->stateId == stateOf("sand"));
     CHECK(world.blockState(4, 61, 4) == stateOf("sand"));
     CHECK(falling->removed);
 }
@@ -107,12 +114,12 @@ TEST_CASE("it falls faster the longer it falls") {
 
     // parity: `FallingBlockEntity.tick` takes gravity off and then scales by the air drag, so the
     // first tick moves it a little under a twenty-fifth of a block.
-    CHECK_FALSE(fallingBlocks::tick(world, *falling).has_value());
+    CHECK_FALSE(fallingBlocks::tick(world, *falling, anythingStands()).placed.has_value());
     CHECK(falling->velocityY == doctest::Approx(-0.0392));
     CHECK(falling->y == doctest::Approx(199.9608));
 
     const double firstStep = 200.0 - falling->y;
-    CHECK_FALSE(fallingBlocks::tick(world, *falling).has_value());
+    CHECK_FALSE(fallingBlocks::tick(world, *falling, anythingStands()).placed.has_value());
     const double secondStep = 199.9608 - falling->y;
     CHECK(secondStep > firstStep);
 }
@@ -141,7 +148,7 @@ TEST_CASE("a block that falls out of the world is gone") {
     ServerEntity* falling = fallingBlocks::beginFalling(world, 4, -60, 4, ids());
     REQUIRE(falling != nullptr);
     for (std::int32_t at = 0; at < 500 && !falling->removed; ++at) {
-        CHECK_FALSE(fallingBlocks::tick(world, *falling).has_value());
+        CHECK_FALSE(fallingBlocks::tick(world, *falling, anythingStands()).placed.has_value());
     }
     CHECK(falling->removed);
     // Nothing was put back anywhere on the way down.

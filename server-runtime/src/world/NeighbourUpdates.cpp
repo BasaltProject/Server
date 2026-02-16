@@ -193,6 +193,12 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
         scheduledBlocks::scheduleBreakIfLoose(world, x, y, z, false);
         return false;
     }
+    // parity: `SpeleothemBlock.updateShape` books a turn too, and its own delay: a stalactite waits
+    // two ticks and then falls as an entity rather than breaking where it hangs.
+    if (breakingPath == "pointed_dripstone" || breakingPath == "sulfur_spike") {
+        scheduledBlocks::scheduleSpeleothem(world, x, y, z, false);
+        return false;
+    }
     // parity: `ScaffoldingBlock.updateShape` never breaks anything either: the turn it booked is
     // what decides, and that turn has already been booked by the shape walk.
     if (breakingPath == "scaffolding") {
@@ -218,18 +224,14 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
 /// parity: `BlockState.updateNeighbourShapes`, the six squares a write redraws, each told the side
 /// the news arrives from and walked in vanilla's own order.
 void shapeAround(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z, const OnReshaped& reshaped) {
-    std::vector<BlockChange> bubbles;
     for (const BlockFace face : kUpdateShapeOrder) {
         const std::int32_t nx = x + registry::stepX(face);
         const std::int32_t ny = y + registry::stepY(face);
         const std::int32_t nz = z + registry::stepZ(face);
-        if (const std::optional<std::int32_t> drawn = reshape(context, nx, ny, nz, bubbles, registry::opposite(face));
+        if (const std::optional<std::int32_t> drawn = reshape(context, nx, ny, nz, registry::opposite(face));
             drawn.has_value()) {
             reshaped(drawn.value(), nx, ny, nz);
         }
-    }
-    for (const BlockChange& change : bubbles) {
-        reshaped(change.stateId, change.x, change.y, change.z);
     }
 }
 
@@ -246,10 +248,8 @@ void visit(const Walk& walk, std::deque<Position>& pending, std::int32_t x, std:
            BlockFace towards) {
     fallingBlocks::scheduleIfFalling(walk.context.world, x, y, z);
     bool changed = false;
-    std::vector<BlockChange> bubbles;
     const std::optional<std::int32_t> before = walk.context.world.blockState(x, y, z);
-    if (const std::optional<std::int32_t> reshaped = reshape(walk.context, x, y, z, bubbles, towards);
-        reshaped.has_value()) {
+    if (const std::optional<std::int32_t> reshaped = reshape(walk.context, x, y, z, towards); reshaped.has_value()) {
         // parity: `Block.updateOrDestroy`, which is what runs a shape update's answer: a state is
         // written, but **air** is a `destroyBlock` and that one drops what was standing there. Half a
         // door left alone comes apart and leaves its door on the floor.
@@ -259,10 +259,6 @@ void visit(const Walk& walk, std::deque<Position>& pending, std::int32_t x, std:
         } else {
             walk.onReshaped(*reshaped, x, y, z);
         }
-        changed = true;
-    }
-    for (const BlockChange& change : bubbles) {
-        walk.onReshaped(change.stateId, change.x, change.y, change.z);
         changed = true;
     }
     if (breakIfUnsupported(walk.context, x, y, z, walk.scaffolding, walk.onBroken, towards) || changed) {
@@ -323,7 +319,7 @@ std::optional<std::int32_t> connect(const Context& context, std::int32_t x, std:
 }
 
 std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
-                                    std::vector<BlockChange>& bubbles, std::optional<BlockFace> towards) {
+                                    std::optional<BlockFace> towards) {
     WorldState& world = context.world;
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
@@ -336,6 +332,7 @@ std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std:
         scheduledBlocks::scheduleCoveredSoil(world, x, y, z);
     }
     scheduledBlocks::scheduleCoralDeath(world, x, y, z, context.random.nextLong());
+    scheduledBlocks::scheduleCreakingHeart(world, x, y, z);
     // parity: `ScaffoldingBlock.updateShape` answers the state it was given and books a turn for the
     // next tick. Counting the distance here made a whole run collapse in one tick instead of walking
     // out from the footing a square at a time. Measured in `andamio`.
@@ -550,16 +547,18 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // parity: and `ScaffoldingBlock.updateShape` runs on the piece as it lands too, which is why a
     // piece put down by hand keeps the `bottom` it was given until its first turn.
     scheduledBlocks::scheduleScaffolding(world, x, y, z);
+    // parity: `CoralBlock.onPlace` and the three `BaseCoralPlantTypeBlock` ones book the die turn for
+    // the coral **as it lands**, not only when a neighbour moves: one put down out of water arrives
+    // with its count already running. The shape walk above only ever reaches the neighbours.
+    scheduledBlocks::scheduleCoralDeath(world, x, y, z, context.random.nextLong());
+    // parity: `CreakingHeartBlock.onPlace` is `updateShape`'s own turn, booked the same way.
+    scheduledBlocks::scheduleCreakingHeart(world, x, y, z);
 
     // The block that just arrived reaches out to what was already there, which is the other half of
     // `updateShape`: a fence put down beside a fence joins it, not only the other way.
-    std::vector<BlockChange> bubbles;
     if (reshapeSelf) {
-        if (const std::optional<std::int32_t> moved = reshape(context, x, y, z, bubbles); moved.has_value()) {
+        if (const std::optional<std::int32_t> moved = reshape(context, x, y, z); moved.has_value()) {
             reshaped(*moved, x, y, z);
-        }
-        for (const BlockChange& change : bubbles) {
-            reshaped(change.stateId, change.x, change.y, change.z);
         }
     }
     // parity: `RedStoneWireBlock.updateIndirectNeighbourShapes`, the one place a dust reaches past

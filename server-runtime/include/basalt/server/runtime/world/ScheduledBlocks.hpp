@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -102,12 +103,45 @@ void scheduleHatch(WorldState& world, std::int32_t x, std::int32_t y, std::int32
 /// parity: `FrogspawnBlock.onPlace`, an hour or so away and never the same twice.
 void scheduleFrogspawn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t seed);
 
-/// Whether this block answers a neighbour that moved by booking a turn instead of breaking.
+/// Whether a state is a pale oak log, which only the tag can answer.
+using IsPaleOakLog = std::function<bool(std::int32_t stateId)>;
+
+/// parity: `CreakingHeartBlock.updateShape`, which books a turn for any neighbour that moved.
+void scheduleCreakingHeart(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
+/// parity: `CreakingHeartBlock.tick` over `updateState`: an uprooted heart with a pale oak log at
+/// both ends of its own axis wakes up, awake by night and dormant by day.
+[[nodiscard]] std::optional<std::int32_t> creakingHeartTick(WorldState& world, std::int32_t x, std::int32_t y,
+                                                            std::int32_t z, const IsPaleOakLog& isPaleOakLog,
+                                                            bool creakingActive);
+
+/// What `SpeleothemBlock.tick` decides: nothing, a stalagmite broken where it stands, or a whole
+/// stalactite coming down as entities.
+struct SpeleothemTurn {
+    bool destroys = false;
+    bool falls = false;
+};
+
+/// parity: `SpeleothemBlock.updateShape`, which books two ticks for a stalactite and one for a
+/// stalagmite, and leaves a stalactite alone once its turn is already booked.
+void scheduleSpeleothem(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool supported);
+
+/// Whether a stalactite hangs here, and whether that piece is its tip.
 ///
-/// parity: `SugarCaneBlock.updateShape`, `CactusBlock.updateShape` and `BigDripleafStemBlock`'s,
-/// which are the same three lines: no `canSurvive` means a turn one tick out, and the turn is what
-/// breaks the block. A whole tower therefore comes apart one square per tick, not all at once.
-/// Measured in `cactuscana`.
+/// parity: `SpeleothemBlock.spawnFallingStalactite` walks down from the piece that lost its anchor
+/// and turns every one into an entity, stopping after the tip.
+[[nodiscard]] bool isStalactiteAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
+[[nodiscard]] bool isStalactiteTipAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
+/// parity: `SpeleothemBlock.tick`, the turn it booked.
+[[nodiscard]] SpeleothemTurn speleothemTick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                            bool supported);
+
+/// Whether this block answers a neighbour that moved by booking a turn instead of breaking. parity:
+/// `SugarCaneBlock.updateShape` and the cactus and dripleaf stem are the same three lines: no
+/// `canSurvive` means a turn one tick out, and the turn is what breaks the block, so a tower comes
+/// apart one square per tick.
 [[nodiscard]] bool booksItsOwnBreak(std::string_view path);
 
 /// Books that turn. `supported` is the answer `canSurvive` would give.

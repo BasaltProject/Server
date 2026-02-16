@@ -23,7 +23,17 @@ const wire::common::Identifier& entityType() {
     return instance;
 }
 
-bool falls(std::int32_t stateId) { return registry::blockConnections::isFalling(stateId); }
+bool falls(std::int32_t stateId) {
+    // parity: `SpeleothemBlock implements Fallable` so that a stalactite the block itself drops can
+    // land, but it is **not** a `FallingBlock`: it books no fall check of its own and a dripstone
+    // with air under it stays where it is. The table cannot tell the two apart, so it is named here.
+    // Measured in `estalactita`, where ours fell like sand and the jar's hung there.
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    if (block != nullptr && (block->path() == "pointed_dripstone" || block->path() == "sulfur_spike")) {
+        return false;
+    }
+    return registry::blockConnections::isFalling(stateId);
+}
 
 bool isFree(std::int32_t stateId) {
     if (stateId == registry::blocks::air().stateId || registry::blockShapes::isReplaceable(stateId)) {
@@ -87,7 +97,7 @@ entity::ServerEntity* beginFalling(WorldState& world, std::int32_t x, std::int32
     return fallFrom(world, x, y, z, allocateEntityId);
 }
 
-std::optional<BlockChange> tick(WorldState& world, entity::ServerEntity& entity) {
+Landing tick(WorldState& world, entity::ServerEntity& entity, const CanSurvive& canSurvive) {
     entity.velocityY -= kGravity;
     entity.velocityY *= kAirDrag;
     const double nextY = entity.y + entity.velocityY;
@@ -99,18 +109,24 @@ std::optional<BlockChange> tick(WorldState& world, entity::ServerEntity& entity)
     if (below.has_value() && !isFree(*below)) {
         entity.removed = true;
         const std::int32_t resting = landingY + 1;
-        if (world.setBlockState(blockX, resting, blockZ, entity.objectData)) {
-            return BlockChange{.x = blockX, .y = resting, .z = blockZ, .stateId = entity.objectData};
+        // parity: `mayReplace && wouldSurvive`, the two questions `FallingBlockEntity.tick` asks
+        // before it writes. `wouldContinueFalling` is already false here: the square under this one
+        // is what stopped the fall.
+        const std::optional<std::int32_t> at = world.blockState(blockX, resting, blockZ);
+        const bool mayReplace = at.has_value() && registry::blockShapes::isReplaceable(*at);
+        const bool wouldSurvive = !canSurvive || canSurvive(entity.objectData, blockX, resting, blockZ);
+        if (mayReplace && wouldSurvive && world.setBlockState(blockX, resting, blockZ, entity.objectData)) {
+            return Landing{.placed = BlockChange{.x = blockX, .y = resting, .z = blockZ, .stateId = entity.objectData}};
         }
-        return std::nullopt;
+        return Landing{.shattered = entity.objectData};
     }
     const server::world::Chunk* chunk = world.chunkIfLoaded(blockX >> 4, blockZ >> 4);
     if (chunk != nullptr && landingY < chunk->verticalBounds().minY()) {
         entity.removed = true;
-        return std::nullopt;
+        return Landing{};
     }
     entity.y = nextY;
-    return std::nullopt;
+    return Landing{};
 }
 
 } // namespace basalt::server::runtime::world::fallingBlocks

@@ -47,6 +47,10 @@ public:
     /// `removed` is what stood there before, for the half of the cascade that belongs to the block
     /// that has gone. Nothing means the caller does not know, which is not the same as nothing having
     /// been removed, so it has no default.
+    /// parity: `FallingBlockEntity.tick`'s `spawnAtLocation(level, block)` when the block cannot be
+    /// placed where it stopped: the block's **own** item, not its loot table.
+    void dropFallenBlock(world::LoadedWorld& world, double x, double y, double z, std::int32_t stateId);
+
     void notifyAround(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
                       std::int32_t y, std::int32_t z, std::optional<std::int32_t> removed);
 

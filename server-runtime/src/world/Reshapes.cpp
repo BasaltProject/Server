@@ -287,9 +287,40 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return changed(world, x, y, z, stateId, block, "type", "single");
 }
 
+/// parity: `ChorusPlantBlock.canSurvive`, word for word.
+[[nodiscard]] bool chorusPlantSurvives(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::int32_t below = stateAt(world, x, y - 1, z);
+    const std::int32_t air = registry::blocks::air().stateId;
+    const bool blockAboveOrBelow = stateAt(world, x, y + 1, z) != air && below != air;
+    for (const registry::BlockFace face : {registry::BlockFace::North, registry::BlockFace::South,
+                                           registry::BlockFace::West, registry::BlockFace::East}) {
+        const std::int32_t sideX = x + offsetX(face);
+        const std::int32_t sideZ = z + offsetZ(face);
+        if (pathOf(stateAt(world, sideX, y, sideZ)) != "chorus_plant") {
+            continue;
+        }
+        if (blockAboveOrBelow) {
+            return false;
+        }
+        // parity: `#minecraft:supports_chorus_plant`, which is end stone and little else.
+        const std::string under = pathOf(stateAt(world, sideX, y - 1, sideZ));
+        if (under == "chorus_plant" || under == "end_stone") {
+            return true;
+        }
+    }
+    const std::string underMe = pathOf(below);
+    return underMe == "chorus_plant" || underMe == "end_stone";
+}
+
 /// parity: `ChorusPlantBlock.updateShape`, six faces of it.
 [[nodiscard]] std::optional<std::int32_t> chorusPlant(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                       std::int32_t stateId, const wire::common::Identifier& block) {
+    // parity: the shape update asks `canSurvive` **first**, and a plant that cannot stay is left
+    // exactly as it is while its turn is booked: it keeps the `down` it had for one more tick.
+    // Measured in `tallostorre`.
+    if (!chorusPlantSurvives(world, x, y, z)) {
+        return std::nullopt;
+    }
     std::map<std::string, std::string> wanted;
     for (const registry::BlockFace face : kAllFaces) {
         const std::int32_t neighbour = stateAt(world, x + offsetX(face), y + offsetY(face), z + offsetZ(face));

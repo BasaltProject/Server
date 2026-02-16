@@ -14,6 +14,7 @@
 #include <basalt/server/runtime/world/ArrowButtons.hpp>
 #include <basalt/server/runtime/world/BlockEntityTicks.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
+#include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/Dripleaves.hpp>
 #include <basalt/server/runtime/world/FallingBlocks.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
@@ -469,10 +470,21 @@ void RedstoneTickSystem::tickFallingBlocks(world::LoadedWorld& world, const sche
         return;
     }
     const std::vector<PlayerSession*> watchers = watchersOf(world);
+    const bool hasSkylight = config::dimensionFacts(world.declaration().dimension).hasSkylight;
     for (entity::ServerEntity* entity : falling) {
-        const std::optional<world::BlockChange> landed = world::fallingBlocks::tick(world.state(), *entity);
-        if (landed.has_value()) {
-            sendBlockUpdate(watchers, BlockPos{landed->x, landed->y, landed->z}, landed->stateId);
+        const double wasX = entity->x;
+        const double wasY = entity->y;
+        const double wasZ = entity->z;
+        const world::fallingBlocks::Landing landed = world::fallingBlocks::tick(
+            world.state(), *entity,
+            [&world, hasSkylight](std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) {
+                return world::blockSurvival::isSupported(world.state(), x, y, z, stateId, {}, hasSkylight);
+            });
+        if (landed.placed.has_value()) {
+            sendBlockUpdate(watchers, BlockPos{landed.placed->x, landed.placed->y, landed.placed->z},
+                            landed.placed->stateId);
+        } else if (landed.shattered.has_value()) {
+            broadcaster_->dropFallenBlock(world, wasX, wasY, wasZ, *landed.shattered);
         }
     }
 }

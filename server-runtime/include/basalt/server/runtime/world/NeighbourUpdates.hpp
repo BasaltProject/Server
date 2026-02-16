@@ -127,11 +127,10 @@ void settleArrivedSignal(WorldState& world, std::int32_t x, std::int32_t y, std:
 /// parity: `CrossCollisionBlock.updateShape`, which is the half of a neighbour update that changes
 /// how a block looks rather than whether it stays.
 ///
-/// A column is more than one block, so what a bubble column did is reported through `bubbles`.
 ///
 /// `towards` is the side the news arrives from, seen from this block, and only the dust reads it.
 [[nodiscard]] std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std::int32_t y,
-                                                  std::int32_t z, std::vector<BlockChange>& bubbles,
+                                                  std::int32_t z,
                                                   std::optional<registry::BlockFace> towards = std::nullopt);
 
 /// Joins a block to what is beside it: a fence to a fence, a wall to a wall, a staircase to its
