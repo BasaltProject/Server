@@ -316,6 +316,13 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                     std::int32_t destroyedState) {
         broadcaster_->dropBrokenBlock(world, x, y, z, destroyedState);
     };
+    wiring.summonGolem = [this](world::LoadedWorld& world, std::string_view type, double x, double y, double z) {
+        if (spawning_ == nullptr) {
+            return;
+        }
+        static_cast<void>(spawning_->spawnMob(world, wire::common::Identifier::vanilla(std::string{type}), x, y, z,
+                                              0.0F, "triggered", {}));
+    };
     wiring.requestRestart = [this] { requestRestart(); };
     wiring.onConfigsReloaded = [this] { worldRegistry_->onConfigsReloaded(); };
     wiring.nowNanos = [this] {
@@ -430,7 +437,17 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     });
 
     broadcaster_ = std::make_unique<BlockChangeBroadcaster>(
-        playerRegistry_, vanillaData_.lootTables, BlockChangeBroadcaster::Hooks{},
+        playerRegistry_, vanillaData_.lootTables,
+        // parity: `spawnGolemInWorld`, which is `EntitySpawnReason.TRIGGERED` and no rotation at all.
+        BlockChangeBroadcaster::Hooks{
+            .summonGolem =
+                [this](world::LoadedWorld& world, std::string_view type, double x, double y, double z) {
+                    if (spawning_ == nullptr) {
+                        return;
+                    }
+                    static_cast<void>(spawning_->spawnMob(world, wire::common::Identifier::vanilla(std::string{type}),
+                                                          x, y, z, 0.0F, "triggered", {}));
+                }},
         BlockChangeBroadcaster::Options{.nextSeed = [] { return scratchSeed(); }});
     explosions_ =
         std::make_unique<ExplosionSystem>(playerRegistry_, vanillaData_.lootTables, ExplosionSystem::Hooks{},

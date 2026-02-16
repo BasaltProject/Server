@@ -17,6 +17,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
+#include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
@@ -174,6 +175,37 @@ void MobActionSystem::eatGrassUnder(world::LoadedWorld& world, const ServerEntit
     }
     if (world.state().setBlockState(x, y - 1, z, dirt->stateId)) {
         broadcaster_->announceBlock(watchers, world::BlockChange{.x = x, .y = y - 1, .z = z, .stateId = dirt->stateId});
+    }
+}
+
+void MobActionSystem::trailSnow(world::LoadedWorld& world, const ServerEntity& golem) {
+    if (!world.gameRules().get(world::gameRules::kMobGriefing)) {
+        return;
+    }
+    const server::registry::BlockState* snow = server::registry::blocks::named("snow");
+    if (snow == nullptr) {
+        return;
+    }
+    const std::vector<PlayerSession*> watchers = watchersOf(world);
+    // parity: `SnowGolem.aiStep` walks four corners a quarter of a block out, which is what leaves a
+    // trail two squares wide when the golem walks along a seam.
+    for (std::int32_t corner = 0; corner < 4; ++corner) {
+        const auto x = static_cast<std::int32_t>(std::floor(golem.x + ((corner % 2 * 2) - 1) * 0.25));
+        const auto y = static_cast<std::int32_t>(std::floor(golem.y));
+        const auto z = static_cast<std::int32_t>(std::floor(golem.z + ((corner / 2 % 2 * 2) - 1) * 0.25));
+        const std::optional<std::int32_t> here = world.state().blockState(x, y, z);
+        if (!here.has_value() || *here != server::registry::blocks::air().stateId ||
+            !world::blockSurvival::isSupported(world.state(), x, y, z, snow->stateId)) {
+            continue;
+        }
+        if (!world.state().setBlockState(x, y, z, snow->stateId)) {
+            continue;
+        }
+        // parity: `setBlockAndUpdate` is flag 3, so the clients hear about the layer first and the
+        // squares around it after, which is the order `Level.setBlock` does the two in.
+        broadcaster_->announceBlock(watchers, world::BlockChange{.x = x, .y = y, .z = z, .stateId = snow->stateId});
+        broadcaster_->notifyAround(world, watchers, x, y, z, here);
+        world::vibrations::emit(world.state(), "block_place", x + 0.5, y + 0.5, z + 0.5, world.gameTime());
     }
 }
 

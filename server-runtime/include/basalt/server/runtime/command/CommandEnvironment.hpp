@@ -82,6 +82,9 @@ public:
         std::function<void(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                            std::int32_t destroyedState)>
             dropBrokenBlock;
+        /// parity: `CarvedPumpkinBlock.trySpawnGolem`'s `addFreshEntity`. Null where there is no
+        /// entity side to put a golem into, which is how the dispatcher's own tests run.
+        std::function<void(world::LoadedWorld& world, std::string_view type, double x, double y, double z)> summonGolem;
         /// What the console reads messages with. Clients resolve translation keys themselves
         /// against their own language, so this exists only so the log shows sentences instead of
         /// keys; an empty table degrades to printing the keys rather than failing.

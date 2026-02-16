@@ -102,6 +102,9 @@ public:
 
     void shootArrow(entity::ServerEntity& mob, double targetX, double targetY, double targetZ, float power) override;
 
+    /// parity: `SnowGolem.aiStep`, the layer of snow it leaves on every square it stands on.
+    void trailSnow(world::LoadedWorld& world, const entity::ServerEntity& golem);
+
     /// The undead burning in the sun, and what burning costs anything that is on fire.
     void tickFire(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                   entity::ServerEntity& mob, random::RandomSource& random);

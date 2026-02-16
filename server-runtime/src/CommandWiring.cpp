@@ -58,6 +58,7 @@ WiredCommands buildCommands(const CommandWiring& wiring) {
     options.maxPlayers = wiring.maxPlayers;
     options.stopServer = wiring.stopServer;
     options.dropBrokenBlock = wiring.dropBrokenBlock;
+    options.summonGolem = wiring.summonGolem;
     options.lang = wiring.lang;
     if (wiring.playerStore != nullptr) {
         options.playerRepository = &wiring.playerStore->players();

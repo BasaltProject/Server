@@ -659,3 +659,73 @@ TEST_CASE("a signal arriving lights a tnt, and the game rule is what stops it") 
     CHECK(loaded.state.blockState(8, 64, 8) != air());
     CHECK(loaded.state.takePrimedTnt().empty());
 }
+
+TEST_CASE("a carved pumpkin over two snow blocks takes all three away and asks for a snow golem") {
+    Loaded loaded;
+    loaded.put(8, 64, 8, stateOf("snow_block"));
+    loaded.put(8, 65, 8, stateOf("snow_block"));
+    loaded.put(8, 66, 8, stateOf("carved_pumpkin", {{"facing", "north"}}));
+    std::vector<std::array<double, 3>> asked;
+    std::vector<golemPatterns::Golem> kinds;
+    neighbourUpdates::Context context = loaded.context();
+    context.summonGolem = [&asked, &kinds](golemPatterns::Golem kind, double x, double y, double z) {
+        kinds.push_back(kind);
+        asked.push_back({x, y, z});
+    };
+    Report report;
+    std::vector<BlockChange> effects;
+    neighbourUpdates::afterChange(context, 8, 66, 8, std::nullopt, effects, report.onBroken(), report.onReshaped());
+
+    CHECK(pathAt(loaded.state, 8, 66, 8) == "air");
+    CHECK(pathAt(loaded.state, 8, 65, 8) == "air");
+    CHECK(pathAt(loaded.state, 8, 64, 8) == "air");
+    REQUIRE(kinds.size() == 1);
+    CHECK(kinds[0] == golemPatterns::Golem::Snow);
+    // parity: `spawnGolemInWorld` is handed `getBlock(0, 2, 0)`, the bottom snow block.
+    CHECK(asked[0] == std::array<double, 3>{8.5, 64.05, 8.5});
+}
+
+TEST_CASE("a carved pumpkin over an iron cross is found through the pattern's other orientation") {
+    Loaded loaded;
+    loaded.put(7, 65, 8, stateOf("iron_block"));
+    loaded.put(8, 65, 8, stateOf("iron_block"));
+    loaded.put(9, 65, 8, stateOf("iron_block"));
+    loaded.put(8, 64, 8, stateOf("iron_block"));
+    loaded.put(8, 66, 8, stateOf("carved_pumpkin", {{"facing", "north"}}));
+    std::vector<golemPatterns::Golem> kinds;
+    std::vector<std::array<double, 3>> asked;
+    neighbourUpdates::Context context = loaded.context();
+    context.summonGolem = [&asked, &kinds](golemPatterns::Golem kind, double x, double y, double z) {
+        kinds.push_back(kind);
+        asked.push_back({x, y, z});
+    };
+    Report report;
+    std::vector<BlockChange> effects;
+    neighbourUpdates::afterChange(context, 8, 66, 8, std::nullopt, effects, report.onBroken(), report.onReshaped());
+
+    CHECK(pathAt(loaded.state, 8, 66, 8) == "air");
+    CHECK(pathAt(loaded.state, 7, 65, 8) == "air");
+    CHECK(pathAt(loaded.state, 8, 65, 8) == "air");
+    CHECK(pathAt(loaded.state, 9, 65, 8) == "air");
+    CHECK(pathAt(loaded.state, 8, 64, 8) == "air");
+    REQUIRE(kinds.size() == 1);
+    CHECK(kinds[0] == golemPatterns::Golem::Iron);
+    // parity: `getBlock(1, 2, 0)`, which is the foot of the cross rather than the pumpkin.
+    CHECK(asked[0] == std::array<double, 3>{8.5, 64.05, 8.5});
+}
+
+TEST_CASE("a carved pumpkin over one snow block finishes nothing and stays where it is") {
+    Loaded loaded;
+    loaded.put(8, 65, 8, stateOf("snow_block"));
+    loaded.put(8, 66, 8, stateOf("carved_pumpkin", {{"facing", "north"}}));
+    std::int32_t asked = 0;
+    neighbourUpdates::Context context = loaded.context();
+    context.summonGolem = [&asked](golemPatterns::Golem, double, double, double) { ++asked; };
+    Report report;
+    std::vector<BlockChange> effects;
+    neighbourUpdates::afterChange(context, 8, 66, 8, std::nullopt, effects, report.onBroken(), report.onReshaped());
+
+    CHECK(pathAt(loaded.state, 8, 66, 8) == "carved_pumpkin");
+    CHECK(pathAt(loaded.state, 8, 65, 8) == "snow_block");
+    CHECK(asked == 0);
+}

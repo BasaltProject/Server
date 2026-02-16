@@ -178,6 +178,14 @@ void BlockEditor::notifyNeighbours() {
                 return world::geysers::validState(world_->state(), world_->metadata().seed, world_->gameTime(), x, y, z,
                                                   stateId);
             },
+        // parity: `CarvedPumpkinBlock.trySpawnGolem`, which a `/setblock` of a pumpkin sets off just
+        // as a player placing one does.
+        .summonGolem =
+            [this](world::golemPatterns::Golem kind, double gx, double gy, double gz) {
+                if (environment_->options().summonGolem) {
+                    environment_->options().summonGolem(*world_, world::golemPatterns::entityTypeOf(kind), gx, gy, gz);
+                }
+            },
         .gameTime = world_->gameTime(),
         .tntExplodes = world_->gameRules().get(world::gameRules::kTntExplodes)};
     for (const std::array<std::int32_t, 3>& at : positions) {
