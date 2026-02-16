@@ -96,6 +96,11 @@ public:
                 return false;
             }
             toPush.push_back(position);
+            // parity: `addBlockLine` counts the blocks it adds **ahead** in `blocksAdded` too, not
+            // only the ones a sticky block dragged behind it. `reorderListAtCollision` and the loop
+            // that looks for branches after a collision both measure with that number, so leaving it
+            // short reorders the wrong slice.
+            ++blocksAdded;
             ++ahead;
         }
     }
@@ -197,7 +202,9 @@ const wire::common::Identifier& block() {
 
 bool isPushable(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z, registry::BlockFace pushing,
                 bool allowDestroyable, registry::BlockFace connection) {
-    if (y < context.minY || y > context.maxY) {
+    // parity: `isPushable` starts with the world and not with the block: out of height or out of the
+    // border and nothing moves.
+    if (y < context.minY || y > context.maxY || (context.withinBorder && !context.withinBorder(x, z))) {
         return false;
     }
     const std::optional<std::int32_t> stateId = context.world.blockState(x, y, z);

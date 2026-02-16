@@ -44,6 +44,13 @@ double WorldBorder::distanceOutside(double x, double z) const {
     return std::max(outsideX, outsideZ);
 }
 
+bool WorldBorder::contains(double x, double z) const {
+    // parity: `isWithinBounds(x, z, 0)`, which is `>= min` and `< max` on both axes. The size that
+    // counts is the one the border has **now**, not the one it is moving towards.
+    const double half = size_ / 2.0;
+    return x >= centerX_ - half && x < centerX_ + half && z >= centerZ_ - half && z < centerZ_ + half;
+}
+
 float WorldBorder::damageAt(double x, double z) const {
     const double outside = distanceOutside(x, z) - damageBuffer;
     if (outside <= 0.0) {
