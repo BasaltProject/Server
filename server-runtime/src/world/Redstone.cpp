@@ -217,7 +217,7 @@ constexpr std::array<std::string_view, 19> kSignalSources{
 } // namespace
 
 std::int32_t signalOf(std::int32_t stateId, BlockFace from, std::int32_t openers, std::int32_t comparatorOutput,
-                      bool mutedWire, bool playing) {
+                      bool mutedWire, bool playing, bool testPowered) {
     const std::string path = pathOf(stateId);
     if (path.empty()) {
         return 0;
@@ -287,6 +287,12 @@ std::int32_t signalOf(std::int32_t stateId, BlockFace from, std::int32_t openers
     if (path == "jukebox") {
         return valueOf(properties, "has_record") == "true" && playing ? kMaxSignal : 0;
     }
+    // parity: `TestBlock.ownSignal`. Only the `start` mode gives anything off, and only while its
+    // block entity says the test is running: the other modes are what **read** a signal, and the
+    // `powered` they keep is theirs and never reaches a wire.
+    if (path == "test_block") {
+        return valueOf(properties, "mode") == "start" && testPowered ? kMaxSignal : 0;
+    }
     return 0;
 }
 
@@ -354,6 +360,18 @@ std::int32_t comparatorOutputAt(const WorldState& world, std::int32_t x, std::in
 namespace {
 
 /// parity: `JukeboxSongPlayer.isPlaying`, which lives in the block entity and not in the state.
+/// parity: `TestBlock.ownSignal` reads `TestBlockEntity.isPowered`, which is not a state property:
+/// the mode is, and whether the test is running is not.
+[[nodiscard]] bool testBlockPoweredAt(const WorldState& world, const std::int32_t x, const std::int32_t y,
+                                      const std::int32_t z) {
+    const server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
+    if (chunk == nullptr) {
+        return false;
+    }
+    const server::world::ChunkBlockEntity* entity = chunk->blockEntityAt(x & 15, y, z & 15);
+    return entity != nullptr && entity->data().getBoolean("powered");
+}
+
 [[nodiscard]] bool jukeboxPlayingAt(const WorldState& world, const std::int32_t x, const std::int32_t y,
                                     const std::int32_t z) {
     const server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
@@ -372,8 +390,9 @@ std::int32_t signalFrom(const WorldState& world, std::string_view worldName, std
     if (!stateId.has_value()) {
         return 0;
     }
-    const std::int32_t own = signalOf(*stateId, from, containerOpeners::count(worldName, x, y, z),
-                                      comparatorOutputAt(world, x, y, z), mutedWire, jukeboxPlayingAt(world, x, y, z));
+    const std::int32_t own =
+        signalOf(*stateId, from, containerOpeners::count(worldName, x, y, z), comparatorOutputAt(world, x, y, z),
+                 mutedWire, jukeboxPlayingAt(world, x, y, z), testBlockPoweredAt(world, x, y, z));
     if (!registry::blockSupport::conductsRedstone(*stateId)) {
         return own;
     }

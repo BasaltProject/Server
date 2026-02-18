@@ -90,8 +90,7 @@ void sendBlock(const std::vector<player::PlayerSession*>& watchers, std::int32_t
         // block below to say what the geyser is doing now.
         .geyser =
             [&world](std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
-                return world::geysers::validState(world.state(), world.metadata().seed, world.gameTime(), x, y, z,
-                                                  stateId);
+                return world::geysers::validState(world.state(), world.gameTime(), x, y, z, stateId);
             },
         .summonGolem = std::move(summonGolem),
         .isCopper = std::move(isCopper),

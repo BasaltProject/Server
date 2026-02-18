@@ -65,11 +65,13 @@ struct Hooks {
 ///
 /// `gameTime` is the world's turn counter, not the clock's time of day: a hopper filling a shelf
 /// raises a game event, and a vibration is booked for the turn it arrives.
+///
+/// `worldSeed` is what a geyser forks its own rhythm from at its own square.
 [[nodiscard]] std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, const WorldClock& clock,
                                             const WorldWeather& weather, std::int64_t gameTime,
                                             const std::vector<std::array<std::int32_t, 2>>& chunks,
                                             random::RandomSource& random, const Hooks& hooks = {},
-                                            bool hasSkylight = true);
+                                            bool hasSkylight = true, std::int64_t worldSeed = 0);
 
 } // namespace blockEntityTicks
 

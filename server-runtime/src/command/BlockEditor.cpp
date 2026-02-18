@@ -176,8 +176,7 @@ void BlockEditor::notifyNeighbours() {
         // and the block below to say what the geyser is doing now.
         .geyser =
             [this](std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
-                return world::geysers::validState(world_->state(), world_->metadata().seed, world_->gameTime(), x, y, z,
-                                                  stateId);
+                return world::geysers::validState(world_->state(), world_->gameTime(), x, y, z, stateId);
             },
         // parity: `CarvedPumpkinBlock.trySpawnGolem`, which a `/setblock` of a pumpkin sets off just
         // as a player placing one does.
