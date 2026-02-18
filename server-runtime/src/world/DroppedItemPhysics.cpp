@@ -1,3 +1,4 @@
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/World.hpp>
 #include <basalt/server/runtime/world/DroppedItemPhysics.hpp>
@@ -22,6 +23,35 @@ namespace {
 /// Two stacks only merge when they carry the same extras, which for now means neither carries any.
 [[nodiscard]] bool sameComponents(const wire::nbt::NbtCompound& first, const wire::nbt::NbtCompound& second) {
     return first.size() == 0 && second.size() == 0;
+}
+
+/// parity: `PowderSnowBlock.NUM_BLOCKS_TO_FALL_INTO_BLOCK`, past which the snow is something to land
+/// on, and `FALLING_COLLISION_SHAPE`, the lid that is nine tenths of a block high.
+constexpr double kSnowCatchesAfter = 2.5;
+constexpr double kSnowLidHeight = 0.9;
+
+/// parity: `PowderSnowBlock.getCollisionShape` seen by a dropped item, which is neither a falling
+/// block nor anything that can walk on powder snow: the lid while it is still falling fast, and
+/// nothing at all once it has stopped.
+[[nodiscard]] entity::entityCollision::ShapeFor snowLidFor(const DroppedItem& item) {
+    if (item.fallDistance <= kSnowCatchesAfter) {
+        return {};
+    }
+    return [](std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) -> std::optional<entity::Aabb> {
+        const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+        if (block == nullptr || block->path() != "powder_snow") {
+            return std::nullopt;
+        }
+        const double blockX = x;
+        const double blockY = y;
+        const double blockZ = z;
+        return entity::Aabb{.minX = blockX,
+                            .minY = blockY,
+                            .minZ = blockZ,
+                            .maxX = blockX + 1.0,
+                            .maxY = blockY + kSnowLidHeight,
+                            .maxZ = blockZ + 1.0};
+    };
 }
 
 } // namespace
@@ -105,9 +135,7 @@ std::vector<std::int32_t> DroppedItemPhysics::tickItems(const sched::Region* reg
             droppedItems_.erase(droppedItems_.begin() + static_cast<std::ptrdiff_t>(index));
             continue;
         }
-        if (!item.resting) {
-            moveItem(item);
-        }
+        moveItem(item);
         ++index;
     }
 
@@ -171,8 +199,19 @@ void DroppedItemPhysics::mergeWithNeighbours(std::size_t index, std::vector<std:
 }
 
 void DroppedItemPhysics::moveItem(DroppedItem& item) {
-    // parity: `ItemEntity.getDefaultGravity`, applied before the move rather than after it.
+    // parity: `ItemEntity.getDefaultGravity`, applied before the move rather than after it, and on
+    // every tick whether or not the move below happens.
     item.velocityY -= kGravity;
+
+    // parity: `ItemEntity.tick` only moves an item that is standing still on one tick in four, and
+    // the drag below is inside that same branch. It is not an optimisation to skip: an item resting
+    // on the lid powder snow offers a falling thing is held up by a shape that is gone the moment it
+    // stops falling, and it is this fourth tick that lets it through. Measured in `nievepolvo`.
+    const bool horizontallyStill =
+        (item.velocityX * item.velocityX) + (item.velocityZ * item.velocityZ) <= kRestingSpeedSquared;
+    if (item.onGround && horizontallyStill && (item.age + item.entityId) % kRestingMoveEvery != 0) {
+        return;
+    }
 
     // parity: `Entity.move` spends what caught it last tick on **this** move and then drops the
     // speed to nothing. What holds the item is asked again after the move, not here.
@@ -190,7 +229,8 @@ void DroppedItemPhysics::moveItem(DroppedItem& item) {
     }
 
     const entity::Aabb box = entity::Aabb::of(item.x, item.y, item.z, kItemWidth, kItemHeight);
-    const std::array<double, 3> moved = entity::entityCollision::collide(blockAt_, box, wantX, wantY, wantZ);
+    const std::array<double, 3> moved =
+        entity::entityCollision::collide(blockAt_, box, wantX, wantY, wantZ, snowLidFor(item));
     const double wasX = item.x;
     const double wasY = item.y;
     const double wasZ = item.z;
@@ -221,12 +261,23 @@ void DroppedItemPhysics::moveItem(DroppedItem& item) {
         item.velocityY = bounciness > 0.0F ? -item.velocityY * static_cast<double>(bounciness) : 0.0;
     }
 
+    // parity: `Entity.checkFallDamage`, which runs inside the move and before `checkInsideBlocks`:
+    // landing puts the count back to zero, and falling adds what the move actually managed.
+    if (onGround) {
+        item.fallDistance = 0.0;
+    } else if (moved[1] < 0.0) {
+        item.fallDistance -= moved[1];
+    }
+
     // parity: `checkInsideBlocks`, which runs inside the move and leaves behind what the next one
     // gets multiplied by.
     if (const std::optional<stuckSpeed::Multiplier> caught =
             stuckSpeed::caughtBy(blockAt_, box.move(moved[0], moved[1], moved[2]), moved[0], moved[1], moved[2]);
         caught.has_value()) {
         item.stuck = *caught;
+        // parity: `Entity.makeStuckInBlock` starts with `resetFallDistance`, which is what lets an
+        // item that has just landed on powder snow sink into it on the very next tick.
+        item.fallDistance = 0.0;
     }
 
     // parity: `ItemEntity.tick`'s own drag: the air takes its share every tick, and the block

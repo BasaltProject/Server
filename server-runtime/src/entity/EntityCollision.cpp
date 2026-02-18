@@ -14,7 +14,7 @@ enum class Axis : std::uint8_t { X, Y, Z };
 const double kUnits = static_cast<double>(registry::blockShapes::kUnits);
 
 template <typename Action>
-void forEachBox(const BlockAt& blockAt, const Aabb& box, Action&& action) {
+void forEachBox(const BlockAt& blockAt, const Aabb& box, const ShapeFor& shapeFor, Action&& action) {
     const std::int32_t minX = static_cast<std::int32_t>(std::floor(box.minX));
     const std::int32_t maxX = static_cast<std::int32_t>(std::ceil(box.maxX));
     const std::int32_t minY = static_cast<std::int32_t>(std::floor(box.minY));
@@ -30,9 +30,20 @@ void forEachBox(const BlockAt& blockAt, const Aabb& box, Action&& action) {
         for (std::int32_t z = minZ; z <= maxZ; ++z) {
             for (std::int32_t x = minX; x <= maxX; ++x) {
                 const std::optional<std::int32_t> stateId = blockAt(x, y, z);
-                // Nothing loaded is nothing in the way, and a shape with no boxes has none to
-                // add: both are the loop below arriving at the same answer more slowly.
-                if (!stateId.has_value() || registry::blockShapes::isEmptyShape(*stateId)) {
+                if (!stateId.has_value()) {
+                    continue;
+                }
+                // parity: an override answers **instead of** the block's own shape, so it is asked
+                // before the empty check: powder snow's table shape is empty and its answer is not.
+                if (shapeFor) {
+                    if (const std::optional<Aabb> instead = shapeFor(*stateId, x, y, z); instead.has_value()) {
+                        action(*instead);
+                        continue;
+                    }
+                }
+                // A shape with no boxes has none to add, which is the loop below arriving at the
+                // same answer more slowly.
+                if (registry::blockShapes::isEmptyShape(*stateId)) {
                     continue;
                 }
                 const std::span<const std::int32_t> shapes = registry::blockShapes::collisionBoxes(*stateId);
@@ -130,14 +141,15 @@ void forEachBox(const BlockAt& blockAt, const Aabb& box, Action&& action) {
 
 } // namespace
 
-std::array<double, 3> collide(const BlockAt& blockAt, const Aabb& box, double dx, double dy, double dz) {
+std::array<double, 3> collide(const BlockAt& blockAt, const Aabb& box, double dx, double dy, double dz,
+                              const ShapeFor& shapeFor) {
     std::array<double, 3> out{dx, dy, dz};
     // Standing still is the common call from the item and mob loops, and it asks the world
     // nothing at all.
     if (dx == 0.0 && dy == 0.0 && dz == 0.0) {
         return out;
     }
-    const std::vector<Aabb> boxes = collidingBoxes(blockAt, box.expandTowards(dx, dy, dz));
+    const std::vector<Aabb> boxes = collidingBoxes(blockAt, box.expandTowards(dx, dy, dz), shapeFor);
     if (boxes.empty()) {
         return out;
     }
@@ -210,7 +222,7 @@ std::array<double, 3> collideWithStep(const BlockAt& blockAt, const Aabb& box, d
 
 bool collides(const BlockAt& blockAt, const Aabb& box) {
     bool hit = false;
-    forEachBox(blockAt, box, [&box, &hit](const Aabb& collider) {
+    forEachBox(blockAt, box, {}, [&box, &hit](const Aabb& collider) {
         if (!hit && collider.intersects(box)) {
             hit = true;
         }
@@ -218,9 +230,9 @@ bool collides(const BlockAt& blockAt, const Aabb& box) {
     return hit;
 }
 
-std::vector<Aabb> collidingBoxes(const BlockAt& blockAt, const Aabb& box) {
+std::vector<Aabb> collidingBoxes(const BlockAt& blockAt, const Aabb& box, const ShapeFor& shapeFor) {
     std::vector<Aabb> found;
-    forEachBox(blockAt, box, [&found](const Aabb& collider) { found.push_back(collider); });
+    forEachBox(blockAt, box, shapeFor, [&found](const Aabb& collider) { found.push_back(collider); });
     return found;
 }
 

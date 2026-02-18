@@ -133,6 +133,25 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return reshaped;
 }
 
+/// The same, when the block itself changes: `stateIdOf` only reads its template when the block is
+/// the same one, so a state asked for a different block comes back with that block's **first** state
+/// under whatever was not named, and a chest turns up waterlogged out of nowhere.
+///
+/// parity: `Block.withPropertiesOf`, which copies over every property the two blocks share. Only for
+/// a pair that shares its whole set, which is what the copper chests are.
+[[nodiscard]] std::optional<std::int32_t> becomes(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                                  std::int32_t stateId, const wire::common::Identifier& block,
+                                                  const std::string& property, const std::string& value) {
+    std::map<std::string, std::string> wanted = registry::blockStateDefinitions::propertiesOf(stateId);
+    wanted[property] = value;
+    const std::optional<std::int32_t> reshaped =
+        registry::blockStateDefinitions::stateIdOf(block, wanted, std::nullopt);
+    if (!reshaped.has_value()) {
+        return std::nullopt;
+    }
+    return apply(world, x, y, z, stateId, *reshaped);
+}
+
 [[nodiscard]] std::optional<std::int32_t> changed(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                   std::int32_t stateId, const wire::common::Identifier& block,
                                                   const std::string& property, const std::string& value) {
@@ -253,6 +272,17 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
 /// parity: `ChestBlock.updateShape`, which is only half of the pairing: it follows a neighbour that
 /// has already claimed the side facing it, and it goes back to single when the chest it was paired
 /// with is gone. Two chests becoming a double one is decided when the second is placed.
+/// parity: every copper chest is in `#minecraft:copper_chests`, which is the whole family, waxed
+/// included. Nothing else ends in `copper_chest`.
+[[nodiscard]] bool isCopperChest(std::string_view path) { return path.ends_with("copper_chest"); }
+
+/// parity: `ChestBlock.chestCanConnectTo` is `is(this)`, the block itself, and
+/// `CopperChestBlock` overrides it with the tag: an exposed copper chest and an oxidized one make
+/// one double chest, where an oak chest and a trapped chest never do.
+[[nodiscard]] bool chestsPair(const wire::common::Identifier& block, const wire::common::Identifier& other) {
+    return block == other || (isCopperChest(block.path()) && isCopperChest(other.path()));
+}
+
 [[nodiscard]] std::optional<std::int32_t> chest(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                 std::int32_t stateId, const wire::common::Identifier& block) {
     const std::string facing = propertyOf(stateId, "facing");
@@ -266,23 +296,28 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
             const registry::BlockFace face = faceOf(side);
             const std::int32_t neighbour = stateAt(world, x + offsetX(face), y, z + offsetZ(face));
             const wire::common::Identifier* neighbourBlock = registry::blockStateDefinitions::blockOf(neighbour);
-            if (neighbourBlock == nullptr || *neighbourBlock != block) {
+            if (neighbourBlock == nullptr || !chestsPair(block, *neighbourBlock)) {
                 continue;
             }
             if (propertyOf(neighbour, "facing") != facing || propertyOf(neighbour, "type") != otherHalf(mine)) {
                 continue;
             }
-            return changed(world, x, y, z, stateId, block, "type", mine);
+            // parity: `CopperChestBlock.updateShape` ends in
+            // `neighbourState.getBlock().withPropertiesOf(blockState)`, so the half that joins takes
+            // the other one's oxidation and keeps its own facing and side.
+            return becomes(world, x, y, z, stateId, *neighbourBlock, "type", mine);
         }
         return std::nullopt;
     }
     const registry::BlockFace face = faceOf(type == "left" ? clockwise(facing) : counterClockwise(facing));
     const std::int32_t partner = stateAt(world, x + offsetX(face), y, z + offsetZ(face));
     const wire::common::Identifier* partnerBlock = registry::blockStateDefinitions::blockOf(partner);
-    const bool stillThere = partnerBlock != nullptr && *partnerBlock == block &&
+    const bool stillThere = partnerBlock != nullptr && chestsPair(block, *partnerBlock) &&
                             propertyOf(partner, "facing") == facing && propertyOf(partner, "type") == otherHalf(type);
     if (stillThere) {
-        return std::nullopt;
+        // parity: the same last line, which also runs when the half already beside it changes
+        // oxidation rather than when it arrives. `apply` answers nothing when the state does not move.
+        return becomes(world, x, y, z, stateId, *partnerBlock, "type", type);
     }
     return changed(world, x, y, z, stateId, block, "type", "single");
 }

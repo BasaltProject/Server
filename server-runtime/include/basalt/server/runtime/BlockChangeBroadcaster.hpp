@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/world/BlockChange.hpp>
+#include <basalt/server/runtime/world/RealBlockTags.hpp>
 
 #include <array>
 #include <cstdint>
@@ -42,6 +43,9 @@ public:
         double pistonReach = 14.0;
         /// The seed a washed-away block's loot roll and a block sound's own random start from.
         std::function<std::int64_t()> nextSeed;
+        /// What answers `minecraft:copper`, the copper golem's body. Null where no jar is loaded,
+        /// and then no copper golem is ever built.
+        const world::realBlockTags::TagMembers* blockTags = nullptr;
     };
 
     BlockChangeBroadcaster(player::PlayerRegistry& players, world::RealLootTables& lootTables, Hooks hooks,

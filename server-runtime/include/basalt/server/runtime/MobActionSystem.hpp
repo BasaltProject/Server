@@ -109,6 +109,10 @@ public:
     void tickFire(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                   entity::ServerEntity& mob, random::RandomSource& random);
 
+    /// parity: `LivingEntity.aiStep`'s travel half, which runs for a mob this build has no goals
+    /// for as much as for one it does.
+    void travelMob(world::LoadedWorld& world, entity::ServerEntity& mob, double speed);
+
     /// One mob's turn to decide and then move.
     void tickMobAi(world::LoadedWorld& world, entity::ServerEntity& mob,
                    const std::vector<entity::ai::PlayerView>& views, const std::vector<entity::ServerEntity*>& living,

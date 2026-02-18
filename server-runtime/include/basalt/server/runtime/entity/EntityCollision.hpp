@@ -25,6 +25,13 @@ namespace entityCollision {
 /// tested.
 using BlockAt = std::function<std::optional<std::int32_t>(std::int32_t x, std::int32_t y, std::int32_t z)>;
 
+/// The box a block offers this mover, when that is not the one in the shape table. parity:
+/// `Block.getCollisionShape` is handed a `CollisionContext`, and powder snow is the one block that
+/// reads it: a lid nine tenths high to something falling more than two and a half blocks, not there
+/// at all to everything else. Nine tenths does not fit the table's thirty-seconds, so it is doubles.
+using ShapeFor =
+    std::function<std::optional<Aabb>(std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z)>;
+
 /// parity: the 1.0E-7 vanilla treats as no movement at all, and as the slack on a shared edge.
 inline constexpr double kEpsilon = 1.0e-7;
 
@@ -34,7 +41,8 @@ inline constexpr std::int32_t kMaxSpan = 8;
 /// The movement the box can actually make, as x, y, z.
 ///
 /// Answers what is left of the movement after the blocks in the way take their share.
-[[nodiscard]] std::array<double, 3> collide(const BlockAt& blockAt, const Aabb& box, double dx, double dy, double dz);
+[[nodiscard]] std::array<double, 3> collide(const BlockAt& blockAt, const Aabb& box, double dx, double dy, double dz,
+                                            const ShapeFor& shapeFor = {});
 
 /// The same move, but allowed to climb up to `stepHeight` on the way.
 ///
@@ -49,7 +57,7 @@ inline constexpr std::int32_t kMaxSpan = 8;
 [[nodiscard]] bool collides(const BlockAt& blockAt, const Aabb& box);
 
 /// The blocks whose collision shape overlaps the box, as boxes in world space.
-[[nodiscard]] std::vector<Aabb> collidingBoxes(const BlockAt& blockAt, const Aabb& box);
+[[nodiscard]] std::vector<Aabb> collidingBoxes(const BlockAt& blockAt, const Aabb& box, const ShapeFor& shapeFor = {});
 
 } // namespace entityCollision
 

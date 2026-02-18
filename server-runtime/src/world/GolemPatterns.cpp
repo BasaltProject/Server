@@ -13,7 +13,7 @@ namespace {
 using registry::BlockFace;
 
 /// What one square of a pattern asks of the block on it.
-enum class Wants : std::uint8_t { Pumpkin, SnowBlock, IronBlock, Air };
+enum class Wants : std::uint8_t { Pumpkin, SnowBlock, IronBlock, CopperBlock, Air };
 
 /// One of `trySpawnGolem`'s three patterns, all of them one aisle deep.
 struct Shape {
@@ -27,10 +27,9 @@ struct Shape {
     std::int32_t spawnDown;
 };
 
-// parity: `getOrCreateSnowGolemFull` and `getOrCreateIronGolemFull`, tried in that order because the
-// first match is the one that gets built. `getOrCreateCopperGolemFull` comes after these two and is
-// not here yet: it needs the copper chest that takes the body's place.
-constexpr std::array<Shape, 2> kShapes{
+// parity: `getOrCreateSnowGolemFull`, `getOrCreateIronGolemFull` and `getOrCreateCopperGolemFull`,
+// tried in that order because the first match is the one that gets built.
+constexpr std::array<Shape, 3> kShapes{
     Shape{.kind = Golem::Snow,
           .width = 1,
           .height = 3,
@@ -44,6 +43,12 @@ constexpr std::array<Shape, 2> kShapes{
                     Wants::Air, Wants::IronBlock, Wants::Air},
           .spawnRight = 1,
           .spawnDown = 2},
+    Shape{.kind = Golem::Copper,
+          .width = 1,
+          .height = 2,
+          .cells = {Wants::Pumpkin, Wants::CopperBlock},
+          .spawnRight = 0,
+          .spawnDown = 0},
 };
 
 constexpr std::array<BlockFace, 6> kDirections{BlockFace::Down,  BlockFace::Up,   BlockFace::North,
@@ -90,7 +95,7 @@ translateAndRotate(const std::array<std::int32_t, 3>& origin, const BlockFace fo
     return block != nullptr && block->path() == name;
 }
 
-[[nodiscard]] bool holds(const Wants wants, const std::int32_t stateId) {
+[[nodiscard]] bool holds(const Wants wants, const std::int32_t stateId, const IsCopper& isCopper) {
     switch (wants) {
     case Wants::Pumpkin:
         return isPumpkin(stateId);
@@ -98,6 +103,8 @@ translateAndRotate(const std::array<std::int32_t, 3>& origin, const BlockFace fo
         return isNamed(stateId, "snow_block");
     case Wants::IronBlock:
         return isNamed(stateId, "iron_block");
+    case Wants::CopperBlock:
+        return isCopper && isCopper(stateId);
     case Wants::Air:
         return registry::blocks::isAir(stateId);
     }
@@ -106,7 +113,7 @@ translateAndRotate(const std::array<std::int32_t, 3>& origin, const BlockFace fo
 
 /// parity: `BlockPattern.matches`, x outermost so a pattern gives up on the first wrong column.
 [[nodiscard]] bool matches(const WorldState& world, const Shape& shape, const std::array<std::int32_t, 3>& origin,
-                           const BlockFace forwards, const BlockFace up) {
+                           const BlockFace forwards, const BlockFace up, const IsCopper& isCopper) {
     for (std::int32_t right = 0; right < shape.width; ++right) {
         for (std::int32_t down = 0; down < shape.height; ++down) {
             const std::array<std::int32_t, 3> at = translateAndRotate(origin, forwards, up, right, down, 0);
@@ -115,7 +122,7 @@ translateAndRotate(const std::array<std::int32_t, 3>& origin, const BlockFace fo
                 return false;
             }
             const Wants wants = shape.cells[static_cast<std::size_t>((down * shape.width) + right)];
-            if (!holds(wants, *stateId)) {
+            if (!holds(wants, *stateId, isCopper)) {
                 return false;
             }
         }
@@ -123,8 +130,8 @@ translateAndRotate(const std::array<std::int32_t, 3>& origin, const BlockFace fo
     return true;
 }
 
-[[nodiscard]] Match matchOf(const Shape& shape, const std::array<std::int32_t, 3>& origin, const BlockFace forwards,
-                            const BlockFace up) {
+[[nodiscard]] Match matchOf(const WorldState& world, const Shape& shape, const std::array<std::int32_t, 3>& origin,
+                            const BlockFace forwards, const BlockFace up) {
     Match match{.kind = shape.kind};
     // parity: `clearPatternBlocks` walks the whole rectangle, x outermost, and the empty corners of
     // the iron cross are in it: it writes air over squares that already were air.
@@ -134,12 +141,21 @@ translateAndRotate(const std::array<std::int32_t, 3>& origin, const BlockFace fo
         }
     }
     match.spawn = translateAndRotate(origin, forwards, up, shape.spawnRight, shape.spawnDown, 0);
+    // parity: `replaceCopperBlockWithChest` and `getWeatherStateFromPattern` read `getBlock(0, 1, 0)`
+    // and `getBlock(0, 0, 0)` off the pattern's own cache, which was filled before the squares were
+    // cleared, so both keep the states the pattern matched on.
+    if (shape.kind == Golem::Copper) {
+        match.body = translateAndRotate(origin, forwards, up, 0, 1, 0);
+        match.bodyState = world.blockState(match.body[0], match.body[1], match.body[2]).value_or(0);
+        match.pumpkinState = world.blockState(origin[0], origin[1], origin[2]).value_or(0);
+    }
     return match;
 }
 
 } // namespace
 
-std::optional<Match> find(const WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+std::optional<Match> find(const WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                          const IsCopper& isCopper) {
     for (const Shape& shape : kShapes) {
         // parity: `BlockPattern.find` walks a cube as wide as the pattern's longest side, and only
         // towards positive x, y and z: a pumpkin is never the bottom right of what it completes.
@@ -153,8 +169,8 @@ std::optional<Match> find(const WorldState& world, const std::int32_t x, const s
                             if (up == forwards || up == registry::opposite(forwards)) {
                                 continue;
                             }
-                            if (matches(world, shape, origin, forwards, up)) {
-                                return matchOf(shape, origin, forwards, up);
+                            if (matches(world, shape, origin, forwards, up, isCopper)) {
+                                return matchOf(world, shape, origin, forwards, up);
                             }
                         }
                     }
@@ -165,6 +181,16 @@ std::optional<Match> find(const WorldState& world, const std::int32_t x, const s
     return std::nullopt;
 }
 
-std::string_view entityTypeOf(const Golem kind) { return kind == Golem::Snow ? "snow_golem" : "iron_golem"; }
+std::string_view entityTypeOf(const Golem kind) {
+    switch (kind) {
+    case Golem::Snow:
+        return "snow_golem";
+    case Golem::Iron:
+        return "iron_golem";
+    case Golem::Copper:
+        return "copper_golem";
+    }
+    return "iron_golem";
+}
 
 } // namespace basalt::server::runtime::world::golemPatterns

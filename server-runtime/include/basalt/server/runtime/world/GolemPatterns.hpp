@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -16,7 +17,7 @@ namespace basalt::server::runtime::world {
 /// body under it, clears every square of the pattern and puts the golem where the pattern says.
 namespace golemPatterns {
 
-enum class Golem : std::uint8_t { Snow, Iron };
+enum class Golem : std::uint8_t { Snow, Iron, Copper };
 
 /// Where a match was found, in the order `clearPatternBlocks` walks it.
 struct Match {
@@ -26,15 +27,22 @@ struct Match {
     std::vector<std::array<std::int32_t, 3>> cells;
     /// The square the golem snaps to, half a block in and a twentieth up.
     std::array<std::int32_t, 3> spawn{};
+    /// The copper golem's body, which becomes a chest rather than air, and the state it had.
+    std::array<std::int32_t, 3> body{};
+    std::int32_t bodyState = 0;
+    /// The pumpkin's own state, which is where the chest takes its facing from.
+    std::int32_t pumpkinState = 0;
 };
 
-/// What the pumpkin at `x`, `y`, `z` completes, if it completes anything.
-///
-/// parity: the patterns are tried in `trySpawnGolem`'s own order, snow then iron, and each
-/// `BlockPattern.find` walks a cube of its own size out of the pumpkin towards positive x, y and z in
-/// all twenty four orientations. The first one that matches wins. The copper golem, which the jar
-/// tries after these two, waits for the copper chest its body turns into.
-[[nodiscard]] std::optional<Match> find(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+/// Whether a state is in `minecraft:copper`, which is the copper golem's body.
+using IsCopper = std::function<bool(std::int32_t stateId)>;
+
+/// What the pumpkin at `x`, `y`, `z` completes, if it completes anything. parity: the three patterns
+/// are tried in `trySpawnGolem`'s order, snow then iron then copper, each walking a cube of its own
+/// size in all twenty four orientations, first match wins. Without `isCopper` the copper golem can
+/// never match.
+[[nodiscard]] std::optional<Match> find(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                        const IsCopper& isCopper = {});
 
 /// The entity each figure is made of.
 [[nodiscard]] std::string_view entityTypeOf(Golem kind);

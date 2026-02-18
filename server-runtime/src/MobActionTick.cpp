@@ -91,14 +91,34 @@ void MobActionSystem::tickFire(world::LoadedWorld& world, const std::vector<Play
     }
 }
 
+/// parity: `LivingEntity.aiStep`'s travel half, which is not the goals': gravity, the path it is
+/// already on, and where it is looking.
+void MobActionSystem::travelMob(world::LoadedWorld& world, ServerEntity& mob, double speed) {
+    // parity: `Mob.travel`'s flying branch: what flies is never walked along a path, and the goals
+    // move it themselves, so all that is left here is the drift.
+    if (entity::flyers::flies(mob.type())) {
+        entity::flyingMovement::tick(world.state(), mob);
+        entity::ai::lookControl::tick(mob);
+        return;
+    }
+    entity::ai::navigation::tick(world.state(), mob);
+    entity::ai::moveControl::tick(world.state(), mob, speed);
+    entity::ai::lookControl::tick(mob);
+}
+
 void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
                                 const std::vector<entity::ai::PlayerView>& views,
                                 const std::vector<ServerEntity*>& living, random::RandomSource& random) {
     if (mob.goals == nullptr) {
         mob.goals = entity::ai::mobGoals::forType(mob.type());
-        if (mob.goals == nullptr) {
-            return;
-        }
+    }
+    // parity: the goals are `Mob.serverAiStep` and the travel below is `LivingEntity.aiStep`, which
+    // every living thing runs whether or not anything is driving it. Leaving early here left a mob
+    // this build has no goals for hanging in the air: a copper golem put down on a chest never fell
+    // the eighth of a block onto its lid.
+    if (mob.goals == nullptr) {
+        travelMob(world, mob, mob.attributeWithModifiers(entity::attribute::kMovementSpeed));
+        return;
     }
     entity::ai::MobContext context{.world = world.state(),
                                    .mob = mob,
@@ -121,16 +141,7 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
     } else {
         mob.goals->tick(context);
     }
-    // parity: `Mob.travel`'s flying branch: what flies is never walked along a path, and the goals
-    // move it themselves, so all that is left here is the drift.
-    if (entity::flyers::flies(mob.type())) {
-        entity::flyingMovement::tick(world.state(), mob);
-        entity::ai::lookControl::tick(mob);
-        return;
-    }
-    entity::ai::navigation::tick(world.state(), mob);
-    entity::ai::moveControl::tick(world.state(), mob, context.speed);
-    entity::ai::lookControl::tick(mob);
+    travelMob(world, mob, context.speed);
 }
 
 void MobActionSystem::activateSkeletonTrap(world::LoadedWorld& world, ServerEntity& horse,
