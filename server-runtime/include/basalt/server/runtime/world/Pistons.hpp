@@ -81,6 +81,13 @@ struct Context {
 /// beside the piston's landing turn on the same square.
 [[nodiscard]] const wire::common::Identifier& slideTickType();
 
+/// The body a piston head belongs to, if the head at these coordinates has one.
+///
+/// parity: `PistonHeadBlock.isFittingBase`: the right kind of piston, extended, and looking the same
+/// way. `affectNeighborsAfterRemoval` uses it to break the body when the head is taken off.
+[[nodiscard]] std::optional<std::array<std::int32_t, 3>>
+fittingBase(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t headState);
+
 /// parity: `PistonBaseBlock.isPushable`. Air moves, obsidian and its family never do, a block with no
 /// destroy speed (bedrock) never does, and the push reaction decides the rest.
 ///

@@ -278,12 +278,62 @@ std::optional<Push> resolve(const Context& context, std::int32_t pistonX, std::i
     return Push{.moved = resolver.toPush, .destroyed = resolver.destroyed};
 }
 
+std::optional<std::array<std::int32_t, 3>> fittingBase(const WorldState& world, const std::int32_t x,
+                                                       const std::int32_t y, const std::int32_t z,
+                                                       const std::int32_t headState) {
+    if (pathOf(headState) != "piston_head") {
+        return std::nullopt;
+    }
+    const std::string facing = propertyOf(headState, "facing");
+    const std::optional<BlockFace> direction = faceNamed(facing);
+    if (!direction.has_value()) {
+        return std::nullopt;
+    }
+    const BlockFace back = registry::opposite(*direction);
+    const std::array<std::int32_t, 3> at{x + registry::stepX(back), y + registry::stepY(back),
+                                         z + registry::stepZ(back)};
+    const std::optional<std::int32_t> body = world.blockState(at[0], at[1], at[2]);
+    if (!body.has_value()) {
+        return std::nullopt;
+    }
+    // parity: `isFittingBase`, which picks the block by the head's own `type`: a sticky head only
+    // fits a sticky piston.
+    const std::string_view wanted = propertyOf(headState, "type") == "sticky" ? "sticky_piston" : "piston";
+    if (pathOf(*body) != wanted || propertyOf(*body, "extended") != "true" || propertyOf(*body, "facing") != facing) {
+        return std::nullopt;
+    }
+    return at;
+}
+
 void trigger(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::optional<std::int32_t> stateId = context.world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return;
     }
     const std::string path = pathOf(*stateId);
+    // parity: `PistonHeadBlock.neighborChanged` hands the news straight to the body behind it, and
+    // that is the whole of it. It matters because a piston looking up reads the squares around
+    // `pos.above()`, which is where its own head stands: without this the body never hears that the
+    // block beside its head has gone and stays out for ever. Measured in `pistoncabeza`.
+    if (path == "piston_head") {
+        const std::optional<BlockFace> facing = faceNamed(propertyOf(*stateId, "facing"));
+        if (!facing.has_value()) {
+            return;
+        }
+        const BlockFace back = registry::opposite(*facing);
+        const std::int32_t bodyX = x + registry::stepX(back);
+        const std::int32_t bodyY = y + registry::stepY(back);
+        const std::int32_t bodyZ = z + registry::stepZ(back);
+        // parity: `if (state.canSurvive(level, pos))`, which for a head is the body being really
+        // there and looking the same way.
+        const std::optional<std::int32_t> body = context.world.blockState(bodyX, bodyY, bodyZ);
+        if (!body.has_value() || !isPiston(pathOf(*body)) ||
+            propertyOf(*body, "facing") != propertyOf(*stateId, "facing")) {
+            return;
+        }
+        trigger(context, bodyX, bodyY, bodyZ);
+        return;
+    }
     if (!isPiston(path)) {
         return;
     }

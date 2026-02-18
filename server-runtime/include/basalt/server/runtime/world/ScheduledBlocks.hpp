@@ -100,6 +100,12 @@ void driedGhast(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
 /// as the last one lands, plus its own random spread.
 void scheduleHatch(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t seed);
 
+/// parity: `FrostedIceBlock.onPlace`, which is one line: every piece of frosted ice that lands books
+/// its own melt between sixty and a hundred and twenty ticks out. Without it a trail of it sat there
+/// for ever, and the jar's own `block_ticks` had a turn on every square where ours had none.
+void scheduleFrostedIce(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                        random::RandomSource& random);
+
 /// parity: `FrogspawnBlock.onPlace`, an hour or so away and never the same twice.
 void scheduleFrogspawn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t seed);
 
