@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/entity/EntityCollision.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/world/FallingBlocks.hpp>
+#include <basalt/server/runtime/world/Reshapes.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
 #include <array>
@@ -154,7 +155,13 @@ Landing tick(WorldState& world, entity::ServerEntity& entity, const CanSurvive& 
     const bool wouldSurvive =
         (!canSurvive || canSurvive(entity.objectData, blockX, blockY, blockZ)) && !wouldContinueFalling;
     if (mayReplace && wouldSurvive && world.setBlockState(blockX, blockY, blockZ, entity.objectData)) {
-        return Landing{.placed = BlockChange{.x = blockX, .y = blockY, .z = blockZ, .stateId = entity.objectData}};
+        std::int32_t landed = entity.objectData;
+        if (const std::optional<std::int32_t> set =
+                reshapes::landedConcrete(world, blockX, blockY, blockZ, entity.objectData, *at);
+            set.has_value() && world.setBlockState(blockX, blockY, blockZ, *set)) {
+            landed = *set;
+        }
+        return Landing{.placed = BlockChange{.x = blockX, .y = blockY, .z = blockZ, .stateId = landed}};
     }
     return Landing{.shattered = entity.objectData};
 }

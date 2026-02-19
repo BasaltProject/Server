@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockConnections.hpp>
+#include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
@@ -8,6 +9,7 @@
 #include <array>
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -17,6 +19,8 @@ namespace {
 constexpr std::array<registry::BlockFace, 6> kAllFaces{registry::BlockFace::Down,  registry::BlockFace::Up,
                                                        registry::BlockFace::North, registry::BlockFace::South,
                                                        registry::BlockFace::West,  registry::BlockFace::East};
+
+constexpr std::string_view kPowderSuffix = "_concrete_powder";
 
 constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::North, registry::BlockFace::South,
                                                          registry::BlockFace::West, registry::BlockFace::East};
@@ -134,11 +138,9 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
 }
 
 /// The same, when the block itself changes: `stateIdOf` only reads its template when the block is
-/// the same one, so a state asked for a different block comes back with that block's **first** state
-/// under whatever was not named, and a chest turns up waterlogged out of nowhere.
-///
-/// parity: `Block.withPropertiesOf`, which copies over every property the two blocks share. Only for
-/// a pair that shares its whole set, which is what the copper chests are.
+/// the same one, so a state asked for a different block comes back with that block's first state
+/// under whatever was not named, and a chest turns up waterlogged. parity: `Block.withPropertiesOf`,
+/// only for a pair that shares its whole property set, which is what the copper chests are.
 [[nodiscard]] std::optional<std::int32_t> becomes(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                   std::int32_t stateId, const wire::common::Identifier& block,
                                                   const std::string& property, const std::string& value) {
@@ -510,6 +512,66 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
                    frontSturdy && backSturdy ? "double_wall" : "single_wall");
 }
 
+[[nodiscard]] registry::BlockFace facing(registry::BlockFace face) {
+    switch (face) {
+    case registry::BlockFace::Down:
+        return registry::BlockFace::Up;
+    case registry::BlockFace::Up:
+        return registry::BlockFace::Down;
+    case registry::BlockFace::North:
+        return registry::BlockFace::South;
+    case registry::BlockFace::South:
+        return registry::BlockFace::North;
+    case registry::BlockFace::West:
+        return registry::BlockFace::East;
+    default:
+        return registry::BlockFace::West;
+    }
+}
+
+/// parity: `ConcretePowderBlock.touchesLiquid`, quirk included: the loop reads the square it looked
+/// at last to decide whether to look down, and on the first turn that square is the powder itself.
+/// A powder is never water, so the block **underneath** never hardens it, which is why a column of
+/// powder poured into a pool only sets where the water touches its sides.
+[[nodiscard]] bool touchesWater(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    for (const registry::BlockFace face : kAllFaces) {
+        if (face == registry::BlockFace::Down && !registry::blockFluids::hasWaterFluid(stateAt(world, x, y, z))) {
+            continue;
+        }
+        const std::int32_t neighbour = stateAt(world, x + offsetX(face), y + offsetY(face), z + offsetZ(face));
+        if (registry::blockFluids::hasWaterFluid(neighbour) &&
+            !registry::blockShapes::isFaceSturdy(neighbour, facing(face))) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/// The concrete this powder sets into.
+[[nodiscard]] std::optional<std::int32_t> setInto(const wire::common::Identifier& block) {
+    const std::string_view path = block.path();
+    if (!path.ends_with(kPowderSuffix)) {
+        return std::nullopt;
+    }
+    constexpr std::string_view kPowder = "_powder";
+    return registry::blockStateDefinitions::stateIdOf(
+        wire::common::Identifier::vanilla(std::string{path.substr(0, path.size() - kPowder.size())}), {}, std::nullopt);
+}
+
+/// parity: `ConcretePowderBlock.updateShape`, which sets the powder the moment water reaches it.
+[[nodiscard]] std::optional<std::int32_t> concretePowder(WorldState& world, std::int32_t x, std::int32_t y,
+                                                         std::int32_t z, std::int32_t stateId,
+                                                         const wire::common::Identifier& block) {
+    if (!touchesWater(world, x, y, z)) {
+        return std::nullopt;
+    }
+    const std::optional<std::int32_t> set = setInto(block);
+    if (!set.has_value() || *set == stateId || !world.setBlockState(x, y, z, *set)) {
+        return std::nullopt;
+    }
+    return set;
+}
+
 [[nodiscard]] bool endsWith(std::string_view text, std::string_view suffix) { return text.ends_with(suffix); }
 
 } // namespace
@@ -573,7 +635,25 @@ std::optional<std::int32_t> of(WorldState& world, std::int32_t x, std::int32_t y
     if (path == "pale_moss_carpet") {
         return mossCarpet(world, x, y, z, stateId, *block);
     }
+    if (endsWith(path, kPowderSuffix)) {
+        return concretePowder(world, x, y, z, stateId, *block);
+    }
     return std::nullopt;
+}
+
+std::optional<std::int32_t> landedConcrete(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                           std::int32_t stateId, std::int32_t replaced) {
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+    if (block == nullptr) {
+        return std::nullopt;
+    }
+    // parity: `ConcretePowderBlock.shouldSolidify`, which counts the square it landed in as well as
+    // the six around it, so powder dropped straight into a pool sets where it stops.
+    if (!registry::blockFluids::hasWaterFluid(replaced) && !touchesWater(world, x, y, z)) {
+        return std::nullopt;
+    }
+    const std::optional<std::int32_t> set = setInto(*block);
+    return set.has_value() && *set != stateId ? set : std::nullopt;
 }
 
 } // namespace basalt::server::runtime::world::reshapes

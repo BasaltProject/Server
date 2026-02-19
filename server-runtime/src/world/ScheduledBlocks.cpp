@@ -269,7 +269,11 @@ const wire::common::Identifier& sugarCaneTickType() {
     if (!above.has_value() || !registry::blockShapes::isSolidState(*above)) {
         return false;
     }
-    return path != "farmland" || !registry::blockConnections::maintainsFarmland(*above);
+    if (path != "farmland") {
+        // parity: `DirtPathBlock.canSurvive` lets a fence gate stand on a path, and nothing else.
+        return !pathOf(*above).ends_with("fence_gate");
+    }
+    return !registry::blockConnections::maintainsFarmland(*above);
 }
 
 void scheduleCoveredSoil(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
