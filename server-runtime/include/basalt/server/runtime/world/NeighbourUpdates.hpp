@@ -149,7 +149,8 @@ void settleArrivedSignal(WorldState& world, std::int32_t x, std::int32_t y, std:
 /// blocks, so the placement path asks for it directly instead of reshaping the block it just put
 /// down: reshaping it undid every state placement had decided, a double chest included.
 [[nodiscard]] std::optional<std::int32_t> connect(const Context& context, std::int32_t x, std::int32_t y,
-                                                  std::int32_t z, std::int32_t stateId);
+                                                  std::int32_t z, std::int32_t stateId,
+                                                  std::optional<registry::BlockFace> towards = std::nullopt);
 
 /// How far these leaves are from a trunk.
 ///

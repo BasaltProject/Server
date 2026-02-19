@@ -291,6 +291,32 @@ bool isSupported(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
             return false;
         }
     }
+    // parity: `BaseRailBlock.shouldBeRemoved`, which asks two things and not one: something rigid
+    // under it, and, for a slope, something rigid in the square it climbs **towards** as well. The
+    // table of block ids only has the first: the probe measures every block in its default shape and
+    // a rail's is flat, so the slope's other support never reached it. Measured in `railrampa`,
+    // where the jar drops the slope as its footing goes and this build left it hanging.
+    if (path == "rail" || path == "powered_rail" || path == "detector_rail" || path == "activator_rail") {
+        if (!registry::blockShapes::supportsRigid(stateAt(world, x, y - 1, z), registry::BlockFace::Up)) {
+            return false;
+        }
+        const std::string shape = valueOf(state, "shape");
+        std::optional<registry::BlockFace> climbing;
+        if (shape == "ascending_east") {
+            climbing = registry::BlockFace::East;
+        } else if (shape == "ascending_west") {
+            climbing = registry::BlockFace::West;
+        } else if (shape == "ascending_north") {
+            climbing = registry::BlockFace::North;
+        } else if (shape == "ascending_south") {
+            climbing = registry::BlockFace::South;
+        }
+        if (!climbing.has_value()) {
+            return true;
+        }
+        return registry::blockShapes::supportsRigid(
+            stateAt(world, x + registry::stepX(*climbing), y, z + registry::stepZ(*climbing)), registry::BlockFace::Up);
+    }
     // parity: `RedStoneWireBlock.canSurviveOn` is `isFaceSturdy(UP) || is(HOPPER)`, and that is a
     // question about the **state** below, not about which block it is. The table cannot answer it:
     // its rule for dust is a set of block ids taken from the probe, so a trapdoor that supports only
