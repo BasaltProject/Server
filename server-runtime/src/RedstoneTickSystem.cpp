@@ -522,6 +522,12 @@ void RedstoneTickSystem::tickFallingBlocks(world::LoadedWorld& world, const sche
         if (landed.placed.has_value()) {
             sendBlockUpdate(watchers, BlockPos{landed.placed->x, landed.placed->y, landed.placed->z},
                             landed.placed->stateId);
+            // parity: `FallingBlockEntity.tick` lands with `setBlock(pos, state, 3)`, so the square
+            // it stops in tells its neighbours and reshapes them. Writing the block and telling only
+            // the client left a fence beside the landing square unjoined and a tilled soil under it
+            // untouched, which is what `arenacae` measured.
+            broadcaster_->notifyAround(world, watchers, landed.placed->x, landed.placed->y, landed.placed->z,
+                                       std::nullopt);
         } else if (landed.shattered.has_value()) {
             broadcaster_->dropFallenBlock(world, wasX, wasY, wasZ, *landed.shattered);
         }
