@@ -385,17 +385,28 @@ const wire::common::Identifier& lamp() {
 /// parity: the blocks whose `onPlace` reads `hasNeighborSignal`. Everything else that reacts to a
 /// signal does it only from `neighborChanged`, which never reaches the square that changed.
 [[nodiscard]] bool readsPowerOnPlace(const std::string_view path) {
+    // parity: the shelf is not one of them. `ShelfBlock.onPlace` only joins or breaks its side chain
+    // (`SideChainPartBlock`), and the signal is read in `neighborChanged` alone.
     return path == "tnt" || path == "hopper" || path.ends_with("copper_bulb") || path == "powered_rail" ||
-           path == "activator_rail" || path == "detector_rail" || shelves::isShelf(path);
+           path == "activator_rail" || path == "detector_rail";
 }
 
 std::vector<BlockChange> placed(WorldState& world, const std::string_view worldName, const std::int32_t x,
                                 const std::int32_t y, const std::int32_t z, const std::int64_t gameTime,
-                                random::RandomSource& random, const bool tntExplodes) {
+                                random::RandomSource& random, const bool tntExplodes,
+                                const std::optional<std::int32_t> removed) {
     std::vector<BlockChange> changes;
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value() || !readsPowerOnPlace(pathOf(*stateId))) {
         return changes;
+    }
+    // parity: the same block written again is not an arrival, so none of them answers it.
+    if (removed.has_value()) {
+        const wire::common::Identifier* before = registry::blockStateDefinitions::blockOf(*removed);
+        const wire::common::Identifier* after = registry::blockStateDefinitions::blockOf(*stateId);
+        if (before != nullptr && after != nullptr && *before == *after) {
+            return changes;
+        }
     }
     react(world, worldName, x, y, z, gameTime, tntExplodes, changes, random);
     return changes;

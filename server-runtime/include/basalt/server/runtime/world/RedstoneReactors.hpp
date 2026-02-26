@@ -43,9 +43,12 @@ inline constexpr std::int32_t kLampOffDelay = 4;
 /// `Level.updateNeighborsAt` never tells the square that changed, so a block landing on a powered
 /// square reacts only if its own `onPlace` reads the power. Four do: tnt primes, a hopper comes out
 /// disabled, a copper bulb lights and a shelf joins its chain. A lamp, a door or a bell have none.
+/// parity: every block that reads the signal in its `onPlace` gates it on
+/// `!oldState.is(state.getBlock())`, so a write that only moves a property reads nothing.
 [[nodiscard]] std::vector<BlockChange> placed(WorldState& world, std::string_view worldName, std::int32_t x,
                                               std::int32_t y, std::int32_t z, std::int64_t gameTime,
-                                              random::RandomSource& random, bool tntExplodes);
+                                              random::RandomSource& random, bool tntExplodes,
+                                              std::optional<std::int32_t> removed = std::nullopt);
 
 /// The reactors on and around the square a diode feeds, less the way back to the diode.
 ///

@@ -295,18 +295,30 @@ TEST_CASE("a rod that has oxidised is still a rod") {
     }
 }
 
-TEST_CASE("the square a rod and a hook tell on top of their own six") {
+TEST_CASE("the squares a block tells on top of its own six") {
     // parity: `LightningRodBlock.updateNeighbours` and `TripWireHookBlock.notifyNeighbors`, both an
-    // `updateNeighborsAt` on the square the block hangs on. Nothing else in the game does this.
-    CHECK(redstone::alsoTells(stateOf(
-              "lightning_rod", {{"facing", "up"}, {"powered", "false"}, {"waterlogged", "false"}})) == BlockFace::Down);
+    // `updateNeighborsAt` on the square the block hangs on.
+    using Faces = std::vector<BlockFace>;
+    CHECK(redstone::alsoTells(
+              stateOf("lightning_rod", {{"facing", "up"}, {"powered", "false"}, {"waterlogged", "false"}})) ==
+          Faces{BlockFace::Down});
     CHECK(redstone::alsoTells(
               stateOf("waxed_lightning_rod", {{"facing", "north"}, {"powered", "false"}, {"waterlogged", "false"}})) ==
-          BlockFace::South);
-    CHECK(redstone::alsoTells(stateOf(
-              "tripwire_hook", {{"facing", "east"}, {"powered", "false"}, {"attached", "false"}})) == BlockFace::West);
-    CHECK_FALSE(redstone::alsoTells(stateOf("lever")).has_value());
-    CHECK_FALSE(redstone::alsoTells(stateOf("stone")).has_value());
+          Faces{BlockFace::South});
+    CHECK(redstone::alsoTells(
+              stateOf("tripwire_hook", {{"facing", "east"}, {"powered", "false"}, {"attached", "false"}})) ==
+          Faces{BlockFace::West});
+    // parity: `PoweredRailBlock.updateState` tells the square below, and the one above as well when
+    // the rail lies on a slope. The rail feeds nobody: what this reaches is a neighbour left out of
+    // step, which is what a lamp written `lit=false` beside a block of redstone is.
+    CHECK(redstone::alsoTells(
+              stateOf("powered_rail", {{"shape", "east_west"}, {"powered", "false"}, {"waterlogged", "false"}})) ==
+          Faces{BlockFace::Down});
+    CHECK(redstone::alsoTells(
+              stateOf("powered_rail", {{"shape", "ascending_east"}, {"powered", "false"}, {"waterlogged", "false"}})) ==
+          Faces{BlockFace::Down, BlockFace::Up});
+    CHECK(redstone::alsoTells(stateOf("lever")).empty());
+    CHECK(redstone::alsoTells(stateOf("stone")).empty());
 }
 
 TEST_CASE("the reach of a change is two blocks through anything solid") {
