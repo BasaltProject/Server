@@ -199,6 +199,9 @@ void BedrockListener::run() {
         // Before the poll rather than after it: what the poll flushes is what is queued now, so a
         // line left by another thread goes out on this turn instead of the next.
         for (const auto& [peer, session] : sessions_) {
+            if (session->player != nullptr) {
+                session->player->tick();
+            }
             deliverMail(*session);
         }
         server_->poll(nowMillis(), kPollTimeoutMillis);

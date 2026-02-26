@@ -1,17 +1,41 @@
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/WorldClock.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
 #include <basalt/wire/text/MiniMessage.hpp>
 #include <basalt/wire/text/Serializers.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
 
+#include <array>
+#include <chrono>
+#include <cmath>
 #include <cstdlib>
+#include <span>
 #include <utility>
 
 namespace basalt::server::runtime::bedrock {
 namespace {
 
 using wire::text::Component;
+
+/// What `start_game` told this client it is. Every client is told the same number: a Bedrock
+/// session only ever draws one player of its own.
+constexpr std::uint64_t kRuntimeEntityId = 1;
+
+/// How often the rest of the server is looked at, in the listener's own loop. The world moves once
+/// every fifty milliseconds and the loop turns faster than that, so this is what a tick is worth.
+constexpr std::chrono::milliseconds kSyncPeriod{50};
+
+/// A position this client has already been told is the same position: a double that came off the
+/// wire as a float never lands exactly where it started.
+constexpr double kMoveEpsilon = 0.01;
+constexpr float kTurnEpsilon = 1.0F;
+
+/// Somebody else's number, as this client knows it. One is the client's own, from `start_game`,
+/// and every entity id is one or more, so they are all moved out of the way by exactly that.
+[[nodiscard]] std::uint64_t runtimeIdFor(const std::int32_t entityId) {
+    return static_cast<std::uint64_t>(entityId) + 1;
+}
 
 } // namespace
 
@@ -68,6 +92,78 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
              fadeIn, stay, fadeOut);
     };
 
+    connection.teleportTo = [this](const double x, const double y, const double z, const float yaw, const float pitch) {
+        if (session_ != nullptr) {
+            session_->x = x;
+            session_->y = y;
+            session_->z = z;
+            session_->yaw = yaw;
+            session_->pitch = pitch;
+        }
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeTeleport(body, kRuntimeEntityId, static_cast<float>(x),
+                                     static_cast<float>(y) + wire::bedrock::kPlayerEyeHeight, static_cast<float>(z),
+                                     yaw, pitch, 0);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::MovePlayer), body.toVector());
+    };
+    connection.setGamemode = [this](const wire::protocol::play::Gamemode mode) {
+        if (session_ != nullptr) {
+            session_->gamemode = mode;
+        }
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeSetPlayerGameType(body, static_cast<std::int32_t>(mode));
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetPlayerGameType), body.toVector());
+    };
+
+    // Rain and thunder are two events rather than a state, and the strength rides along as the
+    // whole range of an unsigned short. Thunder is only sent while it is raining: a client told to
+    // thunder in clear weather starts raining by itself.
+    connection.sendWeather = [mailbox = joining.mailbox](const world::WorldWeather& weather) {
+        const auto send = [&mailbox](const wire::bedrock::LevelEventType type, const float strength) {
+            wire::io::ByteBuffer body;
+            wire::bedrock::writeLevelEvent(
+                body, type, 0.0F, 0.0F, 0.0F,
+                static_cast<std::int32_t>(strength * static_cast<float>(wire::bedrock::kWeatherStrengthScale)));
+            mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LevelEvent), body.toVector());
+        };
+        send(weather.raining ? wire::bedrock::LevelEventType::StartRaining : wire::bedrock::LevelEventType::StopRaining,
+             weather.rainLevel());
+        if (weather.raining && weather.thundering) {
+            send(wire::bedrock::LevelEventType::StartThunderstorm, weather.thunderLevel());
+        } else {
+            send(wire::bedrock::LevelEventType::StopThunderstorm, 0.0F);
+        }
+    };
+
+    // Bedrock draws its hearts and haunches from attributes, and is told the range of each one:
+    // where Java hardcodes the bounds in the client, here the server states them.
+    connection.syncHealth = [this] {
+        if (session_ == nullptr) {
+            return;
+        }
+        const std::array<wire::bedrock::AttributeValue, 4> values{{
+            {"minecraft:health", 0.0F, session_->maxHealth(), session_->health(), session_->maxHealth()},
+            {"minecraft:player.hunger", 0.0F, 20.0F, static_cast<float>(session_->food.foodLevel()), 20.0F},
+            {"minecraft:player.saturation", 0.0F, 20.0F, session_->food.saturationLevel(), 20.0F},
+            {"minecraft:absorption", 0.0F, 1024.0F, session_->absorption, 0.0F},
+        }};
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeUpdateAttributes(body, kRuntimeEntityId, values, 0);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::UpdateAttributes), body.toVector());
+    };
+    connection.syncExperience = [this] {
+        if (session_ == nullptr) {
+            return;
+        }
+        const std::array<wire::bedrock::AttributeValue, 2> values{{
+            {"minecraft:player.experience", 0.0F, 1.0F, session_->experience.progress(), 0.0F},
+            {"minecraft:player.level", 0.0F, 24791.0F, static_cast<float>(session_->experience.level()), 0.0F},
+        }};
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeUpdateAttributes(body, kRuntimeEntityId, values, 0);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::UpdateAttributes), body.toVector());
+    };
+
     // A window of items is a list of buttons over here, and the plugin never learns the difference.
     connection.openPluginMenu =
         [this](const std::string& title, std::int32_t, const std::map<std::int32_t, server::plugins::PluginItem>& items,
@@ -103,6 +199,11 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
     if (context_.registry != nullptr) {
         context_.registry->add(session_.get());
     }
+    // What the HUD draws, before anything can change it: a client that is told nothing draws a
+    // player with no hearts at all.
+    session_->connection().syncHealth();
+    session_->connection().syncExperience();
+    session_->connection().sendWeather(context_.weather);
     wire::io::ByteBuffer time;
     wire::bedrock::writeSetTime(time, context_.worldTime);
     mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetTime), time.toVector());
@@ -237,6 +338,92 @@ void BedrockPlayer::formAnswer(const std::uint32_t formId, const std::optional<s
     if (onClick) {
         onClick(slot);
     }
+}
+
+void BedrockPlayer::tick() {
+    const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+    if (now - lastSync_ < kSyncPeriod) {
+        return;
+    }
+    lastSync_ = now;
+    syncOthers();
+}
+
+void BedrockPlayer::syncOthers() {
+    if (session_ == nullptr || context_.registry == nullptr) {
+        return;
+    }
+    const auto post = [this](const wire::bedrock::BedrockPacket packet, wire::io::ByteBuffer& body) {
+        mailbox_->post(static_cast<std::uint16_t>(packet), body.toVector());
+    };
+
+    std::unordered_map<wire::common::Uuid, Other> present;
+    for (const player::PlayerSession* other : context_.registry->snapshot()) {
+        if (other->uuid() == session_->uuid() || other->worldName != session_->worldName) {
+            continue;
+        }
+        const Other now{other->entityId(), other->x, other->y, other->z, other->yaw, other->pitch};
+        present.emplace(other->uuid(), now);
+
+        const auto known = others_.find(other->uuid());
+        if (known == others_.end()) {
+            wire::bedrock::PlayerListEntry entry;
+            entry.uuidHigh = other->uuid().high();
+            entry.uuidLow = other->uuid().low();
+            entry.entityId = static_cast<std::int64_t>(runtimeIdFor(now.entityId));
+            entry.name = other->name();
+            entry.skin = wire::bedrock::flatSkin(other->name());
+            wire::io::ByteBuffer list;
+            wire::bedrock::writePlayerListAdd(list, std::span{&entry, 1});
+            post(wire::bedrock::BedrockPacket::PlayerList, list);
+
+            wire::bedrock::AddPlayerInfo spawn;
+            spawn.uuidHigh = entry.uuidHigh;
+            spawn.uuidLow = entry.uuidLow;
+            spawn.entityId = entry.entityId;
+            spawn.runtimeEntityId = static_cast<std::uint64_t>(entry.entityId);
+            spawn.name = entry.name;
+            spawn.x = static_cast<float>(now.x);
+            spawn.y = static_cast<float>(now.y);
+            spawn.z = static_cast<float>(now.z);
+            spawn.yaw = now.yaw;
+            spawn.pitch = now.pitch;
+            spawn.gameType = static_cast<std::int32_t>(other->gamemode);
+            wire::io::ByteBuffer body;
+            wire::bedrock::writeAddPlayer(body, spawn);
+            post(wire::bedrock::BedrockPacket::AddPlayer, body);
+            continue;
+        }
+
+        const Other& before = known->second;
+        const bool moved = std::abs(now.x - before.x) > kMoveEpsilon || std::abs(now.y - before.y) > kMoveEpsilon ||
+                           std::abs(now.z - before.z) > kMoveEpsilon;
+        const bool turned =
+            std::abs(now.yaw - before.yaw) > kTurnEpsilon || std::abs(now.pitch - before.pitch) > kTurnEpsilon;
+        if (!moved && !turned) {
+            continue;
+        }
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeMoveEntity(body, runtimeIdFor(now.entityId), static_cast<float>(now.x),
+                                       static_cast<float>(now.y) + wire::bedrock::kPlayerEyeHeight,
+                                       static_cast<float>(now.z), now.yaw, now.pitch, true);
+        post(wire::bedrock::BedrockPacket::MoveEntityAbsolute, body);
+    }
+
+    for (const auto& [uuid, gone] : others_) {
+        if (present.contains(uuid)) {
+            continue;
+        }
+        const std::pair<std::uint64_t, std::uint64_t> id{uuid.high(), uuid.low()};
+        wire::io::ByteBuffer list;
+        wire::bedrock::writePlayerListRemove(list, std::span{&id, 1});
+        post(wire::bedrock::BedrockPacket::PlayerList, list);
+
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeRemoveEntity(body, static_cast<std::int64_t>(runtimeIdFor(gone.entityId)));
+        post(wire::bedrock::BedrockPacket::RemoveEntity, body);
+    }
+    others_ = std::move(present);
 }
 
 void BedrockPlayer::announce(const Component& message) const {

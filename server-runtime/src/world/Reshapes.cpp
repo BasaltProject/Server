@@ -576,6 +576,89 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return set;
 }
 
+/// parity: `MultifaceBlock.updateShape`, which takes off the **face** whose hold has gone and answers
+/// air only when that was the last one. A lichen growing on a wall and on the floor that loses the
+/// wall stays on the floor; before this it kept a face attached to nothing.
+[[nodiscard]] std::optional<std::int32_t> multiface(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                                    std::int32_t stateId, const wire::common::Identifier& block,
+                                                    std::optional<registry::BlockFace> towards) {
+    if (!towards.has_value()) {
+        return std::nullopt;
+    }
+    const std::string side{nameOf(*towards)};
+    std::map<std::string, std::string> faces = registry::blockStateDefinitions::propertiesOf(stateId);
+    const auto here = faces.find(side);
+    if (here == faces.end() || here->second != "true") {
+        return std::nullopt;
+    }
+    // parity: `canAttachTo` asks the neighbour for a full face on the side that looks back here.
+    const std::int32_t neighbour =
+        stateAt(world, x + offsetX(*towards), y + offsetY(*towards), z + offsetZ(*towards));
+    if (registry::blockShapes::isFaceSturdy(neighbour, facing(*towards))) {
+        return std::nullopt;
+    }
+    here->second = "false";
+    // parity: `removeFace` answers air when nothing is left holding it anywhere.
+    const bool anyLeft = std::ranges::any_of(kAllFaces, [&faces](registry::BlockFace face) {
+        const auto found = faces.find(std::string{nameOf(face)});
+        return found != faces.end() && found->second == "true";
+    });
+    const std::optional<std::int32_t> written =
+        anyLeft ? registry::blockStateDefinitions::stateIdOf(block, faces, stateId)
+                : std::optional{registry::blocks::air().stateId};
+    if (!written.has_value() || *written == stateId || !world.setBlockState(x, y, z, *written)) {
+        return std::nullopt;
+    }
+    return written;
+}
+
+/// parity: `VineBlock.getUpdatedState`, the multiface rule with one addition: a horizontal face that
+/// has lost its wall survives anyway when the vine **above** has that same face, which is what lets a
+/// curtain of vines hang off a single block. `updateShape` recomputes every face, not just the one
+/// the news came from, and answers air when none is left.
+[[nodiscard]] std::optional<std::int32_t> vine(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                                std::int32_t stateId, const wire::common::Identifier& block,
+                                                std::optional<registry::BlockFace> towards) {
+    // parity: from below `updateShape` hands the state straight back without looking at anything.
+    if (towards == registry::BlockFace::Down) {
+        return std::nullopt;
+    }
+    std::map<std::string, std::string> faces = registry::blockStateDefinitions::propertiesOf(stateId);
+    const std::int32_t above = stateAt(world, x, y + 1, z);
+    const bool vineAbove = pathOf(above) == "vine";
+    const std::map<std::string, std::string> overhead =
+        vineAbove ? registry::blockStateDefinitions::propertiesOf(above) : std::map<std::string, std::string>{};
+    if (const auto up = faces.find("up"); up != faces.end() && up->second == "true") {
+        // parity: `isAcceptableNeighbour(level, above, DOWN)` tests the **up** face of the block over
+        // it, not its underside. It reads odd and it only matters for a block that is full on one
+        // side and not the other.
+        up->second = registry::blockShapes::isFaceSturdy(above, registry::BlockFace::Up) ? "true" : "false";
+    }
+    for (const registry::BlockFace face : kHorizontal) {
+        const auto side = faces.find(std::string{nameOf(face)});
+        if (side == faces.end() || side->second != "true") {
+            continue;
+        }
+        const std::int32_t beside = stateAt(world, x + offsetX(face), y, z + offsetZ(face));
+        bool holds = registry::blockShapes::isFaceSturdy(beside, facing(face));
+        if (!holds && vineAbove) {
+            const auto same = overhead.find(std::string{nameOf(face)});
+            holds = same != overhead.end() && same->second == "true";
+        }
+        side->second = holds ? "true" : "false";
+    }
+    const bool anyLeft = std::ranges::any_of(faces, [](const auto& one) {
+        return one.second == "true" && one.first != "waterlogged";
+    });
+    const std::optional<std::int32_t> written =
+        anyLeft ? registry::blockStateDefinitions::stateIdOf(block, faces, stateId)
+                : std::optional{registry::blocks::air().stateId};
+    if (!written.has_value() || *written == stateId || !world.setBlockState(x, y, z, *written)) {
+        return std::nullopt;
+    }
+    return written;
+}
+
 [[nodiscard]] bool endsWith(std::string_view text, std::string_view suffix) { return text.ends_with(suffix); }
 
 } // namespace
@@ -641,6 +724,12 @@ std::optional<std::int32_t> of(WorldState& world, std::int32_t x, std::int32_t y
     }
     if (endsWith(path, kPowderSuffix)) {
         return concretePowder(world, x, y, z, stateId, *block);
+    }
+    if (path == "glow_lichen" || path == "sculk_vein" || path == "resin_clump") {
+        return multiface(world, x, y, z, stateId, *block, towards);
+    }
+    if (path == "vine") {
+        return vine(world, x, y, z, stateId, *block, towards);
     }
     return std::nullopt;
 }
