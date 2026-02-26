@@ -208,10 +208,15 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             scheduled.push_back(*lectern);
         }
         // parity: `DetectorRailBlock.tick`, the recheck a pressed rail books for itself.
-        if (const std::optional<world::BlockChange> rail =
-                world::detectorRails::check(world.state(), x, y, z, world.state().entities());
-            rail.has_value()) {
-            scheduled.push_back(*rail);
+        if (const world::detectorRails::Checked rail = world::detectorRails::check(
+                world.state(), x, y, z, world.state().entities(), world::detectorRails::Caller::ScheduledTick);
+            rail.ran) {
+            if (rail.change.has_value()) {
+                scheduled.push_back(*rail.change);
+            }
+            // parity: `checkPressed` ends in `updateNeighbourForOutputSignal` whatever it decided, so
+            // a comparator reading a container minecart parked here follows what is inside it.
+            world::redstoneComponents::scheduleComparatorsAround(world.state(), world.name(), x, y, z, containerSignal);
         }
         // parity: `SculkSensorBlock.tick`: thirty ticks awake, then ten of cooldown, plus the turn
         // the vibration on its way spends. `activate` and `deactivate` both end in `updateNeighbours`,

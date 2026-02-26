@@ -210,6 +210,10 @@ void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32
     bool attached = true;
     bool powered = false;
     std::int32_t receiver = 0;
+    // parity: `BlockState[] wireStates`, the states the scan **read**, which is what the pass writes
+    // back at the end: a square the caller handed over as a state of its own is written from that
+    // state and not from whatever the world holds by then.
+    std::map<std::int32_t, std::int32_t> scanned;
     for (std::int32_t step = 1; step < kMaxLength; ++step) {
         const std::int32_t tx = x + (registry::stepX(*direction) * step);
         const std::int32_t tz = z + (registry::stepZ(*direction) * step);
@@ -233,6 +237,7 @@ void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32
             continue;
         }
         const std::int32_t readId = isSource ? wireSourceState.value_or(*alongId) : *alongId;
+        scanned.emplace(step, readId);
         const Properties wire = registry::blockStateDefinitions::propertiesOf(readId);
         // parity: a wire cut with shears is disarmed, and a disarmed wire never powers.
         const bool armed = valueOf(wire, "disarmed") != "true";
@@ -280,19 +285,30 @@ void calculateHook(WorldState& world, std::int32_t x, std::int32_t y, std::int32
         heard(world, event, ox, y, oz, gameTime);
     }
     heard(world, event, x, y, z, gameTime);
-    // parity: the wires themselves follow the pair, which is what draws them taut.
+    // parity: the wires themselves follow the pair, which is what draws them taut, and the jar does
+    // this **only when `attached` moved**: a line that was already taut is left alone, however out of
+    // step a single string in it may be.
+    if (wasAttached == attached) {
+        return;
+    }
     for (std::int32_t step = 1; step < std::max(receiver, 1); ++step) {
+        const auto read = scanned.find(step);
+        if (read == scanned.end()) {
+            continue;
+        }
         const std::int32_t tx = x + (registry::stepX(*direction) * step);
         const std::int32_t tz = z + (registry::stepZ(*direction) * step);
         const std::optional<std::int32_t> alongId = world.blockState(tx, y, tz);
         if (!alongId.has_value()) {
             continue;
         }
+        // parity: the square has to hold a string **or a hook** for the write to land, and what is
+        // written is the state the scan read.
         const wire::common::Identifier* along = registry::blockStateDefinitions::blockOf(*alongId);
-        if (along == nullptr || *along != wireBlock()) {
+        if (along == nullptr || (*along != wireBlock() && *along != hookBlock())) {
             continue;
         }
-        write(world, tx, y, tz, *alongId, *along, attached, std::nullopt, changes);
+        write(world, tx, y, tz, read->second, *along, attached, std::nullopt, changes);
         // parity: ese `setBlock` redibuja a los **vecinos** de la cuerda, no a la cuerda: medido con
         // `cuerdasola`, donde el jar deja la cuerda de al lado del gancho tal y como la escribio el
         // comando. Redibujarla aqui la unia al gancho y el jar no lo hace.

@@ -574,6 +574,27 @@ TEST_CASE("a block that only changed shape carries the walk on to the next one")
     CHECK(propertyAt(loaded.state, 8, 64, 10, "south") == "true");
 }
 
+TEST_CASE("a coral books its own death only where the jar books it") {
+    // parity: `CoralBlock` has **no** `onPlace`; its die turn comes out of `updateShape`. A placement
+    // runs `updateFromNeighbourShapes` on the state it is about to write and books it; a plain write
+    // of the square never calls `updateShape` on that square, so it books nothing.
+    Loaded placed;
+    placed.put(8, 64, 8, stateOf("fire_coral_block"));
+    Report report;
+    neighbourUpdates::afterChange(placed.context(), 8, 64, 8, std::nullopt, report.effects, report.onBroken(),
+                                  report.onReshaped());
+
+    CHECK(placed.state.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("fire_coral_block")));
+
+    Loaded written;
+    written.put(8, 64, 8, stateOf("fire_coral_block"));
+    Report quiet;
+    neighbourUpdates::afterChange(written.context(), 8, 64, 8, std::nullopt, quiet.effects, quiet.onBroken(),
+                                  quiet.onReshaped(), false);
+
+    CHECK_FALSE(written.state.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("fire_coral_block")));
+}
+
 TEST_CASE("a rail that only changes shape still reaches the square above it") {
     // parity: `LevelChunk.setBlockState` runs `affectNeighborsAfterRemoval` when the block changed
     // **or when the one that arrived is a rail**. A sloped rail whose `powered` moves is the same

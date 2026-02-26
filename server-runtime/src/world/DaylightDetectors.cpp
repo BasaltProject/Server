@@ -17,11 +17,21 @@ constexpr std::int32_t kMax = 15;
 constexpr std::int64_t kDayTicks = 24000;
 constexpr float kDegrees = 360.0F;
 
-/// parity: `updateSkyBrightness`: rain and thunder each take five sixteenths off the daylight.
+/// parity: `updateSkyBrightness`, which in 26.2 is `15 - EnvironmentAttributes.SKY_LIGHT_LEVEL` and is
+/// no longer written as a formula: it comes off a track with keyframes at 133, 11867, 13670 and 22330.
+/// The sum here lands on the same numbers at both ends, and at night both sides answer eleven,
+/// checked against the jar. Rain and thunder each take five sixteenths off the daylight.
 constexpr double kRainShare = 1.0 - (5.0 / 16.0);
 constexpr double kDarkenRange = 11.0;
 
-/// parity: `DimensionType.timeOfDay`, the curved fraction of the day everything else reads.
+/// The curved fraction of the day everything else reads.
+///
+/// parity: this was `DimensionType.timeOfDay` until 26.2, which moved it to a **timeline track**:
+/// `EnvironmentAttributes.SUN_ANGLE`, eased with `symmetricCubicBezier(0.362, 0.241)` over keyframes
+/// running 360 to 0 degrees on a 24000 period. That Bezier all but reproduces the blend here: walked
+/// against each other over a whole day, a detector's power differs on 86 ticks out of 24000 and never
+/// by more than one. Measured against the jar too, in `detectorluz`, which reads noon and midnight:
+/// both sides answer the same.
 [[nodiscard]] float timeOfDay(const WorldClock& clock) {
     const float dayTime = static_cast<float>(clock.totalTicks() % kDayTicks) / static_cast<float>(kDayTicks);
     float fraction = dayTime - 0.25F;

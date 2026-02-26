@@ -61,20 +61,34 @@ TEST_CASE("a cart on the rail turns it on and books another look") {
     const std::unique_ptr<ServerEntity> standing = cart("minecart", 4.5, 64.0, 4.5);
     const std::vector<ServerEntity*> entities{standing.get()};
 
-    const std::optional<BlockChange> pressed = detectorRails::check(world, 4, 64, 4, entities);
-    REQUIRE(pressed.has_value());
-    CHECK(poweredOf(pressed->stateId) == "true");
-    CHECK(world.blockState(4, 64, 4) == pressed->stateId);
+    // parity: `entityInside` is what a cart arriving runs, and it only asks while the rail is off.
+    const detectorRails::Checked pressed =
+        detectorRails::check(world, 4, 64, 4, entities, detectorRails::Caller::Entity);
+    REQUIRE(pressed.change.has_value());
+    CHECK(poweredOf(pressed.change->stateId) == "true");
+    CHECK(world.blockState(4, 64, 4) == pressed.change->stateId);
     // parity: twenty ticks, and it is the rail's own turn that finds the cart gone later.
     CHECK(world.hasScheduledBlockTick(4, 64, 4, Identifier::vanilla("detector_rail")));
 
-    // Still there: nothing to report, and another turn booked.
-    CHECK_FALSE(detectorRails::check(world, 4, 64, 4, entities).has_value());
+    // parity: with the rail already on, a cart arriving asks nothing at all: `entityInside` is gated
+    // on `!POWERED`, and from here on it is the twenty tick turn that keeps looking.
+    const detectorRails::Checked again = detectorRails::check(world, 4, 64, 4, entities, detectorRails::Caller::Entity);
+    CHECK_FALSE(again.ran);
+    CHECK_FALSE(again.change.has_value());
 
-    const std::optional<BlockChange> released = detectorRails::check(world, 4, 64, 4, {});
-    REQUIRE(released.has_value());
-    CHECK(poweredOf(released->stateId) == "false");
-    CHECK_FALSE(detectorRails::check(world, 4, 64, 4, {}).has_value());
+    // The rail's own turn does run, reports nothing, and still counts as a pass: that is what tells
+    // the comparators again.
+    const detectorRails::Checked held =
+        detectorRails::check(world, 4, 64, 4, entities, detectorRails::Caller::ScheduledTick);
+    CHECK(held.ran);
+    CHECK_FALSE(held.change.has_value());
+
+    const detectorRails::Checked released =
+        detectorRails::check(world, 4, 64, 4, {}, detectorRails::Caller::ScheduledTick);
+    REQUIRE(released.change.has_value());
+    CHECK(poweredOf(released.change->stateId) == "false");
+    // parity: and now it is `tick` that is gated off, because the rail is no longer powered.
+    CHECK_FALSE(detectorRails::check(world, 4, 64, 4, {}, detectorRails::Caller::ScheduledTick).ran);
 }
 
 TEST_CASE("the box a cart has to be in") {
@@ -85,8 +99,9 @@ TEST_CASE("the box a cart has to be in") {
     const auto pressesFrom = [&world](double x, double y, double z) {
         const std::unique_ptr<ServerEntity> at = cart("minecart", x, y, z);
         const std::vector<ServerEntity*> entities{at.get()};
-        const std::optional<BlockChange> change = detectorRails::check(world, 4, 64, 4, entities);
-        const bool pressed = change.has_value() && poweredOf(change->stateId) == "true";
+        const detectorRails::Checked checked =
+            detectorRails::check(world, 4, 64, 4, entities, detectorRails::Caller::Entity);
+        const bool pressed = checked.change.has_value() && poweredOf(checked.change->stateId) == "true";
         if (pressed) {
             // Put it back so each question is asked of the same rail.
             static_cast<void>(world.setBlockState(4, 64, 4, stateOf("detector_rail")));
@@ -119,23 +134,31 @@ TEST_CASE("what does not press a rail") {
 
     // A pig standing on it is not a cart.
     const std::unique_ptr<ServerEntity> pig = cart("pig", 4.5, 64.0, 4.5);
-    CHECK_FALSE(detectorRails::check(world, 4, 64, 4, std::vector<ServerEntity*>{pig.get()}).has_value());
+    CHECK_FALSE(
+        detectorRails::check(world, 4, 64, 4, std::vector<ServerEntity*>{pig.get()}, detectorRails::Caller::Entity)
+            .change.has_value());
 
     // A cart that has been removed is not there any more, whatever its coordinates still say.
     const std::unique_ptr<ServerEntity> gone = cart("minecart", 4.5, 64.0, 4.5);
     gone->removed = true;
-    CHECK_FALSE(detectorRails::check(world, 4, 64, 4, std::vector<ServerEntity*>{gone.get()}).has_value());
+    CHECK_FALSE(
+        detectorRails::check(world, 4, 64, 4, std::vector<ServerEntity*>{gone.get()}, detectorRails::Caller::Entity)
+            .change.has_value());
 
     // A plain rail is not a detector rail, and neither is an empty position.
     REQUIRE(world.setBlockState(5, 64, 5, stateOf("rail")));
     const std::unique_ptr<ServerEntity> onRail = cart("minecart", 5.5, 64.0, 5.5);
-    CHECK_FALSE(detectorRails::check(world, 5, 64, 5, std::vector<ServerEntity*>{onRail.get()}).has_value());
+    CHECK_FALSE(
+        detectorRails::check(world, 5, 64, 5, std::vector<ServerEntity*>{onRail.get()}, detectorRails::Caller::Entity)
+            .change.has_value());
 
     // Nor is a powered rail, which does have a `powered` of its own: a cart rolling over one must
     // not switch it on, that is what the redstone under it decides.
     REQUIRE(world.setBlockState(6, 64, 6, stateOf("powered_rail")));
     const std::unique_ptr<ServerEntity> onPowered = cart("minecart", 6.5, 64.0, 6.5);
-    CHECK_FALSE(detectorRails::check(world, 6, 64, 6, std::vector<ServerEntity*>{onPowered.get()}).has_value());
+    CHECK_FALSE(detectorRails::check(world, 6, 64, 6, std::vector<ServerEntity*>{onPowered.get()},
+                                     detectorRails::Caller::Entity)
+                    .change.has_value());
     CHECK(poweredOf(*world.blockState(6, 64, 6)) == "false");
-    CHECK_FALSE(detectorRails::check(world, 500, 64, 500, {}).has_value());
+    CHECK_FALSE(detectorRails::check(world, 500, 64, 500, {}, detectorRails::Caller::Entity).change.has_value());
 }

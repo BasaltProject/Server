@@ -9,10 +9,12 @@
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/PrimedTnt.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
+#include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
 #include <basalt/server/runtime/world/Hoppers.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
+#include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
@@ -509,10 +511,16 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                  railX <= wire::common::mth::floor(entity->x + world::detectorRails::kCartHalfWidth); ++railX) {
                 for (std::int32_t railZ = wire::common::mth::floor(entity->z - world::detectorRails::kCartHalfWidth);
                      railZ <= wire::common::mth::floor(entity->z + world::detectorRails::kCartHalfWidth); ++railZ) {
-                    if (const std::optional<world::BlockChange> pressed =
-                            world::detectorRails::check(world.state(), railX, cartY, railZ, living);
-                        pressed.has_value()) {
-                        broadcaster_->announceRedstone(world, watchers, *pressed);
+                    if (const world::detectorRails::Checked pressed = world::detectorRails::check(
+                            world.state(), railX, cartY, railZ, living, world::detectorRails::Caller::Entity);
+                        pressed.ran) {
+                        if (pressed.change.has_value()) {
+                            broadcaster_->announceRedstone(world, watchers, *pressed.change);
+                        }
+                        // parity: `checkPressed` tells the comparators whatever it decided.
+                        world::redstoneComponents::scheduleComparatorsAround(
+                            world.state(), world.name(), railX, cartY, railZ,
+                            world::comparatorReading::of(world.state()));
                     }
                 }
             }

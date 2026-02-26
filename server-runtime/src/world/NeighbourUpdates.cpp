@@ -654,19 +654,10 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         }
     }
     settleArrivedSignal(world, x, y, z, reshaped);
-    // parity: `SugarCaneBlock.updateShape` runs on the cane itself as it lands, and that is where a
-    // cane with nothing to drink books the turn that breaks it.
-    scheduledBlocks::scheduleBreakIfLoose(
-        world, x, y, z, blockSurvival::isSupported(world, x, y, z, std::nullopt, scaffolding, context.hasSkylight));
-    // parity: and `ScaffoldingBlock.updateShape` runs on the piece as it lands too, which is why a
-    // piece put down by hand keeps the `bottom` it was given until its first turn.
+    // parity: `ScaffoldingBlock.onPlace` really is an `onPlace`, `level.scheduleTick(pos, this, 1)`,
+    // so it runs on **every** write of the piece and not only on a placement. That is why it stays
+    // out here while the cane and the coral below went in with the shape walk.
     scheduledBlocks::scheduleScaffolding(world, x, y, z);
-    // parity: `CoralBlock.onPlace` and the three `BaseCoralPlantTypeBlock` ones book the die turn for
-    // the coral **as it lands**, not only when a neighbour moves: one put down out of water arrives
-    // with its count already running. The shape walk above only ever reaches the neighbours.
-    scheduledBlocks::scheduleCoralDeath(world, x, y, z, context.random.nextLong());
-    // parity: `CreakingHeartBlock.onPlace` is `updateShape`'s own turn, booked the same way.
-    scheduledBlocks::scheduleCreakingHeart(world, x, y, z);
 
     // parity: `Level.setBlock` runs `updateIndirectNeighbourShapes` on the state that **left** as
     // well, and before the arriving one's, so a line of dust broken on a staircase still tells the
@@ -683,10 +674,22 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     }
     // The block that just arrived reaches out to what was already there, which is the other half of
     // `updateShape`: a fence put down beside a fence joins it, not only the other way.
+    //
+    // parity: `CreakingHeartBlock` has **no** `onPlace`, only `updateShape`, so its turn belongs in
+    // here and not outside: `BlockInput.place` runs `updateFromNeighbourShapes` on the state it is
+    // about to write, which books it, and `Level.setBlock` never calls `updateShape` on the square it
+    // wrote. Booked outside, a heart re-booked itself every time its own turn changed its state, and
+    // the chain took three ticks to die down.
     if (reshapeSelf) {
         if (const std::optional<std::int32_t> moved = reshape(context, x, y, z); moved.has_value()) {
             reshaped(*moved, x, y, z);
         }
+        // parity: the fifteen blocks of `booksItsOwnBreak` and `CoralBlock` have **no** `onPlace`
+        // either: their turn comes out of `updateShape`, so a placement books it (through
+        // `updateFromNeighbourShapes`) and a plain write of the square does not. `reshape` above
+        // already books the coral's, and the loose ones are the only family it does not cover.
+        scheduledBlocks::scheduleBreakIfLoose(
+            world, x, y, z, blockSurvival::isSupported(world, x, y, z, std::nullopt, scaffolding, context.hasSkylight));
     }
     // parity: `RedStoneWireBlock.updateIndirectNeighbourShapes`, the one place a dust reaches past
     // its own six sides: the dust one below and one above the square it connects to are told to look
