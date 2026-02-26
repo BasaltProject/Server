@@ -37,17 +37,15 @@ namespace redstoneWire {
                                                   std::int32_t stateId,
                                                   std::optional<registry::BlockFace> towards = std::nullopt);
 
-/// The shape a dust has as it lands, written if it moved. parity:
-/// `RedStoneWireBlock.getStateForPlacement`, which draws from the cross rather than from the state
-/// it starts with, so a dust put down on its own is a cross and never a dot.
-/// What a right click turns this dust into: a cross becomes a dot and a dot becomes a cross, and
-/// anything already drawn as a line is left alone.
-///
-/// parity: `RedStoneWireBlock.useWithoutItem`, which only answers for `isCross` or `isDot`, keeps the
-/// power and then redraws with `getConnectionState`.
-[[nodiscard]] std::optional<std::int32_t> toggleShape(WorldState& world, std::int32_t x, std::int32_t y,
-                                                     std::int32_t z, std::int32_t stateId);
+/// What a right click turns this dust into: a cross becomes a dot and a dot becomes a cross, and a
+/// line is left alone. parity: `RedStoneWireBlock.useWithoutItem` only answers for `isCross` or
+/// `isDot`, keeps the power and redraws with `getConnectionState`.
+[[nodiscard]] std::optional<std::int32_t> toggleShape(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                                      std::int32_t stateId);
 
+/// The shape a dust has as it lands, written if it moved. parity:
+/// `RedStoneWireBlock.getStateForPlacement` draws from the cross rather than from the state it
+/// starts with, so a dust put down on its own is a cross and never a dot.
 [[nodiscard]] std::optional<std::int32_t> shapeOnPlacement(WorldState& world, std::int32_t x, std::int32_t y,
                                                            std::int32_t z, std::int32_t stateId);
 
@@ -63,6 +61,12 @@ struct Step {
 /// `RedStoneWireBlock.updateIndirectNeighbourShapes`: the dust below and above a connected
 /// non-dust square. Without it a line running up a staircase is drawn as if the steps were not there.
 [[nodiscard]] std::vector<Step> acrossSteps(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
+/// The same reach read off a state that is no longer there. `Level.setBlock` runs the walk on the
+/// state that left as well as on the one that arrived, so a broken line still tells the dust it used
+/// to reach across the step.
+[[nodiscard]] std::vector<Step> acrossSteps(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                            std::int32_t stateId);
 
 } // namespace redstoneWire
 

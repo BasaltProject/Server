@@ -363,14 +363,20 @@ void trigger(const Context& context, std::int32_t x, std::int32_t y, std::int32_
         .x = x, .y = y, .z = z, .block = path, .first = event, .second = static_cast<std::int32_t>(*direction)});
 }
 
-void runEvent(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t b0, std::int32_t b1,
-              std::vector<BlockChange>& effects) {
+void runEvent(const Context& context, const BlockEvent& event, std::vector<BlockChange>& effects) {
+    const std::int32_t x = event.x;
+    const std::int32_t y = event.y;
+    const std::int32_t z = event.z;
+    const std::int32_t b0 = event.first;
+    const std::int32_t b1 = event.second;
     const std::optional<std::int32_t> stateId = context.world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return;
     }
     const std::string path = pathOf(*stateId);
-    if (!isPiston(path)) {
+    // parity: `doBlockEvent` drops an event whose square no longer holds the block that booked it,
+    // so a sticky piston's move does not run on the plain piston that took its place.
+    if (!isPiston(path) || path != event.block) {
         return;
     }
     const std::optional<BlockFace> direction = faceNamed(propertyOf(*stateId, "facing"));

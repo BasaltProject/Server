@@ -103,6 +103,9 @@ private:
 
     Context context_;
     std::shared_ptr<BedrockMailbox> mailbox_;
+    /// Which Bedrock protocol this client speaks: several packets are shaped one way for the
+    /// newest and another for everything below it.
+    int protocol_ = 0;
     std::unique_ptr<player::PlayerSession> session_;
     bool moved_ = false;
     /// Written by whoever opens a menu and read by the thread the answer arrives on, which are

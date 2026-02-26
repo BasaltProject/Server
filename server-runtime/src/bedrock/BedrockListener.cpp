@@ -302,7 +302,7 @@ void BedrockListener::onReady(Session& session) {
     info.worldId = "basalt";
 
     wire::io::ByteBuffer body;
-    wire::bedrock::writeStartGame(body, info);
+    wire::bedrock::writeStartGame(body, info, session.connection.protocolVersion());
     session.connection.sendPacket(BedrockPacket::StartGame, body.readable());
 
     body.clear();
@@ -320,7 +320,8 @@ void BedrockListener::onReady(Session& session) {
     for (std::int32_t x = -kInitialRadius; x <= kInitialRadius; ++x) {
         for (std::int32_t z = -kInitialRadius; z <= kInitialRadius; ++z) {
             body.clear();
-            wire::bedrock::writeEmptyLevelChunk(body, x, z, kOverworldSubChunks, 0);
+            wire::bedrock::writeEmptyLevelChunk(body, x, z, kOverworldSubChunks, 0,
+                                                session.connection.protocolVersion());
             session.connection.sendPacket(BedrockPacket::LevelChunk, body.readable());
         }
     }
@@ -340,6 +341,7 @@ void BedrockListener::onReady(Session& session) {
     joining.uuid = uuidOf(session.login.xuid.empty() ? session.login.name : session.login.xuid);
     joining.address = session.transport.peer().toString();
     joining.authenticated = session.login.authenticated;
+    joining.protocol = session.connection.protocolVersion();
     joining.mailbox = session.mailbox;
     session.player = hooks_.join(joining);
 }

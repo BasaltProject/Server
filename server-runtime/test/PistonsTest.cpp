@@ -69,7 +69,7 @@ struct Loaded {
 [[nodiscard]] std::vector<BlockChange> fireEvents(Loaded& loaded) {
     std::vector<BlockChange> effects;
     for (const BlockEvent& event : loaded.state.takeBlockEvents()) {
-        pistons::runEvent(loaded.context(), event.x, event.y, event.z, event.first, event.second, effects);
+        pistons::runEvent(loaded.context(), event, effects);
     }
     return effects;
 }

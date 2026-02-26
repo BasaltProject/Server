@@ -224,6 +224,16 @@ void WorldState::queueBlockEvent(BlockEvent event) {
     blockEvents_.push_back(std::move(event));
 }
 
+std::optional<BlockEvent> WorldState::takeFirstBlockEvent() {
+    const WorldWriteLock lock{mutex_};
+    if (blockEvents_.empty()) {
+        return std::nullopt;
+    }
+    BlockEvent first = std::move(blockEvents_.front());
+    blockEvents_.erase(blockEvents_.begin());
+    return first;
+}
+
 std::vector<BlockEvent> WorldState::takeBlockEvents() {
     const WorldWriteLock lock{mutex_};
     return std::exchange(blockEvents_, {});
@@ -690,6 +700,10 @@ std::vector<DroppedItem> WorldState::nearbyItems(double x, double y, double z, d
 
 bool WorldState::shiftItem(std::int32_t entityId, double dx, double dy, double dz) {
     return itemPhysics_.shiftItem(entityId, dx, dy, dz);
+}
+
+bool WorldState::hurtItem(const std::int32_t entityId, const std::int32_t amount) {
+    return itemPhysics_.hurtItem(entityId, amount);
 }
 
 std::optional<DroppedItem> WorldState::removeItem(std::int32_t entityId) {

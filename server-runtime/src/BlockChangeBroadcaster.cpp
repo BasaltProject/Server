@@ -291,7 +291,7 @@ void BlockChangeBroadcaster::runPistonEvent(world::LoadedWorld& world, const wor
                 return world.border().contains(static_cast<double>(bx), static_cast<double>(bz));
             }};
     std::vector<world::BlockChange> effects;
-    world::pistons::runEvent(context, event.x, event.y, event.z, event.first, event.second, effects);
+    world::pistons::runEvent(context, event, effects);
     for (const world::BlockChange& effect : effects) {
         sendEffects(watchers, effect.x, effect.y, effect.z, effect.stateId, effect.effects);
     }

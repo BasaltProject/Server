@@ -233,7 +233,7 @@ std::optional<std::int32_t> reshape(WorldState& world, std::int32_t x, std::int3
 }
 
 std::optional<std::int32_t> toggleShape(WorldState& world, const std::int32_t x, const std::int32_t y,
-                                       const std::int32_t z, const std::int32_t stateId) {
+                                        const std::int32_t z, const std::int32_t stateId) {
     if (!isWire(stateId)) {
         return std::nullopt;
     }
@@ -256,12 +256,17 @@ std::optional<std::int32_t> shapeOnPlacement(WorldState& world, std::int32_t x, 
 }
 
 std::vector<Step> acrossSteps(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
-    std::vector<Step> reach;
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
-    if (!stateId.has_value() || !isWire(*stateId)) {
+    return stateId.has_value() ? acrossSteps(world, x, y, z, *stateId) : std::vector<Step>{};
+}
+
+std::vector<Step> acrossSteps(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                              const std::int32_t stateId) {
+    std::vector<Step> reach;
+    if (!isWire(stateId)) {
         return reach;
     }
-    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*stateId);
+    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
     for (const BlockFace face : kSides) {
         const auto found = properties.find(std::string{nameOf(face)});
         if (found == properties.end() || found->second == kNone) {

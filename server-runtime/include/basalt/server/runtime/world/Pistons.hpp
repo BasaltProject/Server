@@ -112,8 +112,9 @@ void trigger(const Context& context, std::int32_t x, std::int32_t y, std::int32_
 /// The booked move starting: the arm and what it pushes turn into `moving_piston`, the body takes
 /// `extended`, the landing is booked two ticks out. parity: `PistonBaseBlock.triggerEvent`. The
 /// signal is read again here, so a pulse already gone by leaves the piston where it stands.
-void runEvent(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t b0, std::int32_t b1,
-              std::vector<BlockChange>& effects);
+/// `booked` is the block that booked it: an event whose square now holds something else is dropped,
+/// which is `doBlockEvent` checking `state.is(eventData.block())`.
+void runEvent(const Context& context, const BlockEvent& event, std::vector<BlockChange>& effects);
 
 /// The move landing: the blocks go one along, the head appears or goes, and a sticky piston takes the
 /// block in front of it back with it.

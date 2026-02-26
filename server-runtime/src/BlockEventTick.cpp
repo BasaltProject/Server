@@ -4,33 +4,33 @@
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
+#include <optional>
 #include <utility>
 #include <vector>
 
 namespace basalt::server::runtime {
 
 void RedstoneTickSystem::tickBlockEvents(world::LoadedWorld& world, const sched::Region& region) {
-    std::vector<world::BlockEvent> events = world.state().takeBlockEvents();
-    if (events.empty()) {
+    std::optional<world::BlockEvent> event = world.state().takeFirstBlockEvent();
+    if (!event.has_value()) {
         return;
     }
     const std::vector<player::PlayerSession*> watchers = watchersOf(world);
-    // parity: `runBlockEvents` drains the queue rather than taking a turn's worth, so an event booked
-    // by another event runs in this same tick. What falls outside what this turn ticks goes back in
-    // the queue, which is what `blockEventsToReschedule` is for.
+    // parity: `runBlockEvents` takes the oldest one and drains until nothing is left, so an event
+    // booked by another event runs in this same tick, and one booked while the queue still holds an
+    // identical one collapses against it. What falls outside what this turn ticks goes back in the
+    // queue, which is what `blockEventsToReschedule` is for.
     std::vector<world::BlockEvent> again;
-    while (!events.empty()) {
-        for (const world::BlockEvent& event : events) {
-            if (!region.owns(event.x >> 4, event.z >> 4)) {
-                again.push_back(event);
-                continue;
-            }
-            broadcaster_->runPistonEvent(world, event, watchers);
+    while (event.has_value()) {
+        if (region.owns(event->x >> 4, event->z >> 4)) {
+            broadcaster_->runPistonEvent(world, *event, watchers);
+        } else {
+            again.push_back(std::move(*event));
         }
-        events = world.state().takeBlockEvents();
+        event = world.state().takeFirstBlockEvent();
     }
-    for (world::BlockEvent& event : again) {
-        world.state().queueBlockEvent(std::move(event));
+    for (world::BlockEvent& booked : again) {
+        world.state().queueBlockEvent(std::move(booked));
     }
 }
 
