@@ -200,7 +200,7 @@ TEST_CASE("the vertical bounds are the last word on what can break") {
     }
 }
 
-TEST_CASE("the cascade gives up after a thousand and twenty four neighbours") {
+TEST_CASE("the cascade takes a whole tower down, and its budget is the vanilla one") {
     Loaded loaded;
     loaded.put(8, 64, 8, stateOf("stone"));
     // Snow on snow, because the budget is what stops a chain that breaks on the spot: a cactus or a
@@ -218,11 +218,24 @@ TEST_CASE("the cascade gives up after a thousand and twenty four neighbours") {
     Report report;
     neighbourUpdates::afterChange(context, 8, 64, 8, std::nullopt, report.effects, report.onBroken());
 
-    // The budget is spent six at a time, so a hundred and seventy one positions come off the queue
-    // and each of them takes the one above it with it.
-    CHECK(report.broken.size() == 171);
-    CHECK(loaded.state.blockState(8, 235, 8) == air());
-    CHECK(loaded.state.blockState(8, 236, 8) == deep);
+    // parity: at `max-chained-neighbor-updates` the whole column goes, which is what vanilla does.
+    CHECK(report.broken.size() == 200);
+    CHECK(loaded.state.blockState(8, 264, 8) == air());
+
+    // And the budget still bites when the operator sets a small one, counted one square at a time.
+    Loaded bounded;
+    bounded.put(8, 64, 8, stateOf("stone"));
+    for (std::int32_t y = 65; y <= 264; ++y) {
+        bounded.put(8, y, 8, deep);
+    }
+    bounded.put(8, 64, 8, air());
+    neighbourUpdates::Context small = bounded.context();
+    small.minY = 64;
+    small.maxChainedUpdates = 20;
+    Report stopped;
+    neighbourUpdates::afterChange(small, 8, 64, 8, std::nullopt, stopped.effects, stopped.onBroken());
+
+    CHECK(stopped.broken.size() == 20);
 }
 
 TEST_CASE("a fence joins the fence beside it") {
@@ -559,6 +572,48 @@ TEST_CASE("a block that only changed shape carries the walk on to the next one")
     CHECK(propertyAt(loaded.state, 8, 64, 11, "north") == "true");
     CHECK(propertyAt(loaded.state, 8, 64, 10, "north") == "true");
     CHECK(propertyAt(loaded.state, 8, 64, 10, "south") == "true");
+}
+
+TEST_CASE("a rail that only changes shape still reaches the square above it") {
+    // parity: `LevelChunk.setBlockState` runs `affectNeighborsAfterRemoval` when the block changed
+    // **or when the one that arrived is a rail**. A sloped rail whose `powered` moves is the same
+    // block, so without that exception nothing tells the square above it.
+    Loaded loaded;
+    loaded.put(8, 63, 8, stateOf("stone"));
+    const std::int32_t off =
+        stateOf("powered_rail", {{"shape", "ascending_east"}, {"powered", "false"}, {"waterlogged", "false"}});
+    loaded.put(8, 64, 8, off);
+    loaded.put(9, 65, 8, stateOf("redstone_lamp", {{"lit", "false"}}));
+    loaded.put(10, 65, 8, stateOf("redstone_block"));
+
+    loaded.put(8, 64, 8,
+               stateOf("powered_rail", {{"shape", "ascending_east"}, {"powered", "true"}, {"waterlogged", "false"}}));
+    Report report;
+    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, off, report.effects, report.onBroken(),
+                                  report.onReshaped());
+
+    // The lamp is two squares from the rail and only reachable through the square above it.
+    const std::optional<std::int32_t> lamp = loaded.state.blockState(9, 65, 8);
+    REQUIRE(lamp.has_value());
+    CHECK(registry::blockStateDefinitions::propertiesOf(*lamp).at("lit") == "true");
+}
+
+TEST_CASE("a container that lands wakes the comparator reading it through a wall") {
+    // parity: `Level.setBlock` follows the neighbour updates with `updateNeighbourForOutputSignal`
+    // when the state that arrived is one a comparator reads. Nothing else reaches a comparator one
+    // square past a block that conducts: the six neighbours stop at the wall.
+    Loaded loaded;
+    for (std::int32_t at = 8; at <= 10; ++at) {
+        loaded.put(at, 63, 8, stateOf("stone"));
+    }
+    loaded.put(9, 64, 8, stateOf("stone"));
+    loaded.put(10, 64, 8, stateOf("comparator", {{"facing", "west"}, {"mode", "compare"}, {"powered", "false"}}));
+    loaded.put(8, 64, 8, stateOf("composter", {{"level", "5"}}));
+
+    std::vector<BlockChange> effects;
+    neighbourUpdates::afterChange(loaded.context(), 8, 64, 8, std::nullopt, effects, {});
+
+    CHECK(loaded.state.hasScheduledBlockTick(10, 64, 8, Identifier::vanilla("comparator")));
 }
 
 TEST_CASE("a broken line of dust tells the dust it reached across a step") {

@@ -369,6 +369,26 @@ void BasaltServer::startBedrockListener() {
         context.quit = [emitOnOwner](const player::PlayerSession& player) {
             emitOnOwner(server::plugins::pluginEventTypes::playerQuit(), player);
         };
+        // Which commands to offer, filtered by permission exactly as the Java tree is: a player who
+        // cannot run one is never told it exists. Read straight off the dispatcher rather than
+        // queued, because the answer goes back to the caller and the tree only changes when a
+        // plugin loads or a group does.
+        context.commandList =
+            [this](const player::PlayerSession& player) -> std::vector<std::pair<std::string, std::string>> {
+            command::CommandDispatcher* dispatcher = wired_.dispatcher.get();
+            // The source wants the session the registry owns, not the const view this was handed.
+            player::PlayerSession* session = playerRegistry_.get(player.uuid());
+            if (dispatcher == nullptr || session == nullptr) {
+                return {};
+            }
+            const command::PlayerCommandSource source{*session, dispatcher->environment().groups()};
+            std::vector<std::pair<std::string, std::string>> named;
+            for (const command::CommandNode* node : dispatcher->usableCommands(source)) {
+                named.emplace_back(node->name(), command::smartUsage(*node, source));
+            }
+            return named;
+        };
+
         // A command a Bedrock player typed, run where commands are allowed to run and through the
         // same dispatcher and the same plugin event as one typed on Java.
         context.runCommand = [this](const player::PlayerSession& player, std::string line) {

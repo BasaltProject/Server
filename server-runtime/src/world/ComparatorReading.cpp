@@ -46,6 +46,20 @@ std::optional<std::int32_t> at(WorldState& world, const std::int32_t x, const st
     return containers::analogSignal(world, x, y, z, from, readers);
 }
 
+bool exists(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value()) {
+        return false;
+    }
+    // parity: `ShelfBlock.hasAnalogOutputSignal` is true whichever side the comparator is on, even
+    // though `getAnalogOutputSignal` only answers from behind.
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
+    if (block != nullptr && shelves::isShelf(block->path())) {
+        return true;
+    }
+    return at(world, x, y, z, {}).has_value();
+}
+
 redstoneComponents::ContainerSignalAt of(WorldState& world) {
     return [&world](const std::int32_t x, const std::int32_t y, const std::int32_t z, const std::string_view from) {
         return at(world, x, y, z, from);

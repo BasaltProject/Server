@@ -28,9 +28,11 @@ namespace basalt::server::runtime::world {
 /// a player.
 namespace neighbourUpdates {
 
-/// How far one change is allowed to cascade. A tower of torches comes down in one go and this is
-/// never reached; the bound is there so a rule that somehow contradicts itself cannot spin.
-inline constexpr std::int32_t kMaxCascade = 1024;
+/// How far one change is allowed to cascade, counted one square at a time. parity:
+/// `max-chained-neighbor-updates`, counted one per `updateNeighborsAt`, so the unit is the square
+/// coming off the queue and not the six sides it looks at. It exists so a rule that contradicts
+/// itself cannot spin; at the vanilla default a real build never reaches it.
+inline constexpr std::int32_t kMaxChainedNeighbourUpdates = 1000000;
 
 /// Told about every block that changed shape, so the caller can send it out.
 using OnReshaped = std::function<void(std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z)>;
@@ -69,6 +71,8 @@ using WireReshape =
 struct Context {
     WorldState& world;
     std::string_view worldName;
+    /// The operator's `max-chained-neighbor-updates`.
+    std::int32_t maxChainedUpdates = kMaxChainedNeighbourUpdates;
     /// Where the world ends. Nothing outside these is broken, so a wrong pair only ever spares a
     /// block; the defaults are the overworld's.
     std::int32_t minY = -64;

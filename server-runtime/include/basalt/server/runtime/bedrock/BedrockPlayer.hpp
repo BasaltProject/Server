@@ -16,6 +16,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace basalt::server::runtime::bedrock {
@@ -40,6 +41,11 @@ public:
 
         /// Runs a command as this player, where commands are allowed to run.
         std::function<void(const player::PlayerSession&, std::string)> runCommand;
+
+        /// Every command this player may use, with the usage line `/help` would print for it.
+        /// Bedrock refuses to send what is not in its own list, so a client that is told nothing
+        /// can run nothing.
+        std::function<std::vector<std::pair<std::string, std::string>>(const player::PlayerSession&)> commandList;
         std::string worldName;
         double spawnX = 0.0;
         double spawnY = 64.0;
