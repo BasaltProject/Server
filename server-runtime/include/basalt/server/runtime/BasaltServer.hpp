@@ -22,6 +22,7 @@
 #include <basalt/server/runtime/TickLoop.hpp>
 #include <basalt/server/runtime/VanillaGameData.hpp>
 #include <basalt/server/runtime/WorldRegistry.hpp>
+#include <basalt/server/runtime/bedrock/BedrockListener.hpp>
 #include <basalt/server/runtime/command/commands/SaveCommands.hpp>
 #include <basalt/server/runtime/config/CompatibilityConfig.hpp>
 #include <basalt/server/runtime/config/LiveConfigs.hpp>
@@ -107,6 +108,10 @@ private:
     /// `worldRuns` is false on a turn `/tick freeze` is holding. Then only the queued tasks run, so
     /// the console keeps working, and nothing that belongs to the world's clock moves.
     void tickWorlds(bool worldRuns);
+
+    /// Opens the Bedrock door, if the operator left it open. Never fatal: a taken port costs that
+    /// door and nothing else.
+    void startBedrockListener();
 
     /// Ticks the entities that are not players, items or falling blocks.
     void tickEntities(world::LoadedWorld& world, const sched::Region& region);
@@ -221,6 +226,8 @@ private:
     std::string difficulty_ = "easy";
 
     std::optional<wire::io::TcpListener> listener_;
+    /// The Bedrock door, when the operator left it open. Its own socket and its own thread.
+    std::unique_ptr<bedrock::BedrockListener> bedrockListener_;
     std::atomic<bool> accepting_{true};
     /// Guards against running the shutdown twice: a stop command and a signal can arrive together.
     std::atomic<bool> shuttingDown_{false};

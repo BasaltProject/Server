@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
 #include <basalt/wire/io/Platform.hpp>
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
+#include <basalt/wire/text/Serializers.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -49,6 +50,7 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
                                  "config/server.toml.");
     }
     listener_ = std::move(*bound);
+    startBedrockListener();
 
     // Said once at startup, because it changes the order of tick and an operator reading a bug
     // report has to know which mode produced it.
@@ -164,6 +166,9 @@ void BasaltServer::shutdown() {
     if (listener_.has_value()) {
         listener_->close();
     }
+    if (bedrockListener_) {
+        bedrockListener_->stop();
+    }
 
     const std::vector<player::PlayerSession*> players = playerRegistry_.snapshot();
     if (!players.empty()) {
@@ -275,6 +280,37 @@ void BasaltServer::reportOrphanedPluginData() {
         return "Data is here for " + std::to_string(orphans.size()) + " plugin(s) that are not installed: " + listed +
                ". Nothing was deleted. /plugins orphans lists them, /plugins purge <id> removes one.";
     });
+}
+
+void BasaltServer::startBedrockListener() {
+    const config::BedrockSettings& settings = options_.compatibility.bedrock();
+    if (!settings.enabled) {
+        return;
+    }
+
+    bedrock::BedrockOptions options;
+    options.enabled = true;
+    options.port = settings.port;
+    options.prefix = settings.prefix;
+
+    bedrock::BedrockListener::Hooks hooks;
+    // The same answer a Java client gets to its ping, rendered flat: a Bedrock server list has one
+    // line and no colours of its own to give it.
+    hooks.status = [this] {
+        bedrock::BedrockListener::Status status;
+        const wire::protocol::status::ServerStatusPayload payload =
+            serverList_->statusFor(wire::multiversion::protocolVersions::kNative, "bedrock", std::nullopt);
+        status.motd = wire::text::toPlainText(payload.description);
+        if (payload.players.has_value()) {
+            status.online = payload.players->online;
+            status.max = payload.players->max;
+        }
+        return status;
+    };
+
+    bedrockListener_ = std::make_unique<bedrock::BedrockListener>(std::move(options), std::move(hooks),
+                                                                  std::string{bedrock::kBedrockGameVersion});
+    static_cast<void>(bedrockListener_->start());
 }
 
 } // namespace basalt::server::runtime

@@ -30,9 +30,15 @@ inline constexpr std::int32_t kMaxLength = 42;
 
 [[nodiscard]] bool isHook(std::int32_t stateId);
 
-/// parity: `TripWireBlock.updateShape`, which is what draws a line of string as a line: each
-/// horizontal side is set from `shouldConnectTo`, which is another string or a hook facing back.
-/// Answers the new state, or nothing when this is not a string or nothing moved.
+/// Whether a string here would join what is on that side: another string, or a hook facing this way.
+/// parity: `TripWireBlock.shouldConnectTo`. Reads only the neighbour, so placement can ask it before
+/// the string is written.
+[[nodiscard]] bool connectsTo(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                              server::registry::BlockFace towards);
+
+/// parity: `TripWireBlock.updateShape`, which draws a line of string as a line: each horizontal side
+/// is set from `shouldConnectTo`. Answers the new state, or nothing when this is not a string or
+/// nothing moved.
 [[nodiscard]] std::optional<std::int32_t> reshape(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                   std::int32_t stateId, std::optional<registry::BlockFace> towards);
 
