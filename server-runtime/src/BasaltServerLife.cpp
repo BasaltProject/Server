@@ -344,6 +344,90 @@ void BasaltServer::startBedrockListener() {
         [this](const bedrock::BedrockListener::Joining& joining) -> std::unique_ptr<bedrock::BedrockListener::Player> {
         bedrock::BedrockPlayer::Context context;
         context.registry = &playerRegistry_;
+        // The same two events the Java door raises, with the same fields: a plugin has no way of
+        // telling which door somebody came in by, and that is the point. Queued onto the owner
+        // because a decider only runs where the plugins do, carrying copies since the player may be
+        // gone by the time the owner gets to it.
+        const auto emitOnOwner = [this](const server::plugins::PluginEventType& type,
+                                        const player::PlayerSession& player) {
+            std::string name = player.name();
+            std::string uuid = player.uuid().toString();
+            std::string world = player.worldName;
+            worldRegistry_->scheduler().global().submit(
+                [this, &type, name = std::move(name), uuid = std::move(uuid), world = std::move(world)] {
+                    static_cast<void>(
+                        server::plugins::emit(&plugins_->events(), &type, [&](server::plugins::PluginEvent& filled) {
+                            filled.set(0, name);
+                            filled.set(1, uuid);
+                            filled.set(2, world);
+                        }));
+                });
+        };
+        context.joined = [emitOnOwner](const player::PlayerSession& player) {
+            emitOnOwner(server::plugins::pluginEventTypes::playerJoin(), player);
+        };
+        context.quit = [emitOnOwner](const player::PlayerSession& player) {
+            emitOnOwner(server::plugins::pluginEventTypes::playerQuit(), player);
+        };
+        // A command a Bedrock player typed, run where commands are allowed to run and through the
+        // same dispatcher and the same plugin event as one typed on Java.
+        context.runCommand = [this](const player::PlayerSession& player, std::string line) {
+            const wire::common::Uuid uuid = player.uuid();
+            const std::string name = player.name();
+            const std::string world = player.worldName;
+            worldRegistry_->scheduler().global().submit([this, uuid, name, world, line = std::move(line)]() mutable {
+                command::CommandDispatcher* dispatcher = wired_.dispatcher.get();
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (dispatcher == nullptr || session == nullptr) {
+                    return;
+                }
+                const server::plugins::PluginEvent* event =
+                    server::plugins::emit(&plugins_->events(), &server::plugins::pluginEventTypes::playerCommand(),
+                                          [&](server::plugins::PluginEvent& filled) {
+                                              filled.set(0, name);
+                                              filled.set(1, uuid.toString());
+                                              filled.set(2, world);
+                                              filled.set(3, line);
+                                          });
+                if (event != nullptr) {
+                    if (const std::string* edited = std::get_if<std::string>(&event->get(3)); edited != nullptr) {
+                        line = *edited;
+                    }
+                    if (event->cancelled()) {
+                        return;
+                    }
+                }
+                logger_.info([&name, &line] { return name + " issued server command: /" + line; });
+                command::PlayerCommandSource source{*session, dispatcher->environment().groups()};
+                dispatcher->execute(source, line);
+            });
+        };
+        context.chatFilter = [this](const player::PlayerSession& player, std::string message,
+                                    std::function<void(bool, std::string)> answer) {
+            std::string name = player.name();
+            std::string uuid = player.uuid().toString();
+            std::string world = player.worldName;
+            worldRegistry_->scheduler().global().submit([this, name = std::move(name), uuid = std::move(uuid),
+                                                         world = std::move(world), message = std::move(message),
+                                                         answer = std::move(answer)]() mutable {
+                const server::plugins::PluginEvent* event =
+                    server::plugins::emit(&plugins_->events(), &server::plugins::pluginEventTypes::playerChat(),
+                                          [&](server::plugins::PluginEvent& filled) {
+                                              filled.set(0, name);
+                                              filled.set(1, uuid);
+                                              filled.set(2, world);
+                                              filled.set(3, message);
+                                          });
+                if (event == nullptr) {
+                    answer(true, std::move(message));
+                    return;
+                }
+                if (const std::string* edited = std::get_if<std::string>(&event->get(3)); edited != nullptr) {
+                    message = *edited;
+                }
+                answer(!event->cancelled(), std::move(message));
+            });
+        };
         context.lang = options_.lang;
         context.logger = logger_;
         if (worldRegistry_ != nullptr) {
@@ -353,6 +437,9 @@ void BasaltServer::startBedrockListener() {
             context.spawnX = spawn[0];
             context.spawnY = spawn[1];
             context.spawnZ = spawn[2];
+            // What time it is right now, for a client that has just arrived and would otherwise
+            // run its own clock from whatever it last saw.
+            context.worldTime = static_cast<std::int32_t>(world.clock().totalTicks());
         }
         return std::make_unique<bedrock::BedrockPlayer>(joining, std::move(context));
     };

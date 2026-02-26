@@ -72,23 +72,26 @@ struct BedrockListener::Session {
         : transport(session), connection(session, std::move(keys), std::move(gameVersion), std::move(gate)) {}
 };
 
-void BedrockMailbox::post(std::string line) {
+void BedrockMailbox::post(const std::uint16_t packetId, std::vector<std::uint8_t> body, const bool last) {
     const std::lock_guard<std::mutex> guard{lock_};
     if (!open_) {
         return;
     }
-    lines_.push_back(std::move(line));
+    items_.push_back(Item{packetId, std::move(body), last});
+    if (last) {
+        open_ = false;
+    }
 }
 
-std::vector<std::string> BedrockMailbox::drain() {
+std::vector<BedrockMailbox::Item> BedrockMailbox::drain() {
     const std::lock_guard<std::mutex> guard{lock_};
-    return std::exchange(lines_, {});
+    return std::exchange(items_, {});
 }
 
 void BedrockMailbox::close() {
     const std::lock_guard<std::mutex> guard{lock_};
     open_ = false;
-    lines_.clear();
+    items_.clear();
 }
 
 BedrockListener::BedrockListener(BedrockOptions options, Hooks hooks, std::string gameVersion,
@@ -248,6 +251,20 @@ void BedrockListener::onConnect(RakSession& session) {
             }
             return;
         }
+        if (packet == BedrockPacket::CommandRequest && entry.player) {
+            const auto line = wire::bedrock::readCommandRequest(body);
+            if (line.has_value()) {
+                entry.player->command(*line);
+            }
+            return;
+        }
+        if (packet == BedrockPacket::ModalFormResponse && entry.player) {
+            const auto answer = wire::bedrock::readModalFormResponse(body);
+            if (answer.has_value()) {
+                entry.player->formAnswer(answer->formId, answer->data);
+            }
+            return;
+        }
         if (packet == BedrockPacket::Text && entry.player) {
             const auto text = wire::bedrock::readText(body);
             if (text.has_value() && !text->message.empty()) {
@@ -325,15 +342,19 @@ void BedrockListener::onReady(Session& session) {
 }
 
 void BedrockListener::deliverMail(Session& session) {
-    const std::vector<std::string> lines = session.mailbox->drain();
-    if (lines.empty()) {
+    const std::vector<BedrockMailbox::Item> items = session.mailbox->drain();
+    if (items.empty()) {
         return;
     }
-    wire::io::ByteBuffer body;
-    for (const std::string& line : lines) {
-        body.clear();
-        wire::bedrock::writeText(body, wire::bedrock::TextType::Raw, "", line);
-        session.connection.sendPacket(BedrockPacket::Text, body.readable());
+    for (const BedrockMailbox::Item& item : items) {
+        session.connection.sendPacket(static_cast<BedrockPacket>(item.packetId), item.body);
+        if (item.last) {
+            // The goodbye was written by whoever posted it, so this only has to stop: the client
+            // leaves on its own once it has read it, and RakNet clears the session up after.
+            session.connection.flush();
+            session.connection.close();
+            return;
+        }
     }
     session.connection.flush();
 }

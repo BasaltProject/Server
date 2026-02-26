@@ -68,6 +68,15 @@ struct PlayerConnection {
     /// Pushes the world's weather, which is three game events rather than one packet.
     std::function<void(const world::WorldWeather& weather)> sendWeather;
 
+    /// A line over the hotbar. Its own callback rather than a packet, because what draws it is not
+    /// the same thing on every edition.
+    std::function<void(const wire::text::Component& message)> sendActionBar;
+
+    /// A title, its subtitle and how long the three parts of it last.
+    std::function<void(const wire::text::Component& title, const wire::text::Component& subtitle, std::int32_t fadeIn,
+                       std::int32_t stay, std::int32_t fadeOut)>
+        sendTitle;
+
     /// Closes this connection with a reason the client shows. Unset, nothing happens.
     std::function<void(const wire::text::Component& reason)> disconnect;
 

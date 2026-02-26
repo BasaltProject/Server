@@ -94,8 +94,13 @@ constexpr std::int32_t kDelay = 1;
         }
     }
     if (server::world::ChunkBlockEntity* entity = entityAt(world, x, y, z); entity != nullptr) {
-        entity->data().putBoolean(std::string{kConditionKey}, met);
-        world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
+        // parity: `markConditionMet` writes the field and calls nothing else. A repeating block marks
+        // it on **every** turn, so dirtying the chunk here rewrote it once a tick for ever, where the
+        // jar leaves the chunk alone as soon as nothing is really moving.
+        if (entity->data().getBoolean(std::string{kConditionKey}) != met) {
+            entity->data().putBoolean(std::string{kConditionKey}, met);
+            world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
+        }
     }
     return met;
 }
@@ -287,7 +292,7 @@ bool tick(WorldState& world, const std::int32_t x, const std::int32_t y, const s
         static_cast<void>(markConditionMet(world, x, y, z, *stateId));
         if (wasMet) {
             execute(world, x, y, z, *stateId, gameTime, commandBlocksWork, maxChainLength, run);
-        } else if (conditional) {
+        } else if (conditional && entity->data().getInt(std::string{kSuccessKey}, 0) != 0) {
             entity->data().putInt(std::string{kSuccessKey}, 0);
             world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
         }
@@ -299,7 +304,7 @@ bool tick(WorldState& world, const std::int32_t x, const std::int32_t y, const s
     } else if (*mode == Mode::Impulse) {
         if (wasMet) {
             execute(world, x, y, z, *stateId, gameTime, commandBlocksWork, maxChainLength, run);
-        } else if (conditional) {
+        } else if (conditional && entity->data().getInt(std::string{kSuccessKey}, 0) != 0) {
             entity->data().putInt(std::string{kSuccessKey}, 0);
             world.chunkIfLoaded(x >> 4, z >> 4)->markDirty();
         }
