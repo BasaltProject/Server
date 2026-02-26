@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/BuildInfo.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
+#include <basalt/server/runtime/bedrock/BedrockChunks.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
 #include <basalt/server/runtime/player/PlayerDeath.hpp>
@@ -370,6 +371,26 @@ void BasaltServer::startBedrockListener() {
         context.quit = [emitOnOwner](const player::PlayerSession& player) {
             emitOnOwner(server::plugins::pluginEventTypes::playerQuit(), player);
         };
+        // The world, built where the world lives. A chunk belongs to its region's owner, so the
+        // columns are read and written there and only the finished bytes cross to the Bedrock
+        // thread. Queued rather than answered on the spot for the same reason.
+        context.sendChunks = [this](std::vector<std::pair<std::int32_t, std::int32_t>> columns, const int protocol,
+                                    std::function<void(std::vector<std::uint8_t>)> send, std::function<void()> done) {
+            if (worldRegistry_ == nullptr) {
+                return;
+            }
+            worldRegistry_->scheduler().global().submit(
+                [this, columns = std::move(columns), protocol, send = std::move(send), done = std::move(done)] {
+                    world::LoadedWorld& world = worldRegistry_->defaultWorld();
+                    for (const auto& [x, z] : columns) {
+                        send(bedrock::writeColumn(world.state().getOrGenerateChunk(x, z), protocol));
+                    }
+                    if (done) {
+                        done();
+                    }
+                });
+        };
+
         // What players.db remembers, and where what they become goes back. The same store the Java
         // door reads: a player who came in one door and out the other is one row, not two.
         context.stored = [this](const wire::common::Uuid& uuid) -> std::optional<storage::StoredPlayer> {

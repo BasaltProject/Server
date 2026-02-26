@@ -11,6 +11,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <set>
 #include <span>
 #include <utility>
 
@@ -26,6 +27,10 @@ constexpr std::uint64_t kRuntimeEntityId = 1;
 /// How often the rest of the server is looked at, in the listener's own loop. The world moves once
 /// every fifty milliseconds and the loop turns faster than that, so this is what a tick is worth.
 constexpr std::chrono::milliseconds kSyncPeriod{50};
+
+/// How far around a player the world is sent when they arrive. The same distance the door already
+/// told the client to draw.
+constexpr std::int32_t kChunkRadius = 4;
 
 [[nodiscard]] std::int64_t nowEpochSeconds() {
     return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
@@ -182,6 +187,16 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
         return true;
     };
 
+    // A block that changed under somebody's feet. Only reaches a client that already has the
+    // column: one that does not will get it whole when it comes into range.
+    connection.sendBlockChange = [mailbox = joining.mailbox,
+                                  protocol = joining.protocol](const std::int32_t x, const std::int32_t y,
+                                                               const std::int32_t z, const std::int32_t stateId) {
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeUpdateBlock(body, x, y, z, stateId, protocol);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::UpdateBlock), body.toVector());
+    };
+
     connection.sendCommandTree = [this] {
         if (session_ == nullptr || !context_.commandList) {
             return;
@@ -292,6 +307,21 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
     // player with no hearts at all.
     session_->connection().syncHealth();
     session_->connection().syncExperience();
+    // The world itself, once the player exists. The columns are built where the world runs and
+    // arrive here already written, so the door's thread never reads a chunk.
+    //
+    // And the client is only told it has spawned once they are all on their way: telling it first
+    // drops somebody into a world that is not there yet, which is what the bots caught.
+    const auto spawned = [mailbox = mailbox_] {
+        wire::io::ByteBuffer status;
+        wire::bedrock::writePlayStatus(status, wire::bedrock::PlayStatus::PlayerSpawn);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::PlayStatus), status.toVector());
+    };
+    if (!sendColumnsAround(spawned)) {
+        // No world to send means no reason to wait for it.
+        spawned();
+    }
+
     session_->connection().sendWeather(context_.weather);
     session_->connection().sendCommandTree();
     wire::io::ByteBuffer time;
@@ -462,6 +492,61 @@ void BedrockPlayer::tick() {
     }
     lastSync_ = now;
     syncOthers();
+
+    // The world follows: crossing into another column is what asks for the ring that just came into
+    // range, and nothing happens while somebody stands still.
+    if (session_ != nullptr) {
+        const std::pair here{static_cast<std::int32_t>(std::floor(session_->x)) >> 4,
+                             static_cast<std::int32_t>(std::floor(session_->z)) >> 4};
+        if (lastColumn_.has_value() && *lastColumn_ != here) {
+            static_cast<void>(sendColumnsAround({}));
+        }
+    }
+}
+
+bool BedrockPlayer::sendColumnsAround(std::function<void()> done) {
+    if (session_ == nullptr || !context_.sendChunks) {
+        return false;
+    }
+    const std::int32_t centreX = static_cast<std::int32_t>(std::floor(session_->x)) >> 4;
+    const std::int32_t centreZ = static_cast<std::int32_t>(std::floor(session_->z)) >> 4;
+    lastColumn_ = std::pair{centreX, centreZ};
+
+    // What is in range now, minus what this client already has, and the far ones forgotten so that
+    // walking back sends them again.
+    std::set<std::pair<std::int32_t, std::int32_t>> inRange;
+    std::vector<std::pair<std::int32_t, std::int32_t>> wanted;
+    for (std::int32_t x = centreX - kChunkRadius; x <= centreX + kChunkRadius; ++x) {
+        for (std::int32_t z = centreZ - kChunkRadius; z <= centreZ + kChunkRadius; ++z) {
+            inRange.emplace(x, z);
+            if (!columns_.contains({x, z})) {
+                wanted.emplace_back(x, z);
+            }
+        }
+    }
+    columns_ = std::move(inRange);
+
+    // Where the client should expect the world to be, which is what stops it waiting for columns
+    // that are not coming.
+    wire::io::ByteBuffer centre;
+    wire::bedrock::writeNetworkChunkPublisherUpdate(centre, centreX * 16, static_cast<std::int32_t>(session_->y),
+                                                    centreZ * 16, kChunkRadius * 16);
+    mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::NetworkChunkPublisherUpdate),
+                   centre.toVector());
+
+    if (wanted.empty()) {
+        if (done) {
+            done();
+        }
+        return true;
+    }
+    context_.sendChunks(
+        std::move(wanted), protocol_,
+        [mailbox = mailbox_](std::vector<std::uint8_t> column) {
+            mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LevelChunk), std::move(column));
+        },
+        std::move(done));
+    return true;
 }
 
 void BedrockPlayer::syncOthers() {

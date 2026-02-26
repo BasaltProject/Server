@@ -16,9 +16,6 @@ using wire::bedrock::RakSession;
 /// idle server is not a spinning thread.
 constexpr int kPollTimeoutMillis = 20;
 
-/// The overworld is three hundred and eighty four blocks tall, which is twenty four sections.
-constexpr std::uint32_t kOverworldSubChunks = 24;
-
 /// What a client is told to draw before it has asked for anything.
 constexpr std::int32_t kInitialRadius = 4;
 
@@ -322,20 +319,10 @@ void BedrockListener::onReady(Session& session) {
                                                     static_cast<std::int32_t>(info.z), kInitialRadius * 16);
     session.connection.sendPacket(BedrockPacket::NetworkChunkPublisherUpdate, body.readable());
 
-    // Empty columns, because the world is not wired to this door yet: what the client needs before
-    // it will stop loading is a chunk for every column it was told to expect, not blocks in them.
-    for (std::int32_t x = -kInitialRadius; x <= kInitialRadius; ++x) {
-        for (std::int32_t z = -kInitialRadius; z <= kInitialRadius; ++z) {
-            body.clear();
-            wire::bedrock::writeEmptyLevelChunk(body, x, z, kOverworldSubChunks, 0,
-                                                session.connection.protocolVersion());
-            session.connection.sendPacket(BedrockPacket::LevelChunk, body.readable());
-        }
-    }
+    // No empty columns here any more: the player made just below asks the world for the real
+    // ones, which answer the same question and answer it with blocks in them. Sending a hole
+    // first and the ground a moment later is worse than sending the ground a moment later.
 
-    body.clear();
-    wire::bedrock::writePlayStatus(body, wire::bedrock::PlayStatus::PlayerSpawn);
-    session.connection.sendPacket(BedrockPacket::PlayStatus, body.readable());
     session.connection.flush();
 
     if (!hooks_.join) {

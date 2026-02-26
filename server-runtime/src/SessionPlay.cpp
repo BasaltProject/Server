@@ -256,6 +256,12 @@ player::PlayerConnection ClientSession::playerConnection() {
     connection.sendCommandTree = [this] { sendCommandTree(); };
     connection.syncExperience = [this] { syncExperience(); };
     connection.killPlayer = [this](std::string_view deathMessageId) { killPlayer(deathMessageId); };
+    connection.sendBlockChange = [this](const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                                        const std::int32_t stateId) {
+        const play::ClientboundBlockUpdatePacket packet{.pos = play::BlockPos{x, y, z}, .blockStateId = stateId};
+        sendCompressed(play::ClientboundBlockUpdatePacket::kId,
+                       [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+    };
     connection.sendCombatDeath = [this](const wire::text::Component& message) {
         sendCompressed(wire::protocol::play::PlayerCombatKillPacket::kId, [&](wire::io::ByteBuffer& buffer) {
             wire::protocol::play::PlayerCombatKillPacket{.playerId = playerSession()->entityId(), .message = message}
