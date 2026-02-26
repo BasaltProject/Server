@@ -232,6 +232,21 @@ std::optional<std::int32_t> reshape(WorldState& world, std::int32_t x, std::int3
     return written(world, x, y, z, stateId, wanted);
 }
 
+std::optional<std::int32_t> toggleShape(WorldState& world, const std::int32_t x, const std::int32_t y,
+                                       const std::int32_t z, const std::int32_t stateId) {
+    if (!isWire(stateId)) {
+        return std::nullopt;
+    }
+    const std::map<std::string, std::string> was = registry::blockStateDefinitions::propertiesOf(stateId);
+    const bool cross = isCross(was);
+    if (!cross && !isDot(was)) {
+        return std::nullopt;
+    }
+    // parity: a cross goes to the default state, which is a dot, and a dot goes to the cross; then
+    // both are redrawn against the world, so the answer is often neither of the two.
+    return written(world, x, y, z, stateId, drawnFrom(world, x, y, z, cross));
+}
+
 std::optional<std::int32_t> shapeOnPlacement(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                              std::int32_t stateId) {
     if (!isWire(stateId)) {

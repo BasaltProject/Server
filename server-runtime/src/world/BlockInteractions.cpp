@@ -1,7 +1,9 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
+#include <basalt/server/runtime/world/RedstoneWire.hpp>
 
 #include <array>
+#include <cmath>
 #include <charconv>
 #include <cstdint>
 #include <map>
@@ -92,6 +94,23 @@ enum class Toggle { Door, Trapdoor, FenceGate, Lever, Button };
     return path;
 }
 
+/// parity: `Entity.getDirection`, the quarter turn a yaw falls in. Zero looks south.
+[[nodiscard]] std::string_view playerFacing(float yaw) {
+    static constexpr std::array<std::string_view, 4> kQuarters{"south", "west", "north", "east"};
+    const auto quarter = static_cast<std::int32_t>(std::floor((yaw / 90.0F) + 0.5F));
+    return kQuarters[static_cast<std::size_t>(quarter & 3)];
+}
+
+[[nodiscard]] std::string_view oppositeName(std::string_view face) {
+    if (face == "north") {
+        return "south";
+    }
+    if (face == "south") {
+        return "north";
+    }
+    return face == "west" ? "east" : "west";
+}
+
 [[nodiscard]] std::optional<Toggle> toggleOf(std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block == nullptr) {
@@ -175,10 +194,15 @@ bool isCycleable(std::int32_t stateId) {
         return false;
     }
     const std::string_view path = block->path();
-    return path == "repeater" || path == "comparator";
+    // parity: `DaylightDetectorBlock.useWithoutItem` cycles `inverted`, and
+    // `RedStoneWireBlock.useWithoutItem` turns a cross into a dot and back. Both are components you
+    // set up by clicking them, and the bench cannot press anything, so neither was here.
+    return path == "repeater" || path == "comparator" || path == "daylight_detector" ||
+           redstoneWire::isWire(stateId);
 }
 
-std::optional<BlockToggle> toggle(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+std::optional<BlockToggle> toggle(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                  std::optional<float> playerYaw) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return std::nullopt;
@@ -218,6 +242,19 @@ std::optional<BlockToggle> toggle(WorldState& world, std::int32_t x, std::int32_
         changes.push_back(BlockChange{.x = atX, .y = atY, .z = atZ, .stateId = *flipped});
     };
 
+    // parity: `FenceGateBlock.useWithoutItem` turns a gate that is about to open and happens to face
+    // **away** from whoever opened it, so it always swings out of their way. Only on the way open,
+    // and only from the opposite side; from either end of its own line it is left alone.
+    if (*kind == Toggle::FenceGate && open && playerYaw.has_value()) {
+        const std::string_view wanted = playerFacing(*playerYaw);
+        if (valueOf(properties, "facing") == oppositeName(wanted)) {
+            const std::optional<std::int32_t> turned = registry::blockStateDefinitions::stateIdOf(
+                *block, Properties{{"facing", std::string{wanted}}}, *stateId);
+            if (turned.has_value()) {
+                static_cast<void>(world.setBlockState(x, y, z, *turned));
+            }
+        }
+    }
     flip(x, y, z);
     if (*kind == Toggle::Door) {
         // The other half, whichever way round this one is.
@@ -263,6 +300,24 @@ std::optional<BlockCycle> cycle(WorldState& world, std::int32_t x, std::int32_t 
                           .sound = std::string{"block.comparator.click"},
                           .pitch = subtracting ? kComparePitch : kSubtractPitch,
                           .volume = kComparatorVolume};
+    }
+    if (path == "daylight_detector") {
+        // parity: the detector writes `inverted` on its own with `setBlock(..., 2)` and then lets
+        // `updateSignalStrength` write the new reading, which is the write that tells anybody.
+        const bool inverted = valueOf(properties, "inverted") == "true";
+        const std::optional<std::int32_t> turned = registry::blockStateDefinitions::stateIdOf(
+            *block, Properties{{"inverted", inverted ? "false" : "true"}}, *stateId);
+        if (!turned.has_value() || !world.setBlockState(x, y, z, *turned)) {
+            return std::nullopt;
+        }
+        return BlockCycle{.stateId = *turned, .sound = std::nullopt};
+    }
+    if (redstoneWire::isWire(*stateId)) {
+        const std::optional<std::int32_t> drawn = redstoneWire::toggleShape(world, x, y, z, *stateId);
+        if (!drawn.has_value()) {
+            return std::nullopt;
+        }
+        return BlockCycle{.stateId = *drawn, .sound = std::nullopt};
     }
     return std::nullopt;
 }

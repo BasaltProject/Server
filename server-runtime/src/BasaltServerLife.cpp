@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/BuildInfo.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
+#include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
 #include <basalt/wire/io/Platform.hpp>
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
@@ -306,6 +307,25 @@ void BasaltServer::startBedrockListener() {
             status.max = payload.players->max;
         }
         return status;
+    };
+
+    // What a client that finished the login becomes: the same kind of player a Java login makes,
+    // in the same registry, so everything that asks who is online finds them.
+    hooks.join =
+        [this](const bedrock::BedrockListener::Joining& joining) -> std::unique_ptr<bedrock::BedrockListener::Player> {
+        bedrock::BedrockPlayer::Context context;
+        context.registry = &playerRegistry_;
+        context.lang = options_.lang;
+        context.logger = logger_;
+        if (worldRegistry_ != nullptr) {
+            const world::LoadedWorld& world = worldRegistry_->defaultWorld();
+            const std::array<double, 3>& spawn = world.spawn();
+            context.worldName = world.name();
+            context.spawnX = spawn[0];
+            context.spawnY = spawn[1];
+            context.spawnZ = spawn[2];
+        }
+        return std::make_unique<bedrock::BedrockPlayer>(joining, std::move(context));
     };
 
     bedrockListener_ = std::make_unique<bedrock::BedrockListener>(std::move(options), std::move(hooks),

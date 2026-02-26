@@ -13,6 +13,7 @@ basalt_module(server-runtime-core
         src/Connection.cpp
         src/LoginHandler.cpp
         src/bedrock/BedrockListener.cpp
+        src/bedrock/BedrockPlayer.cpp
         src/config/AnimationsConfig.cpp
         src/config/BasaltConfig.cpp
         src/config/CommandsConfig.cpp

@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/DaylightDetectors.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
@@ -828,14 +829,14 @@ std::vector<std::array<double, 6>> BlockInteractionHandler::buildersInTheWay() c
     return boxes;
 }
 
-void BlockInteractionHandler::toggleBlock(const BlockPos& pos) {
+void BlockInteractionHandler::toggleBlock(const BlockPos& pos, const float playerYaw) {
     world::LoadedWorld* world = owner_->currentWorld();
     if (world == nullptr) {
         return;
     }
     const std::optional<std::int32_t> before = world->state().blockState(pos.x, pos.y, pos.z);
     const std::optional<world::blockInteractions::BlockToggle> toggled =
-        world::blockInteractions::toggle(world->state(), pos.x, pos.y, pos.z);
+        world::blockInteractions::toggle(world->state(), pos.x, pos.y, pos.z, playerYaw);
     if (!toggled.has_value()) {
         return;
     }
@@ -886,7 +887,17 @@ void BlockInteractionHandler::cycleBlock(const BlockPos& pos) {
         return;
     }
     broadcastBlockUpdate(pos, cycled->stateId);
-    // parity: both are components, so the change has to reach the dust and the diodes around them.
+    // parity: `DaylightDetectorBlock.useWithoutItem` writes `inverted` telling nobody and then lets
+    // `updateSignalStrength` write the reading, which is the write that carries. Without this the
+    // detector flipped and kept the old number until its own turn came round.
+    const std::optional<world::BlockChange> reread = world::daylightDetectors::update(
+        world->state(), world->clock(), world->weather(), pos.x, pos.y, pos.z,
+        config::dimensionFacts(world->declaration().dimension).hasSkylight);
+    if (reread.has_value()) {
+        broadcastBlockUpdate(pos, reread->stateId);
+    }
+    // parity: every one of these is a component, so the change has to reach the dust and the diodes
+    // around them.
     notifyNeighbours(pos);
     if (cycled->sound.has_value()) {
         broadcastSound(pos, *cycled->sound, cycled->volume, cycled->pitch);
