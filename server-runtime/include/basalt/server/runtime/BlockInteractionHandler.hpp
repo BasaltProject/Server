@@ -262,6 +262,10 @@ private:
     /// The boxes of everything in this world that stops a block being placed inside it.
     [[nodiscard]] std::vector<std::array<double, 6>> buildersInTheWay() const;
 
+    /// Lighting a tnt block by hand, which takes the block away and leaves the entity.
+    void primeTntAt(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos, std::int32_t heldSlot,
+                    const storage::StoredItemStack& held, bool wears);
+
     void toggleBlock(const wire::protocol::play::BlockPos& pos, float playerYaw);
 
     void cycleBlock(const wire::protocol::play::BlockPos& pos);

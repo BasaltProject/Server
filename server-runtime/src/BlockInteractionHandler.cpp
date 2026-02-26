@@ -24,6 +24,7 @@
 #include <basalt/server/runtime/world/RealItemTags.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
+#include <basalt/server/runtime/world/MiscGrowth.hpp>
 #include <basalt/server/runtime/world/Shulkers.hpp>
 #include <basalt/server/runtime/world/Tripwires.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
@@ -478,6 +479,13 @@ void BlockInteractionHandler::handlePlayerAction(const play::ServerboundPlayerAc
                                  owner_->world().blockState(action.pos.x, action.pos.y, action.pos.z).value_or(0),
                                  struck);
             }
+            // parity: `RedStoneOreBlock.attack` runs the same `interact` a right click does, so an
+            // ore lights whichever button was pressed on it.
+            if (const std::optional<world::BlockChange> glow =
+                    world::miscGrowth::lightRedstoneOre(loaded->state(), action.pos.x, action.pos.y, action.pos.z);
+                glow.has_value()) {
+                broadcastBlockUpdate(action.pos, glow->stateId);
+            }
         }
         startDigging(action.pos);
     } else if (action.action == Action::AbortDestroyBlock || action.action == Action::StopDestroyBlock) {
@@ -551,6 +559,18 @@ void BlockInteractionHandler::handlePlayerAction(const play::ServerboundPlayerAc
                 heardBySculk("shear", action.pos);
             }
         }
+    }
+    // parity: `TntBlock.playerWillDestroy`: an `unstable` block broken by a survival player lights
+    // instead of dropping. `unstable` is read nowhere else, and a signal lights a block whatever it
+    // says, so this is the only place it means anything.
+    if (session != nullptr && session->gamemode != Gamemode::Creative && broken.has_value() &&
+        brokenBlock != nullptr && brokenBlock->path() == "tnt" && world != nullptr &&
+        world->gameRules().get(world::gameRules::kTntExplodes) &&
+        reg::blockStateDefinitions::propertiesOf(*broken).contains("unstable") &&
+        reg::blockStateDefinitions::propertiesOf(*broken).at("unstable") == "true") {
+        // parity: `prime` only spawns the entity and raises the event; taking the block away and
+        // dropping whatever it drops is the ordinary break that follows, exactly as in the jar.
+        world->state().primeTnt(action.pos.x, action.pos.y, action.pos.z, "prime_fuse");
     }
     const std::int32_t leaves = meltedIce(broken, action.pos).value_or(reg::blocks::air().stateId);
     const bool changed = owner_->world().setBlockState(action.pos.x, action.pos.y, action.pos.z, leaves);

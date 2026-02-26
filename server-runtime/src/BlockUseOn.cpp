@@ -18,6 +18,7 @@
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/BoneMeal.hpp>
 #include <basalt/server/runtime/world/Buckets.hpp>
+#include <basalt/server/runtime/world/MiscGrowth.hpp>
 #include <basalt/server/runtime/world/Campfires.hpp>
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
@@ -96,6 +97,44 @@ world::neighbourUpdates::Context contextOf(world::LoadedWorld& world, random::Ra
 }
 
 } // namespace
+
+void BlockInteractionHandler::primeTntAt(PlayerSession& session, const BlockPos& pos, std::int32_t heldSlot,
+                                         const storage::StoredItemStack& held, const bool wears) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    if (world == nullptr) {
+        return;
+    }
+    // parity: `TntBlock.prime` answers false with the `tnt_explodes` rule off, and then nothing at
+    // all happens: the block stays and the item is not spent.
+    if (!world->gameRules().get(world::gameRules::kTntExplodes)) {
+        return;
+    }
+    if (!world->state().setBlockState(pos.x, pos.y, pos.z, reg::blocks::air().stateId)) {
+        return;
+    }
+    broadcastBlockUpdate(pos, reg::blocks::air().stateId);
+    // parity: `TntBlock.prime` raises `PRIME_FUSE`, which is what a sculk sensor hears.
+    world->state().primeTnt(pos.x, pos.y, pos.z, "prime_fuse");
+    notifyNeighbours(pos);
+    if (session.gamemode == Gamemode::Creative) {
+        return;
+    }
+    if (!wears) {
+        // parity: a fire charge is consumed rather than worn.
+        session.inventory.set(heldSlot,
+                              held.count <= 1 ? std::nullopt : std::optional{withCount(held, held.count - 1)});
+        return;
+    }
+    random::RandomSource wear = random::RandomSource::legacy(nextSeed());
+    const std::optional<storage::StoredItemStack> worn = item::itemWear::hurt(
+        held, 1, wear,
+        [this](const storage::StoredItemStack& stack, std::int32_t amount, random::RandomSource& source) {
+            return damageEffects_.process(stack, amount, source);
+        });
+    if (worn != held) {
+        session.inventory.set(heldSlot, worn);
+    }
+}
 
 void BlockInteractionHandler::igniteAt(PlayerSession& session, const BlockPos& pos, std::int32_t heldSlot,
                                        const storage::StoredItemStack& held) {
@@ -319,6 +358,19 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         const Identifier* clicked =
             clickedState.has_value() ? reg::blockStateDefinitions::blockOf(*clickedState) : nullptr;
         const std::string path = clicked == nullptr ? std::string{} : std::string{clicked->path()};
+        // parity: `RedStoneOreBlock.useItemOn` lights the ore and then answers `PASS` whenever the
+        // held item is a block that could go down, so the ore lights **and** the block is placed.
+        // This is why it falls through rather than acking here.
+        if (path == "redstone_ore" || path == "deepslate_redstone_ore") {
+            if (world::LoadedWorld* lit = owner_->currentWorld(); lit != nullptr) {
+                if (const std::optional<world::BlockChange> glow =
+                        world::miscGrowth::lightRedstoneOre(lit->state(), hit.pos.x, hit.pos.y, hit.pos.z);
+                    glow.has_value()) {
+                    broadcastBlockUpdate(hit.pos, glow->stateId);
+                    notifyNeighbours(hit.pos);
+                }
+            }
+        }
         if (path == "crafting_table") {
             owner_->menus().openCraftingTable(*session);
             ack();
@@ -458,7 +510,19 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
     const std::optional<Identifier> heldBlock = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
     // Flint and steel is not a block, so it has to be answered before the "is this placeable" check
     // below throws the click away. parity: `FlintAndSteelItem.useOn`.
-    if (held.has_value() && heldBlock == Identifier::vanilla("flint_and_steel")) {
+    // parity: `TntBlock.useItemOn` runs before anything a flint and steel would do to the square
+    // beside it: the block is primed on the spot and taken away, and no fire is ever placed. A fire
+    // charge does the same and is spent instead of worn.
+    const bool lighter = held.has_value() && heldBlock == Identifier::vanilla("flint_and_steel");
+    const bool charge = held.has_value() && heldBlock == Identifier::vanilla("fire_charge");
+    if ((lighter || charge) && clickedState.has_value() &&
+        reg::blockStateDefinitions::blockOf(*clickedState) != nullptr &&
+        reg::blockStateDefinitions::blockOf(*clickedState)->path() == "tnt") {
+        primeTntAt(*session, hit.pos, heldSlot, *held, lighter);
+        ack();
+        return;
+    }
+    if (lighter) {
         igniteAt(*session, hit.pos.offset(hit.direction), heldSlot, *held);
         ack();
         return;
