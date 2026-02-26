@@ -261,7 +261,10 @@ void onSignal(WorldState& world, const std::int32_t x, const std::int32_t y, con
         return;
     }
     static_cast<void>(markConditionMet(world, x, y, z, *stateId));
-    world.scheduleBlockTick(x, y, z, impulseBlock(), kDelay);
+    // parity: a turn is stored under the block that booked it, and vanilla drops one whose name does
+    // not match what is standing there. Booking every command block's turn as the impulse block left
+    // a repeating block's turn named wrong in the saved world.
+    world.scheduleBlockTick(x, y, z, blockOfMode(*mode), kDelay);
 }
 
 bool tick(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
@@ -291,7 +294,7 @@ bool tick(WorldState& world, const std::int32_t x, const std::int32_t y, const s
         const bool awake =
             entity->data().getBoolean(std::string{kPoweredKey}) || entity->data().getBoolean(std::string{kAutoKey});
         if (awake) {
-            world.scheduleBlockTick(x, y, z, impulseBlock(), kDelay);
+            world.scheduleBlockTick(x, y, z, blockOfMode(*mode), kDelay);
         }
     } else if (*mode == Mode::Impulse) {
         if (wasMet) {
@@ -322,7 +325,11 @@ void onDataLoaded(WorldState& world, const std::int32_t x, const std::int32_t y,
         entity->data().getBoolean(std::string{kPoweredKey})) {
         return;
     }
-    world.scheduleBlockTick(x, y, z, impulseBlock(), kDelay);
+    // parity: `CommandBlockEntity.scheduleTick` marks the condition **before** booking the turn, so
+    // the very first turn already finds `wasConditionMet` true and runs the command. Booking without
+    // marking made a block switched to automatic by command start a whole tick late.
+    static_cast<void>(markConditionMet(world, x, y, z, *stateId));
+    world.scheduleBlockTick(x, y, z, blockOfMode(*mode), kDelay);
 }
 
 std::optional<BlockChange> program(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
@@ -383,7 +390,7 @@ std::optional<BlockChange> program(WorldState& world, const std::int32_t x, cons
     const bool becameRepeating = *was != mode && mode == Mode::Repeating && (powered || automatic);
     if (switchedOn || becameRepeating) {
         static_cast<void>(markConditionMet(world, x, y, z, *now));
-        world.scheduleBlockTick(x, y, z, impulseBlock(), kDelay);
+        world.scheduleBlockTick(x, y, z, blockOfMode(mode), kDelay);
     }
     return moved;
 }

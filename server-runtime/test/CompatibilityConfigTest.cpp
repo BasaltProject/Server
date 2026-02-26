@@ -184,6 +184,21 @@ TEST_CASE("bedrock is on with nothing written, and off only when somebody says s
     CHECK(chosen.bedrock().port == 19200);
     CHECK(chosen.bedrock().prefix.empty());
 
+    // The window of live protocols, and what happens past its top end.
+    CHECK_FALSE(defaults.bedrock().protocols.has_value());
+    CHECK(defaults.bedrock().futureProtocols == basalt::wire::bedrock::BedrockFuturePolicy::Warn);
+
+    const CompatibilityConfig window =
+        compatibility("compat-bedrock-window", "[bedrock]\nprotocols = [2168]\nfuture-protocols = \"refuse\"\n");
+    REQUIRE(window.bedrock().protocols.has_value());
+    CHECK(window.bedrock().protocols->contains(2168));
+    CHECK(window.bedrock().futureProtocols == basalt::wire::bedrock::BedrockFuturePolicy::Refuse);
+
+    const auto badPolicy = CompatibilityConfig::load(
+        written("compat-bedrock-policy", "compatibility.toml", "[bedrock]\nfuture-protocols = \"maybe\"\n"));
+    REQUIRE_FALSE(badPolicy.has_value());
+    CHECK(badPolicy.error().find("accept, warn or refuse") != std::string::npos);
+
     // A port outside what a port can be is the operator meaning something, and it is said rather
     // than rounded into range.
     const auto refused =

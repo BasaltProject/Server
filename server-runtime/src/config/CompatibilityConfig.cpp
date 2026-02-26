@@ -88,6 +88,26 @@ std::expected<CompatibilityConfig, std::string> CompatibilityConfig::load(const 
         if (const std::optional<std::string_view> prefix = table->string("prefix"); prefix.has_value()) {
             bedrock.prefix = std::string{*prefix};
         }
+        if (const std::optional<std::string_view> written = table->string("protocols"); written.has_value()) {
+            if (lowercaseAscii(trim(*written)) != "all") {
+                return std::unexpected(path + ": the bedrock protocols must be \"all\" or a list of numbers");
+            }
+        } else if (table->find("protocols") != nullptr) {
+            std::set<std::int32_t> chosen;
+            for (const std::int64_t protocol : table->integerList("protocols")) {
+                chosen.insert(static_cast<std::int32_t>(protocol));
+            }
+            bedrock.protocols = std::move(chosen);
+        }
+        if (const std::optional<std::string_view> written = table->string("future-protocols"); written.has_value()) {
+            const std::optional<wire::bedrock::BedrockFuturePolicy> parsed =
+                wire::bedrock::parseBedrockFuturePolicy(*written);
+            if (!parsed.has_value()) {
+                return std::unexpected(path + ": the bedrock future-protocols must be accept, warn or refuse, not \"" +
+                                       std::string{*written} + "\"");
+            }
+            bedrock.futureProtocols = *parsed;
+        }
     }
 
     logger.debug([&path] { return "Loaded " + path + "."; });

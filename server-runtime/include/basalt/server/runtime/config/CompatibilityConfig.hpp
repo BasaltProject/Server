@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/config/ConfigDirectory.hpp>
+#include <basalt/wire/bedrock/BedrockGate.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 #include <basalt/wire/multiversion/ProtocolGate.hpp>
 
@@ -32,6 +33,13 @@ struct BedrockSettings {
     /// players writes, and it is a real choice: two accounts of different editions with the same
     /// name are then two players called the same thing.
     std::string prefix = ".";
+
+    /// Which Bedrock protocols may in. Absent means all of them this build speaks, which is what
+    /// makes updating the server add versions without editing this file.
+    std::optional<std::set<std::int32_t>> protocols;
+
+    /// What happens to a client newer than anything this build speaks.
+    wire::bedrock::BedrockFuturePolicy futureProtocols = wire::bedrock::BedrockFuturePolicy::Warn;
 };
 
 /// `config/compatibility.toml`.

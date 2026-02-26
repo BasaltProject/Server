@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/wire/bedrock/BedrockConnection.hpp>
+#include <basalt/wire/bedrock/BedrockGate.hpp>
 #include <basalt/wire/bedrock/RakServer.hpp>
 #include <basalt/wire/common/Uuid.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
@@ -29,6 +30,9 @@ struct BedrockOptions {
     /// What goes in front of a Bedrock player's name so two people called Steve are two people.
     /// Empty is a deliberate choice for a server where nobody can collide.
     std::string prefix = ".";
+
+    /// Which protocols may in, and what happens to one newer than this build knows.
+    wire::bedrock::BedrockGate gate;
 };
 
 /// Where a message waits until the Bedrock thread can send it.

@@ -294,6 +294,35 @@ void BasaltServer::startBedrockListener() {
     options.port = settings.port;
     options.prefix = settings.prefix;
 
+    // What this build speaks, narrowed to what the operator asked for. A list that names a protocol
+    // this build has no codec for is said out loud rather than accepted and then failed at.
+    std::set<std::int32_t> speakable = wire::bedrock::BedrockGate::buildSupport();
+    if (settings.protocols.has_value()) {
+        std::set<std::int32_t> chosen;
+        std::vector<std::int32_t> missing;
+        for (const std::int32_t protocol : *settings.protocols) {
+            if (speakable.contains(protocol)) {
+                chosen.insert(protocol);
+            } else {
+                missing.push_back(protocol);
+            }
+        }
+        if (!missing.empty()) {
+            logger_.warn([&missing] {
+                std::string named;
+                for (const std::int32_t protocol : missing) {
+                    if (!named.empty()) {
+                        named += ", ";
+                    }
+                    named += std::to_string(protocol);
+                }
+                return "compatibility.toml asks for Bedrock protocols this build cannot speak: " + named;
+            });
+        }
+        speakable = std::move(chosen);
+    }
+    options.gate = wire::bedrock::BedrockGate{std::move(speakable), settings.futureProtocols};
+
     bedrock::BedrockListener::Hooks hooks;
     // The same answer a Java client gets to its ping, rendered flat: a Bedrock server list has one
     // line and no colours of its own to give it.

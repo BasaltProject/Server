@@ -196,7 +196,12 @@ TEST_CASE("a repeating block books its own next turn while it has a signal") {
     CHECK(commandBlocks::tick(loaded.state, 8, 64, 8, 1, true, 8, loaded.runner()));
 
     CHECK(loaded.ran.size() == 1);
-    CHECK(loaded.state.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("command_block")));
+    // parity: `level.scheduleTick(pos, this, 1)` books under **this** block, so a repeating block's
+    // turn is named after the repeating block. Naming every one of them after the impulse block left
+    // a saved world whose ticks vanilla would drop on sight, and the jar's own photo of
+    // `bloquerepetitivo` shows `minecraft:repeating_command_block`.
+    CHECK(loaded.state.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("repeating_command_block")));
+    CHECK_FALSE(loaded.state.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("command_block")));
 }
 
 TEST_CASE("a command block is put down with every field its save writes") {
@@ -226,7 +231,10 @@ TEST_CASE("turning auto on is what starts a repeating block nobody has powered")
 
     commandBlocks::onDataLoaded(loaded.state, 8, 64, 8, false);
 
-    CHECK(loaded.state.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("command_block")));
+    CHECK(loaded.state.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("repeating_command_block")));
+    // parity: `CommandBlockEntity.scheduleTick` marks the condition before booking, so the first turn
+    // already finds it met and runs the command instead of spending itself on the marking.
+    CHECK(loaded.dataAt(8, 64, 8).getBoolean("conditionMet"));
 
     // Already on before the write books nothing, and neither does a chain block.
     Loaded again;
@@ -311,8 +319,8 @@ TEST_CASE("what a player types in changes the block as well as the command") {
 
     // parity: `CommandBlockEntity.setAutomatic` books a turn the moment a block with nothing powering
     // it is switched to `auto`, and a chain block books none.
-    CHECK_FALSE(loaded.state.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("command_block")));
+    CHECK_FALSE(loaded.state.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("repeating_command_block")));
     static_cast<void>(
         commandBlocks::program(loaded.state, 8, 64, 8, "say new", commandBlocks::Mode::Repeating, false, true, true));
-    CHECK(loaded.state.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("command_block")));
+    CHECK(loaded.state.hasScheduledBlockTick(8, 64, 8, Identifier::vanilla("repeating_command_block")));
 }

@@ -47,3 +47,19 @@ port = 19132
 # only Bedrock players join, and then two accounts with the same name are two
 # players shown with the same name.
 prefix = "."
+
+# Which Bedrock protocols may in. "all" is everything this build speaks, so
+# updating the server adds versions without editing this file. A list fixes it
+# to those: protocols = [2168].
+#
+# Bedrock has no launcher to pick a version in, so nobody is on an old one on
+# purpose: the window is the handful of protocols that devices are still being
+# updated from, and what falls out of it is retired rather than kept for ever.
+protocols = "all"
+
+# A Bedrock client newer than anything this server speaks. Bedrock updates
+# itself and will not let anyone stay behind, so the day a version lands half
+# the players are locked out until the server is updated. "warn" lets them in
+# and says so, "accept" lets them in quietly, "refuse" turns them away with the
+# screen that offers to update the server instead.
+future-protocols = "warn"
