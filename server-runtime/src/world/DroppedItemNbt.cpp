@@ -44,9 +44,7 @@ NbtCompound encode(const DroppedItem& item) {
     tag.putString("UUID", item.uuid.toString());
     tag.set("Pos", doubles(item.x, item.y, item.z));
     tag.set("Motion", doubles(item.velocityX, item.velocityY, item.velocityZ));
-    // parity: an item entity has five health and only loses it to fire or an explosion, which this
-    // build does not model yet. It is written because vanilla reads it back.
-    tag.putShort("Health", 5);
+    tag.putShort("Health", static_cast<std::int16_t>(item.health));
     tag.putShort("Age", static_cast<std::int16_t>(item.age));
     tag.putShort("PickupDelay", static_cast<std::int16_t>(item.pickupDelay));
     tag.set("Item", NbtTag::ofCompound(std::move(stack)));
@@ -82,6 +80,7 @@ std::optional<DroppedItem> decode(const NbtCompound& tag, const std::function<st
                         .velocityZ = at(motion, 2)};
     dropped.pickupDelay = tag.getShort("PickupDelay", 0);
     dropped.age = tag.getShort("Age", 0);
+    dropped.health = tag.getShort("Health", static_cast<std::int16_t>(kItemHealth));
     if (const NbtCompound* components = stack->getCompound("components"); components != nullptr) {
         dropped.components = *components;
     }

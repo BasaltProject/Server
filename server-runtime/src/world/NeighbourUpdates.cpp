@@ -768,6 +768,11 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         for (const redstoneComponents::Reach& at : redstoneComponents::outputReach(*removed, x, y, z)) {
             reach.push_back(at);
         }
+        // parity: the two `affectNeighborsAfterRemoval` that reach past their own square, a rail's
+        // and a lectern's.
+        for (const redstoneComponents::Reach& at : redstoneComponents::removalReach(*removed, x, y, z)) {
+            reach.push_back(at);
+        }
     }
     for (const redstoneComponents::Reach& at : reach) {
         std::vector<BlockChange> ahead;

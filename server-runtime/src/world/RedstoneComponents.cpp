@@ -559,6 +559,33 @@ std::vector<Reach> outputReach(const std::int32_t stateId, const std::int32_t x,
         .x = x + registry::stepX(out), .y = y + registry::stepY(out), .z = z + registry::stepZ(out), .skip = *facing}};
 }
 
+std::vector<Reach> removalReach(const std::int32_t stateId, const std::int32_t x, const std::int32_t y,
+                                const std::int32_t z) {
+    const std::string path = pathOf(stateId);
+    // parity: `LecternBlock.affectNeighborsAfterRemoval`, the only one of its three power paths a
+    // world with nobody in it can reach.
+    if (path == "lectern") {
+        return valueOf(registry::blockStateDefinitions::propertiesOf(stateId), "powered") == "true"
+                   ? std::vector<Reach>{Reach{.x = x, .y = y - 1, .z = z}}
+                   : std::vector<Reach>{};
+    }
+    // parity: `isStraight` is the constructor flag, false for the plain rail and true for the three
+    // that only ever lie flat.
+    const bool straight = path == "powered_rail" || path == "detector_rail" || path == "activator_rail";
+    if (!straight && path != "rail") {
+        return {};
+    }
+    std::vector<Reach> out;
+    if (valueOf(registry::blockStateDefinitions::propertiesOf(stateId), "shape").starts_with("ascending_")) {
+        out.push_back(Reach{.x = x, .y = y + 1, .z = z});
+    }
+    if (straight) {
+        out.push_back(Reach{.x = x, .y = y, .z = z});
+        out.push_back(Reach{.x = x, .y = y - 1, .z = z});
+    }
+    return out;
+}
+
 void scheduleInFront(WorldState& world, const std::string_view worldName, const std::int32_t x, const std::int32_t y,
                      const std::int32_t z, const BlockFace back, const ContainerSignalAt& containerSignal) {
     schedule(world, worldName, x, y, z, containerSignal);
@@ -684,6 +711,11 @@ void scheduleAround(WorldState& world, std::string_view worldName, std::int32_t 
     // from here: `outputReach` and `scheduleInFront` are where that lives, because the exclusion it
     // carries (the way back to the diode) has no meaning for a caller that only knows a centre. What
     // this used to add instead was reach on the **input** side, which the jar never touches.
+}
+
+bool wouldBeLocked(const WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                   const std::map<std::string, std::string>& properties) {
+    return isLocked(world, x, y, z, properties);
 }
 
 std::optional<std::int32_t> relock(WorldState& world, const std::int32_t x, const std::int32_t y,

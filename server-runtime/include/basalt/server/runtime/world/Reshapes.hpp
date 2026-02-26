@@ -27,6 +27,15 @@ namespace reshapes {
 /// it is ported, and then that owns it.
 [[nodiscard]] std::span<const std::string_view> chestBlocks();
 
+/// Whether water reaches this square from any side the jar counts.
+///
+/// parity: `ConcretePowderBlock.touchesLiquid`, quirk included: the block **underneath** never counts,
+/// because the first turn of the loop asks the powder itself whether to look down.
+[[nodiscard]] bool touchesWater(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
+/// The concrete this powder sets into, or absent for a block that is not concrete powder.
+[[nodiscard]] std::optional<std::int32_t> concreteFor(const wire::common::Identifier& block);
+
 /// The concrete a landed powder sets into, if the square it stopped in has water in it or beside it.
 ///
 /// parity: `ConcretePowderBlock.onLand`, which is the shape update's question plus the block the

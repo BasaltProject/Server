@@ -533,12 +533,16 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
 /// at last to decide whether to look down, and on the first turn that square is the powder itself.
 /// A powder is never water, so the block **underneath** never hardens it, which is why a column of
 /// powder poured into a pool only sets where the water touches its sides.
-[[nodiscard]] bool touchesWater(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+[[nodiscard]] std::int32_t readAt(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    return world.blockState(x, y, z).value_or(registry::blocks::air().stateId);
+}
+
+[[nodiscard]] bool touchesWaterImpl(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     for (const registry::BlockFace face : kAllFaces) {
-        if (face == registry::BlockFace::Down && !registry::blockFluids::hasWaterFluid(stateAt(world, x, y, z))) {
+        if (face == registry::BlockFace::Down && !registry::blockFluids::hasWaterFluid(readAt(world, x, y, z))) {
             continue;
         }
-        const std::int32_t neighbour = stateAt(world, x + offsetX(face), y + offsetY(face), z + offsetZ(face));
+        const std::int32_t neighbour = readAt(world, x + offsetX(face), y + offsetY(face), z + offsetZ(face));
         if (registry::blockFluids::hasWaterFluid(neighbour) &&
             !registry::blockShapes::isFaceSturdy(neighbour, facing(face))) {
             return true;
@@ -562,7 +566,7 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
 [[nodiscard]] std::optional<std::int32_t> concretePowder(WorldState& world, std::int32_t x, std::int32_t y,
                                                          std::int32_t z, std::int32_t stateId,
                                                          const wire::common::Identifier& block) {
-    if (!touchesWater(world, x, y, z)) {
+    if (!touchesWaterImpl(world, x, y, z)) {
         return std::nullopt;
     }
     const std::optional<std::int32_t> set = setInto(block);
@@ -649,11 +653,17 @@ std::optional<std::int32_t> landedConcrete(WorldState& world, std::int32_t x, st
     }
     // parity: `ConcretePowderBlock.shouldSolidify`, which counts the square it landed in as well as
     // the six around it, so powder dropped straight into a pool sets where it stops.
-    if (!registry::blockFluids::hasWaterFluid(replaced) && !touchesWater(world, x, y, z)) {
+    if (!registry::blockFluids::hasWaterFluid(replaced) && !touchesWaterImpl(world, x, y, z)) {
         return std::nullopt;
     }
     const std::optional<std::int32_t> set = setInto(*block);
     return set.has_value() && *set != stateId ? set : std::nullopt;
 }
+
+bool touchesWater(const WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+    return touchesWaterImpl(world, x, y, z);
+}
+
+std::optional<std::int32_t> concreteFor(const wire::common::Identifier& block) { return setInto(block); }
 
 } // namespace basalt::server::runtime::world::reshapes

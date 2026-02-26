@@ -91,6 +91,14 @@ struct Reach {
 
 [[nodiscard]] std::vector<Reach> outputReach(std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z);
 
+/// The squares a block that has just gone tells on top of its own six.
+///
+/// parity: `BaseRailBlock.affectNeighborsAfterRemoval`, which reaches one square past itself (a
+/// slope tells the square above it, and a powered, detector or activator rail tells its own square
+/// and the one below; a plain flat rail tells nothing extra), and `LecternBlock`'s, which tells the
+/// square under a lectern that was still powered.
+[[nodiscard]] std::vector<Reach> removalReach(std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z);
+
 /// The turn every component on and around the square a diode feeds books, less the way back to the
 /// diode itself. parity: `DiodeBlock.updateNeighborsInFront`, which is a `neighborChanged` on that
 /// square and an `updateNeighborsAtExceptFromFacing` on it.
@@ -110,6 +118,12 @@ void scheduleAroundWire(WorldState& world, std::string_view worldName, std::int3
 /// moved. parity: `RepeaterBlock.updateShape`, which recomputes it whenever a shape update arrives
 /// from an axis that is not the repeater's own. It is only a property: what the lock actually does
 /// is read live on the repeater's turn, so this is the half a player sees and a snapshot records.
+/// Whether a repeater with these properties would arrive held, for a square that has no repeater in
+/// it yet. parity: `RepeaterBlock.getStateForPlacement`, which asks `isLocked` before the block is
+/// written, so a repeater placed between two powered ones is locked from its very first tick.
+[[nodiscard]] bool wouldBeLocked(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                 const std::map<std::string, std::string>& properties);
+
 [[nodiscard]] std::optional<std::int32_t> relock(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
 /// The same for the six squares around a block that just wrote its own state, which is the shape

@@ -236,7 +236,8 @@ public:
 
     bool setBlock(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view block) override {
         const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(std::string{block});
-        const std::optional<std::int32_t> stateId = id.has_value() ? reg::blocks::blockIdOf(*id) : std::nullopt;
+        const std::optional<std::int32_t> stateId =
+            id.has_value() ? reg::blocks::defaultStateIdOf(*id) : std::nullopt;
         return stateId.has_value() && world_->state().setBlockState(x, y, z, *stateId);
     }
 

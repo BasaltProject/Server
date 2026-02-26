@@ -43,6 +43,8 @@ struct Placement {
     /// The state the new block is going into, which is what a waterlogged block keeps.
     std::int32_t replacing = 0;
     const WorldState* world = nullptr;
+    /// Needed only to ask the world for power, which a handful of blocks do as they land.
+    std::string_view worldName;
     std::int32_t x = 0;
     std::int32_t y = 0;
     std::int32_t z = 0;

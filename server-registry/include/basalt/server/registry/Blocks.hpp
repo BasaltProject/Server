@@ -42,7 +42,14 @@ namespace blocks {
 [[nodiscard]] const Registry<BlockState>& registry();
 
 /// This block's `minecraft:block` registry id, or absent if it is not a known block.
+///
+/// This is **not** a block state id and must never be written into the world or sent as one. The two
+/// numbering spaces look alike and are not: `redstone_block` is block 475 and state 11311, and state
+/// 475 belongs to `pale_oak_leaves`. For a state id use `defaultStateIdOf`.
 [[nodiscard]] std::optional<std::int32_t> blockIdOf(const wire::common::Identifier& block);
+
+/// This block's default block **state** id, the number the world and the protocol both speak.
+[[nodiscard]] std::optional<std::int32_t> defaultStateIdOf(const wire::common::Identifier& block);
 
 /// This block's destroy time and tool requirement, or absent for one this build's table does not
 /// list.

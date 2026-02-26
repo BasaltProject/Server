@@ -13,6 +13,34 @@
 namespace basalt::server::runtime::world {
 namespace {
 
+/// parity: `CactusBlock.entityInside`, one point of damage per square of cactus the box touches, and
+/// `ItemEntity.hurtServer`, which spends the item's health without any invulnerable window: five
+/// turns against a cactus and the stack is gone. Nothing else here spends that health, because fire
+/// and lava go through the fire clock and the stack's own `damage_resistant` component.
+[[nodiscard]] std::int32_t cactusDamage(const entity::entityCollision::BlockAt& blocks, const DroppedItem& item) {
+    constexpr double kEdgeSlack = 1.0e-7;
+    const double half = DroppedItemPhysics::kItemWidth / 2.0;
+    std::int32_t hits = 0;
+    for (std::int32_t bx = wire::common::mth::floor(item.x - half + kEdgeSlack);
+         bx <= wire::common::mth::floor(item.x + half - kEdgeSlack); ++bx) {
+        for (std::int32_t by = wire::common::mth::floor(item.y + kEdgeSlack);
+             by <= wire::common::mth::floor(item.y + DroppedItemPhysics::kItemHeight - kEdgeSlack); ++by) {
+            for (std::int32_t bz = wire::common::mth::floor(item.z - half + kEdgeSlack);
+                 bz <= wire::common::mth::floor(item.z + half - kEdgeSlack); ++bz) {
+                const std::optional<std::int32_t> here = blocks(bx, by, bz);
+                if (!here.has_value()) {
+                    continue;
+                }
+                const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*here);
+                if (block != nullptr && block->path() == "cactus") {
+                    ++hits;
+                }
+            }
+        }
+    }
+    return hits;
+}
+
 [[nodiscard]] double squaredDistance(const DroppedItem& item, double x, double y, double z) {
     const double dx = item.x - x;
     const double dy = item.y - y;
@@ -136,6 +164,15 @@ std::vector<std::int32_t> DroppedItemPhysics::tickItems(const sched::Region* reg
             continue;
         }
         moveItem(item);
+        // parity: `applyEffectsFromBlocks` runs on every tick of an item, on the resting branch as
+        // much as on the moving one, so a stack lying against a cactus is pricked four times in
+        // four ticks and not once.
+        item.health -= cactusDamage(blockAt_, item);
+        if (item.health <= 0) {
+            despawned.push_back(item.entityId);
+            droppedItems_.erase(droppedItems_.begin() + static_cast<std::ptrdiff_t>(index));
+            continue;
+        }
         ++index;
     }
 
