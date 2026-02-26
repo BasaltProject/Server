@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
+#include <basalt/server/runtime/player/PlayerDeath.hpp>
 #include <basalt/wire/io/Platform.hpp>
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
 #include <basalt/wire/text/Serializers.hpp>
@@ -369,6 +370,67 @@ void BasaltServer::startBedrockListener() {
         context.quit = [emitOnOwner](const player::PlayerSession& player) {
             emitOnOwner(server::plugins::pluginEventTypes::playerQuit(), player);
         };
+        // What players.db remembers, and where what they become goes back. The same store the Java
+        // door reads: a player who came in one door and out the other is one row, not two.
+        context.stored = [this](const wire::common::Uuid& uuid) -> std::optional<storage::StoredPlayer> {
+            if (playerStore_ == nullptr || !playerStore_->isOpen()) {
+                return std::nullopt;
+            }
+            return playerStore_->players().load(uuid.toString());
+        };
+        context.save = [this](const storage::StoredPlayer& row) {
+            // The database is closed when the server is shutting down, and by then everyone has
+            // already been written: this is only the door catching up.
+            if (playerStore_ != nullptr && playerStore_->isOpen()) {
+                playerStore_->players().save(row);
+            }
+        };
+
+        // Moving between worlds: the same refusal the Java path makes (staying put is not a move),
+        // and the world's own dimension turned into the one Bedrock draws.
+        context.changeWorld = [](player::PlayerSession& player, const world::LoadedWorld& target, const double x,
+                                 const double y,
+                                 const double z) -> std::optional<bedrock::BedrockPlayer::Context::Arrival> {
+            static_cast<void>(x);
+            static_cast<void>(y);
+            static_cast<void>(z);
+            if (player.worldName == target.name()) {
+                return std::nullopt;
+            }
+            bedrock::BedrockPlayer::Context::Arrival arrival;
+            arrival.worldName = target.name();
+            switch (target.declaration().dimension) {
+            case config::WorldDimension::Nether:
+                arrival.dimension = wire::bedrock::BedrockDimension::Nether;
+                break;
+            case config::WorldDimension::End:
+                arrival.dimension = wire::bedrock::BedrockDimension::End;
+                break;
+            case config::WorldDimension::Overworld:
+                arrival.dimension = wire::bedrock::BedrockDimension::Overworld;
+                break;
+            }
+            return arrival;
+        };
+
+        // Dying goes through the same code a Java player's death does, queued where the rest of
+        // the server runs: it touches the registry and every other player's connection.
+        context.killed = [this](player::PlayerSession& player, const std::string_view deathMessageId) {
+            const wire::common::Uuid uuid = player.uuid();
+            const std::string reason{deathMessageId};
+            worldRegistry_->scheduler().global().submit([this, uuid, reason] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (session == nullptr) {
+                    return;
+                }
+                player::DeathContext death;
+                death.registry = &playerRegistry_;
+                death.logger = logger_;
+                death.lang = options_.lang;
+                player::killPlayer(*session, reason, std::nullopt, death);
+            });
+        };
+
         // Which commands to offer, filtered by permission exactly as the Java tree is: a player who
         // cannot run one is never told it exists. Read straight off the dispatcher rather than
         // queued, because the answer goes back to the caller and the tree only changes when a

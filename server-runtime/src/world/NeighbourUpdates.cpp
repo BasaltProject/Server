@@ -588,8 +588,15 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // neighbours, and this dust is one of those, so a dust with nothing to sit on goes at once,
     // before anything around it has been reshaped. That is what leaves the dust beside it a dot
     // instead of a cross: it never sees this one arrive.
+    //
+    // parity: and it only runs when the **block** changed (`!oldState.is(state.getBlock())`), so a
+    // dust written over a dust settles nothing. Nothing else asks it either: `/setblock` writes with
+    // `2 | 256` and its tail, `updateNeighboursOnBlockSet`, tells the six squares around and not the
+    // one in the middle. A dust handed a strength it could not have keeps it, the same way a
+    // repeater does in `repetidormentira`.
     if (const std::optional<std::int32_t> arrived = world.blockState(x, y, z);
-        arrived.has_value() && redstoneWire::isWire(*arrived)) {
+        arrived.has_value() && redstoneWire::isWire(*arrived) &&
+        !(removed.has_value() && redstoneWire::isWire(*removed))) {
         // parity: `onPlace` settles this dust's own strength before it tells anybody, and that write
         // redraws the squares around it while this dust is still there. It is the whole difference
         // between leaving the dust beside it a dot and leaving it a cross: with no signal the

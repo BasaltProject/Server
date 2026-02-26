@@ -70,6 +70,16 @@ constexpr std::int32_t kGrowthSparkles = 15;
     return instance;
 }
 
+[[nodiscard]] const wire::common::Identifier& carvedPumpkin() {
+    static const wire::common::Identifier instance = wire::common::Identifier::vanilla("carved_pumpkin");
+    return instance;
+}
+
+[[nodiscard]] const wire::common::Identifier& brush() {
+    static const wire::common::Identifier instance = wire::common::Identifier::vanilla("brush");
+    return instance;
+}
+
 [[nodiscard]] const wire::common::Identifier& boneMealItem() {
     static const wire::common::Identifier instance = wire::common::Identifier::vanilla("bone_meal");
     return instance;
@@ -417,6 +427,33 @@ void heard(WorldState& world, const std::string_view event, const std::int32_t x
     const std::int32_t tx = x + registry::stepX(out);
     const std::int32_t ty = y + registry::stepY(out);
     const std::int32_t tz = z + registry::stepZ(out);
+    // parity: the carved pumpkin entry, an `OptionalDispenseItemBehavior`: it puts the pumpkin down
+    // only when the square in front is empty **and** `canSpawnGolem` says a figure would stand up.
+    // Anything else is a refusal, so the pumpkin stays in the dispenser instead of being thrown, and
+    // that is what lets a dispenser finish an iron golem.
+    if (stack.item == carvedPumpkin()) {
+        const std::optional<std::int32_t> front = context.world.blockState(tx, ty, tz);
+        if (!front.has_value() || !registry::blocks::isAir(*front) ||
+            !golemPatterns::canComplete(context.world, tx, ty, tz, hooks.isCopper)) {
+            return Special{.refused = true};
+        }
+        const registry::BlockState* pumpkin = registry::blocks::named("carved_pumpkin");
+        if (pumpkin == nullptr || !context.world.setBlockState(tx, ty, tz, pumpkin->stateId)) {
+            return Special{.refused = true};
+        }
+        heard(context.world, "block_place", tx, ty, tz, hooks.gameTime);
+        return Special{.handled = true,
+                       .left = minusOne(stack),
+                       .change = BlockChange{.x = tx, .y = ty, .z = tz, .stateId = pumpkin->stateId}};
+    }
+    // parity: the brush entry, which brushes an armadillo standing in the square in front and
+    // refuses when there is none. Brushing is not implemented anywhere in this build, not even by
+    // hand, so this refuses always: wrong only when an armadillo is standing there, and right the
+    // rest of the time. What it does get right either way is that a refusal **keeps** the brush,
+    // because an `OptionalDispenseItemBehavior` never throws what it failed on.
+    if (stack.item == brush()) {
+        return Special{.refused = true};
+    }
     // parity: the armor stand entry, which stands one in the square in front whatever is there, at
     // the bottom middle of it and turned the way the dispenser looks.
     if (stack.item == armorStand()) {

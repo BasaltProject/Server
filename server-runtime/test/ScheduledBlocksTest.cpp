@@ -226,34 +226,37 @@ TEST_CASE("frosted ice packed in with its own kind mostly waits") {
     CHECK(meltsBeside(4, 1));
 }
 
-TEST_CASE("melting ice takes its neighbours' turn with it") {
+TEST_CASE("ice that goes whole thins its neighbours on the spot") {
+    // parity: `FrostedIceBlock.tick` reaches the six squares **only** when `slightlyMelt` answered
+    // true, which it does only for the last age, and it calls `slightlyMelt` on each neighbour rather
+    // than just booking it. The neighbour that survives that is the one that gets a turn.
     Loaded loaded;
     WorldState& world = loaded.state;
-    const std::int32_t ice = stateOf("frosted_ice", {{"age", "0"}});
-    REQUIRE(world.setBlockState(8, 64, 8, ice));
-    REQUIRE(world.setBlockState(9, 64, 8, ice));
+    const auto ice = [](std::int32_t age) { return stateOf("frosted_ice", {{"age", std::to_string(age)}}); };
+    REQUIRE(world.setBlockState(8, 64, 8, ice(3)));
+    REQUIRE(world.setBlockState(9, 64, 8, ice(0)));
+    REQUIRE(world.setBlockState(7, 64, 8, ice(3)));
     rng::RandomSource random = rng::RandomSource::legacy(1);
     std::vector<BlockChange> changes;
 
     scheduledBlocks::frostedIce(world, 8, 64, 8, random, changes);
 
-    // Its own turn is booked at twenty, and the neighbour's between twenty and thirty-nine. Both are
-    // read from the same pass, since asking twice would eat the first answer's turns.
-    std::int32_t own = -1;
-    std::int32_t neighbour = -1;
-    for (std::int32_t turn = 0; turn < 100; ++turn) {
-        for (const std::array<std::int32_t, 3>& position : world.dueBlockTicks()) {
-            if (position[0] == 8 && own < 0) {
-                own = turn + 1;
-            }
-            if (position[0] == 9 && neighbour < 0) {
-                neighbour = turn + 1;
-            }
-        }
-    }
-    CHECK(own == 20);
-    CHECK(neighbour >= 20);
-    CHECK(neighbour < 40);
+    CHECK(world.blockState(8, 64, 8) == stateOf("water"));
+    // The young one thinned and kept its place, so it books a turn between twenty and forty.
+    CHECK(world.blockState(9, 64, 8) == ice(1));
+    CHECK(world.hasScheduledBlockTick(9, 64, 8, scheduledBlocks::frostedIceTickType()));
+    // The old one went with it, and water books nothing.
+    CHECK(world.blockState(7, 64, 8) == stateOf("water"));
+    CHECK_FALSE(world.hasScheduledBlockTick(7, 64, 8, scheduledBlocks::frostedIceTickType()));
+    // parity: a piece that only thins never reaches its neighbours at all.
+    Loaded young;
+    REQUIRE(young.state.setBlockState(8, 64, 8, ice(0)));
+    REQUIRE(young.state.setBlockState(9, 64, 8, ice(0)));
+    std::vector<BlockChange> thinned;
+    scheduledBlocks::frostedIce(young.state, 8, 64, 8, random, thinned);
+    CHECK(young.state.blockState(9, 64, 8) == ice(0));
+    CHECK_FALSE(young.state.hasScheduledBlockTick(9, 64, 8, scheduledBlocks::frostedIceTickType()));
+    CHECK(young.state.hasScheduledBlockTick(8, 64, 8, scheduledBlocks::frostedIceTickType()));
 }
 
 TEST_CASE("frosted ice thins in the light and asks again in the dark") {

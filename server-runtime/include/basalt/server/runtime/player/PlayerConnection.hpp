@@ -140,6 +140,10 @@ struct PlayerConnection {
 
     std::function<void(std::string_view deathMessageId)> killPlayer;
 
+    /// The screen the dying player is shown, with the sentence on it. The only part of dying that
+    /// is their edition's own business, which is why it is here and not in the death itself.
+    std::function<void(const wire::text::Component& message)> sendCombatDeath;
+
     /// A window a plugin drew, which is the session's business: the container machinery and the
     /// socket are both already there.
     std::function<void(const std::string& title, std::int32_t rows,

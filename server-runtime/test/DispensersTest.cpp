@@ -226,6 +226,37 @@ TEST_CASE("a dispenser lights the tnt it holds instead of throwing it") {
     CHECK(slotsAt(world, 8, 64, 8, dispensers::kSize)[0]->count == 1);
 }
 
+TEST_CASE("a dispenser finishes a golem with the pumpkin it holds, or keeps it") {
+    // parity: the carved pumpkin entry is an `OptionalDispenseItemBehavior`: it places the pumpkin
+    // only when the square in front is empty and `canSpawnGolem` says a figure would stand up, and a
+    // refusal keeps the pumpkin in the slot instead of throwing it.
+    Fixture builds;
+    WorldState& world = builds.world;
+    oneItem(world, "north", ItemStack{.item = item("carved_pumpkin"), .count = 1});
+    // The dispenser looks north, so the pumpkin lands at z minus one, over two snow blocks.
+    REQUIRE(world.setBlockState(8, 63, 7, stateOf("snow_block")));
+    REQUIRE(world.setBlockState(8, 62, 7, stateOf("snow_block")));
+
+    const dispensers::Result built = dispensers::fire(builds.context(), 8, 64, 8, ids());
+
+    CHECK(built.fired);
+    CHECK(world.items().empty());
+    CHECK(world.blockState(8, 64, 7) == stateOf("carved_pumpkin"));
+    CHECK(slotsAt(world, 8, 64, 8, dispensers::kSize)[0] == std::nullopt);
+
+    // With nothing under it there is no figure to finish, so the pumpkin stays where it is.
+    Fixture keeps;
+    WorldState& bare = keeps.world;
+    oneItem(bare, "north", ItemStack{.item = item("carved_pumpkin"), .count = 1});
+
+    const dispensers::Result refused = dispensers::fire(keeps.context(), 8, 64, 8, ids());
+
+    CHECK_FALSE(refused.fired);
+    CHECK(bare.items().empty());
+    CHECK(bare.blockState(8, 64, 7) == registry::blocks::air().stateId);
+    CHECK(slotsAt(bare, 8, 64, 8, dispensers::kSize)[0]->count == 1);
+}
+
 TEST_CASE("a minecart lands on the rail in front, or on the one a step below") {
     // parity: `MinecartDispenseItemBehavior`, whose four heights are the rail in front (flat or a
     // slope) and the rail below an empty square (again flat or a slope).

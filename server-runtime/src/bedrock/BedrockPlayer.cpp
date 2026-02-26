@@ -1,4 +1,5 @@
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
+#include <basalt/server/runtime/player/PlayerPersistence.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
@@ -25,6 +26,11 @@ constexpr std::uint64_t kRuntimeEntityId = 1;
 /// How often the rest of the server is looked at, in the listener's own loop. The world moves once
 /// every fifty milliseconds and the loop turns faster than that, so this is what a tick is worth.
 constexpr std::chrono::milliseconds kSyncPeriod{50};
+
+[[nodiscard]] std::int64_t nowEpochSeconds() {
+    return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
+        .count();
+}
 
 /// A position this client has already been told is the same position: a double that came off the
 /// wire as a float never lands exactly where it started.
@@ -135,6 +141,47 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
         }
     };
 
+    // Bedrock draws the death screen itself once health reaches zero; this is only the sentence on
+    // it. The way back is the client pressing the button, which arrives as a respawn of its own.
+    connection.sendCombatDeath = [mailbox = joining.mailbox, lang = context_.lang](const Component& message) {
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeDeathInfo(body, wire::text::toLegacyText(wire::text::resolveComponent(message, lang)));
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::DeathInfo), body.toVector());
+    };
+    connection.killPlayer = [this](const std::string_view deathMessageId) {
+        if (session_ != nullptr && context_.killed) {
+            context_.killed(*session_, deathMessageId);
+        }
+    };
+
+    // Another world is another dimension as far as a Bedrock client is concerned: the sky, the fog
+    // and the chunk cache all hang off it. What the world means by "somewhere else" stays with the
+    // caller; this only draws the arrival.
+    connection.switchWorld = [this](world::LoadedWorld& target, const double x, const double y,
+                                    const double z) -> bool {
+        if (session_ == nullptr || !context_.changeWorld) {
+            return false;
+        }
+        const std::optional<Context::Arrival> arrival = context_.changeWorld(*session_, target, x, y, z);
+        if (!arrival.has_value()) {
+            return false;
+        }
+        session_->worldName = arrival->worldName;
+        session_->x = x;
+        session_->y = y;
+        session_->z = z;
+        // Everybody drawn so far was in the world just left, so the next turn draws the new one
+        // from nothing rather than moving people who are no longer there.
+        others_.clear();
+
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeChangeDimension(body, arrival->dimension, static_cast<float>(x),
+                                            static_cast<float>(y) + wire::bedrock::kPlayerEyeHeight,
+                                            static_cast<float>(z), false);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::ChangeDimension), body.toVector());
+        return true;
+    };
+
     connection.sendCommandTree = [this] {
         if (session_ == nullptr || !context_.commandList) {
             return;
@@ -202,12 +249,41 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::ClientboundCloseForm), {});
     };
 
+    // What players.db already knows, asked for before a single packet goes out: the client is told
+    // its position and its game mode as it arrives, so restoring afterwards would announce one
+    // state and then correct it.
+    connection.storedSnapshot = [this]() -> std::optional<storage::StoredPlayer> {
+        if (session_ == nullptr) {
+            return std::nullopt;
+        }
+        return player::playerPersistence::toStored(*session_, session_->worldName, firstSeenEpochSeconds_,
+                                                   playTimeTicks_, nowEpochSeconds());
+    };
+
     const std::int32_t entityId = context_.registry != nullptr ? context_.registry->allocateEntityId() : 1;
     session_ = std::make_unique<player::PlayerSession>(joining.uuid, joining.name, entityId, std::move(connection));
     session_->x = context_.spawnX;
     session_->y = context_.spawnY;
     session_->z = context_.spawnZ;
     session_->worldName = context_.worldName;
+
+    if (context_.stored) {
+        if (const std::optional<storage::StoredPlayer> stored = context_.stored(joining.uuid); stored.has_value()) {
+            player::playerPersistence::restore(*session_, *stored);
+            firstSeenEpochSeconds_ = stored->firstSeenEpochSeconds;
+            playTimeTicks_ = stored->playTimeTicks;
+            // Only the *position* is meaningless when the stored world is gone. Health, hunger,
+            // experience and game mode are the player's, not the world's.
+            if (stored->world != context_.worldName) {
+                session_->x = context_.spawnX;
+                session_->y = context_.spawnY;
+                session_->z = context_.spawnZ;
+            } else {
+                session_->worldName = stored->world;
+            }
+            context_.logger.info([this] { return "Loaded " + session_->name() + " from players.db."; });
+        }
+    }
 
     if (context_.registry != nullptr) {
         context_.registry->add(session_.get());
@@ -233,6 +309,12 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
 BedrockPlayer::~BedrockPlayer() {
     if (session_ == nullptr) {
         return;
+    }
+    // Written before they leave the registry, so what is saved is a player who still exists.
+    if (context_.save && session_->connection().storedSnapshot) {
+        if (const std::optional<storage::StoredPlayer> row = session_->connection().storedSnapshot(); row.has_value()) {
+            context_.save(*row);
+        }
     }
     if (context_.quit) {
         context_.quit(*session_);
@@ -352,6 +434,25 @@ void BedrockPlayer::formAnswer(const std::uint32_t formId, const std::optional<s
     if (onClick) {
         onClick(slot);
     }
+}
+
+void BedrockPlayer::respawn() {
+    if (session_ == nullptr || !session_->dead) {
+        return;
+    }
+    session_->dead = false;
+    session_->setHealth(session_->maxHealth());
+    session_->food.set(player::FoodData::kMaxFood, player::FoodData::kDefaultSaturation);
+    session_->x = context_.spawnX;
+    session_->y = context_.spawnY;
+    session_->z = context_.spawnZ;
+
+    wire::io::ByteBuffer body;
+    wire::bedrock::writeRespawn(
+        body, static_cast<float>(session_->x), static_cast<float>(session_->y) + wire::bedrock::kPlayerEyeHeight,
+        static_cast<float>(session_->z), wire::bedrock::RespawnState::ServerReady, kRuntimeEntityId);
+    mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::Respawn), body.toVector());
+    session_->connection().syncHealth();
 }
 
 void BedrockPlayer::tick() {

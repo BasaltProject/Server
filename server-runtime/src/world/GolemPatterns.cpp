@@ -112,12 +112,22 @@ translateAndRotate(const std::array<std::int32_t, 3>& origin, const BlockFace fo
 }
 
 /// parity: `BlockPattern.matches`, x outermost so a pattern gives up on the first wrong column.
+/// The state a square is read as when the caller is asking what a pumpkin **would** finish.
+[[nodiscard]] std::optional<std::int32_t> pumpkinState() {
+    const registry::BlockState* block = registry::blocks::named("carved_pumpkin");
+    return block == nullptr ? std::nullopt : std::optional<std::int32_t>{block->stateId};
+}
+
 [[nodiscard]] bool matches(const WorldState& world, const Shape& shape, const std::array<std::int32_t, 3>& origin,
-                           const BlockFace forwards, const BlockFace up, const IsCopper& isCopper) {
+                           const BlockFace forwards, const BlockFace up, const IsCopper& isCopper,
+                           const std::optional<std::array<std::int32_t, 3>>& asPumpkin) {
     for (std::int32_t right = 0; right < shape.width; ++right) {
         for (std::int32_t down = 0; down < shape.height; ++down) {
             const std::array<std::int32_t, 3> at = translateAndRotate(origin, forwards, up, right, down, 0);
-            const std::optional<std::int32_t> stateId = world.blockState(at[0], at[1], at[2]);
+            // A square asked about as if it already held a pumpkin picks itself out: no other cell of
+            // any of the three patterns takes one, so a match can only be one with its head here.
+            const std::optional<std::int32_t> stateId =
+                asPumpkin.has_value() && at == *asPumpkin ? pumpkinState() : world.blockState(at[0], at[1], at[2]);
             if (!stateId.has_value()) {
                 return false;
             }
@@ -154,8 +164,9 @@ translateAndRotate(const std::array<std::int32_t, 3>& origin, const BlockFace fo
 
 } // namespace
 
-std::optional<Match> find(const WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
-                          const IsCopper& isCopper) {
+[[nodiscard]] std::optional<Match> search(const WorldState& world, const std::int32_t x, const std::int32_t y,
+                                          const std::int32_t z, const IsCopper& isCopper,
+                                          const std::optional<std::array<std::int32_t, 3>>& asPumpkin) {
     for (const Shape& shape : kShapes) {
         // parity: `BlockPattern.find` walks a cube as wide as the pattern's longest side, and only
         // towards positive x, y and z: a pumpkin is never the bottom right of what it completes.
@@ -169,7 +180,7 @@ std::optional<Match> find(const WorldState& world, const std::int32_t x, const s
                             if (up == forwards || up == registry::opposite(forwards)) {
                                 continue;
                             }
-                            if (matches(world, shape, origin, forwards, up, isCopper)) {
+                            if (matches(world, shape, origin, forwards, up, isCopper, asPumpkin)) {
                                 return matchOf(world, shape, origin, forwards, up);
                             }
                         }
@@ -179,6 +190,16 @@ std::optional<Match> find(const WorldState& world, const std::int32_t x, const s
         }
     }
     return std::nullopt;
+}
+
+std::optional<Match> find(const WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                          const IsCopper& isCopper) {
+    return search(world, x, y, z, isCopper, std::nullopt);
+}
+
+bool canComplete(const WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                 const IsCopper& isCopper) {
+    return search(world, x, y, z, isCopper, std::array<std::int32_t, 3>{x, y, z}).has_value();
 }
 
 std::string_view entityTypeOf(const Golem kind) {
