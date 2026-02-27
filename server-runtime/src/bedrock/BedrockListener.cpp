@@ -309,6 +309,24 @@ void BedrockListener::onReady(Session& session) {
     wire::bedrock::writeStartGame(body, info, session.connection.protocolVersion());
     session.connection.sendPacket(BedrockPacket::StartGame, body.readable());
 
+    // What a client is told about the world before it is told it is in it. A real client reads
+    // start_game, finds it knows nothing about what lives here, and leaves without a word.
+    body.clear();
+    wire::bedrock::writeBiomeDefinitionList(body);
+    session.connection.sendPacket(BedrockPacket::BiomeDefinitionList, body.readable());
+
+    body.clear();
+    wire::bedrock::writeAvailableEntityIdentifiers(body);
+    session.connection.sendPacket(BedrockPacket::AvailableEntityIdentifiers, body.readable());
+
+    body.clear();
+    wire::bedrock::writeCreativeContent(body);
+    session.connection.sendPacket(BedrockPacket::CreativeContent, body.readable());
+
+    body.clear();
+    wire::bedrock::writeSetCommandsEnabled(body, true);
+    session.connection.sendPacket(BedrockPacket::SetCommandsEnabled, body.readable());
+
     body.clear();
     wire::bedrock::writeChunkRadiusUpdated(body, kInitialRadius);
     session.connection.sendPacket(BedrockPacket::ChunkRadiusUpdated, body.readable());

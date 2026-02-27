@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -95,6 +96,10 @@ private:
     std::map<std::array<std::int32_t, 3>, std::map<std::string, std::string>> written_properties_;
     /// What each written position held before, for the removal half of the cascade.
     std::map<std::array<std::int32_t, 3>, std::optional<std::int32_t>> replaced_;
+    /// The squares this command **destroyed** rather than overwrote. parity: `destroy` mode goes
+    /// through `Level.destroyBlock`, whose flags carry `UPDATE_NEIGHBORS`, so those squares do get
+    /// the removal side effects that a plain `2 | 256` write never runs.
+    std::set<std::array<std::int32_t, 3>> destroyed_;
 
     const CommandEnvironment* environment_;
     world::LoadedWorld* world_;

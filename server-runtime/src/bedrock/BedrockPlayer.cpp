@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
+#include <basalt/wire/bedrock/BedrockSounds.hpp>
 #include <basalt/wire/text/MiniMessage.hpp>
 #include <basalt/wire/text/Serializers.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
@@ -185,6 +186,20 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
                                             static_cast<float>(z), false);
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::ChangeDimension), body.toVector());
         return true;
+    };
+
+    // A sound, under the name its own edition knows it by. One that Bedrock has no name for is not
+    // played rather than played wrong: a wrong sound is worse than a silent one.
+    connection.playSound = [mailbox = joining.mailbox,
+                            protocol = joining.protocol](const std::string_view sound, const double x, const double y,
+                                                         const double z, const float volume, const float pitch) {
+        const std::string_view named = wire::bedrock::bedrockSoundName(sound);
+        if (named.empty()) {
+            return;
+        }
+        wire::io::ByteBuffer body;
+        wire::bedrock::writePlaySound(body, named, x, y, z, volume, pitch, protocol);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::PlaySound), body.toVector());
     };
 
     // A block that changed under somebody's feet. Only reaches a client that already has the

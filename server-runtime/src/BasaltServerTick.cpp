@@ -138,9 +138,11 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
                 }
                 static_cast<void>(region.owner().runPending(onTaskFailure));
             });
-            // Whatever those commands killed or lit goes off now, frozen or not: this is where
-            // vanilla's own command phase sits, and neither `die()` nor `prime()` is part of the
-            // world's turn.
+            // Whatever those commands killed or lit goes off now, frozen or not.
+            //
+            // KNOWN GAP, not parity: vanilla runs queued tasks after `processPacketsAndTick`, so a
+            // console command lands after the world's turn, and `tickDeath` and a primed tnt are
+            // ordinary entity ticks there. Moving this needs its own measurement first.
             tickDeaths(world, region);
             tickPrimedTnt(world);
             if (!worldRuns) {

@@ -91,13 +91,17 @@ struct Reach {
 
 [[nodiscard]] std::vector<Reach> outputReach(std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z);
 
-/// The squares a block that has just gone tells on top of its own six.
-///
-/// parity: `BaseRailBlock.affectNeighborsAfterRemoval`, which reaches one square past itself (a
-/// slope tells the square above it, and a powered, detector or activator rail tells its own square
-/// and the one below; a plain flat rail tells nothing extra), and `LecternBlock`'s, which tells the
-/// square under a lectern that was still powered.
+/// The squares a block that has just gone tells on top of its own six. parity:
+/// `BaseRailBlock.affectNeighborsAfterRemoval` reaches one square past itself, and `LecternBlock`'s
+/// tells the square under a lectern that was still powered.
 [[nodiscard]] std::vector<Reach> removalReach(std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z);
+
+/// Whether the block that just left answers its removal with `Containers.updateNeighboursAfterDestroy`.
+///
+/// parity: thirteen containers do, and the call carries the state that **went**, which is the only
+/// thing that reaches a comparator sitting one square past a block that conducts. `Level.setBlock`
+/// makes the same call looking at the state that arrived, and air is not read by anybody.
+[[nodiscard]] bool tellsComparatorsOnRemoval(std::int32_t stateId);
 
 /// The turn every component on and around the square a diode feeds books, less the way back to the
 /// diode itself. parity: `DiodeBlock.updateNeighborsInFront`, which is a `neighborChanged` on that

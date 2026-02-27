@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
@@ -374,19 +375,11 @@ public:
 
     void sound(std::string_view sound, float volume, float pitch) override {
         player::PlayerSession* player = session();
-        if (player == nullptr || !player->connection().sendPlayPacket) {
+        if (player == nullptr) {
             return;
         }
-        const play::SoundPacket packet{.sound = std::string{sound},
-                                       .source = play::SoundSource::Master,
-                                       .x = player->x,
-                                       .y = player->y,
-                                       .z = player->z,
-                                       .volume = volume,
-                                       .pitch = pitch,
-                                       .seed = 0};
-        player->connection().sendPlayPacket(play::SoundPacket::kId,
-                                            [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+        player::playSoundFor(*player, sound, play::SoundSource::Master, player->x, player->y, player->z, volume, pitch,
+                             0);
     }
 
     void particle(std::string_view particle, double x, double y, double z, std::int32_t count, double spread) override {
