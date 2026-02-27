@@ -71,6 +71,9 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
 
 /// parity: `ObserverBlock.onPlace` only reaches out for one that arrives **powered**, and one that
 /// arrives powered clears itself first, so an observer that has just landed tells nobody from here.
+/// Measured in `observadorllegapuesto`: one written `powered=true` ends up `powered=false`, and one
+/// written `powered=false` still pulses, because the command's own shape pass hands it a change on
+/// the side it is watching.
 [[nodiscard]] bool isObserverState(const std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     return block != nullptr && block->path() == "observer";
