@@ -173,11 +173,39 @@ std::expected<BasaltConfig, std::string> BasaltConfig::fromToml(const TomlTable&
     const TomlTable* plugins = root.table("plugins");
 
     if (server != nullptr) {
-        config.port = static_cast<std::int32_t>(server->integer("port").value_or(defaults.port));
+        // The port sat here until the two editions each got their own door. Said out loud rather
+        // than ignored: a server that quietly went back to 25565 is a server nobody can reach.
+        if (server->find("port") != nullptr) {
+            return std::unexpected(std::string{path} + ": `port` moved to [network.java], beside the Bedrock one");
+        }
         config.maxPlayers = static_cast<std::int32_t>(server->integer("max-players").value_or(defaults.maxPlayers));
         config.onlineMode = server->boolean("online-mode").value_or(defaults.onlineMode);
         config.gamemode = std::string{server->string("gamemode").value_or(defaults.gamemode)};
         config.whitelist = server->boolean("whitelist").value_or(defaults.whitelist);
+    }
+
+    // The two doors, side by side: neither edition is a layer on top of the other.
+    if (const TomlTable* network = root.table("network"); network != nullptr) {
+        if (const TomlTable* java = network->table("java"); java != nullptr) {
+            config.javaEnabled = java->boolean("enabled").value_or(defaults.javaEnabled);
+            const std::optional<std::int64_t> port = java->integer("port");
+            if (port.has_value() && (*port < 1 || *port > 65535)) {
+                return std::unexpected(std::string{path} + ": the java port must be between 1 and 65535");
+            }
+            config.port = static_cast<std::int32_t>(port.value_or(defaults.port));
+        }
+        if (const TomlTable* bedrock = network->table("bedrock"); bedrock != nullptr) {
+            config.bedrockEnabled = bedrock->boolean("enabled").value_or(defaults.bedrockEnabled);
+            const std::optional<std::int64_t> port = bedrock->integer("port");
+            if (port.has_value() && (*port < 1 || *port > 65535)) {
+                return std::unexpected(std::string{path} + ": the bedrock port must be between 1 and 65535");
+            }
+            config.bedrockPort = static_cast<std::int32_t>(port.value_or(defaults.bedrockPort));
+            config.bedrockPrefix = std::string{bedrock->string("prefix").value_or(defaults.bedrockPrefix)};
+        }
+    }
+    if (!config.javaEnabled && !config.bedrockEnabled) {
+        return std::unexpected(std::string{path} + ": both editions are off, so nobody can join at all");
     }
 
     std::expected<wire::auth::forwarding::ProxyForwarding, std::string> forwarding =

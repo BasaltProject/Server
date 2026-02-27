@@ -256,6 +256,13 @@ public:
     /// The player this connection is carrying, or nothing before they have logged in.
     [[nodiscard]] player::PlayerSession* playerSession() const noexcept { return playerSession_.get(); }
 
+    /// Hands this player over to whoever will let go of them. Called on the way out: the thread
+    /// that ends a connection is not the thread that walks the list of players, so the object
+    /// cannot simply die here.
+    [[nodiscard]] std::unique_ptr<player::PlayerSession> takePlayerSession() noexcept {
+        return std::move(playerSession_);
+    }
+
     [[nodiscard]] world::LoadedWorld* currentWorld() const noexcept { return currentWorld_; }
 
     /// The world's blocks. Only valid once the player is in one.

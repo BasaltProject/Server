@@ -25,15 +25,10 @@ struct BackwardsSelection {
 
 /// The Bedrock half of the same file. A server accepts both editions out of the box, so every
 /// value here has an answer that needs no editing.
+/// What versions of the other edition may in. Which port it listens on and what a Bedrock player
+/// is called live in `server.toml`, under `[network.bedrock]`: those are the door, and this file is
+/// only about who is old enough to come through it.
 struct BedrockSettings {
-    bool enabled = true;
-    std::uint16_t port = 19132;
-
-    /// What goes in front of a Bedrock player's name. Empty is what a server with only Bedrock
-    /// players writes, and it is a real choice: two accounts of different editions with the same
-    /// name are then two players called the same thing.
-    std::string prefix = ".";
-
     /// Which Bedrock protocols may in. Absent means all of them this build speaks, which is what
     /// makes updating the server add versions without editing this file.
     std::optional<std::set<std::int32_t>> protocols;
@@ -42,10 +37,14 @@ struct BedrockSettings {
     wire::bedrock::BedrockFuturePolicy futureProtocols = wire::bedrock::BedrockFuturePolicy::Warn;
 };
 
-/// `config/compatibility.toml`.
+/// How old a client of either edition may be, read from `config/server.toml`.
+///
+/// It lived in a file of its own while Bedrock was something bolted on the side. It is not: the two
+/// editions are two doors into the same server, so each one's port and each one's answer to this
+/// question sit together, under `[network.java]` and `[network.bedrock]`.
 class CompatibilityConfig {
 public:
-    static constexpr std::string_view kFileName = "compatibility.toml";
+    static constexpr std::string_view kFileName = "server.toml";
 
     CompatibilityConfig(BackwardsSelection backwards, wire::multiversion::UnknownProtocolPolicy futureProtocols,
                         wire::multiversion::UnknownProtocolPolicy snapshots, bool nameSubstitutes = true,

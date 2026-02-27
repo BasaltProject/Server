@@ -96,6 +96,10 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             });
     }
 
+    // Between turns, where nothing this thread handed out is still being walked: what a player who
+    // left leaves behind is let go here and nowhere else.
+    playerRegistry_.collect();
+
     // Where each player's packets go is decided here, between turns: no region is running, so
     // handing a session that walked across a border to its new owner cannot land two threads inside
     // the same player.

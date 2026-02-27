@@ -19,25 +19,9 @@ constexpr std::int64_t kDayTicks = 24000;
 constexpr std::int64_t kNoon = 6000;
 constexpr float kDegrees = 360.0F;
 
-/// parity: `updateSkyBrightness`, which in 26.2 is `15 - EnvironmentAttributes.SKY_LIGHT_LEVEL` and is
-/// no longer written as a formula: it comes off a track with keyframes at 133, 11867, 13670 and 22330.
-/// The sum here lands on the same numbers at both ends, and at night both sides answer eleven,
-/// checked against the jar. Rain and thunder each take five sixteenths off the daylight.
-constexpr double kRainShare = 1.0 - (5.0 / 16.0);
-constexpr double kDarkenRange = 11.0;
-
-/// The curved fraction of the day everything else reads. parity: 26.2 moved this off
-/// `DimensionType.timeOfDay` onto the `SUN_ANGLE` timeline track, eased with
-/// `symmetricCubicBezier(0.362, 0.241)`. Walked against each other over a day, a detector's power
-/// differs on 86 ticks out of 24000 and never by more than one.
-[[nodiscard]] float timeOfDay(const WorldClock& clock) {
-    const float dayTime = static_cast<float>(clock.totalTicks() % kDayTicks) / static_cast<float>(kDayTicks);
-    float fraction = dayTime - 0.25F;
-    if (fraction < 0.0F) {
-        fraction += 1.0F;
-    }
-    return fraction + (1.0F - ((std::cos(fraction * std::numbers::pi_v<float>) + 1.0F) / 2.0F) - fraction) / 3.0F;
-}
+/// parity: rain and thunder each take five sixteenths off the sky light, and they multiply it the
+/// same way every modifier on that attribute does.
+constexpr float kRainShare = 1.0F - (5.0F / 16.0F);
 
 /// One of the two cubic curves a `EasingType.CubicBezier` is made of.
 struct CubicCurve {
@@ -112,6 +96,38 @@ constexpr std::int32_t kEaseIterations = 4;
     return skyEase(alpha) * kDegrees;
 }
 
+/// The share of the full sky light the time of day allows. parity: 26.2 put this on a
+/// `FloatModifier.MULTIPLY` track with four keyframes and no easing, so it is linear. `bakeSegments`
+/// wraps the ends, leaving two ramps of 1803 ticks: one down from 11867 and one up from 22330
+/// through midnight. Fifteen times 0.26666668 is the four of `NIGHT_SKY_LIGHT_LEVEL`.
+constexpr float kNightShare = 0.26666668F;
+constexpr std::int64_t kDuskStart = 11867;
+constexpr std::int64_t kDuskEnd = 13670;
+constexpr std::int64_t kDawnStart = 22330;
+constexpr std::int64_t kDawnEnd = 133;
+constexpr float kRampTicks = 1803.0F;
+
+[[nodiscard]] float skyLightShare(const WorldClock& clock) {
+    const std::int64_t looped = ((clock.totalTicks() % kDayTicks) + kDayTicks) % kDayTicks;
+    if (looped < kDawnEnd) {
+        // The tail of the ramp that started at 22330 and crosses midnight.
+        const float alpha = static_cast<float>(looped + (kDayTicks - kDawnStart)) / kRampTicks;
+        return wire::common::mth::lerp(alpha, kNightShare, 1.0F);
+    }
+    if (looped < kDuskStart) {
+        return 1.0F;
+    }
+    if (looped < kDuskEnd) {
+        const float alpha = static_cast<float>(looped - kDuskStart) / kRampTicks;
+        return wire::common::mth::lerp(alpha, 1.0F, kNightShare);
+    }
+    if (looped < kDawnStart) {
+        return kNightShare;
+    }
+    const float alpha = static_cast<float>(looped - kDawnStart) / kRampTicks;
+    return wire::common::mth::lerp(alpha, kNightShare, 1.0F);
+}
+
 /// parity: `Math.round(float)`, which is `floor(x + 0.5)` and not the away-from-zero rounding of
 /// `lround`: the two differ on every negative half.
 [[nodiscard]] std::int32_t roundLikeJava(float value) {
@@ -128,13 +144,14 @@ constexpr std::int32_t kEaseIterations = 4;
 } // namespace
 
 std::int32_t skyDarken(const WorldClock& clock, const WorldWeather& weather) {
-    const double rain = weather.raining ? kRainShare : 1.0;
-    const double thunder = weather.thundering ? kRainShare : 1.0;
-    // The fraction is worked out in float, as vanilla does, and widened once here rather than by
-    // the multiplication: an implicit promotion is what the build refuses.
-    const double fraction = static_cast<double>(timeOfDay(clock));
-    const double curve = 0.5 + (2.0 * std::clamp(std::cos(fraction * 2.0 * std::numbers::pi), -0.25, 0.25));
-    return static_cast<std::int32_t>((1.0 - (curve * rain * thunder)) * kDarkenRange);
+    const float rain = weather.raining ? kRainShare : 1.0F;
+    const float thunder = weather.thundering ? kRainShare : 1.0F;
+    // parity: `Level.tickTime` writes
+    // `skyDarken = (int)(15.0F - environmentAttributes().getDimensionValue(SKY_LIGHT_LEVEL))`, and
+    // that `(int)` truncates towards zero. The weather keeps multiplying the share, which is the
+    // shape of every modifier on this attribute.
+    const float share = skyLightShare(clock) * rain * thunder;
+    return static_cast<std::int32_t>(static_cast<float>(kMax) - (static_cast<float>(kMax) * share));
 }
 
 std::int32_t signalFor(WorldState& world, const WorldClock& clock, const WorldWeather& weather, std::int32_t x,

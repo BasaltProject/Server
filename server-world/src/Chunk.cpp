@@ -145,14 +145,16 @@ void Chunk::removeBlockEntityAt(std::int32_t x, std::int32_t y, std::int32_t z) 
     }
 }
 
-const Chunk::PackedLight& Chunk::skyLight(const std::function<PackedLight()>& compute) {
+Chunk::PackedLight Chunk::skyLight(const std::function<PackedLight()>& compute) {
+    const std::lock_guard<std::mutex> guard{*lightLock_};
     if (!skyLight_.has_value()) {
         skyLight_ = compute();
     }
     return *skyLight_;
 }
 
-const Chunk::PackedLight& Chunk::blockLight(const std::function<PackedLight()>& compute) {
+Chunk::PackedLight Chunk::blockLight(const std::function<PackedLight()>& compute) {
+    const std::lock_guard<std::mutex> guard{*lightLock_};
     if (!blockLight_.has_value()) {
         blockLight_ = compute();
     }
@@ -164,6 +166,7 @@ const Chunk::PackedLight* Chunk::cachedSkyLight() const { return skyLight_.has_v
 const Chunk::PackedLight* Chunk::cachedBlockLight() const { return blockLight_.has_value() ? &*blockLight_ : nullptr; }
 
 void Chunk::invalidateLight() {
+    const std::lock_guard<std::mutex> guard{*lightLock_};
     skyLight_.reset();
     blockLight_.reset();
 }

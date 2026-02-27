@@ -6,8 +6,6 @@
 # in for where an option went.
 
 [server]
-# Port the server listens on.
-port = 25565
 # How many players can be connected at once. Vanilla ships 20; this ships 80,
 # because 20 is a number from 2010 and nothing in the server cares. What the list
 # *shows* is a separate thing, in server_list.toml, since a profile can advertise
@@ -25,6 +23,76 @@ whitelist = false
 
 [network]
 # Reserved for future network tuning (compression threshold, rate limits).
+
+# The two editions are two doors into the same server: the same worlds, the same
+# players, the same chat. Neither is a layer on top of the other, so each one has
+# its own table here with its own port and its own answer to "how old a client
+# may be".
+
+[network.java]
+# Whether Java Edition clients are let in at all. Off makes this a Bedrock-only
+# server, which is a real thing to want; both off is refused, because then
+# nobody can join.
+enabled = true
+# Port the server listens on.
+port = 25565
+
+# Versions this server translates. "all" is everything this build knows how to
+# do, so updating the server adds versions without editing this file. A list of
+# protocol numbers fixes it to those: backwards = [775, 774].
+# An empty list leaves only the native version.
+backwards = "all"
+
+# A client newer than this server: "accept" lets it in, "warn" lets it in and
+# says so in the log, "refuse" turns it away with an explanation.
+#
+# It is "refuse" because a newer client cannot finish joining: measured between
+# 26.2 and the first 26.3 snapshot, ten packets of the configuration phase moved
+# and every block state number changed. Letting it in means it disconnects
+# halfway through with a decoding error instead of reading why. "accept" is
+# there for whoever wants to try their luck the day a version lands.
+future-protocols = "refuse"
+
+# Snapshots are recognised on their own (bit 30 of the protocol number) and get
+# their own answer, because a development version changes from one day to
+# the next.
+snapshots = "refuse"
+
+# What to do about content this server has and the client's version never had.
+#
+# It is shown something similar instead, which is all that client can draw. With
+# this on, what stands in is also renamed to what it really is, so a 26.2 block
+# reads "Cinnabar (26.2)" in the inventory rather than "Red Sandstone". An item
+# somebody named themselves keeps that name.
+name-substitutes = true
+
+[network.bedrock]
+# Minecraft Bedrock clients (phone, console, Windows). On by default: nobody
+# should have to configure being able to join.
+enabled = true
+# Bedrock speaks its own protocol over UDP, so it needs a port of its own. 19132
+# is the one every Bedrock client tries first.
+port = 19132
+# What goes in front of a Bedrock player's name inside the server, so a Steve
+# from each edition is two people and not one. Set it to "" on a server where
+# only Bedrock players join, and then two accounts with the same name are two
+# players shown with the same name.
+prefix = "."
+# Which Bedrock protocols may in. "all" is everything this build speaks, so
+# updating the server adds versions without editing this file. A list fixes it
+# to those: protocols = [2168].
+#
+# Bedrock has no launcher to pick a version in, so nobody is on an old one on
+# purpose: the window is the handful of protocols that devices are still being
+# updated from, and what falls out of it is retired rather than kept for ever.
+protocols = "all"
+
+# A Bedrock client newer than anything this server speaks. Bedrock updates
+# itself and will not let anyone stay behind, so the day a version lands half
+# the players are locked out until the server is updated. "warn" lets them in
+# and says so, "accept" lets them in quietly, "refuse" turns them away with the
+# screen that offers to update the server instead.
+future-protocols = "warn"
 
 # A proxy in front of this server (BungeeCord, Waterfall, Velocity, Gate) connects
 # on behalf of every player, so without forwarding the whole server sees one address

@@ -55,7 +55,7 @@ private:
 
 [[nodiscard]] CompatibilityConfig compatibility(std::string_view name, std::string_view contents) {
     const std::expected<CompatibilityConfig, std::string> config =
-        CompatibilityConfig::load(written(name, "compatibility.toml", contents));
+        CompatibilityConfig::load(written(name, "server.toml", contents));
     REQUIRE(config.has_value());
     return *config;
 }
@@ -75,7 +75,7 @@ private:
 } // namespace
 
 TEST_CASE("the commented default lets old clients in and keeps new ones out") {
-    const CompatibilityConfig config = compatibility("compat-default", kCompatibilityDefaultToml);
+    const CompatibilityConfig config = compatibility("compat-default", kServerDefaultToml);
     CHECK(config.backwards().all);
     // A newer client cannot finish joining, so it is turned away with an explanation rather than
     // let in to disconnect halfway through with a decoding error.
@@ -85,7 +85,7 @@ TEST_CASE("the commented default lets old clients in and keeps new ones out") {
 }
 
 TEST_CASE("what the door is built from is what this build can actually translate") {
-    const CompatibilityConfig all = compatibility("compat-all", "[java]\nbackwards = \"all\"\n");
+    const CompatibilityConfig all = compatibility("compat-all", "[network.java]\nbackwards = \"all\"\n");
     const std::set<std::int32_t> translatable{765, 766};
     const multiversion::ProtocolGate gate = all.gate(translatable);
     CHECK(accepts(gate, versions::kNative));
@@ -95,7 +95,7 @@ TEST_CASE("what the door is built from is what this build can actually translate
 
     // A list is exactly the list, plus the native version, which is never off: a server its own
     // clients cannot join is not a configuration anybody meant to write.
-    const CompatibilityConfig some = compatibility("compat-list", "[java]\nbackwards = [765]\n");
+    const CompatibilityConfig some = compatibility("compat-list", "[network.java]\nbackwards = [765]\n");
     CHECK_FALSE(some.backwards().all);
     CHECK(some.backwards().protocols == std::set<std::int32_t>{765});
     const multiversion::ProtocolGate chosen = some.gate(translatable);
@@ -104,10 +104,10 @@ TEST_CASE("what the door is built from is what this build can actually translate
     CHECK(accepts(chosen, versions::kNative));
 
     // However it was written: the word is a word, not a spelling.
-    CHECK(compatibility("compat-caps", "[java]\nbackwards = \"  ALL  \"\n").backwards().all);
+    CHECK(compatibility("compat-caps", "[network.java]\nbackwards = \"  ALL  \"\n").backwards().all);
 
     // An empty list is not "all": it is somebody saying only the native version.
-    const CompatibilityConfig none = compatibility("compat-empty", "[java]\nbackwards = []\n");
+    const CompatibilityConfig none = compatibility("compat-empty", "[network.java]\nbackwards = []\n");
     CHECK_FALSE(none.backwards().all);
     const multiversion::ProtocolGate bare = none.gate(translatable);
     CHECK(accepts(bare, versions::kNative));
@@ -115,7 +115,7 @@ TEST_CASE("what the door is built from is what this build can actually translate
 }
 
 TEST_CASE("asking for a version this build cannot translate is said out loud, not silently dropped") {
-    const CompatibilityConfig config = compatibility("compat-missing", "[java]\nbackwards = [765, 1]\n");
+    const CompatibilityConfig config = compatibility("compat-missing", "[network.java]\nbackwards = [765, 1]\n");
     const CapturedLog log;
     const multiversion::ProtocolGate gate = config.gate({765});
     CHECK(accepts(gate, 765));
@@ -124,7 +124,7 @@ TEST_CASE("asking for a version this build cannot translate is said out loud, no
 }
 
 TEST_CASE("a list this build covers entirely is not warned about") {
-    const CompatibilityConfig config = compatibility("compat-covered", "[java]\nbackwards = [765, 766]\n");
+    const CompatibilityConfig config = compatibility("compat-covered", "[network.java]\nbackwards = [765, 766]\n");
     const CapturedLog log;
     const multiversion::ProtocolGate gate = config.gate({765, 766});
     CHECK(accepts(gate, 765));
@@ -134,19 +134,19 @@ TEST_CASE("a list this build covers entirely is not warned about") {
 
 TEST_CASE("a word that is neither a policy nor a list stops the server") {
     const std::expected<CompatibilityConfig, std::string> word =
-        CompatibilityConfig::load(written("compat-word", "compatibility.toml", "[java]\nbackwards = \"none\"\n"));
+        CompatibilityConfig::load(written("compat-word", "server.toml", "[network.java]\nbackwards = \"none\"\n"));
     REQUIRE_FALSE(word.has_value());
     // "none" and "775" are both someone meaning something specific, and reading either as "all"
     // is the worst answer available.
     CHECK(word.error().ends_with(": backwards must be \"all\" or a list of protocol numbers"));
 
     const std::expected<CompatibilityConfig, std::string> policy = CompatibilityConfig::load(
-        written("compat-policy", "compatibility.toml", "[java]\nfuture-protocols = \"maybe\"\n"));
+        written("compat-policy", "server.toml", "[network.java]\nfuture-protocols = \"maybe\"\n"));
     REQUIRE_FALSE(policy.has_value());
     CHECK(policy.error().ends_with(": future-protocols must be accept, warn or refuse, not \"maybe\""));
 
     const std::expected<CompatibilityConfig, std::string> snapshots = CompatibilityConfig::load(
-        written("compat-snapshots", "compatibility.toml", "[java]\nsnapshots = \"sometimes\"\n"));
+        written("compat-snapshots", "server.toml", "[network.java]\nsnapshots = \"sometimes\"\n"));
     REQUIRE_FALSE(snapshots.has_value());
     CHECK(snapshots.error().ends_with(": snapshots must be accept, warn or refuse, not \"sometimes\""));
 }
@@ -159,52 +159,37 @@ TEST_CASE("a file with nothing in it is every default") {
     CHECK(config.nameSubstitutes());
 
     // A `[java]` table that says nothing is the same as no table at all.
-    const CompatibilityConfig bare = compatibility("compat-empty-java", "[java]\n");
+    const CompatibilityConfig bare = compatibility("compat-empty-java", "[network.java]\n");
     CHECK(bare.backwards().all);
     CHECK(bare.nameSubstitutes());
     CHECK(bare.futureProtocols() == multiversion::UnknownProtocolPolicy::Refuse);
 
     const CompatibilityConfig accepting =
-        compatibility("compat-accept", "[java]\nfuture-protocols = \"accept\"\nsnapshots = \"warn\"\n"
+        compatibility("compat-accept", "[network.java]\nfuture-protocols = \"accept\"\nsnapshots = \"warn\"\n"
                                        "name-substitutes = false\n");
     CHECK(accepting.futureProtocols() == multiversion::UnknownProtocolPolicy::Accept);
     CHECK(accepting.snapshots() == multiversion::UnknownProtocolPolicy::Warn);
     CHECK_FALSE(accepting.nameSubstitutes());
 }
 
-TEST_CASE("bedrock is on with nothing written, and off only when somebody says so") {
+TEST_CASE("which bedrock versions may in, which is all of them unless somebody says otherwise") {
     const CompatibilityConfig defaults = compatibility("compat-bedrock-default", "# nothing\n");
-    CHECK(defaults.bedrock().enabled);
-    CHECK(defaults.bedrock().port == 19132);
-    CHECK(defaults.bedrock().prefix == ".");
-
-    const CompatibilityConfig chosen =
-        compatibility("compat-bedrock-written", "[bedrock]\nenabled = false\nport = 19200\nprefix = \"\"\n");
-    CHECK_FALSE(chosen.bedrock().enabled);
-    CHECK(chosen.bedrock().port == 19200);
-    CHECK(chosen.bedrock().prefix.empty());
 
     // The window of live protocols, and what happens past its top end.
     CHECK_FALSE(defaults.bedrock().protocols.has_value());
     CHECK(defaults.bedrock().futureProtocols == basalt::wire::bedrock::BedrockFuturePolicy::Warn);
 
     const CompatibilityConfig window =
-        compatibility("compat-bedrock-window", "[bedrock]\nprotocols = [2168]\nfuture-protocols = \"refuse\"\n");
+        compatibility("compat-bedrock-window", "[network.bedrock]\nprotocols = [2168]\nfuture-protocols = \"refuse\"\n");
     REQUIRE(window.bedrock().protocols.has_value());
     CHECK(window.bedrock().protocols->contains(2168));
     CHECK(window.bedrock().futureProtocols == basalt::wire::bedrock::BedrockFuturePolicy::Refuse);
 
     const auto badPolicy = CompatibilityConfig::load(
-        written("compat-bedrock-policy", "compatibility.toml", "[bedrock]\nfuture-protocols = \"maybe\"\n"));
+        written("compat-bedrock-policy", "server.toml", "[network.bedrock]\nfuture-protocols = \"maybe\"\n"));
     REQUIRE_FALSE(badPolicy.has_value());
     CHECK(badPolicy.error().find("accept, warn or refuse") != std::string::npos);
 
-    // A port outside what a port can be is the operator meaning something, and it is said rather
-    // than rounded into range.
-    const auto refused =
-        CompatibilityConfig::load(written("compat-bedrock-port", "compatibility.toml", "[bedrock]\nport = 70000\n"));
-    REQUIRE_FALSE(refused.has_value());
-    CHECK(refused.error().find("between 1 and 65535") != std::string::npos);
 }
 
 TEST_CASE("a command nobody configured is a command with nothing changed") {

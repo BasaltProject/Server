@@ -43,21 +43,25 @@ using server::world::light::SectionLight;
     // Rebuilding it per query cost eleven microseconds a time, and the grass alone asks for it
     // thousands of times a tick: it was most of a tick on its own.
     const Chunk::PackedLight* cached = sky ? chunk->cachedSkyLight() : chunk->cachedBlockLight();
+    // Held only when it had to be worked out here: what the chunk already had is read where it
+    // lies, which is what keeps this cheap enough to ask thousands of times a tick.
+    Chunk::PackedLight computedHere;
     if (cached == nullptr) {
         const LightWindow::Neighbours neighbours = [&world](std::int32_t chunkX, std::int32_t chunkZ) {
             return world.chunkIfLoaded(chunkX, chunkZ);
         };
         if (sky) {
-            cached = &chunk->skyLight([chunk, &neighbours] {
+            computedHere = chunk->skyLight([chunk, &neighbours] {
                 return packAll(server::world::light::skyLight::compute(LightWindow{*chunk, neighbours}));
             });
         } else {
-            cached = &chunk->blockLight([chunk, &neighbours] {
+            computedHere = chunk->blockLight([chunk, &neighbours] {
                 const std::optional<std::vector<SectionLight>> computed =
                     server::world::light::blockLight::compute(LightWindow{*chunk, neighbours});
                 return computed.has_value() ? packAll(*computed) : Chunk::PackedLight{};
             });
         }
+        cached = &computedHere;
     }
 
     const std::size_t section = static_cast<std::size_t>((y - chunk->verticalBounds().minY()) >> 4);

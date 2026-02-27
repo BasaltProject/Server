@@ -121,6 +121,14 @@ void scheduleCreakingHeart(WorldState& world, std::int32_t x, std::int32_t y, st
                                                             std::int32_t z, const IsPaleOakLog& isPaleOakLog,
                                                             bool creakingActive);
 
+/// Whether the creaking is awake, which is not the same window as being able to sleep.
+///
+/// parity: `EnvironmentAttributes.CREAKING_ACTIVE` is a timeline track,
+/// `addKeyframe(12600, true).addKeyframe(23401, false)`, and those are the `nightStart` and
+/// `nightEnd` of `Timelines.bootstrap`. A bed's own window is 12542 to 23459, fifty-eight ticks wider
+/// at each end, so reading one for the other put the heart in the wrong state on 116 ticks a day.
+[[nodiscard]] bool creakingIsActive(std::int64_t timeOfDay);
+
 /// What `SpeleothemBlock.tick` decides: nothing, a stalagmite broken where it stands, or a whole
 /// stalactite coming down as entities.
 struct SpeleothemTurn {

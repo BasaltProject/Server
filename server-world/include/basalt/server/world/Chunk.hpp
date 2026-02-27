@@ -9,6 +9,8 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <memory>
+#include <mutex>
 #include <optional>
 #include <span>
 #include <vector>
@@ -119,10 +121,16 @@ public:
     /// nothing is known yet, and `invalidateLight` throws it away as soon as the missing neighbour
     /// arrives. Not keeping it meant recomputing the whole chunk on *every* query at the edge of the
     /// loaded area, which cost over two milliseconds a time.
-    const PackedLight& skyLight(const std::function<PackedLight()>& compute);
+    ///
+    /// A copy, not a reference into what is kept: the thread sending a chunk is not the thread that
+    /// writes blocks, and a reference to the cache stays valid only until the next block moves.
+    /// Measured with the sanitiser, that was a read of freed memory in the middle of encoding a
+    /// chunk. Copying a chunk's packed light is a few tens of kilobytes against sending the whole
+    /// column, which is the next thing that happens to it.
+    [[nodiscard]] PackedLight skyLight(const std::function<PackedLight()>& compute);
 
     /// The same for the light the blocks themselves give off.
-    const PackedLight& blockLight(const std::function<PackedLight()>& compute);
+    [[nodiscard]] PackedLight blockLight(const std::function<PackedLight()>& compute);
 
     /// The light this chunk has already worked out, or null when nobody has asked yet.
     ///
@@ -342,6 +350,10 @@ private:
     std::function<void(std::int32_t, std::int32_t, std::int32_t, std::int32_t, std::int32_t)> blockWriteObserver_;
     std::function<std::optional<std::int32_t>(std::int32_t, std::int32_t, std::int32_t)> externalDecorationState_;
     GeneratedBlockWritePolicy generatedBlockWritePolicy_ = GeneratedBlockWritePolicy::Exact;
+    /// Guards the two below, which the thread sending a chunk reads and the thread writing blocks
+    /// throws away. Behind a pointer because a chunk is moved (out of a generator, into the map)
+    /// and a lock is not movable; the pointer is, and a moved-from chunk is nobody's.
+    std::unique_ptr<std::mutex> lightLock_ = std::make_unique<std::mutex>();
     std::optional<PackedLight> skyLight_;
     std::optional<PackedLight> blockLight_;
     bool dirty_ = false;

@@ -43,9 +43,11 @@ TEST_CASE("a missing file is written from its commented default and then read") 
     CHECK(*written == kServerDefaultToml);
     CHECK(written->find('#') != std::string::npos);
 
-    const toml::TomlTable* server = loaded->table("server");
-    REQUIRE(server != nullptr);
-    REQUIRE(server->find("port") != nullptr);
+    const toml::TomlTable* network = loaded->table("network");
+    REQUIRE(network != nullptr);
+    const toml::TomlTable* java = network->table("java");
+    REQUIRE(java != nullptr);
+    REQUIRE(java->find("port") != nullptr);
 }
 
 TEST_CASE("a file that is already there is not overwritten by the default") {
@@ -82,8 +84,8 @@ TEST_CASE("every commented default is valid TOML") {
     // somebody's first run. Here instead.
     const std::vector<std::pair<std::string, std::string_view>> templates = {
         {"animations.toml", kAnimationsDefaultToml}, {"boss_bar.toml", kBossBarDefaultToml},
-        {"commands.toml", kCommandsDefaultToml},     {"compatibility.toml", kCompatibilityDefaultToml},
-        {"groups.toml", kGroupsDefaultToml},         {"scoreboard.toml", kScoreboardDefaultToml},
+        {"commands.toml", kCommandsDefaultToml},     {"groups.toml", kGroupsDefaultToml},
+        {"scoreboard.toml", kScoreboardDefaultToml},
         {"server.toml", kServerDefaultToml},         {"server_list.toml", kServerListDefaultToml},
         {"tab_list.toml", kTabListDefaultToml},      {"world_settings.toml", kWorldSettingsDefaultToml},
         {"worlds.toml", kWorldsDefaultToml},
