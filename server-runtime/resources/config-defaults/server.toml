@@ -11,19 +11,20 @@
 # *shows* is a separate thing, in server_list.toml, since a profile can advertise
 # whatever it likes without changing who actually gets in.
 max-players = 80
+
 # Verify players against Mojang's session server. Disabling this accepts any
 # claimed username with no verification (vanilla's "cracked" mode).
 online-mode = true
+
 # Game mode new players join in: survival, creative, adventure or spectator.
 gamemode = "survival"
+
 # Only let players on the whitelist in. Who is on it is state, not configuration:
 # it lives in players.db and is edited with /whitelist add and /whitelist remove.
 # /whitelist on and off move this for the run; a restart follows this file again.
 whitelist = false
 
 [network]
-# Reserved for future network tuning (compression threshold, rate limits).
-
 # The two editions are two doors into the same server: the same worlds, the same
 # players, the same chat. Neither is a layer on top of the other, so each one has
 # its own table here with its own port and its own answer to "how old a client
@@ -34,6 +35,7 @@ whitelist = false
 # server, which is a real thing to want; both off is refused, because then
 # nobody can join.
 enabled = true
+
 # Port the server listens on.
 port = 25565
 
@@ -70,14 +72,17 @@ name-substitutes = true
 # Minecraft Bedrock clients (phone, console, Windows). On by default: nobody
 # should have to configure being able to join.
 enabled = true
+
 # Bedrock speaks its own protocol over UDP, so it needs a port of its own. 19132
 # is the one every Bedrock client tries first.
 port = 19132
+
 # What goes in front of a Bedrock player's name inside the server, so a Steve
 # from each edition is two people and not one. Set it to "" on a server where
 # only Bedrock players join, and then two accounts with the same name are two
 # players shown with the same name.
 prefix = "."
+
 # Which Bedrock protocols may in. "all" is everything this build speaks, so
 # updating the server adds versions without editing this file. A list fixes it
 # to those: protocols = [2168].
@@ -181,11 +186,14 @@ orphan-data = "warn"
 [logging]
 # One of: trace, debug, info, warn, error.
 level = "info"
+
 # Mirror everything the console shows into .basalt/logs/latest.log, archiving the
 # previous run as .basalt/logs/archive/<date>-<n>.log.gz on every start.
 file = true
+
 # How many days of archived logs to keep. 0 keeps them forever.
 keep-days = 14
+
 # Colour the console output. One of: auto, always, never. "auto" colours only when
 # writing to a terminal, so redirected output and log files stay clean.
 color = "auto"

@@ -117,23 +117,34 @@ TEST_CASE("an inverted detector is the other way round and skips the curve") {
 
 TEST_CASE("rain and thunder each take their share of the daylight") {
     const WorldClock noon = at(6000);
+    const WorldClock midnight = at(18000);
     WorldWeather clear;
     WorldWeather raining;
     raining.raining = true;
+    raining.setRainLevel(1.0F);
     WorldWeather storm;
     storm.raining = true;
     storm.thundering = true;
+    storm.setRainLevel(1.0F);
+    storm.setThunderLevel(1.0F);
 
-    // parity: `updateSkyBrightness` takes five sixteenths per weather, so a storm is darker than
-    // rain and rain is darker than a clear sky.
+    // parity: `WeatherAttributes` blends `SKY_LIGHT_LEVEL` towards four with `ALPHA_BLEND`, so at
+    // noon fifteen becomes 11.5625 under rain and 9.19921875 under a storm. The storm takes its own
+    // level off the rain's, which is why the two do not stack.
     CHECK(daylightDetectors::skyDarken(noon, clear) == 0);
-    CHECK(daylightDetectors::skyDarken(noon, raining) > daylightDetectors::skyDarken(noon, clear));
-    CHECK(daylightDetectors::skyDarken(noon, storm) > daylightDetectors::skyDarken(noon, raining));
+    CHECK(daylightDetectors::skyDarken(noon, raining) == 3);
+    CHECK(daylightDetectors::skyDarken(noon, storm) == 5);
+
+    // parity: at midnight the value is already four (fifteen by 0.26666668 rounds to it exactly in
+    // a float), so blending towards four changes nothing and the rain stops counting. The old
+    // product kept darkening a number that was already on the floor.
+    CHECK(daylightDetectors::skyDarken(midnight, clear) == 11);
+    CHECK(daylightDetectors::skyDarken(midnight, raining) == 11);
 
     WorldState world = emptyWorld();
     openSky(world);
-    CHECK(daylightDetectors::signalFor(world, noon, storm, 8, 64, 8, false) <
-          daylightDetectors::signalFor(world, noon, clear, 8, 64, 8, false));
+    CHECK(daylightDetectors::signalFor(world, noon, storm, 8, 64, 8, false) == 10);
+    CHECK(daylightDetectors::signalFor(world, noon, clear, 8, 64, 8, false) == 15);
 }
 
 TEST_CASE("a detector under a roof reads nothing at all") {

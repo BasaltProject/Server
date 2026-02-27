@@ -275,13 +275,8 @@ void BedrockPlayer::useItemOn(const std::int32_t x, const std::int32_t y, const 
                    });
 }
 
-void BedrockPlayer::drawWindow(const std::shared_ptr<BedrockMailbox>& mailbox, const int protocol,
-                               const OpenWindow& window,
-                               const std::vector<std::optional<storage::StoredItemStack>>& slots) {
-    wire::io::ByteBuffer open;
-    wire::bedrock::writeContainerOpen(open, window.containerId, window.type, window.x, window.y, window.z);
-    mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::ContainerOpen), open.toVector());
-
+void drawWindowSlots(const std::shared_ptr<BedrockMailbox>& mailbox, const int protocol, const OpenWindow& window,
+                     const std::vector<std::optional<storage::StoredItemStack>>& slots) {
     std::vector<wire::bedrock::BedrockItemStack> items;
     items.reserve(slots.size());
     for (const std::optional<storage::StoredItemStack>& stack : slots) {
@@ -291,6 +286,15 @@ void BedrockPlayer::drawWindow(const std::shared_ptr<BedrockMailbox>& mailbox, c
     wire::bedrock::writeInventoryContent(body, static_cast<std::uint32_t>(window.containerId), items,
                                          wire::bedrock::BedrockContainerSlot::LevelEntity, protocol);
     mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::InventoryContent), body.toVector());
+}
+
+void BedrockPlayer::drawWindow(const std::shared_ptr<BedrockMailbox>& mailbox, const int protocol,
+                               const OpenWindow& window,
+                               const std::vector<std::optional<storage::StoredItemStack>>& slots) {
+    wire::io::ByteBuffer open;
+    wire::bedrock::writeContainerOpen(open, window.containerId, window.type, window.x, window.y, window.z);
+    mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::ContainerOpen), open.toVector());
+    drawWindowSlots(mailbox, protocol, window, slots);
 }
 
 void BedrockPlayer::setSneaking(const bool sneaking) {

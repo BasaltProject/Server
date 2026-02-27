@@ -27,6 +27,10 @@ namespace {
 
 using wire::text::Component;
 
+/// How many turns of the world go by between two readings of an open window's contents. Half a
+/// second: long enough that a chest costs nothing, short enough that nobody sees the wait.
+constexpr std::int32_t kWindowReadTurns = 10;
+
 } // namespace
 
 /// Everything this player can be told, in the only terms a Bedrock client understands.
@@ -301,6 +305,69 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         wire::io::ByteBuffer body;
         wire::bedrock::writeBlockEvent(body, x, y, z, b0, b1);
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::BlockEvent), body.toVector());
+    };
+
+    // One of the numbered one-off effects. That edition splits what Java's single number carries
+    // into an effect and a sound, and has no answer at all for most of them: one it cannot draw is
+    // left undrawn rather than drawn as something else.
+    connection.sendLevelEvent = [mailbox = joining.mailbox, protocol = joining.protocol](
+                                    const std::int32_t type, const std::int32_t x, const std::int32_t y,
+                                    const std::int32_t z, const std::int32_t data) {
+        const wire::bedrock::BedrockLevelEffect effect = wire::bedrock::bedrockLevelEffect(type, data);
+        if (effect.event != 0) {
+            wire::io::ByteBuffer body;
+            wire::bedrock::writeLevelEvent(body, effect.event, static_cast<float>(x) + effect.x,
+                                           static_cast<float>(y) + effect.y, static_cast<float>(z) + effect.z,
+                                           effect.keepsData ? data : 0);
+            mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LevelEvent), body.toVector());
+        }
+        if (effect.sound.empty()) {
+            return;
+        }
+        const std::string_view named = wire::bedrock::bedrockSoundName(effect.sound);
+        if (named.empty()) {
+            return;
+        }
+        wire::io::ByteBuffer sound;
+        wire::bedrock::writePlaySound(sound, named, static_cast<double>(x) + 0.5, static_cast<double>(y) + 0.5,
+                                      static_cast<double>(z) + 0.5, 1.0F, 1.0F, protocol);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::PlaySound), sound.toVector());
+    };
+
+    // The numbers of an open furnace, once per turn of the world. It carries the windows rather
+    // than the player because it runs where the world runs, and by then this player may be gone.
+    connection.syncOpenWindow = [mailbox = joining.mailbox, protocol = joining.protocol,
+                                 windows = windows_](world::LoadedWorld& world) {
+        // A window with none of the block's own slots has nothing the world can change under it:
+        // a table's grid is the player's, and it only moves when they move it.
+        if (!windows->open.has_value() || windows->open->size == 0) {
+            return;
+        }
+        // What it holds, for the turns nobody touched it: a furnace fills its own result slot, and
+        // somebody else may be in the same chest. Not every turn: see `sinceRead`.
+        if (++windows->sinceRead >= kWindowReadTurns) {
+            windows->sinceRead = 0;
+            std::vector<std::optional<storage::StoredItemStack>> slots = readWindow(world, *windows->open);
+            if (slots != windows->saidSlots) {
+                windows->saidSlots = std::move(slots);
+                drawWindowSlots(mailbox, protocol, *windows->open, windows->saidSlots);
+            }
+        }
+        const std::optional<FurnaceNumbers> numbers = furnaceNumbers(world, *windows->open);
+        if (!numbers.has_value() || (windows->saidNumbers.has_value() && *windows->saidNumbers == *numbers)) {
+            return;
+        }
+        windows->saidNumbers = numbers;
+        const std::int32_t containerId = windows->open->containerId;
+        const auto say = [&mailbox, containerId](const wire::bedrock::BedrockContainerData property,
+                                                 const std::int32_t value) {
+            wire::io::ByteBuffer body;
+            wire::bedrock::writeContainerSetData(body, containerId, property, value);
+            mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::ContainerSetData), body.toVector());
+        };
+        say(wire::bedrock::BedrockContainerData::FurnaceCookTime, numbers->cookTime);
+        say(wire::bedrock::BedrockContainerData::FurnaceLitTime, numbers->litTime);
+        say(wire::bedrock::BedrockContainerData::FurnaceLitDuration, numbers->litDuration);
     };
 
     // A block that changed under somebody's feet. Only reaches a client that already has the

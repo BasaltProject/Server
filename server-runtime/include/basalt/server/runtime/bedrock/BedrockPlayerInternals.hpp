@@ -1,10 +1,13 @@
 #pragma once
 
+#include <basalt/server/runtime/bedrock/BedrockWindows.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
 
 #include <cstdint>
+#include <memory>
 #include <optional>
+#include <vector>
 
 namespace basalt::server::runtime::bedrock {
 
@@ -30,5 +33,10 @@ inline constexpr std::uint32_t kArmourContainer = 120;
 /// player it was drawn for.
 [[nodiscard]] wire::bedrock::BedrockItemStack itemStackFor(const std::optional<storage::StoredItemStack>& stack,
                                                            int protocol);
+
+/// Everything one window holds, said whole. What opening it sends after the window itself, and what
+/// a turn of the world sends again when the block's contents moved on their own.
+void drawWindowSlots(const std::shared_ptr<BedrockMailbox>& mailbox, int protocol, const OpenWindow& window,
+                     const std::vector<std::optional<storage::StoredItemStack>>& slots);
 
 } // namespace basalt::server::runtime::bedrock

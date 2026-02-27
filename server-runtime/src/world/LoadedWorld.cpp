@@ -110,9 +110,10 @@ bool LoadedWorld::tickTime(random::RandomSource& random) {
     // parity: only a dimension with a clock of its own has time to advance.
     const bool advanced =
         config::hasClock(declaration_.dimension) && clock_.tick(gameRules_.get(gameRules::kAdvanceTime));
-    // parity: `ServerLevel.advanceWeatherCycle` runs only where the dimension can have weather.
-    if (config::canHaveWeather(declaration_.dimension) && gameRules_.get(gameRules::kAdvanceWeather)) {
-        weather_.tick(random);
+    // parity: `ServerLevel.advanceWeatherCycle` runs only where the dimension can have weather, and
+    // the game rule stops the counters inside it, not the whole thing: the levels keep ramping.
+    if (config::canHaveWeather(declaration_.dimension)) {
+        weather_.tick(random, gameRules_.get(gameRules::kAdvanceWeather));
     }
     return advanced;
 }

@@ -193,6 +193,11 @@ struct PlayerConnection {
 
     std::function<void()> closeOpenMenu;
 
+    /// A turn of the world for whatever window this player has open: the numbers a furnace draws
+    /// its fire and its arrow from. Called on the tick thread, between turns, like the hand-over
+    /// below. Unset for a door whose own loop already keeps its windows up to date.
+    std::function<void(world::LoadedWorld& world)> syncOpenWindow;
+
     /// Moves this session onto the owner of the world it is standing in, between ticks.
     ///
     /// Called from the global phase, where no region is running: handing a session that walked

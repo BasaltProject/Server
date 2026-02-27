@@ -19,9 +19,13 @@ constexpr std::int64_t kDayTicks = 24000;
 constexpr std::int64_t kNoon = 6000;
 constexpr float kDegrees = 360.0F;
 
-/// parity: rain and thunder each take five sixteenths off the sky light, and they multiply it the
-/// same way every modifier on that attribute does.
-constexpr float kRainShare = 1.0F - (5.0F / 16.0F);
+/// parity: `WeatherAttributes.RAIN` and `THUNDER` modify `SKY_LIGHT_LEVEL` with
+/// `FloatModifier.ALPHA_BLEND`, which is `lerp(alpha, value, 4.0)`. They do **not** multiply: 26.2
+/// moved the old five sixteenths into an alpha that lands on the same number in full daylight and on
+/// a different one everywhere else, because the blend has a floor and the product does not.
+constexpr float kNightSkyLightLevel = 4.0F;
+constexpr float kRainAlpha = 0.3125F;
+constexpr float kThunderAlpha = 0.52734375F;
 
 /// One of the two cubic curves a `EasingType.CubicBezier` is made of.
 struct CubicCurve {
@@ -53,7 +57,7 @@ constexpr float kEaseTolerance = 1.0e-5F;
 constexpr float kEaseMaxStep = 0.25F;
 constexpr std::int32_t kEaseIterations = 4;
 
-/// parity: `CubicBezier.solveT`, Newton-Raphson with a bounded step and a bisection behind it.
+/// parity: `EasingType.CubicBezier.solveT`, Newton-Raphson with a bounded step and a bisection behind it.
 [[nodiscard]] float solveEaseT(float x) {
     float t = x;
     for (std::int32_t attempt = 0; attempt < kEaseIterations; ++attempt) {
@@ -134,7 +138,7 @@ constexpr float kRampTicks = 1803.0F;
     return static_cast<std::int32_t>(std::floor(static_cast<double>(value) + 0.5));
 }
 
-/// parity: `Level.getEffectiveSkyBrightness`, the sky light above the block minus what the weather
+/// parity: `LevelReader.getEffectiveSkyBrightness`, the sky light above the block minus what the weather
 /// takes off it.
 [[nodiscard]] std::int32_t skyBrightness(WorldState& world, const WorldClock& clock, const WorldWeather& weather,
                                          std::int32_t x, std::int32_t y, std::int32_t z, bool hasSkylight) {
@@ -144,14 +148,22 @@ constexpr float kRampTicks = 1803.0F;
 } // namespace
 
 std::int32_t skyDarken(const WorldClock& clock, const WorldWeather& weather) {
-    const float rain = weather.raining ? kRainShare : 1.0F;
-    const float thunder = weather.thundering ? kRainShare : 1.0F;
-    // parity: `Level.tickTime` writes
+    float value = static_cast<float>(kMax) * skyLightShare(clock);
+    // parity: `WeatherAttributes.addLayer` takes the thunder level **off** the rain level before
+    // blending, so a full thunderstorm skips the rain layer altogether instead of stacking on it.
+    const float thunder = weather.thunderLevel();
+    const float rain = weather.rainLevel() - thunder;
+    if (rain > 0.0F) {
+        value = wire::common::mth::lerp(rain, value, wire::common::mth::lerp(kRainAlpha, value, kNightSkyLightLevel));
+    }
+    if (thunder > 0.0F) {
+        value =
+            wire::common::mth::lerp(thunder, value, wire::common::mth::lerp(kThunderAlpha, value, kNightSkyLightLevel));
+    }
+    // parity: `Level.updateSkyBrightness` writes
     // `skyDarken = (int)(15.0F - environmentAttributes().getDimensionValue(SKY_LIGHT_LEVEL))`, and
-    // that `(int)` truncates towards zero. The weather keeps multiplying the share, which is the
-    // shape of every modifier on this attribute.
-    const float share = skyLightShare(clock) * rain * thunder;
-    return static_cast<std::int32_t>(static_cast<float>(kMax) - (static_cast<float>(kMax) * share));
+    // that `(int)` truncates towards zero.
+    return static_cast<std::int32_t>(static_cast<float>(kMax) - value);
 }
 
 std::int32_t signalFor(WorldState& world, const WorldClock& clock, const WorldWeather& weather, std::int32_t x,

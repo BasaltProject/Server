@@ -2,6 +2,7 @@
 
 #include <basalt/server/random/RandomSource.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <optional>
@@ -88,7 +89,9 @@ public:
     std::int32_t thunderTime = 0;
     std::int32_t clearWeatherTime = 0;
 
-    void tick(random::RandomSource& random);
+    /// parity: `ServerLevel.advanceWeatherCycle`. The counters only move with the `advanceWeather`
+    /// game rule; the two levels ramp either way, because they chase the flags and not the clock.
+    void tick(random::RandomSource& random, bool advanceCycle);
 
     /// parity: `MinecraftServer.setWeatherParameters`, which `/weather` calls with these four.
     void set(std::int32_t clearTime, std::int32_t weatherTime, bool raining, bool thundering);
@@ -97,10 +100,31 @@ public:
     [[nodiscard]] static std::int32_t randomDuration(std::pair<std::int32_t, std::int32_t> range,
                                                      random::RandomSource& random);
 
-    /// parity: `ServerLevel.getRainLevel`, as far as the client is concerned: on or off.
-    [[nodiscard]] float rainLevel() const noexcept { return raining ? 1.0F : 0.0F; }
+    /// parity: `Level.getRainLevel(1.0F)`, which on the server is the level itself: the `o` twin
+    /// only exists to interpolate a partial tick, and the server always asks for a whole one.
+    [[nodiscard]] float rainLevel() const noexcept { return rainLevel_; }
 
-    [[nodiscard]] float thunderLevel() const noexcept { return thundering ? 1.0F : 0.0F; }
+    [[nodiscard]] float thunderLevel() const noexcept { return thunderLevel_; }
+
+    /// parity: `Level.isRaining` and `Level.isThundering` ask the **level**, not the flag, so a
+    /// `/weather rain` takes 21 ticks to count and a `/weather thunder` 91.
+    [[nodiscard]] bool isRaining() const noexcept { return rainLevel_ > kRainingAt; }
+
+    [[nodiscard]] bool isThundering() const noexcept { return thunderLevel_ > kThunderingAt; }
+
+    /// parity: `Level.setRainLevel` and `setThunderLevel`, which clamp and skip the slope.
+    void setRainLevel(float level) noexcept { rainLevel_ = std::clamp(level, 0.0F, 1.0F); }
+
+    void setThunderLevel(float level) noexcept { thunderLevel_ = std::clamp(level, 0.0F, 1.0F); }
+
+private:
+    /// parity: neither level is saved. A world that loads raining starts them at zero and climbs.
+    static constexpr float kLevelStep = 0.01F;
+    static constexpr float kRainingAt = 0.2F;
+    static constexpr float kThunderingAt = 0.9F;
+
+    float rainLevel_ = 0.0F;
+    float thunderLevel_ = 0.0F;
 };
 
 } // namespace basalt::server::runtime::world
