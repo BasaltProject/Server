@@ -393,6 +393,26 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                     world.state(), world.name(), at.x, at.y, at.z, *at.skip, world.gameTime(), random,
                     world.gameRules().get(world::gameRules::kTntExplodes));
                 scheduled.insert(scheduled.end(), ahead.begin(), ahead.end());
+                // parity: that reach is an `updateNeighborsAtExceptFromFacing`, so the two nobody
+                // else asks hear it as well. Measured in `pistonpordiodo`: a piston stuck under the
+                // block a repeater feeds never extended, because only the dust reached this far.
+                for (const server::registry::BlockFace face :
+                     {server::registry::BlockFace::West, server::registry::BlockFace::East,
+                      server::registry::BlockFace::Down, server::registry::BlockFace::Up,
+                      server::registry::BlockFace::North, server::registry::BlockFace::South}) {
+                    if (face == *at.skip) {
+                        continue;
+                    }
+                    const std::int32_t nx = at.x + server::registry::stepX(face);
+                    const std::int32_t ny = at.y + server::registry::stepY(face);
+                    const std::int32_t nz = at.z + server::registry::stepZ(face);
+                    world::pistons::trigger(pistonContext, nx, ny, nz);
+                    if (const std::optional<world::BlockChange> armed =
+                            world::dispensers::onNeighbourChange(world.state(), world.name(), nx, ny, nz);
+                        armed.has_value()) {
+                        scheduled.push_back(*armed);
+                    }
+                }
             }
             for (const world::BlockChange& change : settled) {
                 const std::vector<world::BlockChange> around = world::redstoneReactors::updateAroundWire(

@@ -3,11 +3,13 @@
 #include <basalt/server/runtime/config/GroupsConfig.hpp>
 #include <basalt/server/runtime/item/ItemComponents.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/player/PlayerParticles.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
@@ -386,7 +388,7 @@ public:
         player::PlayerSession* player = session();
         const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(std::string{particle});
         const reg::ParticleType* type = id.has_value() ? reg::particleTypes::of(*id) : nullptr;
-        if (player == nullptr || type == nullptr || !player->connection().sendPlayPacket) {
+        if (player == nullptr || type == nullptr) {
             return;
         }
         const play::LevelParticlesPacket packet{.particleTypeId = type->protocolId,
@@ -397,8 +399,30 @@ public:
                                                 .offsetY = static_cast<float>(spread),
                                                 .offsetZ = static_cast<float>(spread),
                                                 .count = count};
-        player->connection().sendPlayPacket(play::LevelParticlesPacket::kId,
-                                            [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+        player::showParticleFor(*player, type->id.toString(), packet);
+    }
+
+    bool effect(const std::string_view effect, const std::int32_t durationTicks,
+                const std::int32_t amplifier) override {
+        player::PlayerSession* player = session();
+        const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(std::string{effect});
+        if (player == nullptr || !id.has_value() || !world::mobEffects::protocolIdOf(*id).has_value()) {
+            return false;
+        }
+        if (durationTicks == 0) {
+            player->effects.erase(*id);
+            if (player->connection().sendEffectRemoved) {
+                player->connection().sendEffectRemoved(*id);
+            }
+            return true;
+        }
+        const world::ActiveEffect active{
+            .effect = *id, .amplifier = amplifier, .remainingTicks = durationTicks, .visible = true, .showIcon = true};
+        player->effects.insert_or_assign(*id, active);
+        if (player->connection().sendEffect) {
+            player->connection().sendEffect(active);
+        }
+        return true;
     }
 
     [[nodiscard]] std::optional<double> attribute(std::string_view name) const override {

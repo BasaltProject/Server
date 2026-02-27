@@ -1,8 +1,11 @@
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
+#include <basalt/wire/bedrock/BedrockEffects.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
+#include <basalt/wire/bedrock/BedrockParticles.hpp>
 #include <basalt/wire/bedrock/BedrockSounds.hpp>
 #include <basalt/wire/text/MiniMessage.hpp>
 #include <basalt/wire/text/Serializers.hpp>
@@ -12,6 +15,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <limits>
 #include <set>
 #include <span>
 #include <utility>
@@ -160,6 +164,75 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
         }
     };
 
+    connection.hurt = [this](const float amount, const std::string_view deathMessageId,
+                             const wire::common::Identifier& damageType,
+                             const std::optional<entity::DamageSource>& source) {
+        if (session_ != nullptr && context_.hurt) {
+            context_.hurt(*session_, amount, deathMessageId, damageType, source);
+        }
+    };
+    connection.heal = [this](const float amount) {
+        if (session_ != nullptr && context_.heal) {
+            context_.heal(*session_, amount);
+        }
+    };
+
+    // Bedrock paints the flash off an entity event rather than off a damage type, so the type is
+    // read only for whether there is one at all. Its own hearts come off the attributes.
+    connection.showDamage = [this](const std::int32_t entityId, std::int32_t, std::int32_t) {
+        const std::uint64_t runtime =
+            session_ != nullptr && entityId == session_->entityId() ? kRuntimeEntityId : runtimeIdFor(entityId);
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeEntityEvent(body, runtime, wire::bedrock::BedrockEntityEvent::Hurt, 0, protocol_);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::EntityEvent), body.toVector());
+    };
+
+    // The shove. Bedrock turns the red on the screen itself from where the motion came, so the
+    // angle the Java animation carries has nowhere to go here.
+    connection.pushBack = [this](const double velocityX, const double velocityY, const double velocityZ, float) {
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeSetEntityMotion(body, kRuntimeEntityId, static_cast<float>(velocityX),
+                                            static_cast<float>(velocityY), static_cast<float>(velocityZ));
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetEntityMotion), body.toVector());
+    };
+
+    // One column again, for a change too big to patch block by block. Bedrock carries the biomes
+    // inside the column, so asking for new biomes is asking for the column: the two share a call.
+    connection.resendChunk = [this](const std::int32_t chunkX, const std::int32_t chunkZ) {
+        sendColumn(chunkX, chunkZ);
+    };
+    connection.sendBiomes = [this](const std::vector<std::pair<std::int32_t, std::int32_t>>& columns) {
+        for (const auto& [chunkX, chunkZ] : columns) {
+            sendColumn(chunkX, chunkZ);
+        }
+    };
+
+    // The bubbles and the flames. Bedrock draws both off entity metadata rather than off a packet
+    // of their own, and the flags have to go out whole every time: a field left out is not a field
+    // left alone, it is a field the client keeps at whatever it last heard.
+    connection.syncSubmersion = [this] {
+        if (session_ == nullptr) {
+            return;
+        }
+        std::uint64_t flags = wire::bedrock::flagBit(wire::bedrock::EntityFlag::HasCollision) |
+                              wire::bedrock::flagBit(wire::bedrock::EntityFlag::HasGravity) |
+                              wire::bedrock::flagBit(wire::bedrock::EntityFlag::Breathing) |
+                              wire::bedrock::flagBit(wire::bedrock::EntityFlag::CanShowName);
+        if (session_->fireTicks > 0) {
+            flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::OnFire);
+        }
+        if (session_->sneaking) {
+            flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Sneaking);
+        }
+        if (session_->sprinting) {
+            flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Sprinting);
+        }
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeSubmersion(body, kRuntimeEntityId, static_cast<std::int16_t>(session_->airSupply), flags,
+                                       protocol_);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetEntityData), body.toVector());
+    };
+
     // Another world is another dimension as far as a Bedrock client is concerned: the sky, the fog
     // and the chunk cache all hang off it. What the world means by "somewhere else" stays with the
     // caller; this only draws the arrival.
@@ -173,6 +246,7 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
             return false;
         }
         session_->worldName = arrival->worldName;
+        dimension_ = arrival->dimension;
         session_->x = x;
         session_->y = y;
         session_->z = z;
@@ -202,6 +276,19 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::PlaySound), body.toVector());
     };
 
+    // A particle, under the name its own edition knows it by. One that Bedrock only draws from a
+    // numbered event has no name to send, so it is left undrawn rather than drawn as something else.
+    connection.showParticle = [this](const std::string_view particle, const double x, const double y, const double z) {
+        const std::string_view named = wire::bedrock::bedrockParticleName(particle);
+        if (named.empty()) {
+            return;
+        }
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeSpawnParticle(body, dimension_, named, static_cast<float>(x), static_cast<float>(y),
+                                          static_cast<float>(z));
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SpawnParticleEffect), body.toVector());
+    };
+
     // A block that changed under somebody's feet. Only reaches a client that already has the
     // column: one that does not will get it whole when it comes into range.
     connection.sendBlockChange = [mailbox = joining.mailbox,
@@ -225,6 +312,20 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::AvailableCommands), body.toVector());
     };
 
+    // The three effect callbacks are the same packet with a different word in it, so they share a
+    // writer. An effect Bedrock has no number for is not sent: a wrong icon is worse than none.
+    connection.addEffect = [this](const wire::common::Identifier& effect, const std::int32_t durationTicks,
+                                  const std::int32_t amplifier) {
+        sendEffect(effect, wire::bedrock::BedrockEffectEvent::Add, durationTicks, amplifier, false, true);
+    };
+    connection.sendEffect = [this](const world::ActiveEffect& effect) {
+        sendEffect(effect.effect, wire::bedrock::BedrockEffectEvent::Add, effect.remainingTicks, effect.amplifier,
+                   effect.ambient, effect.visible);
+    };
+    connection.sendEffectRemoved = [this](const wire::common::Identifier& effect) {
+        sendEffect(effect, wire::bedrock::BedrockEffectEvent::Remove, 0, 0, false, false);
+    };
+
     // Bedrock draws its hearts and haunches from attributes, and is told the range of each one:
     // where Java hardcodes the bounds in the client, here the server states them.
     connection.syncHealth = [this] {
@@ -241,6 +342,7 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
         wire::bedrock::writeUpdateAttributes(body, kRuntimeEntityId, values, 0);
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::UpdateAttributes), body.toVector());
     };
+    connection.syncAbsorption = connection.syncHealth;
     connection.syncExperience = [this] {
         if (session_ == nullptr) {
             return;
@@ -388,6 +490,25 @@ void BedrockPlayer::chat(const std::string_view message) {
     });
 }
 
+void BedrockPlayer::sendEffect(const wire::common::Identifier& effect, const wire::bedrock::BedrockEffectEvent event,
+                               const std::int32_t durationTicks, const std::int32_t amplifier, const bool ambient,
+                               const bool particles) {
+    const std::optional<std::int32_t> java = world::mobEffects::protocolIdOf(effect);
+    if (!java.has_value()) {
+        return;
+    }
+    const std::int32_t id = wire::bedrock::bedrockEffectId(*java);
+    if (id == 0) {
+        return;
+    }
+    wire::io::ByteBuffer body;
+    // parity: Java counts an infinite effect as -1 and Bedrock has no such thing, so it is sent as
+    // the longest one that edition can hold instead of as a negative that reads as already over.
+    const std::int32_t ticks = durationTicks < 0 ? std::numeric_limits<std::int32_t>::max() : durationTicks;
+    wire::bedrock::writeMobEffect(body, kRuntimeEntityId, event, id, amplifier, particles, ticks, ambient);
+    mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::MobEffect), body.toVector());
+}
+
 void BedrockPlayer::command(const std::string_view line) {
     if (session_ == nullptr || line.empty() || !context_.runCommand) {
         return;
@@ -517,6 +638,20 @@ void BedrockPlayer::tick() {
             static_cast<void>(sendColumnsAround({}));
         }
     }
+}
+
+void BedrockPlayer::sendColumn(const std::int32_t chunkX, const std::int32_t chunkZ) {
+    // Only a column this client already has: one it has never been sent arrives whole when they
+    // walk into range, and sending it early would leave the client holding two of the same.
+    if (!context_.sendChunks || !columns_.contains({chunkX, chunkZ})) {
+        return;
+    }
+    context_.sendChunks({{chunkX, chunkZ}}, protocol_,
+                        [mailbox = mailbox_](std::vector<std::uint8_t> column) {
+                            mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LevelChunk),
+                                          std::move(column));
+                        },
+                        {});
 }
 
 bool BedrockPlayer::sendColumnsAround(std::function<void()> done) {

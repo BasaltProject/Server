@@ -27,6 +27,7 @@
 #include <basalt/server/runtime/config/CompatibilityConfig.hpp>
 #include <basalt/server/runtime/config/LiveConfigs.hpp>
 #include <basalt/server/runtime/function/FunctionLibrary.hpp>
+#include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
 #include <basalt/server/runtime/plugins/ServerPluginServices.hpp>
 #include <basalt/server/runtime/scoreboard/Scoreboard.hpp>
@@ -166,6 +167,9 @@ private:
     plugins::NpcRegistry npcs_;
     ServerMetrics metrics_;
     CpuMeter cpuMeter_;
+    /// What hurting or healing a player needs, whichever door they came in by.
+    [[nodiscard]] player::DamageContext damageContext();
+
     VanillaGameData vanillaData_;
     ChunkSimulationView chunkSimulation_;
     /// What a mob spawns holding, out of the operator's own jar.

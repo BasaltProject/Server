@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/command/Coordinates.hpp>
 #include <basalt/server/runtime/command/ParticleArgument.hpp>
 #include <basalt/server/runtime/command/commands/ParticleCommand.hpp>
+#include <basalt/server/runtime/player/PlayerParticles.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 
@@ -58,11 +59,9 @@ void ParticleCommand::build(const CommandNodeBuilder& root) const {
             return std::unexpected{
                 CommandSyntaxError{.component = Component::translatable("commands.particle.failed")}};
         }
+        const std::string name = parsed->type->id.toString();
         for (const player::PlayerSession* player : audience) {
-            if (player->connection().sendPlayPacket) {
-                player->connection().sendPlayPacket(play::LevelParticlesPacket::kId,
-                                                    [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
-            }
+            player::showParticleFor(*player, name, packet);
         }
         context.success(
             Component::translatable("commands.particle.success", {Component::text(parsed->type->id.toString())}));

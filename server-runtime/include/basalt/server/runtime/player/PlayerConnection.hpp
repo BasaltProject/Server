@@ -67,6 +67,22 @@ struct PlayerConnection {
     /// speaks another edition translates the name itself.
     std::function<void(std::string_view sound, double x, double y, double z, float volume, float pitch)> playSound;
 
+    /// Shows a particle where this player can see it, named the way Java names it. A connection
+    /// that speaks another edition translates the name itself, and drops what it cannot name.
+    std::function<void(std::string_view particle, double x, double y, double z)> showParticle;
+
+    /// Draws somebody being hurt: the flash, and whatever else that edition paints on a hit. The
+    /// damage type is the Java registry id, which an edition without that table ignores.
+    std::function<void(std::int32_t entityId, std::int32_t damageTypeId, std::int32_t causeEntityId)> showDamage;
+
+    /// Shoves this player, in blocks per tick, away from the thing at that angle. The angle is
+    /// where the hit came from, which is what turns the red on the screen towards it.
+    std::function<void(double velocityX, double velocityY, double velocityZ, float fromYaw)> pushBack;
+
+    /// Redraws the yellow half of the hearts. Its own callback because an edition may draw
+    /// absorption from somewhere other than where it draws health.
+    std::function<void()> syncAbsorption;
+
     /// Sends one chunk again, for a change too big to patch block by block.
     std::function<void(std::int32_t chunkX, std::int32_t chunkZ)> resendChunk;
 

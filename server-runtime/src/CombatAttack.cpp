@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/player/PlayerParticles.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
@@ -553,11 +554,9 @@ void CombatHandler::broadcastParticle(std::string_view particle, double x, doubl
     }
     const wire::protocol::play::LevelParticlesPacket packet{
         .particleTypeId = type->protocolId, .x = x, .y = y, .z = z, .count = count};
-    for (PlayerSession* player : owner_->playersInSameWorld()) {
-        if (player->connection().sendPlayPacket) {
-            player->connection().sendPlayPacket(wire::protocol::play::LevelParticlesPacket::kId,
-                                                [packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
-        }
+    const std::string name = type->id.toString();
+    for (const PlayerSession* player : owner_->playersInSameWorld()) {
+        player::showParticleFor(*player, name, packet);
     }
 }
 

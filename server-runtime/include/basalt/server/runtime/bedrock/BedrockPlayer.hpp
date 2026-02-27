@@ -78,6 +78,15 @@ public:
         /// makes, so a plugin never learns which door they came in by.
         std::function<void(player::PlayerSession&, std::string_view)> killed;
 
+        /// Hurts or heals this player, where the world and the plugins are. The arithmetic is the
+        /// same on both editions and lives in `player/PlayerDamage`; what happens here is only
+        /// getting the call to the thread that owns the answer, exactly as `killed` does.
+        std::function<void(player::PlayerSession&, float amount, std::string_view deathMessageId,
+                           const wire::common::Identifier& damageType,
+                           const std::optional<entity::DamageSource>& source)>
+            hurt;
+        std::function<void(player::PlayerSession&, float amount)> heal;
+
         /// Every command this player may use, with the usage line `/help` would print for it.
         /// Bedrock refuses to send what is not in its own list, so a client that is told nothing
         /// can run nothing.
@@ -150,6 +159,14 @@ private:
         std::function<void(std::int32_t)> onClick;
     };
 
+    /// One column again, to a client that already has it. What a biome change and a world edit
+    /// too big to patch block by block both ask for.
+    void sendColumn(std::int32_t chunkX, std::int32_t chunkZ);
+
+    /// The three effect callbacks in one: they differ only in the word they put in the packet.
+    void sendEffect(const wire::common::Identifier& effect, wire::bedrock::BedrockEffectEvent event,
+                    std::int32_t durationTicks, std::int32_t amplifier, bool ambient, bool particles);
+
     Context context_;
     std::shared_ptr<BedrockMailbox> mailbox_;
     /// Which Bedrock protocol this client speaks: several packets are shaped one way for the
@@ -163,6 +180,9 @@ private:
     std::uint32_t nextFormId_ = 1;
     std::optional<OpenForm> form_;
     std::string openTitle_;
+    /// Which of Bedrock's three the player is in. Packets that name a dimension go to a world the
+    /// receiver may not be in, so they carry it rather than assuming the overworld.
+    wire::bedrock::BedrockDimension dimension_ = wire::bedrock::BedrockDimension::Overworld;
     std::unordered_map<wire::common::Uuid, Other> others_;
     /// Which columns this client already has, so walking sends only what is new. A column that
     /// falls out of range is forgotten, which is what makes coming back send it again.
