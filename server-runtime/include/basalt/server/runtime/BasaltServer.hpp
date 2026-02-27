@@ -27,6 +27,7 @@
 #include <basalt/server/runtime/config/CompatibilityConfig.hpp>
 #include <basalt/server/runtime/config/LiveConfigs.hpp>
 #include <basalt/server/runtime/function/FunctionLibrary.hpp>
+#include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
 #include <basalt/server/runtime/plugins/ServerPluginServices.hpp>
@@ -169,6 +170,9 @@ private:
     CpuMeter cpuMeter_;
     /// What hurting or healing a player needs, whichever door they came in by.
     [[nodiscard]] player::DamageContext damageContext();
+
+    /// What breaking a block needs, whichever door the breaker came in by.
+    [[nodiscard]] player::BreakContext breakContext();
 
     VanillaGameData vanillaData_;
     ChunkSimulationView chunkSimulation_;

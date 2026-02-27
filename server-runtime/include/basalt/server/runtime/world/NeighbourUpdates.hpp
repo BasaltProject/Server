@@ -110,10 +110,12 @@ struct Context {
     /// default is the rule's own so that a site which forgets it still behaves like vanilla: passed
     /// as a hardcoded false, no signal ever lit a tnt at all.
     bool tntExplodes = true;
-    /// parity: `LevelChunk.setBlockState` runs `affectNeighborsAfterRemoval` only under
-    /// `(flags & UPDATE_NEIGHBORS) != 0 || movedByPiston`, and `/setblock` writes with `2 | 256`, so
-    /// a command never gets the removal side effects: only the six squares its tail tells.
-    bool updateNeighbours = true;
+    /// parity: the removal side effects reach a command too, but by another road, and the two roads
+    /// do not agree on one line. `LevelChunk.setBlockState` runs them under
+    /// `(blockChanged || newBlock instanceof BaseRailBlock)`, while the tail a command uses,
+    /// `ServerLevel.updateNeighboursOnBlockSet`, runs them under `blockChanged` alone. So a rail
+    /// written over a rail tells its own square on the world's road and tells nobody on a command's.
+    bool railArrivalTells = true;
 };
 
 /// Breaks whatever `x`, `y`, `z` stopped holding up, and whatever that in turn stopped holding.

@@ -87,6 +87,11 @@ public:
             hurt;
         std::function<void(player::PlayerSession&, float amount)> heal;
 
+        /// Takes a block away where the world is, as a player breaking it does. The arithmetic and
+        /// everything that hears it are the same on both editions and live in
+        /// `player/PlayerBlockBreak`; what happens here is only getting onto the right thread.
+        std::function<void(player::PlayerSession&, std::int32_t x, std::int32_t y, std::int32_t z)> breakBlock;
+
         /// Every command this player may use, with the usage line `/help` would print for it.
         /// Bedrock refuses to send what is not in its own list, so a client that is told nothing
         /// can run nothing.
@@ -113,6 +118,8 @@ public:
     void formAnswer(std::uint32_t formId, const std::optional<std::string>& data) override;
 
     void command(std::string_view line) override;
+
+    void blockAction(std::int32_t action, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t face) override;
 
     void tick() override;
 
@@ -162,6 +169,14 @@ private:
     /// One column again, to a client that already has it. What a biome change and a world edit
     /// too big to patch block by block both ask for.
     void sendColumn(std::int32_t chunkX, std::int32_t chunkZ);
+
+    /// One stack as the other edition carries it, or air when it has no such item.
+    [[nodiscard]] wire::bedrock::BedrockItemStack stackFor(const std::optional<storage::StoredItemStack>& stack) const;
+
+    /// One window's worth of slots, said whole. Bedrock has no "one slot changed" for a window it
+    /// was never told about, so the three windows a player has go out together.
+    void sendWindow(std::uint32_t containerId, std::span<const wire::bedrock::BedrockItemStack> items,
+                    wire::bedrock::BedrockContainerSlot slot);
 
     /// The three effect callbacks in one: they differ only in the word they put in the packet.
     void sendEffect(const wire::common::Identifier& effect, wire::bedrock::BedrockEffectEvent event,

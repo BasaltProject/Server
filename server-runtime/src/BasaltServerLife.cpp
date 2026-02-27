@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/bedrock/BedrockChunks.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
+#include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerDeath.hpp>
 #include <basalt/wire/io/Platform.hpp>
@@ -21,6 +22,12 @@
 
 namespace basalt::server::runtime {
 namespace {
+
+/// One source for the numbers nobody checks bit for bit: a drop's scatter, a seed.
+[[nodiscard]] std::mt19937_64& scratchRandom() {
+    static thread_local std::mt19937_64 random{std::random_device{}()};
+    return random;
+}
 
 /// How often the watchdog looks, and how long a plugin may be inside the server. Five ticks: long
 /// enough that no honest handler reaches it, short enough to be felt once.
@@ -286,6 +293,25 @@ void BasaltServer::reportOrphanedPluginData() {
     });
 }
 
+player::BreakContext BasaltServer::breakContext() {
+    player::BreakContext context;
+    context.blocks = broadcaster_.get();
+    context.registry = &playerRegistry_;
+    context.lootTables = &vanillaData_.lootTables;
+    context.blockTags = &vanillaData_.blockTags;
+    context.enchantments = &vanillaData_.enchantments;
+    context.itemTags = &vanillaData_.itemTags;
+    context.nextDouble = [] { return std::uniform_real_distribution<double>{0.0, 1.0}(scratchRandom()); };
+    context.nextSeed = [] { return static_cast<std::int64_t>(scratchRandom()()); };
+    // However that edition draws one slot of a bag, which for Bedrock is the whole window.
+    context.slotChanged = [](const player::PlayerSession& player, std::int32_t) {
+        if (player.connection().sendInventoryAll) {
+            player.connection().sendInventoryAll();
+        }
+    };
+    return context;
+}
+
 player::DamageContext BasaltServer::damageContext() {
     player::DamageContext context;
     context.registry = &playerRegistry_;
@@ -461,6 +487,25 @@ void BasaltServer::startBedrockListener() {
                 death.logger = logger_;
                 death.lang = options_.lang;
                 player::killPlayer(*session, reason, std::nullopt, death);
+            });
+        };
+
+        // Breaking a block is the same everywhere, so both doors call the same thing; what this
+        // adds is only getting onto the thread that owns the world.
+        context.breakBlock = [this](player::PlayerSession& player, const std::int32_t x, const std::int32_t y,
+                                    const std::int32_t z) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, x, y, z] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (session == nullptr) {
+                    return;
+                }
+                const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                const auto found = worlds.find(session->worldName);
+                if (found == worlds.end() || found->second == nullptr) {
+                    return;
+                }
+                static_cast<void>(player::breakBlockFor(*session, *found->second, x, y, z, breakContext()));
             });
         };
 

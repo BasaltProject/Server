@@ -209,7 +209,7 @@ void BlockEditor::notifyNeighbours() {
         .tntExplodes = world_->gameRules().get(world::gameRules::kTntExplodes),
         // parity: `/setblock` and `/fill` write with `2 | 256`, no `UPDATE_NEIGHBORS`, so the state
         // that left gets no `affectNeighborsAfterRemoval`.
-        .updateNeighbours = false};
+        .railArrivalTells = false};
     for (const std::array<std::int32_t, 3>& at : positions) {
         const std::optional<std::int32_t> written = world_->state().blockState(at[0], at[1], at[2]);
         // parity: `onPlace` runs inside the write, and everything `Level.setBlock` does afterwards is
@@ -234,7 +234,7 @@ void BlockEditor::notifyNeighbours() {
         bool unsupported = false;
         const auto wasHere = replaced_.find(at);
         neighbourUpdates::Context broke = context;
-        broke.updateNeighbours = true;
+        broke.railArrivalTells = true;
         neighbourUpdates::afterChange(
             destroyed_.contains(at) ? broke : context, at[0], at[1], at[2],
             wasHere == replaced_.end() ? std::nullopt : wasHere->second, effects_,

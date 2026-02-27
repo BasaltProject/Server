@@ -1,9 +1,12 @@
+#include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
+#include <basalt/wire/bedrock/BedrockBlocks.hpp>
 #include <basalt/wire/bedrock/BedrockEffects.hpp>
+#include <basalt/wire/bedrock/BedrockItems.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
 #include <basalt/wire/bedrock/BedrockParticles.hpp>
 #include <basalt/wire/bedrock/BedrockSounds.hpp>
@@ -28,6 +31,10 @@ using wire::text::Component;
 /// What `start_game` told this client it is. Every client is told the same number: a Bedrock
 /// session only ever draws one player of its own.
 constexpr std::uint64_t kRuntimeEntityId = 1;
+
+/// The two windows a player has beside the one they carry. Neither number has moved in this window.
+constexpr std::uint32_t kOffhandContainer = 119;
+constexpr std::uint32_t kArmourContainer = 120;
 
 /// How often the rest of the server is looked at, in the listener's own loop. The world moves once
 /// every fifty milliseconds and the loop turns faster than that, so this is what a tick is worth.
@@ -233,6 +240,33 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetEntityData), body.toVector());
     };
 
+    // Everything they carry. Bedrock numbers its own inventory the other way round from Java: the
+    // hotbar is the first nine slots there and the last nine here.
+    connection.sendInventoryAll = [this] {
+        if (session_ == nullptr) {
+            return;
+        }
+        const player::PlayerInventory& inventory = session_->inventory;
+        std::array<wire::bedrock::BedrockItemStack, player::PlayerInventory::kMainSlots> carried{};
+        for (std::int32_t slot = 0; slot < player::PlayerInventory::kMainSlots; ++slot) {
+            const std::int32_t from = slot < player::PlayerInventory::kHotbarSize
+                                          ? player::PlayerInventory::kHotbarStart + slot
+                                          : slot - player::PlayerInventory::kHotbarSize;
+            carried[static_cast<std::size_t>(slot)] = stackFor(inventory.at(from));
+        }
+        sendWindow(0, carried, wire::bedrock::BedrockContainerSlot::HotbarAndInventory);
+
+        std::array<wire::bedrock::BedrockItemStack, player::PlayerInventory::kArmourSlots> worn{};
+        for (std::int32_t slot = 0; slot < player::PlayerInventory::kArmourSlots; ++slot) {
+            worn[static_cast<std::size_t>(slot)] = stackFor(inventory.at(player::PlayerInventory::kArmourStart + slot));
+        }
+        sendWindow(kArmourContainer, worn, wire::bedrock::BedrockContainerSlot::Armour);
+
+        const std::array<wire::bedrock::BedrockItemStack, 1> other{
+            stackFor(inventory.at(player::PlayerInventory::kOffhandSlot))};
+        sendWindow(kOffhandContainer, other, wire::bedrock::BedrockContainerSlot::Offhand);
+    };
+
     // Another world is another dimension as far as a Bedrock client is concerned: the sky, the fog
     // and the chunk cache all hang off it. What the world means by "somewhere else" stays with the
     // caller; this only draws the arrival.
@@ -424,6 +458,7 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
     // player with no hearts at all.
     session_->connection().syncHealth();
     session_->connection().syncExperience();
+    session_->connection().sendInventoryAll();
     // The world itself, once the player exists. The columns are built where the world runs and
     // arrive here already written, so the door's thread never reads a chunk.
     //
@@ -490,6 +525,36 @@ void BedrockPlayer::chat(const std::string_view message) {
     });
 }
 
+wire::bedrock::BedrockItemStack BedrockPlayer::stackFor(const std::optional<storage::StoredItemStack>& stack) const {
+    if (!stack.has_value() || stack->count <= 0) {
+        return {};
+    }
+    const wire::bedrock::ItemName* named = wire::bedrock::bedrockItem(stack->id);
+    if (named == nullptr) {
+        return {};
+    }
+    // An item that places a block carries which one: the client draws the block from that and not
+    // from the item's own name.
+    std::int32_t block = 0;
+    if (const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
+            wire::common::Identifier::parse(stack->id);
+        id.has_value()) {
+        if (const std::optional<std::int32_t> state = server::registry::blocks::defaultStateIdOf(*id);
+            state.has_value()) {
+            block = static_cast<std::int32_t>(wire::bedrock::bedrockBlockId(*state, protocol_));
+        }
+    }
+    return {.runtimeId = named->palettePlace + 1, .count = stack->count, .data = named->data, .blockRuntimeId = block};
+}
+
+void BedrockPlayer::sendWindow(const std::uint32_t containerId,
+                               const std::span<const wire::bedrock::BedrockItemStack> items,
+                               const wire::bedrock::BedrockContainerSlot slot) {
+    wire::io::ByteBuffer body;
+    wire::bedrock::writeInventoryContent(body, containerId, items, slot, protocol_);
+    mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::InventoryContent), body.toVector());
+}
+
 void BedrockPlayer::sendEffect(const wire::common::Identifier& effect, const wire::bedrock::BedrockEffectEvent event,
                                const std::int32_t durationTicks, const std::int32_t amplifier, const bool ambient,
                                const bool particles) {
@@ -507,6 +572,21 @@ void BedrockPlayer::sendEffect(const wire::common::Identifier& effect, const wir
     const std::int32_t ticks = durationTicks < 0 ? std::numeric_limits<std::int32_t>::max() : durationTicks;
     wire::bedrock::writeMobEffect(body, kRuntimeEntityId, event, id, amplifier, particles, ticks, ambient);
     mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::MobEffect), body.toVector());
+}
+
+void BedrockPlayer::blockAction(const std::int32_t action, const std::int32_t x, const std::int32_t y,
+                                const std::int32_t z, std::int32_t) {
+    if (session_ == nullptr || !context_.breakBlock) {
+        return;
+    }
+    // A client that predicts the break has already taken the block away on its own screen, which is
+    // the one that counts here: everything else is told by the world. The other four say a dig is
+    // starting, going on or given up, and this server draws no cracks yet.
+    if (action != static_cast<std::int32_t>(wire::bedrock::BedrockBlockActionType::PredictDestroy) &&
+        action != static_cast<std::int32_t>(wire::bedrock::BedrockBlockActionType::StopBreak)) {
+        return;
+    }
+    context_.breakBlock(*session_, x, y, z);
 }
 
 void BedrockPlayer::command(const std::string_view line) {

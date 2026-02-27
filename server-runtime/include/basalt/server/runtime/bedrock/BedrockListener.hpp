@@ -110,6 +110,10 @@ public:
         /// Where the client says it is now, in the server's own terms: feet, not eyes.
         virtual void move(double x, double y, double z, float yaw, float pitch) = 0;
 
+        /// What the client did to a block: its own number, where, and which face.
+        virtual void blockAction(std::int32_t action, std::int32_t x, std::int32_t y, std::int32_t z,
+                                 std::int32_t face) = 0;
+
         /// What the client chose in a form, or nothing when it dismissed one.
         virtual void formAnswer(std::uint32_t formId, const std::optional<std::string>& data) = 0;
 

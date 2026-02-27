@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/item/ItemDamageEffects.hpp>
+#include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/common/Identifier.hpp>
@@ -150,6 +151,9 @@ private:
 
     void wearHeldItemOnBreak(const wire::common::Identifier& block);
 
+    /// What breaking a block needs of the server, built from what this connection knows.
+    [[nodiscard]] player::BreakContext breakContext();
+
     /// Sets fire where the flint and steel points, and lights a Nether portal if it lands in a frame.
     void igniteAt(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos, std::int32_t heldSlot,
                   const storage::StoredItemStack& held);
@@ -182,10 +186,6 @@ private:
     /// Arms an end portal frame, and opens the portal when that was the twelfth eye.
     void placeEnderEye(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos, std::int32_t heldSlot,
                        const storage::StoredItemStack& held);
-
-    /// What breaking a block leaves behind, which is water when it was ice over something solid.
-    [[nodiscard]] std::optional<std::int32_t> meltedIce(std::optional<std::int32_t> broken,
-                                                        const wire::protocol::play::BlockPos& pos) const;
 
     /// parity: `BellBlock.onHit` with `isProperHit`, which is what a bell can swing towards.
     [[nodiscard]] bool ringBell(const wire::protocol::play::BlockHitResult& hit);

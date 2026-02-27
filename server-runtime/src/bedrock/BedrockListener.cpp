@@ -243,8 +243,11 @@ void BedrockListener::onConnect(RakSession& session) {
             return;
         }
         if (packet == BedrockPacket::PlayerAuthInput && entry.player) {
-            const auto input = wire::bedrock::readPlayerAuthInput(body);
+            const auto input = wire::bedrock::readPlayerAuthInput(body, entry.connection.protocolVersion());
             if (input.has_value()) {
+                for (const wire::bedrock::BedrockBlockAction& action : input->blockActions) {
+                    entry.player->blockAction(action.action, action.x, action.y, action.z, action.face);
+                }
                 entry.player->move(static_cast<double>(input->x),
                                    static_cast<double>(input->y) - static_cast<double>(wire::bedrock::kPlayerEyeHeight),
                                    static_cast<double>(input->z), input->yaw, input->pitch);
@@ -314,6 +317,12 @@ void BedrockListener::onReady(Session& session) {
     body.clear();
     wire::bedrock::writeBiomeDefinitionList(body);
     session.connection.sendPacket(BedrockPacket::BiomeDefinitionList, body.readable());
+
+    // Which item is which number, said by the server rather than agreed by version. It goes before
+    // anything that could carry an item, which is everything after this point.
+    body.clear();
+    wire::bedrock::writeItemComponent(body);
+    session.connection.sendPacket(BedrockPacket::ItemComponent, body.readable());
 
     body.clear();
     wire::bedrock::writeAvailableEntityIdentifiers(body);
