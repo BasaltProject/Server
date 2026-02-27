@@ -37,7 +37,8 @@ inline constexpr std::int32_t kLampOffDelay = 4;
 /// rule, and with it off a signal leaves the tnt alone.
 [[nodiscard]] std::vector<BlockChange> update(WorldState& world, std::string_view worldName, std::int32_t x,
                                               std::int32_t y, std::int32_t z, std::int64_t gameTime,
-                                              random::RandomSource& random, bool tntExplodes, bool itself = true);
+                                              random::RandomSource& random, bool tntExplodes, bool itself = true,
+                                              std::optional<std::int32_t> told = std::nullopt);
 
 /// The half of a write only the block itself can answer, which is its `onPlace`. parity:
 /// `Level.updateNeighborsAt` never tells the square that changed, so a block landing on a powered

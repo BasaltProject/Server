@@ -71,8 +71,8 @@ TEST_CASE("what a player puts down is the block they were holding") {
     // down as `oak_wood` and a redstone block as leaves, with no error anywhere.
     for (const std::string& path :
          {std::string{"redstone_wire"}, std::string{"redstone_block"}, std::string{"repeater"},
-          std::string{"comparator"}, std::string{"redstone_torch"}, std::string{"lever"},
-          std::string{"stone"}, std::string{"oak_log"}, std::string{"chest"}}) {
+          std::string{"comparator"}, std::string{"redstone_torch"}, std::string{"lever"}, std::string{"stone"},
+          std::string{"oak_log"}, std::string{"chest"}}) {
         const std::int32_t state = placedAsTheServerDoes(path);
         const basalt::wire::common::Identifier* owner = registry::blockStateDefinitions::blockOf(state);
         REQUIRE(owner != nullptr);
@@ -118,14 +118,9 @@ TEST_CASE("what lands in a powered square arrives switched on") {
         const std::optional<std::int32_t> defaultState =
             registry::blocks::defaultStateIdOf(basalt::wire::common::Identifier::vanilla(path));
         REQUIRE(defaultState.has_value());
-        return blockPlacement::stateFor(block(path), *defaultState,
-                                        {.face = Direction::Up,
-                                         .world = &loaded.state,
-                                         .worldName = "overworld",
-                                         .x = x,
-                                         .y = 64,
-                                         .z = 8},
-                                        random);
+        return blockPlacement::stateFor(
+            block(path), *defaultState,
+            {.face = Direction::Up, .world = &loaded.state, .worldName = "overworld", .x = x, .y = 64, .z = 8}, random);
     };
 
     const std::int32_t beside = place("oak_trapdoor", 9);
@@ -203,14 +198,9 @@ TEST_CASE("a string laid beside a string joins it") {
     REQUIRE(loaded.state.setBlockState(9, 64, 8, wire));
     REQUIRE(loaded.state.setBlockState(8, 63, 8, defaultOf("stone")));
     rng::RandomSource random = rng::RandomSource::legacy(1);
-    const std::int32_t laid = blockPlacement::stateFor(block("tripwire"), wire,
-                                                       {.face = Direction::Up,
-                                                        .world = &loaded.state,
-                                                        .worldName = "overworld",
-                                                        .x = 8,
-                                                        .y = 64,
-                                                        .z = 8},
-                                                       random);
+    const std::int32_t laid = blockPlacement::stateFor(
+        block("tripwire"), wire,
+        {.face = Direction::Up, .world = &loaded.state, .worldName = "overworld", .x = 8, .y = 64, .z = 8}, random);
     CHECK(propertyOf(laid, "east") == "true");
     CHECK(propertyOf(laid, "north") == "false");
     CHECK(propertyOf(laid, "south") == "false");
@@ -284,14 +274,9 @@ TEST_CASE("every block in the game goes down as itself") {
         const basalt::wire::common::Identifier id = basalt::wire::common::Identifier::vanilla(name);
         const std::optional<std::int32_t> defaultState = registry::blocks::defaultStateIdOf(id);
         REQUIRE(defaultState.has_value());
-        const std::int32_t landed = blockPlacement::stateFor(id, *defaultState,
-                                                             {.face = Direction::Up,
-                                                              .world = &loaded.state,
-                                                              .worldName = "overworld",
-                                                              .x = 8,
-                                                              .y = 64,
-                                                              .z = 8},
-                                                             random);
+        const std::int32_t landed = blockPlacement::stateFor(
+            id, *defaultState,
+            {.face = Direction::Up, .world = &loaded.state, .worldName = "overworld", .x = 8, .y = 64, .z = 8}, random);
         const basalt::wire::common::Identifier* owner = registry::blockStateDefinitions::blockOf(landed);
         REQUIRE(owner != nullptr);
         CHECK(owner->path() == name);

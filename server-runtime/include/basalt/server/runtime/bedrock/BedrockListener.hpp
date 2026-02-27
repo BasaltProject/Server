@@ -2,6 +2,7 @@
 
 #include <basalt/wire/bedrock/BedrockConnection.hpp>
 #include <basalt/wire/bedrock/BedrockGate.hpp>
+#include <basalt/wire/bedrock/BedrockPackets.hpp>
 #include <basalt/wire/bedrock/RakServer.hpp>
 #include <basalt/wire/common/Uuid.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
@@ -113,6 +114,21 @@ public:
         /// What the client did to a block: its own number, where, and which face.
         virtual void blockAction(std::int32_t action, std::int32_t x, std::int32_t y, std::int32_t z,
                                  std::int32_t face) = 0;
+
+        /// A click on a block with whatever is in hand: which block, which face, where on it, and
+        /// which slot of the hotbar the client believes it is holding.
+        virtual void useItemOn(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t face, float clickX,
+                               float clickY, float clickZ, std::int32_t hotbarSlot) = 0;
+
+        /// Stacks the client asked to be moved between its own windows.
+        virtual void stackRequest(const wire::bedrock::BedrockStackRequest& request) = 0;
+
+        /// Whether the client is crouching, which decides whether a click uses a block or places
+        /// one against it.
+        virtual void setSneaking(bool sneaking) = 0;
+
+        /// The client closed a window, by the number this server gave it.
+        virtual void closeWindow(std::int32_t containerId) = 0;
 
         /// What the client chose in a form, or nothing when it dismissed one.
         virtual void formAnswer(std::uint32_t formId, const std::optional<std::string>& data) = 0;

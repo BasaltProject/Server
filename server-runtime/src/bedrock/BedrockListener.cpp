@@ -245,12 +245,31 @@ void BedrockListener::onConnect(RakSession& session) {
         if (packet == BedrockPacket::PlayerAuthInput && entry.player) {
             const auto input = wire::bedrock::readPlayerAuthInput(body, entry.connection.protocolVersion());
             if (input.has_value()) {
+                // Before the click, because it is what decides what the click means.
+                entry.player->setSneaking(input->sneaking);
+                // Zero is a click on a block; one is a click on the air and two is breaking, and
+                // neither of those puts anything down.
+                if (input->itemUse.has_value() && input->itemUse->action == 0) {
+                    entry.player->useItemOn(input->itemUse->x, input->itemUse->y, input->itemUse->z,
+                                            input->itemUse->face, input->itemUse->clickX, input->itemUse->clickY,
+                                            input->itemUse->clickZ, input->itemUse->hotbarSlot);
+                }
+                if (input->stackRequest.has_value()) {
+                    entry.player->stackRequest(*input->stackRequest);
+                }
                 for (const wire::bedrock::BedrockBlockAction& action : input->blockActions) {
                     entry.player->blockAction(action.action, action.x, action.y, action.z, action.face);
                 }
                 entry.player->move(static_cast<double>(input->x),
                                    static_cast<double>(input->y) - static_cast<double>(wire::bedrock::kPlayerEyeHeight),
                                    static_cast<double>(input->z), input->yaw, input->pitch);
+            }
+            return;
+        }
+        if (packet == BedrockPacket::ContainerClose && entry.player) {
+            const auto close = wire::bedrock::readContainerClose(body);
+            if (close.has_value()) {
+                entry.player->closeWindow(close->containerId);
             }
             return;
         }

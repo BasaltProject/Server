@@ -3,9 +3,11 @@
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealItemTags.hpp>
 #include <basalt/wire/common/Identifier.hpp>
+#include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -69,6 +71,10 @@ struct BreakContext {
 /// One block, its new state, to everyone who can see it.
 void announceBlock(const BreakContext& context, std::string_view worldName, std::int32_t x, std::int32_t y,
                    std::int32_t z, std::int32_t stateId);
+
+/// The neighbours of a block that changed, told the way the world tells them.
+void notifyAround(const BreakContext& context, world::LoadedWorld& world, std::int32_t x, std::int32_t y,
+                  std::int32_t z, std::optional<std::int32_t> removed);
 
 /// What a vibration-sensitive block hears, and whatever that shakes loose.
 void heardBySculk(const BreakContext& context, world::LoadedWorld& world, std::string_view event, std::int32_t x,

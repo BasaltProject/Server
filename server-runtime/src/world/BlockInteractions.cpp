@@ -3,8 +3,8 @@
 #include <basalt/server/runtime/world/RedstoneWire.hpp>
 
 #include <array>
-#include <cmath>
 #include <charconv>
+#include <cmath>
 #include <cstdint>
 #include <map>
 #include <span>
@@ -197,8 +197,7 @@ bool isCycleable(std::int32_t stateId) {
     // parity: `DaylightDetectorBlock.useWithoutItem` cycles `inverted`, and
     // `RedStoneWireBlock.useWithoutItem` turns a cross into a dot and back. Both are components you
     // set up by clicking them, and the bench cannot press anything, so neither was here.
-    return path == "repeater" || path == "comparator" || path == "daylight_detector" ||
-           redstoneWire::isWire(stateId);
+    return path == "repeater" || path == "comparator" || path == "daylight_detector" || redstoneWire::isWire(stateId);
 }
 
 std::optional<BlockToggle> toggle(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,

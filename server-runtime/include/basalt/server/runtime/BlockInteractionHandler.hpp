@@ -132,6 +132,10 @@ public:
     /// One tick of whatever the player is breaking.
     void tickDigging(player::PlayerSession& session);
 
+    /// What breaking a block needs of the server, built from what this connection knows. Public
+    /// because everything that has to reach a whole world takes one of these, not only breaking.
+    [[nodiscard]] player::BreakContext breakContext();
+
 private:
     /// The seed a loot roll, a fire's delay or a sound's own random starts from.
     [[nodiscard]] std::int64_t nextSeed() const;
@@ -150,9 +154,6 @@ private:
     [[nodiscard]] bool eyesInWater() const;
 
     void wearHeldItemOnBreak(const wire::common::Identifier& block);
-
-    /// What breaking a block needs of the server, built from what this connection knows.
-    [[nodiscard]] player::BreakContext breakContext();
 
     /// Sets fire where the flint and steel points, and lights a Nether portal if it lands in a frame.
     void igniteAt(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos, std::int32_t heldSlot,

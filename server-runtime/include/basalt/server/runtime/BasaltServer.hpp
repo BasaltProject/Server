@@ -23,6 +23,7 @@
 #include <basalt/server/runtime/VanillaGameData.hpp>
 #include <basalt/server/runtime/WorldRegistry.hpp>
 #include <basalt/server/runtime/bedrock/BedrockListener.hpp>
+#include <basalt/server/runtime/bedrock/BedrockWindows.hpp>
 #include <basalt/server/runtime/command/commands/SaveCommands.hpp>
 #include <basalt/server/runtime/config/CompatibilityConfig.hpp>
 #include <basalt/server/runtime/config/LiveConfigs.hpp>
@@ -173,6 +174,9 @@ private:
 
     /// What breaking a block needs, whichever door the breaker came in by.
     [[nodiscard]] player::BreakContext breakContext();
+
+    /// Tells a world that one more, or one fewer, is looking into the block that window belongs to.
+    void openersChanged(world::LoadedWorld& world, const bedrock::OpenWindow& window, bool opened);
 
     VanillaGameData vanillaData_;
     ChunkSimulationView chunkSimulation_;

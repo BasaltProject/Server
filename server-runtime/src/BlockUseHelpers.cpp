@@ -12,7 +12,6 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
-#include <basalt/server/runtime/world/DaylightDetectors.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
@@ -22,6 +21,7 @@
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Composters.hpp>
+#include <basalt/server/runtime/world/DaylightDetectors.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
 #include <basalt/server/runtime/world/Explosions.hpp>
 #include <basalt/server/runtime/world/ItemFrames.hpp>
@@ -890,9 +890,9 @@ void BlockInteractionHandler::cycleBlock(const BlockPos& pos) {
     // parity: `DaylightDetectorBlock.useWithoutItem` writes `inverted` telling nobody and then lets
     // `updateSignalStrength` write the reading, which is the write that carries. Without this the
     // detector flipped and kept the old number until its own turn came round.
-    const std::optional<world::BlockChange> reread = world::daylightDetectors::update(
-        world->state(), world->clock(), world->weather(), pos.x, pos.y, pos.z,
-        config::dimensionFacts(world->declaration().dimension).hasSkylight);
+    const std::optional<world::BlockChange> reread =
+        world::daylightDetectors::update(world->state(), world->clock(), world->weather(), pos.x, pos.y, pos.z,
+                                         config::dimensionFacts(world->declaration().dimension).hasSkylight);
     if (reread.has_value()) {
         broadcastBlockUpdate(pos, reread->stateId);
     }

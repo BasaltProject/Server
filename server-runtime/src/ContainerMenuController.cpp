@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
+#include <basalt/server/runtime/player/PlayerContainers.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
@@ -166,73 +167,19 @@ void ContainerMenuController::openChest(PlayerSession& session, const BlockPos& 
     }
 }
 
-void ContainerMenuController::announceOpeners(const BlockPos& pos, const std::string& block, std::int32_t openers) {
+void ContainerMenuController::announceOpeners(const BlockPos& pos, const std::string& block,
+                                              const std::int32_t openers) {
     world::LoadedWorld* world = owner_->currentWorld();
     if (world == nullptr) {
         return;
     }
-    const std::optional<std::int32_t> stateId = world->state().blockState(pos.x, pos.y, pos.z);
-    if (!stateId.has_value()) {
-        return;
-    }
-    if (block == "barrel") {
-        const std::optional<std::int32_t> opened = server::registry::blockStateDefinitions::stateIdOf(
-            Identifier::vanilla("barrel"), {{"open", openers > 0 ? "true" : "false"}}, *stateId);
-        if (opened.has_value() && *opened != *stateId && world->state().setBlockState(pos.x, pos.y, pos.z, *opened)) {
-            owner_->blockInteraction().broadcastBlockUpdate(pos, *opened);
-        }
-    } else {
-        const std::int32_t blockId = server::registry::blockSupport::blockRegistryIdOf(*stateId);
-        for (PlayerSession* player : owner_->playersInSameWorld()) {
-            if (!player->connection().sendPlayPacket) {
-                continue;
-            }
-            player->connection().sendPlayPacket(
-                wire::protocol::play::BlockEventPacket::kId, [&](wire::io::ByteBuffer& buffer) {
-                    wire::protocol::play::BlockEventPacket{
-                        .pos = pos, .b0 = 1, .b1 = static_cast<std::uint8_t>(openers), .blockId = blockId}
-                        .write(buffer);
-                });
-        }
-    }
-    // Only the first in and the last out make a sound, which is why a busy chest is not a rattle.
-    const std::string family = block == "barrel"                      ? "barrel"
-                               : world::shulkers::isShulkerBox(block) ? "shulker_box"
-                                                                      : "chest";
-    std::string sound;
-    if (openers == 1) {
-        sound = "block." + family + ".open";
-    } else if (openers == 0) {
-        sound = "block." + family + ".close";
-    } else {
-        return;
-    }
-    // parity: `ContainerOpenersCounter` raises `CONTAINER_OPEN` on the first one in and
-    // `CONTAINER_CLOSE` on the last one out, on the same edges as the sound. A sculk sensor beside a
-    // chest hears somebody open it, and here it heard nothing at all.
-    if (world->state().hasSculkSensorNear(pos.x, pos.y, pos.z, world::vibrations::kCalibratedRange)) {
-        world::vibrations::emit(world->state(), openers == 1 ? "container_open" : "container_close", pos.x + 0.5,
-                                pos.y + 0.5, pos.z + 0.5, world->gameTime());
-    }
-    const float roll = options_.nextFloat ? options_.nextFloat() : 0.5F;
-    for (PlayerSession* player : owner_->playersInSameWorld()) {
-        if (!player->connection().sendPlayPacket) {
-            continue;
-        }
-        player->connection().sendPlayPacket(wire::protocol::play::SoundPacket::kId, [&](wire::io::ByteBuffer& buffer) {
-            wire::protocol::play::SoundPacket{.sound = sound,
-                                              .source = SoundSource::Blocks,
-                                              .x = pos.x + 0.5,
-                                              .y = pos.y + 0.5,
-                                              .z = pos.z + 0.5,
-                                              .volume = 0.5F,
-                                              // parity: `ChestBlockEntity.playSound`, a tenth
-                                              // of a tone of randomness.
-                                              .pitch = (roll * 0.1F) + 0.9F,
-                                              .seed = options_.nextSeed ? options_.nextSeed() : 0}
-                .write(buffer);
-        });
-    }
+    // The lid, the barrel, the sound and the vibration are the same on both editions, so both
+    // doors say it the same way: see `player/PlayerContainers`.
+    player::OpenersContext context;
+    context.blocks = owner_->blockInteraction().breakContext();
+    context.nextFloat = options_.nextFloat;
+    context.nextSeed = options_.nextSeed;
+    player::announceOpeners(context, *world, pos.x, pos.y, pos.z, block, openers);
 }
 
 void ContainerMenuController::openPluginMenu(const std::string& title, std::int32_t rows,

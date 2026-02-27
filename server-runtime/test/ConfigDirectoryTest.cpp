@@ -83,11 +83,15 @@ TEST_CASE("every commented default is valid TOML") {
     // The templates are edited by hand and compiled in, so a broken one would only show up on
     // somebody's first run. Here instead.
     const std::vector<std::pair<std::string, std::string_view>> templates = {
-        {"animations.toml", kAnimationsDefaultToml}, {"boss_bar.toml", kBossBarDefaultToml},
-        {"commands.toml", kCommandsDefaultToml},     {"groups.toml", kGroupsDefaultToml},
+        {"animations.toml", kAnimationsDefaultToml},
+        {"boss_bar.toml", kBossBarDefaultToml},
+        {"commands.toml", kCommandsDefaultToml},
+        {"groups.toml", kGroupsDefaultToml},
         {"scoreboard.toml", kScoreboardDefaultToml},
-        {"server.toml", kServerDefaultToml},         {"server_list.toml", kServerListDefaultToml},
-        {"tab_list.toml", kTabListDefaultToml},      {"world_settings.toml", kWorldSettingsDefaultToml},
+        {"server.toml", kServerDefaultToml},
+        {"server_list.toml", kServerListDefaultToml},
+        {"tab_list.toml", kTabListDefaultToml},
+        {"world_settings.toml", kWorldSettingsDefaultToml},
         {"worlds.toml", kWorldsDefaultToml},
     };
     for (const auto& [name, contents] : templates) {

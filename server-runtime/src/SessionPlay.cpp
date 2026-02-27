@@ -1,3 +1,4 @@
+#include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ChunkStreamer.hpp>
@@ -210,6 +211,19 @@ player::PlayerConnection ClientSession::playerConnection() {
     connection.broadcastEffects = [this](std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
                                          const std::vector<world::BlockEffect>& effects) {
         blockInteraction_->broadcastEffects(play::BlockPos{x, y, z}, stateId, effects);
+    };
+    connection.sendBlockEvent = [this](const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                                       const std::int32_t stateId, const std::int32_t b0, const std::int32_t b1) {
+        const play::BlockEventPacket packet{.pos = play::BlockPos{x, y, z},
+                                            .b0 = static_cast<std::uint8_t>(b0),
+                                            .b1 = static_cast<std::uint8_t>(b1),
+                                            .blockId = reg::blockSupport::blockRegistryIdOf(stateId)};
+        sendPlayPacket(play::BlockEventPacket::kId, [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+    };
+    connection.sendLevelEvent = [this](const std::int32_t type, const std::int32_t x, const std::int32_t y,
+                                       const std::int32_t z, const std::int32_t data) {
+        const play::LevelEventPacket packet{.event = type, .pos = play::BlockPos{x, y, z}, .data = data};
+        sendPlayPacket(play::LevelEventPacket::kId, [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
     };
     connection.resendChunk = [this](std::int32_t chunkX, std::int32_t chunkZ) { resendChunk(chunkX, chunkZ); };
     connection.handOverToRegion = [this](world::LoadedWorld& world) { handOverToRegionOf(world); };

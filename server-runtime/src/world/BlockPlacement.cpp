@@ -1,6 +1,6 @@
-#include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockConnections.hpp>
 #include <basalt/server/registry/BlockFluids.hpp>
+#include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
@@ -322,10 +322,9 @@ constexpr auto kGrowingHeads =
             const bool acrossZ = properties["facing"] == "north" || properties["facing"] == "south";
             const std::int32_t first = acrossZ ? stateAt(*world, x - 1, y, z) : stateAt(*world, x, y, z - 1);
             const std::int32_t second = acrossZ ? stateAt(*world, x + 1, y, z) : stateAt(*world, x, y, z + 1);
-            properties["in_wall"] = registry::blockConnections::isWall(first) ||
-                                            registry::blockConnections::isWall(second)
-                                        ? "true"
-                                        : "false";
+            properties["in_wall"] =
+                registry::blockConnections::isWall(first) || registry::blockConnections::isWall(second) ? "true"
+                                                                                                        : "false";
         }
     } else if (path.ends_with("_shelf") || path == "shelf" || path.ends_with("_head") || path.ends_with("_skull")) {
         properties["powered"] = poweredHere() ? "true" : "false";
@@ -335,11 +334,11 @@ constexpr auto kGrowingHeads =
         // parity: `TripWireBlock.getStateForPlacement` sets all four sides from `shouldConnectTo`,
         // the same question `updateShape` asks one side at a time. Only fences and panes were joined
         // as they landed, so a line of string laid by hand stayed a row of stubs.
-        for (const auto& [face, name] : std::array<std::pair<registry::BlockFace, std::string_view>, 4>{
-                 {{registry::BlockFace::North, "north"},
-                  {registry::BlockFace::South, "south"},
-                  {registry::BlockFace::West, "west"},
-                  {registry::BlockFace::East, "east"}}}) {
+        for (const auto& [face, name] :
+             std::array<std::pair<registry::BlockFace, std::string_view>, 4>{{{registry::BlockFace::North, "north"},
+                                                                              {registry::BlockFace::South, "south"},
+                                                                              {registry::BlockFace::West, "west"},
+                                                                              {registry::BlockFace::East, "east"}}}) {
             properties[std::string{name}] = tripwires::connectsTo(*world, x, y, z, face) ? "true" : "false";
         }
     } else if (path == "hopper") {
@@ -478,10 +477,9 @@ std::int32_t stateFor(const wire::common::Identifier& block, std::int32_t givenD
     // had no way to tell. The block itself is the authority here, so the number is checked against
     // it and replaced when it does not fit.
     const wire::common::Identifier* owner = registry::blockStateDefinitions::blockOf(givenDefault);
-    const std::int32_t defaultStateId =
-        owner != nullptr && *owner == block
-            ? givenDefault
-            : registry::blocks::defaultStateIdOf(block).value_or(givenDefault);
+    const std::int32_t defaultStateId = owner != nullptr && *owner == block
+                                            ? givenDefault
+                                            : registry::blocks::defaultStateIdOf(block).value_or(givenDefault);
     // parity: `ConcretePowderBlock.getStateForPlacement`, the third site that asks the same question
     // as the shape update and the landing: the square still holds the water being replaced when it
     // is asked, which is how anybody actually makes concrete. This goes before everything else
@@ -527,9 +525,9 @@ std::int32_t stateFor(const wire::common::Identifier& block, std::int32_t givenD
         // watches the square beyond. A piston, a dispenser, a barrel and a command block all take the
         // single opposite and face back. Every observer placed by hand used to look the wrong way.
         const Direction looking = nearestLooking(placement.yaw, placement.pitch);
-        properties["facing"] = named(path, kClickedFaceBlocks)  ? nameOf(face)
-                               : path == "observer"             ? nameOf(looking)
-                                                                : nameOf(opposite(looking));
+        properties["facing"] = named(path, kClickedFaceBlocks) ? nameOf(face)
+                               : path == "observer"            ? nameOf(looking)
+                                                               : nameOf(opposite(looking));
     } else if (facings == 4 && path.contains("wall") && face != Direction::Up && face != Direction::Down) {
         properties["facing"] = nameOf(face);
     } else if (facings == 4 && attached) {
