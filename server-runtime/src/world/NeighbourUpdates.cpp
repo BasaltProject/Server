@@ -434,8 +434,32 @@ std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std:
     return connect(context, x, y, z, *stateId, towards);
 }
 
-void settleArrivedSignal(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+namespace {
+
+/// parity: `ObserverBlock.updateNeighborsInFront`, the notice an observer owes the square it feeds.
+void tellInFront(const Context& context, const std::int32_t stateId, const std::int32_t x, const std::int32_t y,
+                 const std::int32_t z, const OnReshaped& onReshaped) {
+    WorldState& world = context.world;
+    for (const redstoneComponents::Reach& at : redstoneComponents::outputReach(stateId, x, y, z)) {
+        if (!at.skip.has_value()) {
+            continue;
+        }
+        redstoneComponents::scheduleInFront(world, context.worldName, at.x, at.y, at.z, *at.skip);
+        for (const BlockChange& change :
+             redstoneReactors::updateInFront(world, context.worldName, at.x, at.y, at.z, *at.skip, context.gameTime,
+                                             context.random, context.tntExplodes)) {
+            if (world.setBlockState(change.x, change.y, change.z, change.stateId)) {
+                (onReshaped ? onReshaped : OnReshaped{noop})(change.stateId, change.x, change.y, change.z);
+            }
+        }
+    }
+}
+
+} // namespace
+
+void settleArrivedSignal(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                          const OnReshaped& onReshaped) {
+    WorldState& world = context.world;
     // parity: `SculkSensorBlock.onPlace` and `TargetBlock.onPlace`, which are the same four lines:
     // a block that arrives already carrying a signal and with no turn booked to spend it puts that
     // signal back to zero. A `/setblock` of a target with `power=15` reads fifteen here and nothing
@@ -482,6 +506,10 @@ void settleArrivedSignal(WorldState& world, std::int32_t x, std::int32_t y, std:
                 registry::blockStateDefinitions::stateIdOf(*block, {{"powered", "false"}}, *arrived);
             quiet.has_value() && world.setBlockState(x, y, z, *quiet)) {
             (onReshaped ? onReshaped : OnReshaped{noop})(*quiet, x, y, z);
+            // parity: that `onPlace` ends in `updateNeighborsInFront`, and the write it makes first
+            // carries no `UPDATE_NEIGHBORS`, so this notice is the only one the square it feeds ever
+            // gets. Without it a lamp an observer was lighting never books the turn that puts it out.
+            tellInFront(context, *quiet, x, y, z, onReshaped);
         }
         return;
     }
@@ -684,7 +712,7 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
             }
         }
     }
-    settleArrivedSignal(world, x, y, z, reshaped);
+    settleArrivedSignal(context, x, y, z, reshaped);
     // parity: `ScaffoldingBlock.onPlace` really is an `onPlace`, `level.scheduleTick(pos, this, 1)`,
     // so it runs on **every** write of the piece and not only on a placement. That is why it stays
     // out here while the cane and the coral below went in with the shape walk.
@@ -804,12 +832,8 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // updates the shapes around it, so a piece of dust that lit up wakes an observer looking at it
     // just as much as a block somebody placed.
     redstoneComponents::watchFor(world, x, y, z);
-    // parity: `ObserverBlock.onPlace` switching off one that arrived powered. The notice it owes is
-    // held back to where `reach` exists, because that is the list this road runs an output reach on.
-    const std::optional<BlockChange> woke = redstoneComponents::watchOnPlace(world, x, y, z, removed);
-    if (woke.has_value()) {
-        reshaped(woke->stateId, woke->x, woke->y, woke->z);
-    }
+    // parity: `ObserverBlock.updateShape` on the observer itself, which books its first turn.
+    redstoneComponents::watchOnPlace(world, x, y, z, removed);
     for (const BlockChange& change : settled) {
         redstoneComponents::watchFor(world, change.x, change.y, change.z);
     }
@@ -839,13 +863,6 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // parity: the square that changed tells with the block that **left** on the world's road and with
     // the one that arrived on a command's, the same as every other notice.
     reacting.push_back({{x, y, z}, context.railArrivalTells ? removed : world.blockState(x, y, z)});
-    // parity: the first of the two calls in `ObserverBlock.updateNeighborsInFront` is
-    // `neighborChanged(front)`, so the square it feeds hears it directly and books its own turn.
-    if (woke.has_value()) {
-        for (const redstoneComponents::Reach& at : redstoneComponents::outputReach(woke->stateId, x, y, z)) {
-            reacting.push_back({{at.x, at.y, at.z}, woke->stateId});
-        }
-    }
     // parity: `DiodeBlock.updateNeighborsInFront` from `onPlace` and from
     // `affectNeighborsAfterRemoval`, plus `RedstoneTorchBlock.notifyNeighbors`, which tell the square
     // they feed **and its own neighbours**. The state that has just gone is what says where a
@@ -857,16 +874,6 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     if (standing.has_value() && !isObserverState(*standing)) {
         for (const redstoneComponents::Reach& at : redstoneComponents::outputReach(*standing, x, y, z)) {
             reach.emplace_back(at, *standing);
-        }
-    }
-    // parity: an observer is left out of the reach above because its own arrival feeds nothing: it
-    // only reaches out on its turn. `onPlace` is the exception, and the one case it covers is the
-    // observer that arrives **powered**: it is switched off and then runs `updateNeighborsInFront`,
-    // which is this same reach. Measured in `observadorcolocado`, where the turn that was missing
-    // belonged to the **lamp**: it never heard the observer go out, so it never booked its own.
-    if (woke.has_value()) {
-        for (const redstoneComponents::Reach& at : redstoneComponents::outputReach(woke->stateId, x, y, z)) {
-            reach.emplace_back(at, woke->stateId);
         }
     }
     // parity: `LevelChunk.setBlockState` runs `affectNeighborsAfterRemoval` on the state that left

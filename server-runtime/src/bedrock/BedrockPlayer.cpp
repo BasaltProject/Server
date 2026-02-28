@@ -410,6 +410,38 @@ void BedrockPlayer::setStance(const bool onGround, const bool sprinting) {
     session_->sprinting = sprinting;
 }
 
+void BedrockPlayer::attack(const std::uint64_t runtimeEntityId) {
+    if (session_ == nullptr || !context_.attackEntity || runtimeEntityId == 0) {
+        return;
+    }
+    // The client counts entities from one where this server counts from zero.
+    context_.attackEntity(*session_, static_cast<std::int32_t>(runtimeEntityId - 1), fallDistance_ > 0.0);
+}
+
+void BedrockPlayer::setHeldSlot(const std::int32_t slot) {
+    if (session_ == nullptr || slot < 0 || slot >= player::PlayerInventory::kHotbarSize) {
+        return;
+    }
+    session_->inventory.setHeldSlot(slot);
+}
+
+void BedrockPlayer::openOwnInventory() {
+    if (session_ == nullptr) {
+        return;
+    }
+    // The bag itself is container zero, and it carries no block behind it: the position is the
+    // player's own, which is what that client draws the screen over.
+    wire::io::ByteBuffer body;
+    wire::bedrock::writeContainerOpen(
+        body, 0, wire::bedrock::BedrockContainerType::Inventory, static_cast<std::int32_t>(std::floor(session_->x)),
+        static_cast<std::int32_t>(std::floor(session_->y)), static_cast<std::int32_t>(std::floor(session_->z)));
+    mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::ContainerOpen), body.toVector());
+    // What is in it, so the screen it opens is not an empty one.
+    if (session_->connection().sendInventoryAll) {
+        session_->connection().sendInventoryAll();
+    }
+}
+
 void BedrockPlayer::closeWindow(const std::int32_t containerId) {
     if (session_ == nullptr) {
         return;
@@ -467,6 +499,13 @@ void BedrockPlayer::move(const double x, const double y, const double z, const f
             return session_->name() + " is moving: " + std::to_string(x) + ", " + std::to_string(y) + ", " +
                    std::to_string(z);
         });
+    }
+    // How far they have dropped without landing. parity: `Entity.fallDistance`, which is what
+    // decides whether a swing counts as a critical: only a hit on the way down does.
+    if (session_->onGround) {
+        fallDistance_ = 0.0;
+    } else if (y < session_->y) {
+        fallDistance_ += session_->y - y;
     }
     // Written from the listener's thread, read by the tick, which is exactly what a Java connection
     // does with the same fields from its own thread.
@@ -616,7 +655,7 @@ void BedrockPlayer::syncSurroundings() {
                 wire::bedrock::writeAddEntity(body, static_cast<std::int64_t>(runtimeIdFor(id)), seen.type,
                                               static_cast<float>(seen.x), static_cast<float>(seen.y),
                                               static_cast<float>(seen.z), seen.yaw, seen.pitch, seen.width, seen.height,
-                                              protocol_);
+                                              seen.flags, protocol_);
                 mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::AddEntity), body.toVector());
             }
             present.emplace(id, std::move(seen));

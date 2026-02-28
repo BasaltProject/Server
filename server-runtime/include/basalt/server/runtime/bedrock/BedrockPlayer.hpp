@@ -46,6 +46,9 @@ struct Seen {
     float height = 1.8F;
     /// What is lying there, for a stack. Nothing for anything alive.
     std::optional<storage::StoredItemStack> stack;
+    /// What it is doing, as the flags that edition draws it by: burning, small, sitting. A mob that
+    /// is only ever drawn once stays as it arrived, so a lamb never grows and a fire never shows.
+    std::uint64_t flags = 0;
 };
 
 /// A player who arrived through the Bedrock door: the same `PlayerSession` in the same registry, so
@@ -120,6 +123,10 @@ public:
         /// that same thread. A Bedrock client is told about mobs and dropped stacks by packet, so a
         /// server that never looks draws an empty world with nothing on the floor.
         std::function<void(const player::PlayerSession&, std::function<void(std::vector<Seen>)>)> lookAround;
+        /// Hits whatever that entity is, where the world is. The numbers are the same ones the
+        /// other door swings by: the formula lives in `player::combat` so the two cannot drift.
+        std::function<void(player::PlayerSession&, std::int32_t entityId, bool falling)> attackEntity;
+
         /// Picks up whatever this player is standing on, where the world is. Java does the same
         /// thing once per tick from its own session; a Bedrock player has none, and without this
         /// nothing they break ever reaches their bag.
@@ -187,6 +194,9 @@ public:
     void setSneaking(bool sneaking) override;
     void setStance(bool onGround, bool sprinting) override;
 
+    void attack(std::uint64_t runtimeEntityId) override;
+    void setHeldSlot(std::int32_t slot) override;
+    void openOwnInventory() override;
     void closeWindow(std::int32_t containerId) override;
 
     void tick() override;
@@ -314,6 +324,10 @@ private:
     std::unique_ptr<ui::PlayerUi> ui_;
     std::int64_t uiTick_ = 0;
     bool bossBarShown_ = false;
+    /// How far this player has dropped since they last stood on something.
+    double fallDistance_ = 0.0;
+    /// The bars this client has been shown, by the id each one travels under over here.
+    std::set<std::int64_t> shownBars_;
     /// What the sidebar is showing right now, line by line, so only what changed goes out.
     std::vector<std::string> sidebarShown_;
     std::optional<std::string> sidebarTitle_;

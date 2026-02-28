@@ -52,6 +52,20 @@ constexpr std::int32_t kVillageHeight = 4;
 constexpr std::int32_t kVillageBeds = 3;
 
 void sendRaidBar(PlayerSession& player, const Raid& raid, BossEventPacket::Operation operation) {
+    // A client that draws bars its own way is told what the bar says rather than handed Java's
+    // packet: the shape of the operation is this edition's, the bar is not.
+    if (player.connection().showBossBar) {
+        if (const auto* add = std::get_if<BossEventPacket::Add>(&operation); add != nullptr) {
+            player.connection().showBossBar(raid.barId(), add->name, add->progress, true);
+            return;
+        }
+        if (const auto* progress = std::get_if<BossEventPacket::UpdateProgress>(&operation); progress != nullptr) {
+            player.connection().showBossBar(raid.barId(), wire::text::Component::empty(), progress->progress, true);
+            return;
+        }
+        player.connection().showBossBar(raid.barId(), wire::text::Component::empty(), 0.0F, false);
+        return;
+    }
     if (!player.connection().sendPlayPacket) {
         return;
     }

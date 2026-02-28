@@ -2,12 +2,18 @@
 #include <basalt/server/plugins/PluginHost.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/BuildInfo.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/bedrock/BedrockChunks.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
+#include <basalt/server/runtime/entity/EntityCombat.hpp>
+#include <basalt/server/runtime/item/ItemDamageEffects.hpp>
+#include <basalt/server/runtime/item/ItemWear.hpp>
+#include <basalt/server/runtime/player/Combat.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerBlockPlace.hpp>
 #include <basalt/server/runtime/player/PlayerContainers.hpp>
@@ -16,8 +22,13 @@
 #include <basalt/server/runtime/player/PlayerDigSpeed.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerItemPickup.hpp>
+#include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/world/ContainerOpeners.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
+#include <basalt/server/runtime/world/RealEnchantments.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
+#include <basalt/server/runtime/world/WeaponDamage.hpp>
+#include <basalt/wire/bedrock/BedrockEntityIdentifiers.hpp>
 #include <basalt/wire/io/Platform.hpp>
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
 #include <basalt/wire/text/Serializers.hpp>
@@ -625,23 +636,46 @@ void BasaltServer::startBedrockListener() {
                     return (dx * dx) + (dy * dy) + (dz * dz) <= kRange * kRange;
                 };
 
+                // What a mob is doing, as the flags that edition draws it by. Sent again whenever
+                // they change: a client that is only ever told once shows a lamb that never grows
+                // and a mob that burns without flames.
+                const auto flagsOf = [](const entity::ServerEntity& mob) {
+                    std::uint64_t flags = wire::bedrock::flagBit(wire::bedrock::EntityFlag::HasCollision) |
+                                          wire::bedrock::flagBit(wire::bedrock::EntityFlag::HasGravity) |
+                                          wire::bedrock::flagBit(wire::bedrock::EntityFlag::Breathing) |
+                                          wire::bedrock::flagBit(wire::bedrock::EntityFlag::CanShowName);
+                    if (mob.fireTicks > 0) {
+                        flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::OnFire);
+                    }
+                    // parity: `AgeableMob.age`, where anything below zero is still a baby.
+                    if (mob.age < 0) {
+                        flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Baby);
+                    }
+                    if (mob.sitting) {
+                        flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Sitting);
+                    }
+                    return flags;
+                };
+
                 std::vector<bedrock::Seen> seen;
                 for (const entity::ServerEntity* alive : found->second->state().entities()) {
                     if (alive == nullptr || alive->removed || !near(alive->x, alive->y, alive->z)) {
                         continue;
                     }
-                    // Both editions name a cow `minecraft:cow`. One they disagree on is one the
-                    // client will not draw, and drawing the wrong animal would be worse.
-                    seen.push_back(bedrock::Seen{.entityId = alive->entityId(),
-                                                 .type = alive->type().toString(),
-                                                 .x = alive->x,
-                                                 .y = alive->y,
-                                                 .z = alive->z,
-                                                 .yaw = alive->yaw,
-                                                 .pitch = alive->pitch,
-                                                 .width = static_cast<float>(alive->width()),
-                                                 .height = static_cast<float>(alive->height()),
-                                                 .stack = std::nullopt});
+                    // Nearly every name is the same on both; the fourteen that are not are a table
+                    // of their own, because nothing about a name says which kind it is.
+                    seen.push_back(
+                        bedrock::Seen{.entityId = alive->entityId(),
+                                      .type = std::string{wire::bedrock::bedrockEntityName(alive->type().toString())},
+                                      .x = alive->x,
+                                      .y = alive->y,
+                                      .z = alive->z,
+                                      .yaw = alive->yaw,
+                                      .pitch = alive->pitch,
+                                      .width = static_cast<float>(alive->width()),
+                                      .height = static_cast<float>(alive->height()),
+                                      .stack = std::nullopt,
+                                      .flags = flagsOf(*alive)});
                 }
                 for (const world::DroppedItem& dropped : found->second->state().items()) {
                     if (!near(dropped.x, dropped.y, dropped.z)) {
@@ -656,6 +690,126 @@ void BasaltServer::startBedrockListener() {
                                                                                    .components = dropped.components}});
                 }
                 answer(std::move(seen));
+            });
+        };
+
+        // A swing at something alive, settled where the world is. Every number here comes from the
+        // same place the other door's swing does: the charge, the reach and what a hit is worth are
+        // all in `player::combat`, so the two editions cannot drift apart.
+        context.attackEntity = [this](player::PlayerSession& player, const std::int32_t entityId, const bool falling) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, entityId, falling] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (session == nullptr || session->dead ||
+                    session->gamemode == wire::protocol::play::Gamemode::Spectator) {
+                    return;
+                }
+                const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                const auto found = worlds.find(session->worldName);
+                if (found == worlds.end() || found->second == nullptr) {
+                    return;
+                }
+                world::LoadedWorld& world = *found->second;
+                entity::ServerEntity* target = world.state().entity(entityId);
+                if (target == nullptr || target->removed || !registry::entityAttributes::isLiving(target->type())) {
+                    return;
+                }
+                const bool reached =
+                    player::combat::withinAttackReach(session->x, session->y, session->z, target->x, target->y,
+                                                      target->z, target->width(), target->height());
+                // TEMPORARY: whether the swing reached, which tells a miss from a hit never arrived.
+                logger_.debug([reached, session, target] {
+                    return std::string{reached ? "attack: within reach" : "attack: out of reach"} + " (player " +
+                           std::to_string(session->x) + "," + std::to_string(session->z) + " target " +
+                           std::to_string(target->x) + "," + std::to_string(target->z) + ")";
+                });
+                if (!reached) {
+                    return;
+                }
+
+                const std::optional<storage::StoredItemStack>& held = session->inventory.heldItem();
+                std::optional<wire::common::Identifier> weapon;
+                if (held.has_value()) {
+                    if (const auto parsed = wire::common::Identifier::parse(held->id); parsed.has_value()) {
+                        weapon = *parsed;
+                    }
+                }
+                const registry::WeaponStats* stats = weapon.has_value() ? registry::itemWeapons::of(*weapon) : nullptr;
+                const float strength = player::combat::attackStrengthScale(
+                    session->ticksSinceSwing,
+                    registry::itemWeapons::kBaseAttackSpeed + (stats == nullptr ? 0.0 : stats->attackSpeed));
+                session->ticksSinceSwing = 0;
+                const auto base = static_cast<float>(registry::itemWeapons::kBaseAttackDamage +
+                                                     (stats == nullptr ? 0.0 : stats->attackDamage));
+                // parity: what the enchantments add rides on the swing but never on the critical, so
+                // it is worked out here and handed to the same arithmetic the other door uses.
+                world::RealEnchantments* enchantments = &vanillaData_.enchantments;
+                const float enchanted =
+                    world::weaponDamage::of(held, base, [enchantments](const wire::common::Identifier& id) {
+                        return enchantments->definitionOf(id);
+                    });
+                const player::combat::Swing swing =
+                    player::combat::swingOf(strength, base, enchanted, falling, session->onGround, session->sprinting);
+                if (swing.damage <= 0.0F) {
+                    return;
+                }
+
+                const entity::entityCombat::Result result = entity::entityCombat::hurt(
+                    *target, swing.damage, session->x, session->z, {}, "attack", session->name());
+                if (!result.landed) {
+                    return;
+                }
+                if (swing.knockbackAttack) {
+                    entity::entityCombat::knockback(*target, 0.5, session->x - target->x, session->z - target->z);
+                }
+                // parity: `HurtByTargetGoal` and `PanicGoal` both read the last thing that hurt it.
+                target->hurtBy = session->entityId();
+                // parity: `Player.attack` wears the weapon by one point per hit, and unbreaking
+                // gets its say before the wear lands rather than repairing it afterwards.
+                if (session->gamemode != wire::protocol::play::Gamemode::Creative && held.has_value() &&
+                    item::itemWear::isDamageable(*held)) {
+                    item::ItemDamageEffects effects{
+                        [enchantments](const wire::common::Identifier& id) { return enchantments->definitionOf(id); }};
+                    random::RandomSource wear =
+                        random::RandomSource::legacy(static_cast<std::int64_t>(scratchRandom()()));
+                    const std::optional<storage::StoredItemStack> worn = item::itemWear::hurt(
+                        *held, item::itemWear::costPerAttack(*held), wear,
+                        [&effects](const storage::StoredItemStack& stack, const std::int32_t amount,
+                                   random::RandomSource& source) { return effects.process(stack, amount, source); });
+                    if (worn != held) {
+                        session->inventory.set(player::PlayerInventory::kHotbarStart + session->inventory.heldSlot(),
+                                               worn);
+                        if (session->connection().sendInventoryAll) {
+                            session->connection().sendInventoryAll();
+                        }
+                    }
+                }
+                world::vibrations::emit(world.state(), "entity_damage", target->x, target->y, target->z,
+                                        world.gameTime());
+                for (player::PlayerSession* watcher : playerRegistry_.snapshot()) {
+                    if (watcher->worldName != session->worldName) {
+                        continue;
+                    }
+                    player::playSoundFor(*watcher,
+                                         result.died ? entity::entityCombat::deathSound(target->type())
+                                                     : entity::entityCombat::hurtSound(target->type()),
+                                         wire::protocol::play::SoundSource::Hostile, target->x, target->y, target->z,
+                                         1.0F, 1.0F, 0);
+                    // parity: `ServerPlayer.crit` and the knockback sound, which is what tells the
+                    // difference between a good hit and an ordinary one from across the field.
+                    if (swing.critical) {
+                        player::playSoundFor(*watcher, "entity.player.attack.crit",
+                                             wire::protocol::play::SoundSource::Players, session->x, session->y,
+                                             session->z, 1.0F, 1.0F, 0);
+                        if (watcher->connection().showCriticalHit) {
+                            watcher->connection().showCriticalHit(target->entityId());
+                        }
+                    } else if (swing.knockbackAttack) {
+                        player::playSoundFor(*watcher, "entity.player.attack.knockback",
+                                             wire::protocol::play::SoundSource::Players, session->x, session->y,
+                                             session->z, 1.0F, 1.0F, 0);
+                    }
+                }
             });
         };
 

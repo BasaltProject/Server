@@ -138,7 +138,7 @@ void reshapeOnly(const Context& context, std::int32_t x, std::int32_t y, std::in
 /// spend it. parity: `SculkSensorBlock.onPlace` and `TargetBlock.onPlace`. Separate because
 /// `onPlace` runs after `overwriteWithDefinedProperties`, so a command naming `power=15` still loses
 /// to it and has to ask again. Doing it twice costs nothing: the second call sees a zero.
-void settleArrivedSignal(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+void settleArrivedSignal(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z,
                          const OnReshaped& reshaped = {});
 
 /// Joins a fence, a gate or a pane to what is now beside it, answering the new state if it moved.

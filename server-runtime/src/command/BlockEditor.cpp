@@ -217,7 +217,7 @@ void BlockEditor::notifyNeighbours() {
         // neighbours are never told at all. A target put down with `power=15` zeroes itself as it
         // lands, so the dust beside it stays the dot it was instead of drawing a line to it.
         neighbourUpdates::settleArrivedSignal(
-            world_->state(), at[0], at[1], at[2],
+            context, at[0], at[1], at[2],
             [this](std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) { record(x, y, z, stateId); });
         if (world_->state().blockState(at[0], at[1], at[2]) != written) {
             // The jar skips the shape updates and the packet here, but `updateNeighboursOnBlockSet`
