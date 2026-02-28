@@ -152,11 +152,10 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
         }
         return std::nullopt;
     }
-    // parity: sin direccion es el caso de `updateFromNeighbourShapes`, que aplica `updateShape`
-    // **una vez por cada lado**, y cada aplicacion puede reservar por su cuenta. Recontar la
-    // distancia una sola vez no es lo mismo: una hoja colocada a distancia 1 de su tronco no
-    // reservaba nada, y el jar reserva igualmente por los otros cinco lados, que son aire. Medido en
-    // `hojaturno`, donde el jar tiene los tres turnos en la primera foto y nosotros ninguno.
+    // parity: no direction is the `updateFromNeighbourShapes` case, which applies `updateShape` once
+    // per side, and each application may book on its own. Recounting the distance once is not the
+    // same: a leaf placed at distance 1 from its trunk booked nothing, and the jar books anyway for
+    // the other five sides, which are air. Measured in `hojaturno`.
     for (const BlockFace face : kUpdateShapeOrder) {
         const std::int32_t fromNeighbour = distanceOf(stateAt(world, x + registry::stepX(face),
                                                               y + registry::stepY(face), z + registry::stepZ(face))) +
@@ -712,10 +711,10 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         if (const std::optional<std::int32_t> moved = reshape(context, x, y, z); moved.has_value()) {
             reshaped(*moved, x, y, z);
         }
-        // parity: the fifteen blocks of `booksItsOwnBreak` and `CoralBlock` have **no** `onPlace`
-        // either: their turn comes out of `updateShape`, so a placement books it (through
-        // `updateFromNeighbourShapes`) and a plain write of the square does not. `reshape` above
-        // already books the coral's, and the loose ones are the only family it does not cover.
+        // parity: the fifteen blocks of `booksItsOwnBreak` and `CoralBlock` have no `onPlace`: their
+        // turn comes out of `updateShape`, so a placement books it and a plain write does not. Only
+        // the solid `CoralBlock` is like that; the plant, fan and wall fan do have an `onPlace` with
+        // the same `tryScheduleDieTick`, so the self-reshape above gets them by another road.
         scheduledBlocks::scheduleBreakIfLoose(
             world, x, y, z, blockSurvival::isSupported(world, x, y, z, std::nullopt, scaffolding, context.hasSkylight));
     }
@@ -1098,20 +1097,18 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     if (laid.has_value() && tripwires::isWire(*laid)) {
         tripwires::updateSource(world, x, y, z, *laid, context.gameTime, effects);
     }
-    // parity: `LevelChunk.setBlockState` solo corre `affectNeighborsAfterRemoval` cuando **cambia el
-    // bloque**, no cuando cambia su estado. Sin esta puerta, reescribir una cuerda con otro estado
-    // se tomaba por una cuerda arrancada y encendia los dos ganchos de la linea: medido en
-    // `cuerdadesigual`, donde el jar los deja apagados.
+    // parity: `LevelChunk.setBlockState` only runs `affectNeighborsAfterRemoval` when the block
+    // changes, not when its state does. Without this gate, rewriting a string with another state was
+    // taken for a string torn out and lit both hooks of the line: measured in `cuerdadesigual`.
     const bool tripwireBlockChanged = !laid.has_value() || !removed.has_value() || !sameBlock(*removed, *laid);
     // parity: `TripWireBlock.affectNeighborsAfterRemoval`, which hands the line the string that has
     // just gone **as if it were still there and powered**, so the hooks fire and each books itself a
     // look ten ticks later to find the gap. Every other block's version of this hook is a plain "tell
     // the neighbours", which the cascade above already does; this is the only one that substitutes a
     // state, and without it a cut wire left both hooks hanging loose at once.
-    // parity: `TripWireHookBlock.onRemoved`, que solo hace algo si el gancho se fue pegado o
-    // encendido: recorre la linea con `isBeingDestroyed` y deja **suelto al gancho del otro
-    // extremo**. Sin esto el otro se quedaba pegado para siempre, porque quitar un gancho no es
-    // quitar una cuerda y nada mas volvia a mirar la linea.
+    // parity: `TripWireHookBlock.onRemoved` only does anything if the hook left attached or powered:
+    // it walks the line with `isBeingDestroyed` and leaves the hook at the other end loose. Without
+    // this the other one stayed stuck for good, because removing a hook is not removing a string.
     if (tripwireBlockChanged && removed.has_value() && tripwires::isHook(*removed)) {
         const std::map<std::string, std::string> gone = registry::blockStateDefinitions::propertiesOf(*removed);
         const auto attachedAt = gone.find("attached");
