@@ -44,6 +44,17 @@ constexpr int kPollTimeoutMillis = 20;
 /// What a client is told to draw before it has asked for anything.
 constexpr std::int32_t kInitialRadius = 4;
 
+/// How much one turn may hand to a client. A join used to glue every column into a single batch of
+/// well over a megabyte: one RakNet message split into a thousand parts, none of them worth
+/// anything until the last one arrived. A turn's worth at a time is the same bytes in pieces a
+/// client can read as they land.
+constexpr std::size_t kTurnBytes = 64U * 1024U;
+
+/// Above this a packet is named in the log on its way out. A join is made of a handful of these and
+/// a stream of small ones, so naming only the big ones says what a slow join was busy with, and
+/// leaves the last one in the log when a client reads something it cannot.
+constexpr std::size_t kLargePacketBytes = 1024;
+
 [[nodiscard]] std::uint64_t nowMillis() {
     return static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
@@ -105,9 +116,21 @@ void BedrockMailbox::post(const std::uint16_t packetId, std::vector<std::uint8_t
     }
 }
 
-std::vector<BedrockMailbox::Item> BedrockMailbox::drain() {
+std::vector<BedrockMailbox::Item> BedrockMailbox::drain(const std::size_t maxBytes) {
     const std::lock_guard<std::mutex> guard{lock_};
-    return std::exchange(items_, {});
+    std::size_t taken = 0;
+    std::size_t count = 0;
+    while (count < items_.size() && taken < maxBytes) {
+        taken += items_[count].body.size();
+        ++count;
+    }
+    if (count == items_.size()) {
+        return std::exchange(items_, {});
+    }
+    std::vector<Item> some{std::make_move_iterator(items_.begin()),
+                           std::make_move_iterator(items_.begin() + static_cast<std::ptrdiff_t>(count))};
+    items_.erase(items_.begin(), items_.begin() + static_cast<std::ptrdiff_t>(count));
+    return some;
 }
 
 void BedrockMailbox::close() {
@@ -172,8 +195,9 @@ bool BedrockListener::start() {
     if (const auto started = server_->start(); !started) {
         logger_.warn([this] {
             return "Could not bind UDP port " + std::to_string(options_.port) +
-                   " for Bedrock. Something else is on it; change `port` under [bedrock] in "
-                   "config/compatibility.toml or turn it off.";
+                   " for Bedrock. Something else is on it, which is usually the last run of this "
+                   "server still letting go of it: try again, or change `port` under "
+                   "[network.bedrock] in config/server.toml.";
         });
         server_.reset();
         return false;
@@ -347,13 +371,37 @@ void BedrockListener::onMessage(RakSession& session, std::span<const std::uint8_
     found->second->connection.receive(payload);
 }
 
-void BedrockListener::onDisconnect(RakSession& session) { sessions_.erase(session.peer()); }
+void BedrockListener::onDisconnect(RakSession& session) {
+    // A client that said goodbye read something it did not like; one that simply went quiet was not
+    // being reached. The counts say which, and a burst that stops being acknowledged halfway names
+    // the transport rather than the packet.
+    logger_.debug([&session] {
+        const wire::bedrock::RakSession::Stats& stats = session.stats();
+        return std::string{"Bedrock session ended: the client "} +
+               (session.saidGoodbye() ? "said goodbye" : "went quiet") + " after " +
+               std::to_string(stats.datagramsSent) + " datagram(s) out (" +
+               std::to_string(stats.datagramsAcknowledged) + " acknowledged, " +
+               std::to_string(stats.datagramsAskedAgain) + " asked for again, " +
+               std::to_string(stats.datagramsResent) + " resent) and " + std::to_string(stats.datagramsReceived) +
+               " in, with " + std::to_string(stats.splitMessages) + " message(s) split into " +
+               std::to_string(stats.splitParts) + " part(s).";
+    });
+    sessions_.erase(session.peer());
+}
 
 void BedrockListener::onReady(Session& session) {
     if (session.started) {
         return;
     }
     session.started = true;
+
+    // How big each piece of the burst is, which is what says whether a client that never answers
+    // is choking on one packet's contents or on the size of it.
+    const auto note = [this](const std::string_view what, const std::size_t bytes) {
+        logger_.debug([what, bytes] {
+            return "Bedrock join: " + std::string{what} + " is " + std::to_string(bytes) + " byte(s).";
+        });
+    };
 
     wire::bedrock::StartGameInfo info;
     // The client is told where its eyes are, not its feet, which is the same offset it reports
@@ -366,30 +414,36 @@ void BedrockListener::onReady(Session& session) {
     wire::io::ByteBuffer body;
     wire::bedrock::writeStartGame(body, info, session.connection.protocolVersion());
     session.connection.sendPacket(BedrockPacket::StartGame, body.readable());
+    note("start_game", body.readableBytes());
 
     // What a client is told about the world before it is told it is in it. A real client reads
     // start_game, finds it knows nothing about what lives here, and leaves without a word.
     body.clear();
     wire::bedrock::writeBiomeDefinitionList(body);
     session.connection.sendPacket(BedrockPacket::BiomeDefinitionList, body.readable());
+    note("biomes", body.readableBytes());
 
     // Which item is which number, said by the server rather than agreed by version. It goes before
     // anything that could carry an item, which is everything after this point.
     body.clear();
     wire::bedrock::writeItemComponent(body);
     session.connection.sendPacket(BedrockPacket::ItemComponent, body.readable());
+    note("items", body.readableBytes());
 
     body.clear();
     wire::bedrock::writeAvailableEntityIdentifiers(body);
     session.connection.sendPacket(BedrockPacket::AvailableEntityIdentifiers, body.readable());
+    note("entities", body.readableBytes());
 
     body.clear();
-    wire::bedrock::writeCreativeContent(body);
+    wire::bedrock::writeCreativeContent(body, session.connection.protocolVersion());
     session.connection.sendPacket(BedrockPacket::CreativeContent, body.readable());
+    note("creative", body.readableBytes());
 
     body.clear();
     wire::bedrock::writeSetCommandsEnabled(body, true);
     session.connection.sendPacket(BedrockPacket::SetCommandsEnabled, body.readable());
+    note("commands", body.readableBytes());
 
     body.clear();
     wire::bedrock::writeChunkRadiusUpdated(body, kInitialRadius);
@@ -423,11 +477,17 @@ void BedrockListener::onReady(Session& session) {
 }
 
 void BedrockListener::deliverMail(Session& session) {
-    const std::vector<BedrockMailbox::Item> items = session.mailbox->drain();
+    const std::vector<BedrockMailbox::Item> items = session.mailbox->drain(kTurnBytes);
     if (items.empty()) {
         return;
     }
     for (const BedrockMailbox::Item& item : items) {
+        if (item.body.size() >= kLargePacketBytes) {
+            logger_.debug([&item] {
+                return "Bedrock out: " + std::string{wire::bedrock::bedrockPacketName(item.packetId)} + " is " +
+                       std::to_string(item.body.size()) + " byte(s).";
+            });
+        }
         session.connection.sendPacket(static_cast<BedrockPacket>(item.packetId), item.body);
         if (item.last) {
             // The goodbye was written by whoever posted it, so this only has to stop: the client
