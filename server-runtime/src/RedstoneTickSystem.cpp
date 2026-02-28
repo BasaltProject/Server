@@ -534,6 +534,10 @@ void RedstoneTickSystem::tickFallingBlocks(world::LoadedWorld& world, const sche
             world.state(), *entity,
             [&world, hasSkylight](std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) {
                 return world::blockSurvival::isSupported(world.state(), x, y, z, stateId, {}, hasSkylight);
+            },
+            [this, &world, &watchers](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
+                sendBlockUpdate(watchers, BlockPos{bx, by, bz}, stateId);
+                broadcaster_->notifyAround(world, watchers, bx, by, bz, std::nullopt);
             });
         // parity: `FrogspawnBlock.entityInside` is `destroyBlock(pos, false)` for a falling block and
         // nothing else, and `checkInsideBlocks` runs inside the move, over the squares the box ends

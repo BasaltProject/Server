@@ -62,8 +62,8 @@ TEST_CASE("a block that can fall books its own turn") {
     REQUIRE(world.setBlockState(4, 70, 4, stateOf("sand")));
     REQUIRE(world.setBlockState(5, 70, 5, stateOf("stone")));
 
-    fallingBlocks::scheduleIfFalling(world, 4, 70, 4);
-    fallingBlocks::scheduleIfFalling(world, 5, 70, 5);
+    fallingBlocks::scheduleIfFalling(world, 4, 70, 4, fallingBlocks::Asked::onPlace);
+    fallingBlocks::scheduleIfFalling(world, 5, 70, 5, fallingBlocks::Asked::onPlace);
     // parity: the turn is stored under the block that booked it, which is what vanilla writes to
     // disk and what it looks the tick up by when it reads a chunk back.
     CHECK(world.hasScheduledBlockTick(4, 70, 4, Identifier::vanilla("sand")));
@@ -72,6 +72,23 @@ TEST_CASE("a block that can fall books its own turn") {
     // parity: two ticks, so it comes due on the second and not the first.
     CHECK(world.dueBlockTicks().empty());
     CHECK(world.dueBlockTicks().size() == 1);
+}
+
+TEST_CASE("concrete powder in water books a turn when it lands but not when a neighbour moves") {
+    WorldState world = emptyWorld();
+    world.getOrGenerateChunk(0, 0);
+    REQUIRE(world.setBlockState(4, 70, 4, stateOf("white_concrete_powder")));
+    REQUIRE(world.setBlockState(5, 70, 4, stateOf("water")));
+    REQUIRE(world.setBlockState(8, 70, 4, stateOf("white_concrete_powder")));
+    REQUIRE(world.setBlockState(9, 70, 4, stateOf("water")));
+
+    // parity: `ConcretePowderBlock` overrides only `updateShape`, and its concrete branch returns
+    // without calling super. `onPlace` is `FallingBlock`'s and books powder the water has reached,
+    // which is the turn the jar keeps on the square a falling powder lands in.
+    fallingBlocks::scheduleIfFalling(world, 4, 70, 4, fallingBlocks::Asked::onPlace);
+    fallingBlocks::scheduleIfFalling(world, 8, 70, 4, fallingBlocks::Asked::updateShape);
+    CHECK(world.hasScheduledBlockTick(4, 70, 4, Identifier::vanilla("white_concrete_powder")));
+    CHECK_FALSE(world.hasScheduledBlockTick(8, 70, 4, Identifier::vanilla("white_concrete_powder")));
 }
 
 TEST_CASE("sand over a hole becomes an entity and lands as sand again") {
@@ -101,6 +118,37 @@ TEST_CASE("sand over a hole becomes an entity and lands as sand again") {
     CHECK(landed.placed->stateId == stateOf("sand"));
     CHECK(world.blockState(4, 61, 4) == stateOf("sand"));
     CHECK(falling->removed);
+}
+
+TEST_CASE("concrete powder is told it landed while it is still powder") {
+    WorldState world = emptyWorld();
+    world.getOrGenerateChunk(0, 0);
+    REQUIRE(world.setBlockState(4, 60, 4, stateOf("stone")));
+    REQUIRE(world.setBlockState(4, 61, 4, stateOf("water")));
+    REQUIRE(world.setBlockState(4, 70, 4, stateOf("white_concrete_powder")));
+
+    ServerEntity* falling = fallingBlocks::beginFalling(world, 4, 70, 4, ids());
+    REQUIRE(falling != nullptr);
+
+    // parity: `FallingBlockEntity.tick` writes what it carried and only **then** calls `onLand`, so
+    // the neighbour update of the first write sees the powder. Running it after both writes would
+    // show the concrete, and the powder's `onPlace` would never leave its fall turn on the square.
+    std::optional<std::int32_t> toldAbout;
+    std::optional<std::int32_t> standingWhenTold;
+    fallingBlocks::Landing landed;
+    for (std::int32_t at = 0; at < 200 && !landed.placed.has_value(); ++at) {
+        landed = fallingBlocks::tick(world, *falling, anythingStands(),
+                                     [&](std::int32_t stateId, std::int32_t x, std::int32_t y, std::int32_t z) {
+                                         toldAbout = stateId;
+                                         standingWhenTold = world.blockState(x, y, z);
+                                     });
+    }
+    REQUIRE(landed.placed.has_value());
+    REQUIRE(toldAbout.has_value());
+    CHECK(*toldAbout == stateOf("white_concrete_powder"));
+    CHECK(standingWhenTold == stateOf("white_concrete_powder"));
+    // And what stays is the concrete, because `onLand` runs straight after.
+    CHECK(landed.placed->stateId == stateOf("white_concrete"));
 }
 
 TEST_CASE("it falls faster the longer it falls") {

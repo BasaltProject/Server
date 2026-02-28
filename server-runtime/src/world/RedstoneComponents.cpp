@@ -824,15 +824,27 @@ std::vector<BlockChange> relockAround(WorldState& world, const std::int32_t x, c
     return changes;
 }
 
-void watchOnPlace(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+std::optional<BlockChange> watchOnPlace(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value() || pathOf(*stateId) != "observer") {
-        return;
+        return std::nullopt;
     }
     if (valueOf(registry::blockStateDefinitions::propertiesOf(*stateId), "powered") == "true") {
-        return;
+        // parity: `ObserverBlock.onPlace`, que es el unico gancho que mira el caso de llegar
+        // **encendido**: lo apaga con `setBlock(..., 18)` y avisa a lo que alimenta. La bandera 18
+        // lleva el 16, asi que esa escritura no redibuja formas: solo cambia el estado.
+        if (world.hasScheduledBlockTick(x, y, z, observer())) {
+            return std::nullopt;
+        }
+        const std::optional<std::int32_t> off =
+            registry::blockStateDefinitions::stateIdOf(observer(), {{"powered", "false"}}, *stateId);
+        if (!off.has_value() || !world.setBlockState(x, y, z, *off)) {
+            return std::nullopt;
+        }
+        return BlockChange{.x = x, .y = y, .z = z, .stateId = *off};
     }
     world.scheduleBlockTick(x, y, z, observer(), kObserverDelay);
+    return std::nullopt;
 }
 
 void watchFor(WorldState& world, std::int32_t changedX, std::int32_t changedY, std::int32_t changedZ) {
