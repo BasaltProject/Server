@@ -366,8 +366,12 @@ Chunk& WorldState::installLocked(Chunk chunk) {
         }
         const std::int32_t stateId = installed.blockStateId(mark.x & 15, mark.y, mark.z & 15);
         if (const std::optional<FluidKind> kind = fluidFlow::kindOf(stateId); kind.has_value()) {
-            installed.scheduleFluidTick(server::world::ChunkScheduledTick{
-                .type = fluidId(*kind), .localX = mark.x & 15, .y = mark.y, .localZ = mark.z & 15, .delay = 0});
+            installed.scheduleFluidTick(
+                server::world::ChunkScheduledTick{.type = fluidId(*kind, isSourceFluid(stateId)),
+                                                  .localX = mark.x & 15,
+                                                  .y = mark.y,
+                                                  .localZ = mark.z & 15,
+                                                  .delay = 0});
         }
     }
     // A neighbour that was waiting on this chunk gets its own marked blocks redone now.
@@ -639,9 +643,8 @@ std::vector<std::array<std::int32_t, 3>> WorldState::dueBlockTicks(const Ticking
 }
 
 std::vector<WorldState::DueTick> WorldState::dueBlockTicksTyped(const Ticking& ticking) {
-    const std::vector<std::array<std::int32_t, 3>> positions =
-        dueTicks([](Chunk& chunk, std::vector<ChunkScheduledTick>& due) { chunk.advanceBlockTicks(due); }, true,
-                 ticking);
+    const std::vector<std::array<std::int32_t, 3>> positions = dueTicks(
+        [](Chunk& chunk, std::vector<ChunkScheduledTick>& due) { chunk.advanceBlockTicks(due); }, true, ticking);
     const WorldReadLock lock{mutex_};
     std::vector<DueTick> due;
     due.reserve(positions.size());

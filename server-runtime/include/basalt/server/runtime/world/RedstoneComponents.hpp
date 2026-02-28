@@ -136,17 +136,14 @@ void scheduleAroundWire(WorldState& world, std::string_view worldName, std::int3
 /// this it only locked later, when something else happened to touch it.
 [[nodiscard]] std::vector<BlockChange> relockAround(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
-/// parity: `ObserverBlock.updateShape` runs on the observer itself the moment it lands, because
-/// `updateFromNeighbourShapes` asks every direction and one of them is the one it watches. So an
-/// observer books a turn as soon as it is placed, whatever is in front of it, and a chain of them
-/// is one turn out of step without this.
+/// parity: `ObserverBlock.updateShape` runs on the observer itself the moment it lands, so one books
+/// a turn as soon as it is placed and a chain of them is otherwise a turn out of step.
 ///
-/// Y el caso contrario, que es de otro gancho: parity: `ObserverBlock.onPlace` es el unico que hace
-/// algo cuando el observador llega **encendido**, y lo que hace es apagarlo y avisar a quien
-/// alimenta. Sin eso, una lampara detras de un observador colocado encendido se quedaba encendida
-/// para siempre. Devuelve ese cambio para que el que llama lo anuncie.
-[[nodiscard]] std::optional<BlockChange> watchOnPlace(WorldState& world, std::int32_t x, std::int32_t y,
-                                                      std::int32_t z);
+/// `ObserverBlock.onPlace` is the other hook, the only one that acts when it arrives powered: it
+/// switches off and tells what it feeds, without which a lamp behind it stayed lit for good.
+/// `removed` is what stood there before. Answers the change, output reach included.
+[[nodiscard]] std::optional<BlockChange> watchOnPlace(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                                      std::optional<std::int32_t> removed);
 
 /// parity: `ObserverBlock.updateShape`, which only fires for the block it faces: an observer
 /// watches one direction and ignores everything else that moves around it.

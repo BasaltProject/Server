@@ -804,7 +804,10 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // updates the shapes around it, so a piece of dust that lit up wakes an observer looking at it
     // just as much as a block somebody placed.
     redstoneComponents::watchFor(world, x, y, z);
-    if (const std::optional<BlockChange> woke = redstoneComponents::watchOnPlace(world, x, y, z); woke.has_value()) {
+    // parity: `ObserverBlock.onPlace` switching off one that arrived powered. The notice it owes is
+    // held back to where `reach` exists, because that is the list this road runs an output reach on.
+    const std::optional<BlockChange> woke = redstoneComponents::watchOnPlace(world, x, y, z, removed);
+    if (woke.has_value()) {
         reshaped(woke->stateId, woke->x, woke->y, woke->z);
     }
     for (const BlockChange& change : settled) {
@@ -847,6 +850,16 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     if (standing.has_value() && !isObserverState(*standing)) {
         for (const redstoneComponents::Reach& at : redstoneComponents::outputReach(*standing, x, y, z)) {
             reach.emplace_back(at, *standing);
+        }
+    }
+    // parity: an observer is left out of the reach above because its own arrival feeds nothing: it
+    // only reaches out on its turn. `onPlace` is the exception, and the one case it covers is the
+    // observer that arrives **powered**: it is switched off and then runs `updateNeighborsInFront`,
+    // which is this same reach. Measured in `observadorcolocado`, where the turn that was missing
+    // belonged to the **lamp**: it never heard the observer go out, so it never booked its own.
+    if (woke.has_value()) {
+        for (const redstoneComponents::Reach& at : redstoneComponents::outputReach(woke->stateId, x, y, z)) {
+            reach.emplace_back(at, woke->stateId);
         }
     }
     // parity: `LevelChunk.setBlockState` runs `affectNeighborsAfterRemoval` on the state that left

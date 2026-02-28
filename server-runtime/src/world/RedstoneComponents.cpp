@@ -825,15 +825,23 @@ std::vector<BlockChange> relockAround(WorldState& world, const std::int32_t x, c
     return changes;
 }
 
-std::optional<BlockChange> watchOnPlace(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+std::optional<BlockChange> watchOnPlace(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                        const std::optional<std::int32_t> removed) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value() || pathOf(*stateId) != "observer") {
         return std::nullopt;
     }
+    // parity: `ObserverBlock.onPlace` opens with `!state.is(oldState.getBlock())`, so it answers a
+    // block that changed and not a state that moved. An observer written over an observer runs none
+    // of this, however its `facing` or its `powered` differ.
+    if (removed.has_value() && pathOf(*removed) == pathOf(*stateId)) {
+        return std::nullopt;
+    }
     if (valueOf(registry::blockStateDefinitions::propertiesOf(*stateId), "powered") == "true") {
-        // parity: `ObserverBlock.onPlace`, que es el unico gancho que mira el caso de llegar
-        // **encendido**: lo apaga con `setBlock(..., 18)` y avisa a lo que alimenta. La bandera 18
-        // lleva el 16, asi que esa escritura no redibuja formas: solo cambia el estado.
+        // parity: `ObserverBlock.onPlace` is the only hook that looks at arriving **powered**: it
+        // switches it off with `setBlock(..., 18)` and then runs `updateNeighborsInFront`. Flag 18
+        // carries the 16, so that write redraws no shapes; it only changes the state. The notice is
+        // the caller's half, and without it the lamp it was feeding never hears that it went out.
         if (world.hasScheduledBlockTick(x, y, z, observer())) {
             return std::nullopt;
         }

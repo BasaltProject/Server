@@ -25,6 +25,23 @@
 namespace basalt::server::runtime::bedrock {
 namespace {
 
+/// What a client will take as the line under a command in its suggestion list. Since 1.21.130 it
+/// refuses a description past a thousand characters, and it refuses the whole packet rather than
+/// the one command: a `gamerule` usage naming every rule is nearly three thousand on its own, and
+/// it took the command tree, the join and the player with it. A line break is cut for the same
+/// reason Geyser cuts one, which is that the list is unreadable after it.
+[[nodiscard]] std::string fitsInACommandTip(std::string usage) {
+    constexpr std::size_t kMostCharacters = 950;
+    if (const std::size_t breaksAt = usage.find('\n'); breaksAt != std::string::npos) {
+        usage.resize(breaksAt);
+    }
+    if (usage.size() > kMostCharacters) {
+        usage.resize(kMostCharacters - 3);
+        usage += "...";
+    }
+    return usage;
+}
+
 using wire::text::Component;
 
 /// How many turns of the world go by between two readings of an open window's contents. Half a
@@ -386,7 +403,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         }
         std::vector<wire::bedrock::CommandInfo> commands;
         for (auto& [name, usage] : context_.commandList(*session_)) {
-            commands.push_back(wire::bedrock::CommandInfo{std::move(name), std::move(usage)});
+            commands.push_back(wire::bedrock::CommandInfo{std::move(name), fitsInACommandTip(usage)});
         }
         wire::io::ByteBuffer body;
         wire::bedrock::writeAvailableCommands(body, commands);
