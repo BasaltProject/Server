@@ -173,3 +173,61 @@ TEST_CASE("an unlit chunk sends empty masks rather than empty arrays") {
     CHECK(lit.skyLight.size() == chunk.sectionCount());
     CHECK(lit.emptySkyLightMask.front() == 0);
 }
+
+TEST_CASE("what a block gives off is a property of the state, not of the block") {
+    const auto light = [](const std::string& block, const std::map<std::string, std::string>& properties) {
+        const std::optional<std::int32_t> stateId = registry::blocks::stateIdOf(Identifier::vanilla(block), properties);
+        REQUIRE(stateId.has_value());
+        return blockLight::emission(*stateId);
+    };
+
+    // parity: `litBlockEmission`, which is what these blocks are registered with. Reading the block
+    // instead of the state lit an unlit ore and left a lit lamp dark, which is the whole point of
+    // this case.
+    CHECK(light("redstone_lamp", {{"lit", "true"}}) == 15);
+    CHECK(light("redstone_lamp", {{"lit", "false"}}) == 0);
+    CHECK(light("redstone_ore", {{"lit", "true"}}) == 9);
+    CHECK(light("redstone_ore", {{"lit", "false"}}) == 0);
+    CHECK(light("furnace", {{"lit", "true"}, {"facing", "north"}}) == 13);
+    CHECK(light("furnace", {{"lit", "false"}, {"facing", "north"}}) == 0);
+
+    // A wall torch gives the same light whichever way it hangs.
+    for (const std::string& facing : {"north", "south", "west", "east"}) {
+        CHECK(light("wall_torch", {{"facing", facing}}) == 14);
+        CHECK(light("redstone_wall_torch", {{"facing", facing}, {"lit", "true"}}) == 7);
+        CHECK(light("redstone_wall_torch", {{"facing", facing}, {"lit", "false"}}) == 0);
+    }
+
+    // parity: the ones that count something rather than answering yes or no.
+    CHECK(light("candle", {{"lit", "true"}, {"candles", "4"}, {"waterlogged", "false"}}) == 12);
+    CHECK(light("candle", {{"lit", "false"}, {"candles", "4"}, {"waterlogged", "false"}}) == 0);
+    CHECK(light("sea_pickle", {{"pickles", "4"}, {"waterlogged", "true"}}) == 15);
+    CHECK(light("sea_pickle", {{"pickles", "4"}, {"waterlogged", "false"}}) == 0);
+    CHECK(light("respawn_anchor", {{"charges", "4"}}) == 15);
+    CHECK(light("respawn_anchor", {{"charges", "1"}}) == 3);
+    CHECK(light("respawn_anchor", {{"charges", "0"}}) == 0);
+    CHECK(light("cave_vines", {{"berries", "true"}, {"age", "0"}}) == 14);
+    CHECK(light("cave_vines", {{"berries", "false"}, {"age", "0"}}) == 0);
+}
+
+TEST_CASE("a copper bulb gives less light the more it has weathered") {
+    const auto light = [](const std::string& block) {
+        const std::optional<std::int32_t> lit =
+            registry::blocks::stateIdOf(Identifier::vanilla(block), {{"lit", "true"}, {"powered", "false"}});
+        REQUIRE(lit.has_value());
+        return blockLight::emission(*lit);
+    };
+    // parity: `COPPER_BULB`'s own `litBlockEmission(switch ...)`, and the waxed ones are the same
+    // block with the weathering stopped, so they light the same.
+    CHECK(light("copper_bulb") == 15);
+    CHECK(light("exposed_copper_bulb") == 12);
+    CHECK(light("weathered_copper_bulb") == 8);
+    CHECK(light("oxidized_copper_bulb") == 4);
+    CHECK(light("waxed_copper_bulb") == 15);
+    CHECK(light("waxed_oxidized_copper_bulb") == 4);
+
+    const std::optional<std::int32_t> dark =
+        registry::blocks::stateIdOf(Identifier::vanilla("copper_bulb"), {{"lit", "false"}, {"powered", "false"}});
+    REQUIRE(dark.has_value());
+    CHECK(blockLight::emission(*dark) == 0);
+}
