@@ -1,5 +1,7 @@
 #include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/plugins/PluginHost.hpp>
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/BuildInfo.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
@@ -11,8 +13,11 @@
 #include <basalt/server/runtime/player/PlayerContainers.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerDeath.hpp>
+#include <basalt/server/runtime/player/PlayerDigSpeed.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/player/PlayerItemPickup.hpp>
 #include <basalt/server/runtime/world/ContainerOpeners.hpp>
+#include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/wire/io/Platform.hpp>
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
 #include <basalt/wire/text/Serializers.hpp>
@@ -201,8 +206,10 @@ void BasaltServer::shutdown() {
     if (listener_.has_value()) {
         listener_->close();
     }
+    // Only the door: the thread stays up until the players below have been told why they are
+    // leaving, because it is that thread that carries the goodbye to a Bedrock client.
     if (bedrockListener_) {
-        bedrockListener_->stop();
+        bedrockListener_->closeDoor();
     }
 
     const std::vector<player::PlayerSession*> players = playerRegistry_.snapshot();
@@ -220,6 +227,9 @@ void BasaltServer::shutdown() {
             }
             playerRegistry_.remove(player->uuid());
         }
+    }
+    if (bedrockListener_) {
+        bedrockListener_->stop();
     }
 
     tickLoop_->stop();
@@ -421,6 +431,38 @@ void BasaltServer::startBedrockListener() {
         return status;
     };
 
+    // Where this player left off, asked before the world is described to them: `start_game` names a
+    // position and the client puts its player there for good. A saved position that arrives after
+    // it, as a teleport, is one the client has already decided against.
+    hooks.spawn = [this](const wire::common::Uuid& uuid) {
+        bedrock::BedrockListener::Spawn spawn;
+        if (worldRegistry_ != nullptr) {
+            const world::LoadedWorld& world = worldRegistry_->defaultWorld();
+            const std::array<double, 3>& at = world.spawn();
+            spawn.x = at[0];
+            spawn.y = at[1];
+            spawn.z = at[2];
+        }
+        if (playerStore_ == nullptr || !playerStore_->isOpen()) {
+            return spawn;
+        }
+        const std::optional<storage::StoredPlayer> stored = playerStore_->players().load(uuid.toString());
+        if (!stored.has_value()) {
+            return spawn;
+        }
+        spawn.gamemode = static_cast<std::int32_t>(stored->gamemode);
+        // Only the position is meaningless when the world they were in is gone.
+        if (worldRegistry_ != nullptr && stored->world != worldRegistry_->defaultWorld().name()) {
+            return spawn;
+        }
+        spawn.x = stored->x;
+        spawn.y = stored->y;
+        spawn.z = stored->z;
+        spawn.yaw = stored->yaw;
+        spawn.pitch = stored->pitch;
+        return spawn;
+    };
+
     // What a client that finished the login becomes: the same kind of player a Java login makes,
     // in the same registry, so everything that asks who is online finds them.
     hooks.join =
@@ -548,7 +590,138 @@ void BasaltServer::startBedrockListener() {
                 if (found == worlds.end() || found->second == nullptr) {
                     return;
                 }
-                static_cast<void>(player::breakBlockFor(*session, *found->second, x, y, z, breakContext()));
+                // TEMPORARY: whether the world agreed, which is what tells a refused break from a
+                // break that never arrived.
+                const bool broke = player::breakBlockFor(*session, *found->second, x, y, z, breakContext());
+                logger_.debug([broke, x, y, z] {
+                    return std::string{"break at "} + std::to_string(x) + ", " + std::to_string(y) + ", " +
+                           std::to_string(z) + (broke ? ": yes" : ": refused");
+                });
+            });
+        };
+
+        // What is alive and what is lying around, near enough to be worth drawing. Taken where the
+        // world is and left for the door's thread to turn into packets.
+        context.lookAround = [this](const player::PlayerSession& player,
+                                    std::function<void(std::vector<bedrock::Seen>)> answer) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, answer = std::move(answer)] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (session == nullptr) {
+                    return;
+                }
+                const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                const auto found = worlds.find(session->worldName);
+                if (found == worlds.end() || found->second == nullptr) {
+                    return;
+                }
+                // Near enough to be worth drawing, which is the draw distance a Bedrock join asks
+                // for rather than the whole world.
+                constexpr double kRange = 64.0;
+                const auto near = [session](const double x, const double y, const double z) {
+                    const double dx = x - session->x;
+                    const double dy = y - session->y;
+                    const double dz = z - session->z;
+                    return (dx * dx) + (dy * dy) + (dz * dz) <= kRange * kRange;
+                };
+
+                std::vector<bedrock::Seen> seen;
+                for (const entity::ServerEntity* alive : found->second->state().entities()) {
+                    if (alive == nullptr || alive->removed || !near(alive->x, alive->y, alive->z)) {
+                        continue;
+                    }
+                    // Both editions name a cow `minecraft:cow`. One they disagree on is one the
+                    // client will not draw, and drawing the wrong animal would be worse.
+                    seen.push_back(bedrock::Seen{.entityId = alive->entityId(),
+                                                 .type = alive->type().toString(),
+                                                 .x = alive->x,
+                                                 .y = alive->y,
+                                                 .z = alive->z,
+                                                 .yaw = alive->yaw,
+                                                 .pitch = alive->pitch,
+                                                 .width = static_cast<float>(alive->width()),
+                                                 .height = static_cast<float>(alive->height()),
+                                                 .stack = std::nullopt});
+                }
+                for (const world::DroppedItem& dropped : found->second->state().items()) {
+                    if (!near(dropped.x, dropped.y, dropped.z)) {
+                        continue;
+                    }
+                    seen.push_back(bedrock::Seen{.entityId = dropped.entityId,
+                                                 .x = dropped.x,
+                                                 .y = dropped.y,
+                                                 .z = dropped.z,
+                                                 .stack = storage::StoredItemStack{.id = dropped.item.toString(),
+                                                                                   .count = dropped.count,
+                                                                                   .components = dropped.components}});
+                }
+                answer(std::move(seen));
+            });
+        };
+
+        // What they are standing on, gathered where the world is and told to them where they are.
+        context.pickupItems = [this](player::PlayerSession& player) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (session == nullptr) {
+                    return;
+                }
+                const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                const auto found = worlds.find(session->worldName);
+                if (found == worlds.end() || found->second == nullptr) {
+                    return;
+                }
+                const std::vector<player::PickedItem> taken =
+                    player::pickupNearbyItems(*session, found->second->state(), pluginHooks().pickupAllowed);
+                if (taken.empty()) {
+                    return;
+                }
+                // The little arc the stack makes on its way in, to everybody who can see it.
+                for (const player::PickedItem& row : taken) {
+                    for (const player::PlayerSession* watcher : playerRegistry_.snapshot()) {
+                        if (watcher->worldName == session->worldName && watcher->connection().sendPickupAnimation) {
+                            watcher->connection().sendPickupAnimation(row.item.entityId, session->entityId());
+                        }
+                    }
+                }
+                if (session->connection().sendInventoryAll) {
+                    session->connection().sendInventoryAll();
+                }
+            });
+        };
+
+        // How fast this player digs, answered where the world is: the block, its hardness and
+        // whether the eyes are under water all live over there.
+        context.digSpeed = [this](player::PlayerSession& player, const std::int32_t x, const std::int32_t y,
+                                  const std::int32_t z, std::function<void(float)> answer) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, x, y, z, answer = std::move(answer)] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (session == nullptr) {
+                    return;
+                }
+                const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                const auto found = worlds.find(session->worldName);
+                if (found == worlds.end() || found->second == nullptr) {
+                    return;
+                }
+                const world::LoadedWorld& world = *found->second;
+                const std::optional<std::int32_t> state = world.state().blockState(x, y, z);
+                if (!state.has_value()) {
+                    return;
+                }
+                const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*state);
+                if (block == nullptr || registry::blocks::isAir(*state)) {
+                    return;
+                }
+                const double eyeY = session->y + world::fluids::eyeHeight(session->sneaking);
+                const std::optional<std::int32_t> around = world.state().blockState(
+                    static_cast<std::int32_t>(std::floor(session->x)), static_cast<std::int32_t>(std::floor(eyeY)),
+                    static_cast<std::int32_t>(std::floor(session->z)));
+                const bool underwater = around.has_value() && world::fluids::of(*around) == world::Submersion::Water;
+                answer(player::destroyProgressPerTickFor(*session, *block, registry::blocks::hardnessOf(*block),
+                                                         breakContext().blockTags, underwater));
             });
         };
 
@@ -603,13 +776,27 @@ void BasaltServer::startBedrockListener() {
                     }
                     player::PlaceContext placing;
                     placing.blocks = breakContext();
+                    // A sign that has just gone down opens its own editor, the same as on the other
+                    // door: without it a Bedrock player places a sign and is never asked for text.
+                    placing.openSign = [](const player::PlayerSession& who, const std::int32_t signX,
+                                          const std::int32_t signY, const std::int32_t signZ, std::int32_t) {
+                        if (who.connection().openSignEditor) {
+                            who.connection().openSignEditor(signX, signY, signZ);
+                        }
+                    };
                     placing.sendInventory = [](const player::PlayerSession& who) {
                         if (who.connection().sendInventoryAll) {
                             who.connection().sendInventoryAll();
                         }
                     };
-                    static_cast<void>(
-                        player::placeBlockFor(*session, *found->second, hit, *item, slot, *held, placing));
+                    // TEMPORARY: whether the world took it, which is what tells a refused placement
+                    // from one that never reached here.
+                    const bool placed =
+                        player::placeBlockFor(*session, *found->second, hit, *item, slot, *held, placing);
+                    logger_.debug([placed, &hit, &held] {
+                        return "place " + held->id + " at " + std::to_string(hit.x) + ", " + std::to_string(hit.y) +
+                               ", " + std::to_string(hit.z) + (placed ? ": yes" : ": refused");
+                    });
                 });
             };
 
@@ -798,6 +985,9 @@ void BasaltServer::startBedrockListener() {
         };
         context.lang = options_.lang;
         context.logger = logger_;
+        // The same files and the same placeholders the other door draws from.
+        context.uiConfigs = [this] { return live_->current()->ui; };
+        context.placeholders = &placeholders_;
         if (worldRegistry_ != nullptr) {
             const world::LoadedWorld& world = worldRegistry_->defaultWorld();
             const std::array<double, 3>& spawn = world.spawn();

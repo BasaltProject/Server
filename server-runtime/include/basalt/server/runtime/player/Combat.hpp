@@ -53,6 +53,32 @@ inline constexpr float kCriticalMultiplier = 1.5F;
                                               double velocityY, double velocityZ, bool onGround,
                                               double knockbackResistance = 0.0);
 
+/// Whether a player standing here can reach that box. Vanilla measures from the eyes to the nearest
+/// corner of the target rather than centre to centre, so a tall mob is reachable from further up.
+///
+/// parity: `Player.canInteractWithEntity` over `AABB.distanceToSqr`.
+[[nodiscard]] bool withinAttackReach(double playerX, double playerY, double playerZ, double targetX, double targetY,
+                                     double targetZ, double targetWidth, double targetHeight);
+
+/// What one swing is worth before the target does anything about it, and the three things the rest
+/// of the hit needs to know about it.
+///
+/// Pure on purpose: the two doors compute a swing from the same numbers, and a formula that lives
+/// in one of them is a formula the other one drifts away from.
+struct Swing {
+    float damage = 0.0F;
+    /// Whether the swing had recharged. The sweep, the sprint push and the critical all need it.
+    bool fullStrength = false;
+    /// parity: `canCriticalAttack`, the falling half of a jump and nothing else.
+    bool critical = false;
+    /// A sprinting hit at full strength, which pushes harder and sounds different.
+    bool knockbackAttack = false;
+};
+
+/// parity: `Player.attack`'s own arithmetic: the charge scales the base, a critical takes half again
+/// of that, and what the enchantments add rides on the swing but never on the critical.
+[[nodiscard]] Swing swingOf(float strength, float base, float enchanted, bool falling, bool onGround, bool sprinting);
+
 /// parity: `LivingEntity.getDamageAfterMagicAbsorb`'s resistance case, which counts in fifths and
 /// floors at zero rather than going negative at level four and above.
 [[nodiscard]] float afterResistance(float damage, std::int32_t amplifier);

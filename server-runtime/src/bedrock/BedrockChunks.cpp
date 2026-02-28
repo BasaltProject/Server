@@ -1,4 +1,5 @@
 #include <basalt/server/runtime/bedrock/BedrockChunks.hpp>
+#include <basalt/server/runtime/world/Signs.hpp>
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/ChunkSection.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
@@ -42,11 +43,25 @@ std::vector<std::uint8_t> writeColumn(const server::world::Chunk& chunk, const i
                                      static_cast<std::int8_t>(chunk.verticalBounds().minSection() + section), protocol);
     }
 
+    // What the column holds that is more than a block. Only signs for now: the rest of the block
+    // entities are drawn from the block itself over there, and a sign with no text is a blank sign.
+    wire::io::ByteBuffer extras;
+    for (const server::world::ChunkBlockEntity& entity : chunk.blockEntities()) {
+        if (!world::signs::isSign(chunk.blockStateId(entity.localX(), entity.y(), entity.localZ()))) {
+            continue;
+        }
+        wire::bedrock::writeSignTag(
+            extras, (chunk.chunkX() * 16) + entity.localX(), entity.y(), (chunk.chunkZ() * 16) + entity.localZ(),
+            world::signs::plainText(entity.data(), true), world::signs::plainText(entity.data(), false),
+            world::signs::isWaxed(entity.data()));
+    }
+
     wire::io::ByteBuffer body;
     // The count of subchunks is what was written; the count of biome sections is the column's own
     // height, which does not shrink with them.
     wire::bedrock::writeLevelChunk(body, chunk.chunkX(), chunk.chunkZ(), static_cast<std::uint32_t>(sent),
-                                   packed.readable(), static_cast<std::uint32_t>(sections), 0, protocol);
+                                   packed.readable(), static_cast<std::uint32_t>(sections), 0, protocol,
+                                   extras.readable());
     return body.toVector();
 }
 

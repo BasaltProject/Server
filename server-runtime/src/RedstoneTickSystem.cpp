@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
+#include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
 #include <basalt/server/runtime/world/ArrowButtons.hpp>
@@ -59,12 +60,9 @@ std::int32_t unpackZ(std::int64_t packed) { return static_cast<std::int32_t>((pa
 
 void sendBlockUpdate(const std::vector<PlayerSession*>& watchers, const BlockPos& pos, std::int32_t stateId) {
     for (PlayerSession* player : watchers) {
-        if (!player->connection().sendPlayPacket) {
-            continue;
-        }
-        player->connection().sendPlayPacket(ClientboundBlockUpdatePacket::kId, [&](wire::io::ByteBuffer& buffer) {
-            ClientboundBlockUpdatePacket{.pos = pos, .blockStateId = stateId}.write(buffer);
-        });
+        // Through the shared one, which says it the way each client reads it: a lever, a lamp or a
+        // piston told only in Java's packet leaves the other edition looking at the old block.
+        player::sendBlockChangeTo(*player, pos.x, pos.y, pos.z, stateId);
     }
 }
 

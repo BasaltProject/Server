@@ -82,6 +82,13 @@ void PlayerUi::clearScoreboard() {
     if (!scoreboardShown_) {
         return;
     }
+    if (surfaces_.clearScoreboard) {
+        surfaces_.clearScoreboard();
+        scoreboardShown_ = false;
+        lastScoreboardLines_.clear();
+        lastScoreboardTitle_.reset();
+        return;
+    }
     send_(SetObjectivePacket::kId, [](wire::io::ByteBuffer& buffer) {
         SetObjectivePacket{.objectiveName = std::string{kObjective}, .method = SetObjectivePacket::kMethodRemove}.write(
             buffer);
@@ -151,6 +158,19 @@ void PlayerUi::updateScoreboard(const PlaceholderContext& context) {
 }
 
 void PlayerUi::drawScoreboard(const std::string& title, const std::vector<std::string>& lines) {
+    // A client that draws its own gets the whole board every time: what changed is its business,
+    // and the two editions do not agree on how a line is named.
+    if (surfaces_.scoreboard) {
+        if (scoreboardShown_ && lastScoreboardTitle_.has_value() && *lastScoreboardTitle_ == title &&
+            lastScoreboardLines_ == lines) {
+            return;
+        }
+        surfaces_.scoreboard(title, lines);
+        scoreboardShown_ = true;
+        lastScoreboardTitle_ = title;
+        lastScoreboardLines_ = lines;
+        return;
+    }
     if (!scoreboardShown_) {
         send_(SetObjectivePacket::kId, [&](wire::io::ByteBuffer& buffer) {
             SetObjectivePacket{.objectiveName = std::string{kObjective},
@@ -233,6 +253,14 @@ void PlayerUi::clearBossBar() {
     if (!bossBarId_.has_value()) {
         return;
     }
+    if (surfaces_.clearBossBar) {
+        surfaces_.clearBossBar();
+        bossBarId_.reset();
+        lastBossText_.reset();
+        lastBossProgress_.reset();
+        lastBossStyle_.reset();
+        return;
+    }
     const wire::common::Uuid id = *bossBarId_;
     send_(BossEventPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         BossEventPacket{.id = id, .operation = BossEventPacket::Remove{}}.write(buffer);
@@ -244,6 +272,22 @@ void PlayerUi::clearBossBar() {
 }
 
 void PlayerUi::drawBossBar(const std::string& text, float progress, BossBarColor color, BossBarOverlay overlay) {
+    if (surfaces_.bossBar) {
+        // One bar, kept by whether it has an id at all: over there the bar belongs to an entity and
+        // adding it twice is what makes it flicker, so this only says what changed.
+        const bool fresh = !bossBarId_.has_value();
+        if (fresh) {
+            bossBarId_ = wire::common::Uuid::random();
+        }
+        if (fresh || !lastBossText_.has_value() || *lastBossText_ != text || !lastBossProgress_.has_value() ||
+            *lastBossProgress_ != progress) {
+            surfaces_.bossBar(text, progress);
+        }
+        lastBossText_ = text;
+        lastBossProgress_ = progress;
+        lastBossStyle_ = std::pair{color, overlay};
+        return;
+    }
     if (!bossBarId_.has_value()) {
         const wire::common::Uuid fresh = wire::common::Uuid::random();
         bossBarId_ = fresh;

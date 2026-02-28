@@ -450,6 +450,12 @@ void CombatSystem::announceEntityHit(const std::vector<PlayerSession*>& watchers
     const std::string sound =
         died ? entity::entityCombat::deathSound(entity.type()) : entity::entityCombat::hurtSound(entity.type());
     for (PlayerSession* watcher : watchers) {
+        // A client on the other edition hears the hit and nothing else of this: the flinch and the
+        // knock back are drawn from its own metadata, which the entity sync already carries.
+        if (watcher->connection().playSound) {
+            watcher->connection().playSound(sound, entity.x, entity.y, entity.z, 1.0F, 1.0F);
+            continue;
+        }
         if (!watcher->connection().sendPlayPacket) {
             continue;
         }

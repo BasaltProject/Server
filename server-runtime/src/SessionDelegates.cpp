@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/FoodData.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/player/PlayerItemPickup.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
@@ -36,14 +37,6 @@ namespace reg = server::registry;
 using player::PlayerInventory;
 using player::PlayerSession;
 using wire::common::Identifier;
-
-/// How close (blocks) a player has to be to a dropped item to vacuum it up. parity: vanilla's own
-/// box-based range is close to this.
-constexpr double kPickupRadius = 1.5;
-
-/// parity: `ServerGamePacketListenerImpl.handleInteract`, three blocks of reach plus three of slack.
-constexpr double kAttackReach = 6.0;
-constexpr double kEyeHeight = 1.5;
 
 void sendTo(const std::vector<PlayerSession*>& players, std::int32_t packetId,
             const std::function<void(wire::io::ByteBuffer&)>& write) {
@@ -173,12 +166,8 @@ void ClientSession::applyConsumeEffects(PlayerSession& session, const std::vecto
 }
 
 bool ClientSession::withinAttackReach(const PlayerSession& session, const entity::ServerEntity& target) const {
-    const double half = target.width() / 2.0;
-    const double dx = std::max(std::abs(target.x - session.x) - half, 0.0);
-    const double dz = std::max(std::abs(target.z - session.z) - half, 0.0);
-    const double eyeY = session.y + kEyeHeight;
-    const double dy = std::max(std::max(target.y - eyeY, eyeY - (target.y + target.height())), 0.0);
-    return (dx * dx) + (dy * dy) + (dz * dz) < kAttackReach * kAttackReach;
+    return player::combat::withinAttackReach(session.x, session.y, session.z, target.x, target.y, target.z,
+                                             target.width(), target.height());
 }
 
 void ClientSession::broadcastSound(std::string_view sound, double x, double y, double z, play::SoundSource source,
@@ -261,54 +250,34 @@ void ClientSession::swapWithOffhand() {
 
 void ClientSession::tryPickupNearbyItems() {
     PlayerSession* session = playerSession_.get();
-    if (session == nullptr || session->gamemode == play::Gamemode::Spectator) {
+    if (session == nullptr) {
         return;
     }
-    for (const world::DroppedItem& candidate : world().nearbyItems(session->x, session->y, session->z, kPickupRadius)) {
-        // parity: a player's own toss cannot be picked straight back up (`ItemEntity.pickupDelay`).
-        if (!candidate.canBePickedUp()) {
-            continue;
-        }
-        std::optional<world::DroppedItem> removed = world().removeItem(candidate.entityId);
-        if (!removed.has_value()) {
-            continue;
-        }
-        if (options_.plugins.pickupAllowed &&
-            !options_.plugins.pickupAllowed(*session, removed->item.toString(), removed->count, removed->entityId)) {
-            // Put it back exactly as it was: the client has not been told anything yet.
-            static_cast<void>(world().spawnItem(*removed));
-            continue;
-        }
-        const std::int32_t leftover = session->inventory.add(storage::StoredItemStack{
-            .id = removed->item.toString(), .count = removed->count, .components = removed->components});
-        const std::int32_t picked = removed->count - leftover;
-        if (picked <= 0) {
-            // Nowhere for it to go: put it back exactly as it was, nothing happened.
-            static_cast<void>(world().spawnItem(*removed));
-            continue;
-        }
-        sendInventoryAll();
-        const std::vector<PlayerSession*> watchers = playersInSameWorld();
-        if (leftover > 0) {
-            // Only some of it fit: the same entity, fewer items, still sitting where it was.
-            removed->count = leftover;
-            const std::int32_t entityId = removed->entityId;
-            const reg::Item* item = reg::items::registry().byName(removed->item);
-            static_cast<void>(world().spawnItem(*removed));
+    const std::vector<player::PickedItem> taken =
+        player::pickupNearbyItems(*session, world(), options_.plugins.pickupAllowed);
+    if (taken.empty()) {
+        return;
+    }
+    sendInventoryAll();
+    const std::vector<PlayerSession*> watchers = playersInSameWorld();
+    for (const player::PickedItem& row : taken) {
+        if (row.leftover > 0) {
+            // Only some of it fit, and what is left is the same entity with fewer items in it.
+            const reg::Item* item = reg::items::registry().byName(row.item.item);
             if (item != nullptr) {
                 const play::SetEntityDataPacket packet = play::SetEntityDataPacket::item(
-                    entityId, play::WireItemStack{.itemId = item->protocolId, .count = leftover});
+                    row.item.entityId, play::WireItemStack{.itemId = item->protocolId, .count = row.leftover});
                 sendTo(watchers, play::SetEntityDataPacket::kId,
                        [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
             }
         }
         // The pickup animation only: the entity itself leaves every watcher's view through their own
         // item sync, since it is no longer in the world.
-        const play::TakeItemEntityPacket taken{.collectedEntityId = candidate.entityId,
-                                               .collectorEntityId = session->entityId(),
-                                               .pickupItemCount = picked};
+        const play::TakeItemEntityPacket collected{.collectedEntityId = row.item.entityId,
+                                                   .collectorEntityId = session->entityId(),
+                                                   .pickupItemCount = row.picked};
         sendTo(watchers, play::TakeItemEntityPacket::kId,
-               [&taken](wire::io::ByteBuffer& buffer) { taken.write(buffer); });
+               [&collected](wire::io::ByteBuffer& buffer) { collected.write(buffer); });
     }
 }
 

@@ -47,8 +47,6 @@ using wire::protocol::play::SoundSource;
 constexpr float kVehicleDamagePerPoint = 10.0F;
 constexpr float kVehicleBreakDamage = 40.0F;
 
-/// parity: `Player.attack`: a swing past nine tenths of the way back is a full-strength one.
-constexpr float kFullStrength = 0.9F;
 constexpr double kSprintKnockback = 0.5;
 constexpr float kSweepDamage = 1.0F;
 constexpr double kSweepRange = 1.0;
@@ -121,20 +119,16 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     const float enchanted = world::weaponDamage::of(heldStack, base, [enchantments](const Identifier& id) {
         return enchantments == nullptr ? nullptr : enchantments->definitionOf(id);
     });
-    const float boost = strength * (enchanted - base);
-    float damage = base * player::combat::chargeScale(strength);
-    const bool fullStrength = strength > kFullStrength;
-    // parity: `canCriticalAttack`, which is the falling half of a jump and nothing else.
-    const bool critical = fullStrength && fallDistance > 0.0 && !session->onGround && !session->sprinting;
-    if (critical) {
-        damage *= player::combat::kCriticalMultiplier;
-    }
-    damage += boost;
+    const player::combat::Swing swing =
+        player::combat::swingOf(strength, base, enchanted, fallDistance > 0.0, session->onGround, session->sprinting);
+    const float damage = swing.damage;
+    const bool fullStrength = swing.fullStrength;
+    const bool critical = swing.critical;
     if (damage <= 0.0F) {
         return;
     }
 
-    const bool knockbackAttack = session->sprinting && fullStrength;
+    const bool knockbackAttack = swing.knockbackAttack;
     if (knockbackAttack) {
         owner_->broadcastSound(kSoundAttackKnockback, session->x, session->y, session->z, SoundSource::Players);
     }
@@ -528,6 +522,10 @@ void CombatHandler::broadcastPassengers(const ServerEntity& vehicle) {
     const wire::protocol::play::SetPassengersPacket packet{.vehicleId = vehicle.entityId(),
                                                            .passengerIds = vehicle.passengerIds};
     for (PlayerSession* player : owner_->playersInSameWorld()) {
+        if (player->connection().sendPassengers) {
+            player->connection().sendPassengers(vehicle.entityId(), vehicle.passengerIds);
+            continue;
+        }
         if (player->connection().sendPlayPacket) {
             player->connection().sendPlayPacket(wire::protocol::play::SetPassengersPacket::kId,
                                                 [packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });

@@ -171,6 +171,10 @@ namespace {
     const auto* host = context.get<std::string>("hostname");
     const wire::protocol::play::TransferPacket packet{.host = host == nullptr ? std::string{} : *host, .port = port};
     for (const player::PlayerSession* player : players) {
+        if (player->connection().transferTo) {
+            player->connection().transferTo(packet.host, port);
+            continue;
+        }
         sendTo(*player, wire::protocol::play::TransferPacket::kId,
                [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
     }

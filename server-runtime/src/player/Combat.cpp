@@ -82,6 +82,41 @@ std::array<double, 3> knockback(double power, double towardsX, double towardsZ, 
             (velocityZ / 2.0) - pushZ};
 }
 
+bool withinAttackReach(const double playerX, const double playerY, const double playerZ, const double targetX,
+                       const double targetY, const double targetZ, const double targetWidth,
+                       const double targetHeight) {
+    /// parity: `Attributes.ENTITY_INTERACTION_RANGE` plus the slack the server allows.
+    constexpr double kAttackReach = 6.0;
+    /// Where a standing player's eyes are, which is what the reach is measured from.
+    constexpr double kEyeHeight = 1.5;
+
+    const double half = targetWidth / 2.0;
+    const double dx = std::max(std::abs(targetX - playerX) - half, 0.0);
+    const double dz = std::max(std::abs(targetZ - playerZ) - half, 0.0);
+    const double eyeY = playerY + kEyeHeight;
+    const double dy = std::max(std::max(targetY - eyeY, eyeY - (targetY + targetHeight)), 0.0);
+    return (dx * dx) + (dy * dy) + (dz * dz) < kAttackReach * kAttackReach;
+}
+
+Swing swingOf(const float strength, const float base, const float enchanted, const bool falling, const bool onGround,
+              const bool sprinting) {
+    /// parity: `Player.attack`, where a swing counts as charged from nine tenths.
+    constexpr float kFullStrength = 0.9F;
+
+    Swing swing;
+    swing.fullStrength = strength > kFullStrength;
+    swing.critical = swing.fullStrength && falling && !onGround && !sprinting;
+    swing.knockbackAttack = sprinting && swing.fullStrength;
+    swing.damage = base * chargeScale(strength);
+    if (swing.critical) {
+        swing.damage *= kCriticalMultiplier;
+    }
+    // What the enchantments add comes back on top, after the charge and the critical have had the
+    // base to themselves.
+    swing.damage += strength * (enchanted - base);
+    return swing;
+}
+
 float afterResistance(float damage, std::int32_t amplifier) {
     const std::int32_t level = (amplifier + 1) * kResistancePerLevel;
     const std::int32_t remaining = std::max(static_cast<std::int32_t>(kProtectionDivider) - level, 0);

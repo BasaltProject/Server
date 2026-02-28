@@ -195,6 +195,21 @@ CommandNode* CommandDispatcher::registerBuilt(const Command& command) {
     if (!override.enabled) {
         return nullptr;
     }
+    // A second registration of the same name takes the first one's place rather than standing
+    // beside it. The wiring does exactly that on purpose: the plain `/whitelist` goes in first and
+    // the one that can reach the running server goes in after it, and leaving both in the tree
+    // gives every client two root children with one name.
+    const CommandNode* replaced = nullptr;
+    for (const std::unique_ptr<CommandNode>& child : root_.children()) {
+        if (child->kind() == NodeKind::Literal && child->redirect == nullptr && child->name() == command.name()) {
+            replaced = child.get();
+            break;
+        }
+    }
+    if (replaced != nullptr) {
+        unregisterNode(replaced);
+    }
+
     auto node = std::make_unique<CommandNode>(NodeKind::Literal, command.name());
     // Before build(), so children inherit them: a sub-command is never easier to reach than the
     // command it belongs to.

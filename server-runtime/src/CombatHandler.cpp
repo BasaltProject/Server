@@ -73,6 +73,10 @@ void CombatHandler::dismount(PlayerSession& session) {
     const wire::protocol::play::SetPassengersPacket packet{.vehicleId = vehicle->entityId(),
                                                            .passengerIds = vehicle->passengerIds};
     for (PlayerSession* player : owner_->playersInSameWorld()) {
+        if (player->connection().sendPassengers) {
+            player->connection().sendPassengers(vehicle->entityId(), vehicle->passengerIds);
+            continue;
+        }
         if (player->connection().sendPlayPacket) {
             player->connection().sendPlayPacket(wire::protocol::play::SetPassengersPacket::kId,
                                                 [packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });

@@ -1,7 +1,11 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/world/Signs.hpp>
+#include <basalt/wire/common/json/Json.hpp>
+#include <basalt/wire/text/ComponentJson.hpp>
+#include <basalt/wire/text/Serializers.hpp>
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 namespace basalt::server::runtime::world::signs {
@@ -65,6 +69,30 @@ wire::nbt::NbtCompound withText(const wire::nbt::NbtCompound& data, bool isFront
     wire::nbt::NbtCompound updated = data;
     updated.set(isFront ? kFront : kBack, wire::nbt::NbtTag::ofCompound(side(trimmed)));
     return updated;
+}
+
+std::string plainText(const wire::nbt::NbtCompound& data, const bool front) {
+    const wire::nbt::NbtCompound* side = data.getCompound(front ? kFront : kBack);
+    if (side == nullptr) {
+        return {};
+    }
+    const wire::nbt::NbtList* messages = side->getList("messages");
+    if (messages == nullptr) {
+        return {};
+    }
+    std::string text;
+    for (const wire::nbt::NbtTag& line : *messages) {
+        if (!text.empty()) {
+            text += '\n';
+        }
+        const std::string* raw = line.get<std::string>();
+        if (raw == nullptr) {
+            continue;
+        }
+        const std::expected<wire::common::JsonValue, wire::common::JsonError> parsed = wire::common::parseJson(*raw);
+        text += parsed.has_value() ? wire::text::toPlainText(wire::text::componentJson::deserialize(*parsed)) : *raw;
+    }
+    return text;
 }
 
 bool isWaxed(const wire::nbt::NbtCompound& data) { return data.getByte("is_waxed") != 0; }

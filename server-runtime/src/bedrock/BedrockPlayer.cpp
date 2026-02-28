@@ -1,6 +1,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayerInternals.hpp>
+#include <basalt/server/runtime/placeholder/PlaceholderSlots.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
@@ -111,7 +112,23 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
     // player with no hearts at all.
     session_->connection().syncHealth();
     session_->connection().syncExperience();
+    // The body itself, which nothing else says: gravity, collision and how much air it holds. Until
+    // this arrives the client has zero for all three, which is a player who floats, cannot jump and
+    // drowns standing on grass. Everywhere else it only goes out when the air or the fire changes.
+    session_->connection().syncSubmersion();
     session_->connection().sendInventoryAll();
+    // What its hands may do. Nothing else says this, and a client that is told nothing cannot mine,
+    // build, open a door or hit anything whatever its gamemode is.
+    sendAbilities();
+
+    // Where they actually are. `start_game` went out before this player was loaded, so the client
+    // was told the only place a start can name without knowing anybody: the origin. Left at that, a
+    // client stands at zero sixty-four zero in a world where that is rock or water, and cannot jump
+    // out of it because as far as it knows it is not standing anywhere.
+    if (session_->connection().teleportTo) {
+        session_->connection().teleportTo(session_->x, session_->y, session_->z, session_->yaw, session_->pitch);
+    }
+
     // The world itself, once the player exists. The columns are built where the world runs and
     // arrive here already written, so the door's thread never reads a chunk.
     //
@@ -132,8 +149,51 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
     wire::io::ByteBuffer time;
     wire::bedrock::writeSetTime(time, context_.worldTime);
     mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetTime), time.toVector());
-    announce(Component::translatable("multiplayer.player.joined", {Component::text(session_->name())})
-                 .color(wire::text::kYellow));
+    announceAndSay(Component::translatable("multiplayer.player.joined", {Component::text(session_->name())})
+                       .color(wire::text::kYellow));
+    // The sidebar and the boss bar, off the same files and the same renderer the other door uses.
+    if (context_.uiConfigs && context_.placeholders != nullptr) {
+        ui_ = std::make_unique<ui::PlayerUi>(context_.uiConfigs, *context_.placeholders,
+                                             [](std::int32_t, const std::function<void(wire::io::ByteBuffer&)>&) {
+                                                 // Nothing speaks Java here: everything this player
+                                                 // is shown goes out through the surfaces below.
+                                             });
+        ui::PlayerUi::Surfaces surfaces;
+        surfaces.scoreboard = [this](const std::string& title, const std::vector<std::string>& lines) {
+            drawSidebar(title, lines);
+        };
+        surfaces.clearScoreboard = [this] { clearSidebar(); };
+        surfaces.bossBar = [this](const std::string& title, const float progress) {
+            wire::io::ByteBuffer body;
+            wire::bedrock::writeBossEvent(body, static_cast<std::int64_t>(kRuntimeEntityId),
+                                          bossBarShown_ ? wire::bedrock::BedrockBossAction::UpdatePercentage
+                                                        : wire::bedrock::BedrockBossAction::Create,
+                                          wire::text::toLegacyText(wire::text::miniMessage::parse(title)), progress);
+            mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::BossEvent), body.toVector());
+            if (bossBarShown_) {
+                // The percentage and the name are two separate nudges over there, and re-adding the
+                // bar restarts its fade.
+                wire::io::ByteBuffer named;
+                wire::bedrock::writeBossEvent(
+                    named, static_cast<std::int64_t>(kRuntimeEntityId), wire::bedrock::BedrockBossAction::UpdateName,
+                    wire::text::toLegacyText(wire::text::miniMessage::parse(title)), progress);
+                mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::BossEvent), named.toVector());
+            }
+            bossBarShown_ = true;
+        };
+        surfaces.clearBossBar = [this] {
+            if (!bossBarShown_) {
+                return;
+            }
+            wire::io::ByteBuffer body;
+            wire::bedrock::writeBossEvent(body, static_cast<std::int64_t>(kRuntimeEntityId),
+                                          wire::bedrock::BedrockBossAction::Remove, "", 0.0F);
+            mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::BossEvent), body.toVector());
+            bossBarShown_ = false;
+        };
+        ui_->drawInto(std::move(surfaces));
+    }
+
     // Last, once the player exists everywhere: a plugin that opens a menu on the join event has to
     // find a player who is already in the registry and can already be sent something.
     if (context_.joined) {
@@ -160,8 +220,8 @@ BedrockPlayer::~BedrockPlayer() {
     if (context_.quit) {
         context_.quit(*session_);
     }
-    announce(Component::translatable("multiplayer.player.left", {Component::text(session_->name())})
-                 .color(wire::text::kYellow));
+    announceAndSay(Component::translatable("multiplayer.player.left", {Component::text(session_->name())})
+                       .color(wire::text::kYellow));
     if (context_.registry != nullptr) {
         context_.registry->remove(session_->uuid());
         // Handed over rather than deleted here: this runs on the listener's thread, and the tick
@@ -238,14 +298,53 @@ void BedrockPlayer::sendEffect(const wire::common::Identifier& effect, const wir
 
 void BedrockPlayer::blockAction(const std::int32_t action, const std::int32_t x, const std::int32_t y,
                                 const std::int32_t z, std::int32_t) {
-    if (session_ == nullptr || !context_.breakBlock) {
+    if (session_ == nullptr) {
         return;
     }
+    const auto kind = static_cast<wire::bedrock::BedrockBlockActionType>(action);
+
+    // A dig that is starting or carrying on: the client is told how fast it goes, which is both the
+    // cracks and the pace. The world answers on its own thread, so the reply carries the mailbox.
+    if (kind == wire::bedrock::BedrockBlockActionType::StartBreak ||
+        kind == wire::bedrock::BedrockBlockActionType::ContinueBreak ||
+        kind == wire::bedrock::BedrockBlockActionType::ContinueDestroy) {
+        if (!context_.digSpeed) {
+            return;
+        }
+        const bool starting = kind == wire::bedrock::BedrockBlockActionType::StartBreak;
+        context_.digSpeed(*session_, x, y, z, [mailbox = mailbox_, x, y, z, starting](const float perTick) {
+            // Nothing to draw on a block that comes apart in one tick or not at all.
+            if (perTick <= 0.0F || perTick >= 1.0F) {
+                return;
+            }
+            // How many whole ticks it takes, and the range shared out over them: the client counts in
+            // ticks, so a block that needs three and a half of them needs four.
+            const auto ticks = static_cast<std::int32_t>(std::ceil(1.0F / perTick));
+            wire::io::ByteBuffer body;
+            wire::bedrock::writeLevelEvent(body,
+                                           starting ? wire::bedrock::LevelEventType::BlockStartBreak
+                                                    : wire::bedrock::LevelEventType::BlockUpdateBreak,
+                                           static_cast<float>(x), static_cast<float>(y), static_cast<float>(z),
+                                           wire::bedrock::kBreakProgressScale / ticks);
+            mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LevelEvent), body.toVector());
+        });
+        return;
+    }
+
+    // Given up on: the cracks come off again.
+    if (kind == wire::bedrock::BedrockBlockActionType::AbortBreak) {
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeLevelEvent(body, wire::bedrock::LevelEventType::BlockStopBreak, static_cast<float>(x),
+                                       static_cast<float>(y), static_cast<float>(z), 0);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LevelEvent), body.toVector());
+        return;
+    }
+
     // A client that predicts the break has already taken the block away on its own screen, which is
-    // the one that counts here: everything else is told by the world. The other four say a dig is
-    // starting, going on or given up, and this server draws no cracks yet.
-    if (action != static_cast<std::int32_t>(wire::bedrock::BedrockBlockActionType::PredictDestroy) &&
-        action != static_cast<std::int32_t>(wire::bedrock::BedrockBlockActionType::StopBreak)) {
+    // the one that counts here: everything else is told by the world. Only this one action carries
+    // where it happened; `stop_break` arrives at the origin, and breaking what is there instead is
+    // how this server spent a while quarrying the middle of the world.
+    if (!context_.breakBlock || kind != wire::bedrock::BedrockBlockActionType::PredictDestroy) {
         return;
     }
     context_.breakBlock(*session_, x, y, z);
@@ -301,6 +400,14 @@ void BedrockPlayer::setSneaking(const bool sneaking) {
     if (session_ != nullptr) {
         session_->sneaking = sneaking;
     }
+}
+
+void BedrockPlayer::setStance(const bool onGround, const bool sprinting) {
+    if (session_ == nullptr) {
+        return;
+    }
+    session_->onGround = onGround;
+    session_->sprinting = sprinting;
 }
 
 void BedrockPlayer::closeWindow(const std::int32_t containerId) {
@@ -451,6 +558,25 @@ void BedrockPlayer::tick() {
     lastSync_ = now;
     syncOthers();
 
+    if (session_ != nullptr && context_.pickupItems) {
+        context_.pickupItems(*session_);
+    }
+    if (ui_ != nullptr && session_ != nullptr) {
+        const wire::common::placeholder::PlaceholderContext context =
+            wire::common::placeholder::PlaceholderContext{}.with(runtime::placeholder::playerSlot(), session_.get());
+        ui_->tick(uiTick_++, context);
+    }
+    syncSurroundings();
+    if (session_ != nullptr && context_.lookAround) {
+        // The answer lands on the world's thread, where this player may already be gone: it carries
+        // the shared slot and nothing else.
+        context_.lookAround(*session_, [into = surroundings_](std::vector<Seen> seen) {
+            const std::lock_guard<std::mutex> guard{into->lock};
+            into->latest = std::move(seen);
+            into->fresh = true;
+        });
+    }
+
     // The world follows: crossing into another column is what asks for the ring that just came into
     // range, and nothing happens while somebody stands still.
     if (session_ != nullptr) {
@@ -460,6 +586,158 @@ void BedrockPlayer::tick() {
             static_cast<void>(sendColumnsAround({}));
         }
     }
+}
+
+void BedrockPlayer::syncSurroundings() {
+    std::vector<Seen> now;
+    {
+        const std::lock_guard<std::mutex> guard{surroundings_->lock};
+        if (!surroundings_->fresh) {
+            return;
+        }
+        surroundings_->fresh = false;
+        now = std::move(surroundings_->latest);
+    }
+
+    std::unordered_map<std::int32_t, Seen> present;
+    for (Seen& seen : now) {
+        const std::int32_t id = seen.entityId;
+        const auto known = shown_.find(id);
+        if (known == shown_.end()) {
+            wire::io::ByteBuffer body;
+            if (seen.stack.has_value()) {
+                wire::bedrock::writeAddItemEntity(body, static_cast<std::int64_t>(runtimeIdFor(id)),
+                                                  itemStackFor(seen.stack, protocol_), static_cast<float>(seen.x),
+                                                  static_cast<float>(seen.y), static_cast<float>(seen.z), 0.0F, 0.0F,
+                                                  0.0F, protocol_);
+                mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::AddItemEntity),
+                               body.toVector());
+            } else {
+                wire::bedrock::writeAddEntity(body, static_cast<std::int64_t>(runtimeIdFor(id)), seen.type,
+                                              static_cast<float>(seen.x), static_cast<float>(seen.y),
+                                              static_cast<float>(seen.z), seen.yaw, seen.pitch, seen.width, seen.height,
+                                              protocol_);
+                mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::AddEntity), body.toVector());
+            }
+            present.emplace(id, std::move(seen));
+            continue;
+        }
+
+        const Seen& before = known->second;
+        const bool moved = std::abs(seen.x - before.x) > kMoveEpsilon || std::abs(seen.y - before.y) > kMoveEpsilon ||
+                           std::abs(seen.z - before.z) > kMoveEpsilon;
+        const bool turned =
+            std::abs(seen.yaw - before.yaw) > kTurnEpsilon || std::abs(seen.pitch - before.pitch) > kTurnEpsilon;
+        if (moved || turned) {
+            wire::io::ByteBuffer body;
+            wire::bedrock::writeMoveEntity(body, runtimeIdFor(id), static_cast<float>(seen.x),
+                                           static_cast<float>(seen.y), static_cast<float>(seen.z), seen.yaw, seen.pitch,
+                                           true);
+            mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::MoveEntityAbsolute),
+                           body.toVector());
+        }
+        present.emplace(id, std::move(seen));
+    }
+
+    for (const auto& [id, gone] : shown_) {
+        if (present.contains(id)) {
+            continue;
+        }
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeRemoveEntity(body, static_cast<std::int64_t>(runtimeIdFor(id)));
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::RemoveEntity), body.toVector());
+    }
+    shown_ = std::move(present);
+}
+
+void BedrockPlayer::sendAbilities() {
+    if (session_ == nullptr) {
+        return;
+    }
+    const wire::protocol::play::Gamemode mode = session_->gamemode;
+    // A mode that only looks cannot change the world, and over here that is not an ability: it is
+    // a packet of its own, and the client believes it over anything the layer says.
+    wire::io::ByteBuffer settings;
+    wire::bedrock::writeUpdateAdventureSettings(settings, mode == wire::protocol::play::Gamemode::Adventure ||
+                                                              mode == wire::protocol::play::Gamemode::Spectator);
+    mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::UpdateAdventureSettings),
+                   settings.toVector());
+
+    wire::io::ByteBuffer abilities;
+    // Not an operator as far as this packet goes: what an operator may do with a command is decided
+    // by the command tree and the groups, not here, and claiming it would hand a client the
+    // operator's own buttons.
+    wire::bedrock::writeUpdateAbilities(abilities, static_cast<std::int64_t>(kRuntimeEntityId), false,
+                                        mode == wire::protocol::play::Gamemode::Creative);
+    mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::UpdateAbilities), abilities.toVector());
+}
+
+void BedrockPlayer::drawSidebar(const std::string& title, const std::vector<std::string>& lines) {
+    /// The objective a server-drawn board lives under. One per client, so the name never collides.
+    constexpr std::string_view kObjective = "basalt";
+
+    const std::string drawn = wire::text::toLegacyText(wire::text::miniMessage::parse(title));
+    if (!sidebarTitle_.has_value() || *sidebarTitle_ != drawn) {
+        wire::io::ByteBuffer shown;
+        wire::bedrock::writeSetDisplayObjective(shown, "sidebar", kObjective, drawn);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetDisplayObjective), shown.toVector());
+        sidebarTitle_ = drawn;
+    }
+
+    // Only what changed, the way the other door does it: these boards carry coordinates and a
+    // spinner, so every single tick has a different line in it somewhere.
+    std::vector<wire::bedrock::BedrockScoreLine> changed;
+    for (std::size_t at = 0; at < lines.size(); ++at) {
+        std::string text = wire::text::toLegacyText(wire::text::miniMessage::parse(lines[at]));
+        if (at < sidebarShown_.size() && sidebarShown_[at] == text) {
+            continue;
+        }
+        // Highest at the top, which is how a sidebar is read on both editions.
+        changed.push_back(wire::bedrock::BedrockScoreLine{.lineId = static_cast<std::int64_t>(at) + 1,
+                                                          .name = std::move(text),
+                                                          .score = static_cast<std::int32_t>(lines.size() - at)});
+    }
+
+    // A board that got shorter leaves its tail behind unless it is taken away by name.
+    std::vector<std::int64_t> gone;
+    for (std::size_t at = lines.size(); at < sidebarShown_.size(); ++at) {
+        gone.push_back(static_cast<std::int64_t>(at) + 1);
+    }
+    if (!gone.empty()) {
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeRemoveScores(body, gone);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetScore), body.toVector());
+    }
+    if (!changed.empty()) {
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeSetScore(body, kObjective, changed);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetScore), body.toVector());
+    }
+
+    sidebarShown_.clear();
+    sidebarShown_.reserve(lines.size());
+    for (const std::string& line : lines) {
+        sidebarShown_.push_back(wire::text::toLegacyText(wire::text::miniMessage::parse(line)));
+    }
+}
+
+void BedrockPlayer::clearSidebar() {
+    if (sidebarShown_.empty()) {
+        return;
+    }
+    std::vector<std::int64_t> gone;
+    gone.reserve(sidebarShown_.size());
+    for (std::size_t at = 0; at < sidebarShown_.size(); ++at) {
+        gone.push_back(static_cast<std::int64_t>(at) + 1);
+    }
+    wire::io::ByteBuffer body;
+    wire::bedrock::writeRemoveScores(body, gone);
+    mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetScore), body.toVector());
+    wire::io::ByteBuffer objective;
+    wire::bedrock::writeRemoveObjective(objective, "basalt");
+    mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::RemoveObjective), objective.toVector());
+    sidebarShown_.clear();
+    sidebarTitle_.reset();
 }
 
 void BedrockPlayer::sendColumn(const std::int32_t chunkX, const std::int32_t chunkZ) {
@@ -478,6 +756,13 @@ void BedrockPlayer::sendColumn(const std::int32_t chunkX, const std::int32_t chu
 
 bool BedrockPlayer::sendColumnsAround(std::function<void()> done) {
     if (session_ == nullptr || !context_.sendChunks) {
+        return false;
+    }
+    // TEMPORARY: a join with no world at all. A client that stays in a void read everything else
+    // happily, and then the columns are the only thing left to blame.
+    if (const char* const drop = std::getenv("BASALT_BEDROCK_DROP");
+        drop != nullptr && std::string_view{drop}.find("chunks") != std::string_view::npos) {
+        context_.logger.warn([] { return "Leaving out of the Bedrock join: chunks"; });
         return false;
     }
     const std::int32_t centreX = static_cast<std::int32_t>(std::floor(session_->x)) >> 4;
@@ -534,8 +819,43 @@ void BedrockPlayer::syncOthers() {
         if (other->uuid() == session_->uuid() || other->worldName != session_->worldName) {
             continue;
         }
-        const Other now{other->entityId(), other->x, other->y, other->z, other->yaw, other->pitch};
+        const std::optional<storage::StoredItemStack> holding = other->inventory.heldItem();
+        std::array<std::optional<storage::StoredItemStack>, player::PlayerInventory::kArmourSlots> wearing{};
+        std::string wornKey;
+        for (std::int32_t slot = 0; slot < player::PlayerInventory::kArmourSlots; ++slot) {
+            wearing[static_cast<std::size_t>(slot)] = other->inventory.at(player::PlayerInventory::kArmourStart + slot);
+            wornKey += wearing[static_cast<std::size_t>(slot)].has_value() ? wearing[static_cast<std::size_t>(slot)]->id
+                                                                           : std::string{};
+            wornKey += '|';
+        }
+        const Other now{other->entityId(),
+                        other->x,
+                        other->y,
+                        other->z,
+                        other->yaw,
+                        other->pitch,
+                        holding.has_value() ? holding->id : std::string{},
+                        wornKey};
         present.emplace(other->uuid(), now);
+
+        // What is in their hand, whenever it is not what it was. Sent after the spawn below on the
+        // first turn, because the client has nobody to put it in the hand of before that.
+        const auto drawHand = [this, &post, &now, &holding] {
+            wire::io::ByteBuffer body;
+            wire::bedrock::writeMobEquipment(body, runtimeIdFor(now.entityId), itemStackFor(holding, protocol_), 0,
+                                             protocol_);
+            post(wire::bedrock::BedrockPacket::MobEquipment, body);
+        };
+        // Head, chest, legs and feet, in the order this edition reads them. The fifth is a mob's
+        // own body plate, which a player never wears.
+        const auto drawArmour = [this, &post, &now, &wearing] {
+            wire::io::ByteBuffer body;
+            wire::bedrock::writeMobArmorEquipment(
+                body, runtimeIdFor(now.entityId), itemStackFor(wearing[0], protocol_),
+                itemStackFor(wearing[1], protocol_), itemStackFor(wearing[2], protocol_),
+                itemStackFor(wearing[3], protocol_), wire::bedrock::BedrockItemStack{}, protocol_);
+            post(wire::bedrock::BedrockPacket::MobArmorEquipment, body);
+        };
 
         const auto known = others_.find(other->uuid());
         if (known == others_.end()) {
@@ -564,10 +884,18 @@ void BedrockPlayer::syncOthers() {
             wire::io::ByteBuffer body;
             wire::bedrock::writeAddPlayer(body, spawn, protocol_);
             post(wire::bedrock::BedrockPacket::AddPlayer, body);
+            drawHand();
+            drawArmour();
             continue;
         }
 
         const Other& before = known->second;
+        if (before.held != now.held) {
+            drawHand();
+        }
+        if (before.worn != now.worn) {
+            drawArmour();
+        }
         const bool moved = std::abs(now.x - before.x) > kMoveEpsilon || std::abs(now.y - before.y) > kMoveEpsilon ||
                            std::abs(now.z - before.z) > kMoveEpsilon;
         const bool turned =
@@ -598,11 +926,16 @@ void BedrockPlayer::syncOthers() {
     others_ = std::move(present);
 }
 
-void BedrockPlayer::announce(const Component& message) const {
-    // Said on the console too, exactly as the Java side says it: joining and leaving are what an
-    // operator watches the console for, and an edition is not a reason to stay quiet.
+void BedrockPlayer::announceAndSay(const Component& message) const {
+    // On the console too, exactly as the Java side says it: joining and leaving are what an operator
+    // watches the console for, and an edition is not a reason to stay quiet. Chat says itself where
+    // it is read, so it does not come through here.
     wire::common::Logger{"Server"}.info(
         [this, &message] { return wire::text::resolvePlainText(message, context_.lang); });
+    announce(message);
+}
+
+void BedrockPlayer::announce(const Component& message) const {
     if (context_.registry == nullptr) {
         return;
     }
