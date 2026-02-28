@@ -599,6 +599,10 @@ void BedrockPlayer::syncOthers() {
 }
 
 void BedrockPlayer::announce(const Component& message) const {
+    // Said on the console too, exactly as the Java side says it: joining and leaving are what an
+    // operator watches the console for, and an edition is not a reason to stay quiet.
+    wire::common::Logger{"Server"}.info(
+        [this, &message] { return wire::text::resolvePlainText(message, context_.lang); });
     if (context_.registry == nullptr) {
         return;
     }

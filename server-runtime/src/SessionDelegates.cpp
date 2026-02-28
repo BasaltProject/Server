@@ -217,6 +217,10 @@ void ClientSession::broadcastToEveryone(const wire::text::Component& message) {
             text = wire::text::miniMessage::parse(plain);
         }
     }
+    // parity: vanilla ends `PlayerList.broadcastSystemMessage` at `MinecraftServer.sendSystemMessage`,
+    // which writes the same line to the console. Joining and leaving are the only two that come
+    // through here, and they are the two an operator watches the console for.
+    wire::common::Logger{"Server"}.info([&text, this] { return wire::text::resolvePlainText(text, consoleLang()); });
     if (options_.playerRegistry == nullptr) {
         return;
     }

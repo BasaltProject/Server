@@ -173,11 +173,6 @@ std::expected<BasaltConfig, std::string> BasaltConfig::fromToml(const TomlTable&
     const TomlTable* plugins = root.table("plugins");
 
     if (server != nullptr) {
-        // The port sat here until the two editions each got their own door. Said out loud rather
-        // than ignored: a server that quietly went back to 25565 is a server nobody can reach.
-        if (server->find("port") != nullptr) {
-            return std::unexpected(std::string{path} + ": `port` moved to [network.java], beside the Bedrock one");
-        }
         config.maxPlayers = static_cast<std::int32_t>(server->integer("max-players").value_or(defaults.maxPlayers));
         config.onlineMode = server->boolean("online-mode").value_or(defaults.onlineMode);
         config.gamemode = std::string{server->string("gamemode").value_or(defaults.gamemode)};

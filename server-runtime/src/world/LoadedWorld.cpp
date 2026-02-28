@@ -79,6 +79,16 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
     weather_.thundering = metadata_.thundering;
     weather_.thunderTime = metadata_.thunderTime;
     weather_.clearWeatherTime = metadata_.clearWeatherTime;
+    // parity: `TicketType.FORCED` persists, so a `/forceload` is still in force after a restart.
+    // Without this the world came back with nothing forced, and with nobody connected that means
+    // nothing is simulated at all: a sculk sensor with a noise still on its way never delivered it.
+    forcedChunks_.insert(metadata_.forcedChunks.begin(), metadata_.forcedChunks.end());
+    // The same as the command does when it forces one: there now, not on the next visit. The
+    // simulated list names a forced chunk whether or not it is in memory, and an absent one ticks
+    // nothing.
+    for (const std::int64_t key : forcedChunks_) {
+        generationQueue_.request(ChunkGenerationQueue::unpackX(key), ChunkGenerationQueue::unpackZ(key), 0);
+    }
     portals_.load(worldRoot_);
     randomSequences_.load(worldRoot_);
     state_.setOwner(&region_->owner());
@@ -129,6 +139,7 @@ void LoadedWorld::saveMetadata() {
     saved.gameTime = gameTime_;
     saved.clockRate = clock_.rate();
     saved.clockPaused = clock_.paused();
+    saved.forcedChunks.assign(forcedChunks_.begin(), forcedChunks_.end());
     saved.raining = weather_.raining;
     saved.rainTime = weather_.rainTime;
     saved.thundering = weather_.thundering;

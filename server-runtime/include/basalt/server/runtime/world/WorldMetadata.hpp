@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace basalt::server::runtime::world {
 
@@ -50,6 +51,11 @@ struct WorldMetadata {
     std::optional<std::string> difficulty;
     bool difficultyLocked = false;
     std::optional<std::string> defaultGamemode;
+
+    /// parity: `TicketType.FORCED` has `persist()`, so `/forceload` survives a restart: the jar
+    /// writes its tickets as the `chunk_tickets` saved data. Packed the way the generation queue
+    /// packs a chunk key.
+    std::vector<std::int64_t> forcedChunks;
 
     /// parity: `WanderingTraderData`, persisted independently of the spawner's 1,200-tick counter.
     std::int32_t wanderingTraderSpawnDelay = 24000;

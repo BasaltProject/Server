@@ -79,9 +79,9 @@ TaskHandle Owner::scheduleAtEnd(std::function<void()> task) {
     return handle;
 }
 
-std::size_t Owner::runPending(const FailureHandler& onFailure) { return drain(incoming_, running_, onFailure); }
+std::size_t Owner::runPending(const FailureHandler& onFailure) { return drain(incoming_, onFailure); }
 
-std::size_t Owner::runEndOfTick(const FailureHandler& onFailure) { return drain(atEnd_, atEndRunning_, onFailure); }
+std::size_t Owner::runEndOfTick(const FailureHandler& onFailure) { return drain(atEnd_, onFailure); }
 
 void Owner::advanceTick() {
     const std::lock_guard<std::mutex> lock{mutex_};
@@ -166,24 +166,28 @@ void Owner::check(std::string_view what) const {
     throw std::logic_error{std::string{what} + " belongs to '" + name_ + "' and was touched from another thread"};
 }
 
-std::size_t Owner::drain(std::deque<ScheduledTask>& queue, std::deque<ScheduledTask>& spare,
-                         const FailureHandler& onFailure) {
-    // Only the owning thread runs the queue. Two threads draining the same owner swap the two
-    // buffers past each other and end up iterating one that the other is filling, which is a
-    // corrupted queue and a packet handled twice. It is a bug in the caller, so it says so.
+std::size_t Owner::drain(std::deque<ScheduledTask>& queue, const FailureHandler& onFailure) {
+    // Only the owning thread runs the queue. A second thread draining it runs a world's work off
+    // the thread that owns that world, which is the whole point of an owner. It is a bug in the
+    // caller, so it says so.
     if (isClaimed() && !isCurrent()) {
         throw std::logic_error{"'" + name_ + "' was drained from a thread that does not own it"};
     }
+    // The turn's work leaves the owner entirely rather than resting in a buffer it still holds. A
+    // task may drain this owner again, since saving a world does and `/stop` saves from inside a
+    // task: a buffer the owner still knows about is one that nested turn swaps back into the queue,
+    // and closing the owner then frees the task it is standing inside.
+    std::deque<ScheduledTask> turn;
     {
         const std::lock_guard<std::mutex> lock{mutex_};
-        queue.swap(spare);
+        queue.swap(turn);
     }
     // An empty turn is the common case for most owners, and this is what keeps it free.
-    if (spare.empty()) {
+    if (turn.empty()) {
         return 0;
     }
     std::size_t ran = 0;
-    for (const ScheduledTask& task : spare) {
+    for (const ScheduledTask& task : turn) {
         if (task.handle.isCancelled()) {
             continue;
         }
@@ -196,7 +200,6 @@ std::size_t Owner::drain(std::deque<ScheduledTask>& queue, std::deque<ScheduledT
             onFailure(failure);
         }
     }
-    spare.clear();
     return ran;
 }
 

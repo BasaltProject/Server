@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -58,6 +59,10 @@ private:
     WorldMutex* mutex_;
     /// In the order they were spawned, which is the order every listing here answers in.
     std::vector<std::unique_ptr<entity::ServerEntity>> entities_;
+    /// Same entities by id, so a lookup and the duplicate check do not walk the list. A chunk
+    /// arriving with its mobs spawns them one by one, and one pass each turned a busy world's tick
+    /// into half a minute.
+    std::unordered_map<std::int32_t, entity::ServerEntity*> byId_;
     std::vector<wire::nbt::NbtCompound> pendingEntities_;
 };
 

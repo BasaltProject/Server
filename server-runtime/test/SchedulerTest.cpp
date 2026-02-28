@@ -95,6 +95,29 @@ TEST_CASE("what a task adds belongs to the next turn, which is what bounds one")
     CHECK(owner.runPending() == 0);
 }
 
+TEST_CASE("a task that drains its own owner does not take the turn it is standing in with it") {
+    Owner owner{"world"};
+    owner.bindToCurrentThread();
+
+    // Saving a world drains its owner, and `/stop` saves from inside a task queued on that owner.
+    // With the turn parked in a buffer the owner still held, this nested drain swapped it back into
+    // the queue: closing the owner then freed the task that was running, and the second task of the
+    // turn ran twice.
+    std::int32_t first = 0;
+    std::int32_t second = 0;
+    std::thread{[&owner, &first, &second] {
+        owner.submit([&owner, &first] {
+            ++first;
+            static_cast<void>(owner.runPending());
+        });
+        owner.submit([&second] { ++second; });
+    }}.join();
+    CHECK(owner.runPending() == 2);
+    CHECK(first == 1);
+    CHECK(second == 1);
+    CHECK(owner.pending() == 0);
+}
+
 TEST_CASE("a cancelled task does not run, whether it was queued, delayed or at the end") {
     Owner owner{"world"};
     owner.bindToCurrentThread();
