@@ -10,10 +10,10 @@
 #include <basalt/wire/common/Mth.hpp>
 
 #include <array>
-#include <map>
-#include <string>
 #include <cstdint>
+#include <map>
 #include <memory>
+#include <string>
 #include <string_view>
 
 namespace basalt::server::runtime::world::fallingBlocks {
@@ -22,7 +22,6 @@ namespace {
 /// parity: `Entity.getGravity` for a falling block, and `Entity.getAirDrag`.
 constexpr double kGravity = 0.04;
 constexpr double kAirDrag = 0.98;
-
 
 /// parity: `FluidTags.WATER` at a square, which is the water itself and anything waterlogged.
 [[nodiscard]] bool waterAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
@@ -129,6 +128,12 @@ void scheduleIfFalling(WorldState& world, std::int32_t x, std::int32_t y, std::i
     // all, and vanilla drops a tick whose name it cannot find in the block registry.
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
     if (block == nullptr) {
+        return;
+    }
+    // parity: `ConcretePowderBlock.updateShape` devuelve el hormigon **sin llamar a super**, y es
+    // super quien reserva el turno de caida. O sea que un polvo al que le llega agua no reserva nada:
+    // se endurece y ya. Reservarlo dejaba un turno de mas que el jar no tiene, medido en `hormigon`.
+    if (reshapes::concreteFor(*block).has_value() && reshapes::touchesWater(world, x, y, z)) {
         return;
     }
     world.scheduleBlockTick(x, y, z, *block, kFallDelayTicks);

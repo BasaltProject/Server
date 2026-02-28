@@ -9,7 +9,9 @@
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/PrimedTnt.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
+#include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
+#include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
 #include <basalt/server/runtime/world/Hoppers.hpp>
@@ -19,6 +21,7 @@
 #include <basalt/wire/common/Mth.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <exception>
 #include <random>
@@ -273,6 +276,34 @@ void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& re
         dead->killed = false;
         // parity: `Entity.die` drops the entity's own loot table where it stood.
         mobActions_->dropDeathLoot(world, *dead);
+        // parity: `AbstractMinecartContainer.remove` calls `Containers.dropContents`, so what the
+        // cart was carrying falls where it was killed. Measured in `vagonetacomparador`: the jar
+        // leaves 192 stone and we left nothing. The drop is `dropItemStack`'s, which starts from the
+        // floor of the square (`Math.floor`) and not from the entity's exact point.
+        if (const std::optional<std::int32_t> size = world::containers::sizeOf(dead->type().path());
+            size.has_value() && dead->sourceNbt.has_value()) {
+            random::RandomSource random = random::RandomSource::legacy(scratchSeed());
+            constexpr double kItemWidth = 0.25;
+            constexpr double kRange = 1.0 - kItemWidth;
+            constexpr double kSpread = 0.11485000171139836;
+            for (const std::optional<server::world::loot::ItemStack>& slot :
+                 world::blockInventory::read(*dead->sourceNbt, *size)) {
+                if (!slot.has_value() || slot->count <= 0) {
+                    continue;
+                }
+                static_cast<void>(world.state().spawnItem(
+                    world::DroppedItem{.entityId = playerRegistry_.allocateEntityId(),
+                                       .uuid = wire::common::Uuid::random(),
+                                       .item = slot->item,
+                                       .count = slot->count,
+                                       .x = std::floor(dead->x) + (random.nextDouble() * kRange) + (kItemWidth / 2.0),
+                                       .y = std::floor(dead->y) + (random.nextDouble() * kRange),
+                                       .z = std::floor(dead->z) + (random.nextDouble() * kRange) + (kItemWidth / 2.0),
+                                       .velocityX = random.triangle(0.0, kSpread),
+                                       .velocityY = random.triangle(0.2, kSpread),
+                                       .velocityZ = random.triangle(0.0, kSpread)}));
+            }
+        }
         // parity: `GameEvent.ENTITY_DIE`, the loudest thing a sculk sensor hears. Measured in
         // `sensormuerte`: waiting for the next turn to raise it made the sensor wake a tick late,
         // because a `/kill` runs while the world is frozen and the jar stamps it with that turn.
