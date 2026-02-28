@@ -79,6 +79,13 @@ public:
     static constexpr double kMinecartGravity = 0.04;
 
     /// Runs every fluid tick that came due and tells the players what moved.
+    /// The chunks whose scheduled turns run this tick: the simulated ones, which is what the jar
+    /// hands a `LevelTicks` container to.
+    /// `extraRadius` is 1 for anything that belongs to `BLOCK_TICKING` and 0 for anything that
+    /// belongs to `ENTITY_TICKING`, which stops one chunk sooner.
+    [[nodiscard]] world::WorldState::Ticking tickingChunks(const world::LoadedWorld& world, const sched::Region& region,
+                                                           std::int32_t extraRadius) const;
+
     void tickFluids(world::LoadedWorld& world, const sched::Region& region);
 
     /// Runs the block ticks that have come due: buttons letting themselves back up, redstone

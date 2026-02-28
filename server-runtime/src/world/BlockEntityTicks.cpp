@@ -93,9 +93,9 @@ namespace crafting = server::world::crafting;
 } // namespace
 
 std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, const WorldClock& clock,
-                              const WorldWeather& weather, const std::int64_t gameTime,
+                              const std::int32_t skyDarken, const std::int64_t gameTime,
                               const std::vector<std::array<std::int32_t, 2>>& chunks, random::RandomSource& random,
-                              const Hooks& hooks, bool hasSkylight, std::int64_t worldSeed) {
+                              const Hooks& hooks, bool hasSkylight, bool sunMoves, std::int64_t worldSeed) {
     std::vector<BlockChange> changes;
     // parity: `DaylightDetectorBlock`'s own ticker, which looks once every twenty ticks.
     // parity: `DaylightDetectorBlock.tickEntity` is `level.getGameTime() % 20L == 0L`, the world's
@@ -115,7 +115,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 const std::int32_t x = (position[0] << 4) + entity.localX();
                 const std::int32_t z = (position[1] << 4) + entity.localZ();
                 const std::optional<BlockChange> updated =
-                    daylightDetectors::update(world, clock, weather, x, entity.y(), z, hasSkylight);
+                    daylightDetectors::update(world, clock, skyDarken, x, entity.y(), z, hasSkylight, sunMoves);
                 if (updated.has_value()) {
                     changes.push_back(*updated);
                 }

@@ -585,10 +585,16 @@ void scheduleCreakingHeart(WorldState& world, std::int32_t x, std::int32_t y, st
     world.scheduleBlockTick(x, y, z, wire::common::Identifier::vanilla("creaking_heart"), 1);
 }
 
-bool creakingIsActive(const std::int64_t timeOfDay) {
+bool creakingIsActive(const std::int64_t timeOfDay, const bool hasDayTimeline) {
     constexpr std::int64_t kNightStart = 12600;
     constexpr std::int64_t kNightEnd = 23401;
     constexpr std::int64_t kDay = 24000;
+    // parity: `creaking_active` is a track of the `minecraft:day` timeline, and only
+    // `#minecraft:in_overworld` carries it. Everywhere else the attribute keeps its own `false`, so a
+    // heart in the Nether or the End never wakes whatever the clock says.
+    if (!hasDayTimeline) {
+        return false;
+    }
     const std::int64_t inDay = ((timeOfDay % kDay) + kDay) % kDay;
     // parity: the keyframe at 23401 carries `false`, so the last active tick is the one before it.
     return inDay >= kNightStart && inDay < kNightEnd;

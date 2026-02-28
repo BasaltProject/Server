@@ -58,7 +58,33 @@ void openSky(WorldState& world) {
 
 [[nodiscard]] WorldClock at(std::int64_t ticks) { return WorldClock{ticks, 1.0F, false}; }
 
+/// What the world would have stored for that clock and weather, which is what a reader gets.
+[[nodiscard]] std::int32_t darken(const WorldClock& clock, const WorldWeather& weather) {
+    return daylightDetectors::skyDarken(clock, weather);
+}
+
 } // namespace
+
+TEST_CASE("only the overworld has a night") {
+    // parity: the `minecraft:day` timeline is tagged `#minecraft:in_overworld` and nothing else, so
+    // the Nether sits at its own four and the End at the attribute's default fifteen, both unmoving.
+    const WorldWeather clear;
+    const daylightDetectors::Sky nether{.level = 4.0F, .dayTimeline = false};
+    const daylightDetectors::Sky end{.level = 15.0F, .dayTimeline = false};
+    for (const std::int64_t ticks : {0, 6000, 13000, 18000, 23000}) {
+        CHECK(daylightDetectors::skyDarken(at(ticks), clear, nether) == 11);
+        CHECK(daylightDetectors::skyDarken(at(ticks), clear, end) == 0);
+    }
+
+    // A detector in the End reads the full fifteen at every hour: the sun angle is the attribute's
+    // own zero there, so nothing bends the reading either.
+    WorldState world = emptyWorld();
+    openSky(world);
+    REQUIRE(world.setBlockState(8, 64, 8, detectorOf("false")));
+    for (const std::int64_t ticks : {0, 6000, 18000}) {
+        CHECK(daylightDetectors::signalFor(world, at(ticks), 0, 8, 64, 8, false, true, false) == 15);
+    }
+}
 
 TEST_CASE("a detector reads most at noon and nothing at night") {
     WorldState world = emptyWorld();
@@ -67,12 +93,14 @@ TEST_CASE("a detector reads most at noon and nothing at night") {
     REQUIRE(world.setBlockState(8, 64, 8, detectorOf("false")));
 
     // parity: the reading is bent by the angle of the sun, so noon is the peak and not a plateau.
-    const std::int32_t noon = daylightDetectors::signalFor(world, at(6000), clear, 8, 64, 8, false);
+    const std::int32_t noon = daylightDetectors::signalFor(world, at(6000), darken(at(6000), clear), 8, 64, 8, false);
     CHECK(noon == 15);
-    const std::int32_t morning = daylightDetectors::signalFor(world, at(1000), clear, 8, 64, 8, false);
+    const std::int32_t morning =
+        daylightDetectors::signalFor(world, at(1000), darken(at(1000), clear), 8, 64, 8, false);
     CHECK(morning > 0);
     CHECK(morning < noon);
-    const std::int32_t midnight = daylightDetectors::signalFor(world, at(18000), clear, 8, 64, 8, false);
+    const std::int32_t midnight =
+        daylightDetectors::signalFor(world, at(18000), darken(at(18000), clear), 8, 64, 8, false);
     CHECK(midnight == 0);
 }
 
@@ -88,7 +116,7 @@ TEST_CASE("the reading follows the sun through the day") {
                                                                       {18000, 0}, {23000, 2}};
     for (const auto& [ticks, expected] : readings) {
         CAPTURE(ticks);
-        CHECK(daylightDetectors::signalFor(world, at(ticks), clear, 8, 64, 8, false) == expected);
+        CHECK(daylightDetectors::signalFor(world, at(ticks), darken(at(ticks), clear), 8, 64, 8, false) == expected);
     }
 }
 
@@ -100,7 +128,7 @@ TEST_CASE("a detector reads the sky above itself, not its own square") {
     // and the square it actually reads is inside the stone: a covered detector reads nothing.
     REQUIRE(world.setBlockState(8, 65, 8, stateOf("stone")));
     REQUIRE(worldLight::skyLight(world, 8, 64, 8) > worldLight::skyLight(world, 8, 65, 8));
-    CHECK(daylightDetectors::signalFor(world, at(6000), clear, 8, 64, 8, false) == 0);
+    CHECK(daylightDetectors::signalFor(world, at(6000), darken(at(6000), clear), 8, 64, 8, false) == 0);
 }
 
 TEST_CASE("an inverted detector is the other way round and skips the curve") {
@@ -111,8 +139,8 @@ TEST_CASE("an inverted detector is the other way round and skips the curve") {
     // parity: fifteen minus the sky brightness, with no sun angle at all, which is what makes it a
     // clean night switch. Night takes eleven off the sky rather than all fifteen, so an inverted
     // detector reads eleven and not the full scale.
-    CHECK(daylightDetectors::signalFor(world, at(6000), clear, 8, 64, 8, true) == 0);
-    CHECK(daylightDetectors::signalFor(world, at(18000), clear, 8, 64, 8, true) == 11);
+    CHECK(daylightDetectors::signalFor(world, at(6000), darken(at(6000), clear), 8, 64, 8, true) == 0);
+    CHECK(daylightDetectors::signalFor(world, at(18000), darken(at(18000), clear), 8, 64, 8, true) == 11);
 }
 
 TEST_CASE("rain and thunder each take their share of the daylight") {
@@ -143,8 +171,8 @@ TEST_CASE("rain and thunder each take their share of the daylight") {
 
     WorldState world = emptyWorld();
     openSky(world);
-    CHECK(daylightDetectors::signalFor(world, noon, storm, 8, 64, 8, false) == 10);
-    CHECK(daylightDetectors::signalFor(world, noon, clear, 8, 64, 8, false) == 15);
+    CHECK(daylightDetectors::signalFor(world, noon, darken(noon, storm), 8, 64, 8, false) == 10);
+    CHECK(daylightDetectors::signalFor(world, noon, darken(noon, clear), 8, 64, 8, false) == 15);
 }
 
 TEST_CASE("a detector under a roof reads nothing at all") {
@@ -157,7 +185,7 @@ TEST_CASE("a detector under a roof reads nothing at all") {
             REQUIRE(world.setBlockState(x, 70, z, stateOf("stone")));
         }
     }
-    CHECK(daylightDetectors::signalFor(world, at(6000), clear, 8, 64, 8, false) < 15);
+    CHECK(daylightDetectors::signalFor(world, at(6000), darken(at(6000), clear), 8, 64, 8, false) < 15);
 }
 
 TEST_CASE("the block follows its reading, and says nothing when it has not moved") {
@@ -166,23 +194,25 @@ TEST_CASE("the block follows its reading, and says nothing when it has not moved
     const WorldWeather clear;
     REQUIRE(world.setBlockState(8, 64, 8, detectorOf("false")));
 
-    const std::optional<BlockChange> lit = daylightDetectors::update(world, at(6000), clear, 8, 64, 8);
+    const std::optional<BlockChange> lit =
+        daylightDetectors::update(world, at(6000), darken(at(6000), clear), 8, 64, 8);
     REQUIRE(lit.has_value());
     CHECK(powerAt(world, 8, 64, 8) == "15");
-    CHECK_FALSE(daylightDetectors::update(world, at(6000), clear, 8, 64, 8).has_value());
+    CHECK_FALSE(daylightDetectors::update(world, at(6000), darken(at(6000), clear), 8, 64, 8).has_value());
 
     // Night falls and it goes out.
-    const std::optional<BlockChange> dark = daylightDetectors::update(world, at(18000), clear, 8, 64, 8);
+    const std::optional<BlockChange> dark =
+        daylightDetectors::update(world, at(18000), darken(at(18000), clear), 8, 64, 8);
     REQUIRE(dark.has_value());
     CHECK(powerAt(world, 8, 64, 8) == "0");
 
     // What is not a detector is left alone, including a block that has a `power` of its own: a
     // weighted plate is not driven by the sky.
     REQUIRE(world.setBlockState(9, 64, 8, stateOf("stone")));
-    CHECK_FALSE(daylightDetectors::update(world, at(6000), clear, 9, 64, 8).has_value());
-    CHECK_FALSE(daylightDetectors::update(world, at(6000), clear, 500, 64, 500).has_value());
+    CHECK_FALSE(daylightDetectors::update(world, at(6000), darken(at(6000), clear), 9, 64, 8).has_value());
+    CHECK_FALSE(daylightDetectors::update(world, at(6000), darken(at(6000), clear), 500, 64, 500).has_value());
     REQUIRE(world.setBlockState(10, 64, 8, stateOf("light_weighted_pressure_plate")));
-    CHECK_FALSE(daylightDetectors::update(world, at(6000), clear, 10, 64, 8).has_value());
+    CHECK_FALSE(daylightDetectors::update(world, at(6000), darken(at(6000), clear), 10, 64, 8).has_value());
     CHECK(powerAt(world, 10, 64, 8) == "0");
 }
 
@@ -191,7 +221,7 @@ TEST_CASE("a world with no sky never reads anything") {
     openSky(world);
     const WorldWeather clear;
     REQUIRE(world.setBlockState(8, 64, 8, detectorOf("false")));
-    CHECK(daylightDetectors::signalFor(world, at(6000), clear, 8, 64, 8, false, false) == 0);
+    CHECK(daylightDetectors::signalFor(world, at(6000), darken(at(6000), clear), 8, 64, 8, false, false) == 0);
     // Inverted, no sky is the full fifteen: down there it is always night.
-    CHECK(daylightDetectors::signalFor(world, at(6000), clear, 8, 64, 8, true, false) == 15);
+    CHECK(daylightDetectors::signalFor(world, at(6000), darken(at(6000), clear), 8, 64, 8, true, false) == 15);
 }

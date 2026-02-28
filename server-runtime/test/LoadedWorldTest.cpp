@@ -113,6 +113,26 @@ TEST_CASE("the clock and the weather advance with the world, and the rules can s
     CHECK(world.clock().totalTicks() == 1);
 }
 
+TEST_CASE("the reading of the sky is the one the turn started with") {
+    const std::string root = scratch("loaded-world-sky");
+    WorldMetadata metadata = metadataOf();
+    // The last tick reading zero: one later the dusk ramp has taken the first step off the sky.
+    metadata.timeOfDay = 12030;
+    LoadedWorld world{declarationOf("world"), WorldSettings{}, metadata, root, basalt::wire::common::Logger{"Test"}};
+    rng::RandomSource random = rng::RandomSource::legacy(1);
+
+    // parity: `ServerLevel`'s constructor ends on `updateSkyBrightness()`, so it reads before any turn.
+    CHECK(world.skyDarken() == 0);
+
+    // parity: `ServerLevel.tick` writes the reading before `tickTime()`, so everything asking this
+    // turn gets the sky as it stood when the turn began and not the one the clock just moved to.
+    CHECK(world.tickTime(random));
+    CHECK(world.clock().totalTicks() == 12031);
+    CHECK(world.skyDarken() == 0);
+    CHECK(world.tickTime(random));
+    CHECK(world.skyDarken() == 1);
+}
+
 TEST_CASE("time does not run in the Nether, whatever the rules say") {
     const std::string root = scratch("loaded-world-nether");
     WorldDeclaration declaration = declarationOf("nether");

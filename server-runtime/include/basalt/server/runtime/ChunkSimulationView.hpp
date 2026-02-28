@@ -31,8 +31,11 @@ public:
     /// parity: vanilla's simulation distance, which is ten by default and separate from the view
     /// distance. This build has no setting of its own for it yet, so it follows the view distance up
     /// to vanilla's own default and no further.
+    /// parity: `ChunkLevel.byStatus` puts `BLOCK_TICKING` at level 32 and `ENTITY_TICKING` at 31, so
+    /// the blocks of a chunk tick **one further out** than its entities. `extraRadius` is that one.
     [[nodiscard]] std::vector<std::array<std::int32_t, 2>> simulatedChunks(const world::LoadedWorld& world,
-                                                                           const sched::Region* region = nullptr) const;
+                                                                           const sched::Region* region = nullptr,
+                                                                           std::int32_t extraRadius = 0) const;
 
 private:
     player::PlayerRegistry* players_;

@@ -573,7 +573,8 @@ bool WorldState::hasScheduledBlockTick(std::int32_t x, std::int32_t y, std::int3
 }
 
 std::vector<std::array<std::int32_t, 3>>
-WorldState::dueTicks(const std::function<void(Chunk&, std::vector<ChunkScheduledTick>&)>& advance, bool remember) {
+WorldState::dueTicks(const std::function<void(Chunk&, std::vector<ChunkScheduledTick>&)>& advance, bool remember,
+                     const Ticking& ticking) {
     std::vector<ChunkScheduledTick> due;
     std::vector<std::array<std::int32_t, 4>> found;
     const WorldWriteLock lock{mutex_};
@@ -581,6 +582,13 @@ WorldState::dueTicks(const std::function<void(Chunk&, std::vector<ChunkScheduled
         // Nothing to advance, and most chunks have nothing: the same walk without this ran the
         // whole loaded world through two empty vectors twenty times a second.
         if (chunk->scheduledTickCount() == 0) {
+            continue;
+        }
+        // parity: a chunk that is loaded and not ticking is frozen: `ChunkMap` takes its
+        // `LevelTicks` container away, so its turns neither run nor count down. Ours used to walk
+        // every loaded chunk, and a clock three chunks from spawn kept going with nobody connected
+        // where 26.2 stops it (`spawnsigue`).
+        if (ticking && !ticking(chunk->chunkX(), chunk->chunkZ())) {
             continue;
         }
         const std::size_t before = due.size();
@@ -617,21 +625,23 @@ WorldState::dueTicks(const std::function<void(Chunk&, std::vector<ChunkScheduled
     return positions;
 }
 
-std::vector<std::array<std::int32_t, 3>> WorldState::dueFluidTicks() {
-    return dueTicks([](Chunk& chunk, std::vector<ChunkScheduledTick>& due) { chunk.advanceFluidTicks(due); }, false);
+std::vector<std::array<std::int32_t, 3>> WorldState::dueFluidTicks(const Ticking& ticking) {
+    return dueTicks([](Chunk& chunk, std::vector<ChunkScheduledTick>& due) { chunk.advanceFluidTicks(due); }, false,
+                    ticking);
 }
 
-std::vector<std::array<std::int32_t, 3>> WorldState::dueBlockTicks() {
+std::vector<std::array<std::int32_t, 3>> WorldState::dueBlockTicks(const Ticking& ticking) {
     std::vector<std::array<std::int32_t, 3>> positions;
-    for (const DueTick& tick : dueBlockTicksTyped()) {
+    for (const DueTick& tick : dueBlockTicksTyped(ticking)) {
         positions.push_back(std::array<std::int32_t, 3>{tick.x, tick.y, tick.z});
     }
     return positions;
 }
 
-std::vector<WorldState::DueTick> WorldState::dueBlockTicksTyped() {
+std::vector<WorldState::DueTick> WorldState::dueBlockTicksTyped(const Ticking& ticking) {
     const std::vector<std::array<std::int32_t, 3>> positions =
-        dueTicks([](Chunk& chunk, std::vector<ChunkScheduledTick>& due) { chunk.advanceBlockTicks(due); }, true);
+        dueTicks([](Chunk& chunk, std::vector<ChunkScheduledTick>& due) { chunk.advanceBlockTicks(due); }, true,
+                 ticking);
     const WorldReadLock lock{mutex_};
     std::vector<DueTick> due;
     due.reserve(positions.size());

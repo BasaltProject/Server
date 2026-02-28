@@ -66,6 +66,14 @@ struct DimensionFacts {
     /// parity: `gameplay/nether_portal_spawns_piglin`, which the overworld's own dimension type
     /// turns on and every other one leaves off.
     bool spawnsPortalPiglins = false;
+    /// parity: `EnvironmentAttributes.SKY_LIGHT_LEVEL`, whose default is fifteen and which only the
+    /// Nether sets, to four. It is what `Level.updateSkyBrightness` subtracts from fifteen.
+    float skyLightLevel = 15.0F;
+    /// parity: the `minecraft:day` timeline, which only `#minecraft:in_overworld` carries: the
+    /// Nether and the End tag nothing but `#minecraft:universal`, so neither the sky light nor the
+    /// angle of the sun moves there. Without this the End went dark at night and a detector in it
+    /// followed the overworld's clock.
+    bool hasDayTimeline = false;
 };
 
 [[nodiscard]] const DimensionFacts& dimensionFacts(WorldDimension dimension) noexcept;

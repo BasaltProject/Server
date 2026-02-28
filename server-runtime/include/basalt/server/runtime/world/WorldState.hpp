@@ -238,8 +238,14 @@ public:
     [[nodiscard]] bool hasScheduledBlockTick(std::int32_t x, std::int32_t y, std::int32_t z,
                                              const wire::common::Identifier& type) const;
 
+    /// Whether a chunk's turns run at all this tick, by chunk coordinates. parity:
+    /// `ChunkMap.onFullChunkStatusChange` hands a chunk's `LevelTicks` container over only while it
+    /// is at block ticking, so a chunk that is loaded and not ticking neither runs its turns nor
+    /// counts them down. Unset means every loaded chunk, which is what the tests want.
+    using Ticking = std::function<bool(std::int32_t chunkX, std::int32_t chunkZ)>;
+
     /// Every fluid tick that comes due this tick, in world coordinates.
-    [[nodiscard]] std::vector<std::array<std::int32_t, 3>> dueFluidTicks();
+    [[nodiscard]] std::vector<std::array<std::int32_t, 3>> dueFluidTicks(const Ticking& ticking = {});
 
     /// One block turn that comes due, with the block it was booked for.
     struct DueTick {
@@ -250,11 +256,11 @@ public:
     };
 
     /// The same for block ticks: a button that has been held down long enough, and later redstone.
-    [[nodiscard]] std::vector<std::array<std::int32_t, 3>> dueBlockTicks();
+    [[nodiscard]] std::vector<std::array<std::int32_t, 3>> dueBlockTicks(const Ticking& ticking = {});
 
     /// parity: `ServerLevel.tickBlock` runs a turn only on the block it was booked for, so what runs
     /// has to know which block asked for it.
-    [[nodiscard]] std::vector<DueTick> dueBlockTicksTyped();
+    [[nodiscard]] std::vector<DueTick> dueBlockTicksTyped(const Ticking& ticking = {});
 
     /// parity: `LevelTicks.willTickThisTick`, the turns already taken for this tick and still to
     /// run. A diode that hears a neighbour while its own turn is waiting books nothing.
@@ -357,7 +363,7 @@ private:
     [[nodiscard]] std::vector<server::world::Chunk*> snapshot() const;
     [[nodiscard]] std::vector<std::array<std::int32_t, 3>>
     dueTicks(const std::function<void(server::world::Chunk&, std::vector<server::world::ChunkScheduledTick>&)>& advance,
-             bool remember);
+             bool remember, const Ticking& ticking);
     server::world::Chunk& installLocked(server::world::Chunk chunk);
 
     /// One turn of this tick's batch, kept only to answer `willTickThisTick`.

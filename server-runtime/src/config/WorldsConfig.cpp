@@ -90,7 +90,9 @@ const DimensionFacts& dimensionFacts(WorldDimension dimension) noexcept {
                                                .hasSkylight = true,
                                                .hasCeiling = false,
                                                .coordinateScale = 1.0,
-                                               .spawnsPortalPiglins = true};
+                                               .spawnsPortalPiglins = true,
+                                               .skyLightLevel = 15.0F,
+                                               .hasDayTimeline = true};
     static constexpr DimensionFacts kNether{.configName = "nether",
                                             .registryPath = "the_nether",
                                             .registryIndex = 1,
@@ -99,7 +101,9 @@ const DimensionFacts& dimensionFacts(WorldDimension dimension) noexcept {
                                             .hasSkylight = false,
                                             .hasCeiling = true,
                                             .coordinateScale = 8.0,
-                                            .spawnsPortalPiglins = false};
+                                            .spawnsPortalPiglins = false,
+                                            .skyLightLevel = 4.0F,
+                                            .hasDayTimeline = false};
     static constexpr DimensionFacts kEnd{.configName = "end",
                                          .registryPath = "the_end",
                                          .registryIndex = 2,
@@ -108,7 +112,9 @@ const DimensionFacts& dimensionFacts(WorldDimension dimension) noexcept {
                                          .hasSkylight = true,
                                          .hasCeiling = false,
                                          .coordinateScale = 1.0,
-                                         .spawnsPortalPiglins = false};
+                                         .spawnsPortalPiglins = false,
+                                         .skyLightLevel = 15.0F,
+                                         .hasDayTimeline = false};
     switch (dimension) {
     case WorldDimension::Nether:
         return kNether;

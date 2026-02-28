@@ -4,7 +4,6 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/CustomSpawners.hpp>
-#include <basalt/server/runtime/world/DaylightDetectors.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobLocalDifficulty.hpp>
@@ -80,7 +79,7 @@ void PhantomSpawner::tick(LoadedWorld& world, bool spawnEnemies, const std::vect
         return;
     }
     nextTick_ += (kMinIntervalSeconds + random.nextInt(kIntervalSecondsRange)) * kTicksPerSecond;
-    if (facts.hasSkylight && daylightDetectors::skyDarken(world.clock(), world.weather()) < kMinSkyDarken) {
+    if (facts.hasSkylight && world.skyDarken() < kMinSkyDarken) {
         return;
     }
 
@@ -265,8 +264,7 @@ void PatrolSpawner::tick(LoadedWorld& world, bool spawnEnemies, const std::vecto
         return;
     }
     nextTick_ += kBaseIntervalTicks + random.nextInt(kIntervalRangeTicks);
-    if (daylightDetectors::skyDarken(world.clock(), world.weather()) >= kBrightOutsideDarken ||
-        random.nextInt(kAttemptOdds) != 0 || players.empty()) {
+    if (world.skyDarken() >= kBrightOutsideDarken || random.nextInt(kAttemptOdds) != 0 || players.empty()) {
         return;
     }
 
@@ -584,9 +582,7 @@ constexpr std::int32_t kCosIndexOffset = 16384;
     if (worldLight::blockLight(world.state(), x, y, z) > kSiegeMaxMonsterBlockLight) {
         return false;
     }
-    const std::int32_t skyDampen = world.weather().thundering
-                                       ? kSiegeThunderSkyDampen
-                                       : daylightDetectors::skyDarken(world.clock(), world.weather());
+    const std::int32_t skyDampen = world.weather().thundering ? kSiegeThunderSkyDampen : world.skyDarken();
     if (worldLight::rawBrightness(world.state(), x, y, z, true, skyDampen) > random.nextInt(kSiegeMonsterLightRange)) {
         return false;
     }
@@ -656,7 +652,7 @@ void VillageSiegeSpawner::tick(LoadedWorld& world, bool spawnEnemies,
     if (world.declaration().dimension != config::WorldDimension::Overworld) {
         return;
     }
-    if (daylightDetectors::skyDarken(world.clock(), world.weather()) < kSiegeBrightOutsideDarken || !spawnEnemies) {
+    if (world.skyDarken() < kSiegeBrightOutsideDarken || !spawnEnemies) {
         siegeTonight_ = false;
         hasSetUpSiege_ = false;
         return;

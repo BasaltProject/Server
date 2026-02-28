@@ -405,6 +405,21 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
     }
 
     random::RandomSource random = random::RandomSource::legacy(scratchSeed());
+    // Worked out on the first entity and not before, so a world with nothing alive never builds it.
+    // The plain radius here: entities stop one chunk sooner than blocks (`ChunkLevel.byStatus`).
+    std::optional<std::unordered_set<std::int64_t>> entityTicking;
+    const auto ticking = [this, &entityTicking, &world, &region](double atX, double atZ) {
+        if (!entityTicking.has_value()) {
+            std::unordered_set<std::int64_t> built;
+            for (const std::array<std::int32_t, 2>& at : chunkSimulation_.simulatedChunks(world, &region)) {
+                built.insert((static_cast<std::int64_t>(at[0]) << 32) | static_cast<std::uint32_t>(at[1]));
+            }
+            entityTicking = std::move(built);
+        }
+        const auto chunkX = static_cast<std::int32_t>(std::floor(atX)) >> 4;
+        const auto chunkZ = static_cast<std::int32_t>(std::floor(atZ)) >> 4;
+        return entityTicking->contains((static_cast<std::int64_t>(chunkX) << 32) | static_cast<std::uint32_t>(chunkZ));
+    };
     for (entity::ServerEntity* entity : living) {
         if (entity->removed || MobTickSystem::hasActiveVehicle(world, *entity)) {
             continue;
@@ -418,6 +433,13 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         // region during its own turn: that is fine, the next tick asks again, and the repartition
         // that could change the answer only happens between ticks.
         if (!region.ownsPosition(entity->x, entity->z)) {
+            continue;
+        }
+        // parity: `ServerLevel` ticks an entity only when it is a player or its chunk is
+        // `inEntityTickingRange`; everything else stays on the list, keeps its box and is still read
+        // by whatever stands under it, but takes no turn. Ours ticked every entity in the world, so
+        // a minecart three chunks from spawn kept rolling with nobody connected (`vagonetasinticket`).
+        if (!ticking(entity->x, entity->z)) {
             continue;
         }
         // parity: `LightningBolt.tick` does everything on the turn its life is still two: it powers

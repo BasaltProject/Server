@@ -891,8 +891,9 @@ void BlockInteractionHandler::cycleBlock(const BlockPos& pos) {
     // `updateSignalStrength` write the reading, which is the write that carries. Without this the
     // detector flipped and kept the old number until its own turn came round.
     const std::optional<world::BlockChange> reread =
-        world::daylightDetectors::update(world->state(), world->clock(), world->weather(), pos.x, pos.y, pos.z,
-                                         config::dimensionFacts(world->declaration().dimension).hasSkylight);
+        world::daylightDetectors::update(world->state(), world->clock(), world->skyDarken(), pos.x, pos.y, pos.z,
+                                         config::dimensionFacts(world->declaration().dimension).hasSkylight,
+                                         config::dimensionFacts(world->declaration().dimension).hasDayTimeline);
     if (reread.has_value()) {
         broadcastBlockUpdate(pos, reread->stateId);
     }

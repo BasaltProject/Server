@@ -70,7 +70,8 @@ void sendBlockUpdates(const std::vector<PlayerSession*>& watchers, const std::ve
 } // namespace
 
 void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sched::Region& region) {
-    const std::vector<world::WorldState::DueTick> due = world.state().dueBlockTicksTyped();
+    const std::vector<world::WorldState::DueTick> due =
+        world.state().dueBlockTicksTyped(tickingChunks(world, region, 1));
     if (due.empty()) {
         return;
     }
@@ -544,7 +545,8 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                     return block != nullptr && options_.blockTags != nullptr &&
                            world::realBlockTags::contains(*options_.blockTags, "minecraft:pale_oak_logs", *block);
                 },
-                world::scheduledBlocks::creakingIsActive(world.clock().totalTicks()));
+                world::scheduledBlocks::creakingIsActive(
+                    world.clock().totalTicks(), config::dimensionFacts(world.declaration().dimension).hasDayTimeline));
             heart.has_value()) {
             scheduled.push_back(world::BlockChange{.x = x, .y = y, .z = z, .stateId = *heart});
             broadcaster_->notifyAround(world, watchers, x, y, z, std::nullopt);

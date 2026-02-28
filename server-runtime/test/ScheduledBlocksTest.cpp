@@ -440,3 +440,16 @@ TEST_CASE("a column stops where the water does") {
     CHECK(changes.size() == 2);
     CHECK(world.blockState(8, 66, 8) == stateOf("stone"));
 }
+
+TEST_CASE("a creaking heart only has a night in the overworld") {
+    // parity: `creaking_active` is a track of the `minecraft:day` timeline, tagged
+    // `#minecraft:in_overworld` and nowhere else, so the attribute keeps its own `false` in the
+    // Nether and the End whatever their clock says.
+    CHECK_FALSE(scheduledBlocks::creakingIsActive(12599));
+    CHECK(scheduledBlocks::creakingIsActive(12600));
+    CHECK(scheduledBlocks::creakingIsActive(23400));
+    CHECK_FALSE(scheduledBlocks::creakingIsActive(23401));
+    for (const std::int64_t ticks : {0, 12600, 18000, 23400}) {
+        CHECK_FALSE(scheduledBlocks::creakingIsActive(ticks, false));
+    }
+}
