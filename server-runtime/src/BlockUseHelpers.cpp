@@ -15,6 +15,7 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/PlayerSleep.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
@@ -61,30 +62,6 @@ using wire::common::Identifier;
 /// parity: `MinecartItem.useOn`, a sixteenth of a block above the rail.
 constexpr double kMinecartRestHeight = 0.0625;
 
-std::optional<Identifier> parsedOrNothing(const std::string& id) {
-    const std::expected<Identifier, wire::common::IdentifierError> parsed = Identifier::parse(id);
-    return parsed.has_value() ? std::optional{*parsed} : std::nullopt;
-}
-
-std::string lowercaseName(play::Direction face) {
-    switch (face) {
-    case play::Direction::Down:
-        return "down";
-    case play::Direction::Up:
-        return "up";
-    case play::Direction::North:
-        return "north";
-    case play::Direction::South:
-        return "south";
-    case play::Direction::West:
-        return "west";
-    case play::Direction::East:
-        return "east";
-    }
-    return "north";
-}
-
-/// parity: the two axes a bell can swing along, which is what `isProperHit` compares.
 storage::StoredItemStack withCount(const storage::StoredItemStack& stack, std::int32_t count) {
     storage::StoredItemStack copy = stack;
     copy.count = count;
@@ -272,24 +249,8 @@ bool BlockInteractionHandler::useLectern(PlayerSession& session, const BlockPos&
         return true;
     }
     const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session.inventory.heldSlot();
-    const std::optional<storage::StoredItemStack> held = session.inventory.at(heldSlot);
-    const std::optional<Identifier> item = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
-    if (!item.has_value() || !world::lecterns::isBook(*item)) {
-        return false;
-    }
-    // parity: `tryPlaceBook` takes the whole stack, and the pages a comparator counts are one of its
-    // components.
-    const std::optional<world::BlockChange> change = world::lecterns::placeBook(
-        world->state(), pos.x, pos.y, pos.z,
-        server::world::loot::ItemStack{.item = *item, .count = 1, .components = held->components});
-    if (!change.has_value()) {
-        return false;
-    }
-    broadcastBlockUpdate(BlockPos{change->x, change->y, change->z}, change->stateId);
-    session.inventory.set(heldSlot, held->count <= 1 ? std::nullopt : std::optional{withCount(*held, held->count - 1)});
-    owner_->sendInventorySlot(heldSlot);
-    notifyNeighbours(pos);
-    return true;
+    return player::placeBookOnLecternFor(breakContext(), session, *world, pos.x, pos.y, pos.z, heldSlot,
+                                         session.inventory.at(heldSlot));
 }
 
 void BlockInteractionHandler::openLectern(PlayerSession& session, const BlockPos& pos) {
@@ -315,34 +276,9 @@ bool BlockInteractionHandler::useJukebox(PlayerSession& session, const BlockPos&
     if (world == nullptr) {
         return false;
     }
-    const std::optional<std::pair<world::BlockChange, Identifier>> ejected =
-        world::jukeboxes::eject(world->state(), pos.x, pos.y, pos.z);
-    if (ejected.has_value()) {
-        const world::BlockChange& change = ejected->first;
-        broadcastBlockUpdate(BlockPos{change.x, change.y, change.z}, change.stateId);
-        spawnDroppedItem(ejected->second, 1, pos.x + 0.5, pos.y + 1.0, pos.z + 0.5);
-        notifyNeighbours(pos);
-        return true;
-    }
     const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session.inventory.heldSlot();
-    const std::optional<storage::StoredItemStack> held = session.inventory.at(heldSlot);
-    const std::optional<Identifier> item = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
-    if (!item.has_value() || !world::jukeboxes::isDisc(*item)) {
-        return false;
-    }
-    const std::optional<world::BlockChange> change =
-        world::jukeboxes::insert(world->state(), pos.x, pos.y, pos.z, *item);
-    if (!change.has_value()) {
-        return false;
-    }
-    broadcastBlockUpdate(BlockPos{change->x, change->y, change->z}, change->stateId);
-    if (session.gamemode != Gamemode::Creative) {
-        session.inventory.set(heldSlot,
-                              held->count <= 1 ? std::nullopt : std::optional{withCount(*held, held->count - 1)});
-        owner_->sendInventorySlot(heldSlot);
-    }
-    notifyNeighbours(pos);
-    return true;
+    return player::useJukeboxFor(breakContext(), session, *world, pos.x, pos.y, pos.z, heldSlot,
+                                 session.inventory.at(heldSlot));
 }
 
 bool BlockInteractionHandler::spawnFromItem(PlayerSession& session, const Identifier& type, std::int32_t heldSlot,
@@ -476,86 +412,13 @@ void BlockInteractionHandler::useBookshelf(PlayerSession& session, const play::B
 
 void BlockInteractionHandler::useShelf(PlayerSession& session, const play::BlockHitResult& hit) {
     world::LoadedWorld* world = owner_->currentWorld();
-    const std::optional<std::int32_t> stateId =
-        world == nullptr ? std::nullopt : world->state().blockState(hit.pos.x, hit.pos.y, hit.pos.z);
-    if (!stateId.has_value()) {
-        return;
-    }
-    const std::optional<std::int32_t> slot =
-        world::shelves::slotAt(*stateId, lowercaseName(hit.direction), hit.clickX, hit.clickY, hit.clickZ);
-    if (!slot.has_value()) {
-        return;
-    }
-    if (reg::blockStateDefinitions::propertiesOf(*stateId)["powered"] == "true") {
-        swapHotbarWithShelf(session, hit.pos, *stateId);
-        return;
-    }
-    const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session.inventory.heldSlot();
-    const std::optional<storage::StoredItemStack> held = session.inventory.at(heldSlot);
-    std::optional<server::world::loot::ItemStack> placed;
-    if (held.has_value()) {
-        const std::optional<Identifier> item = parsedOrNothing(held->id);
-        if (item.has_value()) {
-            placed = server::world::loot::ItemStack{.item = *item, .count = held->count};
-        }
-    }
-    const std::optional<world::shelves::SwapResult> result =
-        world::shelves::swap(world->state(), hit.pos.x, hit.pos.y, hit.pos.z, *slot, placed);
-    if (!result.has_value()) {
-        return;
-    }
-    session.inventory.set(heldSlot, result->removed.has_value()
-                                        ? std::optional{storage::StoredItemStack{.id = result->removed->item.toString(),
-                                                                                 .count = result->removed->count}}
-                                        : std::nullopt);
-    owner_->sendInventorySlot(heldSlot);
-    // parity: `swapSingleItem` ends in `setChanged(ITEM_INTERACT_FINISH)`. Its one exception, an item
-    // whose `use_effects` asks for silence, is a component this server does not carry yet.
-    if (world->state().hasSculkSensorNear(hit.pos.x, hit.pos.y, hit.pos.z, world::vibrations::kCalibratedRange)) {
-        world::vibrations::emit(world->state(), "item_interact_finish", hit.pos.x + 0.5, hit.pos.y + 0.5,
-                                hit.pos.z + 0.5, world->gameTime());
-    }
-    broadcastEffects(hit.pos, *stateId, result->effects);
-}
-
-void BlockInteractionHandler::swapHotbarWithShelf(PlayerSession& session, const BlockPos& pos, std::int32_t stateId) {
-    world::LoadedWorld* world = owner_->currentWorld();
     if (world == nullptr) {
         return;
     }
-    world::blockInventory::Slots hotbar(PlayerInventory::kHotbarSize);
-    for (std::int32_t index = 0; index < PlayerInventory::kHotbarSize; index++) {
-        const std::optional<storage::StoredItemStack>& stack =
-            session.inventory.at(PlayerInventory::kHotbarStart + index);
-        const std::optional<Identifier> item = stack.has_value() ? parsedOrNothing(stack->id) : std::nullopt;
-        if (item.has_value()) {
-            hotbar[static_cast<std::size_t>(index)] =
-                server::world::loot::ItemStack{.item = *item, .count = stack->count};
-        }
-    }
-    if (!world::shelves::swapHotbar(world->state(), pos.x, pos.y, pos.z, hotbar)) {
-        return;
-    }
-    for (std::int32_t index = 0; index < PlayerInventory::kHotbarSize; index++) {
-        const std::optional<server::world::loot::ItemStack>& stack = hotbar[static_cast<std::size_t>(index)];
-        session.inventory.set(PlayerInventory::kHotbarStart + index,
-                              stack.has_value() ? std::optional{storage::StoredItemStack{.id = stack->item.toString(),
-                                                                                         .count = stack->count}}
-                                                : std::nullopt);
-    }
-    owner_->sendInventoryAll();
-    // parity: `swapHotbar` calls `setChanged(ENTITY_INTERACT)` on every shelf of the chain, and each
-    // one is a noise of its own.
-    for (const world::shelves::Position& part : world::shelves::chainAt(world->state(), pos.x, pos.y, pos.z)) {
-        if (world->state().hasSculkSensorNear(part[0], part[1], part[2], world::vibrations::kCalibratedRange)) {
-            world::vibrations::emit(world->state(), "entity_interact", part[0] + 0.5, part[1] + 0.5, part[2] + 0.5,
-                                    world->gameTime());
-        }
-    }
-    broadcastEffects(
-        pos, stateId,
-        {world::blockEffect::Sound{
-            .name = "block.shelf.multi_swap", .source = play::SoundSource::Blocks, .volume = 1.0F, .pitch = 1.0F}});
+    const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session.inventory.heldSlot();
+    player::useShelfFor(breakContext(), session, *world, hit.pos.x, hit.pos.y, hit.pos.z,
+                        player::FaceHit{.face = hit.direction, .x = hit.clickX, .y = hit.clickY, .z = hit.clickZ},
+                        heldSlot, session.inventory.at(heldSlot));
 }
 
 void BlockInteractionHandler::usePot(PlayerSession& session, const BlockPos& pos) {
@@ -687,21 +550,6 @@ void BlockInteractionHandler::cycleBlock(const BlockPos& pos) {
     }
 }
 
-std::optional<world::BedProblem> BlockInteractionHandler::bedReachProblem(const PlayerSession& session,
-                                                                          const BlockPos& head,
-                                                                          std::int32_t headState) const {
-    if (world::beds::isOccupied(headState)) {
-        return world::BedProblem::Occupied;
-    }
-    const double dx = session.x - (head.x + 0.5);
-    const double dy = session.y - head.y;
-    const double dz = session.z - (head.z + 0.5);
-    if ((dx * dx) + (dy * dy) + (dz * dz) > world::beds::kRange * world::beds::kRange) {
-        return world::BedProblem::TooFarAway;
-    }
-    return std::nullopt;
-}
-
 void BlockInteractionHandler::setSpawnPointAt(PlayerSession& session, const BlockPos& bed) {
     storage::PlayerStore* store = owner_->options().playerStore;
     if (store == nullptr || !store->isOpen()) {
@@ -716,93 +564,32 @@ void BlockInteractionHandler::setSpawnPointAt(PlayerSession& session, const Bloc
     owner_->sendActionBar(wire::text::Component::translatable("block.minecraft.set_spawn"));
 }
 
-void BlockInteractionHandler::useBed(PlayerSession& session, const BlockPos& pos, std::int32_t state) {
-    world::LoadedWorld* world = owner_->currentWorld();
-    if (world == nullptr) {
-        return;
-    }
-    const std::array<std::int32_t, 3> step = world::beds::headOffset(state);
-    const BlockPos head =
-        world::beds::isHead(state) ? pos : BlockPos{pos.x + step[0], pos.y + step[1], pos.z + step[2]};
-    const std::optional<std::int32_t> headState = world->state().blockState(head.x, head.y, head.z);
-    if (!headState.has_value() || !world::beds::isBed(*headState)) {
-        return;
-    }
-
-    if (world::beds::explodesIn(world->declaration().dimension)) {
-        for (const world::BlockChange& change : world::beds::destroy(world->state(), head.x, head.y, head.z)) {
-            broadcastBlockUpdate(BlockPos{change.x, change.y, change.z}, change.stateId);
-        }
-        owner_->sendActionBar(wire::text::Component::translatable("block.minecraft.bed.not_valid"));
-        // parity: `BedBlock.useWithoutItem`, which does not merely refuse: it takes the bed out and
-        // sets off an explosion of five where it stood.
+player::SleepContext BlockInteractionHandler::sleepContext() {
+    player::SleepContext context;
+    context.blocks = breakContext();
+    context.setSpawn = [this](PlayerSession& player, const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+        setSpawnPointAt(player, BlockPos{x, y, z});
+    };
+    context.bedAllowed = hooks_.bedAllowed;
+    context.explode = [this](world::LoadedWorld& world, const double x, const double y, const double z,
+                             const std::int32_t byEntityId) {
         if (ExplosionSystem* explosions = owner_->options().explosions; explosions != nullptr) {
-            explosions->blowUp(*world, owner_->playersInSameWorld(), head.x + 0.5, head.y + 0.5, head.z + 0.5,
-                               world::explosions::kBedPower, "bed", session.entityId());
+            explosions->blowUp(world, owner_->playersInSameWorld(), x, y, z, world::explosions::kBedPower, "bed",
+                               byEntityId);
         }
-        return;
-    }
-    // parity: `ServerPlayer.startSleepInBed` sets the spawn point once the bed is reachable and
-    // free, and only then asks whether the night allows sleeping.
-    const std::optional<world::BedProblem> reachProblem = bedReachProblem(session, head, *headState);
-    if (reachProblem.has_value()) {
-        owner_->sendActionBar(wire::text::Component::translatable(std::string{world::translationKeyOf(*reachProblem)}));
-        return;
-    }
-    setSpawnPointAt(session, head);
-    if (!world::beds::isNight(world->clock().totalTicks()) && !world->weather().thundering) {
-        owner_->sendActionBar(wire::text::Component::translatable(
-            std::string{world::translationKeyOf(world::BedProblem::NotPossibleNow)}));
-        return;
-    }
+    };
+    return context;
+}
 
-    const std::int32_t occupied = world::beds::withOccupied(*headState, true);
-    world->state().setBlockState(head.x, head.y, head.z, occupied);
-    broadcastBlockUpdate(head, occupied);
-    if (hooks_.bedAllowed && !hooks_.bedAllowed(session, head.x, head.y, head.z)) {
-        return;
-    }
-    session.sleepingBed = std::array<std::int32_t, 3>{head.x, head.y, head.z};
-    session.sleepTicks = 0;
-    session.stats.reset(storage::stats::timeSinceRest());
-    const play::SetEntityDataPacket packet = play::SetEntityDataPacket::sleeping(session.entityId(), head);
-    owner_->sendPlayPacket(play::SetEntityDataPacket::kId,
-                           [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
-    for (const PlayerSession* other : owner_->playersInSameWorld()) {
-        if (other->entityId() == session.entityId() || !other->connection().sendPlayPacket) {
-            continue;
-        }
-        other->connection().sendPlayPacket(play::SetEntityDataPacket::kId,
-                                           [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+void BlockInteractionHandler::useBed(PlayerSession& session, const BlockPos& pos, std::int32_t state) {
+    if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
+        static_cast<void>(player::sleepInBedFor(sleepContext(), session, *world, pos.x, pos.y, pos.z, state));
     }
 }
 
 void BlockInteractionHandler::wakeUp() {
-    PlayerSession* session = owner_->playerSession();
-    if (session == nullptr || !session->sleepingBed.has_value()) {
-        return;
-    }
-    const std::array<std::int32_t, 3> bed = *session->sleepingBed;
-    session->sleepingBed.reset();
-    session->sleepTicks = 0;
-    world::LoadedWorld* world = owner_->currentWorld();
-    const std::optional<std::int32_t> state =
-        world == nullptr ? std::nullopt : world->state().blockState(bed[0], bed[1], bed[2]);
-    if (world != nullptr && state.has_value() && world::beds::isBed(*state)) {
-        const std::int32_t awake = world::beds::withOccupied(*state, false);
-        world->state().setBlockState(bed[0], bed[1], bed[2], awake);
-        broadcastBlockUpdate(BlockPos{bed[0], bed[1], bed[2]}, awake);
-    }
-    // Nobody was moved into the bed, so nobody moves out.
-    const play::SetEntityDataPacket packet = play::SetEntityDataPacket::sleeping(session->entityId(), std::nullopt);
-    owner_->sendPlayPacket(play::SetEntityDataPacket::kId,
-                           [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
-    for (const PlayerSession* other : owner_->playersInSameWorld()) {
-        if (other->entityId() == session->entityId() || !other->connection().sendPlayPacket) {
-            continue;
-        }
-        other->connection().sendPlayPacket(play::SetEntityDataPacket::kId,
-                                           [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+    if (PlayerSession* session = owner_->playerSession(); session != nullptr) {
+        player::wakeUpFor(breakContext(), *session, owner_->currentWorld());
     }
 }
 

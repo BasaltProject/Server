@@ -163,6 +163,10 @@ public:
         /// else reads as "what they are holding".
         virtual void setHeldSlot(std::int32_t slot) = 0;
 
+        /// Swallows what is in that hotbar slot: this edition eats on its own clock and only says
+        /// when it is done.
+        virtual void finishEating(std::int32_t hotbarSlot) = 0;
+
         /// The client asked for its own bag. This edition does not open it by itself: it asks,
         /// and a client whose ask goes unanswered never sees an inventory at all.
         virtual void openOwnInventory() = 0;

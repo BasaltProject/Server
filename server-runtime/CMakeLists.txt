@@ -191,8 +191,11 @@ basalt_module(server-runtime-core
         src/player/PlayerBlockSlots.cpp
         src/player/PlayerBlockToggle.cpp
         src/player/PlayerDigSpeed.cpp
+        src/player/PlayerEating.cpp
         src/player/PlayerItemPickup.cpp
+        src/player/PlayerSleep.cpp
         src/player/PlayerSweep.cpp
+        src/player/PlayerVitals.cpp
         src/player/PlayerBlockPlace.cpp
         src/player/PlayerContainers.cpp
         src/player/PlayerDamage.cpp

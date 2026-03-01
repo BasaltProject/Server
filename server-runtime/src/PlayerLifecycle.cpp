@@ -32,27 +32,10 @@ using player::PlayerSession;
 using wire::protocol::play::Gamemode;
 using wire::text::Component;
 
-/// parity: `death.attack.starve`, which is what hunger kills with.
-constexpr std::string_view kDeathStarve = "starve";
-
 /// Seconds since the epoch, which is what a saved row is stamped with.
 std::int64_t nowEpochSeconds() {
     return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
         .count();
-}
-
-/// The difficulty as the food clock wants it, from the word the config carries.
-player::Difficulty difficultyOf(std::string_view name) {
-    if (name == "peaceful") {
-        return player::Difficulty::Peaceful;
-    }
-    if (name == "normal") {
-        return player::Difficulty::Normal;
-    }
-    if (name == "hard") {
-        return player::Difficulty::Hard;
-    }
-    return player::Difficulty::Easy;
 }
 
 } // namespace
@@ -96,11 +79,6 @@ void PlayerLifecycle::tickPlayer() {
         session->stats.increment(storage::stats::timeSinceRest());
     }
     checkAdvancements(*session);
-    if (session->invulnerableTicks > 0) {
-        session->invulnerableTicks--;
-    }
-    // parity: `Player.tick`, which counts this up for as long as the player is not swinging.
-    session->ticksSinceSwing++;
     if (session->dead) {
         return;
     }
@@ -108,33 +86,7 @@ void PlayerLifecycle::tickPlayer() {
     checkEquipment(*session);
     owner_->itemUseTimers().tickEating(*session);
     owner_->itemUseTimers().tickDrawing(*session);
-    if (session->sleepingBed.has_value()) {
-        session->sleepTicks++;
-    }
     owner_->blockInteraction().tickDigging(*session);
-    if (session->gamemode == Gamemode::Creative || session->gamemode == Gamemode::Spectator) {
-        return;
-    }
-
-    const float healthBefore = session->health();
-    const std::int32_t foodBefore = session->food.foodLevel();
-    const float saturationBefore = session->food.saturationLevel();
-    session->food.tick(
-        difficultyOf(owner_->options().difficulty), session->health(), session->maxHealth(),
-        [session](float amount) { session->setHealth(std::min(session->health() + amount, session->maxHealth())); },
-        [this](float amount) { owner_->hurt(amount, kDeathStarve, world::damageTypes::kStarve); });
-    // Only when something actually moved: `set_health` every tick is twenty packets a second per
-    // player for a bar that changes a few times a minute.
-    if (session->food.foodLevel() != foodBefore && hooks_.foodChanged) {
-        const std::optional<std::int32_t> wanted = hooks_.foodChanged(*session, session->food.foodLevel(), foodBefore);
-        if (wanted.has_value() && *wanted != session->food.foodLevel()) {
-            session->food.set(*wanted, session->food.saturationLevel());
-        }
-    }
-    if (session->health() != healthBefore || session->food.foodLevel() != foodBefore ||
-        session->food.saturationLevel() != saturationBefore) {
-        owner_->uiState().syncHealth();
-    }
 }
 
 void PlayerLifecycle::checkAdvancements(PlayerSession& session) {

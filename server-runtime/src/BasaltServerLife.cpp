@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/BuildInfo.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
+#include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/bedrock/BedrockChunks.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
@@ -24,16 +25,20 @@
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerDeath.hpp>
 #include <basalt/server/runtime/player/PlayerDigSpeed.hpp>
+#include <basalt/server/runtime/player/PlayerEating.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerItemPickup.hpp>
+#include <basalt/server/runtime/player/PlayerSleep.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/player/PlayerSweep.hpp>
+#include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
 #include <basalt/server/runtime/world/ContainerOpeners.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
+#include <basalt/server/runtime/world/Shelves.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WeaponDamage.hpp>
 #include <basalt/wire/bedrock/BedrockEntityIdentifiers.hpp>
@@ -909,6 +914,46 @@ void BasaltServer::startBedrockListener() {
         };
 
         // What they are standing on, gathered where the world is and told to them where they are.
+        // A bed whose sleeper left: this arrives from the door's own thread, so the world is
+        // reached the way everything else from there is.
+        context.freeBed = [this](const std::string& worldName, const std::int32_t x, const std::int32_t y,
+                                 const std::int32_t z) {
+            worldRegistry_->scheduler().global().submit([this, worldName, x, y, z] {
+                const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                const auto found = worlds.find(worldName);
+                if (found == worlds.end() || found->second == nullptr) {
+                    return;
+                }
+                player::freeBedAt(breakContext(), *found->second, x, y, z);
+            });
+        };
+
+        // Morning reaches every connection on the world's own thread, so this runs where it is
+        // called rather than going round the scheduler.
+        context.wakeUp = [this](player::PlayerSession& player) {
+            const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+            const auto found = worlds.find(player.worldName);
+            player::wakeUpFor(breakContext(), player, found == worlds.end() ? nullptr : found->second);
+        };
+
+        context.eat = [this](player::PlayerSession& player, const std::int32_t slot) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, slot] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (session == nullptr) {
+                    return;
+                }
+                const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                const auto found = worlds.find(session->worldName);
+                if (found == worlds.end() || found->second == nullptr) {
+                    return;
+                }
+                static_cast<void>(player::eatHeldItem(breakContext(), *session, *found->second, slot, [] {
+                    return std::uniform_real_distribution<float>{0.0F, 1.0F}(scratchRandom());
+                }));
+            });
+        };
+
         context.pickupItems = [this](player::PlayerSession& player) {
             const wire::common::Uuid uuid = player.uuid();
             worldRegistry_->scheduler().global().submit([this, uuid] {
@@ -1018,6 +1063,48 @@ void BasaltServer::startBedrockListener() {
                     // rather than letting whatever is held be placed against it.
                     if (!session->sneaking) {
                         const player::BreakContext blocks = breakContext();
+                        // parity: `BedBlock.useWithoutItem`. The spawn point and the plugin's say
+                        // come from this side, the same as they do for the other door.
+                        if (const std::optional<std::int32_t> clickedState =
+                                found->second->state().blockState(hit.x, hit.y, hit.z);
+                            clickedState.has_value() && world::beds::isBed(*clickedState)) {
+                            player::SleepContext sleeping;
+                            sleeping.blocks = blocks;
+                            sleeping.setSpawn = [this](player::PlayerSession& who, const std::int32_t bedX,
+                                                       const std::int32_t bedY, const std::int32_t bedZ) {
+                                if (playerStore_ == nullptr || !playerStore_->isOpen()) {
+                                    return;
+                                }
+                                playerStore_->access().setSpawnPoint(
+                                    storage::StoredSpawnPoint{.uuid = who.uuid().toString(),
+                                                              .world = who.worldName,
+                                                              .x = bedX + 0.5,
+                                                              .y = static_cast<double>(bedY),
+                                                              .z = bedZ + 0.5,
+                                                              .yaw = who.yaw});
+                                if (who.connection().sendActionBar) {
+                                    who.connection().sendActionBar(
+                                        wire::text::Component::translatable("block.minecraft.set_spawn"));
+                                }
+                            };
+                            sleeping.explode = [this](world::LoadedWorld& where, const double bx, const double by,
+                                                      const double bz, const std::int32_t byEntityId) {
+                                if (explosions_ == nullptr) {
+                                    return;
+                                }
+                                std::vector<player::PlayerSession*> watchers;
+                                for (player::PlayerSession* other : playerRegistry_.snapshot()) {
+                                    if (other->worldName == where.name()) {
+                                        watchers.push_back(other);
+                                    }
+                                }
+                                explosions_->blowUp(where, watchers, bx, by, bz, world::explosions::kBedPower, "bed",
+                                                    byEntityId);
+                            };
+                            static_cast<void>(player::sleepInBedFor(sleeping, *session, *found->second, hit.x, hit.y,
+                                                                    hit.z, *clickedState));
+                            return;
+                        }
                         if (player::ringBellFor(blocks, *found->second, hit.x, hit.y, hit.z, hit.direction,
                                                 hit.clickY) ||
                             player::tuneNoteBlockFor(blocks, *found->second, hit.x, hit.y, hit.z) ||
@@ -1072,6 +1159,23 @@ void BasaltServer::startBedrockListener() {
                         }
                         if (world::decoratedPots::isPot(clicked->path())) {
                             player::usePotFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, slot, held);
+                            return;
+                        }
+                        // parity: `JukeboxBlock` and `LecternBlock` both answer the hand without a
+                        // screen. A lectern that already holds a book opens one, which this door
+                        // does not draw yet, so it falls through to placing instead.
+                        if (clicked->path() == "jukebox" &&
+                            player::useJukeboxFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, slot, held)) {
+                            return;
+                        }
+                        if (clicked->path() == "lectern" &&
+                            player::placeBookOnLecternFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, slot,
+                                                          held)) {
+                            return;
+                        }
+                        if (world::shelves::isShelf(clicked->path())) {
+                            player::useShelfFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, face, slot,
+                                                held);
                             return;
                         }
                     }

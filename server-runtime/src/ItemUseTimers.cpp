@@ -1,10 +1,12 @@
 #include <basalt/server/registry/ItemFood.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ItemUseTimers.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/player/PlayerEating.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
@@ -116,49 +118,13 @@ void ItemUseTimers::tickEating(PlayerSession& session) {
         return;
     }
     const std::int32_t slot = eatingSlot_;
-    const storage::StoredItemStack eaten = *held;
-    // parity: `Consumable.onConsume` raises `DRINK` for the four the jar builds with the drinking
-    // animation and `EAT` for everything else, and it runs before `stopUsingItem`, which is the one
-    // that raises `ITEM_INTERACT_FINISH`.
-    if (const std::optional<Identifier> id = parsedOrNothing(eaten.id); id.has_value()) {
-        static constexpr std::array<std::string_view, 4> kDrunk{"milk_bucket", "potion", "honey_bottle",
-                                                                "ominous_bottle"};
-        const bool drunk = std::ranges::find(kDrunk, id->path()) != kDrunk.end();
-        emitAt(drunk ? "drink" : "eat");
-    }
     stopEating();
-    session.food.eat(food->nutrition, food->saturation);
-    owner_->applyConsumeEffects(session, food->effects);
-    if (session.gamemode != Gamemode::Creative) {
-        const std::int32_t remaining = eaten.count - 1;
-        // parity: `use_remainder` replaces what was eaten: the bowl, the bottle, the bucket.
-        std::optional<storage::StoredItemStack> leftover;
-        if (food->remainder.has_value()) {
-            leftover = eaten;
-            leftover->id = food->remainder->toString();
-            leftover->count = 1;
-        }
-        if (remaining > 0) {
-            storage::StoredItemStack kept = eaten;
-            kept.count = remaining;
-            session.inventory.set(slot, kept);
-        } else {
-            session.inventory.set(slot, leftover);
-        }
-        owner_->sendInventorySlot(slot);
-        // A stack of two bowls of stew leaves the second bowl looking for a slot of its own, and on
-        // the floor when there is none.
-        if (remaining > 0 && leftover.has_value()) {
-            if (session.inventory.add(*leftover) > 0) {
-                const std::optional<Identifier> id = parsedOrNothing(leftover->id);
-                if (id.has_value()) {
-                    owner_->spawnDroppedItem(*id, 1, session.x, session.y + kThrowEyeHeight, session.z);
-                }
-            }
-            owner_->sendInventory();
-        }
+    world::LoadedWorld* world = owner_->currentWorld();
+    if (world == nullptr) {
+        return;
     }
-    owner_->syncHealth();
+    static_cast<void>(player::eatHeldItem(owner_->blockInteraction().breakContext(), session, *world, slot,
+                                          [this] { return options_.nextFloat ? options_.nextFloat() : 0.5F; }));
 }
 
 bool ItemUseTimers::startDrawing(PlayerSession& session, const Identifier& item, std::int32_t slot) {

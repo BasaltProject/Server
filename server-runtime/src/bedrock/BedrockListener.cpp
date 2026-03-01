@@ -404,15 +404,25 @@ void BedrockListener::onConnect(RakSession& session) {
             /// Zero interacts with the entity, one hits it.
             constexpr std::int32_t kAttack = 1;
 
-            const auto use = wire::bedrock::readEntityUse(body, entry.connection.protocolVersion());
-            if (!use.has_value()) {
+            /// Zero lets go of a bow, one swallows what was being eaten.
+            constexpr std::int32_t kConsume = 1;
+
+            const wire::bedrock::BedrockTransaction transaction =
+                wire::bedrock::readTransaction(body, entry.connection.protocolVersion());
+            // A mouthful finishing arrives the same way a hit does: this client eats on its own
+            // clock and this is the only word the server gets that it is done.
+            if (transaction.itemRelease.has_value() && transaction.itemRelease->action == kConsume) {
+                entry.player->finishEating(transaction.itemRelease->hotbarSlot);
                 return;
             }
-            if (use->action == kAttack) {
-                entry.player->attack(use->runtimeEntityId);
+            if (!transaction.entityUse.has_value()) {
+                return;
+            }
+            if (transaction.entityUse->action == kAttack) {
+                entry.player->attack(transaction.entityUse->runtimeEntityId);
             } else {
                 // Everything that is not a hit: sitting in a cart, feeding an animal, shearing.
-                entry.player->useOnEntity(use->runtimeEntityId);
+                entry.player->useOnEntity(transaction.entityUse->runtimeEntityId);
             }
             return;
         }

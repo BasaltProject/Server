@@ -113,7 +113,7 @@ TEST_CASE("the clock and the weather advance with the world, and the rules can s
     CHECK(world.clock().totalTicks() == 1);
 }
 
-TEST_CASE("the reading of the sky is the one the turn started with") {
+TEST_CASE("the reading of the sky is the one the clock has already moved to") {
     const std::string root = scratch("loaded-world-sky");
     WorldMetadata metadata = metadataOf();
     // The last tick reading zero: one later the dusk ramp has taken the first step off the sky.
@@ -124,12 +124,15 @@ TEST_CASE("the reading of the sky is the one the turn started with") {
     // parity: `ServerLevel`'s constructor ends on `updateSkyBrightness()`, so it reads before any turn.
     CHECK(world.skyDarken() == 0);
 
-    // parity: `ServerLevel.tick` writes the reading before `tickTime()`, so everything asking this
-    // turn gets the sky as it stood when the turn began and not the one the clock just moved to.
+    // parity: the day clock is the server's, not the level's: `MinecraftServer.tickChildren` runs
+    // `clockManager.tick()` before the loop over the levels, so `updateSkyBrightness()` already sees
+    // the clock of this turn. The dusk ramp takes its first step at 12031, so that is the turn the
+    // reading moves, not the one after.
     CHECK(world.tickTime(random));
     CHECK(world.clock().totalTicks() == 12031);
-    CHECK(world.skyDarken() == 0);
+    CHECK(world.skyDarken() == 1);
     CHECK(world.tickTime(random));
+    CHECK(world.clock().totalTicks() == 12032);
     CHECK(world.skyDarken() == 1);
 }
 

@@ -29,10 +29,6 @@ class PlayerLifecycle {
 public:
     /// What a plugin gets a say in, and what it is told. Unset means nobody objects.
     struct Hooks {
-        /// Answers the food level to settle on, or nothing to leave it where it was.
-        std::function<std::optional<std::int32_t>(const player::PlayerSession& player, std::int32_t food,
-                                                  std::int32_t previous)>
-            foodChanged;
         std::function<void(const player::PlayerSession& player, const world::LoadedWorld& world, double x, double y,
                            double z)>
             respawned;
