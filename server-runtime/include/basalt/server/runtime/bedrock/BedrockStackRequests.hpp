@@ -6,6 +6,7 @@
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
 
 #include <functional>
+#include <optional>
 #include <vector>
 
 namespace basalt::server::runtime::bedrock {
@@ -20,9 +21,17 @@ struct StackRequestAnswer {
 /// Moves stacks around one player's windows, as their client asked. Every line is applied in order
 /// and the first that cannot be ends it: a request is all or nothing on the client too. `world` is
 /// where an open block's window lives and `drop` puts a stack into it; without either, refused.
+/// What the request needs of the rest of the server: where a dropped stack goes, and what a recipe
+/// number means. A recipe nobody can name is a request that is refused.
+struct StackRequestContext {
+    std::function<void(const storage::StoredItemStack&)> drop;
+    /// The stack that recipe makes, by the number this server sent the client at login.
+    std::function<std::optional<storage::StoredItemStack>(std::int32_t recipeNetId)> resultOf;
+};
+
 [[nodiscard]] StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWindows& windows,
                                                    world::LoadedWorld* world,
                                                    const wire::bedrock::BedrockStackRequest& request,
-                                                   const std::function<void(const storage::StoredItemStack&)>& drop);
+                                                   const StackRequestContext& context);
 
 } // namespace basalt::server::runtime::bedrock

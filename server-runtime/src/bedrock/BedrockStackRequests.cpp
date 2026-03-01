@@ -20,14 +20,16 @@ using wire::bedrock::BedrockStackAction;
 using wire::bedrock::BedrockStackActionType;
 using wire::bedrock::BedrockStackSlot;
 
-/// Where that edition starts numbering a table's grid. parity: Geyser's own `slot + 31`, which is
-/// the number a client sends for the first cell.
-constexpr std::int32_t kFirstGridSlot = 32;
+/// Where that edition starts numbering a grid. A table's nine cells run from 32 and the player's
+/// own four from 28: the same window number with two runs of slots inside it.
+constexpr std::int32_t kFirstTableSlot = 32;
+constexpr std::int32_t kFirstCarriedSlot = 28;
+constexpr std::int32_t kCarriedCells = 4;
 
 /// Where one end of a move really is. Bedrock names a window and a slot of it; this server has one
 /// list of slots per player, one stack being dragged, a table's grid and whatever block is open.
 struct Place {
-    enum class Kind : std::uint8_t { None, Storage, Cursor, Block, Grid };
+    enum class Kind : std::uint8_t { None, Storage, Cursor, Block, Grid, Created };
 
     Kind kind = Kind::None;
     std::int32_t slot = 0;
@@ -54,9 +56,12 @@ struct Place {
     }
     const auto container = static_cast<BedrockContainerSlot>(named.container);
     if (container == BedrockContainerSlot::CraftingInput) {
-        // That edition numbers a table's nine cells from 32, left to right and then down, which is
-        // the same order as here with the number moved.
-        const std::int32_t cell = named.slot - kFirstGridSlot;
+        // Both grids are counted left to right and then down, which is this server's own order.
+        // The four a player carries land on the first four cells: only one grid is ever open.
+        if (named.slot >= kFirstCarriedSlot && named.slot < kFirstCarriedSlot + kCarriedCells) {
+            return {.kind = Place::Kind::Grid, .slot = named.slot - kFirstCarriedSlot};
+        }
+        const std::int32_t cell = named.slot - kFirstTableSlot;
         if (cell < 0 || cell >= static_cast<std::int32_t>(kGridCells)) {
             return {};
         }
@@ -89,8 +94,16 @@ struct Place {
             return {};
         }
         return {.kind = Place::Kind::Storage, .slot = PlayerInventory::kOffhandSlot};
+    case BedrockContainerSlot::StonecutterInput:
+        // One slot, which lives where the grid's first cell does: only one screen is ever open.
+        return {.kind = Place::Kind::Grid, .slot = 0};
     case BedrockContainerSlot::Cursor:
         return {.kind = Place::Kind::Cursor};
+    case BedrockContainerSlot::CreatedOutput:
+    case BedrockContainerSlot::CraftingOutput:
+    case BedrockContainerSlot::StonecutterResult:
+        // What a craft just made, which is nowhere until the line that takes it says where.
+        return {.kind = Place::Kind::Created};
     default:
         return {};
     }
@@ -110,6 +123,9 @@ struct Reach {
     std::map<std::int32_t, std::optional<storage::StoredItemStack>> grid;
     std::optional<std::optional<storage::StoredItemStack>> cursor;
     std::vector<storage::StoredItemStack> dropped;
+    /// What the recipe named by the last craft line makes. It exists only between that line and the
+    /// one that takes it, which is how this edition hands a result over.
+    std::optional<storage::StoredItemStack> created;
 };
 
 [[nodiscard]] std::optional<storage::StoredItemStack> stackAt(const Reach& reach, const Place& place) {
@@ -120,6 +136,8 @@ struct Reach {
     }
     case Place::Kind::Cursor:
         return reach.cursor.has_value() ? *reach.cursor : reach.windows.cursor;
+    case Place::Kind::Created:
+        return reach.created;
     case Place::Kind::Grid: {
         const auto staged = reach.grid.find(place.slot);
         return staged == reach.grid.end() ? reach.windows.grid[static_cast<std::size_t>(place.slot)] : staged->second;
@@ -148,6 +166,9 @@ struct Reach {
         return true;
     case Place::Kind::Cursor:
         reach.cursor = std::move(stack);
+        return true;
+    case Place::Kind::Created:
+        reach.created = std::move(stack);
         return true;
     case Place::Kind::Grid:
         reach.grid[place.slot] = std::move(stack);
@@ -267,7 +288,8 @@ private:
 
 StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWindows& windows, world::LoadedWorld* world,
                                      const wire::bedrock::BedrockStackRequest& request,
-                                     const std::function<void(const storage::StoredItemStack&)>& drop) {
+                                     const StackRequestContext& context) {
+    const std::function<void(const storage::StoredItemStack&)>& drop = context.drop;
     Reach reach{.session = session, .windows = windows, .world = world};
     Touched touched;
     for (const BedrockStackAction& action : request.actions) {
@@ -315,8 +337,35 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
             }
             touched.add(action.source);
             break;
+        case BedrockStackActionType::Craft: {
+            // What the recipe makes is this server's answer, not the client's claim: the number is
+            // the only thing taken from the line.
+            if (!context.resultOf) {
+                return {};
+            }
+            const std::optional<storage::StoredItemStack> made = context.resultOf(action.recipeNetId);
+            if (!made.has_value() || action.crafts <= 0) {
+                return {};
+            }
+            // Asking for it a stack at a time is the same line with a number on it: what it makes
+            // is that many times over, and the lines that follow take it in whatever helpings fit.
+            reach.created = withCount(*made, made->count * action.crafts);
+            break;
+        }
+        case BedrockStackActionType::Consume: {
+            // The ingredients, one line each. What they come out of is the client's own accounting,
+            // and it only stands if the slot really holds what it says.
+            if (!takeStack(reach, placeOf(action.source, windows), action.count).has_value()) {
+                return {};
+            }
+            touched.add(action.source);
+            break;
+        }
+        case BedrockStackActionType::CraftResults:
+            // The client repeating what it thinks it made, which this server already knows.
+            break;
         default:
-            // Crafting and everything a block's own machinery does: not moved by this build yet.
+            // Everything a block's own machinery does: not moved by this build yet.
             return {};
         }
     }

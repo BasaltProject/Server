@@ -9,6 +9,9 @@ namespace {
 
 namespace crafting = server::world::crafting;
 
+/// The screen a stonecutter's recipes belong to, which is what tells them from a table's.
+constexpr std::string_view kStonecutterTag = "stonecutter";
+
 /// What one ingredient is on the other edition: the tag it came from when it had one, and the item
 /// itself when it did not. An ingredient of several items with no tag behind it can only be sent as
 /// one of them, which is the one thing here that is not a faithful translation.
@@ -87,6 +90,26 @@ BedrockRecipeList bedrockRecipes(const world::RealRecipes& recipes) {
             ++out.unnamed;
             continue;
         }
+        out.results.emplace(
+            netId, storage::StoredItemStack{.id = recipe->result.item.toString(), .count = recipe->result.count});
+        ++netId;
+        out.recipes.push_back(std::move(built));
+    }
+    // A stonecutter's recipes travel in the same list under a screen of their own: one thing in,
+    // one thing out, which that client draws as a row of buttons.
+    for (const crafting::Recipe* recipe : recipes.stonecutting()) {
+        wire::bedrock::BedrockRecipe built;
+        built.id = "minecraft:stonecutter_" + std::to_string(netId);
+        built.tag = kStonecutterTag;
+        built.ingredients.push_back(ingredientOf(recipe->ingredient));
+        built.result = resultOf(recipe->result);
+        built.netId = netId;
+        if (!sendable(built)) {
+            ++out.unnamed;
+            continue;
+        }
+        out.results.emplace(
+            netId, storage::StoredItemStack{.id = recipe->result.item.toString(), .count = recipe->result.count});
         ++netId;
         out.recipes.push_back(std::move(built));
     }

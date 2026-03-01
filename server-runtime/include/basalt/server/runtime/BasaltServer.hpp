@@ -23,6 +23,7 @@
 #include <basalt/server/runtime/VanillaGameData.hpp>
 #include <basalt/server/runtime/WorldRegistry.hpp>
 #include <basalt/server/runtime/bedrock/BedrockListener.hpp>
+#include <basalt/server/runtime/bedrock/BedrockRecipes.hpp>
 #include <basalt/server/runtime/bedrock/BedrockWindows.hpp>
 #include <basalt/server/runtime/command/commands/SaveCommands.hpp>
 #include <basalt/server/runtime/config/CompatibilityConfig.hpp>
@@ -175,6 +176,13 @@ private:
     /// What breaking a block needs, whichever door the breaker came in by.
     [[nodiscard]] player::BreakContext breakContext();
 
+    /// The recipe book as the other door reads it, built the first time it is asked for: the list
+    /// is the same for everyone and costs a walk of every recipe to build.
+    [[nodiscard]] const bedrock::BedrockRecipeList& bedrockRecipeBook();
+
+    /// What the recipe with that number makes, which is the only thing a craft asks for.
+    [[nodiscard]] std::optional<storage::StoredItemStack> bedrockRecipeResult(std::int32_t netId);
+
     /// Tells a world that one more, or one fewer, is looking into the block that window belongs to.
     void openersChanged(world::LoadedWorld& world, const bedrock::OpenWindow& window, bool opened);
 
@@ -224,6 +232,8 @@ private:
 
     std::unique_ptr<BlockChangeBroadcaster> broadcaster_;
     std::unique_ptr<ExplosionSystem> explosions_;
+    /// Built the first time a Bedrock client asks for it, and the same for every one after.
+    std::optional<bedrock::BedrockRecipeList> bedrockRecipes_;
     std::unique_ptr<NaturalSpawningSystem> spawning_;
     std::unique_ptr<CombatSystem> combat_;
     std::unique_ptr<RedstoneTickSystem> redstone_;
