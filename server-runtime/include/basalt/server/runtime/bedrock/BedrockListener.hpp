@@ -84,6 +84,23 @@ public:
         std::int32_t max = 0;
     };
 
+    /// What every Bedrock player on this server looks like, by uuid. Shared because the one who
+    /// draws a skin is never the one who sent it: a client describes itself, and everybody else's
+    /// client is what has to be told.
+    class Skins {
+    public:
+        void remember(const wire::common::Uuid& who, wire::bedrock::SkinInfo skin);
+
+        void forget(const wire::common::Uuid& who);
+
+        /// What that player sent, or nothing for a Java player or one whose skin could not be read.
+        [[nodiscard]] std::optional<wire::bedrock::SkinInfo> of(const wire::common::Uuid& who) const;
+
+    private:
+        mutable std::mutex lock_;
+        std::unordered_map<wire::common::Uuid, wire::bedrock::SkinInfo> skins_;
+    };
+
     /// A client that finished the login, as the server needs to hear about it.
     struct Joining {
         /// Already prefixed, which is the name the rest of the server knows this player by.
@@ -98,6 +115,8 @@ public:
         int protocol = 0;
         /// Where to leave what this player is told.
         std::shared_ptr<BedrockMailbox> mailbox;
+        /// Where every Bedrock player's skin lives, so one can draw another.
+        std::shared_ptr<Skins> skins;
     };
 
     /// What the server hands back once it has made a player out of a session. Destroying it is that
@@ -133,6 +152,9 @@ public:
         /// Whether they are standing on something and whether they are running. Digging in the air
         /// is five times slower, so a player whose feet are never on the ground mines at a crawl.
         virtual void setStance(bool onGround, bool sprinting) = 0;
+
+        /// The client clicked something alive without hitting it.
+        virtual void useOnEntity(std::uint64_t runtimeEntityId) = 0;
 
         /// The client hit something. The number is that client's own, one more than the server's.
         virtual void attack(std::uint64_t runtimeEntityId) = 0;
@@ -239,6 +261,7 @@ private:
     std::unordered_map<wire::io::UdpEndpoint, std::unique_ptr<Session>> sessions_;
     std::atomic<bool> running_{false};
     std::atomic<bool> accepting_{true};
+    std::shared_ptr<Skins> skins_ = std::make_shared<Skins>();
     std::jthread thread_;
 };
 

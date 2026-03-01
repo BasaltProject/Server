@@ -1,4 +1,5 @@
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/bedrock/BedrockBlockEntities.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayerInternals.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
@@ -535,6 +536,13 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         wire::io::ByteBuffer body;
         wire::bedrock::writeUpdateBlock(body, x, y, z, stateId, protocol);
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::UpdateBlock), body.toVector());
+        // A bed that was just put down is one block over there and sixteen here, so the colour
+        // travels behind the block rather than in it.
+        if (const auto colour = bedColourOf(stateId); colour) {
+            wire::io::ByteBuffer bed;
+            wire::bedrock::writeBedData(bed, x, y, z, *colour);
+            mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::BlockEntityData), bed.toVector());
+        }
     };
 
     connection.sendCommandTree = [this] {

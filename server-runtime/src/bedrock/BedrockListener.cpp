@@ -112,6 +112,22 @@ struct BedrockListener::Session {
         : transport(session), connection(session, std::move(keys), std::move(gameVersion), std::move(gate)) {}
 };
 
+void BedrockListener::Skins::remember(const wire::common::Uuid& who, wire::bedrock::SkinInfo skin) {
+    const std::lock_guard<std::mutex> guard{lock_};
+    skins_.insert_or_assign(who, std::move(skin));
+}
+
+void BedrockListener::Skins::forget(const wire::common::Uuid& who) {
+    const std::lock_guard<std::mutex> guard{lock_};
+    skins_.erase(who);
+}
+
+std::optional<wire::bedrock::SkinInfo> BedrockListener::Skins::of(const wire::common::Uuid& who) const {
+    const std::lock_guard<std::mutex> guard{lock_};
+    const auto found = skins_.find(who);
+    return found == skins_.end() ? std::nullopt : std::optional{found->second};
+}
+
 void BedrockMailbox::post(const std::uint16_t packetId, std::vector<std::uint8_t> body, const bool last) {
     const std::lock_guard<std::mutex> guard{lock_};
     if (!open_) {
@@ -389,8 +405,14 @@ void BedrockListener::onConnect(RakSession& session) {
             constexpr std::int32_t kAttack = 1;
 
             const auto use = wire::bedrock::readEntityUse(body, entry.connection.protocolVersion());
-            if (use.has_value() && use->action == kAttack) {
+            if (!use.has_value()) {
+                return;
+            }
+            if (use->action == kAttack) {
                 entry.player->attack(use->runtimeEntityId);
+            } else {
+                // Everything that is not a hit: sitting in a cart, feeding an animal, shearing.
+                entry.player->useOnEntity(use->runtimeEntityId);
             }
             return;
         }
@@ -483,6 +505,11 @@ void BedrockListener::onDisconnect(RakSession& session) {
                " in, with " + std::to_string(stats.splitMessages) + " message(s) split into " +
                std::to_string(stats.splitParts) + " part(s).";
     });
+    if (const auto found = sessions_.find(session.peer()); found != sessions_.end()) {
+        // Their skin leaves with them: nobody else needs to draw somebody who is not here.
+        skins_->forget(
+            uuidOf(found->second->login.xuid.empty() ? found->second->login.name : found->second->login.xuid));
+    }
     sessions_.erase(session.peer());
 }
 
@@ -616,6 +643,21 @@ void BedrockListener::onReady(Session& session) {
     joining.authenticated = session.login.authenticated;
     joining.protocol = session.connection.protocolVersion();
     joining.mailbox = session.mailbox;
+    joining.skins = skins_;
+    // What the client said it looks like, kept for everybody else to draw. One that sent nothing
+    // readable is remembered as nothing, and whoever draws it falls back to a flat colour.
+    if (!session.login.skinPixels.empty()) {
+        wire::bedrock::SkinInfo skin;
+        skin.skinId = session.login.skinId.empty() ? joining.name : session.login.skinId;
+        if (!session.login.skinGeometry.empty()) {
+            // Keeping the default here is what says "the geometry you already have".
+            skin.resourcePatch = session.login.skinGeometry;
+        }
+        skin.width = session.login.skinWidth;
+        skin.height = session.login.skinHeight;
+        skin.image = session.login.skinPixels;
+        skins_->remember(joining.uuid, skin);
+    }
     session.player = hooks_.join(joining);
 }
 

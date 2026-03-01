@@ -127,6 +127,9 @@ public:
         /// other door swings by: the formula lives in `player::combat` so the two cannot drift.
         std::function<void(player::PlayerSession&, std::int32_t entityId, bool falling)> attackEntity;
 
+        /// A click on something alive that is not a hit: sitting in a cart, feeding an animal.
+        std::function<void(player::PlayerSession&, std::int32_t entityId)> useEntity;
+
         /// Picks up whatever this player is standing on, where the world is. Java does the same
         /// thing once per tick from its own session; a Bedrock player has none, and without this
         /// nothing they break ever reaches their bag.
@@ -195,6 +198,7 @@ public:
     void setStance(bool onGround, bool sprinting) override;
 
     void attack(std::uint64_t runtimeEntityId) override;
+    void useOnEntity(std::uint64_t runtimeEntityId) override;
     void setHeldSlot(std::int32_t slot) override;
     void openOwnInventory() override;
     void closeWindow(std::int32_t containerId) override;
@@ -331,6 +335,10 @@ private:
     /// What the sidebar is showing right now, line by line, so only what changed goes out.
     std::vector<std::string> sidebarShown_;
     std::optional<std::string> sidebarTitle_;
+
+    /// Every Bedrock player's skin, so this client can be shown the others as they described
+    /// themselves rather than as a flat colour.
+    std::shared_ptr<BedrockListener::Skins> skins_;
 
     std::shared_ptr<Surroundings> surroundings_ = std::make_shared<Surroundings>();
     /// What this client has already been shown, by entity id. The door's thread owns it.

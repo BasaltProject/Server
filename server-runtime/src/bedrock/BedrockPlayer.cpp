@@ -77,7 +77,7 @@ wire::bedrock::BedrockItemStack itemStackFor(const std::optional<storage::Stored
 }
 
 BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context context)
-    : context_(std::move(context)), mailbox_(joining.mailbox), protocol_(joining.protocol) {
+    : context_(std::move(context)), mailbox_(joining.mailbox), protocol_(joining.protocol), skins_(joining.skins) {
     player::PlayerConnection connection = buildConnection(joining);
 
     const std::int32_t entityId = context_.registry != nullptr ? context_.registry->allocateEntityId() : 1;
@@ -416,6 +416,13 @@ void BedrockPlayer::attack(const std::uint64_t runtimeEntityId) {
     }
     // The client counts entities from one where this server counts from zero.
     context_.attackEntity(*session_, static_cast<std::int32_t>(runtimeEntityId - 1), fallDistance_ > 0.0);
+}
+
+void BedrockPlayer::useOnEntity(const std::uint64_t runtimeEntityId) {
+    if (session_ == nullptr || !context_.useEntity || runtimeEntityId == 0) {
+        return;
+    }
+    context_.useEntity(*session_, static_cast<std::int32_t>(runtimeEntityId - 1));
 }
 
 void BedrockPlayer::setHeldSlot(const std::int32_t slot) {
@@ -903,7 +910,11 @@ void BedrockPlayer::syncOthers() {
             entry.uuidLow = other->uuid().low();
             entry.entityId = static_cast<std::int64_t>(runtimeIdFor(now.entityId));
             entry.name = other->name();
-            entry.skin = wire::bedrock::flatSkin(other->name());
+            // What that player's own client said it looks like, and a plain colour for anybody who
+            // arrived through the other door and has no Bedrock skin to send.
+            const std::optional<wire::bedrock::SkinInfo> theirs =
+                skins_ == nullptr ? std::nullopt : skins_->of(other->uuid());
+            entry.skin = theirs.has_value() ? *theirs : wire::bedrock::flatSkin(other->name());
             wire::io::ByteBuffer list;
             wire::bedrock::writePlayerListAdd(list, std::span{&entry, 1}, protocol_);
             post(wire::bedrock::BedrockPacket::PlayerList, list);
