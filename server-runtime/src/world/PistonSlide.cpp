@@ -1,7 +1,9 @@
 #include "PistonSlide.hpp"
 
+#include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
+#include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
@@ -273,6 +275,14 @@ void destroyPushed(const Context& context, const Push& push, std::vector<BlockCh
     std::vector<BlockChange> changes;
     std::vector<Position> landed;
     for (const Carried& entry : carried) {
+        // parity: `PistonMovingBlockEntity` runs `Block.updateFromNeighbourShapes` on the state it is
+        // carrying **before** drying it, and every `updateShape` of a flooded block opens by booking
+        // a turn of water. So the jar leaves a water turn on the square even though the block lands
+        // dry: a turn that will find nothing and do nothing. Measured in `pistonanegado`.
+        if (registry::blockFluids::hasWaterFluid(entry.stateId)) {
+            context.world.scheduleFluidTick(entry.at[0], entry.at[1], entry.at[2], fluidId(FluidKind::Water, true),
+                                            fluidFlow::kWaterTickDelay);
+        }
         const std::int32_t stateId = dried(entry.stateId);
         if (context.world.setBlockState(entry.at[0], entry.at[1], entry.at[2], stateId)) {
             changes.push_back(BlockChange{.x = entry.at[0], .y = entry.at[1], .z = entry.at[2], .stateId = stateId});

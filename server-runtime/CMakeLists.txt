@@ -17,6 +17,7 @@ basalt_module(server-runtime-core
         src/bedrock/BedrockListener.cpp
         src/bedrock/BedrockPlayer.cpp
         src/bedrock/BedrockPlayerConnection.cpp
+        src/bedrock/BedrockRecipes.cpp
         src/bedrock/BedrockStackRequests.cpp
         src/bedrock/BedrockWindows.cpp
         src/config/AnimationsConfig.cpp
@@ -190,11 +191,13 @@ basalt_module(server-runtime-core
         src/player/PlayerBlockItemUse.cpp
         src/player/PlayerBlockSlots.cpp
         src/player/PlayerBlockToggle.cpp
+        src/player/PlayerBuckets.cpp
         src/player/PlayerDigSpeed.cpp
         src/player/PlayerEating.cpp
         src/player/PlayerItemPickup.cpp
         src/player/PlayerSleep.cpp
         src/player/PlayerSweep.cpp
+        src/player/PlayerThrown.cpp
         src/player/PlayerVitals.cpp
         src/player/PlayerBlockPlace.cpp
         src/player/PlayerContainers.cpp

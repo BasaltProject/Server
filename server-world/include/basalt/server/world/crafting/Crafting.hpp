@@ -46,6 +46,11 @@ private:
 struct Ingredient {
     std::set<std::string, std::less<>> items;
 
+    /// The tag this came from, when it came from one. Kept only so a client that has tags of its
+    /// own can be told the tag rather than the eleven planks it stands for; nothing here matches
+    /// on it, and an ingredient written as a list of items has none.
+    std::string tag;
+
     [[nodiscard]] bool test(const loot::ItemStack* stack) const;
 
     /// parity: `Ingredient.testOptionalIngredient`: an empty slot matches only an absent ingredient.

@@ -144,6 +144,11 @@ public:
                            std::vector<world::BlockEffect> effects)>
             blockEffects;
 
+        /// A click on nothing with that slot in hand, where the world is: a throw, or the start of
+        /// a draw. `drawnTicks` is how long a bow was held, which only the release knows.
+        std::function<void(player::PlayerSession&, std::int32_t slot)> useInAir;
+        std::function<void(player::PlayerSession&, std::int32_t slot, std::int32_t drawnTicks)> releaseItem;
+
         /// Swallows what is in that slot, where the world is: the food, the effects and the stack
         /// it comes off. The clock for it belongs to the client on this door.
         std::function<void(player::PlayerSession&, std::int32_t slot)> eat;
@@ -220,6 +225,10 @@ public:
     void setHeldSlot(std::int32_t slot) override;
 
     void finishEating(std::int32_t hotbarSlot) override;
+
+    void useItemInAir(std::int32_t hotbarSlot) override;
+
+    void releaseItem(std::int32_t hotbarSlot) override;
     void openOwnInventory() override;
     void closeWindow(std::int32_t containerId) override;
 
@@ -355,6 +364,10 @@ private:
     /// What the sidebar is showing right now, line by line, so only what changed goes out.
     std::vector<std::string> sidebarShown_;
     std::optional<std::string> sidebarTitle_;
+
+    /// When this player started holding an item down, which is the only clock there is for a draw:
+    /// the client bends the bow itself and says nothing until it lets go.
+    std::optional<std::chrono::steady_clock::time_point> drawingSince_;
 
     /// Every Bedrock player's skin, so this client can be shown the others as they described
     /// themselves rather than as a flat colour.

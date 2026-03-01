@@ -371,6 +371,12 @@ void BedrockListener::onConnect(RakSession& session) {
                                             input->itemUse->face, input->itemUse->clickX, input->itemUse->clickY,
                                             input->itemUse->clickZ, input->itemUse->hotbarSlot);
                 }
+                /// One clicks the air, which is a throw, a drink, or a bow starting to bend.
+                constexpr std::int32_t kUseInAir = 1;
+
+                if (input->itemUse.has_value() && input->itemUse->action == kUseInAir) {
+                    entry.player->useItemInAir(input->itemUse->hotbarSlot);
+                }
                 if (input->stackRequest.has_value()) {
                     // What the client asked for, by line, before anything acts on it. A request
                     // this build refuses says why here rather than only failing: the lines that
@@ -411,8 +417,12 @@ void BedrockListener::onConnect(RakSession& session) {
                 wire::bedrock::readTransaction(body, entry.connection.protocolVersion());
             // A mouthful finishing arrives the same way a hit does: this client eats on its own
             // clock and this is the only word the server gets that it is done.
-            if (transaction.itemRelease.has_value() && transaction.itemRelease->action == kConsume) {
-                entry.player->finishEating(transaction.itemRelease->hotbarSlot);
+            if (transaction.itemRelease.has_value()) {
+                if (transaction.itemRelease->action == kConsume) {
+                    entry.player->finishEating(transaction.itemRelease->hotbarSlot);
+                } else {
+                    entry.player->releaseItem(transaction.itemRelease->hotbarSlot);
+                }
                 return;
             }
             if (!transaction.entityUse.has_value()) {
@@ -611,10 +621,12 @@ void BedrockListener::onReady(Session& session) {
     session.connection.sendPacket(BedrockPacket::GameRulesChanged, body.readable());
     note("gamerules", body.readableBytes());
 
-    // The recipe book, empty for now. The inventory screen is built around it, and a client that
-    // was never sent one has nothing to open.
+    // What can be crafted, which on this door is the client's own copy of the recipe book: a grid
+    // shows no result at all unless the recipe behind it came from here.
     body.clear();
-    wire::bedrock::writeCraftingData(body);
+    wire::bedrock::writeCraftingData(body,
+                                     hooks_.recipes ? hooks_.recipes() : std::vector<wire::bedrock::BedrockRecipe>{},
+                                     session.connection.protocolVersion());
     session.connection.sendPacket(BedrockPacket::CraftingData, body.readable());
     note("recipes", body.readableBytes());
 

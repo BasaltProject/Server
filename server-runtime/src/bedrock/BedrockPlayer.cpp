@@ -446,6 +446,34 @@ void BedrockPlayer::finishEating(const std::int32_t hotbarSlot) {
     context_.eat(*session_, player::PlayerInventory::kHotbarStart + hotbarSlot);
 }
 
+void BedrockPlayer::useItemInAir(const std::int32_t hotbarSlot) {
+    if (session_ == nullptr || hotbarSlot < 0 || hotbarSlot >= player::PlayerInventory::kHotbarSize) {
+        return;
+    }
+    // Whatever it is, it is now being held down: a bow bending, a spyglass raised, a bottle tipped.
+    drawingSince_ = std::chrono::steady_clock::now();
+    if (context_.useInAir) {
+        context_.useInAir(*session_, player::PlayerInventory::kHotbarStart + hotbarSlot);
+    }
+}
+
+void BedrockPlayer::releaseItem(const std::int32_t hotbarSlot) {
+    if (session_ == nullptr || hotbarSlot < 0 || hotbarSlot >= player::PlayerInventory::kHotbarSize) {
+        return;
+    }
+    /// How long a tick is, which is what turns a client's own draw into the number a bow wants.
+    constexpr std::int64_t kTickMillis = 50;
+
+    const std::chrono::steady_clock::time_point started = drawingSince_.value_or(std::chrono::steady_clock::now());
+    drawingSince_.reset();
+    const auto held =
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
+    if (context_.releaseItem) {
+        context_.releaseItem(*session_, player::PlayerInventory::kHotbarStart + hotbarSlot,
+                             static_cast<std::int32_t>(held / kTickMillis));
+    }
+}
+
 void BedrockPlayer::openOwnInventory() {
     if (session_ == nullptr) {
         return;

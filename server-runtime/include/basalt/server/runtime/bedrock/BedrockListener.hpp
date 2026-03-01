@@ -167,6 +167,12 @@ public:
         /// when it is done.
         virtual void finishEating(std::int32_t hotbarSlot) = 0;
 
+        /// A click on nothing: a throw, or a bow starting to bend.
+        virtual void useItemInAir(std::int32_t hotbarSlot) = 0;
+
+        /// Letting go of what was being held down, which for a bow is the shot.
+        virtual void releaseItem(std::int32_t hotbarSlot) = 0;
+
         /// The client asked for its own bag. This edition does not open it by itself: it asks,
         /// and a client whose ask goes unanswered never sees an inventory at all.
         virtual void openOwnInventory() = 0;
@@ -211,6 +217,10 @@ public:
         /// Makes a player out of a client that got in. Unset, or answering nothing, leaves the door
         /// open and the client alone: it sees a world and nobody sees it.
         std::function<std::unique_ptr<Player>(const Joining&)> join;
+
+        /// Every recipe a joining client is told about, built once and asked for per join. Unset
+        /// means an empty book, and a client with an empty book crafts nothing.
+        std::function<std::vector<wire::bedrock::BedrockRecipe>()> recipes;
     };
 
     BedrockListener(BedrockOptions options, Hooks hooks, std::string gameVersion,

@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/bedrock/BedrockChunks.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
+#include <basalt/server/runtime/bedrock/BedrockRecipes.hpp>
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
@@ -21,6 +22,7 @@
 #include <basalt/server/runtime/player/PlayerBlockPlace.hpp>
 #include <basalt/server/runtime/player/PlayerBlockSlots.hpp>
 #include <basalt/server/runtime/player/PlayerBlockToggle.hpp>
+#include <basalt/server/runtime/player/PlayerBuckets.hpp>
 #include <basalt/server/runtime/player/PlayerContainers.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerDeath.hpp>
@@ -31,6 +33,7 @@
 #include <basalt/server/runtime/player/PlayerSleep.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/player/PlayerSweep.hpp>
+#include <basalt/server/runtime/player/PlayerThrown.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
 #include <basalt/server/runtime/world/ContainerOpeners.hpp>
@@ -453,6 +456,17 @@ void BasaltServer::startBedrockListener() {
             status.max = payload.players->max;
         }
         return status;
+    };
+
+    // The recipe book, built once and handed to every client that joins: on that door the list the
+    // server sends is the only crafting a client knows.
+    hooks.recipes = [this] {
+        static const bedrock::BedrockRecipeList built = bedrock::bedrockRecipes(vanillaData_.recipes);
+        logger_.debug([] {
+            return "Bedrock recipes: " + std::to_string(built.recipes.size()) + " sent, " +
+                   std::to_string(built.unnamed) + " left out for want of a name over there.";
+        });
+        return built.recipes;
     };
 
     // Where this player left off, asked before the world is described to them: `start_game` names a
@@ -950,6 +964,42 @@ void BasaltServer::startBedrockListener() {
             player::wakeUpFor(breakContext(), player, found == worlds.end() ? nullptr : found->second);
         };
 
+        // A click on nothing: what leaves the hand does so here, and a bow only starts bending.
+        context.useInAir = [this](player::PlayerSession& player, const std::int32_t slot) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, slot] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                const auto found = session == nullptr ? worlds.end() : worlds.find(session->worldName);
+                if (found == worlds.end() || found->second == nullptr) {
+                    return;
+                }
+                const std::optional<storage::StoredItemStack> held = session->inventory.at(slot);
+                if (!held.has_value()) {
+                    return;
+                }
+                const auto item = wire::common::Identifier::parse(held->id);
+                if (item.has_value()) {
+                    static_cast<void>(player::throwItemFor(breakContext(), *session, *found->second, *item, slot));
+                }
+            });
+        };
+
+        // Letting go of it, which for a bow is the shot and its arrow.
+        context.releaseItem = [this](player::PlayerSession& player, const std::int32_t slot,
+                                     const std::int32_t drawnTicks) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, slot, drawnTicks] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                const auto found = session == nullptr ? worlds.end() : worlds.find(session->worldName);
+                if (found == worlds.end() || found->second == nullptr) {
+                    return;
+                }
+                player::shootBowFor(breakContext(), *session, *found->second, slot, drawnTicks, {});
+            });
+        };
+
         context.eat = [this](player::PlayerSession& player, const std::int32_t slot) {
             const wire::common::Uuid uuid = player.uuid();
             worldRegistry_->scheduler().global().submit([this, uuid, slot] {
@@ -1141,6 +1191,21 @@ void BasaltServer::startBedrockListener() {
                     // parity: `ServerPlayerGameMode.useItemOn` with something in hand: these are
                     // the item's own use, which happens sneaking or not, unlike the block's.
                     const player::BreakContext blocks = breakContext();
+                    // parity: `BucketItem.use` looks where the player is looking rather than at the
+                    // block that was clicked, so this hands it the eye and not the hit.
+                    // parity: `ThrowableProjectileItem.use`, which leaves the hand whatever is in
+                    // front of it. This door hears it as a click on whatever the arc started at.
+                    if (player::throwItemFor(blocks, *session, *found->second, *item, slot)) {
+                        return;
+                    }
+
+                    // parity: `BucketItem.use` traces where the player is looking; this door is told
+                    // the block and the face outright, so it goes straight to the same fill or pour.
+                    if (player::useBucketOnFor(blocks, *session, *found->second, *item, slot, *held, hit.x, hit.y,
+                                               hit.z, hit.direction, {})) {
+                        return;
+                    }
+
                     // parity: `TntBlock.useItemOn` runs before anything a flint and steel would do
                     // to the square beside it, and a fire charge is spent where the lighter is worn.
                     const bool lighter = *item == wire::common::Identifier::vanilla("flint_and_steel");

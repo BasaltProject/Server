@@ -59,9 +59,9 @@ using Parsed = std::expected<Value, RecipeParseError>;
         return std::unexpected(RecipeParseError{"Malformed ingredient token: " + std::string{raw}});
     }
     if (tag) {
-        return Ingredient{resolveTag(id->toString())};
+        return Ingredient{.items = resolveTag(id->toString()), .tag = id->toString()};
     }
-    return Ingredient{{id->toString()}};
+    return Ingredient{.items = {id->toString()}};
 }
 
 [[nodiscard]] Parsed<Ingredient> parseIngredient(const JsonValue& element, const TagResolver& resolveTag) {
@@ -80,6 +80,8 @@ using Parsed = std::expected<Value, RecipeParseError>;
                 return std::unexpected(one.error());
             }
             built.items.insert(one->items.begin(), one->items.end());
+            // A list of tokens is its own set, not any one tag: only a lone tag keeps its name.
+            built.tag = array->size() == 1 ? one->tag : std::string{};
         }
         return built;
     }
