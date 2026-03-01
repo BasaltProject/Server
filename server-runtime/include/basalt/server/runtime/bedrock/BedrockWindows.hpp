@@ -10,6 +10,10 @@
 #include <string>
 #include <vector>
 
+namespace basalt::server::runtime::player {
+class PlayerSession;
+}
+
 namespace basalt::server::runtime::bedrock {
 
 /// A block's window, as one Bedrock client has it open.
@@ -27,6 +31,9 @@ struct OpenWindow {
     std::int32_t size = 0;
     /// The block's own path, because what a container keeps its stacks under is per block.
     std::string block;
+    /// True for the one window whose slots are not in the world at all: an ender chest shows the
+    /// player's own twenty-seven, which travel with them from world to world.
+    bool playerOwned = false;
 };
 
 /// The nine cells of a crafting table. parity: `CraftingMenu`'s own three by three.
@@ -85,15 +92,16 @@ inline constexpr std::int32_t kMaxContainerId = 100;
 [[nodiscard]] std::optional<FurnaceNumbers> furnaceNumbers(world::LoadedWorld& world, const OpenWindow& window);
 
 /// What the window holds, in its own slot order.
-[[nodiscard]] std::vector<std::optional<storage::StoredItemStack>> readWindow(world::LoadedWorld& world,
-                                                                              const OpenWindow& window);
+[[nodiscard]] std::vector<std::optional<storage::StoredItemStack>>
+readWindow(world::LoadedWorld& world, const OpenWindow& window, const player::PlayerSession* owner);
 
 [[nodiscard]] std::optional<storage::StoredItemStack> readWindowSlot(world::LoadedWorld& world,
-                                                                     const OpenWindow& window, std::int32_t slot);
+                                                                     const OpenWindow& window, std::int32_t slot,
+                                                                     const player::PlayerSession* owner);
 
 /// Writes one slot back into the block. False when the block is not there any more, which is what
 /// stops a window surviving its own chest.
 bool writeWindowSlot(world::LoadedWorld& world, const OpenWindow& window, std::int32_t slot,
-                     const std::optional<storage::StoredItemStack>& stack);
+                     const std::optional<storage::StoredItemStack>& stack, player::PlayerSession* owner);
 
 } // namespace basalt::server::runtime::bedrock

@@ -321,6 +321,11 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             scheduled.insert(scheduled.end(), settled.begin(), settled.end());
             world::redstoneComponents::scheduleAround(world.state(), world.name(), moved->x, moved->y, moved->z, false,
                                                       containerSignal);
+            // parity: that write is a flag two, and the shape updates sit outside the
+            // `UPDATE_NEIGHBORS` gate, so the six squares around it are redrawn all the same. That is
+            // what books the turn of a block of sand beside an observer that just pulsed. Measured in
+            // `arenacae`.
+            broadcaster_->reshapeAround(world, watchers, moved->x, moved->y, moved->z);
             // parity: writing its own state still runs the shape update on the six squares around it,
             // and that is what locks the repeater beside a repeater that just turned on.
             const std::vector<world::BlockChange> held =

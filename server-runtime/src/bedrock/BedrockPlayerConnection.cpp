@@ -204,6 +204,15 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::EntityEvent), body.toVector());
     };
 
+    // What a command's block change asks the whole world to hear. One connection carries it for
+    // everybody, which is why it cannot be this door's own mailbox.
+    connection.broadcastEffects = [this](const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                                         const std::int32_t stateId, const std::vector<world::BlockEffect>& effects) {
+        if (session_ != nullptr && context_.blockEffects) {
+            context_.blockEffects(session_->worldName, x, y, z, stateId, effects);
+        }
+    };
+
     // Morning, or a plugin, getting this player up. The world owns the bed and the pose, so this
     // only asks: the answer comes back as the packet above.
     connection.wakeUp = [this] {
@@ -410,15 +419,15 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
     connection.syncOpenWindow = [mailbox = joining.mailbox, protocol = joining.protocol,
                                  windows = windows_](world::LoadedWorld& world) {
         // A window with none of the block's own slots has nothing the world can change under it:
-        // a table's grid is the player's, and it only moves when they move it.
-        if (!windows->open.has_value() || windows->open->size == 0) {
+        // a table's grid is the player's, and so is an ender chest. Both only move when they do.
+        if (!windows->open.has_value() || windows->open->size == 0 || windows->open->playerOwned) {
             return;
         }
         // What it holds, for the turns nobody touched it: a furnace fills its own result slot, and
         // somebody else may be in the same chest. Not every turn: see `sinceRead`.
         if (++windows->sinceRead >= kWindowReadTurns) {
             windows->sinceRead = 0;
-            std::vector<std::optional<storage::StoredItemStack>> slots = readWindow(world, *windows->open);
+            std::vector<std::optional<storage::StoredItemStack>> slots = readWindow(world, *windows->open, nullptr);
             if (slots != windows->saidSlots) {
                 windows->saidSlots = std::move(slots);
                 drawWindowSlots(mailbox, protocol, *windows->open, windows->saidSlots);

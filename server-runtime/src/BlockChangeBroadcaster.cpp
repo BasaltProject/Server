@@ -131,6 +131,33 @@ void BlockChangeBroadcaster::notifyAround(world::LoadedWorld& world,
     }
 }
 
+void BlockChangeBroadcaster::reshapeAround(world::LoadedWorld& world,
+                                           const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
+                                           std::int32_t y, std::int32_t z) {
+    random::RandomSource random = random::RandomSource::legacy(nextSeed());
+    const world::neighbourUpdates::Context context = contextOf(
+        world, random,
+        [this, &world](world::golemPatterns::Golem kind, double gx, double gy, double gz) {
+            if (hooks_.summonGolem) {
+                hooks_.summonGolem(world, world::golemPatterns::entityTypeOf(kind), gx, gy, gz);
+            }
+        },
+        [this](std::int32_t stateId) {
+            const wire::common::Identifier* block = reg::blockStateDefinitions::blockOf(stateId);
+            return block != nullptr && options_.blockTags != nullptr &&
+                   world::realBlockTags::contains(*options_.blockTags, "minecraft:copper", *block);
+        });
+    world::neighbourUpdates::reshapeOnly(
+        context, x, y, z,
+        [this, &world, &watchers](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
+            sendBlock(watchers, bx, by, bz, reg::blocks::air().stateId);
+            dropBrokenBlock(world, bx, by, bz, stateId);
+        },
+        [&watchers](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
+            sendBlock(watchers, bx, by, bz, stateId);
+        });
+}
+
 void BlockChangeBroadcaster::announceBlock(const std::vector<player::PlayerSession*>& watchers,
                                            const world::BlockChange& change) const {
     sendBlock(watchers, change.x, change.y, change.z, change.stateId);
