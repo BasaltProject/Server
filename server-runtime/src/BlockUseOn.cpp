@@ -9,7 +9,9 @@
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/ItemUseTimers.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
+#include <basalt/server/runtime/player/PlayerBlockItemUse.hpp>
 #include <basalt/server/runtime/player/PlayerBlockPlace.hpp>
+#include <basalt/server/runtime/player/PlayerBlockToggle.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
@@ -67,9 +69,6 @@ std::optional<Identifier> parsedOrNothing(const std::string& id) {
     return parsed.has_value() ? std::optional{*parsed} : std::nullopt;
 }
 
-/// parity: the `15` vanilla passes with `LevelEvent.PARTICLES_AND_SOUND_PLANT_GROWTH`.
-constexpr std::int32_t kGrowthSparkles = 15;
-
 storage::StoredItemStack withCount(const storage::StoredItemStack& stack, std::int32_t count) {
     storage::StoredItemStack copy = stack;
     copy.count = count;
@@ -80,184 +79,36 @@ storage::StoredItemStack withCount(const storage::StoredItemStack& stack, std::i
 
 void BlockInteractionHandler::primeTntAt(PlayerSession& session, const BlockPos& pos, std::int32_t heldSlot,
                                          const storage::StoredItemStack& held, const bool wears) {
-    world::LoadedWorld* world = owner_->currentWorld();
-    if (world == nullptr) {
-        return;
-    }
-    // parity: `TntBlock.prime` answers false with the `tnt_explodes` rule off, and then nothing at
-    // all happens: the block stays and the item is not spent.
-    if (!world->gameRules().get(world::gameRules::kTntExplodes)) {
-        return;
-    }
-    if (!world->state().setBlockState(pos.x, pos.y, pos.z, reg::blocks::air().stateId)) {
-        return;
-    }
-    broadcastBlockUpdate(pos, reg::blocks::air().stateId);
-    // parity: `TntBlock.prime` raises `PRIME_FUSE`, which is what a sculk sensor hears.
-    world->state().primeTnt(pos.x, pos.y, pos.z, "prime_fuse");
-    notifyNeighbours(pos);
-    if (session.gamemode == Gamemode::Creative) {
-        return;
-    }
-    if (!wears) {
-        // parity: a fire charge is consumed rather than worn.
-        session.inventory.set(heldSlot,
-                              held.count <= 1 ? std::nullopt : std::optional{withCount(held, held.count - 1)});
-        return;
-    }
-    random::RandomSource wear = random::RandomSource::legacy(nextSeed());
-    const std::optional<storage::StoredItemStack> worn = item::itemWear::hurt(
-        held, 1, wear,
-        [this](const storage::StoredItemStack& stack, std::int32_t amount, random::RandomSource& source) {
-            return damageEffects_.process(stack, amount, source);
-        });
-    if (worn != held) {
-        session.inventory.set(heldSlot, worn);
+    if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
+        player::primeTntFor(breakContext(), session, *world, pos.x, pos.y, pos.z, heldSlot, held, wears);
     }
 }
 
 void BlockInteractionHandler::igniteAt(PlayerSession& session, const BlockPos& pos, std::int32_t heldSlot,
                                        const storage::StoredItemStack& held) {
-    world::LoadedWorld* world = owner_->currentWorld();
-    const std::optional<std::int32_t> existing =
-        world == nullptr ? std::nullopt : world->state().blockState(pos.x, pos.y, pos.z);
-    if (!existing.has_value() || !isAirLike(*existing)) {
-        return;
+    if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
+        player::igniteFor(breakContext(), session, *world, pos.x, pos.y, pos.z, heldSlot, held);
     }
-    // parity: `BaseFireBlock.onPlace` checks the frame, not the item, which is why any fire in the
-    // right place opens a portal and why the portal replaces the fire rather than burning next to it.
-    const std::optional<server::world::portal::PortalShape> shape =
-        world::netherPortals::light(*world, pos.x, pos.y, pos.z);
-    if (shape.has_value()) {
-        const std::int32_t portal = server::world::portal::PortalShape::portalState(shape->axis());
-        for (const server::world::portal::PortalBlock& block : shape->interior()) {
-            broadcastBlockUpdate(BlockPos{block.x, block.y, block.z}, portal);
-        }
-    } else {
-        if (!world::netherPortals::placeFire(*world, pos.x, pos.y, pos.z)) {
-            return;
-        }
-        const std::optional<std::int32_t> fire = world->state().blockState(pos.x, pos.y, pos.z);
-        broadcastBlockUpdate(pos, fire.value_or(reg::blocks::air().stateId));
-        // parity: `BaseFireBlock.onPlace`, which is what starts fire acting at all.
-        random::RandomSource random = random::RandomSource::legacy(nextSeed());
-        world::fires::schedule(world->state(), pos.x, pos.y, pos.z, random);
-    }
-
-    if (session.gamemode == Gamemode::Creative) {
-        return;
-    }
-    random::RandomSource wear = random::RandomSource::legacy(nextSeed());
-    const std::optional<storage::StoredItemStack> worn = item::itemWear::hurt(
-        held, 1, wear,
-        [this](const storage::StoredItemStack& stack, std::int32_t amount, random::RandomSource& source) {
-            return damageEffects_.process(stack, amount, source);
-        });
-    if (worn == held) {
-        return;
-    }
-    session.inventory.set(heldSlot, worn);
-    owner_->sendInventorySlot(heldSlot);
 }
 
 bool BlockInteractionHandler::useBoneMeal(PlayerSession& session, const BlockPos& pos, const std::int32_t heldSlot,
                                           const storage::StoredItemStack& held) {
     world::LoadedWorld* world = owner_->currentWorld();
-    const std::optional<std::int32_t> existing =
-        world == nullptr ? std::nullopt : world->state().blockState(pos.x, pos.y, pos.z);
-    // parity: `BoneMealItem.growCrop` spends the item on a valid target whether or not the growth
-    // roll did anything, and answers no on anything else so the click falls through.
-    if (!existing.has_value() || !world::boneMeal::grows(*existing)) {
-        return false;
-    }
-    random::RandomSource random = random::RandomSource::legacy(nextSeed());
-    std::optional<world::BlockChange> grown = world::boneMeal::apply(world->state(), pos.x, pos.y, pos.z, random);
-    if (grown.has_value()) {
-        grown->effects.emplace_back(
-            world::blockEffect::Effect{.type = world::blockEffect::Effect::kPlantGrowth, .data = kGrowthSparkles});
-        BlockChangeBroadcaster* blocks = owner_->options().blocks;
-        if (blocks != nullptr) {
-            blocks->announceBlock(owner_->playersInSameWorld(), *grown);
-        }
-    }
-    if (session.gamemode == Gamemode::Creative) {
-        return true;
-    }
-    session.inventory.set(heldSlot, held.count <= 1 ? std::nullopt : std::optional{withCount(held, held.count - 1)});
-    owner_->sendInventorySlot(heldSlot);
-    return true;
-}
-
-void BlockInteractionHandler::reshapeBlock(const BlockPos& pos, const std::int32_t stateId, const std::int32_t effect) {
-    owner_->world().setBlockState(pos.x, pos.y, pos.z, stateId);
-    world::BlockChange change{.x = pos.x, .y = pos.y, .z = pos.z, .stateId = stateId};
-    change.effects.emplace_back(world::blockEffect::Effect{.type = effect, .data = 0});
-    BlockChangeBroadcaster* blocks = owner_->options().blocks;
-    if (blocks != nullptr) {
-        blocks->announceBlock(owner_->playersInSameWorld(), change);
-    }
-    // parity: `setBlock(pos, state, 11)`, which does tell the neighbours, and `GameEvent.BLOCK_CHANGE`.
-    notifyNeighbours(pos);
-    heardBySculk("block_change", pos);
+    return world != nullptr &&
+           player::useBoneMealFor(breakContext(), session, *world, pos.x, pos.y, pos.z, heldSlot, held);
 }
 
 bool BlockInteractionHandler::useHoneycomb(PlayerSession& session, const BlockPos& pos, const std::int32_t heldSlot,
                                            const storage::StoredItemStack& held) {
     world::LoadedWorld* world = owner_->currentWorld();
-    const std::optional<std::int32_t> existing =
-        world == nullptr ? std::nullopt : world->state().blockState(pos.x, pos.y, pos.z);
-    const std::optional<std::int32_t> waxed =
-        existing.has_value() ? world::waxing::waxed(*existing) : std::optional<std::int32_t>{};
-    if (!waxed.has_value()) {
-        return false;
-    }
-    reshapeBlock(pos, *waxed, world::blockEffect::Effect::kWaxOn);
-    if (session.gamemode == Gamemode::Creative) {
-        return true;
-    }
-    session.inventory.set(heldSlot, held.count <= 1 ? std::nullopt : std::optional{withCount(held, held.count - 1)});
-    owner_->sendInventorySlot(heldSlot);
-    return true;
+    return world != nullptr &&
+           player::useHoneycombFor(breakContext(), session, *world, pos.x, pos.y, pos.z, heldSlot, held);
 }
 
 bool BlockInteractionHandler::useAxe(PlayerSession& session, const BlockPos& pos, const std::int32_t heldSlot,
                                      const storage::StoredItemStack& held) {
     world::LoadedWorld* world = owner_->currentWorld();
-    const std::optional<std::int32_t> existing =
-        world == nullptr ? std::nullopt : world->state().blockState(pos.x, pos.y, pos.z);
-    const std::optional<world::waxing::Scrape> cut =
-        existing.has_value() ? world::waxing::scraped(*existing) : std::optional<world::waxing::Scrape>{};
-    if (!cut.has_value()) {
-        return false;
-    }
-    // parity: stripping a log is only a sound, and the other two draw their own particles.
-    const std::int32_t effect = cut->cut == world::waxing::Cut::Scraped   ? world::blockEffect::Effect::kCopperScrape
-                                : cut->cut == world::waxing::Cut::Unwaxed ? world::blockEffect::Effect::kWaxOff
-                                                                          : 0;
-    if (effect == 0) {
-        owner_->world().setBlockState(pos.x, pos.y, pos.z, cut->stateId);
-        broadcastBlockUpdate(pos, cut->stateId);
-        notifyNeighbours(pos);
-        heardBySculk("block_change", pos);
-    } else {
-        reshapeBlock(pos, cut->stateId, effect);
-    }
-    if (session.gamemode == Gamemode::Creative) {
-        return true;
-    }
-    // parity: `hurtAndBreak(1, ...)`, one point off the axe whichever of the three it did.
-    random::RandomSource wear = random::RandomSource::legacy(nextSeed());
-    const std::optional<storage::StoredItemStack> worn = item::itemWear::hurt(
-        held, 1, wear,
-        [this](const storage::StoredItemStack& stack, std::int32_t amount, random::RandomSource& source) {
-            return damageEffects_.process(stack, amount, source);
-        });
-    if (worn == held) {
-        return true;
-    }
-    session.inventory.set(heldSlot, worn);
-    owner_->sendInventorySlot(heldSlot);
-    return true;
+    return world != nullptr && player::useAxeFor(breakContext(), session, *world, pos.x, pos.y, pos.z, heldSlot, held);
 }
 
 bool BlockInteractionHandler::chargeAnchor(PlayerSession& session, const BlockPos& pos, const std::int32_t heldSlot,
@@ -445,16 +296,9 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
             ack();
             return;
         }
-        // parity: `NoteBlock.useWithoutItem`, which moves the note on one and plays it.
         if (path == "note_block") {
-            world::LoadedWorld* loaded = owner_->currentWorld();
-            if (loaded != nullptr) {
-                const std::optional<world::BlockChange> change =
-                    world::noteBlocks::tune(loaded->state(), hit.pos.x, hit.pos.y, hit.pos.z);
-                if (change.has_value()) {
-                    broadcastBlockUpdate(hit.pos, change->stateId);
-                    broadcastEffects(hit.pos, change->stateId, change->effects);
-                }
+            if (world::LoadedWorld* loaded = owner_->currentWorld(); loaded != nullptr) {
+                player::tuneNoteBlockFor(breakContext(), *loaded, hit.pos.x, hit.pos.y, hit.pos.z);
             }
             ack();
             return;

@@ -9,6 +9,9 @@
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/command/CommandSource.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/player/PlayerBlockItemUse.hpp>
+#include <basalt/server/runtime/player/PlayerBlockSlots.hpp>
+#include <basalt/server/runtime/player/PlayerBlockToggle.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -55,9 +58,6 @@ using player::PlayerInventory;
 using player::PlayerSession;
 using wire::common::Identifier;
 
-/// parity: `BellBlock.isProperHit`, whose ceiling for a side hit is the block's own upper edge.
-constexpr float kBellHitTop = 0.8124F;
-
 /// parity: `MinecartItem.useOn`, a sixteenth of a block above the rail.
 constexpr double kMinecartRestHeight = 0.0625;
 
@@ -85,19 +85,6 @@ std::string lowercaseName(play::Direction face) {
 }
 
 /// parity: the two axes a bell can swing along, which is what `isProperHit` compares.
-std::string axisOf(std::string_view direction) { return direction == "north" || direction == "south" ? "z" : "x"; }
-
-/// parity: `ItemFrame`'s own direction numbering, which a block event reuses for the bell.
-std::int32_t frameDirectionData(std::string_view facing) {
-    if (facing == "south") {
-        return 0;
-    }
-    if (facing == "west") {
-        return 1;
-    }
-    return facing == "north" ? 2 : 3;
-}
-
 storage::StoredItemStack withCount(const storage::StoredItemStack& stack, std::int32_t count) {
     storage::StoredItemStack copy = stack;
     copy.count = count;
@@ -136,27 +123,9 @@ void BlockInteractionHandler::broadcastSound(const BlockPos& pos, const std::str
 }
 
 bool BlockInteractionHandler::ringBell(const play::BlockHitResult& hit) {
-    const std::optional<std::int32_t> stateId = owner_->world().blockState(hit.pos.x, hit.pos.y, hit.pos.z);
-    if (!stateId.has_value() || hit.direction == play::Direction::Up || hit.direction == play::Direction::Down ||
-        hit.clickY > kBellHitTop) {
-        return false;
-    }
-    const std::map<std::string, std::string> properties = reg::blockStateDefinitions::propertiesOf(*stateId);
-    const auto facing = properties.find("facing");
-    const bool sameAxis =
-        axisOf(facing == properties.end() ? "north" : facing->second) == axisOf(lowercaseName(hit.direction));
-    const auto attachment = properties.find("attachment");
-    const std::string mounting = attachment == properties.end() ? std::string{} : attachment->second;
-    const bool proper = mounting == "ceiling" || (mounting == "floor" ? sameAxis : !sameAxis);
-    if (!proper) {
-        return false;
-    }
-    broadcastEffects(
-        hit.pos, *stateId,
-        {world::blockEffect::Event{.b0 = 1, .b1 = frameDirectionData(lowercaseName(hit.direction))},
-         world::blockEffect::Sound{
-             .name = "block.bell.use", .source = play::SoundSource::Blocks, .volume = 2.0F, .pitch = 1.0F}});
-    return true;
+    world::LoadedWorld* world = owner_->currentWorld();
+    return world != nullptr &&
+           player::ringBellFor(breakContext(), *world, hit.pos.x, hit.pos.y, hit.pos.z, hit.direction, hit.clickY);
 }
 
 void BlockInteractionHandler::openNewSign(const BlockPos& pos, std::int32_t stateId) {
@@ -494,50 +463,15 @@ bool BlockInteractionHandler::useSpawnEgg(PlayerSession& session, const Identifi
     return true;
 }
 
-void BlockInteractionHandler::giveOrDrop(PlayerSession& session, const storage::StoredItemStack& stack,
-                                         const BlockPos& pos) {
-    const std::int32_t leftover = session.inventory.add(stack);
-    owner_->sendInventoryAll();
-    const std::optional<Identifier> item = parsedOrNothing(stack.id);
-    if (leftover <= 0 || !item.has_value()) {
-        return;
-    }
-    spawnDroppedItem(*item, leftover, pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
-}
-
 void BlockInteractionHandler::useBookshelf(PlayerSession& session, const play::BlockHitResult& hit) {
     world::LoadedWorld* world = owner_->currentWorld();
-    const std::optional<std::int32_t> stateId =
-        world == nullptr ? std::nullopt : world->state().blockState(hit.pos.x, hit.pos.y, hit.pos.z);
-    if (!stateId.has_value()) {
-        return;
-    }
-    const std::optional<std::int32_t> slot =
-        world::chiseledBookshelves::slotAt(*stateId, lowercaseName(hit.direction), hit.clickX, hit.clickY, hit.clickZ);
-    if (!slot.has_value()) {
+    if (world == nullptr) {
         return;
     }
     const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session.inventory.heldSlot();
-    const std::optional<storage::StoredItemStack> held = session.inventory.at(heldSlot);
-    const std::optional<Identifier> book = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
-    const world::realItemTags::TagMembers* tags = owner_->options().itemTags;
-    const bool isBook =
-        book.has_value() && tags != nullptr && world::realItemTags::contains(*tags, "minecraft:bookshelf_books", *book);
-    const std::optional<world::chiseledBookshelves::Interaction> interaction =
-        isBook ? world::chiseledBookshelves::putBook(world->state(), hit.pos.x, hit.pos.y, hit.pos.z, *slot, *book)
-               : world::chiseledBookshelves::takeBook(world->state(), hit.pos.x, hit.pos.y, hit.pos.z, *slot);
-    if (!interaction.has_value()) {
-        return;
-    }
-    broadcastBlockUpdate(hit.pos, interaction->change.stateId);
-    broadcastEffects(hit.pos, interaction->change.stateId, interaction->change.effects);
-    if (interaction->taken.has_value()) {
-        giveOrDrop(session, storage::StoredItemStack{.id = interaction->taken->toString(), .count = 1}, hit.pos);
-    } else if (held.has_value() && session.gamemode != Gamemode::Creative) {
-        session.inventory.set(heldSlot,
-                              held->count <= 1 ? std::nullopt : std::optional{withCount(*held, held->count - 1)});
-        owner_->sendInventorySlot(heldSlot);
-    }
+    player::useBookshelfFor(breakContext(), session, *world, hit.pos.x, hit.pos.y, hit.pos.z,
+                            player::FaceHit{.face = hit.direction, .x = hit.clickX, .y = hit.clickY, .z = hit.clickZ},
+                            heldSlot, session.inventory.at(heldSlot), owner_->options().itemTags);
 }
 
 void BlockInteractionHandler::useShelf(PlayerSession& session, const play::BlockHitResult& hit) {
@@ -626,133 +560,31 @@ void BlockInteractionHandler::swapHotbarWithShelf(PlayerSession& session, const 
 
 void BlockInteractionHandler::usePot(PlayerSession& session, const BlockPos& pos) {
     world::LoadedWorld* world = owner_->currentWorld();
-    const std::optional<std::int32_t> stateId =
-        world == nullptr ? std::nullopt : world->state().blockState(pos.x, pos.y, pos.z);
-    server::world::Chunk* chunk = world == nullptr ? nullptr : world->state().chunkIfLoaded(pos.x >> 4, pos.z >> 4);
-    if (!stateId.has_value() || chunk == nullptr) {
+    if (world == nullptr) {
         return;
     }
-    server::world::ChunkBlockEntity* entity = chunk->blockEntityAt(pos.x & 15, pos.y, pos.z & 15);
     const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session.inventory.heldSlot();
-    const std::optional<storage::StoredItemStack> held = session.inventory.at(heldSlot);
-    const std::optional<Identifier> item = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
-    std::optional<std::vector<world::BlockEffect>> inserted;
-    if (entity != nullptr && item.has_value()) {
-        inserted = world::decoratedPots::insert(entity->data(), *item);
-    }
-    // An empty hand, a full pot or the wrong item all end the same way: the pot rocks and takes
-    // nothing.
-    if (!inserted.has_value()) {
-        broadcastEffects(pos, *stateId, world::decoratedPots::rebuff());
-        return;
-    }
-    chunk->markDirty();
-    world::redstoneComponents::scheduleComparatorsAround(world->state(), world->name(), pos.x, pos.y, pos.z,
-                                                         world::comparatorReading::of(world->state()));
-    if (session.gamemode != Gamemode::Creative) {
-        session.inventory.set(heldSlot,
-                              held->count <= 1 ? std::nullopt : std::optional{withCount(*held, held->count - 1)});
-        owner_->sendInventorySlot(heldSlot);
-    }
-    broadcastEffects(pos, *stateId, *inserted);
+    player::usePotFor(breakContext(), session, *world, pos.x, pos.y, pos.z, heldSlot, session.inventory.at(heldSlot));
 }
 
 bool BlockInteractionHandler::placeOnCampfire(PlayerSession& session, const BlockPos& pos) {
     world::LoadedWorld* world = owner_->currentWorld();
-    const std::optional<std::int32_t> stateId =
-        world == nullptr ? std::nullopt : world->state().blockState(pos.x, pos.y, pos.z);
-    if (!stateId.has_value() || !world::campfires::isLitCampfire(*stateId)) {
+    if (world == nullptr) {
         return false;
     }
     const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session.inventory.heldSlot();
-    const std::optional<storage::StoredItemStack> held = session.inventory.at(heldSlot);
-    const std::optional<Identifier> item = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
-    server::world::Chunk* chunk = world->state().chunkIfLoaded(pos.x >> 4, pos.z >> 4);
-    if (!item.has_value() || chunk == nullptr) {
-        return false;
-    }
-    server::world::ChunkBlockEntity* entity = chunk->blockEntityAt(pos.x & 15, pos.y, pos.z & 15);
-    if (entity == nullptr) {
-        chunk->setBlockEntity(
-            server::world::ChunkBlockEntity{pos.x & 15, pos.y, pos.z & 15, world::campfires::block(), {}});
-        entity = chunk->blockEntityAt(pos.x & 15, pos.y, pos.z & 15);
-        if (entity == nullptr) {
-            return false;
-        }
-    }
-    world::campfires::State state = world::campfires::read(entity->data());
-    world::RealRecipes* recipes = owner_->options().recipes;
-    const bool placed = world::campfires::placeFood(
-        state, server::world::loot::ItemStack{.item = *item, .count = 1},
-        [recipes](const server::world::loot::ItemStack& food) {
-            return recipes == nullptr ? nullptr : recipes->cookingFor(server::world::crafting::Cooker::Campfire, food);
-        });
-    if (!placed) {
-        return false;
-    }
-    world::campfires::write(state, entity->data());
-    chunk->markDirty();
-    world::redstoneComponents::scheduleComparatorsAround(world->state(), world->name(), pos.x, pos.y, pos.z,
-                                                         world::comparatorReading::of(world->state()));
-    if (session.gamemode != Gamemode::Creative) {
-        session.inventory.set(heldSlot,
-                              held->count <= 1 ? std::nullopt : std::optional{withCount(*held, held->count - 1)});
-        owner_->sendInventorySlot(heldSlot);
-    }
-    return true;
+    return player::placeOnCampfireFor(breakContext(), session, *world, pos.x, pos.y, pos.z, heldSlot,
+                                      session.inventory.at(heldSlot), owner_->options().recipes);
 }
 
 bool BlockInteractionHandler::useComposter(PlayerSession& session, const BlockPos& pos) {
     world::LoadedWorld* world = owner_->currentWorld();
-    const std::optional<std::int32_t> level =
-        world == nullptr ? std::nullopt : world::composters::levelAt(world->state(), pos.x, pos.y, pos.z);
-    if (!level.has_value()) {
+    if (world == nullptr) {
         return false;
-    }
-    // parity: `useWithoutItem` on a ready composter hands out the bone meal whatever is in the hand,
-    // and `useItemOn` only looks at the item while there is room. Both end in a level change, which
-    // is what the comparator beside it reads.
-    if (*level == world::composters::kReady) {
-        const std::optional<world::BlockChange> emptied = world::composters::empty(world->state(), pos.x, pos.y, pos.z);
-        if (!emptied.has_value()) {
-            return false;
-        }
-        broadcastBlockUpdate(pos, emptied->stateId);
-        // parity: `extractProduce` pops the bone meal a hair above the block and a little to a side.
-        spawnDroppedItem(Identifier::vanilla("bone_meal"), 1, pos.x + 0.5 + popJitter(), pos.y + 1.01,
-                         pos.z + 0.5 + popJitter());
-        broadcastEffects(pos, emptied->stateId,
-                         {world::blockEffect::Sound{.name = "block.composter.empty",
-                                                    .source = wire::protocol::play::SoundSource::Blocks,
-                                                    .volume = 1.0F,
-                                                    .pitch = 1.0F}});
-        notifyComparators(pos);
-        return true;
     }
     const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session.inventory.heldSlot();
-    const std::optional<storage::StoredItemStack> held = session.inventory.at(heldSlot);
-    const std::optional<Identifier> item = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
-    if (!item.has_value() || !world::composters::chanceOf(*item).has_value() || *level >= world::composters::kFull) {
-        return false;
-    }
-    random::RandomSource random = random::RandomSource::legacy(nextSeed());
-    const std::optional<world::BlockChange> filled =
-        world::composters::addItem(world->state(), pos.x, pos.y, pos.z, *item, random);
-    // parity: `levelEvent(1500, pos, changed ? 1 : 0)`, which is what makes the client play the
-    // success sound and the sparkles rather than the plain fill.
-    broadcastEffects(pos, filled.has_value() ? filled->stateId : 0,
-                     {world::blockEffect::Effect{.type = world::blockEffect::Effect::kComposterFill,
-                                                 .data = filled.has_value() ? 1 : 0}});
-    if (filled.has_value()) {
-        broadcastBlockUpdate(pos, filled->stateId);
-        notifyComparators(pos);
-    }
-    if (session.gamemode != Gamemode::Creative) {
-        session.inventory.set(heldSlot,
-                              held->count <= 1 ? std::nullopt : std::optional{withCount(*held, held->count - 1)});
-        owner_->sendInventorySlot(heldSlot);
-    }
-    return true;
+    return player::useComposterFor(breakContext(), session, *world, pos.x, pos.y, pos.z, heldSlot,
+                                   session.inventory.at(heldSlot));
 }
 
 void BlockInteractionHandler::notifyComparators(const BlockPos& pos) {
@@ -844,78 +676,14 @@ std::vector<std::array<double, 6>> BlockInteractionHandler::buildersInTheWay() c
 }
 
 void BlockInteractionHandler::toggleBlock(const BlockPos& pos, const float playerYaw) {
-    world::LoadedWorld* world = owner_->currentWorld();
-    if (world == nullptr) {
-        return;
-    }
-    const std::optional<std::int32_t> before = world->state().blockState(pos.x, pos.y, pos.z);
-    const std::optional<world::blockInteractions::BlockToggle> toggled =
-        world::blockInteractions::toggle(world->state(), pos.x, pos.y, pos.z, playerYaw);
-    if (!toggled.has_value()) {
-        return;
-    }
-    // parity: `ButtonBlock.press` schedules its own release. Everything else stays put until
-    // something touches it again.
-    const std::optional<std::int32_t> pressed = world::blockInteractions::pressedTicks(before.value_or(0));
-    if (pressed.has_value()) {
-        if (const Identifier* button = reg::blockStateDefinitions::blockOf(before.value_or(0)); button != nullptr) {
-            world->state().scheduleBlockTick(pos.x, pos.y, pos.z, *button, *pressed);
-        }
-    }
-    for (const world::BlockChange& change : toggled->changes) {
-        broadcastBlockUpdate(BlockPos{change.x, change.y, change.z}, change.stateId);
-    }
-    // parity: `LeverBlock.updateNeighbours`. Without this the lever moved and powered nothing at all,
-    // and without the second half a torch on the far side of the wall never hears the flip. That
-    // second half belongs to *using* the lever: a `/setblock` of the same state does not do it.
-    for (const world::BlockChange& change : toggled->changes) {
-        notifyNeighbours(BlockPos{change.x, change.y, change.z});
-        if (const std::optional<std::array<std::int32_t, 3>> wall =
-                world::blockInteractions::attachmentOf(change.stateId, change.x, change.y, change.z);
-            wall.has_value()) {
-            notifyNeighbours(BlockPos{(*wall)[0], (*wall)[1], (*wall)[2]});
-        }
-    }
-    broadcastSound(pos, toggled->sound, 1.0F, 1.0F);
-    // parity: the noise a hand makes. `LeverBlock.pull` and `ButtonBlock.press` raise
-    // `BLOCK_ACTIVATE` or `BLOCK_DEACTIVATE` by the new `powered`, and a door, a trapdoor or a gate
-    // raise `BLOCK_OPEN` or `BLOCK_CLOSE` by the new `open`. A sculk sensor beside one hears the flip.
-    if (const std::optional<std::int32_t> after = world->state().blockState(pos.x, pos.y, pos.z); after.has_value()) {
-        const std::map<std::string, std::string> properties = reg::blockStateDefinitions::propertiesOf(*after);
-        if (const auto open = properties.find("open"); open != properties.end()) {
-            heardBySculk(open->second == "true" ? "block_open" : "block_close", pos);
-        } else if (const auto powered = properties.find("powered"); powered != properties.end()) {
-            heardBySculk(powered->second == "true" ? "block_activate" : "block_deactivate", pos);
-        }
+    if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
+        player::toggleBlockFor(breakContext(), *world, pos.x, pos.y, pos.z, playerYaw);
     }
 }
 
 void BlockInteractionHandler::cycleBlock(const BlockPos& pos) {
-    world::LoadedWorld* world = owner_->currentWorld();
-    if (world == nullptr) {
-        return;
-    }
-    const std::optional<world::blockInteractions::BlockCycle> cycled =
-        world::blockInteractions::cycle(world->state(), pos.x, pos.y, pos.z);
-    if (!cycled.has_value()) {
-        return;
-    }
-    broadcastBlockUpdate(pos, cycled->stateId);
-    // parity: `DaylightDetectorBlock.useWithoutItem` writes `inverted` telling nobody and then lets
-    // `updateSignalStrength` write the reading, which is the write that carries. Without this the
-    // detector flipped and kept the old number until its own turn came round.
-    const std::optional<world::BlockChange> reread =
-        world::daylightDetectors::update(world->state(), world->clock(), world->skyDarken(), pos.x, pos.y, pos.z,
-                                         config::dimensionFacts(world->declaration().dimension).hasSkylight,
-                                         config::dimensionFacts(world->declaration().dimension).hasDayTimeline);
-    if (reread.has_value()) {
-        broadcastBlockUpdate(pos, reread->stateId);
-    }
-    // parity: every one of these is a component, so the change has to reach the dust and the diodes
-    // around them.
-    notifyNeighbours(pos);
-    if (cycled->sound.has_value()) {
-        broadcastSound(pos, *cycled->sound, cycled->volume, cycled->pitch);
+    if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
+        player::cycleBlockFor(breakContext(), *world, pos.x, pos.y, pos.z);
     }
 }
 
