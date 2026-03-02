@@ -86,6 +86,8 @@ Menu Menu::stonecutter(std::int32_t containerId) { return Menu{containerId, 0, 0
 
 Menu Menu::smithing(std::int32_t containerId) { return Menu{containerId, 0, 0, blockWindow(4)}; }
 
+Menu Menu::anvil(std::int32_t containerId) { return Menu{containerId, 0, 0, blockWindow(3)}; }
+
 Menu Menu::merchant(std::int32_t containerId) {
     std::vector<std::optional<MenuSlot>> slots;
     slots.reserve(3 + kPlayerSlotsInWindow);

@@ -139,6 +139,7 @@ basalt_module(server-runtime-core
         src/CombatSystem.cpp
         src/ContainerClicks.cpp
         src/ContainerMenuController.cpp
+        src/ContainerAnvil.cpp
         src/ContainerSlots.cpp
         src/MobActionSystem.cpp
         src/ItemUseTimers.cpp
@@ -190,6 +191,7 @@ basalt_module(server-runtime-core
         src/player/PlayerBlockBreak.cpp
         src/player/PlayerBlockItemUse.cpp
         src/player/PlayerBlockSlots.cpp
+        src/player/PlayerAnvil.cpp
         src/player/PlayerBlockToggle.cpp
         src/player/PlayerBuckets.cpp
         src/player/PlayerDigSpeed.cpp
@@ -239,6 +241,7 @@ basalt_module(server-runtime-core
         src/world/SaplingGrowth.cpp
         src/world/RealLootTables.cpp
         src/world/RealEnchantments.cpp
+        src/world/RealEnchantmentTags.cpp
         src/world/RealDamageTypeTags.cpp
         src/world/RealDialogs.cpp
         src/world/RealTestInstances.cpp
@@ -291,6 +294,7 @@ basalt_module(server-runtime-core
         src/world/Explosions.cpp
         src/world/AdvancementTriggers.cpp
         src/world/Anvils.cpp
+        src/world/AnvilEnchantments.cpp
         src/world/DroppedItemPhysics.cpp
         src/world/EntityRegistry.cpp
         src/world/FluidFlow.cpp
@@ -1527,6 +1531,12 @@ target_compile_definitions(server-runtime-argument-types-test
 basalt_test(server-runtime-anvils-test
     SOURCES
         test/AnvilsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-anvil-enchantments-test
+    SOURCES
+        test/AnvilEnchantmentsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

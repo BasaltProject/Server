@@ -275,6 +275,13 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
             ack();
             return;
         }
+        // parity: `AnvilBlock.useWithoutItem`, whose three slots belong to the screen and whose
+        // block wears out under it.
+        if (path == "anvil" || path == "chipped_anvil" || path == "damaged_anvil") {
+            owner_->menus().openAnvilMenu(*session, hit.pos);
+            ack();
+            return;
+        }
         // parity: `EnderChestBlock.useWithoutItem`, the player's own slots and not the block's.
         if (path == "ender_chest") {
             owner_->menus().openEnderChest(*session, hit.pos);

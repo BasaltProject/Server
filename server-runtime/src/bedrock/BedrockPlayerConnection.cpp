@@ -221,6 +221,9 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         }
     };
 
+    // The book again, after a trade has been taken out of it.
+    connection.sendTrades = [this] { sendTrades(); };
+
     // Somebody lying down or standing up, which this edition draws off a flag and the bed's own
     // square rather than off a pose.
     connection.showSleeping = [this](const std::int32_t entityId,

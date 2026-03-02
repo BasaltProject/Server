@@ -94,6 +94,10 @@ Result combine(const storage::StoredItemStack* input, const storage::StoredItemS
 
     if (addition != nullptr) {
         const bool damageable = item::itemWear::isDamageable(*input);
+        // parity: `usingBook`, which is what lets an addition that is not the same item work at all.
+        // An enchanted book carries the component even with nothing written in it.
+        const bool usingBook = addition->id == "minecraft:enchanted_book" ||
+                               addition->components.find(item::itemComponents::kStoredEnchantments) != nullptr;
         if (damageable && isRepairMaterial && isRepairMaterial(*input, *addition)) {
             // parity: a quarter of the maximum per material, and one level for each one used.
             std::int32_t damage = item::itemWear::damage(result);
@@ -109,30 +113,36 @@ Result combine(const storage::StoredItemStack* input, const storage::StoredItemS
             }
             materials = used;
             result = withDamage(std::move(result), damage);
-        } else if (input->id == addition->id && damageable) {
-            // parity: the two durabilities added, plus twelve per cent of the maximum.
-            const std::int32_t max = item::itemWear::maxDamage(*input);
-            const std::int32_t left = max - item::itemWear::damage(*input);
-            const std::int32_t extra = max - item::itemWear::damage(*addition) + (max * 12 / 100);
-            const std::int32_t damage = std::max(max - (left + extra), 0);
-            if (damage < item::itemWear::damage(*input)) {
-                result = withDamage(std::move(result), damage);
-                price += 2;
-            }
-            const Merge merged = merge(result, *addition);
-            if (merged.components.has_value()) {
-                result.components = *merged.components;
-            }
-            price += merged.cost;
         } else {
+            // parity: anything but a book has to be the same damageable item, or the anvil refuses
+            // the pair before it looks at what is written on either of them.
+            if (!usingBook && (input->id != addition->id || !damageable)) {
+                return Result{};
+            }
+            if (damageable && !usingBook) {
+                // parity: the two durabilities added, plus twelve per cent of the maximum.
+                const std::int32_t max = item::itemWear::maxDamage(*input);
+                const std::int32_t left = max - item::itemWear::damage(*input);
+                const std::int32_t extra = max - item::itemWear::damage(*addition) + (max * 12 / 100);
+                const std::int32_t damage = std::max(max - (left + extra), 0);
+                if (damage < item::itemWear::damage(*input)) {
+                    result = withDamage(std::move(result), damage);
+                    price += 2;
+                }
+            }
             const Merge merged = merge(result, *addition);
-            if (!merged.components.has_value() && merged.cost == 0) {
+            if (merged.refused) {
                 return Result{};
             }
             if (merged.components.has_value()) {
                 result.components = *merged.components;
             }
             price += merged.cost;
+            // parity: a stack of more than one is priced out of the anvil rather than refused, and
+            // only once something has actually gone onto it.
+            if (input->count > 1 && merged.cost > 0) {
+                price = kTooExpensive;
+            }
         }
     }
 
@@ -156,18 +166,22 @@ Result combine(const storage::StoredItemStack* input, const storage::StoredItemS
     const std::int64_t total = static_cast<std::int64_t>(tax) + price;
     auto cost = static_cast<std::int32_t>(std::clamp<std::int64_t>(total, 0, std::numeric_limits<std::int32_t>::max()));
     // parity: renaming alone is never refused; it is capped one under the limit instead.
-    if (namingCost == price && namingCost > 0 && cost >= kTooExpensive) {
+    const bool onlyRenaming = namingCost == price && namingCost > 0;
+    if (onlyRenaming && cost >= kTooExpensive) {
         cost = kTooExpensive - 1;
     }
     if (cost >= kTooExpensive) {
-        return Result{.output = std::nullopt, .cost = cost};
+        return Result{.output = std::nullopt, .cost = cost, .onlyRenaming = onlyRenaming};
     }
 
     std::int32_t priorWork = std::max(repairCost(result), addition == nullptr ? 0 : repairCost(*addition));
     if (namingCost != price || namingCost == 0) {
         priorWork = increasedRepairCost(priorWork);
     }
-    return Result{.output = withRepairCost(std::move(result), priorWork), .cost = cost, .materialCount = materials};
+    return Result{.output = withRepairCost(std::move(result), priorWork),
+                  .cost = cost,
+                  .materialCount = materials,
+                  .onlyRenaming = onlyRenaming};
 }
 
 } // namespace basalt::server::runtime::world::anvils

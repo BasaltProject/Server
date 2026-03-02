@@ -702,6 +702,13 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         }
         return;
     }
+    if (packetId == play::ServerboundRenameItemPacket::kId) {
+        const std::optional<play::ServerboundRenameItemPacket> packet = play::ServerboundRenameItemPacket::read(body);
+        if (packet.has_value()) {
+            menus_->setAnvilName(packet->name);
+        }
+        return;
+    }
     if (packetId == play::ContainerButtonClickPacket::kId) {
         const std::optional<play::ContainerButtonClickPacket> packet = play::ContainerButtonClickPacket::read(body);
         if (packet.has_value()) {

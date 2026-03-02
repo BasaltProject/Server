@@ -1,6 +1,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayerInternals.hpp>
+#include <basalt/server/runtime/bedrock/BedrockRecipes.hpp>
 #include <basalt/server/runtime/placeholder/PlaceholderSlots.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -426,10 +427,66 @@ void BedrockPlayer::attack(const std::uint64_t runtimeEntityId) {
 }
 
 void BedrockPlayer::useOnEntity(const std::uint64_t runtimeEntityId) {
-    if (session_ == nullptr || !context_.useEntity || runtimeEntityId == 0) {
+    if (session_ == nullptr || runtimeEntityId == 0) {
         return;
     }
-    context_.useEntity(*session_, static_cast<std::int32_t>(runtimeEntityId - 1));
+    // The client counts entities from one where this server counts from zero.
+    const auto entityId = static_cast<std::int32_t>(runtimeEntityId - 1);
+    // parity: `Villager.mobInteract` opens its trades whatever is in the hand, so the book is asked
+    // for first and the rest of the click only happens when there is none.
+    if (context_.trades) {
+        std::optional<OpenTrades> offers = context_.trades(*session_, entityId);
+        if (offers.has_value() && !offers->offers.empty()) {
+            openTrades(runtimeEntityId, *std::move(offers));
+            return;
+        }
+    }
+    if (context_.useEntity) {
+        context_.useEntity(*session_, entityId);
+    }
+}
+
+void BedrockPlayer::openTrades(const std::uint64_t runtimeEntityId, OpenTrades offers) {
+    windows_->nextContainerId = windows_->nextContainerId >= kMaxContainerId ? 1 : windows_->nextContainerId + 1;
+    // A merchant's window is not a block's: it carries no slots of this server's own, so nothing is
+    // left open behind it and closing it has nothing to put back.
+    windows_->open.reset();
+    windows_->saidSlots.clear();
+    windows_->saidNumbers.reset();
+    windows_->trades = std::move(offers);
+    tradingWith_ = runtimeEntityId;
+    sendTrades();
+}
+
+void BedrockPlayer::sendTrades() {
+    if (!windows_->trades.has_value() || windows_->trades->offers.empty() || tradingWith_ == 0) {
+        return;
+    }
+    std::vector<wire::bedrock::BedrockTrade> lines;
+    lines.reserve(windows_->trades->offers.size());
+    for (const world::trades::Offer& offer : windows_->trades->offers) {
+        const auto [costA, costB] = world::trades::currentCost(offer);
+        wire::bedrock::BedrockTrade line;
+        line.costA = tradeItemOf(costA);
+        line.baseCountA = offer.costA.count;
+        if (costB.has_value()) {
+            line.costB = tradeItemOf(*costB);
+            line.baseCountB = offer.costB->count;
+        }
+        line.sell = tradeItemOf(offer.result);
+        line.maxUses = offer.maxUses;
+        line.uses = offer.uses;
+        line.experience = offer.experience;
+        line.priceMultiplier = offer.priceMultiplier;
+        line.demand = offer.demand;
+        line.tier = windows_->trades->tier;
+        lines.push_back(line);
+    }
+    wire::io::ByteBuffer body;
+    wire::bedrock::writeUpdateTrade(body, windows_->nextContainerId, windows_->trades->tier,
+                                    static_cast<std::int64_t>(tradingWith_),
+                                    static_cast<std::int64_t>(kRuntimeEntityId), "Villager", lines);
+    mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::UpdateTrade), body.toVector());
 }
 
 void BedrockPlayer::setHeldSlot(const std::int32_t slot) {

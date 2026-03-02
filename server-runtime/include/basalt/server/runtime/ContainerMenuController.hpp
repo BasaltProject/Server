@@ -93,6 +93,12 @@ public:
 
     void openSmithingMenu(player::PlayerSession& session);
 
+    void openAnvilMenu(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
+
+    /// parity: `ServerboundRenameItemPacket`, which arrives on every keystroke and works the result
+    /// out again each time.
+    void setAnvilName(const std::string& name);
+
     void openStonecutterMenu(player::PlayerSession& session);
 
     void openCrafter(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
@@ -167,6 +173,18 @@ private:
 
     void takeSmithingResult();
 
+    void recomputeAnvilResult();
+
+    void takeAnvilResult(player::PlayerSession& session);
+
+    /// parity: `AnvilBlock.damage`, the eight chances in a hundred that an anvil survives a use.
+    void wearAnvil();
+
+    void sendAnvilCost();
+
+    /// parity: `Slot.mayPickup`: an anvil's result is only picked up by somebody who can pay for it.
+    [[nodiscard]] bool mayPickup(const player::MenuSlot& slot) const;
+
     void selectStonecutterRecipe(std::int32_t button);
 
     void takeStonecutterResult();
@@ -221,6 +239,17 @@ private:
 
     bool openSmithing_ = false;
     std::array<std::optional<storage::StoredItemStack>, 4> smithingSlots_;
+
+    bool openAnvil_ = false;
+    std::array<std::optional<storage::StoredItemStack>, 3> anvilSlots_;
+    /// What the player has typed into the name box. Nothing means they have typed nothing, which is
+    /// not the same as having emptied it.
+    std::optional<std::string> anvilName_;
+    std::int32_t anvilCost_ = 0;
+    /// How many of the addition a repair is going to eat, which is not always all of them.
+    std::int32_t anvilMaterials_ = 0;
+    /// parity: `onlyRenaming`, which is what leaves the addition where it is and lifts the wall.
+    bool anvilOnlyRenaming_ = false;
 
     std::array<std::int32_t, 4> openBlockData_{-1, -1, -1, -1};
     std::array<std::optional<storage::StoredItemStack>, 3> shownBlockSlots_;

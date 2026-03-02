@@ -116,4 +116,15 @@ BedrockRecipeList bedrockRecipes(const world::RealRecipes& recipes) {
     return out;
 }
 
+wire::bedrock::BedrockTradeItem tradeItemOf(const server::world::loot::ItemStack& stack) {
+    const wire::bedrock::ItemName* named = wire::bedrock::bedrockItem(stack.item.toString());
+    if (named == nullptr) {
+        return {};
+    }
+    return wire::bedrock::BedrockTradeItem{
+        .name = wire::bedrock::bedrockItemPalette()[static_cast<std::size_t>(named->palettePlace)],
+        .count = stack.count,
+        .damage = named->data};
+}
+
 } // namespace basalt::server::runtime::bedrock

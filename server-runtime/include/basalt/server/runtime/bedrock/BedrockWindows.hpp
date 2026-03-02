@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/Trades.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
 
@@ -36,6 +37,16 @@ struct OpenWindow {
     bool playerOwned = false;
 };
 
+/// The merchant whose book a client has open, and what it offered. A trade is taken by naming one
+/// of these rather than by what is in a slot, so the list has to outlive the packet that carried
+/// it, and the uses counted here are this window's own, exactly as the other door counts them.
+struct OpenTrades {
+    std::int32_t entityId = 0;
+    /// Which of the five ranks the merchant is at, counted from nought.
+    std::int32_t tier = 0;
+    std::vector<world::trades::Offer> offers;
+};
+
 /// The nine cells of a crafting table. parity: `CraftingMenu`'s own three by three.
 inline constexpr std::size_t kGridCells = 9;
 
@@ -60,6 +71,9 @@ struct BedrockWindows {
     /// the window puts them back in the bag rather than leaving them in a table anyone can open.
     std::array<std::optional<storage::StoredItemStack>, kGridCells> grid;
     std::optional<OpenWindow> open;
+    /// The merchant's book, when one is open. It is not a window of this server's own: it carries
+    /// no slots, so nothing is left behind it and closing it has nothing to put back.
+    std::optional<OpenTrades> trades;
     /// What was last said about the open window, so a turn that changed nothing says nothing. Both
     /// are cleared when a window opens, because the next one is a different window.
     std::vector<std::optional<storage::StoredItemStack>> saidSlots;

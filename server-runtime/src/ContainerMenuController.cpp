@@ -391,6 +391,25 @@ void ContainerMenuController::closeOpenMenu(PlayerSession& session) {
         std::ranges::fill(smithingSlots_, std::nullopt);
         openSmithing_ = false;
     }
+    // parity: `ItemCombinerMenu.removed`, which hands the two inputs back.
+    if (openAnvil_) {
+        for (const std::int32_t slot : {Menu::kAnvilInput, Menu::kAnvilAddition}) {
+            const std::optional<storage::StoredItemStack>& leftover = anvilSlots_[static_cast<std::size_t>(slot)];
+            if (!leftover.has_value()) {
+                continue;
+            }
+            const std::int32_t left = session.inventory.add(*leftover);
+            if (left > 0) {
+                storage::StoredItemStack dropped = *leftover;
+                dropped.count = left;
+                dropStack(session, dropped);
+            }
+        }
+        std::ranges::fill(anvilSlots_, std::nullopt);
+        anvilName_.reset();
+        anvilCost_ = 0;
+        openAnvil_ = false;
+    }
     // parity: `StonecutterMenu.removed`, which hands whatever was in the input back.
     if (openStonecutter_) {
         if (stonecutterInput_.has_value()) {

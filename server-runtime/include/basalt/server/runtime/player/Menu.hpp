@@ -71,6 +71,12 @@ public:
     static constexpr std::int32_t kStonecutterInput = 0;
     static constexpr std::int32_t kStonecutterResult = 1;
 
+    /// parity: `AnvilMenu`'s own three: what is being worked on, what is going onto it, and what
+    /// comes out.
+    static constexpr std::int32_t kAnvilInput = 0;
+    static constexpr std::int32_t kAnvilAddition = 1;
+    static constexpr std::int32_t kAnvilResult = 2;
+
     static constexpr std::int32_t kSmithingTemplate = 0;
     static constexpr std::int32_t kSmithingBase = 1;
     static constexpr std::int32_t kSmithingAddition = 2;
@@ -119,6 +125,9 @@ public:
 
     /// parity: `SmithingMenu`: template, base, addition, result, then the player's 36.
     [[nodiscard]] static Menu smithing(std::int32_t containerId);
+
+    /// parity: `AnvilMenu`: input, addition, result, then the player's 36.
+    [[nodiscard]] static Menu anvil(std::int32_t containerId);
 
     /// A villager's window. The three trading slots are the menu's own rather than any block's, so
     /// nothing behind them is a container: the trade itself is what moves the items.

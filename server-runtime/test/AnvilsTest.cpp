@@ -332,3 +332,50 @@ TEST_CASE("work alongside a rename still raises the prior work") {
     CHECK(anvils::repairCost(*result.output) == anvils::increasedRepairCost(0));
     CHECK(nameOf(*result.output) == "Digger");
 }
+
+TEST_CASE("only a book or the same item may be put on top") {
+    const StoredItemStack input = stack("minecraft:iron_pickaxe");
+    const StoredItemStack shovel = stack("minecraft:iron_shovel");
+    const auto merged = [](const StoredItemStack&, const StoredItemStack&) {
+        return anvils::Merge{.components = std::nullopt, .cost = 3};
+    };
+
+    // parity: the pair is refused before the merge is ever asked, however much it would have paid.
+    const anvils::Result result = anvils::combine(&input, &shovel, std::nullopt, {}, merged);
+    CHECK_FALSE(result.output.has_value());
+    CHECK(result.cost == 0);
+
+    // A stack that carries stored enchantments is a book whatever it is called.
+    StoredItemStack book = stack("minecraft:iron_shovel");
+    book.components.putInt(itemComponents::kStoredEnchantments, 1);
+    const anvils::Result allowed = anvils::combine(&input, &book, std::nullopt, {}, merged);
+    REQUIRE(allowed.output.has_value());
+    CHECK(allowed.cost == 3);
+}
+
+TEST_CASE("a merge that fits nothing refuses the pair") {
+    const StoredItemStack input = stack("minecraft:iron_pickaxe");
+    const StoredItemStack book = stack("minecraft:enchanted_book");
+
+    // parity: every enchantment offered went on something that cannot take it.
+    const anvils::Result result =
+        anvils::combine(&input, &book, "Digger", {},
+                        [](const StoredItemStack&, const StoredItemStack&) { return anvils::Merge{.refused = true}; });
+
+    CHECK_FALSE(result.output.has_value());
+    CHECK(result.cost == 0);
+}
+
+TEST_CASE("more than one of a thing is priced out of the anvil") {
+    const StoredItemStack input = stack("minecraft:enchanted_book", 2);
+    const StoredItemStack book = stack("minecraft:enchanted_book");
+
+    const anvils::Result result =
+        anvils::combine(&input, &book, std::nullopt, {}, [](const StoredItemStack&, const StoredItemStack&) {
+            return anvils::Merge{.components = std::nullopt, .cost = 1};
+        });
+
+    // parity: forty, which is the wall, so nothing comes out of it.
+    CHECK_FALSE(result.output.has_value());
+    CHECK(result.cost == anvils::kTooExpensive);
+}

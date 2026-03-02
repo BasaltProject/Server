@@ -14,9 +14,11 @@
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
+#include <basalt/server/runtime/entity/Villagers.hpp>
 #include <basalt/server/runtime/item/ItemDamageEffects.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
+#include <basalt/server/runtime/player/PlayerAnvil.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerBlockItemUse.hpp>
 #include <basalt/server/runtime/player/PlayerBlockPlace.hpp>
@@ -35,6 +37,7 @@
 #include <basalt/server/runtime/player/PlayerSpawnItems.hpp>
 #include <basalt/server/runtime/player/PlayerSweep.hpp>
 #include <basalt/server/runtime/player/PlayerThrown.hpp>
+#include <basalt/server/runtime/world/AnvilEnchantments.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
 #include <basalt/server/runtime/world/ContainerOpeners.hpp>
@@ -876,9 +879,28 @@ void BasaltServer::startBedrockListener() {
             });
         };
 
-        // A click on something alive that is not a hit. Only the two that need nothing of the other
-        // door's own machinery: sitting in a cart and feeding an animal. Trades and item frames
-        // still live inside the java session and come with their own screens.
+        // What a villager offers, read where the world is. A mob that is no merchant offers nothing
+        // and the click goes on to whatever else it was.
+        context.trades = [this](player::PlayerSession& player,
+                                const std::int32_t entityId) -> std::optional<bedrock::OpenTrades> {
+            const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+            const auto found = worlds.find(player.worldName);
+            if (found == worlds.end() || found->second == nullptr) {
+                return std::nullopt;
+            }
+            entity::ServerEntity* target = found->second->state().entity(entityId);
+            if (target == nullptr || target->removed || target->type() != entity::villagers::type()) {
+                return std::nullopt;
+            }
+            std::vector<world::trades::Offer> offers =
+                entity::villagers::offersFor(vanillaData_.villagerTrades, target->profession, target->villagerLevel);
+            if (offers.empty()) {
+                return std::nullopt;
+            }
+            return bedrock::OpenTrades{
+                .entityId = entityId, .tier = std::max(0, target->villagerLevel - 1), .offers = std::move(offers)};
+        };
+
         context.useEntity = [this](player::PlayerSession& player, const std::int32_t entityId) {
             const wire::common::Uuid uuid = player.uuid();
             worldRegistry_->scheduler().global().submit([this, uuid, entityId] {
@@ -1123,6 +1145,7 @@ void BasaltServer::startBedrockListener() {
                                 windows->nextContainerId >= bedrock::kMaxContainerId ? 1 : windows->nextContainerId + 1;
                             window->containerId = windows->nextContainerId;
                             windows->open = *window;
+                            windows->trades.reset();
                             // The next window is a different window: what was said about the last
                             // one says nothing about this one.
                             windows->saidSlots = bedrock::readWindow(*found->second, *window, session);
@@ -1348,6 +1371,7 @@ void BasaltServer::startBedrockListener() {
                     openersChanged(*found->second, *windows->open, false);
                 }
                 windows->open.reset();
+                windows->trades.reset();
                 windows->saidSlots.clear();
                 windows->saidNumbers.reset();
                 // parity: `AbstractContainerMenu.removed`, which empties the grid into the player
@@ -1402,14 +1426,67 @@ void BasaltServer::startBedrockListener() {
                         };
                     }
                     world::LoadedWorld* const where = found == worlds.end() ? nullptr : found->second;
+                    const bool free = session->gamemode == wire::protocol::play::Gamemode::Creative;
                     const bedrock::StackRequestAnswer applied = bedrock::applyStackRequest(
                         *session, *windows, where, request,
-                        bedrock::StackRequestContext{.drop = drop, .resultOf = [this](const std::int32_t netId) {
-                                                         return bedrockRecipeResult(netId);
-                                                     }});
+                        bedrock::StackRequestContext{
+                            .drop = drop,
+                            .resultOf = [this](const std::int32_t netId) { return bedrockRecipeResult(netId); },
+                            .anvilResult =
+                                [this](const storage::StoredItemStack* input, const storage::StoredItemStack* addition,
+                                       const std::optional<std::string>& name) {
+                                    return world::anvils::combine(
+                                        input, addition, name, world::anvils::isRepairMaterialFor,
+                                        world::anvils::enchantmentMerge(
+                                            {.enchantments = &vanillaData_.enchantments,
+                                             .itemTags = &vanillaData_.itemTags,
+                                             .enchantmentTags = &vanillaData_.enchantmentTags}));
+                                },
+                            .canPay =
+                                [free, session](const std::int32_t cost) {
+                                    return free || session->experience.level() >= cost;
+                                }});
                     answer(applied.accepted, applied.containers);
                     if (!applied.accepted && session->connection().sendInventoryAll) {
                         session->connection().sendInventoryAll();
+                    }
+                    if (applied.tradedWith.has_value()) {
+                        // parity: `MerchantMenu` hands the experience to the merchant, not to the
+                        // buyer, and the book is drawn again so the used offer stops being offered.
+                        if (where != nullptr) {
+                            entity::ServerEntity* merchant = where->state().entity(*applied.tradedWith);
+                            if (merchant != nullptr) {
+                                merchant->villagerExperience += applied.tradeExperience;
+                            }
+                        }
+                        if (session->connection().sendInventoryAll) {
+                            session->connection().sendInventoryAll();
+                        }
+                        if (session->connection().sendTrades) {
+                            session->connection().sendTrades();
+                        }
+                    }
+                    if (applied.anvilCost.has_value() && windows->open.has_value()) {
+                        if (!free) {
+                            session->experience.giveLevels(-*applied.anvilCost);
+                            if (session->connection().syncExperience) {
+                                session->connection().syncExperience();
+                            }
+                        }
+                        // parity: `AnvilMenu.onTake`: creative wears nothing out, and a block that
+                        // goes takes the screen standing over it with it.
+                        const bool gone =
+                            !free && where != nullptr &&
+                            player::wearAnvilAt(breakContext(), *where, windows->open->x, windows->open->y,
+                                                windows->open->z,
+                                                std::uniform_real_distribution<float>{0.0F, 1.0F}(scratchRandom()));
+                        if (gone) {
+                            windows->open.reset();
+                            windows->saidSlots.clear();
+                        }
+                        if (session->connection().sendInventoryAll) {
+                            session->connection().sendInventoryAll();
+                        }
                     }
                 });
             };

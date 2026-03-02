@@ -374,6 +374,9 @@ void ContainerMenuController::distributeQuickCraft(PlayerSession& session) {
 }
 
 void ContainerMenuController::pickupClick(PlayerSession& session, const MenuSlot& slot, bool half) {
+    if (!mayPickup(slot)) {
+        return;
+    }
     const std::optional<storage::StoredItemStack> inSlot = readSlot(session, slot);
     if (!carriedItem_.has_value()) {
         if (!inSlot.has_value()) {

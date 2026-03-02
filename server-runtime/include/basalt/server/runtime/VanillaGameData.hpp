@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/RealDialogs.hpp>
+#include <basalt/server/runtime/world/RealEnchantmentTags.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 #include <basalt/server/runtime/world/RealEntityTypeTags.hpp>
 #include <basalt/server/runtime/world/RealFluidTags.hpp>
@@ -71,6 +72,9 @@ public:
     world::realEntityTypeTags::TagMembers entityTags;
     world::RealAdvancements advancements;
     world::RealEnchantments enchantments;
+    /// Which enchantments will not sit beside each other, which is what an anvil asks. Declared
+    /// after the registry it is resolved against, because that is the order they are built in.
+    world::realEnchantmentTags::TagMembers enchantmentTags;
     world::RealDialogs dialogs;
     world::RealTimelines timelines;
     world::RealTestInstances testInstances;
