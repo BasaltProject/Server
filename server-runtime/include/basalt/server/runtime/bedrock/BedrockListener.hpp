@@ -186,6 +186,32 @@ public:
         /// What the client typed into a sign's editor, as one string with newlines in it.
         virtual void editSign(std::int32_t x, std::int32_t y, std::int32_t z, const std::string& text) = 0;
 
+        /// The client swung its arm at nothing, which everybody else has to be told about.
+        virtual void swing() = 0;
+
+        /// The middle click: the block at that square, into that hotbar slot.
+        virtual void pickBlock(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t hotbarSlot) = 0;
+
+        /// The same click on something alive. The number is that client's own, one more than this
+        /// server's.
+        virtual void pickEntity(std::uint64_t runtimeEntityId) = 0;
+
+        /// What a player typed into a command block's screen. The mode is that edition's own
+        /// numbering, which is the same three in the same order.
+        virtual void programCommandBlock(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t mode,
+                                         const std::string& command, bool trackOutput, bool conditional,
+                                         bool needsRedstone) = 0;
+
+        /// One of a crafter's nine switched off, or back on.
+        virtual void toggleCrafterSlot(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t slot,
+                                       bool disabled) = 0;
+
+        /// An emote, which goes back out to everybody who can draw one.
+        virtual void emote(const std::string& emoteId, std::int32_t duration, std::uint8_t flags) = 0;
+
+        /// A page turned on a lectern, by the page the client wants to be on.
+        virtual void turnLecternPage(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t page) = 0;
+
         /// A command the client typed, without its slash.
         virtual void command(std::string_view line) = 0;
 
