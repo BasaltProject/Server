@@ -44,6 +44,7 @@ void floor(WorldState& world) {
 /// has finished moving rather than one caught mid-flow.
 void settle(const fluidFlow::Context& context, std::int32_t maxTurns = 4000) {
     for (std::int32_t turn = 0; turn < maxTurns; ++turn) {
+        context.world.openTurn();
         const std::vector<std::array<std::int32_t, 3>> due = context.world.dueFluidTicks();
         if (due.empty()) {
             continue;
@@ -134,6 +135,7 @@ TEST_CASE("a flow drains to the same place whatever the delay roll says") {
         REQUIRE(fixture.world.setBlockState(8, 64, 8, stateOf(fluid)));
         static_cast<void>(fluidFlow::onBlockChanged(fixture.context(), 8, 64, 8));
         for (std::int32_t turn = 0; turn < 4000; ++turn) {
+            fixture.world.openTurn();
             for (const std::array<std::int32_t, 3>& position : fixture.world.dueFluidTicks()) {
                 static_cast<void>(fluidFlow::tick(fixture.context(), position[0], position[1], position[2]));
             }
@@ -142,6 +144,7 @@ TEST_CASE("a flow drains to the same place whatever the delay roll says") {
         static_cast<void>(fluidFlow::onBlockChanged(fixture.context(), 8, 64, 8));
         std::int32_t lastMove = 0;
         for (std::int32_t turn = 0; turn < 4000; ++turn) {
+            fixture.world.openTurn();
             for (const std::array<std::int32_t, 3>& position : fixture.world.dueFluidTicks()) {
                 if (!fluidFlow::tick(fixture.context(), position[0], position[1], position[2]).empty()) {
                     lastMove = turn;
@@ -413,6 +416,7 @@ TEST_CASE("what a flow washed away comes back with the change") {
     std::vector<FluidChange> changes;
     static_cast<void>(fluidFlow::onBlockChanged(fixture.context(), 8, 64, 8));
     for (std::int32_t turn = 0; turn < 200; ++turn) {
+        fixture.world.openTurn();
         for (const std::array<std::int32_t, 3>& position : fixture.world.dueFluidTicks()) {
             for (const FluidChange& change :
                  fluidFlow::tick(fixture.context(), position[0], position[1], position[2])) {
@@ -446,6 +450,7 @@ TEST_CASE("a settled ocean stops asking to be ticked") {
     // Nothing moved, so nothing rewrote a block, so nothing booked another turn.
     std::int32_t moved = 0;
     for (std::int32_t turn = 0; turn < 200; ++turn) {
+        fixture.world.openTurn();
         for (const std::array<std::int32_t, 3>& position : fixture.world.dueFluidTicks()) {
             moved += static_cast<std::int32_t>(
                 fluidFlow::tick(fixture.context(), position[0], position[1], position[2]).size());
@@ -477,6 +482,7 @@ TEST_CASE("a square that has just settled is booked again at the plain delay") {
         std::int32_t changed = -1;
         for (std::int32_t turn = 0; turn < 2000; ++turn) {
             bool mineIsDue = false;
+            fixture.world.openTurn();
             for (const std::array<std::int32_t, 3>& position : fixture.world.dueFluidTicks()) {
                 if (position == std::array<std::int32_t, 3>{5, 64, 8}) {
                     mineIsDue = true;

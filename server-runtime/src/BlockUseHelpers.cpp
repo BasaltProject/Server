@@ -15,6 +15,7 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/PlayerSigns.hpp>
 #include <basalt/server/runtime/player/PlayerSleep.hpp>
 #include <basalt/server/runtime/player/PlayerSpawnItems.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
@@ -130,41 +131,13 @@ void BlockInteractionHandler::writeSign(const play::SignUpdatePacket& update) {
     if (world == nullptr || session == nullptr) {
         return;
     }
-    const BlockPos pos = update.pos;
-    const std::optional<std::int32_t> stateId = world->state().blockState(pos.x, pos.y, pos.z);
-    const std::optional<Identifier> type = stateId.has_value() ? world::signs::typeOf(*stateId) : std::nullopt;
-    server::world::Chunk* chunk = world->state().chunkIfLoaded(pos.x >> 4, pos.z >> 4);
-    if (!type.has_value() || chunk == nullptr) {
-        return;
-    }
-    server::world::ChunkBlockEntity* existing = chunk->blockEntityAt(pos.x & 15, pos.y, pos.z & 15);
-    if (existing != nullptr && world::signs::isWaxed(existing->data())) {
-        return;
-    }
-    std::vector<std::string> lines(update.lines.begin(), update.lines.end());
-    if (hooks_.signChange && !hooks_.signChange(*session, pos.x, pos.y, pos.z, lines)) {
-        return;
-    }
-    const wire::nbt::NbtCompound data = world::signs::withText(
-        existing == nullptr ? world::signs::emptyData() : existing->data(), update.isFrontText, lines);
-    chunk->setBlockEntity(world::signs::blockEntity(pos.x & 15, pos.y, pos.z & 15, *type, data));
-    const std::optional<std::int32_t> typeId = reg::blockEntityTypes::idOf(*type);
-    if (!typeId.has_value()) {
-        return;
-    }
-    const play::BlockEntityDataPacket packet{.pos = pos, .typeId = *typeId, .tag = data};
-    for (const PlayerSession* player : owner_->playersInSameWorld()) {
-        if (player->connection().sendSignText) {
-            player->connection().sendSignText(pos.x, pos.y, pos.z, world::signs::plainText(data, true),
-                                              world::signs::plainText(data, false), world::signs::isWaxed(data));
-            continue;
-        }
-        if (!player->connection().sendPlayPacket) {
-            continue;
-        }
-        player->connection().sendPlayPacket(play::BlockEntityDataPacket::kId,
-                                            [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
-    }
+    static_cast<void>(player::writeSignFor(breakContext(), *world, *session, update.pos.x, update.pos.y, update.pos.z,
+                                           update.isFrontText,
+                                           std::vector<std::string>(update.lines.begin(), update.lines.end()),
+                                           [this](PlayerSession& who, const std::int32_t x, const std::int32_t y,
+                                                  const std::int32_t z, std::vector<std::string>& lines) {
+                                               return !hooks_.signChange || hooks_.signChange(who, x, y, z, lines);
+                                           }));
 }
 
 bool BlockInteractionHandler::mayUseGameMasterBlocks(PlayerSession& session) const {

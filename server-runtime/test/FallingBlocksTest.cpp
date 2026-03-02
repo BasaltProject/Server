@@ -69,8 +69,11 @@ TEST_CASE("a block that can fall books its own turn") {
     CHECK(world.hasScheduledBlockTick(4, 70, 4, Identifier::vanilla("sand")));
     CHECK_FALSE(world.hasScheduledBlockTick(5, 70, 5, Identifier::vanilla("stone")));
 
-    // parity: two ticks, so it comes due on the second and not the first.
+    // parity: two ticks, so it comes due on the second and not the first. Each turn opens before it
+    // asks, which is the one place the countdown happens.
+    world.openTurn();
     CHECK(world.dueBlockTicks().empty());
+    world.openTurn();
     CHECK(world.dueBlockTicks().size() == 1);
 }
 

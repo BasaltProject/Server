@@ -200,6 +200,11 @@ bool isCycleable(std::int32_t stateId) {
     return path == "repeater" || path == "comparator" || path == "daylight_detector" || redstoneWire::isWire(stateId);
 }
 
+bool handToggleTellsNeighbours(const std::int32_t stateId) {
+    const std::optional<Toggle> kind = toggleOf(stateId);
+    return kind.has_value() && (*kind == Toggle::Lever || *kind == Toggle::Button);
+}
+
 std::optional<BlockToggle> toggle(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                   std::optional<float> playerYaw) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);

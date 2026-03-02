@@ -65,6 +65,10 @@ void sendBlockUpdates(const std::vector<PlayerSession*>& watchers, const std::ve
 
 } // namespace
 
+void RedstoneTickSystem::openTurn(world::LoadedWorld& world, const sched::Region& region) {
+    world.state().openTurn(tickingChunks(world, region, 1));
+}
+
 void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sched::Region& region) {
     const std::vector<world::WorldState::DueTick> due =
         world.state().dueBlockTicksTyped(tickingChunks(world, region, 1));

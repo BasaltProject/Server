@@ -131,7 +131,9 @@ TEST_CASE("turning a page pulses the block for two ticks") {
     CHECK(turned->stateId == lectern("true", "true"));
     CHECK(dataAt(world, 8, 64, 8).getInt("Page") == 3);
 
+    world.openTurn();
     CHECK(world.dueBlockTicks().empty());
+    world.openTurn();
     CHECK(world.dueBlockTicks().size() == 1);
 
     const std::optional<BlockChange> quiet = lecterns::endPulse(world, 8, 64, 8);

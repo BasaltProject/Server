@@ -36,6 +36,9 @@ inline constexpr std::int32_t kTorchRestartDelay = 160;
 inline constexpr std::int32_t kComparatorDelay = 2;
 inline constexpr std::int32_t kTorchDelay = 2;
 
+/// parity: `DiodeBlock.setPlacedBy` books its one tick and not the diode's own delay.
+inline constexpr std::int32_t kPlacementDelay = 1;
+
 [[nodiscard]] const wire::common::Identifier& torch();
 [[nodiscard]] const wire::common::Identifier& repeater();
 [[nodiscard]] const wire::common::Identifier& comparator();
@@ -154,6 +157,13 @@ void watchFor(WorldState& world, std::int32_t changedX, std::int32_t changedY, s
 [[nodiscard]] std::optional<BlockChange> tick(WorldState& world, std::string_view worldName, std::int32_t x,
                                               std::int32_t y, std::int32_t z, std::int64_t gameTime,
                                               const ContainerSignalAt& containerSignal = {});
+
+/// parity: `DiodeBlock.setPlacedBy`: a repeater or comparator placed **by hand** into a square that
+/// already feeds it books a turn for the next tick. Nothing else tells it, because `onPlace` only
+/// talks to the square in front, so without this a diode put down onto a live signal stays off until
+/// something unrelated nudges it. A `/setblock` runs none of this.
+void bookOnPlacement(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y, std::int32_t z,
+                     const ContainerSignalAt& containerSignal = {});
 
 /// What a comparator reads behind itself: a container's fullness first, and otherwise the plain
 /// signal. parity: `ComparatorBlock.getInputSignal`.

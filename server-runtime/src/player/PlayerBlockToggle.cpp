@@ -61,6 +61,9 @@ bool tuneNoteBlockFor(const BreakContext& context, world::LoadedWorld& world, co
         return false;
     }
     announceBlock(context, world.name(), x, y, z, change->stateId);
+    // parity: a note block writes with flag **three**, unlike every other block a bare hand cycles,
+    // so moving the note tells the neighbours. Without this a comparator beside one never hears it.
+    notifyAround(context, world, x, y, z, std::nullopt);
     if (context.blocks != nullptr) {
         context.blocks->sendEffects(playersIn(context, world.name()), x, y, z, change->stateId, change->effects);
     }
@@ -117,8 +120,14 @@ bool toggleBlockFor(const BreakContext& context, world::LoadedWorld& world, cons
         announceBlock(context, world.name(), change.x, change.y, change.z, change.stateId);
     }
     // parity: `LeverBlock.updateNeighbours`, twice over: the block itself and whatever it is stuck
-    // to, or a torch on the far side of the wall never hears the flip.
+    // to, or a torch on the far side of the wall never hears the flip. A door, a trapdoor or a gate
+    // writes without `UPDATE_NEIGHBORS`, so a hand on one of those only redraws the shapes.
+    const bool tells = world::blockInteractions::handToggleTellsNeighbours(before.value_or(0));
     for (const world::BlockChange& change : toggled->changes) {
+        if (!tells) {
+            reshapeAround(context, world, change.x, change.y, change.z);
+            continue;
+        }
         notifyAround(context, world, change.x, change.y, change.z, std::nullopt);
         if (const std::optional<std::array<std::int32_t, 3>> wall =
                 world::blockInteractions::attachmentOf(change.stateId, change.x, change.y, change.z);
@@ -149,18 +158,25 @@ bool cycleBlockFor(const BreakContext& context, world::LoadedWorld& world, const
         return false;
     }
     announceBlock(context, world.name(), x, y, z, cycled->stateId);
+    const wire::common::Identifier* cycledBlock = reg::blockStateDefinitions::blockOf(cycled->stateId);
+    const bool detector = cycledBlock != nullptr && cycledBlock->path() == "daylight_detector";
     // parity: `DaylightDetectorBlock.useWithoutItem` writes `inverted` telling nobody and then lets
     // `updateSignalStrength` write the reading, which is the write that carries.
-    if (const std::optional<world::BlockChange> reread =
-            world::daylightDetectors::update(world.state(), world.clock(), world.skyDarken(), x, y, z,
-                                             config::dimensionFacts(world.declaration().dimension).hasSkylight,
-                                             config::dimensionFacts(world.declaration().dimension).hasDayTimeline);
-        reread.has_value()) {
+    const std::optional<world::BlockChange> reread =
+        world::daylightDetectors::update(world.state(), world.clock(), world.skyDarken(), x, y, z,
+                                         config::dimensionFacts(world.declaration().dimension).hasSkylight,
+                                         config::dimensionFacts(world.declaration().dimension).hasDayTimeline);
+    if (reread.has_value()) {
         announceBlock(context, world.name(), x, y, z, reread->stateId);
     }
-    // parity: every one of these is a component, so the change has to reach the dust and the diodes
-    // around them.
-    notifyAround(context, world, x, y, z, std::nullopt);
+    // parity: a repeater writes with flag three, so cycling its delay tells the neighbours. The
+    // detector's own `inverted` goes in with flag two and only `updateSignalStrength` carries, and
+    // that one writes nothing at all when the reading did not move.
+    if (detector && !reread.has_value()) {
+        reshapeAround(context, world, x, y, z);
+    } else {
+        notifyAround(context, world, x, y, z, std::nullopt);
+    }
     if (cycled->sound.has_value()) {
         playBlockSound(context, world, x, y, z, cycled->stateId, *cycled->sound, cycled->volume, cycled->pitch);
     }

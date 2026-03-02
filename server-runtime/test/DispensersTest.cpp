@@ -175,8 +175,10 @@ TEST_CASE("the turn is booked four ticks out") {
     REQUIRE(dispensers::onNeighbourChange(world, "overworld", 8, 64, 8).has_value());
 
     for (std::int32_t turn = 0; turn < 3; ++turn) {
+        world.openTurn();
         CHECK(world.dueBlockTicks().empty());
     }
+    world.openTurn();
     CHECK(world.dueBlockTicks().size() == 1);
 }
 

@@ -244,6 +244,14 @@ public:
     /// counts them down. Unset means every loaded chunk, which is what the tests want.
     using Ticking = std::function<bool(std::int32_t chunkX, std::int32_t chunkZ)>;
 
+    /// Opens a turn: every scheduled turn of every ticking chunk counts down one, both lists at once.
+    ///
+    /// parity: the jar books an absolute `triggerTick`, so nothing a turn books can be shortened by
+    /// that same turn. Counting down here, once and before anything runs, says the same with a
+    /// countdown. It is a step of its own in the tick loop on purpose: hidden inside one of the two
+    /// passes, whoever asked only for the other one would freeze without a word.
+    void openTurn(const Ticking& ticking = {});
+
     /// Every fluid tick that comes due this tick, in world coordinates.
     [[nodiscard]] std::vector<std::array<std::int32_t, 3>> dueFluidTicks(const Ticking& ticking = {});
 

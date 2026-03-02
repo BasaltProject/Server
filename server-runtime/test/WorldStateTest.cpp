@@ -228,8 +228,11 @@ TEST_CASE("a scheduled tick comes due where it was scheduled") {
     CHECK_FALSE(world.hasScheduledBlockTick(3, 64, 5, Identifier::vanilla("lava")));
     CHECK_FALSE(world.hasScheduledBlockTick(500, 64, 500, water));
 
-    // A delay of two fires on the second tick after it was scheduled, not the third.
+    // A delay of two fires on the second turn after it was booked, not the third. parity: a turn
+    // counts down once when it opens, so the turn that books a tick never shortens it.
+    world.openTurn();
     CHECK(world.dueBlockTicks().empty());
+    world.openTurn();
     const std::vector<std::array<std::int32_t, 3>> due = world.dueBlockTicks();
     REQUIRE(due.size() == 1);
     // World coordinates, not the chunk's own.

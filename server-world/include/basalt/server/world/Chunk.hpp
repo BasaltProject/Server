@@ -165,11 +165,13 @@ public:
 
     [[nodiscard]] std::span<const ChunkScheduledTick> scheduledFluidTicks() const noexcept { return fluidTicks_; }
 
-    /// Counts every pending tick down one and hands the ones that come due to `due`.
+    /// Counts down every turn this chunk holds, both lists at once.
     ///
-    /// The countdown itself does not dirty the chunk: whatever the tick then does to a block will,
-    /// and marking it every tick would have a single flowing spring rewriting its region file twenty
-    /// times a second.
+    /// parity: the jar books an absolute `triggerTick`; counting down once as the turn opens keeps
+    /// a turn booked during it at its full delay. Does not dirty the chunk.
+    void openTurn();
+
+    /// Hands over the turns that have come due. The counting down is `openTurn`'s, not theirs.
     void advanceBlockTicks(std::vector<ChunkScheduledTick>& due);
     void advanceFluidTicks(std::vector<ChunkScheduledTick>& due);
 

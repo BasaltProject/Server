@@ -913,6 +913,35 @@ std::int32_t comparatorInput(const WorldState& world, std::string_view worldName
     return plain;
 }
 
+void bookOnPlacement(WorldState& world, std::string_view worldName, const std::int32_t x, const std::int32_t y,
+                     const std::int32_t z, const ContainerSignalAt& containerSignal) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value()) {
+        return;
+    }
+    const std::string path = pathOf(*stateId);
+    const Properties properties = registry::blockStateDefinitions::propertiesOf(*stateId);
+    if (path == "repeater") {
+        if (repeaterInput(world, worldName, x, y, z, properties) > 0) {
+            world.scheduleBlockTick(x, y, z, repeater(), kPlacementDelay);
+        }
+        return;
+    }
+    if (path != "comparator") {
+        return;
+    }
+    // parity: `ComparatorBlock.shouldTurnOn`: the rear input beats both sides, or ties them while
+    // the comparator is comparing rather than subtracting.
+    const std::int32_t input = comparatorInput(world, worldName, x, y, z, properties, containerSignal);
+    if (input == 0) {
+        return;
+    }
+    const std::int32_t sides = alternateSignal(world, x, y, z, properties, false);
+    if (input > sides || (input == sides && valueOf(properties, "mode") == "compare")) {
+        world.scheduleBlockTick(x, y, z, comparator(), kPlacementDelay);
+    }
+}
+
 std::optional<BlockChange> tick(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
                                 std::int32_t z, std::int64_t gameTime, const ContainerSignalAt& containerSignal) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);

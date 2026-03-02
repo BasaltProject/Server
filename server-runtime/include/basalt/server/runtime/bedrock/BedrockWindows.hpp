@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/world/Enchanting.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/Trades.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
@@ -47,6 +48,21 @@ struct OpenTrades {
     std::vector<world::trades::Offer> offers;
 };
 
+/// One of the three rows an enchanting table is offering, as this server worked it out.
+struct EnchantRow {
+    /// The levels the row asks to be *held*, which is not what it charges.
+    std::int32_t cost = 0;
+    /// The number the client names this row by when it asks for it.
+    std::int32_t netId = 0;
+    std::vector<world::enchanting::Offer> offers;
+};
+
+/// What the open enchanting table is offering, kept because the client asks for a row by the number
+/// it was given rather than by what is in the slots.
+struct OpenEnchantment {
+    std::array<EnchantRow, 3> rows;
+};
+
 /// The nine cells of a crafting table. parity: `CraftingMenu`'s own three by three.
 inline constexpr std::size_t kGridCells = 9;
 
@@ -74,6 +90,10 @@ struct BedrockWindows {
     /// The merchant's book, when one is open. It is not a window of this server's own: it carries
     /// no slots, so nothing is left behind it and closing it has nothing to put back.
     std::optional<OpenTrades> trades;
+    /// The three rows an open enchanting table is offering, and nothing when none is open.
+    std::optional<OpenEnchantment> enchanting;
+    /// The last row number handed out, so a fresh roll never reuses the previous one.
+    std::int32_t nextEnchantNetId = 0;
     /// What was last said about the open window, so a turn that changed nothing says nothing. Both
     /// are cleared when a window opens, because the next one is a different window.
     std::vector<std::optional<storage::StoredItemStack>> saidSlots;

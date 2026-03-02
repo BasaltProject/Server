@@ -59,6 +59,8 @@ struct Loaded {
 [[nodiscard]] std::int32_t bookedIn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                     std::int32_t limit) {
     for (std::int32_t turn = 0; turn < limit; ++turn) {
+        // parity: the turn opens before anything runs, and that is where the countdown happens.
+        world.openTurn();
         for (const std::array<std::int32_t, 3>& position : world.dueBlockTicks()) {
             if (position[0] == x && position[1] == y && position[2] == z) {
                 return turn + 1;

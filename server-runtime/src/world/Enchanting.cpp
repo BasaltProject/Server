@@ -1,9 +1,11 @@
+#include <basalt/server/runtime/item/ItemComponents.hpp>
 #include <basalt/server/runtime/world/Enchanting.hpp>
 #include <basalt/server/runtime/world/ItemEnchantability.hpp>
 
 #include <algorithm>
 #include <cmath>
 #include <string>
+#include <utility>
 
 namespace basalt::server::runtime::world::enchanting {
 namespace {
@@ -73,6 +75,26 @@ std::span<const std::array<std::int32_t, 3>> bookshelfOffsets() {
     return kOffsets;
 }
 
+std::int32_t bookshelvesAround(const BlockAt& blockAt, const InTag& inTag, const std::int32_t x, const std::int32_t y,
+                               const std::int32_t z) {
+    if (!blockAt || !inTag) {
+        return 0;
+    }
+    std::int32_t shelves = 0;
+    for (const std::array<std::int32_t, 3>& offset : bookshelfOffsets()) {
+        const std::optional<Identifier> shelf = blockAt(x + offset[0], y + offset[1], z + offset[2]);
+        const std::optional<Identifier> between = blockAt(x + (offset[0] / 2), y + offset[1], z + (offset[2] / 2));
+        if (!shelf.has_value() || !between.has_value()) {
+            continue;
+        }
+        if (inTag("minecraft:enchantment_power_provider", *shelf) &&
+            inTag("minecraft:enchantment_power_transmitter", *between)) {
+            ++shelves;
+        }
+    }
+    return shelves;
+}
+
 std::int32_t costFor(random::RandomSource& random, const std::int32_t slot, std::int32_t bookshelves) {
     /// parity: `getEnchantmentCost`, which stops counting shelves at fifteen.
     constexpr std::int32_t kMaxBookshelves = 15;
@@ -120,6 +142,58 @@ std::vector<Offer> select(random::RandomSource& random, const EnchantmentBooks& 
         cost /= 2;
     }
     return offers;
+}
+
+std::array<Row, 3> roll(const EnchantmentBooks& books, const storage::StoredItemStack& stack, const std::int32_t seed,
+                        const std::int32_t bookshelves) {
+    std::array<Row, 3> rows;
+    if (!itemEnchantability::valueOf(stack.id).has_value()) {
+        return rows;
+    }
+    random::RandomSource random = random::RandomSource::legacy(seed);
+    for (std::size_t row = 0; row < rows.size(); ++row) {
+        rows[row].cost = costFor(random, static_cast<std::int32_t>(row), bookshelves);
+        // parity: a row that came out under its own place is no row at all.
+        if (rows[row].cost < static_cast<std::int32_t>(row) + 1) {
+            rows[row].cost = 0;
+        }
+    }
+    for (std::size_t row = 0; row < rows.size(); ++row) {
+        if (rows[row].cost <= 0) {
+            continue;
+        }
+        random::RandomSource own = random::RandomSource::legacy(seed + static_cast<std::int64_t>(row));
+        std::vector<Offer> offers = select(own, books, stack, rows[row].cost);
+        // parity: a plain book is offered one fewer than everything else, drawn out at random.
+        if (stack.id == "minecraft:book" && offers.size() > 1) {
+            offers.erase(offers.begin() + own.nextInt(static_cast<std::int32_t>(offers.size())));
+        }
+        if (offers.empty()) {
+            continue;
+        }
+        rows[row].clue = offers[static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(offers.size())))];
+        rows[row].offers = std::move(offers);
+    }
+    return rows;
+}
+
+storage::StoredItemStack applied(storage::StoredItemStack stack, const std::span<const Offer> offers) {
+    if (stack.id == "minecraft:book") {
+        stack.id = "minecraft:enchanted_book";
+    }
+    const std::string_view component = stack.id == "minecraft:enchanted_book"
+                                           ? runtime::item::itemComponents::kStoredEnchantments
+                                           : runtime::item::itemComponents::kEnchantments;
+    wire::nbt::NbtCompound levels;
+    if (const wire::nbt::NbtCompound* existing = stack.components.getCompound(component); existing != nullptr) {
+        levels = *existing;
+    }
+    for (const Offer& offer : offers) {
+        const std::string name = offer.enchantment.toString();
+        levels.putInt(name, std::max(levels.contains(name) ? levels.getInt(name) : 0, offer.level));
+    }
+    stack.components.set(component, wire::nbt::NbtTag::ofCompound(std::move(levels)));
+    return stack;
 }
 
 } // namespace basalt::server::runtime::world::enchanting

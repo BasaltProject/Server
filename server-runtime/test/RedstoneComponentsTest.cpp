@@ -422,12 +422,14 @@ TEST_CASE("a change asks the components around it to look again") {
 
     // parity: a repeater's delay is its own, two ticks per notch, so the three-tick one waits six.
     for (std::int32_t at = 0; at < 5; ++at) {
+        world.openTurn();
         const std::vector<std::array<std::int32_t, 3>> due = world.dueBlockTicks();
         // The torch comes due on its second tick and the repeater has not yet.
         if (at == 1) {
             CHECK(due.size() == 1);
         }
     }
+    world.openTurn();
     CHECK(world.dueBlockTicks().size() == 1);
 }
 
@@ -465,4 +467,42 @@ TEST_CASE("a comparator reads the item frame hanging behind the block in front o
     // and the comparator falls back to the plain signal.
     hang(8, true, 3);
     CHECK(redstoneComponents::comparatorInput(world, "world", 8, 64, 8, properties) == 0);
+}
+
+TEST_CASE("a diode placed by hand onto a live signal books its own turn") {
+    // parity: `DiodeBlock.setPlacedBy`. Nobody else tells a diode that has just landed: its
+    // `onPlace` only talks to the square in front, so without this hook a repeater put down onto a
+    // block of redstone stays off for ever. The bench cannot see it because `/setblock` skips the
+    // whole placement path.
+    WorldState world = emptyWorld();
+    world.getOrGenerateChunk(0, 0);
+    REQUIRE(world.setBlockState(8, 64, 8, stateOf("redstone_block")));
+    REQUIRE(world.setBlockState(9, 64, 8, repeaterState("west", "1", "false")));
+
+    redstoneComponents::bookOnPlacement(world, "overworld", 9, 64, 8);
+    CHECK(world.hasScheduledBlockTick(9, 64, 8, Identifier::vanilla("repeater")));
+
+    // And one that lands on nothing books nothing, which is the `shouldTurnOn` half.
+    WorldState quiet = emptyWorld();
+    quiet.getOrGenerateChunk(0, 0);
+    REQUIRE(quiet.setBlockState(8, 64, 8, stateOf("stone")));
+    REQUIRE(quiet.setBlockState(9, 64, 8, repeaterState("west", "1", "false")));
+    redstoneComponents::bookOnPlacement(quiet, "overworld", 9, 64, 8);
+    CHECK_FALSE(quiet.hasScheduledBlockTick(9, 64, 8, Identifier::vanilla("repeater")));
+}
+
+TEST_CASE("a comparator placed by hand weighs its sides before booking") {
+    // parity: `ComparatorBlock.shouldTurnOn`: a tie only turns on the one that compares, and the
+    // subtracting one is left alone.
+    for (const std::string& mode : {std::string{"compare"}, std::string{"subtract"}}) {
+        WorldState world = emptyWorld();
+        world.getOrGenerateChunk(0, 0);
+        REQUIRE(world.setBlockState(8, 64, 8, stateOf("redstone_block")));
+        // The side carries the same fifteen as the rear, so the two inputs tie.
+        REQUIRE(world.setBlockState(9, 64, 7, stateOf("redstone_block")));
+        REQUIRE(world.setBlockState(9, 64, 8, comparatorState("west", mode, "false")));
+
+        redstoneComponents::bookOnPlacement(world, "overworld", 9, 64, 8);
+        CHECK(world.hasScheduledBlockTick(9, 64, 8, Identifier::vanilla("comparator")) == (mode == "compare"));
+    }
 }

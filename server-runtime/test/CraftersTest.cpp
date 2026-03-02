@@ -195,8 +195,10 @@ TEST_CASE("the crafter books four ticks and animates for six") {
     REQUIRE(crafters::onNeighbourChange(world, "overworld", 8, 64, 8).has_value());
 
     for (std::int32_t turn = 0; turn < 3; ++turn) {
+        world.openTurn();
         CHECK(world.dueBlockTicks().empty());
     }
+    world.openTurn();
     CHECK(world.dueBlockTicks().size() == 1);
 
     blockInventory::Slots grid(9);

@@ -54,6 +54,9 @@ struct Bench {
     /// `VibrationSystem.Ticker.tick` lives.
     void advance() {
         ++now;
+        // parity: the tick loop opens the turn before anything runs, and that is the one place the
+        // scheduled turns count down.
+        world.openTurn();
         for (const std::array<std::int32_t, 3>& at : world.dueBlockTicks()) {
             if (const std::optional<BlockChange> change = vibrations::tick(world, at[0], at[1], at[2], now);
                 change.has_value()) {

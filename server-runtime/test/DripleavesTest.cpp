@@ -43,6 +43,8 @@ namespace {
 /// Runs the world's clock forward through whatever the leaf booked for itself.
 void settle(WorldState& world, std::int32_t turns) {
     for (std::int32_t turn = 0; turn < turns; ++turn) {
+        // parity: the turn opens before anything runs, and that is where the countdown happens.
+        world.openTurn();
         for (const std::array<std::int32_t, 3>& at : world.dueBlockTicks()) {
             static_cast<void>(dripleaves::tick(world, "world", at[0], at[1], at[2], 1));
         }

@@ -314,14 +314,38 @@ TEST_CASE("ticks count down and come due once") {
     chunk.scheduleBlockTick({Identifier::vanilla("water"), 1, 64, 2, 5, 0});
     CHECK(chunk.scheduledTickCount() == 1);
 
+    // parity: the counting down happens once, when the turn opens, and the pass only collects what
+    // is already due. That is how the jar's absolute `triggerTick` behaves: a turn cannot shorten
+    // what it booked itself.
     std::vector<ChunkScheduledTick> due;
+    chunk.openTurn();
     chunk.advanceBlockTicks(due);
     CHECK(due.empty());
     CHECK(chunk.scheduledBlockTicks().front().delay == 1);
 
+    chunk.openTurn();
     chunk.advanceBlockTicks(due);
     CHECK(due.size() == 1);
     CHECK(chunk.scheduledTickCount() == 0);
+}
+
+TEST_CASE("a turn does not count down what that same turn booked") {
+    using basalt::wire::common::Identifier;
+    Chunk chunk{0, 0};
+    chunk.openTurn();
+    // Booked after this turn opened: it keeps its two, and the next turn is the first to touch it.
+    chunk.scheduleBlockTick({Identifier::vanilla("water"), 1, 64, 2, 2, 0});
+    CHECK(chunk.scheduledBlockTicks().front().delay == 2);
+
+    std::vector<ChunkScheduledTick> due;
+    chunk.advanceBlockTicks(due);
+    CHECK(due.empty());
+    CHECK(chunk.scheduledBlockTicks().front().delay == 2);
+
+    chunk.openTurn();
+    chunk.advanceBlockTicks(due);
+    CHECK(due.empty());
+    CHECK(chunk.scheduledBlockTicks().front().delay == 1);
 }
 
 TEST_CASE("a chunk is dirty only when it holds something the region file does not") {

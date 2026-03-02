@@ -192,6 +192,11 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             // parity: `ServerLevel.tick` runs the booked block turns first, the fluids after them and
             // the random ticks last, inside the chunk source. Doing the water first let it break a
             // repeater whose own turn was due that very tick, and the pulse the jar gives was lost.
+            // parity: the jar books an absolute `triggerTick`, so a turn cannot shorten what it
+            // books itself. This is that, said with a countdown: everything counts down once, here,
+            // before a single turn runs. Inside a pass instead, the fluids lost a tick of whatever
+            // the block turns had just booked, measured in `vibranota`.
+            step("Open turn", [this, &world, &region] { redstone_->openTurn(world, region); });
             step("Scheduled block tick", [this, &world, &region] { redstone_->tickScheduledBlocks(world, region); });
             step("Fluid tick", [this, &world, &region] { redstone_->tickFluids(world, region); });
             step("Random block tick", [this, &world, &region] { redstone_->tickRandomBlocks(world, region); });

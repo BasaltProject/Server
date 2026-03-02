@@ -72,6 +72,22 @@ TEST_CASE("a hand moves levers, buttons, doors, trapdoors and fence gates and no
     CHECK_FALSE(blockInteractions::isToggleable(stateOf("repeater")));
 }
 
+TEST_CASE("only a lever and a button tell the neighbours when a hand moves them") {
+    // parity: `LeverBlock` and `ButtonBlock` write with flag three. `DoorBlock` and `FenceGateBlock`
+    // write with ten and `TrapDoorBlock` with two, and none of those carries `UPDATE_NEIGHBORS`: a
+    // door opened by hand redraws the shapes around it and tells nobody at all.
+    CHECK(blockInteractions::handToggleTellsNeighbours(stateOf("lever")));
+    CHECK(blockInteractions::handToggleTellsNeighbours(stateOf("oak_button")));
+    CHECK(blockInteractions::handToggleTellsNeighbours(stateOf("stone_button")));
+    CHECK_FALSE(blockInteractions::handToggleTellsNeighbours(stateOf("oak_door")));
+    CHECK_FALSE(blockInteractions::handToggleTellsNeighbours(stateOf("oak_trapdoor")));
+    CHECK_FALSE(blockInteractions::handToggleTellsNeighbours(stateOf("oak_fence_gate")));
+    CHECK_FALSE(blockInteractions::handToggleTellsNeighbours(stateOf("copper_door")));
+    // And what a hand cannot move at all does not tell anybody either.
+    CHECK_FALSE(blockInteractions::handToggleTellsNeighbours(stateOf("iron_door")));
+    CHECK_FALSE(blockInteractions::handToggleTellsNeighbours(stateOf("stone")));
+}
+
 TEST_CASE("the four components a click sets up") {
     CHECK(blockInteractions::isCycleable(stateOf("repeater")));
     CHECK(blockInteractions::isCycleable(stateOf("comparator")));

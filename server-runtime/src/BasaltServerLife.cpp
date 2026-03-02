@@ -32,6 +32,7 @@
 #include <basalt/server/runtime/player/PlayerEating.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerItemPickup.hpp>
+#include <basalt/server/runtime/player/PlayerSigns.hpp>
 #include <basalt/server/runtime/player/PlayerSleep.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/player/PlayerSpawnItems.hpp>
@@ -43,6 +44,7 @@
 #include <basalt/server/runtime/world/ContainerOpeners.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
+#include <basalt/server/runtime/world/Enchanting.hpp>
 #include <basalt/server/runtime/world/EnchantmentBooks.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/Grindstones.hpp>
@@ -423,6 +425,48 @@ void BasaltServer::openersChanged(world::LoadedWorld& world, const bedrock::Open
     tell(window.x, window.y, window.z);
     if (window.second.has_value()) {
         tell((*window.second)[0], (*window.second)[1], (*window.second)[2]);
+    }
+}
+
+void BasaltServer::rollBedrockEnchantment(player::PlayerSession& session, world::LoadedWorld& world,
+                                          bedrock::BedrockWindows& windows) {
+    if (!windows.open.has_value() || windows.open->type != wire::bedrock::BedrockContainerType::Enchantment) {
+        windows.enchanting.reset();
+        return;
+    }
+    if (session.enchantmentSeed == 0) {
+        session.enchantmentSeed = static_cast<std::int32_t>(scratchRandom()());
+    }
+    bedrock::OpenEnchantment rolled;
+    const std::optional<storage::StoredItemStack>& input = windows.grid[0];
+    if (input.has_value()) {
+        const world::realBlockTags::TagMembers* tags = &vanillaData_.blockTags;
+        const std::int32_t shelves = world::enchanting::bookshelvesAround(
+            [&world](const std::int32_t x, const std::int32_t y,
+                     const std::int32_t z) -> std::optional<wire::common::Identifier> {
+                const std::optional<std::int32_t> state = world.state().blockState(x, y, z);
+                const wire::common::Identifier* block =
+                    state.has_value() ? server::registry::blockStateDefinitions::blockOf(*state) : nullptr;
+                return block == nullptr ? std::nullopt : std::optional{*block};
+            },
+            [tags](const std::string_view tag, const wire::common::Identifier& block) {
+                return world::realBlockTags::contains(*tags, tag, block);
+            },
+            windows.open->x, windows.open->y, windows.open->z);
+        const world::EnchantmentBooks books{.enchantments = &vanillaData_.enchantments,
+                                            .itemTags = &vanillaData_.itemTags,
+                                            .enchantmentTags = &vanillaData_.enchantmentTags};
+        const std::array<world::enchanting::Row, 3> rows =
+            world::enchanting::roll(books, *input, session.enchantmentSeed, shelves);
+        for (std::size_t row = 0; row < rows.size(); ++row) {
+            rolled.rows[row].cost = rows[row].cost;
+            rolled.rows[row].offers = rows[row].offers;
+            rolled.rows[row].netId = ++windows.nextEnchantNetId;
+        }
+    }
+    windows.enchanting = std::move(rolled);
+    if (session.connection().sendEnchantOptions) {
+        session.connection().sendEnchantOptions();
     }
 }
 
@@ -977,6 +1021,27 @@ void BasaltServer::startBedrockListener() {
             broadcaster_->sendEffects(watchers, x, y, z, stateId, effects);
         };
 
+        // What a client typed into a sign's editor, written where the world is.
+        context.writeSign = [this](player::PlayerSession& player, const std::int32_t x, const std::int32_t y,
+                                   const std::int32_t z, const std::string& text) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, x, y, z, text] {
+                player::PlayerSession* session = playerRegistry_.get(uuid);
+                if (session == nullptr) {
+                    return;
+                }
+                const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                const auto found = worlds.find(session->worldName);
+                if (found == worlds.end() || found->second == nullptr) {
+                    return;
+                }
+                // parity: that edition only ever edits the front here, which is the side this
+                // server's own editor is opened on.
+                static_cast<void>(player::writeSignFor(breakContext(), *found->second, *session, x, y, z, true,
+                                                       player::signLinesOf(text)));
+            });
+        };
+
         // A bed whose sleeper left: this arrives from the door's own thread, so the world is
         // reached the way everything else from there is.
         context.freeBed = [this](const std::string& worldName, const std::int32_t x, const std::int32_t y,
@@ -1154,6 +1219,7 @@ void BasaltServer::startBedrockListener() {
                             windows->saidNumbers.reset();
                             windows->sinceRead = 0;
                             opened(*window, windows->saidSlots);
+                            rollBedrockEnchantment(*session, *found->second, *windows);
                             openersChanged(*found->second, *window, true);
                             return;
                         }
@@ -1509,6 +1575,24 @@ void BasaltServer::startBedrockListener() {
                     if (session->connection().sendTrades) {
                         session->connection().sendTrades();
                     }
+                }
+                if (applied.enchantCost.has_value()) {
+                    // parity: `clickMenuButton` charges the row's own number plus one in levels and
+                    // moves the seed on, which is what gives the next item new rows.
+                    if (!free) {
+                        session->experience.giveLevels(-*applied.enchantCost);
+                        if (session->connection().syncExperience) {
+                            session->connection().syncExperience();
+                        }
+                    }
+                    session->stats.increment(storage::stats::enchantItem());
+                    session->enchantmentSeed = static_cast<std::int32_t>(scratchRandom()());
+                }
+                if (applied.accepted && where != nullptr && windows->open.has_value() &&
+                    windows->open->type == wire::bedrock::BedrockContainerType::Enchantment) {
+                    // What is in it decides what it offers, so every move over that screen rolls
+                    // the three rows again.
+                    rollBedrockEnchantment(*session, *where, *windows);
                 }
                 if (applied.grindstoneWorth.has_value() && windows->open.has_value()) {
                     // parity: `GrindstoneMenu.ResultSlot.onTake` drops the experience as orbs;

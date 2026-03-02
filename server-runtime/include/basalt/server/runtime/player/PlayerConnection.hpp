@@ -213,6 +213,10 @@ struct PlayerConnection {
     /// has just been used stops being offered. Unset where a window of its own carries the offers.
     std::function<void()> sendTrades;
 
+    /// Draws the three rows of an open enchanting table. Unset on a door whose screen reads them
+    /// out of the window's own numbers instead.
+    std::function<void()> sendEnchantOptions;
+
     /// Pushes the world's clock, which the client runs on its own between updates.
     std::function<void(const world::LoadedWorld& world)> sendTime;
 

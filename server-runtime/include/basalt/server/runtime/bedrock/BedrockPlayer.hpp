@@ -135,6 +135,12 @@ public:
         /// one of them later is priced off the same list.
         std::function<std::optional<OpenTrades>(player::PlayerSession&, std::int32_t entityId)> trades;
 
+        /// What a client typed into a sign's editor, written where the world is. The text is one
+        /// string with newlines, as that edition holds it.
+        std::function<void(player::PlayerSession&, std::int32_t x, std::int32_t y, std::int32_t z,
+                           const std::string& text)>
+            writeSign;
+
         /// Gets this player out of the bed they are in, where the world is. Morning asks every
         /// connection for this, and a Bedrock player who is never asked stays asleep for good.
         std::function<void(player::PlayerSession&)> wakeUp;
@@ -237,6 +243,13 @@ public:
     /// Draws the open book again, which is how an offer that has just been used stops being
     /// offered. The window number does not move, or the client would take the screen down.
     void sendTrades();
+
+    /// Draws the three rows of the open enchanting table, which that edition takes from a packet
+    /// of its own rather than from the window's numbers.
+    void sendEnchantOptions();
+
+    /// What a client typed into a sign's editor, sent back when they close it.
+    void editSign(std::int32_t x, std::int32_t y, std::int32_t z, const std::string& text) override;
 
     void useItemInAir(std::int32_t hotbarSlot) override;
 
