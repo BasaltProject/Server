@@ -68,4 +68,6 @@ const std::string& stats::jump() { return named("jump"); }
 
 const std::string& stats::fallOneCm() { return named("fall_one_cm"); }
 
+const std::string& stats::enchantItem() { return named("enchant_item"); }
+
 } // namespace basalt::server::storage

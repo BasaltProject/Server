@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/bedrock/BedrockWindows.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/Anvils.hpp>
+#include <basalt/server/runtime/world/Grindstones.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/bedrock/BedrockPackets.hpp>
 
@@ -26,6 +27,9 @@ struct StackRequestAnswer {
     /// What an anvil charged, when the request took its result. The levels and the block wearing
     /// out belong where the world is, so only the number comes back.
     std::optional<std::int32_t> anvilCost;
+    /// What a grindstone took off, when the request took its result. The halving, the roll and the
+    /// points belong where the world is.
+    std::optional<std::int32_t> grindstoneWorth;
 };
 
 /// Moves stacks around one player's windows, as their client asked. Every line is applied in order
@@ -44,6 +48,16 @@ struct StackRequestContext {
         anvilResult;
     /// Whether this player can pay that many levels, which only survival ever answers no to.
     std::function<bool(std::int32_t cost)> canPay;
+    /// What a grindstone makes of the two things in it and what it hands back for them.
+    std::function<world::grindstones::Result(const storage::StoredItemStack* input,
+                                             const storage::StoredItemStack* addition)>
+        grindstoneResult;
+    /// What a smithing table makes of its three, asked where the recipes are. That screen names no
+    /// recipe and sends no line of its own: the client simply takes what it can see.
+    std::function<std::optional<storage::StoredItemStack>(const storage::StoredItemStack* templateStack,
+                                                          const storage::StoredItemStack* base,
+                                                          const storage::StoredItemStack* addition)>
+        smithingResult;
 };
 
 [[nodiscard]] StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWindows& windows,

@@ -277,6 +277,19 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         }
         // parity: `AnvilBlock.useWithoutItem`, whose three slots belong to the screen and whose
         // block wears out under it.
+        // parity: `EnchantingTableBlock.useWithoutItem`, whose two slots belong to the screen and
+        // whose offers come off the shelves around it.
+        if (path == "enchanting_table") {
+            owner_->menus().openEnchantmentMenu(*session, hit.pos);
+            ack();
+            return;
+        }
+        // parity: `GrindstoneBlock.useWithoutItem`, whose three slots belong to the screen.
+        if (path == "grindstone") {
+            owner_->menus().openGrindstoneMenu(*session, hit.pos);
+            ack();
+            return;
+        }
         if (path == "anvil" || path == "chipped_anvil" || path == "damaged_anvil") {
             owner_->menus().openAnvilMenu(*session, hit.pos);
             ack();

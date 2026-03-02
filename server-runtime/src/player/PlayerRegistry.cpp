@@ -43,11 +43,20 @@ void PlayerRegistry::retire(std::unique_ptr<PlayerSession> session) {
     retired_.emplace_back(std::chrono::steady_clock::now(), std::move(session));
 }
 
+void PlayerRegistry::keepAlive(std::shared_ptr<void> owner) {
+    if (owner == nullptr) {
+        return;
+    }
+    const std::lock_guard<std::mutex> guard{lock_};
+    kept_.emplace_back(std::chrono::steady_clock::now(), std::move(owner));
+}
+
 void PlayerRegistry::collect() {
     const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
     // Moved out and dropped outside the lock: a session's own destructor is nobody's business here
     // and may take as long as it likes.
     std::vector<std::unique_ptr<PlayerSession>> letGo;
+    std::vector<std::shared_ptr<void>> closed;
     {
         const std::lock_guard<std::mutex> guard{lock_};
         for (auto& gone : retired_) {
@@ -56,6 +65,12 @@ void PlayerRegistry::collect() {
             }
         }
         std::erase_if(retired_, [](const auto& gone) { return gone.second == nullptr; });
+        for (auto& gone : kept_) {
+            if (now - gone.first > kRetirement) {
+                closed.push_back(std::move(gone.second));
+            }
+        }
+        std::erase_if(kept_, [](const auto& gone) { return gone.second == nullptr; });
     }
 }
 

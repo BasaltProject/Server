@@ -141,6 +141,11 @@ public:
     FoodData food;
     ExperienceData experience;
 
+    /// parity: `Player.enchantmentSeed`, which is what fixes an enchanting table's three offers
+    /// until one of them is taken. On the live session only: vanilla writes it as `XpSeed`, which
+    /// here needs a column in `players.db`, so the offers re-roll on a rejoin.
+    std::int32_t enchantmentSeed = 0;
+
     /// Scoreboard tags, as `/tag` sets them. On the live session only: vanilla keeps them with the
     /// saved entity, which here needs a column in `players.db`.
     std::set<std::string, std::less<>> tags;

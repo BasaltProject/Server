@@ -97,8 +97,13 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     options.explosions = explosions_.get();
     options.plugins = pluginHooks();
 
-    ClientSession session{std::move(connection), std::move(options)};
-    session.run();
+    // On the heap and handed to the registry afterwards: a session that has left is kept for a
+    // window because the tick loop may still hold a pointer to it, and its callbacks reach back
+    // into this connection, so the connection has to outlive it by the same window.
+    const std::shared_ptr<ClientSession> session =
+        std::make_shared<ClientSession>(std::move(connection), std::move(options));
+    session->run();
+    playerRegistry_.keepAlive(session);
 }
 
 ClientSession::PluginHooks BasaltServer::pluginHooks() {

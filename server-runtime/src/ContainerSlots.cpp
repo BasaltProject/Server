@@ -3,6 +3,8 @@
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
+#include <basalt/server/runtime/item/ItemComponents.hpp>
+#include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
@@ -66,6 +68,16 @@ std::int32_t ContainerMenuController::halfSize() const {
 }
 
 std::optional<storage::StoredItemStack> ContainerMenuController::readBlockSlot(std::int32_t index) const {
+    if (openEnchantment_) {
+        return index >= 0 && static_cast<std::size_t>(index) < enchantmentSlots_.size()
+                   ? enchantmentSlots_[static_cast<std::size_t>(index)]
+                   : std::nullopt;
+    }
+    if (openGrindstone_) {
+        return index >= 0 && static_cast<std::size_t>(index) < grindstoneSlots_.size()
+                   ? grindstoneSlots_[static_cast<std::size_t>(index)]
+                   : std::nullopt;
+    }
     if (openAnvil_) {
         return index >= 0 && static_cast<std::size_t>(index) < anvilSlots_.size()
                    ? anvilSlots_[static_cast<std::size_t>(index)]
@@ -111,6 +123,30 @@ std::optional<storage::StoredItemStack> ContainerMenuController::readBlockSlot(s
 }
 
 void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::optional<storage::StoredItemStack>& stack) {
+    if (openEnchantment_) {
+        if (index < 0 || static_cast<std::size_t>(index) >= enchantmentSlots_.size()) {
+            return;
+        }
+        enchantmentSlots_[static_cast<std::size_t>(index)] = stack;
+        // parity: `slotsChanged`, which rolls the three rows again whenever either slot moves.
+        rollEnchantmentOffers();
+        return;
+    }
+    if (openGrindstone_) {
+        if (index < 0 || static_cast<std::size_t>(index) >= grindstoneSlots_.size()) {
+            return;
+        }
+        if (index == Menu::kGrindstoneResult) {
+            PlayerSession* session = owner_->playerSession();
+            if (!stack.has_value() && session != nullptr) {
+                takeGrindstoneResult(*session);
+            }
+            return;
+        }
+        grindstoneSlots_[static_cast<std::size_t>(index)] = stack;
+        recomputeGrindstoneResult();
+        return;
+    }
     if (openAnvil_) {
         if (index < 0 || static_cast<std::size_t>(index) >= anvilSlots_.size()) {
             return;
@@ -350,11 +386,15 @@ bool ContainerMenuController::canPlaceInto(const MenuSlot& slot) const {
     if (openAnvil_ && block->index == Menu::kAnvilResult) {
         return false;
     }
+    if (openGrindstone_ && block->index == Menu::kGrindstoneResult) {
+        return false;
+    }
     return !(openSmithing_ && block->index == Menu::kSmithingResult);
 }
 
 bool ContainerMenuController::hasBlockSlots() const {
-    return openBlock.has_value() || openEnderChest_ || openStonecutter_ || openSmithing_ || openAnvil_;
+    return openBlock.has_value() || openEnderChest_ || openStonecutter_ || openSmithing_ || openAnvil_ ||
+           openGrindstone_ || openEnchantment_;
 }
 
 bool ContainerMenuController::accepts(const MenuSlot& target, const storage::StoredItemStack& stack) const {
@@ -373,6 +413,18 @@ bool ContainerMenuController::accepts(const MenuSlot& target, const storage::Sto
     // parity: `ItemCombinerMenu.quickMoveStack`, which tries the two inputs and never the result.
     if (openAnvil_) {
         return block->index != Menu::kAnvilResult;
+    }
+    // parity: `EnchantmentMenu`'s second slot takes lapis and nothing else, and its first takes one
+    // of anything.
+    if (openEnchantment_) {
+        return block->index != Menu::kEnchantmentLapis || stack.id == "minecraft:lapis_lazuli";
+    }
+    // parity: `GrindstoneMenu`'s two slots take only what has wear or enchantments on it.
+    if (openGrindstone_) {
+        return block->index != Menu::kGrindstoneResult &&
+               (item::itemWear::isDamageable(stack) ||
+                stack.components.find(item::itemComponents::kEnchantments) != nullptr ||
+                stack.components.find(item::itemComponents::kStoredEnchantments) != nullptr);
     }
     if (openBlockSize != world::furnaces::kSize) {
         return true;
