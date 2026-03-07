@@ -335,12 +335,10 @@ void StopSoundCommand::build(const CommandNodeBuilder& root) const {
                          bool named) -> Parsed<std::int32_t> {
         const std::vector<player::PlayerSession*>& targets = playersOf(context, "targets");
         const auto* sound = named ? context.get<Identifier>("sound") : nullptr;
-        const play::StopSoundPacket packet{.sound = sound == nullptr ? std::nullopt : std::optional{sound->toString()},
-                                           .source = source};
+        const std::optional<std::string> silenced = sound == nullptr ? std::nullopt : std::optional{sound->toString()};
         for (const player::PlayerSession* target : targets) {
-            if (target->connection().sendPlayPacket) {
-                target->connection().sendPlayPacket(play::StopSoundPacket::kId,
-                                                    [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+            if (target->connection().stopSound) {
+                target->connection().stopSound(silenced, source);
             }
         }
         const Component named_ = sound == nullptr ? Component{} : Component::text(sound->toString());

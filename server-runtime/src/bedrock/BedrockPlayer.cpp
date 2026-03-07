@@ -320,27 +320,40 @@ void BedrockPlayer::blockAction(const std::int32_t action, const std::int32_t x,
             return;
         }
         const bool starting = kind == wire::bedrock::BedrockBlockActionType::StartBreak;
-        context_.digSpeed(*session_, x, y, z, [mailbox = mailbox_, x, y, z, starting](const float perTick) {
-            // Nothing to draw on a block that comes apart in one tick or not at all.
-            if (perTick <= 0.0F || perTick >= 1.0F) {
-                return;
-            }
-            // How many whole ticks it takes, and the range shared out over them: the client counts in
-            // ticks, so a block that needs three and a half of them needs four.
-            const auto ticks = static_cast<std::int32_t>(std::ceil(1.0F / perTick));
-            wire::io::ByteBuffer body;
-            wire::bedrock::writeLevelEvent(body,
-                                           starting ? wire::bedrock::LevelEventType::BlockStartBreak
-                                                    : wire::bedrock::LevelEventType::BlockUpdateBreak,
-                                           static_cast<float>(x), static_cast<float>(y), static_cast<float>(z),
-                                           wire::bedrock::kBreakProgressScale / ticks);
-            mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LevelEvent), body.toVector());
-        });
+        // The client says nothing about how far along it is, so the turns are counted here: it is
+        // what everybody else's cracks are drawn from.
+        if (starting || diggingAt_ != std::array<std::int32_t, 3>{x, y, z}) {
+            diggingAt_ = {x, y, z};
+            diggingTicks_ = 0;
+        }
+        ++diggingTicks_;
+        context_.digSpeed(
+            *session_, x, y, z, diggingTicks_, [mailbox = mailbox_, x, y, z, starting](const float perTick) {
+                // Nothing to draw on a block that comes apart in one tick or not at all.
+                if (perTick <= 0.0F || perTick >= 1.0F) {
+                    return;
+                }
+                // How many whole ticks it takes, and the range shared out over them: the client counts in
+                // ticks, so a block that needs three and a half of them needs four.
+                const auto ticks = static_cast<std::int32_t>(std::ceil(1.0F / perTick));
+                wire::io::ByteBuffer body;
+                wire::bedrock::writeLevelEvent(body,
+                                               starting ? wire::bedrock::LevelEventType::BlockStartBreak
+                                                        : wire::bedrock::LevelEventType::BlockUpdateBreak,
+                                               static_cast<float>(x), static_cast<float>(y), static_cast<float>(z),
+                                               wire::bedrock::kBreakProgressScale / ticks);
+                mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LevelEvent), body.toVector());
+            });
         return;
     }
 
     // Given up on: the cracks come off again.
     if (kind == wire::bedrock::BedrockBlockActionType::AbortBreak) {
+        if (diggingAt_.has_value() && context_.digStopped) {
+            context_.digStopped(*session_, (*diggingAt_)[0], (*diggingAt_)[1], (*diggingAt_)[2]);
+        }
+        diggingAt_.reset();
+        diggingTicks_ = 0;
         wire::io::ByteBuffer body;
         wire::bedrock::writeLevelEvent(body, wire::bedrock::LevelEventType::BlockStopBreak, static_cast<float>(x),
                                        static_cast<float>(y), static_cast<float>(z), 0);
@@ -524,6 +537,21 @@ void BedrockPlayer::editSign(const std::int32_t x, const std::int32_t y, const s
         return;
     }
     context_.writeSign(*session_, x, y, z, text);
+}
+
+void BedrockPlayer::editBookPage(const std::int32_t slot, const world::books::PageEdit what, const std::int32_t page,
+                                 const std::int32_t other, const std::string& text) {
+    if (session_ == nullptr || !context_.writeBookPage) {
+        return;
+    }
+    context_.writeBookPage(*session_, slot, what, page, other, text);
+}
+
+void BedrockPlayer::signBook(const std::int32_t slot, const std::string& title) {
+    if (session_ == nullptr || !context_.signBook) {
+        return;
+    }
+    context_.signBook(*session_, slot, title);
 }
 
 void BedrockPlayer::swing() {

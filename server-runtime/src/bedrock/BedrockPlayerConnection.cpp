@@ -91,6 +91,49 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         wire::bedrock::writeDisconnect(body, wire::text::toPlainText(wire::text::resolveComponent(reason, lang)));
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::Disconnect), body.toVector(), true);
     };
+    // parity: that edition names a mixer and this one cannot, so stopping one mixer stops the lot.
+    // A stop that names a sound is the only one it can be exact about.
+    connection.stopSound = [mailbox = joining.mailbox](const std::optional<std::string>& sound,
+                                                       const std::optional<wire::protocol::play::SoundSource>&) {
+        wire::io::ByteBuffer body;
+        const std::string_view named = sound.has_value() ? wire::bedrock::bedrockSoundName(*sound) : std::string_view{};
+        wire::bedrock::writeStopSound(body, named, named.empty());
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::StopSound), body.toVector());
+    };
+    // parity: the two that edition drives itself go by their bare name; everything else keeps the
+    // whole one, which is what `ClientboundCooldownPacket` carries.
+    connection.startItemCooldown = [mailbox = joining.mailbox](const wire::common::Identifier& item,
+                                                               const std::int32_t durationTicks) {
+        const bool bare = item.path() == "goat_horn" || item.path() == "shield";
+        wire::io::ByteBuffer body;
+        wire::bedrock::writePlayerStartItemCooldown(body, bare ? item.path() : item.toString(), durationTicks);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::PlayerStartItemCooldown),
+                      body.toVector());
+    };
+    // parity: this edition has no steps of cracking. It is given a pace and draws the animation
+    // itself, which is why what goes out is how much of the block comes off in a turn rather than
+    // how far along the break is.
+    connection.sendBlockDestruction = [mailbox = joining.mailbox](std::int32_t, const std::int32_t x,
+                                                                  const std::int32_t y, const std::int32_t z,
+                                                                  const std::int32_t stage, const float perTick) {
+        // parity: the other door's tenth step means the cracks come off again.
+        constexpr std::int32_t kNoCracks = 10;
+        const bool stopping = stage >= kNoCracks;
+        if (!stopping && (perTick <= 0.0F || perTick >= 1.0F)) {
+            return;
+        }
+        // How many whole turns it takes, and the range shared out over them: a block that needs
+        // three and a half of them needs four.
+        const auto ticks = stopping ? 1 : static_cast<std::int32_t>(std::ceil(1.0F / perTick));
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeLevelEvent(body,
+                                       stopping     ? wire::bedrock::LevelEventType::BlockStopBreak
+                                       : stage == 0 ? wire::bedrock::LevelEventType::BlockStartBreak
+                                                    : wire::bedrock::LevelEventType::BlockUpdateBreak,
+                                       static_cast<float>(x), static_cast<float>(y), static_cast<float>(z),
+                                       stopping ? 0 : wire::bedrock::kBreakProgressScale / ticks);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::LevelEvent), body.toVector());
+    };
     connection.sendTime = [mailbox = joining.mailbox](const world::LoadedWorld& world) {
         wire::io::ByteBuffer body;
         wire::bedrock::writeSetTime(body, static_cast<std::int32_t>(world.clock().totalTicks()));

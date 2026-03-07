@@ -246,7 +246,7 @@ private:
 
     void stopDigging();
 
-    void broadcastDestruction(const wire::protocol::play::BlockPos& pos, std::int32_t stage);
+    void broadcastDestruction(const wire::protocol::play::BlockPos& pos, std::int32_t stage, float perTick);
 
     void useBucketOn(player::PlayerSession& session, const wire::common::Identifier& item, std::int32_t slot,
                      const storage::StoredItemStack& held, const wire::protocol::play::BlockHitResult& hit);

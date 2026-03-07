@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/command/CommandSource.hpp>
 #include <basalt/server/runtime/command/commands/BossBarCommand.hpp>
+#include <basalt/server/runtime/player/PlayerBooks.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
@@ -241,6 +242,25 @@ player::PlayerConnection ClientSession::playerConnection() {
     };
     connection.addEffect = [this](const Identifier& effect, std::int32_t durationTicks, std::int32_t amplifier) {
         addEffect(effect, durationTicks, amplifier);
+    };
+    connection.stopSound = [this](const std::optional<std::string>& sound,
+                                  const std::optional<play::SoundSource>& source) {
+        sendPlayPacket(play::StopSoundPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            play::StopSoundPacket{.sound = sound, .source = source}.write(buffer);
+        });
+    };
+    connection.startItemCooldown = [this](const Identifier& item, const std::int32_t durationTicks) {
+        sendPlayPacket(play::CooldownPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            play::CooldownPacket{.cooldownGroup = item.toString(), .durationTicks = durationTicks}.write(buffer);
+        });
+    };
+    connection.sendBlockDestruction = [this](const std::int32_t entityId, const std::int32_t x, const std::int32_t y,
+                                             const std::int32_t z, const std::int32_t stage, float) {
+        sendPlayPacket(play::BlockDestructionPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            play::BlockDestructionPacket{
+                .entityId = entityId, .pos = play::BlockPos{x, y, z}, .stage = static_cast<std::uint8_t>(stage)}
+                .write(buffer);
+        });
     };
     connection.sendEffect = [this](const world::ActiveEffect& effect) { uiState_->sendEffect(effect); };
     connection.sendEffectRemoved = [this](const Identifier& effect) { uiState_->sendEffectRemoved(effect); };
@@ -706,6 +726,15 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         const std::optional<play::ServerboundRenameItemPacket> packet = play::ServerboundRenameItemPacket::read(body);
         if (packet.has_value()) {
             menus_->setAnvilName(packet->name);
+        }
+        return;
+    }
+    if (packetId == play::ServerboundEditBookPacket::kId) {
+        const std::optional<play::ServerboundEditBookPacket> packet = play::ServerboundEditBookPacket::read(body);
+        if (packet.has_value() && session != nullptr) {
+            if (player::editBookFor(*session, packet->slot, packet->pages, packet->title)) {
+                menus_->sendInventoryAll();
+            }
         }
         return;
     }

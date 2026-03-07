@@ -191,6 +191,22 @@ struct PlayerConnection {
     std::function<void(const wire::common::Identifier& effect, std::int32_t durationTicks, std::int32_t amplifier)>
         addEffect;
 
+    /// Silences a sound, or every sound when no name is given. The mixer is the other door's own
+    /// idea: this edition cannot pick one, so a stop that only names a mixer stops everything.
+    std::function<void(const std::optional<std::string>& sound,
+                       const std::optional<wire::protocol::play::SoundSource>& source)>
+        stopSound;
+
+    /// Greys an item out for as long as its cooldown lasts.
+    std::function<void(const wire::common::Identifier& item, std::int32_t durationTicks)> startItemCooldown;
+
+    /// Draws somebody else's cracks on a block. `stage` is the ten steps the other door counts in
+    /// and `perTick` how much of the block comes off in a turn, because this edition draws the
+    /// animation itself off a pace rather than off a step. A negative stage takes the cracks off.
+    std::function<void(std::int32_t entityId, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stage,
+                       float perTick)>
+        sendBlockDestruction;
+
     std::function<void(const world::ActiveEffect& effect)> sendEffect;
     std::function<void(const wire::common::Identifier& effect)> sendEffectRemoved;
 

@@ -561,6 +561,55 @@ void BedrockListener::onConnect(RakSession& session) {
             }
             return;
         }
+        if (packet == BedrockPacket::ShowCredits && entry.player) {
+            // parity: the other door leaves the poem by asking to respawn, which is what takes a
+            // player out of the end once they have read it.
+            const std::optional<wire::bedrock::BedrockCredits> credits = wire::bedrock::readShowCredits(body);
+            if (credits.has_value() && *credits == wire::bedrock::BedrockCredits::Finished) {
+                entry.player->respawn();
+            }
+            return;
+        }
+        if (packet == BedrockPacket::EntityEvent && entry.player) {
+            // parity: the one a client sends is its own eating, and it waits to hear it back before
+            // it makes the noise. It goes to whoever asked and to nobody else.
+            const std::optional<wire::bedrock::BedrockEntityEventIn> event = wire::bedrock::readEntityEvent(body);
+            if (event.has_value() &&
+                event->event == static_cast<std::uint8_t>(wire::bedrock::BedrockEntityEvent::EatingItem)) {
+                entry.mailbox->post(static_cast<std::uint16_t>(packet),
+                                    std::vector<std::uint8_t>{body.readable().begin(), body.readable().end()});
+            }
+            return;
+        }
+        if (packet == BedrockPacket::BookEdit && entry.player) {
+            const std::optional<wire::bedrock::BedrockBookEdit> edit = wire::bedrock::readBookEdit(body);
+            if (!edit.has_value()) {
+                return;
+            }
+            using Action = wire::bedrock::BedrockBookEdit::Action;
+            if (edit->action == Action::Sign) {
+                entry.player->signBook(edit->slot, edit->title);
+                return;
+            }
+            const world::books::PageEdit what = edit->action == Action::ReplacePage  ? world::books::PageEdit::Replace
+                                                : edit->action == Action::AddPage    ? world::books::PageEdit::Add
+                                                : edit->action == Action::DeletePage ? world::books::PageEdit::Delete
+                                                                                     : world::books::PageEdit::Swap;
+            entry.player->editBookPage(edit->slot, what, edit->page, edit->otherPage, edit->text);
+            return;
+        }
+        if (packet == BedrockPacket::FilterText && entry.player) {
+            // parity: the other door filters nothing, so everything typed comes back approved. A
+            // client whose filter is on waits for this before it shows what was typed at all.
+            const std::optional<std::string> text = wire::bedrock::readFilterText(body);
+            if (text.has_value()) {
+                wire::io::ByteBuffer out;
+                wire::bedrock::writeFilterText(out, *text);
+                entry.mailbox->post(static_cast<std::uint16_t>(BedrockPacket::FilterText),
+                                    std::vector<std::uint8_t>{out.readable().begin(), out.readable().end()});
+            }
+            return;
+        }
         if (packet == BedrockPacket::Text && entry.player) {
             const auto text = wire::bedrock::readText(body);
             if (text.has_value() && !text->message.empty()) {
