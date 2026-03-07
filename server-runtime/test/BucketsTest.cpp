@@ -312,3 +312,29 @@ TEST_CASE("a bucket emptied on a block that is already full is spent for nothing
     CHECK(fixture.world.blockState(8, 64, 8) == *soaked);
     CHECK(fixture.world.blockState(8, 65, 8) == air());
 }
+
+TEST_CASE("a bucket of water emptied where water evaporates leaves nothing and is spent") {
+    // parity: `BucketItem.emptyContents` checks `WATER_EVAPORATES` before it soaks a block and
+    // before it writes water, so in the Nether neither the stair nor the air beside it gets wet.
+    Fixture fixture;
+    REQUIRE(fixture.world.setBlockState(8, 64, 8, stateOf("oak_stairs")));
+    fluidFlow::Context nether{
+        .world = fixture.world, .gameRules = fixture.gameRules, .random = fixture.random, .ultrawarm = true};
+
+    const std::optional<buckets::Result> result =
+        buckets::useOn(nether, item("water_bucket"), 8, 64, 8, Direction::Up, false);
+
+    REQUIRE(result.has_value());
+    CHECK(result->replacement == item("bucket"));
+    CHECK(result->changes.empty());
+    CHECK(fixture.world.blockState(8, 65, 8) == air());
+    const std::optional<std::int32_t> stairs = fixture.world.blockState(8, 64, 8);
+    REQUIRE(stairs.has_value());
+    CHECK(registry::blockStateDefinitions::propertiesOf(*stairs)["waterlogged"] == "false");
+
+    // And lava is untouched by the rule: it goes in as always.
+    const std::optional<buckets::Result> lava =
+        buckets::useOn(nether, item("lava_bucket"), 8, 64, 8, Direction::Up, false);
+    REQUIRE(lava.has_value());
+    CHECK(fixture.world.blockState(8, 65, 8) == stateOf("lava"));
+}

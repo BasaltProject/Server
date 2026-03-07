@@ -1,4 +1,6 @@
+#include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/world/Beacons.hpp>
 #include <basalt/server/runtime/world/BlockEntityTicks.hpp>
 #include <basalt/server/runtime/world/BrewingStands.hpp>
 #include <basalt/server/runtime/world/Campfires.hpp>
@@ -11,6 +13,7 @@
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
+#include <basalt/server/world/WorldHeight.hpp>
 
 #include <cstdint>
 #include <map>
@@ -220,6 +223,47 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                     if (hooks.onDropped) {
                         hooks.onDropped(Dropped{.x = x, .y = y, .z = z, .stack = result});
                     }
+                }
+                continue;
+            }
+            // parity: `BeaconBlockEntity.tick`, which counts its pyramid and hands out its effects
+            // once every eighty turns and does nothing at all in between.
+            if (path == "beacon") {
+                if (gameTime % beacons::kApplyInterval != 0) {
+                    continue;
+                }
+                beacons::Stored beacon = beacons::read(entity->data());
+                // parity: `BeaconBlockEntity.tick` walks the column above for blocks light goes
+                // through, and gives nothing out if anything else is in the way.
+                const auto passes = [&world](const std::int32_t bx, const std::int32_t by, const std::int32_t bz) {
+                    const std::optional<std::int32_t> state = world.blockState(bx, by, bz);
+                    if (!state.has_value()) {
+                        return false;
+                    }
+                    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*state);
+                    return block != nullptr &&
+                           beacons::letsBeamThrough(registry::blockShapes::dampening(*state), block->path());
+                };
+                // parity: with the beam blocked the jar leaves the count alone and hands out nothing.
+                if (!beacons::beamReachesSky(passes, x, y, z, server::world::worldHeight::kMaxY)) {
+                    continue;
+                }
+                const std::int32_t levels = beacons::levelsUnder(
+                    [&world, &hooks](const std::int32_t bx, const std::int32_t by, const std::int32_t bz) {
+                        const std::optional<std::int32_t> state = world.blockState(bx, by, bz);
+                        const wire::common::Identifier* block =
+                            state.has_value() ? registry::blockStateDefinitions::blockOf(*state) : nullptr;
+                        return block != nullptr && hooks.isBeaconBase && hooks.isBeaconBase(*block);
+                    },
+                    x, y, z, server::world::worldHeight::kMinY);
+                const bool moved = levels != beacon.levels;
+                beacon.levels = levels;
+                beacons::write(beacon, entity->data());
+                if (moved) {
+                    chunk->markDirty();
+                }
+                if (levels > 0 && !beacon.primary.empty() && hooks.beaconPulse) {
+                    hooks.beaconPulse(x, y, z, levels, beacon.primary, beacon.secondary);
                 }
                 continue;
             }

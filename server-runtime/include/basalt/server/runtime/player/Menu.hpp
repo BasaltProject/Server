@@ -77,6 +77,15 @@ public:
     static constexpr std::int32_t kAnvilAddition = 1;
     static constexpr std::int32_t kAnvilResult = 2;
 
+    /// parity: `LoomMenu`'s four: the banner, the dye, the pattern and what it weaves.
+    static constexpr std::int32_t kLoomBanner = 0;
+    static constexpr std::int32_t kLoomDye = 1;
+    static constexpr std::int32_t kLoomPattern = 2;
+    static constexpr std::int32_t kLoomResult = 3;
+
+    /// parity: `BeaconMenu.PAYMENT_SLOT`, the one slot a beacon has.
+    static constexpr std::int32_t kBeaconPayment = 0;
+
     /// parity: `EnchantmentMenu`'s two: what is being enchanted, and what is paying for it.
     static constexpr std::int32_t kEnchantmentInput = 0;
     static constexpr std::int32_t kEnchantmentLapis = 1;
@@ -143,6 +152,12 @@ public:
 
     /// parity: `EnchantmentMenu`: what is being enchanted and the lapis, then the player's 36.
     [[nodiscard]] static Menu enchantment(std::int32_t containerId);
+
+    /// parity: `BeaconMenu`: the payment slot, then the player's 36.
+    [[nodiscard]] static Menu beacon(std::int32_t containerId);
+
+    /// parity: `LoomMenu`: banner, dye, pattern, result, then the player's 36.
+    [[nodiscard]] static Menu loom(std::int32_t containerId);
 
     /// A villager's window. The three trading slots are the menu's own rather than any block's, so
     /// nothing behind them is a container: the trade itself is what moves the items.

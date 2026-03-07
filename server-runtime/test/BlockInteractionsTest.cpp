@@ -372,3 +372,44 @@ TEST_CASE("redstone opens the three that make a noise and nothing else") {
     CHECK_FALSE(sound("stone", true).has_value());
     CHECK_FALSE(sound("air", false).has_value());
 }
+
+TEST_CASE("a click turns a copper golem statue one pose on, and wraps at the last") {
+    // parity: `CopperGolemStatueBlock.useItemOn` answers SUCCESS to anything that is not an axe, an
+    // empty hand included, and `updatePose` writes `POSE.getNextPose()` with flag three. The next
+    // pose wraps: `getNextPose` is a `ByIdMap.continuous` with `ZERO` out of bounds. What makes this
+    // redstone and not decoration is that the pose is what a comparator beside it reads, one to four.
+    WorldState world = emptyWorld();
+    world.getOrGenerateChunk(0, 0);
+    const auto poseAt = [&world] { return propertyAt(world, 8, 64, 8, "copper_golem_pose"); };
+    const auto put = [&world](const std::string& pose) {
+        REQUIRE(
+            world.setBlockState(8, 64, 8,
+                                stateOf("copper_golem_statue",
+                                        {{"copper_golem_pose", pose}, {"facing", "north"}, {"waterlogged", "false"}})));
+    };
+
+    put("standing");
+    CHECK(blockInteractions::isCycleable(*world.blockState(8, 64, 8)));
+    REQUIRE(blockInteractions::cycle(world, 8, 64, 8).has_value());
+    CHECK(poseAt() == "sitting");
+    REQUIRE(blockInteractions::cycle(world, 8, 64, 8).has_value());
+    CHECK(poseAt() == "running");
+    REQUIRE(blockInteractions::cycle(world, 8, 64, 8).has_value());
+    CHECK(poseAt() == "star");
+    // The wrap, which is the half a plain `next` would get wrong.
+    REQUIRE(blockInteractions::cycle(world, 8, 64, 8).has_value());
+    CHECK(poseAt() == "standing");
+}
+
+TEST_CASE("an axe scrapes a statue instead of turning it, and turns nothing else away") {
+    // parity: `CopperGolemStatueBlock.useItemOn` returns PASS for `ItemTags.AXES` and SUCCESS for
+    // everything else, an empty hand included. Ours is the only cycleable block that looks at the
+    // hand, and the axe branch of the use handler sits **after** the cycle branch, so without this
+    // an axe would turn the pose instead of scraping the copper.
+    CHECK(blockInteractions::cycleYieldsToAxe(stateOf("copper_golem_statue")));
+    CHECK_FALSE(blockInteractions::cycleYieldsToAxe(stateOf("repeater")));
+    CHECK_FALSE(blockInteractions::cycleYieldsToAxe(stateOf("comparator")));
+    CHECK_FALSE(blockInteractions::cycleYieldsToAxe(stateOf("daylight_detector")));
+    CHECK_FALSE(blockInteractions::cycleYieldsToAxe(stateOf("redstone_wire")));
+    CHECK_FALSE(blockInteractions::cycleYieldsToAxe(stateOf("stone")));
+}

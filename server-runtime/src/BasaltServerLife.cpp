@@ -42,6 +42,7 @@
 #include <basalt/server/runtime/player/PlayerSweep.hpp>
 #include <basalt/server/runtime/player/PlayerThrown.hpp>
 #include <basalt/server/runtime/world/AnvilEnchantments.hpp>
+#include <basalt/server/runtime/world/Beacons.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
@@ -55,6 +56,7 @@
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/Grindstones.hpp>
 #include <basalt/server/runtime/world/Lecterns.hpp>
+#include <basalt/server/runtime/world/Looms.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/Shelves.hpp>
@@ -1767,6 +1769,30 @@ void BasaltServer::startBedrockListener() {
                             }
                             return storage::StoredItemStack{
                                 .id = made->item.toString(), .count = made->count, .components = made->components};
+                        },
+                        // parity: `LoomMenu.slotsChanged`, which only weaves a pattern the item in
+                        // the third slot offers, or one of the free ones when it is empty.
+                        .loomResult = [this](const storage::StoredItemStack& banner,
+                                             const storage::StoredItemStack& dye,
+                                             const storage::StoredItemStack* patternItem,
+                                             const std::string& pattern) -> std::optional<storage::StoredItemStack> {
+                            const std::optional<std::string> colour = world::looms::dyeColourOf(dye.id);
+                            if (!colour.has_value() || pattern.empty() || !world::looms::isBanner(banner.id)) {
+                                return std::nullopt;
+                            }
+                            const std::string tag =
+                                patternItem == nullptr
+                                    ? std::string{"minecraft:no_item_required"}
+                                    : world::looms::patternTagOf(patternItem->id).value_or(std::string{});
+                            const std::string named = "minecraft:" + pattern;
+                            const std::vector<wire::common::Identifier>& offered =
+                                world::realBannerPatterns::membersOf(vanillaData_.bannerPatterns, tag);
+                            if (std::ranges::none_of(offered, [&named](const wire::common::Identifier& one) {
+                                    return one.toString() == named;
+                                })) {
+                                return std::nullopt;
+                            }
+                            return world::looms::weave(banner, named, *colour);
                         }});
                 answer(applied.accepted, applied.containers);
                 if (!applied.accepted && session->connection().sendInventoryAll) {
@@ -1833,6 +1859,32 @@ void BasaltServer::startBedrockListener() {
                     }
                     if (session->connection().sendInventoryAll) {
                         session->connection().sendInventoryAll();
+                    }
+                }
+                if (applied.beacon.has_value() && where != nullptr && windows->open.has_value()) {
+                    // parity: `BeaconMenu.updateEffects` refuses a pair the pyramid is not tall
+                    // enough for, and the payment has already gone either way.
+                    server::world::Chunk* chunk =
+                        where->state().chunkIfLoaded(windows->open->x >> 4, windows->open->z >> 4);
+                    server::world::ChunkBlockEntity* entity =
+                        chunk == nullptr
+                            ? nullptr
+                            : chunk->blockEntityAt(windows->open->x & 15, windows->open->y, windows->open->z & 15);
+                    if (entity != nullptr) {
+                        world::beacons::Stored stored = world::beacons::read(entity->data());
+                        const auto named = [](const std::optional<std::int32_t>& id) {
+                            const std::optional<wire::common::Identifier> effect =
+                                id.has_value() ? world::mobEffects::byProtocolId(*id) : std::nullopt;
+                            return effect.has_value() ? effect->toString() : std::string{};
+                        };
+                        const std::string primary = named(applied.beacon->primary);
+                        const std::string secondary = named(applied.beacon->secondary);
+                        if (world::beacons::allows(primary, secondary, stored.levels)) {
+                            stored.primary = primary;
+                            stored.secondary = secondary;
+                            world::beacons::write(stored, entity->data());
+                            chunk->markDirty();
+                        }
                     }
                 }
                 if (applied.anvilCost.has_value() && windows->open.has_value()) {

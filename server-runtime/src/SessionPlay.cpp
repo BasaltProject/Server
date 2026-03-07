@@ -709,6 +709,13 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         }
         return;
     }
+    if (packetId == play::ServerboundSetBeaconPacket::kId) {
+        const std::optional<play::ServerboundSetBeaconPacket> packet = play::ServerboundSetBeaconPacket::read(body);
+        if (packet.has_value()) {
+            menus_->setBeaconEffects(packet->primary, packet->secondary);
+        }
+        return;
+    }
     if (packetId == play::ContainerButtonClickPacket::kId) {
         const std::optional<play::ContainerButtonClickPacket> packet = play::ContainerButtonClickPacket::read(body);
         if (packet.has_value()) {

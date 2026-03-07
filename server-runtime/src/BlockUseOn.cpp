@@ -284,6 +284,18 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
             ack();
             return;
         }
+        // parity: `LoomBlock.useWithoutItem`, whose four slots belong to the screen.
+        if (path == "loom") {
+            owner_->menus().openLoomMenu(*session, hit.pos);
+            ack();
+            return;
+        }
+        // parity: `BeaconBlockEntity` is a `MenuProvider`, so the block just opens its screen.
+        if (path == "beacon") {
+            owner_->menus().openBeaconMenu(*session, hit.pos);
+            ack();
+            return;
+        }
         // parity: `GrindstoneBlock.useWithoutItem`, whose three slots belong to the screen.
         if (path == "grindstone") {
             owner_->menus().openGrindstoneMenu(*session, hit.pos);
@@ -339,8 +351,13 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
             ack();
             return;
         }
-        // parity: `RepeaterBlock.useWithoutItem` and `ComparatorBlock.useWithoutItem`.
-        if (clickedState.has_value() && world::blockInteractions::isCycleable(*clickedState)) {
+        // parity: `RepeaterBlock.useWithoutItem` and `ComparatorBlock.useWithoutItem`. The statue is
+        // the one that answers PASS to an axe, and the axe branch is further down, so it has to let
+        // that hand through rather than turn a pose.
+        const std::optional<Identifier> inHand = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
+        const bool axeInHand = inHand.has_value() && inHand->path().ends_with("_axe");
+        if (clickedState.has_value() && world::blockInteractions::isCycleable(*clickedState) &&
+            !(axeInHand && world::blockInteractions::cycleYieldsToAxe(*clickedState))) {
             cycleBlock(hit.pos);
             ack();
             return;

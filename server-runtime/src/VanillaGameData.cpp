@@ -42,6 +42,7 @@ VanillaGameData::VanillaGameData(const Jar& jar, wire::common::Logger logger)
       timelineTags(world::realTimelineTags::load(readerOf<world::realTimelineTags::JarReader>(jar), logger)),
       damageTypeTags(world::realDamageTypeTags::load(readerOf<world::realDamageTypeTags::JarReader>(jar), logger)),
       entityTags(world::realEntityTypeTags::load(readerOf<world::realEntityTypeTags::JarReader>(jar), logger)),
+      bannerPatterns(world::realBannerPatterns::load(readerOf<world::realBannerPatterns::JarReader>(jar), logger)),
       advancements(world::RealAdvancements::Jar{.entriesUnder = jar.entriesUnder, .readText = jar.readText}),
       enchantments({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
       enchantmentTags(world::realEnchantmentTags::load(

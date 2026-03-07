@@ -9,6 +9,7 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -52,6 +53,13 @@ struct Hooks {
     std::function<bool(const wire::common::Identifier& item)> isBookshelfBook;
     /// parity: `JukeboxSong.lengthInTicks`, which is data in the operator's own jar.
     std::function<std::int64_t(const std::string& song)> songLength;
+    /// parity: the `beacon_base_blocks` block tag, which is the datapack's and not this file's.
+    std::function<bool(const wire::common::Identifier& block)> isBeaconBase;
+    /// A beacon that just counted its pyramid and has an effect to hand out. Who is standing in it
+    /// is the caller's business: this module knows no players.
+    std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t levels, const std::string& primary,
+                       const std::string& secondary)>
+        beaconPulse;
     /// The turn a song ran out on: the block keeps its disc but stops feeding the redstone, so
     /// whatever it was powering has to be told. parity: `JukeboxBlockEntity.onSongChanged`.
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z)> songStopped;
