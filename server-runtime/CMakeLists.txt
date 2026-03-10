@@ -236,6 +236,7 @@ basalt_module(server-runtime-core
         src/sched/RegionScheduler.cpp
         src/sched/RegionWorkers.cpp
         src/scoreboard/Scoreboard.cpp
+        src/scoreboard/TeamNameTags.cpp
         src/scoreboard/Teams.cpp
         src/ui/PlayerUi.cpp
         src/timings/TimingsReport.cpp
@@ -1552,6 +1553,12 @@ basalt_test(server-runtime-anvils-test
 basalt_test(server-runtime-beacons-test
     SOURCES
         test/BeaconsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-team-name-tags-test
+    SOURCES
+        test/TeamNameTagsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

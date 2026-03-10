@@ -780,6 +780,7 @@ void bubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_
     }
     const std::optional<std::int32_t> belowState = world.blockState(x, y - 1, z);
     const std::string below = pathOf(belowState.value_or(0));
+    // parity: `BubbleColumnBlock.getColumnState`, its four branches in this order.
     std::optional<std::int32_t> column;
     if (below == "bubble_column") {
         column = belowState;
@@ -790,25 +791,30 @@ void bubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_
     } else if (pathOf(*here) == "bubble_column") {
         // Nothing feeding it any more: what was a column goes back to being water.
         column = waterState();
+    } else {
+        // parity: the last branch is `occupyState`, the square's own state, and it is not a no-op:
+        // when the turn belongs to the **water** (`LiquidBlock.tick`) and nothing feeds it, the water
+        // carries itself upwards and turns whatever column is over it back into water.
+        column = *here;
     }
     if (!column.has_value()) {
         return;
     }
-    std::int32_t level = y;
-    while (true) {
+    // parity: the jar writes the starting square and **throws the answer away**, and only from the
+    // square above does a write that changes nothing end the walk: `Level.setBlock` answers false
+    // when the state does not move, because `LevelChunk.setBlockState` opens with
+    // `if (oldState == state) return null`. Skipping those and carrying on, which is what this did,
+    // grew a column a tick early every time one was lengthened.
+    if (*here != *column && world.setBlockState(x, y, z, *column)) {
+        changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *column});
+    }
+    for (std::int32_t level = y + 1;; ++level) {
         const std::optional<std::int32_t> state = world.blockState(x, level, z);
-        if (!state.has_value() || !canOccupy(*state)) {
-            return;
-        }
-        if (*state == *column) {
-            ++level;
-            continue;
-        }
-        if (!world.setBlockState(x, level, z, *column)) {
+        if (!state.has_value() || !canOccupy(*state) || *state == *column ||
+            !world.setBlockState(x, level, z, *column)) {
             return;
         }
         changes.push_back(BlockChange{.x = x, .y = level, .z = z, .stateId = *column});
-        ++level;
     }
 }
 

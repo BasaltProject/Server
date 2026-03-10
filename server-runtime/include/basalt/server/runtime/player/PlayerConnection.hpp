@@ -192,6 +192,21 @@ struct PlayerConnection {
     std::function<void(const wire::common::Identifier& effect, std::int32_t durationTicks, std::int32_t amplifier)>
         addEffect;
 
+    /// Draws the world border where this player can see it. parity: that edition has no border of
+    /// its own, so the wall the other one's client draws is a patch of refusal particles here.
+    std::function<void(double minX, double maxX, double minZ, double maxZ, std::int32_t warningBlocks)> drawBorderWall;
+
+    /// A team being made, changed or unmade, and who is in it. parity:
+    /// `ClientboundSetPlayerTeamPacket`, which only the edition that has teams is told.
+    std::function<void(const std::string& team, std::uint8_t method,
+                       const std::optional<wire::protocol::play::SetPlayerTeamPacket::Parameters>& parameters,
+                       const std::vector<std::string>& members)>
+        sendPlayerTeam;
+
+    /// What somebody else's name reads as now, with their team's colour and affixes already in it.
+    /// The edition that has no teams is told the finished line instead of the team.
+    std::function<void(std::int32_t entityId, const std::string& nameTag)> sendNameTag;
+
     /// A scoreboard objective being made, renamed or unmade, and which slot shows it. parity:
     /// `ClientboundSetObjectivePacket` and `ClientboundSetDisplayObjectivePacket`, split this way
     /// because the other edition has no packet for an objective nobody is shown.

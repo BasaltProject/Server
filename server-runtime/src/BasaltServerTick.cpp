@@ -184,6 +184,7 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
             if (region.isPrimary()) {
                 step("Time tick", [this, &world] { environment_->tickTime(world); });
                 step("Border damage", [this, &world] { environment_->tickBorderDamage(world); });
+                step("Border wall", [this, &world] { environment_->tickBorderWall(world); });
                 step("Portal tick", [this, &world] { environment_->tickPortals(world); });
                 step("Drowning tick", [this, &world] { environment_->tickSubmersion(world); });
                 step("Footstep tick", [this, &world] { redstone_->tickFootsteps(world); });

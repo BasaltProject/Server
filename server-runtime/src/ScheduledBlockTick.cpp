@@ -549,11 +549,24 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         // parity: `LiquidBlock.tick` and `BubbleColumnBlock.tick`, both of which end in
         // `BubbleColumnBlock.updateColumn`: the column is built, carried on or taken apart here and
         // not inside the shape cascade. Measured in `columnaburbujas`.
+        const std::size_t beforeColumn = scheduled.size();
         world::scheduledBlocks::bubbleColumn(world.state(), x, y, z, scheduled);
-        // parity: the coral turn, which writes with flag two: it goes white without telling anybody.
+        // parity: `updateColumn` writes every square of the column with `setBlock(..., 2)`, and a
+        // flag two write still runs the three shape walks: bit one only carries the neighbour notice.
+        // That walk is where `BubbleColumnBlock.updateShape` books the water's turn for the whole
+        // column, and without it the turns never appear on our side however well the booking itself
+        // is written. Measured in `columnaburbujas`.
+        for (std::size_t column = beforeColumn, raised = scheduled.size(); column < raised; ++column) {
+            broadcaster_->reshapeAround(world, watchers, scheduled[column].x, scheduled[column].y,
+                                        scheduled[column].z);
+        }
+        // parity: `CoralBlock.tick` is one line, `level.setBlock(pos, deadBlock, 2)`: it goes white
+        // without telling a single neighbour. But flag two still redraws the six squares around it,
+        // which is where a coral fan stuck to it books the turn of the water it is holding.
         if (const std::optional<std::int32_t> dead = world::scheduledBlocks::coral(world.state(), x, y, z);
             dead.has_value()) {
             scheduled.push_back(world::BlockChange{.x = x, .y = y, .z = z, .stateId = *dead});
+            broadcaster_->reshapeAround(world, watchers, x, y, z);
         }
         // parity: `CreakingHeartBlock.tick` over `updateState`, written with `setBlock(..., 3)`. The
         // jar asks `EnvironmentAttributes.CREAKING_ACTIVE`, whose track runs 12600 to 23401: a

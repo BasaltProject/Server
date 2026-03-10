@@ -243,6 +243,14 @@ player::PlayerConnection ClientSession::playerConnection() {
     connection.addEffect = [this](const Identifier& effect, std::int32_t durationTicks, std::int32_t amplifier) {
         addEffect(effect, durationTicks, amplifier);
     };
+    connection.sendPlayerTeam = [this](const std::string& team, const std::uint8_t method,
+                                       const std::optional<play::SetPlayerTeamPacket::Parameters>& parameters,
+                                       const std::vector<std::string>& members) {
+        sendPlayPacket(play::SetPlayerTeamPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            play::SetPlayerTeamPacket{.teamName = team, .method = method, .parameters = parameters, .members = members}
+                .write(buffer);
+        });
+    };
     connection.sendObjective = [this](const std::string& objective, const std::uint8_t method,
                                       const std::optional<wire::text::Component>& title) {
         sendPlayPacket(play::SetObjectivePacket::kId, [&](wire::io::ByteBuffer& buffer) {

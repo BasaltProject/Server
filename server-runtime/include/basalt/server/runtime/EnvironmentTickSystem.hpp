@@ -77,6 +77,10 @@ public:
     /// Hurts whoever has walked outside the border.
     void tickBorderDamage(world::LoadedWorld& world);
 
+    /// Draws the border for whoever cannot draw it themselves. parity: nothing in the jar, which
+    /// needs none: its own client knows where the border is.
+    void tickBorderWall(world::LoadedWorld& world);
+
     /// Moves whoever has stood in a portal long enough, and counts down the wait for everyone else.
     void tickPortals(world::LoadedWorld& world);
 

@@ -131,6 +131,25 @@ void EnvironmentTickSystem::tickBorderDamage(world::LoadedWorld& world) {
     }
 }
 
+void EnvironmentTickSystem::tickBorderWall(world::LoadedWorld& world) {
+    /// Once a second, which is what Geyser settled on: the wall is a puff of particles and drawing
+    /// it every tick is a stream of packets for a thing that does not move.
+    constexpr std::int64_t kWallIntervalTicks = 20;
+
+    if (world.gameTime() % kWallIntervalTicks != 0) {
+        return;
+    }
+    const world::WorldBorder& border = world.border();
+    const double half = border.size() / 2.0;
+    for (PlayerSession* player : players_->snapshot()) {
+        if (player->worldName != world.name() || !player->connection().drawBorderWall) {
+            continue;
+        }
+        player->connection().drawBorderWall(border.centerX() - half, border.centerX() + half, border.centerZ() - half,
+                                            border.centerZ() + half, border.warningBlocks);
+    }
+}
+
 void EnvironmentTickSystem::tickPortals(world::LoadedWorld& world) {
     const std::int32_t creativeDelay = world.gameRules().number(world::gameRules::kPlayersNetherPortalCreativeDelay);
     const std::int32_t defaultDelay = world.gameRules().number(world::gameRules::kPlayersNetherPortalDefaultDelay);
