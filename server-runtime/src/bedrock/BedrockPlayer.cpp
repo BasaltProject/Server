@@ -554,6 +554,67 @@ void BedrockPlayer::signBook(const std::int32_t slot, const std::string& title) 
     context_.signBook(*session_, slot, title);
 }
 
+void BedrockPlayer::showBorderColliders(const double minX, const double maxX, const double minZ, const double maxZ,
+                                        const std::int32_t warningBlocks) {
+    /// The ids the two stand under. Negative on purpose: no entity of the world ever takes one.
+    constexpr std::int64_t kColliderX = -3001;
+    constexpr std::int64_t kColliderZ = -3002;
+    /// How close to a face it is worth standing at, and how far below the player's feet it stands
+    /// so that falling does not drop them through it.
+    constexpr double kNearFace = 8.0;
+    constexpr double kHalfWidth = 5.0;
+    constexpr double kBelowFeet = 10.0;
+
+    if (session_ == nullptr) {
+        return;
+    }
+    const double warning = static_cast<double>(warningBlocks) + kNearFace;
+    const auto standing = [this](const std::int64_t id, bool& up, const std::optional<std::array<double, 3>>& where) {
+        if (!where.has_value()) {
+            if (up) {
+                wire::io::ByteBuffer body;
+                wire::bedrock::writeRemoveEntity(body, id);
+                mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::RemoveEntity), body.toVector());
+                up = false;
+            }
+            return;
+        }
+        wire::io::ByteBuffer body;
+        if (!up) {
+            wire::bedrock::writeAddBorderCollider(body, id, static_cast<float>((*where)[0]),
+                                                  static_cast<float>((*where)[1]), static_cast<float>((*where)[2]),
+                                                  protocol_);
+            mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::AddEntity), body.toVector());
+            up = true;
+            return;
+        }
+        wire::bedrock::writeMoveEntity(body, static_cast<std::uint64_t>(id), static_cast<float>((*where)[0]),
+                                       static_cast<float>((*where)[1]), static_cast<float>((*where)[2]), 0.0F, 0.0F,
+                                       false);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::MoveEntityAbsolute), body.toVector());
+    };
+    // Nothing to walk into once they are already past it, which is where the damage takes over.
+    const bool inside = session_->x > minX && session_->x < maxX && session_->z > minZ && session_->z < maxZ;
+    const double standY = session_->y - kBelowFeet;
+    std::optional<std::array<double, 3>> alongX;
+    std::optional<std::array<double, 3>> alongZ;
+    if (inside) {
+        // Half its own width past the face, because the box is drawn around where it stands.
+        if (session_->x > maxX - warning) {
+            alongX = std::array{maxX + kHalfWidth, standY, session_->z};
+        } else if (session_->x < minX + warning) {
+            alongX = std::array{minX - kHalfWidth, standY, session_->z};
+        }
+        if (session_->z > maxZ - warning) {
+            alongZ = std::array{session_->x, standY, maxZ + kHalfWidth};
+        } else if (session_->z < minZ + warning) {
+            alongZ = std::array{session_->x, standY, minZ - kHalfWidth};
+        }
+    }
+    standing(kColliderX, borderColliderX_, alongX);
+    standing(kColliderZ, borderColliderZ_, alongZ);
+}
+
 void BedrockPlayer::swing() {
     if (session_ != nullptr && context_.swing) {
         context_.swing(*session_);

@@ -81,6 +81,7 @@ struct Client {
     std::vector<Component> messages;
     std::vector<std::int32_t> packets;
     std::int32_t syncs = 0;
+    std::int32_t waypoints = 0;
 
     [[nodiscard]] PlayerConnection connection() {
         PlayerConnection connection;
@@ -92,6 +93,9 @@ struct Client {
             packets.push_back(id);
         };
         connection.syncExperience = [this] { syncs++; };
+        connection.sendWaypoint = [this](const Uuid&, std::int32_t, const std::string&,
+                                         const std::optional<std::int32_t>&, double, double, double,
+                                         bool) { waypoints++; };
         return connection;
     }
 
@@ -209,7 +213,7 @@ TEST_CASE("waypoint tracks an entity once it has an icon, and pushes it to every
     // parity: `/waypoint modify` answers 0 whether or not it changed anything.
     CHECK(fixture.dispatcher.execute(fixture.source, "waypoint modify Steve color hex #ff0000") == 0);
     CHECK(fixture.source.lastAsText().find("commands.waypoint.modify.color") != std::string::npos);
-    CHECK(fixture.clients[0]->sent(play::TrackedWaypointPacket::kId));
+    CHECK(fixture.clients[0]->waypoints == 1);
 
     CHECK(fixture.dispatcher.execute(fixture.source, "waypoint list") == 1);
     CHECK(fixture.source.lastAsText().find("commands.waypoint.list.success") != std::string::npos);

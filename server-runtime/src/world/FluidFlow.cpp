@@ -173,6 +173,8 @@ public:
     }
 
     /// parity: `LiquidBlock.neighborChanged` on all six sides of what just changed.
+    void arrived(std::int32_t x, std::int32_t y, std::int32_t z) { wake(x, y, z); }
+
     void blockChanged(std::int32_t x, std::int32_t y, std::int32_t z) {
         wake(x, y, z);
         for (const std::array<std::int32_t, 3>& offset : kOffsets) {
@@ -513,10 +515,25 @@ std::optional<FluidKind> kindOf(std::int32_t stateId) {
     return registry::blockFluids::hasWaterFluid(stateId) ? std::optional{FluidKind::Water} : std::nullopt;
 }
 
+std::optional<FluidKind> liquidBlockKindOf(std::int32_t stateId) {
+    for (const FluidKind kind : {FluidKind::Water, FluidKind::Lava}) {
+        const std::int32_t base = baseStateId(kind);
+        if (stateId >= base && stateId <= base + 15) {
+            return kind;
+        }
+    }
+    return std::nullopt;
+}
+
 std::vector<FluidChange> tick(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z) {
     std::vector<FluidChange> changes;
     Flow{context, changes}.tick(x, y, z);
     return changes;
+}
+
+void onArrived(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z) {
+    std::vector<FluidChange> changes;
+    Flow{context, changes}.arrived(x, y, z);
 }
 
 std::vector<FluidChange> onBlockChanged(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z) {

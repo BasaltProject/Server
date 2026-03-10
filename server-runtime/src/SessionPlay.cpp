@@ -24,6 +24,7 @@
 #include <basalt/wire/protocol/VarInt.hpp>
 #include <basalt/wire/protocol/configuration/ConfigurationPackets.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
+#include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
 #include <basalt/wire/protocol/play/InventoryPackets.hpp>
 #include <basalt/wire/protocol/play/PlayerStatePackets.hpp>
@@ -35,6 +36,7 @@
 #include <basalt/wire/text/TranslationResolver.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <utility>
 
@@ -298,6 +300,21 @@ player::PlayerConnection ClientSession::playerConnection() {
         sendPlayPacket(play::BlockDestructionPacket::kId, [&](wire::io::ByteBuffer& buffer) {
             play::BlockDestructionPacket{
                 .entityId = entityId, .pos = play::BlockPos{x, y, z}, .stage = static_cast<std::uint8_t>(stage)}
+                .write(buffer);
+        });
+    };
+    connection.sendWaypoint = [this](const wire::common::Uuid& waypoint, std::int32_t, const std::string& style,
+                                     const std::optional<std::int32_t>& color, const double x, const double y,
+                                     const double z, const bool tracked) {
+        sendPlayPacket(play::TrackedWaypointPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            play::TrackedWaypointPacket{.operation = tracked ? play::TrackedWaypointPacket::Operation::Track
+                                                             : play::TrackedWaypointPacket::Operation::Untrack,
+                                        .entityUuid = waypoint,
+                                        .style = style,
+                                        .color = color,
+                                        .x = static_cast<std::int32_t>(std::floor(x)),
+                                        .y = static_cast<std::int32_t>(std::floor(y)),
+                                        .z = static_cast<std::int32_t>(std::floor(z))}
                 .write(buffer);
         });
     };

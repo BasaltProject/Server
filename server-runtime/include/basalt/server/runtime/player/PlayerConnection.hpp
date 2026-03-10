@@ -192,9 +192,12 @@ struct PlayerConnection {
     std::function<void(const wire::common::Identifier& effect, std::int32_t durationTicks, std::int32_t amplifier)>
         addEffect;
 
-    /// Draws the world border where this player can see it. parity: that edition has no border of
-    /// its own, so the wall the other one's client draws is a patch of refusal particles here.
-    std::function<void(double minX, double maxX, double minZ, double maxZ, std::int32_t warningBlocks)> drawBorderWall;
+    /// Shows the world border to a client that has none of its own: the wall the other edition's
+    /// client draws becomes a patch of refusal particles, and the surface it collides with becomes
+    /// something invisible standing in the way. `withWall` is only the particles, which are worth
+    /// once a second rather than once a turn.
+    std::function<void(double minX, double maxX, double minZ, double maxZ, std::int32_t warningBlocks, bool withWall)>
+        showBorder;
 
     /// A team being made, changed or unmade, and who is in it. parity:
     /// `ClientboundSetPlayerTeamPacket`, which only the edition that has teams is told.
@@ -234,6 +237,14 @@ struct PlayerConnection {
 
     /// Greys an item out for as long as its cooldown lasts.
     std::function<void(const wire::common::Identifier& item, std::int32_t durationTicks)> startItemCooldown;
+
+    /// One entry of the locator bar: which waypoint it is, the entity it follows, where that is,
+    /// and the colour of the dot. `style` names the icon the other door draws it with; this one
+    /// has a single style and works the icon out from how far away the viewer is. A colour of
+    /// none is the icon's own. `tracked` false takes the entry off the bar again.
+    std::function<void(const wire::common::Uuid& waypoint, std::int32_t entityId, const std::string& style,
+                       const std::optional<std::int32_t>& color, double x, double y, double z, bool tracked)>
+        sendWaypoint;
 
     /// Draws somebody else's cracks on a block. `stage` is the ten steps the other door counts in
     /// and `perTick` how much of the block comes off in a turn, because this edition draws the

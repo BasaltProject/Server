@@ -82,6 +82,9 @@ struct Context {
     /// down there dries out on the spot.
     bool evaporates = false;
     bool hasSkylight = true;
+    /// parity: the `ultrawarm` dimension attribute, which is what `LavaFluid.getTickDelay` reads:
+    /// lava in the Nether books its turn three times sooner.
+    bool ultrawarm = false;
 
     /// Wakes the fluids around a square that just changed, and answers what moved on the spot.
     ///
@@ -96,6 +99,10 @@ struct Context {
 
     DispenserNeighbourChange dispenser;
     WakeFluids wakeFluids;
+    /// parity: `LiquidBlock.onPlace`, which runs inside `LevelChunk.setBlockState` and so books the
+    /// new block's own turn **before** a single neighbour is told. Same shape as `wakeFluids` and a
+    /// hook for the same reason; what it wakes is this square and nothing around it.
+    WakeFluids arrivedFluid;
     WallShape wallShape;
     WireReshape wireReshape;
     reshapes::GeyserReshape geyser;

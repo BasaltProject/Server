@@ -53,17 +53,11 @@ void WaypointCommand::build(const CommandNodeBuilder& root) const {
         if (!uuid.has_value()) {
             return;
         }
-        const play::TrackedWaypointPacket packet{.operation = play::TrackedWaypointPacket::Operation::Track,
-                                                 .entityUuid = *uuid,
-                                                 .style = found->second.style.toString(),
-                                                 .color = found->second.color,
-                                                 .x = static_cast<std::int32_t>(std::floor(target->x())),
-                                                 .y = static_cast<std::int32_t>(std::floor(target->y())),
-                                                 .z = static_cast<std::int32_t>(std::floor(target->z()))};
+        const std::string style = found->second.style.toString();
         for (const player::PlayerSession* player : context.environment().players().snapshot()) {
-            if (player->connection().sendPlayPacket) {
-                player->connection().sendPlayPacket(play::TrackedWaypointPacket::kId,
-                                                    [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+            if (player->connection().sendWaypoint) {
+                player->connection().sendWaypoint(*uuid, target->entityId(), style, found->second.color, target->x(),
+                                                  target->y(), target->z(), true);
             }
         }
     };
