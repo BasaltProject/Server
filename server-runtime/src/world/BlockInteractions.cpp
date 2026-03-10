@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
+#include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/RedstoneWire.hpp>
 
 #include <array>
@@ -276,6 +277,14 @@ std::optional<BlockToggle> toggle(WorldState& world, std::int32_t x, std::int32_
         }
     }
     flip(x, y, z);
+    // parity: `TrapDoorBlock.toggle` books the water's turn when the door it just flipped is holding
+    // some, and it is one of only two places in the whole block package that book a fluid outside an
+    // `updateShape`. Both of its callers, a hand through `useWithoutItem` and a wind charge through
+    // `onExplosionHit`, come through here. The gate is not waterlogged wood: a fence gate carries no
+    // `waterlogged` at all, so only the trapdoor can reach this.
+    if (*kind == Toggle::Trapdoor && valueOf(properties, "waterlogged") == "true") {
+        world.scheduleFluidTick(x, y, z, fluidId(FluidKind::Water, true), fluidFlow::kWaterTickDelay);
+    }
     if (*kind == Toggle::Door) {
         // The other half, whichever way round this one is.
         const bool upper = valueOf(properties, "half") == "upper";

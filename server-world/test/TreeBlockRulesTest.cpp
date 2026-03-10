@@ -56,10 +56,18 @@ TEST_CASE("the deferred tree rules match the frozen kotlin across every state") 
     // Each generated block asks a different question, and the hit counts differ accordingly: leaves
     // accept fewer targets than logs because a persistent leaf is never overwritten, and stone
     // accepts none at all because it is not a tree block.
+    //
+    // The two `resolve` sums of the blocks that waterlog were re-frozen when `bubble_column` joined
+    // `blockFluids::kAlwaysInWater`. The jar is the authority over the retired Kotlin here:
+    // `RootPlacer.getPotentiallyWaterloggedState` asks `s.is(FluidTags.WATER)` and
+    // `FoliagePlacer` asks `isSourceOfType(Fluids.WATER)`, and `BubbleColumnBlock.getFluidState`
+    // answers `Fluids.WATER.getSource(false)`, so a column satisfies both. Only these two moved,
+    // which is the check that the entry did what it says: the three rows without `waterlogged` are
+    // untouched.
     const std::vector<DeferredCase> cases = {
         {"oak_log", -862025256425519872LL, 711, 6380730288614645155LL, 32366},
-        {"oak_leaves", 5205421896913956162LL, 557, -7046030527350930536LL, 32366},
-        {"mangrove_roots", -154421432389656447LL, 766, -6466281795662395577LL, 32366},
+        {"oak_leaves", 5205421896913956162LL, 557, 7507921152890863202LL, 32366},
+        {"mangrove_roots", -154421432389656447LL, 766, 2765597207296845505LL, 32366},
         {"muddy_mangrove_roots", 7791462882714030475LL, 4, -1524759485161991939LL, 32366},
         {"stone", 3248206000953826909LL, 0, -4021252027964921389LL, 32366},
     };

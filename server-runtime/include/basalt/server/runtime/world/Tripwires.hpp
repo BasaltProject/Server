@@ -48,6 +48,13 @@ inline constexpr std::int32_t kMaxLength = 42;
 [[nodiscard]] bool hookFalls(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                              std::int32_t stateId, registry::BlockFace towards);
 
+/// Whether an entity of this size crosses the wire whose state this is.
+///
+/// parity: `TripWireBlock.checkPressed` uses the wire's own shape, which is taller while
+/// `attached` is false, crossed with the strict `AABB.intersects`.
+[[nodiscard]] bool crosses(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId, double entityX,
+                           double entityY, double entityZ, double halfWidth, double height);
+
 /// What is standing on a wire, as its own box: the whole block, since a wire is walked into.
 [[nodiscard]] bool isStandingOn(std::int32_t x, std::int32_t y, std::int32_t z, double entityX, double entityY,
                                 double entityZ);

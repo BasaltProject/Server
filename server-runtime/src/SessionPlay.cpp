@@ -243,6 +243,37 @@ player::PlayerConnection ClientSession::playerConnection() {
     connection.addEffect = [this](const Identifier& effect, std::int32_t durationTicks, std::int32_t amplifier) {
         addEffect(effect, durationTicks, amplifier);
     };
+    connection.sendObjective = [this](const std::string& objective, const std::uint8_t method,
+                                      const std::optional<wire::text::Component>& title) {
+        sendPlayPacket(play::SetObjectivePacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            play::SetObjectivePacket{.objectiveName = objective, .method = method, .displayName = title}.write(buffer);
+        });
+    };
+    connection.sendDisplayObjective = [this](const play::DisplaySlot slot, const std::string& objective) {
+        sendPlayPacket(play::SetDisplayObjectivePacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            play::SetDisplayObjectivePacket{.slot = slot, .objectiveName = objective}.write(buffer);
+        });
+    };
+    connection.sendScore = [this](const std::string& holder, const std::string& objective, const std::int32_t value) {
+        sendPlayPacket(play::SetScorePacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            play::SetScorePacket{.owner = holder, .objectiveName = objective, .score = value}.write(buffer);
+        });
+    };
+    connection.sendScoreRemoved = [this](const std::string& holder, const std::optional<std::string>& objective) {
+        sendPlayPacket(play::ResetScorePacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            play::ResetScorePacket{.owner = holder, .objectiveName = objective}.write(buffer);
+        });
+    };
+    connection.sendSpawnPosition = [this](const world::LoadedWorld& world, const std::int32_t x, const std::int32_t y,
+                                          const std::int32_t z, const float angle) {
+        sendPlayPacket(play::SpawnPositionPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            play::SpawnPositionPacket{
+                .globalPos = play::GlobalPos{.dimensionName = world.levelKey(), .location = play::BlockPos{x, y, z}},
+                .yaw = angle,
+                .pitch = 0.0F}
+                .write(buffer);
+        });
+    };
     connection.stopSound = [this](const std::optional<std::string>& sound,
                                   const std::optional<play::SoundSource>& source) {
         sendPlayPacket(play::StopSoundPacket::kId, [&](wire::io::ByteBuffer& buffer) {

@@ -35,6 +35,33 @@ namespace {
 /// parity: `Attributes.MOVEMENT_SPEED`'s default for a player, which is what vanilla sends.
 constexpr float kWalkSpeed = 0.1F;
 
+/// What this connection knows about the scoreboard it has drawn.
+///
+/// The other edition names nothing: a line is a number it was given, so the numbers have to be kept
+/// to take a line away again. One per connection, because the ids are the client's own.
+struct DrawnScoreboard {
+    /// The title each objective was made with, which its slot needs when it is put on screen.
+    std::map<std::string, std::string, std::less<>> titles;
+    /// Which objective each slot shows.
+    std::map<std::string, std::string, std::less<>> slots;
+    /// The line each holder was given, by objective.
+    std::map<std::string, std::map<std::string, std::int64_t, std::less<>>, std::less<>> lines;
+    std::int64_t nextLine = 1;
+};
+
+/// parity: the three slots the other door names, under the words this one uses.
+[[nodiscard]] std::string_view slotName(const wire::protocol::play::DisplaySlot slot) {
+    switch (slot) {
+    case wire::protocol::play::DisplaySlot::List:
+        return "list";
+    case wire::protocol::play::DisplaySlot::BelowName:
+        return "belowname";
+    case wire::protocol::play::DisplaySlot::Sidebar:
+        break;
+    }
+    return "sidebar";
+}
+
 } // namespace
 
 namespace {
@@ -90,6 +117,117 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         // signs rather than acting on them, so the colour arrives as litter in front of the words.
         wire::bedrock::writeDisconnect(body, wire::text::toPlainText(wire::text::resolveComponent(reason, lang)));
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::Disconnect), body.toVector(), true);
+    };
+    // The scoreboard, which the other edition draws out of different packets: it has none for an
+    // objective nobody is shown, and its lines are numbered rather than named.
+    const auto board = std::make_shared<DrawnScoreboard>();
+    const auto showObjective = [mailbox = joining.mailbox, board](const std::string& slot,
+                                                                  const std::string& objective) {
+        wire::io::ByteBuffer body;
+        const auto title = board->titles.find(objective);
+        wire::bedrock::writeSetDisplayObjective(body, slot, objective,
+                                                title == board->titles.end() ? objective : title->second);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetDisplayObjective), body.toVector());
+    };
+    connection.sendObjective = [mailbox = joining.mailbox, board, lang = context_.lang,
+                                showObjective](const std::string& objective, const std::uint8_t method,
+                                               const std::optional<Component>& title) {
+        if (method == wire::protocol::play::SetObjectivePacket::kMethodRemove) {
+            wire::io::ByteBuffer body;
+            wire::bedrock::writeRemoveObjective(body, objective);
+            mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::RemoveObjective), body.toVector());
+            board->titles.erase(objective);
+            board->lines.erase(objective);
+            std::erase_if(board->slots, [&objective](const auto& shown) { return shown.second == objective; });
+            return;
+        }
+        board->titles[objective] =
+            title.has_value() ? wire::text::toLegacyText(wire::text::resolveComponent(*title, lang)) : objective;
+        // A title that changed is only worth sending again where it is already on screen.
+        for (const auto& [slot, shown] : board->slots) {
+            if (shown == objective) {
+                showObjective(slot, objective);
+            }
+        }
+    };
+    connection.sendDisplayObjective = [mailbox = joining.mailbox, board, showObjective](
+                                          const wire::protocol::play::DisplaySlot slot, const std::string& objective) {
+        const std::string where{slotName(slot)};
+        if (objective.empty()) {
+            const auto shown = board->slots.find(where);
+            if (shown != board->slots.end()) {
+                wire::io::ByteBuffer body;
+                wire::bedrock::writeRemoveObjective(body, shown->second);
+                mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::RemoveObjective),
+                              body.toVector());
+                board->slots.erase(shown);
+            }
+            return;
+        }
+        board->slots[where] = objective;
+        showObjective(where, objective);
+        // Every score it already holds, because a client is told them only once its objective is up.
+        const auto held = board->lines.find(objective);
+        if (held == board->lines.end()) {
+            return;
+        }
+        std::vector<wire::bedrock::BedrockScoreLine> lines;
+        lines.reserve(held->second.size());
+        for (const auto& [holder, lineId] : held->second) {
+            lines.push_back({.lineId = lineId, .name = holder, .score = 0});
+        }
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeSetScore(body, objective, lines);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetScore), body.toVector());
+    };
+    connection.sendScore = [mailbox = joining.mailbox, board](const std::string& holder, const std::string& objective,
+                                                              const std::int32_t value) {
+        std::int64_t& lineId = board->lines[objective][holder];
+        if (lineId == 0) {
+            lineId = board->nextLine++;
+        }
+        const std::array<wire::bedrock::BedrockScoreLine, 1> line{
+            wire::bedrock::BedrockScoreLine{.lineId = lineId, .name = holder, .score = value}};
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeSetScore(body, objective, line);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetScore), body.toVector());
+    };
+    connection.sendScoreRemoved = [mailbox = joining.mailbox, board](const std::string& holder,
+                                                                     const std::optional<std::string>& objective) {
+        std::vector<std::int64_t> gone;
+        for (auto& [name, holders] : board->lines) {
+            if (objective.has_value() && name != *objective) {
+                continue;
+            }
+            const auto found = holders.find(holder);
+            if (found != holders.end()) {
+                gone.push_back(found->second);
+                holders.erase(found);
+            }
+        }
+        if (gone.empty()) {
+            return;
+        }
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeRemoveScores(body, gone);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetScore), body.toVector());
+    };
+    connection.sendSpawnPosition = [mailbox = joining.mailbox](const world::LoadedWorld& world, const std::int32_t x,
+                                                               const std::int32_t y, const std::int32_t z, float) {
+        wire::bedrock::BedrockDimension dimension = wire::bedrock::BedrockDimension::Overworld;
+        switch (world.declaration().dimension) {
+        case config::WorldDimension::Nether:
+            dimension = wire::bedrock::BedrockDimension::Nether;
+            break;
+        case config::WorldDimension::End:
+            dimension = wire::bedrock::BedrockDimension::End;
+            break;
+        case config::WorldDimension::Overworld:
+            break;
+        }
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeSetSpawnPosition(body, dimension, x, y, z);
+        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetSpawnPosition), body.toVector());
     };
     // parity: that edition names a mixer and this one cannot, so stopping one mixer stops the lot.
     // A stop that names a sound is the only one it can be exact about.

@@ -190,15 +190,28 @@ TEST_CASE("a string with nothing at both ends powers nothing") {
     CHECK(propertyAt(world, 4, 64, 8, "attached") == "false");
 }
 
-TEST_CASE("the box a wire is crossed in") {
-    // A wire lies on the floor, so the whole block counts and a little below it.
-    CHECK(tripwires::isStandingOn(0, 64, 0, 0.5, 64.0, 0.5));
-    CHECK(tripwires::isStandingOn(0, 64, 0, 0.0, 64.0, 1.0));
-    CHECK(tripwires::isStandingOn(0, 64, 0, 0.5, 63.95, 0.5));
-    CHECK(tripwires::isStandingOn(0, 64, 0, 0.5, 65.0, 0.5));
-    CHECK_FALSE(tripwires::isStandingOn(0, 64, 0, 0.5, 63.9, 0.5));
-    CHECK_FALSE(tripwires::isStandingOn(0, 64, 0, 1.1, 64.0, 0.5));
-    CHECK_FALSE(tripwires::isStandingOn(0, 64, 0, 0.5, 64.0, -0.1));
+TEST_CASE("a wire is crossed by a box, and the box changes when it is strung") {
+    // parity: `SHAPE_NOT_ATTACHED = Block.column(16.0, 0.0, 8.0)` while the line is loose and
+    // `SHAPE_ATTACHED = Block.column(16.0, 1.0, 2.5)` once it is strung. Full width both ways; what
+    // changes is how tall it is.
+    constexpr double kHalf = 0.3;
+    constexpr double kTall = 1.8;
+    const std::int32_t loose = wireOf("false", "false");
+    const std::int32_t strung = wireOf("false", "true");
+
+    CHECK(tripwires::crosses(0, 64, 0, loose, 0.5, 64.0, 0.5, kHalf, kTall));
+    CHECK(tripwires::crosses(0, 64, 0, strung, 0.5, 64.0, 0.5, kHalf, kTall));
+
+    // A body one square over still reaches in, which a point never did.
+    CHECK(tripwires::crosses(0, 64, 0, loose, 1.1, 64.0, 0.5, kHalf, kTall));
+    CHECK_FALSE(tripwires::crosses(0, 64, 0, loose, 1.4, 64.0, 0.5, kHalf, kTall));
+
+    // The strung shape starts a sixteenth up and is two and a half tall, so feet resting on the
+    // block still cross it, and a body that has already climbed past it does not.
+    CHECK(tripwires::crosses(0, 64, 0, strung, 0.5, 63.9, 0.5, kHalf, kTall));
+    CHECK_FALSE(tripwires::crosses(0, 64, 0, strung, 0.5, 64.16, 0.5, kHalf, kTall));
+    // The loose one is half a block tall, so it is still crossed where the strung one is not.
+    CHECK(tripwires::crosses(0, 64, 0, loose, 0.5, 64.16, 0.5, kHalf, kTall));
 }
 
 TEST_CASE("what is not a wire and what is not a hook") {

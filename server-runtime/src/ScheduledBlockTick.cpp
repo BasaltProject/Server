@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/RedstoneTickSystem.hpp>
 #include <basalt/server/runtime/entity/BlockTriggers.hpp>
@@ -145,15 +146,25 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
         const wire::common::Identifier* block = server::registry::blockStateDefinitions::blockOf(here);
         if (block != nullptr && *block == world::tripwires::wireBlock()) {
             bool stillOn = false;
+            // parity: the recheck reads the same box the press did, `state.getShape(...).bounds()`,
+            // so the two have to ask the same question or a string lets go while somebody is still
+            // in it.
+            const auto sizeOf = [](const wire::common::Identifier& type) {
+                return std::pair{server::registry::entityTypeShapes::widthOf(type) / 2.0,
+                                 server::registry::entityTypeShapes::heightOf(type)};
+            };
+            const auto [playerHalf, playerHeight] = sizeOf(wire::common::Identifier::vanilla("player"));
+            const auto [itemHalf, itemHeight] = sizeOf(wire::common::Identifier::vanilla("item"));
             for (const PlayerSession* player : watchers) {
-                if (world::tripwires::isStandingOn(x, y, z, player->x, player->y, player->z)) {
+                if (world::tripwires::crosses(x, y, z, here, player->x, player->y, player->z, playerHalf,
+                                              playerHeight)) {
                     stillOn = true;
                     break;
                 }
             }
             if (!stillOn) {
                 for (const world::DroppedItem& item : world.state().items()) {
-                    if (world::tripwires::isStandingOn(x, y, z, item.x, item.y, item.z)) {
+                    if (world::tripwires::crosses(x, y, z, here, item.x, item.y, item.z, itemHalf, itemHeight)) {
                         stillOn = true;
                         break;
                     }
@@ -163,8 +174,12 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             // own shape, so what keeps a string down is not only a player or an item.
             if (!stillOn) {
                 for (const entity::ServerEntity* standing : world.state().entities()) {
-                    if (!standing->removed && !entity::blockTriggers::ignored(standing->type()) &&
-                        world::tripwires::isStandingOn(x, y, z, standing->x, standing->y, standing->z)) {
+                    if (standing->removed || entity::blockTriggers::ignored(standing->type())) {
+                        continue;
+                    }
+                    const auto [half, height] = sizeOf(standing->type());
+                    if (world::tripwires::crosses(x, y, z, here, standing->x, standing->y, standing->z, half,
+                                                  height)) {
                         stillOn = true;
                         break;
                     }

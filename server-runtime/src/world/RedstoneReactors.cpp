@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/Dripleaves.hpp>
+#include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/NoteBlocks.hpp>
 #include <basalt/server/runtime/world/PoweredRails.hpp>
 #include <basalt/server/runtime/world/Redstone.hpp>
@@ -132,6 +133,12 @@ void openable(WorldState& world, std::string_view worldName, std::int32_t x, std
     }
     write(world, x, y, z, stateId, {{"powered", signal ? "true" : "false"}, {"open", signal ? "true" : "false"}},
           changes, openSound(stateId, signal, random));
+    // parity: `TrapDoorBlock.neighborChanged` ends by booking the water's turn when the door holds
+    // some, which is the other half of the pair `TrapDoorBlock.toggle` opens. `FenceGateBlock` shares
+    // this function and books nothing: it has no `waterlogged` to hold water with.
+    if (pathOf(stateId).ends_with("_trapdoor") && valueOf(properties, "waterlogged") == "true") {
+        world.scheduleFluidTick(x, y, z, fluidId(FluidKind::Water, true), fluidFlow::kWaterTickDelay);
+    }
 }
 
 /// parity: `HopperBlock.checkPoweredState`, which is the whole of it: a hopper with any signal
