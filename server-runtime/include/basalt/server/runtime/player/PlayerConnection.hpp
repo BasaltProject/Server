@@ -35,6 +35,18 @@ struct Dialog;
 
 namespace basalt::server::runtime::player {
 
+/// One piece of the title screen. parity: the other door sends five packets for these and this
+/// edition one kind with a type on it, so what travels is which piece it is.
+enum class TitlePiece : std::uint8_t {
+    Title,
+    Subtitle,
+    ActionBar,
+    Times,
+    /// Takes what is on screen away; `Reset` also puts the times back to their defaults.
+    Clear,
+    Reset,
+};
+
 /// What a player's session needs of the connection they arrived on.
 ///
 /// Five facts and one call, handed over rather than reached for: the session is what outlives a
@@ -242,6 +254,16 @@ struct PlayerConnection {
 
     /// Greys an item out for as long as its cooldown lasts.
     std::function<void(const wire::common::Identifier& item, std::int32_t durationTicks)> startItemCooldown;
+
+    /// One piece of the title screen, which is what `/title` sends. The whole-screen `sendTitle`
+    /// above is what a plugin asks for instead: it says everything at once.
+    std::function<void(TitlePiece piece, const wire::text::Component& text, std::int32_t fadeIn, std::int32_t stay,
+                       std::int32_t fadeOut)>
+        sendTitlePiece;
+
+    /// Whose eyes they watch through. Their own entity id puts the camera back, which is how a
+    /// spectator stops. The edition with no spectating of its own moves a camera by hand instead.
+    std::function<void(std::int32_t entityId)> setCamera;
 
     /// One dialog to put in front of them. The other door only needs its registry id, since the
     /// client draws it from the registry it was sent; this one has no dialogs of its own and is

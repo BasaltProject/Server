@@ -959,6 +959,7 @@ void BedrockPlayer::tick() {
         ui_->tick(uiTick_++, context);
     }
     syncSurroundings();
+    tickCamera();
     if (session_ != nullptr && context_.lookAround) {
         // The answer lands on the world's thread, where this player may already be gone: it carries
         // the shared slot and nothing else.
@@ -978,6 +979,99 @@ void BedrockPlayer::tick() {
             static_cast<void>(sendColumnsAround({}));
         }
     }
+}
+
+void BedrockPlayer::setCamera(const std::int32_t entityId) {
+    if (session_ == nullptr) {
+        return;
+    }
+    if (entityId == session_->entityId()) {
+        if (spectating_ == 0) {
+            return;
+        }
+        spectating_ = 0;
+        clearCamera_ = true;
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeCameraClear(body, true);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::CameraInstruction), body.toVector());
+        return;
+    }
+    spectating_ = entityId;
+    clearCamera_ = false;
+    tickCamera();
+}
+
+void BedrockPlayer::tickCamera() {
+    if (clearCamera_) {
+        clearCamera_ = false;
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeCameraClear(body, false);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::CameraInstruction), body.toVector());
+    }
+    if (spectating_ == 0) {
+        return;
+    }
+
+    /// How far behind the watched entity the camera sits, and how much of their height the eyes
+    /// are at. parity: Geyser's own two numbers.
+    constexpr double kBehind = 4.0;
+    constexpr double kEyeRatio = 0.85;
+    constexpr double kDegrees = 0.017453292;
+    /// Long enough to look smooth and short enough not to lag behind somebody running.
+    constexpr float kEase = 0.15F;
+
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
+    double height = 1.8;
+    float yaw = 0.0F;
+    float pitch = 0.0F;
+    bool found = false;
+    for (const auto& [uuid, other] : others_) {
+        if (other.entityId == spectating_) {
+            x = other.x;
+            y = other.y;
+            z = other.z;
+            yaw = other.yaw;
+            pitch = other.pitch;
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        const auto seen = shown_.find(spectating_);
+        if (seen == shown_.end()) {
+            // Out of range, or gone. The camera stays where it was rather than snapping home.
+            return;
+        }
+        x = seen->second.x;
+        y = seen->second.y;
+        z = seen->second.z;
+        yaw = seen->second.yaw;
+        pitch = seen->second.pitch;
+        height = static_cast<double>(seen->second.height);
+        found = true;
+    }
+
+    // parity: `Mth`'s own view vector, which is what puts the camera on the line the eyes look
+    // along rather than on the one the body faces.
+    const double alongYaw = -static_cast<double>(yaw) * kDegrees;
+    const double alongPitch = static_cast<double>(pitch) * kDegrees;
+    const double flat = std::cos(alongPitch);
+    const double forwardX = std::sin(alongYaw) * flat;
+    const double forwardY = -std::sin(alongPitch);
+    const double forwardZ = std::cos(alongYaw) * flat;
+
+    const wire::bedrock::BedrockCamera camera{.preset = wire::bedrock::BedrockCameraPreset::Free,
+                                              .x = static_cast<float>(x - (forwardX * kBehind)),
+                                              .y = static_cast<float>(y + (height * kEyeRatio) - (forwardY * kBehind)),
+                                              .z = static_cast<float>(z - (forwardZ * kBehind)),
+                                              .pitch = pitch,
+                                              .yaw = yaw,
+                                              .easeSeconds = kEase};
+    wire::io::ByteBuffer body;
+    wire::bedrock::writeCameraSet(body, camera);
+    mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::CameraInstruction), body.toVector());
 }
 
 void BedrockPlayer::syncSurroundings() {
@@ -1220,6 +1314,18 @@ void BedrockPlayer::syncOthers() {
                                                                            : std::string{};
             wornKey += '|';
         }
+        // parity: the three the other door carries in `SharedFlags` that this edition draws by
+        // itself. Sleeping is a flag of the second word and has its own packet here.
+        std::uint64_t flags = 0;
+        if (other->fireTicks > 0) {
+            flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::OnFire);
+        }
+        if (other->sneaking) {
+            flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Sneaking);
+        }
+        if (other->sprinting) {
+            flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Sprinting);
+        }
         const Other now{other->entityId(),
                         other->x,
                         other->y,
@@ -1227,7 +1333,8 @@ void BedrockPlayer::syncOthers() {
                         other->yaw,
                         other->pitch,
                         holding.has_value() ? holding->id : std::string{},
-                        wornKey};
+                        wornKey,
+                        flags};
         present.emplace(other->uuid(), now);
 
         // What is in their hand, whenever it is not what it was. Sent after the spawn below on the
@@ -1247,6 +1354,13 @@ void BedrockPlayer::syncOthers() {
                 itemStackFor(wearing[1], protocol_), itemStackFor(wearing[2], protocol_),
                 itemStackFor(wearing[3], protocol_), wire::bedrock::BedrockItemStack{}, protocol_);
             post(wire::bedrock::BedrockPacket::MobArmorEquipment, body);
+        };
+
+        /// How they are drawn, whenever that changed.
+        const auto drawFlags = [this, &post, &now] {
+            wire::io::ByteBuffer body;
+            wire::bedrock::writeEntityFlags(body, runtimeIdFor(now.entityId), now.flags, protocol_);
+            post(wire::bedrock::BedrockPacket::SetEntityData, body);
         };
 
         const auto known = others_.find(other->uuid());
@@ -1282,6 +1396,9 @@ void BedrockPlayer::syncOthers() {
             post(wire::bedrock::BedrockPacket::AddPlayer, body);
             drawHand();
             drawArmour();
+            if (now.flags != 0) {
+                drawFlags();
+            }
             continue;
         }
 
@@ -1291,6 +1408,9 @@ void BedrockPlayer::syncOthers() {
         }
         if (before.worn != now.worn) {
             drawArmour();
+        }
+        if (before.flags != now.flags) {
+            drawFlags();
         }
         const bool moved = std::abs(now.x - before.x) > kMoveEpsilon || std::abs(now.y - before.y) > kMoveEpsilon ||
                            std::abs(now.z - before.z) > kMoveEpsilon;

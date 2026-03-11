@@ -30,6 +30,7 @@ using basalt::wire::text::Component;
 namespace commands = basalt::server::runtime::command::commands;
 namespace config = basalt::server::runtime::config;
 namespace play = basalt::wire::protocol::play;
+using Piece = basalt::server::runtime::player::TitlePiece;
 
 namespace {
 
@@ -74,6 +75,7 @@ public:
 struct Client {
     std::vector<Component> messages;
     std::vector<std::int32_t> packets;
+    std::vector<basalt::server::runtime::player::TitlePiece> titles;
     std::int32_t syncs = 0;
 
     [[nodiscard]] PlayerConnection connection() {
@@ -86,10 +88,16 @@ struct Client {
             packets.push_back(id);
         };
         connection.syncExperience = [this] { syncs++; };
+        connection.sendTitlePiece = [this](basalt::server::runtime::player::TitlePiece piece, const Component&,
+                                           std::int32_t, std::int32_t, std::int32_t) { titles.push_back(piece); };
         return connection;
     }
 
     [[nodiscard]] bool sent(std::int32_t id) const { return std::ranges::find(packets, id) != packets.end(); }
+
+    [[nodiscard]] bool showed(basalt::server::runtime::player::TitlePiece piece) const {
+        return std::ranges::find(titles, piece) != titles.end();
+    }
 };
 
 [[nodiscard]] std::string scratch(std::string_view name) {
@@ -144,6 +152,7 @@ struct Fixture {
 } // namespace
 
 namespace play = basalt::wire::protocol::play;
+using Piece = basalt::server::runtime::player::TitlePiece;
 
 TEST_CASE("title sends each of the three lines to everyone it names") {
     Fixture fixture{scratch("hud-commands-title")};
@@ -152,16 +161,16 @@ TEST_CASE("title sends each of the three lines to everyone it names") {
     fixture.dispatcher.registerCommand(std::make_shared<commands::TitleCommand>());
 
     CHECK(fixture.dispatcher.execute(fixture.source, "title @a title \"Hello\"") == 2);
-    CHECK(fixture.clients[0]->sent(play::kSetTitleTextId));
-    CHECK(fixture.clients[1]->sent(play::kSetTitleTextId));
+    CHECK(fixture.clients[0]->showed(Piece::Title));
+    CHECK(fixture.clients[1]->showed(Piece::Title));
     CHECK(fixture.source.lastAsText().find("commands.title.show.title.multiple") != std::string::npos);
 
     CHECK(fixture.dispatcher.execute(fixture.source, "title Steve subtitle \"Hi\"") == 1);
-    CHECK(fixture.clients[0]->sent(play::kSetSubtitleTextId));
+    CHECK(fixture.clients[0]->showed(Piece::Subtitle));
     CHECK(fixture.source.lastAsText().find("commands.title.show.subtitle.single") != std::string::npos);
 
     CHECK(fixture.dispatcher.execute(fixture.source, "title Steve actionbar \"Hi\"") == 1);
-    CHECK(fixture.clients[0]->sent(play::kSetActionBarTextId));
+    CHECK(fixture.clients[0]->showed(Piece::ActionBar));
 }
 
 TEST_CASE("title clear and reset differ only in whether the timings go back too") {
@@ -173,7 +182,7 @@ TEST_CASE("title clear and reset differ only in whether the timings go back too"
     CHECK(fixture.source.lastAsText().find("commands.title.cleared.single") != std::string::npos);
     CHECK(fixture.dispatcher.execute(fixture.source, "title Steve reset") == 1);
     CHECK(fixture.source.lastAsText().find("commands.title.reset.single") != std::string::npos);
-    CHECK(fixture.clients[0]->sent(play::ClearTitlesPacket::kId));
+    CHECK(fixture.clients[0]->showed(Piece::Clear));
 }
 
 TEST_CASE("title times takes three tick counts") {
@@ -182,7 +191,7 @@ TEST_CASE("title times takes three tick counts") {
     fixture.dispatcher.registerCommand(std::make_shared<commands::TitleCommand>());
 
     CHECK(fixture.dispatcher.execute(fixture.source, "title Steve times 10 70 20") == 1);
-    CHECK(fixture.clients[0]->sent(play::SetTitlesAnimationPacket::kId));
+    CHECK(fixture.clients[0]->showed(Piece::Times));
     CHECK(fixture.source.lastAsText().find("commands.title.times.single") != std::string::npos);
 }
 
