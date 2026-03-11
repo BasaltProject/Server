@@ -2,6 +2,8 @@
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 #include <basalt/server/runtime/command/commands/RemainingCommands.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/world/Dialogs.hpp>
+#include <basalt/server/runtime/world/RealDialogs.hpp>
 #include <basalt/wire/protocol/play/UiPackets.hpp>
 
 #include <algorithm>
@@ -151,12 +153,21 @@ void DialogCommand::build(const CommandNodeBuilder& root) const {
                                 {Component::text(id->toString()), Component::text("minecraft:dialog")})}};
                     }
                     const std::vector<player::PlayerSession*>& targets = targetsOf(context);
-                    const play::ShowDialogPacket packet{.dialogId = *dialogId};
+                    // The door that has no dialogs of its own builds a screen out of this, so the
+                    // registry is read here once rather than by each connection.
+                    const world::RealDialogs& registry = *dialogs_;
+                    const std::optional<world::dialogs::Dialog> dialog = world::dialogs::read(
+                        registry.entries()[static_cast<std::size_t>(*dialogId)].second,
+                        [&registry](const Identifier& named) -> const wire::nbt::NbtCompound* {
+                            const std::optional<std::int32_t> at = registry.protocolIdOf(named);
+                            return at.has_value() ? &registry.entries()[static_cast<std::size_t>(*at)].second : nullptr;
+                        });
+                    if (!dialog.has_value()) {
+                        return 0;
+                    }
                     for (const player::PlayerSession* target : targets) {
-                        if (target->connection().sendPlayPacket) {
-                            target->connection().sendPlayPacket(
-                                play::ShowDialogPacket::kId,
-                                [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+                        if (target->connection().showDialog) {
+                            target->connection().showDialog(*dialogId, *dialog);
                         }
                     }
                     context.success(targets.size() == 1

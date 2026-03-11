@@ -16,6 +16,7 @@
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/Dialogs.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
@@ -301,6 +302,11 @@ player::PlayerConnection ClientSession::playerConnection() {
             play::BlockDestructionPacket{
                 .entityId = entityId, .pos = play::BlockPos{x, y, z}, .stage = static_cast<std::uint8_t>(stage)}
                 .write(buffer);
+        });
+    };
+    connection.showDialog = [this](const std::int32_t dialogId, const world::dialogs::Dialog&) {
+        sendPlayPacket(play::ShowDialogPacket::kId, [dialogId](wire::io::ByteBuffer& buffer) {
+            play::ShowDialogPacket{.dialogId = dialogId}.write(buffer);
         });
     };
     connection.sendWaypoint = [this](const wire::common::Uuid& waypoint, std::int32_t, const std::string& style,

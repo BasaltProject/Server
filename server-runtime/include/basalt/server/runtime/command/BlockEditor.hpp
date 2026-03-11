@@ -59,11 +59,11 @@ public:
     /// Sends everything written since the last flush to whoever is in this world.
     void flush();
 
-    /// parity: `BlockInput.place` runs `Block.updateFromNeighbourShapes` on the state unless the
-    /// caller asked for `strict`, which is why `/setblock` of a dust beside a dust draws a line and
-    /// not a stub. Say this before writing to get the `strict` behaviour, which places what is
-    /// written and nothing else.
-    void placeExactly() noexcept { adjustToNeighbours_ = false; }
+    /// parity: `/setblock ... strict` and `/fill ... strict` write with `2 | 816`, that is
+    /// `16 | 32 | 256 | 512`: no pre-shape, no shape walk, no item, no block entity side effects and
+    /// no `onPlace`. The command does not call `updateNeighboursOnBlockSet` either, so the write
+    /// lands and says nothing.
+    void writeStrictly() noexcept { strict_ = true; }
 
 private:
     /// The one write, with the block entity side effects the caller asks for.
@@ -91,7 +91,7 @@ private:
     /// work.
     void notifyNeighbours();
 
-    bool adjustToNeighbours_ = true;
+    bool strict_ = false;
     /// What the command named, by position, until the next flush.
     std::map<std::array<std::int32_t, 3>, std::map<std::string, std::string>> written_properties_;
     /// What each written position held before, for the removal half of the cascade.

@@ -28,6 +28,11 @@ namespace basalt::server::runtime::world {
 class LoadedWorld;
 } // namespace basalt::server::runtime::world
 
+/// The same, for one dialog already flattened to what a screen of buttons can draw.
+namespace basalt::server::runtime::world::dialogs {
+struct Dialog;
+} // namespace basalt::server::runtime::world::dialogs
+
 namespace basalt::server::runtime::player {
 
 /// What a player's session needs of the connection they arrived on.
@@ -237,6 +242,11 @@ struct PlayerConnection {
 
     /// Greys an item out for as long as its cooldown lasts.
     std::function<void(const wire::common::Identifier& item, std::int32_t durationTicks)> startItemCooldown;
+
+    /// One dialog to put in front of them. The other door only needs its registry id, since the
+    /// client draws it from the registry it was sent; this one has no dialogs of its own and is
+    /// handed the whole thing to build a form out of.
+    std::function<void(std::int32_t dialogId, const world::dialogs::Dialog& dialog)> showDialog;
 
     /// One entry of the locator bar: which waypoint it is, the entity it follows, where that is,
     /// and the colour of the dot. `style` names the icon the other door draws it with; this one

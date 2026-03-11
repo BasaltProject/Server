@@ -378,6 +378,30 @@ bool isSupported(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t
             return under != nullptr && mine != nullptr && *under == *mine;
         }
     }
+    // parity: `DoublePlantBlock.canSurvive`, which is the door's bug one block over: the lower half
+    // asks only about the square under it, and the upper half asks that the lower one be there. The
+    // probe learnt "the partner must be above" from `updateShape`, which answers a different
+    // question, so a lower half written on its own was swept away. `tall_seagrass` put over water by
+    // command is: the jar keeps it and both halves vanished here.
+    if (const std::string half = valueOf(state, "half"); half == "upper" || half == "lower") {
+        const std::int32_t below = stateAt(world, x, y - 1, z);
+        const wire::common::Identifier* mine = registry::blockStateDefinitions::blockOf(state);
+        if (half == "upper") {
+            const wire::common::Identifier* under = registry::blockStateDefinitions::blockOf(below);
+            return under != nullptr && mine != nullptr && *under == *mine && valueOf(below, "half") == "lower";
+        }
+        // The lower half is asked with its partner in place, so every other side keeps the probe's
+        // answer: `TallSeagrassBlock` wants full water at the square and that rides on `waterAbout`.
+        if (mine != nullptr) {
+            if (const std::optional<std::int32_t> partner =
+                    registry::blockStateDefinitions::stateIdOf(*mine, {{"half", "upper"}}, state);
+                partner.has_value()) {
+                return registry::blockSupport::canSurvive(state, below, *partner, stateAt(world, x, y, z - 1),
+                                                          stateAt(world, x, y, z + 1), stateAt(world, x - 1, y, z),
+                                                          stateAt(world, x + 1, y, z), waterAbout(world, x, y, z));
+            }
+        }
+    }
     // parity: `BasePressurePlateBlock.canSurvive` is `canSupportRigidBlock(below) ||
     // canSupportCenter(below, UP)`, another question about the **state** below that the table's set
     // of block ids cannot ask. Same cause as the dust above: a trapdoor closed at the top of its

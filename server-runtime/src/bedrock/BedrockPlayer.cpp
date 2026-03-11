@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/bedrock/BedrockRecipes.hpp>
 #include <basalt/server/runtime/placeholder/PlaceholderSlots.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
+#include <basalt/server/runtime/world/Dialogs.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
@@ -831,6 +832,68 @@ void BedrockPlayer::showMenu(const std::string& title, const std::map<std::int32
     wire::bedrock::writeModalFormRequest(
         body, formId,
         wire::bedrock::simpleFormJson(wire::text::toLegacyText(wire::text::miniMessage::parse(title)), "", buttons));
+    mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::ModalFormRequest), body.toVector());
+}
+
+void BedrockPlayer::showDialog(const world::dialogs::Dialog& dialog) {
+    const auto flatten = [this](const wire::text::Component& text) {
+        return wire::text::toLegacyText(wire::text::resolveComponent(text, context_.lang));
+    };
+    // The body is the whole of what a dialog says; a screen of buttons has one place to put it.
+    std::string content;
+    for (const wire::text::Component& line : dialog.body) {
+        content += content.empty() ? flatten(line) : "\n\n" + flatten(line);
+    }
+    if (dialog.hasInputs) {
+        content += content.empty() ? "" : "\n\n";
+        content += "This dialog asks for something this edition cannot type here.";
+    }
+
+    // Held rather than referenced: the click comes back long after whoever asked for the dialog
+    // has gone, and a button may lead to another dialog inside this one.
+    const auto held = std::make_shared<const world::dialogs::Dialog>(dialog);
+    std::vector<std::string> buttons;
+    std::vector<std::int32_t> which;
+    buttons.reserve(held->buttons.size());
+    which.reserve(held->buttons.size());
+    for (std::size_t at = 0; at < held->buttons.size(); ++at) {
+        buttons.push_back(flatten(held->buttons[at].label));
+        which.push_back(static_cast<std::int32_t>(at));
+    }
+
+    std::uint32_t formId = 0;
+    {
+        const std::lock_guard<std::mutex> guard{formLock_};
+        formId = nextFormId_++;
+        openTitle_.clear();
+        form_ =
+            OpenForm{formId, std::move(which), [this, held](const std::int32_t at) {
+                         if (at < 0 || static_cast<std::size_t>(at) >= held->buttons.size()) {
+                             return;
+                         }
+                         const world::dialogs::Button& pressed = held->buttons[static_cast<std::size_t>(at)];
+                         switch (pressed.press) {
+                         case world::dialogs::Press::RunCommand:
+                             command(pressed.value);
+                             return;
+                         case world::dialogs::Press::ShowText:
+                             if (session_ != nullptr && session_->connection().sendSystemMessage) {
+                                 session_->connection().sendSystemMessage(wire::text::Component::text(pressed.value));
+                             }
+                             return;
+                         case world::dialogs::Press::OpenDialog:
+                             if (pressed.next != nullptr) {
+                                 showDialog(*pressed.next);
+                             }
+                             return;
+                         case world::dialogs::Press::None:
+                             return;
+                         }
+                     }};
+    }
+    wire::io::ByteBuffer body;
+    wire::bedrock::writeModalFormRequest(body, formId,
+                                         wire::bedrock::simpleFormJson(flatten(dialog.title), content, buttons));
     mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::ModalFormRequest), body.toVector());
 }
 

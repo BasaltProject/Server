@@ -32,7 +32,7 @@ enum class Mode : std::uint8_t { Replace, Destroy, Keep, Outline, Hollow };
         return std::unexpected{editor.error()};
     }
     if (strict) {
-        editor->placeExactly();
+        editor->writeStrictly();
     }
     const std::array<std::int32_t, 3> at = resolve(context, "pos");
     if (const std::optional<CommandSyntaxError> failure = editor->require(at[0], at[1], at[2]); failure.has_value()) {
@@ -71,10 +71,13 @@ enum class Mode : std::uint8_t { Replace, Destroy, Keep, Outline, Hollow };
     return editor.set(x, y, z, stateId);
 }
 
-[[nodiscard]] Parsed<std::int32_t> fill(const CommandContext& context, Mode mode, bool onlyAir) {
+[[nodiscard]] Parsed<std::int32_t> fill(const CommandContext& context, Mode mode, bool onlyAir, bool strict = false) {
     std::expected<BlockEditor, CommandSyntaxError> editor = blocksOf(context);
     if (!editor.has_value()) {
         return std::unexpected{editor.error()};
+    }
+    if (strict) {
+        editor->writeStrictly();
     }
     const auto* filter = context.get<BlockPredicateInput>("filter");
     const std::array<std::int32_t, 3> from = resolve(context, "from");
@@ -175,15 +178,19 @@ void FillCommand::build(const CommandNodeBuilder& root) const {
             to.argument("block", blockStateArgument(), [](const CommandNodeBuilder& block) {
                 block.executes([](const CommandContext& context) { return fill(context, Mode::Replace, false); });
                 const auto forms = [](const CommandNodeBuilder& node) {
-                    for (const auto& [word, mode] :
-                         std::array<std::pair<std::string_view, Mode>, 4>{{{"outline", Mode::Outline},
-                                                                           {"hollow", Mode::Hollow},
-                                                                           {"destroy", Mode::Destroy},
-                                                                           {"strict", Mode::Replace}}}) {
+                    for (const auto& [word, mode] : std::array<std::pair<std::string_view, Mode>, 3>{
+                             {{"outline", Mode::Outline}, {"hollow", Mode::Hollow}, {"destroy", Mode::Destroy}}}) {
                         node.literal(std::string{word}, [mode](const CommandNodeBuilder& form) {
                             form.executes([mode](const CommandContext& context) { return fill(context, mode, false); });
                         });
                     }
+                    // parity: `FillCommand.wrapWithMode` hangs `strict` beside the three modes, but it
+                    // is REPLACE with the strict flag, not a mode of its own. Folded into the list the
+                    // word parsed and did nothing.
+                    node.literal("strict", [](const CommandNodeBuilder& form) {
+                        form.executes(
+                            [](const CommandContext& context) { return fill(context, Mode::Replace, false, true); });
+                    });
                 };
                 forms(block);
                 block.literal("keep", [](const CommandNodeBuilder& form) {
