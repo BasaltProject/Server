@@ -1094,11 +1094,31 @@ void BedrockPlayer::syncSurroundings() {
         now = std::move(surroundings_->latest);
     }
 
-    /// How it is drawn, which this edition keeps in a handful of fields shared by every mob.
+    /// How it is drawn, which this edition keeps in a handful of fields shared by every mob, and
+    /// for the newest looks in a property of its own.
     const auto drawLook = [this](const std::int32_t id, const Seen& seen) {
-        wire::io::ByteBuffer body;
-        wire::bedrock::writeEntityLook(body, runtimeIdFor(id), seen.look, protocol_);
-        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetEntityData), body.toVector());
+        if (wire::bedrock::hasAnything(seen.look)) {
+            wire::io::ByteBuffer body;
+            wire::bedrock::writeEntityLook(body, runtimeIdFor(id), seen.look, protocol_);
+            mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetEntityData), body.toVector());
+        }
+        if (seen.look.climate.has_value()) {
+            wire::io::ByteBuffer property;
+            wire::bedrock::writeEntityIntProperty(property, runtimeIdFor(id), 0, *seen.look.climate);
+            mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetEntityData),
+                           property.toVector());
+        }
+    };
+
+    /// An item frame, which is a block over here: the block itself and then what is in it.
+    const auto drawFrame = [this](const Seen::Frame& frame) {
+        wire::io::ByteBuffer block;
+        wire::bedrock::writeItemFrameBlock(block, frame.x, frame.y, frame.z, frame.glowing, frame.face, protocol_);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::UpdateBlock), block.toVector());
+        wire::io::ByteBuffer inside;
+        wire::bedrock::writeItemFrameData(inside, frame.x, frame.y, frame.z, frame.glowing, frame.item, frame.count,
+                                          frame.rotation);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::BlockEntityData), inside.toVector());
     };
 
     /// The line over an entity, which is its own packet here rather than a field of the spawn.
@@ -1121,6 +1141,17 @@ void BedrockPlayer::syncSurroundings() {
                                                   0.0F, protocol_);
                 mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::AddItemEntity),
                                body.toVector());
+            } else if (seen.frame.has_value()) {
+                drawFrame(*seen.frame);
+                present.emplace(id, std::move(seen));
+                continue;
+            } else if (!seen.motive.empty()) {
+                wire::bedrock::writeAddPainting(body, static_cast<std::int64_t>(runtimeIdFor(id)), runtimeIdFor(id),
+                                                static_cast<float>(seen.x), static_cast<float>(seen.y),
+                                                static_cast<float>(seen.z), seen.facing, seen.motive);
+                mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::AddPainting), body.toVector());
+                present.emplace(id, std::move(seen));
+                continue;
             } else {
                 wire::bedrock::writeAddEntity(body, static_cast<std::int64_t>(runtimeIdFor(id)), seen.type,
                                               static_cast<float>(seen.x), static_cast<float>(seen.y),
@@ -1131,7 +1162,7 @@ void BedrockPlayer::syncSurroundings() {
             if (!seen.name.empty()) {
                 drawName(id, seen);
             }
-            if (wire::bedrock::hasAnything(seen.look)) {
+            if (wire::bedrock::hasAnything(seen.look) || seen.look.climate.has_value()) {
                 drawLook(id, seen);
             }
             present.emplace(id, std::move(seen));
@@ -1151,6 +1182,9 @@ void BedrockPlayer::syncSurroundings() {
             mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::MoveEntityAbsolute),
                            body.toVector());
         }
+        if (seen.frame.has_value() && seen.frame != before.frame) {
+            drawFrame(*seen.frame);
+        }
         if (before.name != seen.name || before.alwaysShowName != seen.alwaysShowName) {
             drawName(id, seen);
         }
@@ -1162,6 +1196,14 @@ void BedrockPlayer::syncSurroundings() {
 
     for (const auto& [id, gone] : shown_) {
         if (present.contains(id)) {
+            continue;
+        }
+        if (gone.frame.has_value()) {
+            // The frame was a block, so taking it away is putting back what was really there,
+            // which for anything a frame can hang in is air.
+            wire::io::ByteBuffer empty;
+            wire::bedrock::writeUpdateBlock(empty, gone.frame->x, gone.frame->y, gone.frame->z, 0, protocol_);
+            mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::UpdateBlock), empty.toVector());
             continue;
         }
         wire::io::ByteBuffer body;
@@ -1273,6 +1315,21 @@ void BedrockPlayer::sendColumn(const std::int32_t chunkX, const std::int32_t chu
                                           std::move(column));
                         },
                         {});
+    // An item frame is a block this client was told about and the world knows nothing of, so a
+    // column sent again writes air over it: the ones in this column are put back.
+    for (const auto& [id, seen] : shown_) {
+        if (!seen.frame.has_value() || (seen.frame->x >> 4) != chunkX || (seen.frame->z >> 4) != chunkZ) {
+            continue;
+        }
+        wire::io::ByteBuffer block;
+        wire::bedrock::writeItemFrameBlock(block, seen.frame->x, seen.frame->y, seen.frame->z, seen.frame->glowing,
+                                           seen.frame->face, protocol_);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::UpdateBlock), block.toVector());
+        wire::io::ByteBuffer inside;
+        wire::bedrock::writeItemFrameData(inside, seen.frame->x, seen.frame->y, seen.frame->z, seen.frame->glowing,
+                                          seen.frame->item, seen.frame->count, seen.frame->rotation);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::BlockEntityData), inside.toVector());
+    }
 }
 
 bool BedrockPlayer::sendColumnsAround(std::function<void()> done) {

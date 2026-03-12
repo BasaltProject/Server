@@ -793,6 +793,16 @@ void BedrockListener::onReady(Session& session) {
     session.connection.sendPacket(BedrockPacket::GameRulesChanged, body.readable());
     note("gamerules", body.readableBytes());
 
+    // The looks 26.2 moved out of metadata and into properties of their own. Named once for each
+    // kind that has one: a value for a property the client was never declared draws nothing.
+    for (const std::string_view farmAnimal : {"minecraft:pig", "minecraft:cow", "minecraft:chicken"}) {
+        static constexpr std::array<std::string_view, 3> kClimates{"temperate", "warm", "cold"};
+        body.clear();
+        wire::bedrock::writeSyncEntityProperty(body, farmAnimal, "minecraft:climate_variant", kClimates);
+        session.connection.sendPacket(BedrockPacket::SyncEntityProperty, body.readable());
+    }
+    note("entity properties", body.readableBytes());
+
     // The cameras a client may be put behind. Named once and never again: an instruction that
     // points at a preset the client was not told about is dropped.
     body.clear();

@@ -62,6 +62,31 @@ struct Seen {
     /// How it is drawn beyond its kind, in that edition's own numbering: a villager's trade, a
     /// rabbit's coat, a sheep's wool, a slime's size.
     wire::bedrock::BedrockLook look;
+    /// The picture a painting shows, by the name that edition knows it under, and which way it
+    /// faces in its own numbering. Empty for everything that is not a painting, which this edition
+    /// spawns with a packet of its own.
+    std::string motive;
+    std::int32_t facing = 0;
+
+    /// An item frame, which over there is a block rather than an entity: the client is told to put
+    /// one down where this hangs, and told what is in it separately.
+    struct Frame {
+        bool glowing = false;
+        /// The wall it is on, down first and east last, which both editions number the same way.
+        std::int32_t face = 0;
+        std::int32_t x = 0;
+        std::int32_t y = 0;
+        std::int32_t z = 0;
+        /// What is in it, by the name that edition knows it under. Empty for an empty frame.
+        std::string item;
+        std::int32_t count = 0;
+        /// In eighths of a turn, as the other edition counts them.
+        std::int32_t rotation = 0;
+
+        friend bool operator==(const Frame&, const Frame&) = default;
+    };
+
+    std::optional<Frame> frame;
 };
 
 /// A player who arrived through the Bedrock door: the same `PlayerSession` in the same registry, so

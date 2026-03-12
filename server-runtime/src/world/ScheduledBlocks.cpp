@@ -797,8 +797,8 @@ void scheduleBubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std
     }
 }
 
-void bubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                  std::vector<BlockChange>& changes) {
+void bubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::vector<BlockChange>& changes,
+                  const std::function<void(std::int32_t, std::int32_t, std::int32_t)>& written) {
     const std::optional<std::int32_t> here = world.blockState(x, y, z);
     if (!here.has_value() || !canOccupy(*here)) {
         return;
@@ -832,6 +832,9 @@ void bubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_
     // grew a column a tick early every time one was lengthened.
     if (*here != *column && world.setBlockState(x, y, z, *column)) {
         changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *column});
+        if (written) {
+            written(x, y, z);
+        }
     }
     for (std::int32_t level = y + 1;; ++level) {
         const std::optional<std::int32_t> state = world.blockState(x, level, z);
@@ -840,6 +843,14 @@ void bubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_
             return;
         }
         changes.push_back(BlockChange{.x = x, .y = level, .z = z, .stateId = *column});
+        // parity: the shape walk of this square's own write, run **here** and not after the loop.
+        // The jar writes one square at a time and each `setBlock(..., 2)` shapes its neighbours
+        // before the next one lands, so the square above is still water and hears nothing. Reshaping
+        // the whole column afterwards told every square that a bubble column had arrived below it,
+        // and each booked a turn the jar never books: forty of them in `columnaburbujas`.
+        if (written) {
+            written(x, level, z);
+        }
     }
 }
 
