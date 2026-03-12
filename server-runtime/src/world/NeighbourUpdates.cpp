@@ -421,9 +421,21 @@ std::optional<std::int32_t> connect(const Context& context, std::int32_t x, std:
     }
     std::map<std::string, std::string> wanted;
     for (const auto& [face, name] : kHorizontal) {
+        // parity: `FenceBlock.updateShape` and `IronBarsBlock`'s write **one** property, the one for
+        // the side the news came from, and a vertical side writes none. Redrawing all four joined up
+        // sides nobody had mentioned: a fence written by command with its connections named came out
+        // joined on every side as soon as any one neighbour moved. Measured in `anegadoforma`, where
+        // the jar holds `north=true` alone and this build had all four. No direction is the arriving
+        // block's own pre-shape, which walks all six sides, so there every side is asked.
+        if (towards.has_value() && *towards != face) {
+            continue;
+        }
         const std::int32_t neighbour =
             stateAt(world, x + registry::stepX(face), y + registry::stepY(face), z + registry::stepZ(face));
         wanted[std::string{name}] = registry::blockConnections::connectsTo(stateId, neighbour, face) ? "true" : "false";
+    }
+    if (wanted.empty()) {
+        return std::nullopt;
     }
     return rewrite(world, x, y, z, stateId, wanted);
 }

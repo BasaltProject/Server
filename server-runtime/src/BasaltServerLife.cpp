@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/bedrock/BedrockChunks.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/bedrock/BedrockRecipes.hpp>
+#include <basalt/server/runtime/bedrock/BedrockSeen.hpp>
 #include <basalt/server/runtime/config/ForwardingConfig.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
@@ -67,7 +68,6 @@
 #include <basalt/wire/bedrock/BedrockEntityIdentifiers.hpp>
 #include <basalt/wire/io/Platform.hpp>
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
-#include <basalt/wire/text/MiniMessage.hpp>
 #include <basalt/wire/text/Serializers.hpp>
 
 #include <algorithm>
@@ -736,61 +736,11 @@ void BasaltServer::startBedrockListener() {
                     return (dx * dx) + (dy * dy) + (dz * dz) <= kRange * kRange;
                 };
 
-                // What a mob is doing, as the flags that edition draws it by. Sent again whenever
-                // they change: a client that is only ever told once shows a lamb that never grows
-                // and a mob that burns without flames.
-                const auto flagsOf = [](const entity::ServerEntity& mob) {
-                    std::uint64_t flags = wire::bedrock::flagBit(wire::bedrock::EntityFlag::HasCollision) |
-                                          wire::bedrock::flagBit(wire::bedrock::EntityFlag::HasGravity) |
-                                          wire::bedrock::flagBit(wire::bedrock::EntityFlag::Breathing) |
-                                          wire::bedrock::flagBit(wire::bedrock::EntityFlag::CanShowName);
-                    if (mob.fireTicks > 0) {
-                        flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::OnFire);
-                    }
-                    // parity: `AgeableMob.age`, where anything below zero is still a baby.
-                    if (mob.age < 0) {
-                        flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Baby);
-                    }
-                    if (mob.sitting) {
-                        flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Sitting);
-                    }
-                    return flags;
-                };
-
                 std::vector<bedrock::Seen> seen;
                 for (const entity::ServerEntity* alive : found->second->state().entities()) {
-                    if (alive == nullptr || alive->removed || !near(alive->x, alive->y, alive->z)) {
-                        continue;
+                    if (alive != nullptr && !alive->removed && near(alive->x, alive->y, alive->z)) {
+                        seen.push_back(bedrock::seenOf(*alive));
                     }
-                    // Nearly every name is the same on both; the fourteen that are not are a table
-                    // of their own, because nothing about a name says which kind it is.
-                    bedrock::Seen line{.entityId = alive->entityId(),
-                                       .type = std::string{wire::bedrock::bedrockEntityName(alive->type().toString())},
-                                       .x = alive->x,
-                                       .y = alive->y,
-                                       .z = alive->z,
-                                       .yaw = alive->yaw,
-                                       .pitch = alive->pitch,
-                                       .width = static_cast<float>(alive->width()),
-                                       .height = static_cast<float>(alive->height()),
-                                       .stack = std::nullopt,
-                                       .flags = flagsOf(*alive)};
-                    if (alive->customName.has_value()) {
-                        // Drawn when it is looked at, as vanilla draws a name nobody made visible.
-                        line.name = *alive->customName;
-                    }
-                    // parity: Geyser draws a text display as an armour stand nobody can see with
-                    // the words over it, because that edition has no display entity of its own.
-                    if (alive->displayText.has_value()) {
-                        line.type = "minecraft:armor_stand";
-                        line.flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Invisible) |
-                                      wire::bedrock::flagBit(wire::bedrock::EntityFlag::NoAi);
-                        line.width = 0.0F;
-                        line.height = 0.0F;
-                        line.name = wire::text::toLegacyText(wire::text::miniMessage::parse(*alive->displayText));
-                        line.alwaysShowName = true;
-                    }
-                    seen.push_back(std::move(line));
                 }
                 for (const world::DroppedItem& dropped : found->second->state().items()) {
                     if (!near(dropped.x, dropped.y, dropped.z)) {
