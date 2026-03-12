@@ -825,22 +825,22 @@ std::vector<BlockChange> relockAround(WorldState& world, const std::int32_t x, c
     return changes;
 }
 
-void watchOnPlace(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                  const std::optional<std::int32_t> removed) {
+void watchOnPlace(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value() || pathOf(*stateId) != "observer") {
         return;
     }
-    // parity: `ObserverBlock.onPlace` opens with `!state.is(oldState.getBlock())`, so it answers a
-    // block that changed and not a state that moved. An observer written over an observer runs none
-    // of this, however its `facing` or its `powered` differ.
-    if (removed.has_value() && pathOf(*removed) == pathOf(*stateId)) {
+    // parity: this books `ObserverBlock.updateShape`'s `startSignal`, which carries **no** guard on
+    // the block having changed: that guard belongs to `onPlace`, a different method doing a different
+    // job. The pre-shape of a command write walks all six sides, so the observer's own facing side
+    // always fires and an observer merely turned on the spot books a turn too. Measured in
+    // `llegadadoble`, whose last three turns were the jar booking for a rotation and us booking none.
+    if (valueOf(registry::blockStateDefinitions::propertiesOf(*stateId), "powered") == "true") {
         return;
     }
-    // parity: an observer that arrives **powered** is `settleArrivedSignal`'s, which is where the
-    // notice it owes the square in front of it can be given. By the time the cascade gets here that
-    // one has already gone quiet, so only the booking below is left.
-    if (valueOf(registry::blockStateDefinitions::propertiesOf(*stateId), "powered") == "true") {
+    // parity: `startSignal` is gated on `!hasScheduledTick(pos, this)`, so a second shape update in
+    // the same breath does not push the turn out.
+    if (world.hasScheduledBlockTick(x, y, z, observer())) {
         return;
     }
     world.scheduleBlockTick(x, y, z, observer(), kObserverDelay);

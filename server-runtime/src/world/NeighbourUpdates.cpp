@@ -448,7 +448,7 @@ std::optional<std::int32_t> reshape(const Context& context, std::int32_t x, std:
     // out from the footing a square at a time. Measured in `andamio`.
     scheduledBlocks::scheduleScaffolding(world, x, y, z);
     // A column is more than one block, so it reports through the caller rather than as one state.
-    scheduledBlocks::scheduleBubbleColumn(world, x, y, z);
+    scheduledBlocks::scheduleBubbleColumn(world, x, y, z, towards);
     // parity: `NoteBlock.updateShape` rewrites the instrument **only** when the news comes from above
     // or below (`directionToNeighbour.getAxis() == Y`); from a side it keeps whatever it has. So a
     // note block written with an instrument that does not match what it stands on keeps it until
@@ -836,6 +836,11 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         // the same `tryScheduleDieTick`, so the self-reshape above gets them by another road.
         scheduledBlocks::scheduleBreakIfLoose(
             world, x, y, z, blockSurvival::isSupported(world, x, y, z, std::nullopt, scaffolding, context.hasSkylight));
+        // parity: `ObserverBlock.updateShape` on the observer itself, which books its first turn. It
+        // belongs **inside** the self-reshape: the only thing that runs a block's own `updateShape`
+        // is `BlockInput.place`'s pre-shape, and a component writing its own state with flag two does
+        // not. Outside, an observer's own pulse re-booked it and `relojobservadores` ran away.
+        redstoneComponents::watchOnPlace(world, x, y, z);
     }
     // parity: `RedStoneWireBlock.updateIndirectNeighbourShapes`, the one place a dust reaches past
     // its own six sides: the dust one below and one above the square it connects to are told to look
@@ -923,8 +928,6 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // updates the shapes around it, so a piece of dust that lit up wakes an observer looking at it
     // just as much as a block somebody placed.
     redstoneComponents::watchFor(world, x, y, z);
-    // parity: `ObserverBlock.updateShape` on the observer itself, which books its first turn.
-    redstoneComponents::watchOnPlace(world, x, y, z, removed);
     for (const BlockChange& change : settled) {
         redstoneComponents::watchFor(world, change.x, change.y, change.z);
     }

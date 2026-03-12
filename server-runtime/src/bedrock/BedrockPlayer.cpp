@@ -432,6 +432,12 @@ void BedrockPlayer::setStance(const bool onGround, const bool sprinting) {
     session_->sprinting = sprinting;
 }
 
+void BedrockPlayer::setFlying(const bool flying) {
+    if (session_ != nullptr) {
+        session_->flying = flying && session_->mayFly();
+    }
+}
+
 void BedrockPlayer::attack(const std::uint64_t runtimeEntityId) {
     if (session_ == nullptr || !context_.attackEntity || runtimeEntityId == 0) {
         return;
@@ -685,6 +691,7 @@ void BedrockPlayer::finishEating(const std::int32_t hotbarSlot) {
     if (session_ == nullptr || !context_.eat || hotbarSlot < 0 || hotbarSlot >= player::PlayerInventory::kHotbarSize) {
         return;
     }
+    session_->usingItem = false;
     context_.eat(*session_, player::PlayerInventory::kHotbarStart + hotbarSlot);
 }
 
@@ -694,6 +701,7 @@ void BedrockPlayer::useItemInAir(const std::int32_t hotbarSlot) {
     }
     // Whatever it is, it is now being held down: a bow bending, a spyglass raised, a bottle tipped.
     drawingSince_ = std::chrono::steady_clock::now();
+    session_->usingItem = true;
     if (context_.useInAir) {
         context_.useInAir(*session_, player::PlayerInventory::kHotbarStart + hotbarSlot);
     }
@@ -708,6 +716,7 @@ void BedrockPlayer::releaseItem(const std::int32_t hotbarSlot) {
 
     const std::chrono::steady_clock::time_point started = drawingSince_.value_or(std::chrono::steady_clock::now());
     drawingSince_.reset();
+    session_->usingItem = false;
     const auto held =
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
     if (context_.releaseItem) {
@@ -1085,6 +1094,13 @@ void BedrockPlayer::syncSurroundings() {
         now = std::move(surroundings_->latest);
     }
 
+    /// The line over an entity, which is its own packet here rather than a field of the spawn.
+    const auto drawName = [this](const std::int32_t id, const Seen& seen) {
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeNameTag(body, runtimeIdFor(id), seen.name, seen.alwaysShowName, protocol_);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetEntityData), body.toVector());
+    };
+
     std::unordered_map<std::int32_t, Seen> present;
     for (Seen& seen : now) {
         const std::int32_t id = seen.entityId;
@@ -1105,6 +1121,9 @@ void BedrockPlayer::syncSurroundings() {
                                               seen.flags, protocol_);
                 mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::AddEntity), body.toVector());
             }
+            if (!seen.name.empty()) {
+                drawName(id, seen);
+            }
             present.emplace(id, std::move(seen));
             continue;
         }
@@ -1121,6 +1140,9 @@ void BedrockPlayer::syncSurroundings() {
                                            true);
             mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::MoveEntityAbsolute),
                            body.toVector());
+        }
+        if (before.name != seen.name || before.alwaysShowName != seen.alwaysShowName) {
+            drawName(id, seen);
         }
         present.emplace(id, std::move(seen));
     }
@@ -1325,6 +1347,9 @@ void BedrockPlayer::syncOthers() {
         }
         if (other->sprinting) {
             flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::Sprinting);
+        }
+        if (other->usingItem) {
+            flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::UsingItem);
         }
         const Other now{other->entityId(),
                         other->x,

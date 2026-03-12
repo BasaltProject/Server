@@ -154,6 +154,10 @@ public:
         /// is five times slower, so a player whose feet are never on the ground mines at a crawl.
         virtual void setStance(bool onGround, bool sprinting) = 0;
 
+        /// Whether they are flying, which this edition reports as an edge on one turn's input
+        /// rather than as a packet of abilities.
+        virtual void setFlying(bool flying) = 0;
+
         /// The client clicked something alive without hitting it.
         virtual void useOnEntity(std::uint64_t runtimeEntityId) = 0;
 

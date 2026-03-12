@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/random/RandomSource.hpp>
+#include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
@@ -175,7 +176,13 @@ void snifferEgg(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
 
 /// parity: `LiquidBlock.tryScheduleBubbleBlockColumn`, twenty ticks booked on the water over soul
 /// sand or magma, and `BubbleColumnBlock.updateShape`'s five for a column that is already there.
-void scheduleBubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+///
+/// That second one is **not** booked on every shape update: only when the column has lost its
+/// footing, when the news came from below, or when it came from above and the square up there is
+/// occupiable but not already a column. `towards` is what the news came from, and nothing means the
+/// arriving block reshaping itself, which walks all six sides and so always books.
+void scheduleBubbleColumn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                          std::optional<registry::BlockFace> towards);
 
 /// parity: `BubbleColumnBlock.updateColumn`: soul sand pushes a column up through the water above it
 /// and magma drags one down, and the column climbs while there is water to fill.
