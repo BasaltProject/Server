@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
+#include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/NaturalSpawnObstruction.hpp>
 #include <basalt/server/runtime/world/Shulkers.hpp>
@@ -22,6 +23,16 @@ namespace basalt::server::runtime::world {
 using server::world::Chunk;
 using server::world::ChunkScheduledTick;
 
+namespace {
+
+/// A generated entity that acts, rather than one the chunk only draws: a mob, or a pillar's
+/// crystal, which burns, explodes and heals the dragon.
+[[nodiscard]] bool becomesLive(const server::world::ChunkGeneratedEntity& entity) {
+    return entity::mobs::isMob(entity.type) || endCrystals::isCrystal(entity.type);
+}
+
+} // namespace
+
 WorldState::WorldState(std::vector<Chunk> initialChunks, LoadOrGenerate loadOrGenerate)
     : loadOrGenerate_(
           loadOrGenerate
@@ -39,7 +50,7 @@ WorldState::WorldState(std::vector<Chunk> initialChunks, LoadOrGenerate loadOrGe
     const PendingChunkDecorations::ChunkAt chunkAt = [this](std::int64_t chunkKey) { return chunkAtLocked(chunkKey); };
     for (const auto& [chunkKey, chunk] : chunksByPos_) {
         pendingDecorations_.addPendingGeneratedEntities(chunk->takeGeneratedEntitiesMatching(
-            [](const server::world::ChunkGeneratedEntity& entity) { return entity::mobs::isMob(entity.type); }));
+            [](const server::world::ChunkGeneratedEntity& entity) { return becomesLive(entity); }));
         pendingDecorations_.applyPendingGeneratedBlockWrites(*chunk,
                                                              PendingChunkDecorations::WritePhase::AfterDecoration);
         pendingDecorations_.applyPendingGeneratedBlockEntityWrites(*chunk);
@@ -385,7 +396,7 @@ Chunk& WorldState::installLocked(Chunk chunk) {
     chunkVersion_.fetch_add(1);
     entityRegistry_.addPendingEntities(installed.takeSavedEntities());
     pendingDecorations_.addPendingGeneratedEntities(installed.takeGeneratedEntitiesMatching(
-        [](const server::world::ChunkGeneratedEntity& entity) { return entity::mobs::isMob(entity.type); }));
+        [](const server::world::ChunkGeneratedEntity& entity) { return becomesLive(entity); }));
 
     // The neighbours were lit without this chunk, so their light let the sky in through where it
     // now stands. parity: vanilla relights a chunk's neighbourhood on load.

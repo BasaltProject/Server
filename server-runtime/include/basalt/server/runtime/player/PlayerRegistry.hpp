@@ -21,6 +21,9 @@ class PlayerRegistry {
 public:
     [[nodiscard]] std::int32_t allocateEntityId();
 
+    /// The first of `count` consecutive ids, for an entity whose parts the client numbers after it.
+    [[nodiscard]] std::int32_t allocateEntityIds(std::int32_t count);
+
     void add(PlayerSession* session);
 
     void remove(const wire::common::Uuid& uuid);

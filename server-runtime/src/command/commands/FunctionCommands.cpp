@@ -1,3 +1,5 @@
+#include "ExecuteCommand.hpp"
+
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/CommandTarget.hpp>
 #include <basalt/server/runtime/command/Coordinates.hpp>
@@ -262,14 +264,16 @@ void ReturnCommand::build(const CommandNodeBuilder& root) const {
     root.literal("fail", [returnWith](const CommandNodeBuilder& fail) {
         fail.executes([returnWith](const CommandContext&) { return returnWith(0); });
     });
-    root.literal("run", [returnWith](const CommandNodeBuilder& run) {
-        run.argument("command", greedyStringArgument(), [returnWith](const CommandNodeBuilder& line) {
-            line.executes([returnWith](const CommandContext& context) {
-                const auto* command = context.get<std::string>("command");
-                const std::int32_t result =
-                    command == nullptr ? 0 : context.dispatcher().execute(context.source(), *command);
-                return returnWith(result);
-            });
+    // parity: `run` forwards to the root, so the client completes the nested command, and its
+    // result becomes the function's.
+    root.literal("run", [this, &root](const CommandNodeBuilder& run) {
+        run.redirectTo(root.root(), false, [runner = runner_](const CommandContext& context) {
+            return std::vector<std::shared_ptr<const CommandSource>>{executeCommand::wrapping(
+                context.source(), ExecutionSource::Changes{.onResult = [runner](bool success, std::int32_t result) {
+                    if (runner->insideFunction()) {
+                        runner->requestReturn(success ? result : 0);
+                    }
+                }})};
         });
     });
 }

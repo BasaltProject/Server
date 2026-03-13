@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
+#include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/ProjectileHits.hpp>
@@ -118,7 +119,9 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         // parity: `AbstractWindCharge.onHitEntity` takes one point off whoever it passed through,
         // and lets the gust off there rather than against a face.
         if (target.has_value()) {
-            if (target->mob != nullptr) {
+            if (target->mob != nullptr && world::endCrystals::isCrystal(target->mob->type())) {
+                hitCrystal(world, watchers, *target->mob, false);
+            } else if (target->mob != nullptr) {
                 const entity::entityCombat::Result result =
                     entity::entityCombat::hurt(*target->mob, kWindChargeDamage, fromX, fromZ, hooks_, "wind_charge");
                 if (result.landed) {
@@ -341,7 +344,9 @@ std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<
             (projectile.ownerId.has_value() && candidate->entityId() == *projectile.ownerId)) {
             continue;
         }
-        if (!server::registry::entityAttributes::isLiving(candidate->type())) {
+        // parity: `Projectile.canHitEntity` asks `isPickable`, which a crystal is too.
+        if (!server::registry::entityAttributes::isLiving(candidate->type()) &&
+            !world::endCrystals::isCrystal(candidate->type())) {
             continue;
         }
         const std::optional<double> at = clip(projectile, fromX, fromY, fromZ, candidate->x, candidate->y, candidate->z,
@@ -390,6 +395,11 @@ bool CombatSystem::hitEntityAlong(world::LoadedWorld& world, const std::vector<P
         damage += options_.nextInt((damage / 2) + 2);
     }
 
+    if (target->mob != nullptr && world::endCrystals::isCrystal(target->mob->type())) {
+        arrow.removed = true;
+        hitCrystal(world, watchers, *target->mob, false);
+        return true;
+    }
     if (target->mob != nullptr) {
         const entity::entityCombat::Result result =
             entity::entityCombat::hurt(*target->mob, static_cast<float>(damage), fromX, fromZ, hooks_, "projectile");
@@ -417,6 +427,50 @@ bool CombatSystem::hitEntityAlong(world::LoadedWorld& world, const std::vector<P
                 .entityId = arrow.entityId(), .x = fromX, .z = fromZ, .name = shooterName(watchers, living, arrow)});
     }
     return true;
+}
+
+void CombatSystem::hitCrystal(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                              ServerEntity& crystal, const bool byExplosion, const bool byDragon) {
+    if (world::endCrystals::hurt(crystal, byDragon, byExplosion) != world::endCrystals::Hit::Explodes) {
+        return;
+    }
+    explosions_.blowUp(world, watchers, crystal.x, crystal.y, crystal.z, world::endCrystals::kExplosionPower,
+                       "end_crystal", crystal.entityId());
+    emitVibration(world, "explode", crystal.x, crystal.y, crystal.z);
+}
+
+void CombatSystem::hurtByExplosion(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                                   const double x, const double y, const double z, const float power,
+                                   const std::int32_t sourceEntityId) {
+    const double reach = static_cast<double>(power) * 2.0;
+    for (ServerEntity* entity : world.state().entities()) {
+        if (entity->removed || entity->dying || entity->entityId() == sourceEntityId) {
+            continue;
+        }
+        const double distance = std::sqrt(((entity->x - x) * (entity->x - x)) + ((entity->y - y) * (entity->y - y)) +
+                                          ((entity->z - z) * (entity->z - z)));
+        if (distance > reach) {
+            continue;
+        }
+        if (world::endCrystals::isCrystal(entity->type())) {
+            hitCrystal(world, watchers, *entity, true);
+            continue;
+        }
+        if (!server::registry::entityAttributes::isLiving(entity->type())) {
+            continue;
+        }
+        const float damage = world::explosions::damageAt(distance, power, static_cast<float>(reach));
+        if (damage <= 0.0F) {
+            continue;
+        }
+        const entity::entityCombat::Result result =
+            entity::entityCombat::hurt(*entity, damage, x, z, hooks_, "explosion");
+        if (!result.landed) {
+            continue;
+        }
+        announceEntityHit(watchers, *entity, world::damageTypes::kExplosion, sourceEntityId, result.died);
+        emitVibration(world, "entity_damage", entity->x, entity->y, entity->z);
+    }
 }
 
 Component CombatSystem::shooterName(const std::vector<PlayerSession*>& watchers,

@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/CombatHandler.hpp>
+#include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
@@ -17,6 +18,7 @@
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
+#include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/ItemFrames.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
@@ -93,6 +95,17 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     // frame or takes it off the wall.
     if (world::itemFrames::isFrame(target->type())) {
         breakFrame(*session, *target);
+        return;
+    }
+    if (world::endCrystals::isCrystal(target->type())) {
+        // parity: `EndCrystal.hurtServer`: any blow that counts destroys it and sets it off.
+        if (world::endCrystals::hurt(*target, false, false) == world::endCrystals::Hit::Explodes &&
+            owner_->options().explosions != nullptr) {
+            owner_->options().explosions->blowUp(*world, owner_->playersInSameWorld(), target->x, target->y, target->z,
+                                                 world::endCrystals::kExplosionPower, "end_crystal",
+                                                 target->entityId());
+            world::vibrations::emit(world->state(), "explode", target->x, target->y, target->z, world->gameTime());
+        }
         return;
     }
     if (!server::registry::entityAttributes::isLiving(target->type())) {

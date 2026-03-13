@@ -10,6 +10,13 @@ std::int32_t PlayerRegistry::allocateEntityId() {
     return nextEntityId_++;
 }
 
+std::int32_t PlayerRegistry::allocateEntityIds(const std::int32_t count) {
+    const std::lock_guard<std::mutex> guard{lock_};
+    const std::int32_t first = nextEntityId_;
+    nextEntityId_ += std::max(count, 1);
+    return first;
+}
+
 void PlayerRegistry::add(PlayerSession* session) {
     if (session == nullptr) {
         return;

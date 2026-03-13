@@ -55,14 +55,17 @@ std::shared_ptr<const CommandSource> facing(const CommandSource& source, double 
                                                                  kDegreesPerRadian)}});
 }
 
-void conditional(const CommandNodeBuilder& builder, CommandNode& execute, bool positive, Test test) {
-    builder.executes([test, positive](const CommandContext& context) -> Parsed<std::int32_t> {
-        const std::int32_t count = counted(test, context, positive);
-        context.success(count > 0 ? Component::translatable("commands.execute.conditional.pass_count",
-                                                            {Component::text(std::to_string(count))})
-                                  : Component::translatable("commands.execute.conditional.fail"));
-        return count;
-    });
+void conditional(const CommandNodeBuilder& builder, CommandNode& execute, bool positive, Test test,
+                 const bool terminal) {
+    if (terminal) {
+        builder.executes([test, positive](const CommandContext& context) -> Parsed<std::int32_t> {
+            const std::int32_t count = counted(test, context, positive);
+            context.success(count > 0 ? Component::translatable("commands.execute.conditional.pass_count",
+                                                                {Component::text(std::to_string(count))})
+                                      : Component::translatable("commands.execute.conditional.fail"));
+            return count;
+        });
+    }
     builder.redirectTo(execute, true, [test, positive](const CommandContext& context) {
         std::vector<std::shared_ptr<const CommandSource>> onwards;
         if (counted(test, context, positive) > 0) {

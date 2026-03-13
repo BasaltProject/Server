@@ -450,10 +450,16 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                 }},
         BlockChangeBroadcaster::Options{.nextSeed = [] { return scratchSeed(); },
                                         .blockTags = &vanillaData_.blockTags});
-    explosions_ =
-        std::make_unique<ExplosionSystem>(playerRegistry_, vanillaData_.lootTables, ExplosionSystem::Hooks{},
-                                          ExplosionSystem::Options{.nextSeed = [] { return scratchSeed(); },
-                                                                   .nextDouble = [] { return scratchDouble(); }});
+    explosions_ = std::make_unique<ExplosionSystem>(
+        playerRegistry_, vanillaData_.lootTables,
+        ExplosionSystem::Hooks{.struck =
+                                   [this](world::LoadedWorld& world,
+                                          const std::vector<player::PlayerSession*>& watchers, double x, double y,
+                                          double z, float power, std::int32_t sourceEntityId) {
+                                       combat_->hurtByExplosion(world, watchers, x, y, z, power, sourceEntityId);
+                                   }},
+        ExplosionSystem::Options{.nextSeed = [] { return scratchSeed(); },
+                                 .nextDouble = [] { return scratchDouble(); }});
     spawning_ = std::make_unique<NaturalSpawningSystem>(
         playerRegistry_, vanillaData_.biomeSpawns, chunkSimulation_, *spawnEquipment_, NaturalSpawningSystem::Hooks{},
         NaturalSpawningSystem::Options{.nextSeed = [] { return scratchSeed(); }});

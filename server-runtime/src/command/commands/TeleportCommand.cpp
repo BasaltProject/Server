@@ -231,7 +231,13 @@ void PlaySoundCommand::build(const CommandNodeBuilder& root) const {
         if (sound == nullptr) {
             return 0;
         }
-        const std::vector<player::PlayerSession*>& targets = playersOf(context, "targets");
+        // parity: `getCallingPlayerAsCollection`, the caller alone when no targets were named.
+        const auto* named = context.get<std::vector<player::PlayerSession*>>("targets");
+        std::vector<player::PlayerSession*> caller;
+        if (named == nullptr && context.source().player() != nullptr) {
+            caller.push_back(context.source().player());
+        }
+        const std::vector<player::PlayerSession*>& targets = named == nullptr ? caller : *named;
         const auto* coordinates = positioned ? context.get<Coordinates>("pos") : nullptr;
         const std::array<double, 3> origin =
             coordinates == nullptr ? context.source().position() : coordinates->resolve(context.source().position());
@@ -274,10 +280,17 @@ void PlaySoundCommand::build(const CommandNodeBuilder& root) const {
 
     root.argument("sound", resourceLocationArgument(), [play](const CommandNodeBuilder& sound) {
         sound.suggestsFromClient(std::string{suggestionProviders::kAvailableSounds});
+        // parity: with no targets the sound goes to whoever ran it, on the master mixer.
+        sound.executes([play](const CommandContext& context) {
+            return play(context, play::SoundSource::Master, false, 1.0F, 1.0F, 0.0F);
+        });
         for (std::uint8_t ordinal = 0; ordinal <= static_cast<std::uint8_t>(play::SoundSource::Ui); ordinal++) {
             const auto source = static_cast<play::SoundSource>(ordinal);
             sound.literal(std::string{play::soundSourceCommandName(source)}, [play,
                                                                               source](const CommandNodeBuilder& mixer) {
+                mixer.executes([play, source](const CommandContext& context) {
+                    return play(context, source, false, 1.0F, 1.0F, 0.0F);
+                });
                 mixer.argument("targets", playersArgument(false), [play, source](const CommandNodeBuilder& targets) {
                     targets.executes([play, source](const CommandContext& context) {
                         return play(context, source, false, 1.0F, 1.0F, 0.0F);
@@ -350,7 +363,6 @@ void StopSoundCommand::build(const CommandNodeBuilder& root) const {
     root.argument("targets", playersArgument(false), [stop](const CommandNodeBuilder& targets) {
         targets.executes([stop](const CommandContext& context) { return stop(context, std::nullopt, false); });
         targets.literal("*", [stop](const CommandNodeBuilder& any) {
-            any.executes([stop](const CommandContext& context) { return stop(context, std::nullopt, false); });
             any.argument("sound", resourceLocationArgument(), [stop](const CommandNodeBuilder& sound) {
                 sound.suggestsFromClient(std::string{suggestionProviders::kAvailableSounds});
                 sound.executes([stop](const CommandContext& context) { return stop(context, std::nullopt, true); });

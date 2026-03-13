@@ -191,6 +191,20 @@ TEST_CASE("summon puts a real entity of the named type where it was asked for") 
     CHECK(fixture.source.lastAsText().find("commands.summon.success") != std::string::npos);
 }
 
+TEST_CASE("a summoned dragon keeps the eight ids after its own free for its parts") {
+    Fixture fixture{scratch("entity-summon-dragon")};
+    fixture.dispatcher.registerCommand(std::make_shared<commands::SummonCommand>(fixture.registry));
+
+    CHECK(fixture.dispatcher.execute(fixture.source, "summon minecraft:ender_dragon 0 100 0") == 1);
+    CHECK(fixture.dispatcher.execute(fixture.source, "summon minecraft:pig 0 64 0") == 1);
+    const ServerEntity* dragon = summoned(fixture, "ender_dragon");
+    const ServerEntity* pig = summoned(fixture, "pig");
+    REQUIRE(dragon != nullptr);
+    REQUIRE(pig != nullptr);
+    // parity: `EnderDragon.recreateFromPacket` numbers the parts `id + 1` to `id + 8`.
+    CHECK(pig->entityId() == dragon->entityId() + 9);
+}
+
 TEST_CASE("summon refuses a player and a type nobody registered") {
     Fixture fixture{scratch("entity-summon-refused")};
     fixture.dispatcher.registerCommand(std::make_shared<commands::SummonCommand>(fixture.registry));

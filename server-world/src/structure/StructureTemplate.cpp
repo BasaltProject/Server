@@ -551,7 +551,7 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
     }
 
     const std::vector<StructureBlockInfo>& paletteBlockList = paletteBlocks(paletteIndex);
-    const bool wholePiece = !processors.capped().empty();
+    const bool wholePiece = placement.wholePiece || !processors.capped().empty();
     const ChunkHeight bounds = chunk.verticalBounds();
     std::vector<ProcessedBlock> processedBlocks;
     processedBlocks.reserve(paletteBlockList.size());
@@ -582,7 +582,8 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
             worldPos.y = chunk.worldgenHeightAt(localX, localZ, HeightmapType::WorldSurface) +
                          *placement.gravityOffset + blockInfo.pos.y;
         }
-        if (worldPos.y < bounds.minY() || worldPos.y > bounds.maxY()) {
+        const bool inHeight = worldPos.y >= bounds.minY() && worldPos.y <= bounds.maxY();
+        if (!inHeight && !placement.wholePiece) {
             continue;
         }
         if (!wholePiece && !placement.clipTo.isInside(worldPos)) {
@@ -623,7 +624,9 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
             stateId = parsedAndTransformedStateId(finalStateName, placement.mirror, placement.rotation);
         } else if (!processors.empty()) {
             const std::int32_t worldStateId =
-                chunk.blockStateId(processorLocalX, entry.processorPos.y, processorLocalZ);
+                entry.processorPos.y >= bounds.minY() && entry.processorPos.y <= bounds.maxY()
+                    ? chunk.blockStateId(processorLocalX, entry.processorPos.y, processorLocalZ)
+                    : 0;
             const std::optional<std::int32_t> processedStateId =
                 processors.processAt(blockInfo.stateId, worldStateId, entry.processorPos, placement.settingsRandom);
             if (!processedStateId.has_value()) {
@@ -674,6 +677,9 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
         const Resolved& entry = resolved[index];
         const std::int32_t finalStateId = cappedStates[index];
         if (wholePiece && !placement.clipTo.isInside(entry.worldPos)) {
+            continue;
+        }
+        if (entry.worldPos.y < bounds.minY() || entry.worldPos.y > bounds.maxY()) {
             continue;
         }
         if ((entry.worldPos.x >> 4) == chunk.chunkX() && (entry.worldPos.z >> 4) == chunk.chunkZ()) {
