@@ -238,6 +238,10 @@ player::PlayerConnection ClientSession::playerConnection() {
     connection.disconnect = [this](const wire::text::Component& reason) { disconnect(reason); };
     connection.setGamemode = [this](play::Gamemode mode) { setGamemode(mode); };
     connection.sendInventoryAll = [this] { sendInventoryAll(); };
+    connection.setHeldSlot = [this](const std::int32_t slot) {
+        sendCompressed(play::SetHeldSlotPacket::kId,
+                       [slot](wire::io::ByteBuffer& buffer) { play::SetHeldSlotPacket{.slot = slot}.write(buffer); });
+    };
     connection.heal = [this](float amount) { heal(amount); };
     connection.hurt = [this](float amount, std::string_view deathMessageId, const Identifier& damageType,
                              const std::optional<entity::DamageSource>& source) {

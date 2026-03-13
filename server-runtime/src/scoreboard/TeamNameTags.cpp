@@ -1,28 +1,35 @@
 #include <basalt/server/runtime/scoreboard/TeamNameTags.hpp>
-#include <basalt/wire/text/Serializers.hpp>
+#include <basalt/wire/text/TextColor.hpp>
 
 #include <array>
+#include <optional>
+#include <string>
 
 namespace basalt::server::runtime::scoreboard {
 namespace {
 
-/// parity: `ChatFormatting`'s own order, which is what `TeamColor` counts in: the sixteen colours
-/// come first and in the order their codes run.
-[[nodiscard]] std::string legacyColour(const wire::protocol::play::TeamColor colour) {
-    constexpr std::array<char, 16> kCodes{'0', '1', '2', '3', '4', '5', '6', '7',
-                                          '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+using wire::text::TextColor;
+
+/// parity: `TeamColor` counts in `ChatFormatting`'s order, the sixteen colours first.
+[[nodiscard]] std::optional<TextColor> colourOf(const wire::protocol::play::TeamColor colour) {
+    constexpr std::array<TextColor, 16> kColours{
+        wire::text::kBlack,    wire::text::kDarkBlue,    wire::text::kDarkGreen, wire::text::kDarkAqua,
+        wire::text::kDarkRed,  wire::text::kDarkPurple,  wire::text::kGold,      wire::text::kGray,
+        wire::text::kDarkGray, wire::text::kBlue,        wire::text::kGreen,     wire::text::kAqua,
+        wire::text::kRed,      wire::text::kLightPurple, wire::text::kYellow,    wire::text::kWhite};
     const auto at = static_cast<std::size_t>(colour);
-    return at < kCodes.size() ? std::string{"§"} + kCodes[at] : std::string{};
+    return at < kColours.size() ? std::optional<TextColor>{kColours[at]} : std::nullopt;
 }
 
 } // namespace
 
-std::string nameTagFor(const Teams& teams, const std::string_view member, const std::string_view viewer) {
+wire::text::Component nameTagFor(const Teams& teams, const std::string_view member, const std::string_view viewer) {
     using wire::protocol::play::NameTagVisibility;
+    using wire::text::Component;
 
     const Team* team = teams.teamOf(member);
     if (team == nullptr) {
-        return std::string{member};
+        return Component::text(std::string{member});
     }
     // parity: `Team.Visibility`, which is about who is looking rather than about the name itself.
     const bool together = team->hasMember(viewer);
@@ -30,12 +37,13 @@ std::string nameTagFor(const Teams& teams, const std::string_view member, const 
                         (team->nameTagVisibility == NameTagVisibility::HideForOtherTeams && !together) ||
                         (team->nameTagVisibility == NameTagVisibility::HideForOwnTeam && together);
     if (hidden) {
-        return {};
+        return Component::empty();
     }
-    const std::string prefix = wire::text::toLegacyText(team->prefix);
-    const std::string suffix = wire::text::toLegacyText(team->suffix);
-    const std::string colour = team->color.has_value() ? legacyColour(*team->color) : std::string{};
-    return prefix + colour + std::string{member} + suffix;
+    Component name = Component::text(std::string{member});
+    if (team->color.has_value()) {
+        name = name.color(colourOf(*team->color));
+    }
+    return Component::empty().append(team->prefix).append(name).append(team->suffix);
 }
 
 } // namespace basalt::server::runtime::scoreboard

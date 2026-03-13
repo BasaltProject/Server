@@ -602,9 +602,9 @@ void ContainerMenuController::pickItem(PlayerSession& session, const std::string
     if (!player::pickItemFor(session, id)) {
         return;
     }
-    owner_->sendCompressed(wire::protocol::play::SetHeldSlotPacket::kId, [&session](wire::io::ByteBuffer& buffer) {
-        wire::protocol::play::SetHeldSlotPacket{.slot = session.inventory.heldSlot()}.write(buffer);
-    });
+    if (session.connection().setHeldSlot) {
+        session.connection().setHeldSlot(session.inventory.heldSlot());
+    }
     sendInventoryAll();
 }
 

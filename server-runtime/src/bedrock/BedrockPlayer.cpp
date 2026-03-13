@@ -951,6 +951,38 @@ void BedrockPlayer::respawn() {
     session_->connection().syncHealth();
 }
 
+void BedrockPlayer::leaveBed() {
+    if (session_ != nullptr && session_->connection().wakeUp) {
+        session_->connection().wakeUp();
+    }
+}
+
+void BedrockPlayer::settled(const bool afterDeath) {
+    if (session_ == nullptr) {
+        return;
+    }
+    if (afterDeath) {
+        wire::io::ByteBuffer event;
+        wire::bedrock::writeEntityEvent(event, kRuntimeEntityId, wire::bedrock::BedrockEntityEvent::Respawn, 0,
+                                        protocol_);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::EntityEvent), event.toVector());
+    } else {
+        // Told again that it is in the world: a client that changed dimension sometimes never
+        // decides so on its own and keeps the loading screen up.
+        wire::io::ByteBuffer status;
+        wire::bedrock::writePlayStatus(status, wire::bedrock::PlayStatus::PlayerSpawn);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::PlayStatus), status.toVector());
+    }
+    // Either way the attributes go again, because the client believes its own copy of them and a
+    // screen it just took down is where that copy goes stale.
+    if (session_->connection().syncHealth) {
+        session_->connection().syncHealth();
+    }
+    if (session_->connection().syncExperience) {
+        session_->connection().syncExperience();
+    }
+}
+
 void BedrockPlayer::tick() {
     const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
     if (now - lastSync_ < kSyncPeriod) {

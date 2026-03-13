@@ -245,6 +245,22 @@ constexpr std::array<std::string_view, 6> kLightHungryCrops{"wheat",     "carrot
         path == "dirt_path" || path == "farmland") {
         return only(BlockFace::Up);
     }
+    // parity: `RepeaterBlock.updateShape` and `ComparatorBlock.updateShape` are both
+    // `directionToNeighbour == Direction.DOWN && !canSurviveOn(...)`, and `RedStoneWireBlock`'s opens
+    // the same way. All three fall only for the square under them; this build let any side take them.
+    // `ComparatorBlock` declares its `updateShape` **public** where the rest are `protected`, which is
+    // why a grep for the narrower form says the comparator has none. `DiodeBlock` itself has none: the
+    // repeater and the comparator each write their own.
+    if (path == "repeater" || path == "comparator" || path == "redstone_wire") {
+        return only(BlockFace::Down);
+    }
+    // parity: `VineBlock.updateShape` is the one written inside out: news from `DOWN` goes straight to
+    // super, and every **other** side recomputes the faces and returns air when none is left. So a vine
+    // answers all five sides but the one under it, which is the opposite of the usual gate.
+    if (path == "vine") {
+        return static_cast<std::uint8_t>(only(BlockFace::Up) | only(BlockFace::North) | only(BlockFace::South) |
+                                         only(BlockFace::West) | only(BlockFace::East));
+    }
     // parity: `BaseTorchBlock`, `CakeBlock`, `CandleCakeBlock`, `BasePressurePlateBlock`,
     // `FlowerPotBlock`, `StandingSignBlock`, `BannerBlock` and `BigDripleafBlock`, all gated on `DOWN`.
     const bool standingSign =

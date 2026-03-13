@@ -141,6 +141,30 @@ void lookFrom(const wire::nbt::NbtCompound& data, const std::string_view path, S
         line.look.variant = colour == 1 ? 3 : colour == 3 ? 1 : colour;
         return;
     }
+    if (path == "mooshroom") {
+        // The brown one is the second on both editions, and the red one is what a bad name means.
+        line.look.variant = data.getString("Type") == "brown" ? 1 : 0;
+        return;
+    }
+    if (path == "pufferfish") {
+        // How far it has puffed up, counted the same on both.
+        line.look.variant = data.getInt("PuffState");
+        return;
+    }
+    if (path == "turtle") {
+        // parity: the other edition draws a turtle carrying an egg as a pregnant one.
+        if (data.getBoolean("has_egg")) {
+            line.flags |= wire::bedrock::flagBit(wire::bedrock::EntityFlag::IsPregnant);
+        }
+        return;
+    }
+    if (path == "bee") {
+        // parity: Geyser draws the sting it already used as a mark, which is the only one of a
+        // bee's three states that survives being saved. Its anger is an hour of the world's clock
+        // rather than a countdown, and nectar is a property rather than a look.
+        line.look.markVariant = data.getBoolean("HasStung") ? 1 : 0;
+        return;
+    }
     if (path == "fox") {
         // The only one that is not the red fox is the snowy one, and it is the second on both.
         line.look.variant = data.getString("Type") == "snow" ? 1 : 0;

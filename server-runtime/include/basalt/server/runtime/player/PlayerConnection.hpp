@@ -185,10 +185,12 @@ struct PlayerConnection {
     /// Puts this player in a game mode, which is a packet and a change on the session at once.
     std::function<void(wire::protocol::play::Gamemode mode)> setGamemode;
 
-    /// Kills this player with the death message id vanilla would use.
     /// Re-sends every inventory slot, which is how a change made on the server side is believed:
     /// the client draws from its own copy and never asks.
     std::function<void()> sendInventoryAll;
+
+    /// Moves the hand of a player who did not move it themselves, after a pick or a container.
+    std::function<void(std::int32_t slot)> setHeldSlot;
 
     /// Gives health back, up to whatever their maximum is.
     std::function<void(float amount)> heal;
@@ -225,7 +227,7 @@ struct PlayerConnection {
 
     /// What somebody else's name reads as now, with their team's colour and affixes already in it.
     /// The edition that has no teams is told the finished line instead of the team.
-    std::function<void(std::int32_t entityId, const std::string& nameTag)> sendNameTag;
+    std::function<void(std::int32_t entityId, const wire::text::Component& nameTag)> sendNameTag;
 
     /// A scoreboard objective being made, renamed or unmade, and which slot shows it. parity:
     /// `ClientboundSetObjectivePacket` and `ClientboundSetDisplayObjectivePacket`, split this way

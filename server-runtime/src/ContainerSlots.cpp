@@ -713,9 +713,9 @@ void ContainerMenuController::sendInventory() {
                                                         .carriedItem = session->inventory.toWireStack(carriedItem_)}
             .write(buffer);
     });
-    owner_->sendCompressed(wire::protocol::play::SetHeldSlotPacket::kId, [&](wire::io::ByteBuffer& buffer) {
-        wire::protocol::play::SetHeldSlotPacket{.slot = session->inventory.heldSlot()}.write(buffer);
-    });
+    if (session->connection().setHeldSlot) {
+        session->connection().setHeldSlot(session->inventory.heldSlot());
+    }
 }
 
 void ContainerMenuController::sendInventoryAll() {

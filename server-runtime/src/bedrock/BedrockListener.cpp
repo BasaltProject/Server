@@ -511,6 +511,15 @@ void BedrockListener::onConnect(RakSession& session) {
             }
             return;
         }
+        if (packet == BedrockPacket::PlayerAction && entry.player) {
+            const auto action = wire::bedrock::readPlayerAction(body);
+            if (action == wire::bedrock::BedrockPlayerAction::StopSleep) {
+                entry.player->leaveBed();
+            } else if (action.has_value()) {
+                entry.player->settled(*action == wire::bedrock::BedrockPlayerAction::Respawn);
+            }
+            return;
+        }
         if (packet == BedrockPacket::Respawn && entry.player) {
             const auto state = wire::bedrock::readRespawn(body);
             if (state == wire::bedrock::RespawnState::ClientReady) {
