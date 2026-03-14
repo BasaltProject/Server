@@ -65,6 +65,10 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
     world::LoadedWorldOptions options;
     options.timings = options_.timings;
     options.scheduler = &scheduler_;
+    // The default world's own Nether and End: the one its portals lead to.
+    const config::WorldDeclaration* linked = worldsConfig_->portalTarget(declaration, declaration.dimension);
+    options.vanillaKey =
+        worldsConfig_->overworldOf(declaration).isDefault && linked != nullptr && linked->name == declaration.name;
     options.generationWorkers = options_.generationMetrics ? 1 : world::ChunkGenerationQueue::defaultWorkers();
     if (generators_ != nullptr && isNormal(declaration.type)) {
         world::VanillaWorldGeneratorFactory::Generators built = generators_->create(declaration, metadata);

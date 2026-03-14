@@ -49,11 +49,11 @@ struct Fixture {
 
 } // namespace
 
-TEST_CASE("a bare integer in a vec3 lands in the middle of its block") {
+TEST_CASE("a bare integer in a vec3 lands in the middle of its block, but not above its floor") {
     Fixture fixture;
     const Coordinates* parsed = fixture.parse<Coordinates>(command::vec3Argument(), "10 64 -3");
     REQUIRE(parsed != nullptr);
-    CHECK(parsed->resolve({0.0, 0.0, 0.0}) == std::array<double, 3>{10.5, 64.5, -2.5});
+    CHECK(parsed->resolve({0.0, 0.0, 0.0}) == std::array<double, 3>{10.5, 64.0, -2.5});
 }
 
 TEST_CASE("a decimal point turns the centre correction off") {
@@ -61,7 +61,7 @@ TEST_CASE("a decimal point turns the centre correction off") {
     const Coordinates* parsed = fixture.parse<Coordinates>(command::vec3Argument(), "10.0 64 10");
     REQUIRE(parsed != nullptr);
     CHECK(parsed->resolve({0.0, 0.0, 0.0})[0] == doctest::Approx(10.0));
-    CHECK(parsed->resolve({0.0, 0.0, 0.0})[1] == doctest::Approx(64.5));
+    CHECK(parsed->resolve({0.0, 0.0, 0.0})[1] == doctest::Approx(64.0));
 }
 
 TEST_CASE("a relative coordinate is never centre corrected and reads as an offset") {

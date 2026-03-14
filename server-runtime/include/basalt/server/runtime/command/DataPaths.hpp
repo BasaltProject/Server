@@ -32,8 +32,7 @@ struct Step {
 /// The tag at a path, or nothing when the path leads nowhere.
 [[nodiscard]] std::optional<wire::nbt::NbtTag> resolve(const wire::nbt::NbtTag& root, std::string_view path);
 
-/// The root with `value` written at the path, or nothing when the path is not writable: only a
-/// chain of keys can be written to.
+/// The root with `value` written wherever the path leads, or nothing when it reached nothing.
 [[nodiscard]] std::optional<wire::nbt::NbtCompound> set(const wire::nbt::NbtCompound& root, std::string_view path,
                                                         const wire::nbt::NbtTag& value);
 

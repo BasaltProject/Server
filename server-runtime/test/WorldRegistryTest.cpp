@@ -55,6 +55,11 @@ TEST_CASE("a dimension with no seed of its own takes its overworld's") {
     CHECK(all.at("world_nether")->metadata().seed == 4242);
     CHECK(registry.worldSeed() == 4242);
     CHECK(&registry.defaultWorld() == all.at("world"));
+    // parity: the default save's dimensions answer to vanilla's names, which datapacks write.
+    CHECK(all.at("world")->levelKey() == "minecraft:overworld");
+    CHECK(all.at("world_nether")->levelKey() == "minecraft:the_nether");
+    CHECK(registry.createWorld("arena", config::WorldDimension::Nether, config::WorldType::Flat, 7)->levelKey() ==
+          "basalt:arena");
 }
 
 TEST_CASE("a world made at runtime is a world like any other, and its name has to be usable") {

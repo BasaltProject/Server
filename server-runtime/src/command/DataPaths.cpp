@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <charconv>
 #include <cstdint>
+#include <span>
+#include <vector>
 
 namespace basalt::server::runtime::command::dataPaths {
 namespace {
@@ -69,37 +71,109 @@ using wire::nbt::NbtTag;
     return true;
 }
 
-/// Walks a chain of keys, copying each compound on the way so the original is left alone. Answers
-/// the cursor and the last key, or nothing when a step is not a key or is missing.
-struct Descent {
-    NbtCompound root;
-    std::string lastKey;
-};
-
-[[nodiscard]] std::optional<Descent> descend(const NbtCompound& root, const std::vector<Step>& steps, bool creating) {
-    if (steps.empty()) {
+/// parity: `NbtPathArgument.IndexedElementNode`, where a negative index counts from the end.
+[[nodiscard]] std::optional<std::size_t> indexIn(const NbtList& list, std::int32_t index) {
+    const std::int64_t actual = index < 0 ? static_cast<std::int64_t>(list.size()) + index : index;
+    if (actual < 0 || actual >= static_cast<std::int64_t>(list.size())) {
         return std::nullopt;
     }
-    Descent walked{.root = merge(root, NbtCompound{}), .lastKey = {}};
-    NbtCompound* cursor = &walked.root;
-    for (std::size_t index = 0; index < steps.size(); index++) {
-        if (steps[index].kind != Step::Kind::Key) {
-            return std::nullopt;
-        }
-        if (index + 1 == steps.size()) {
-            walked.lastKey = steps[index].name;
-            return walked;
-        }
-        const NbtTag* next = cursor->find(steps[index].name);
-        const auto* asCompound = next == nullptr ? nullptr : next->get<NbtCompound>();
-        if (asCompound == nullptr && !creating) {
-            return std::nullopt;
-        }
-        cursor->set(steps[index].name,
-                    NbtTag::ofCompound(asCompound == nullptr ? NbtCompound{} : merge(*asCompound, NbtCompound{})));
-        cursor = cursor->find(steps[index].name)->get<NbtCompound>();
+    return static_cast<std::size_t>(actual);
+}
+
+/// What a write does where its path ends: put the value there, or take what is there away.
+struct Write {
+    const NbtTag* value = nullptr;
+};
+
+/// Replaces one element, keeping the list of one element type.
+[[nodiscard]] bool replaceElement(NbtList& list, std::size_t at, const NbtTag& value) {
+    if (list.size() == 1 && value.type() != list.elementType()) {
+        list = NbtList{value.type(), {value}};
+        return true;
     }
-    return std::nullopt;
+    if (value.type() != list.elementType()) {
+        return false;
+    }
+    list[at] = value;
+    return true;
+}
+
+/// Applies the write at every node the path reaches below `node`, answering how many it changed.
+/// parity: `NbtPathArgument.NbtPath.set` and `remove`, which fan out over every match.
+std::int32_t apply(NbtTag& node, std::span<const Step> path, const Write& write) {
+    const Step& step = path.front();
+    const bool last = path.size() == 1;
+    std::int32_t changed = 0;
+    if (step.kind == Step::Kind::Key) {
+        auto* compound = node.get<NbtCompound>();
+        if (compound == nullptr) {
+            return 0;
+        }
+        if (last) {
+            if (write.value != nullptr) {
+                compound->set(step.name, *write.value);
+                return 1;
+            }
+            return compound->remove(step.name) ? 1 : 0;
+        }
+        if (compound->find(step.name) == nullptr) {
+            if (write.value == nullptr) {
+                return 0;
+            }
+            // parity: `createPreferredParentTag`, a list before an index or filter, else a compound.
+            const bool listNext = path[1].kind != Step::Kind::Key;
+            compound->set(step.name, listNext ? NbtTag::ofList(NbtList{}) : NbtTag::ofCompound(NbtCompound{}));
+        }
+        return apply(*compound->find(step.name), path.subspan(1), write);
+    }
+    auto* list = node.get<NbtList>();
+    if (list == nullptr) {
+        return 0;
+    }
+    std::vector<std::size_t> hits;
+    if (step.kind == Step::Kind::Index) {
+        if (const std::optional<std::size_t> at = indexIn(*list, step.index); at.has_value()) {
+            hits.push_back(*at);
+        }
+    } else {
+        for (std::size_t at = 0; at < list->size(); ++at) {
+            if (matches((*list)[at], step.filter)) {
+                hits.push_back(at);
+            }
+        }
+    }
+    if (!last) {
+        for (const std::size_t at : hits) {
+            changed += apply((*list)[at], path.subspan(1), write);
+        }
+        return changed;
+    }
+    if (write.value != nullptr) {
+        for (const std::size_t at : hits) {
+            changed += replaceElement(*list, at, *write.value) ? 1 : 0;
+        }
+        return changed;
+    }
+    std::vector<NbtTag> kept;
+    for (std::size_t at = 0; at < list->size(); ++at) {
+        if (std::ranges::find(hits, at) == hits.end()) {
+            kept.push_back((*list)[at]);
+        }
+    }
+    *list = NbtList{list->elementType(), std::move(kept)};
+    return static_cast<std::int32_t>(hits.size());
+}
+
+[[nodiscard]] std::optional<NbtCompound> written(const NbtCompound& root, std::string_view path, const Write& write) {
+    const std::optional<std::vector<Step>> walk = steps(path);
+    if (!walk.has_value() || walk->empty()) {
+        return std::nullopt;
+    }
+    NbtTag copy = NbtTag::ofCompound(root);
+    if (apply(copy, *walk, write) == 0) {
+        return std::nullopt;
+    }
+    return *copy.get<NbtCompound>();
 }
 
 } // namespace
@@ -187,8 +261,8 @@ std::optional<NbtTag> resolve(const NbtTag& root, std::string_view path) {
             }
         } else if (const auto* list = current.get<NbtList>(); list != nullptr) {
             if (step.kind == Step::Kind::Index) {
-                if (step.index >= 0 && static_cast<std::size_t>(step.index) < list->size()) {
-                    next = (*list)[static_cast<std::size_t>(step.index)];
+                if (const std::optional<std::size_t> at = indexIn(*list, step.index); at.has_value()) {
+                    next = (*list)[*at];
                 }
             } else {
                 const auto found = std::ranges::find_if(
@@ -207,40 +281,11 @@ std::optional<NbtTag> resolve(const NbtTag& root, std::string_view path) {
 }
 
 std::optional<NbtCompound> set(const NbtCompound& root, std::string_view path, const NbtTag& value) {
-    const std::optional<std::vector<Step>> walk = steps(path);
-    if (!walk.has_value()) {
-        return std::nullopt;
-    }
-    std::optional<Descent> descended = descend(root, *walk, true);
-    if (!descended.has_value()) {
-        return std::nullopt;
-    }
-    // Walked again on the copy, since the cursor cannot be carried out of `descend` safely.
-    NbtCompound* cursor = &descended->root;
-    for (std::size_t index = 0; index + 1 < walk->size(); index++) {
-        cursor = cursor->find((*walk)[index].name)->get<NbtCompound>();
-    }
-    cursor->set(descended->lastKey, value);
-    return descended->root;
+    return written(root, path, Write{.value = &value});
 }
 
 std::optional<NbtCompound> remove(const NbtCompound& root, std::string_view path) {
-    const std::optional<std::vector<Step>> walk = steps(path);
-    if (!walk.has_value()) {
-        return std::nullopt;
-    }
-    std::optional<Descent> descended = descend(root, *walk, false);
-    if (!descended.has_value()) {
-        return std::nullopt;
-    }
-    NbtCompound* cursor = &descended->root;
-    for (std::size_t index = 0; index + 1 < walk->size(); index++) {
-        cursor = cursor->find((*walk)[index].name)->get<NbtCompound>();
-    }
-    if (!cursor->remove(descended->lastKey)) {
-        return std::nullopt;
-    }
-    return descended->root;
+    return written(root, path, Write{});
 }
 
 } // namespace basalt::server::runtime::command::dataPaths

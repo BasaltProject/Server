@@ -1,5 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
+#include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/command/ExecutionSource.hpp>
 #include <basalt/server/runtime/command/commands/TeleportCommand.hpp>
 #include <basalt/server/storage/PlayerStore.hpp>
@@ -21,11 +22,13 @@
 using basalt::server::runtime::command::CommandDispatcher;
 using basalt::server::runtime::command::CommandEnvironment;
 using basalt::server::runtime::command::CommandSource;
+using basalt::server::runtime::entity::ServerEntity;
 using basalt::server::runtime::player::PlayerConnection;
 using basalt::server::runtime::player::PlayerRegistry;
 using basalt::server::runtime::player::PlayerSession;
 using basalt::server::runtime::world::LoadedWorld;
 using basalt::server::runtime::world::WorldMetadata;
+using basalt::wire::common::Identifier;
 using basalt::wire::common::Uuid;
 using basalt::wire::text::Component;
 namespace commands = basalt::server::runtime::command::commands;
@@ -258,6 +261,30 @@ TEST_CASE("teleport facing an entity aims at its feet or its eyes") {
     // Looking up, so the pitch is negative, and the eyes are higher still.
     CHECK(atFeet < 0.0F);
     CHECK(atEyes < atFeet);
+}
+
+TEST_CASE("teleport moves any entity, and takes a player to one") {
+    Fixture fixture{scratch("teleport-command-entity")};
+    fixture.add("Steve");
+    const auto* cowType = basalt::server::registry::entityTypes::of(Identifier::vanilla("cow"));
+    REQUIRE(cowType != nullptr);
+    ServerEntity& cow = fixture.world->state().spawnEntity(std::make_unique<ServerEntity>(
+        fixture.registry.allocateEntityId(), Uuid{9, 9}, cowType->id, cowType->protocolId, 5.0, 64.0, 5.0));
+    cow.velocityY = -1.0;
+    fixture.dispatcher.registerCommand(std::make_shared<commands::TeleportCommand>());
+
+    CHECK(fixture.dispatcher.execute(fixture.source, "tp @e[type=cow] 20.0 70.0 -4.0 90 0") == 1);
+    CHECK(cow.x == doctest::Approx(20.0));
+    CHECK(cow.y == doctest::Approx(70.0));
+    CHECK(cow.z == doctest::Approx(-4.0));
+    CHECK(cow.yaw == doctest::Approx(90.0F));
+    // parity: `performTeleport` leaves it standing, with no fall speed.
+    CHECK(cow.velocityY == doctest::Approx(0.0));
+
+    CHECK(fixture.dispatcher.execute(fixture.source, "tp Steve @e[type=cow]") == 1);
+    REQUIRE(fixture.clients[0]->teleports.size() == 1);
+    CHECK(fixture.clients[0]->teleports[0][0] == doctest::Approx(20.0));
+    CHECK(fixture.clients[0]->teleports[0][3] == doctest::Approx(90.0F));
 }
 
 TEST_CASE("teleport into another world switches rather than moving inside this one") {

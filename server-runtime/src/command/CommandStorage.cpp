@@ -1,10 +1,12 @@
 #include <basalt/server/runtime/command/CommandStorage.hpp>
 #include <basalt/server/runtime/command/DataPaths.hpp>
+#include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -83,16 +85,18 @@ NbtCompound entityNbtOf(const player::PlayerSession& player) {
 }
 
 NbtCompound entityNbtOf(const entity::ServerEntity& entity) {
-    NbtCompound tag;
-    tag.putString("id", entity.type().toString());
-    if (entity.customName.has_value()) {
-        tag.putString("CustomName", *entity.customName);
-    }
-    tag.putFloat("Health", static_cast<float>(entity.health));
-    tag.set("Pos", positionOf(entity.x, entity.y, entity.z));
-    tag.set("Rotation", rotationOf(entity.yaw, entity.pitch));
-    tag.set("Tags", tagsOf(entity.tags));
+    // parity: `NbtPredicate.getEntityTagData` is `saveWithoutId`, the save codec minus the type.
+    NbtCompound tag = entity::entityNbt::encode(entity);
+    tag.remove("id");
     return tag;
+}
+
+std::optional<DataHolderRef> entityHolderOf(const CommandTarget& target) {
+    if (target.player() == nullptr && target.entity() == nullptr) {
+        return std::nullopt;
+    }
+    return DataHolderRef{
+        DataHolderRef::Entity{.player = target.player(), .mob = target.entity(), .name = target.name()}};
 }
 
 NbtCompound& CommandStorage::get(const Identifier& id) { return compounds_[id]; }
@@ -153,7 +157,13 @@ std::optional<NbtCompound> DataAccess::read(const CommandContext& context, const
         return entity == nullptr ? std::nullopt : std::optional{entity->data()};
     }
     const auto* entity = holder.as<DataHolderRef::Entity>();
-    return entity == nullptr || entity->player == nullptr ? std::nullopt : std::optional{entityNbtOf(*entity->player)};
+    if (entity == nullptr) {
+        return std::nullopt;
+    }
+    if (entity->player != nullptr) {
+        return entityNbtOf(*entity->player);
+    }
+    return entity->mob == nullptr ? std::nullopt : std::optional{entityNbtOf(*entity->mob)};
 }
 
 bool DataAccess::pathExists(const CommandContext& context, const DataHolderRef& holder, std::string_view path) const {
@@ -179,6 +189,41 @@ void DataAccess::store(const Identifier& id, std::string_view path, double value
     const std::optional<NbtCompound> written = dataPaths::set(storage_->get(id), path, numberTag(value, type));
     if (written.has_value()) {
         storage_->set(id, *written);
+    }
+}
+
+std::optional<CommandSyntaxError> writeEntityData(const DataHolderRef::Entity& holder, NbtCompound tag) {
+    if (holder.player != nullptr || holder.mob == nullptr) {
+        return CommandSyntaxError{.component = wire::text::Component::translatable("commands.data.entity.invalid")};
+    }
+    entity::ServerEntity& mob = *holder.mob;
+    const NbtCompound current = entity::entityNbt::encode(mob);
+    if (const NbtTag* uuid = current.find("UUID"); uuid != nullptr) {
+        tag.set("UUID", *uuid);
+    }
+    tag.putString("id", mob.type().toString());
+    std::unique_ptr<entity::ServerEntity> loaded = entity::entityNbt::decode(tag, mob.entityId(), mob.protocolType());
+    if (loaded == nullptr) {
+        return CommandSyntaxError{.component = wire::text::Component::translatable("commands.data.entity.invalid")};
+    }
+    // What one entity's save does not carry: its links to others and a dragon's fight.
+    loaded->vehicleId = mob.vehicleId;
+    loaded->passengerIds = mob.passengerIds;
+    loaded->leashHolderId = mob.leashHolderId;
+    loaded->dragon = mob.dragon;
+    loaded->removed = mob.removed;
+    mob = std::move(*loaded);
+    return std::nullopt;
+}
+
+void DataAccess::storeInEntity(const DataHolderRef::Entity& holder, std::string_view path, double value,
+                               std::string_view type) const {
+    if (holder.mob == nullptr) {
+        return;
+    }
+    const std::optional<NbtCompound> written = dataPaths::set(entityNbtOf(*holder.mob), path, numberTag(value, type));
+    if (written.has_value()) {
+        static_cast<void>(writeEntityData(holder, *written));
     }
 }
 

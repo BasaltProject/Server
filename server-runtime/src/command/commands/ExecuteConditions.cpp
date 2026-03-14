@@ -183,13 +183,12 @@ void ExecuteCommand::buildConditions(const CommandNodeBuilder& builder, CommandN
                             conditional(path, execute, positive,
                                         [existing](const CommandContext& context) -> std::optional<std::int32_t> {
                                             const std::vector<CommandTarget>& matched = targetsOf(context, "source");
-                                            player::PlayerSession* session =
-                                                matched.empty() ? nullptr : matched.front().player();
-                                            if (session == nullptr) {
+                                            const std::optional<DataHolderRef> holder =
+                                                matched.empty() ? std::nullopt : entityHolderOf(matched.front());
+                                            if (!holder.has_value()) {
                                                 return std::nullopt;
                                             }
-                                            return existing(context,
-                                                            DataHolderRef{DataHolderRef::Entity{.player = session}});
+                                            return existing(context, *holder);
                                         });
                         });
                 });
@@ -445,14 +444,29 @@ void ExecuteCommand::buildStores(const CommandNodeBuilder& builder, CommandNode&
         });
     });
 
-    // Declared for the tree's sake: a player's data is not a compound this build can write to.
-    builder.literal("entity", [&execute, fromSuccess](const CommandNodeBuilder& form) {
-        form.argument("target", entitiesArgument(true), [&execute, fromSuccess](const CommandNodeBuilder& target) {
-            target.argument("path", nbtPathArgument(), [&execute, fromSuccess](const CommandNodeBuilder& path) {
-                typedStore(path, execute, fromSuccess,
-                           [](const CommandContext&, std::string_view) { return [](double) {}; });
+    builder.literal("entity", [this, &execute, fromSuccess](const CommandNodeBuilder& form) {
+        form.argument(
+            "target", entitiesArgument(true), [this, &execute, fromSuccess](const CommandNodeBuilder& target) {
+                target.argument(
+                    "path", nbtPathArgument(), [this, &execute, fromSuccess](const CommandNodeBuilder& path) {
+                        typedStore(path, execute, fromSuccess,
+                                   [this](const CommandContext& context, std::string_view type) {
+                                       const auto* named = context.get<std::string>("path");
+                                       const std::string where = named == nullptr ? std::string{} : *named;
+                                       const std::string kind{type};
+                                       const std::vector<CommandTarget>& matched = targetsOf(context, "target");
+                                       const std::optional<DataHolderRef> holder =
+                                           matched.size() == 1 ? entityHolderOf(matched.front()) : std::nullopt;
+                                       return [this, holder, where, kind](double value) {
+                                           const auto* entity =
+                                               holder.has_value() ? holder->as<DataHolderRef::Entity>() : nullptr;
+                                           if (hooks_.data != nullptr && entity != nullptr) {
+                                               hooks_.data->storeInEntity(*entity, where, value, kind);
+                                           }
+                                       };
+                                   });
+                    });
             });
-        });
     });
 }
 

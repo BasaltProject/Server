@@ -1,3 +1,5 @@
+#include "TeleportMove.hpp"
+
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/CommandTarget.hpp>
 #include <basalt/server/runtime/command/Coordinates.hpp>
@@ -32,6 +34,12 @@ constexpr double kAudibleBlocksPerVolume = 16.0;
     return found == nullptr ? none : *found;
 }
 
+[[nodiscard]] const std::vector<CommandTarget>& targetsOf(const CommandContext& context, std::string_view name) {
+    static const std::vector<CommandTarget> none;
+    const auto* found = context.get<std::vector<CommandTarget>>(name);
+    return found == nullptr ? none : *found;
+}
+
 /// parity: `TeleportCommand.formatDouble`, which is `String.format("%f")`: always six decimals.
 [[nodiscard]] std::string formatCoordinate(double value) {
     const auto scaled = static_cast<std::int64_t>(std::llround(std::abs(value) * 1'000'000.0));
@@ -49,9 +57,10 @@ constexpr double kAudibleBlocksPerVolume = 16.0;
             static_cast<float>(-std::atan2(dy, std::sqrt((dx * dx) + (dz * dz))) * kDegreesPerRadian)};
 }
 
-[[nodiscard]] Parsed<std::int32_t>
-toPosition(const CommandContext& context, const std::vector<player::PlayerSession*>& targets, world::LoadedWorld* world,
-           const std::optional<std::pair<float, float>>& facing, const std::optional<std::array<double, 3>>& lookAt) {
+[[nodiscard]] Parsed<std::int32_t> toPosition(const CommandContext& context, const std::vector<CommandTarget>& targets,
+                                              world::LoadedWorld* world,
+                                              const std::optional<std::pair<float, float>>& facing,
+                                              const std::optional<std::array<double, 3>>& lookAt) {
     const auto* coordinates = context.get<Coordinates>("location");
     if (coordinates == nullptr) {
         return 0;
@@ -66,21 +75,16 @@ toPosition(const CommandContext& context, const std::vector<player::PlayerSessio
     // parity: `TeleportCommand.teleportToPos` resolves once against the source; the relative flags
     // it then sends land every target on that same point.
     const std::array<double, 3> at = coordinates->resolve(context.source());
-    for (player::PlayerSession* target : targets) {
+    for (const CommandTarget& target : targets) {
         const std::pair<float, float> angles = facing.has_value()   ? *facing
                                                : lookAt.has_value() ? anglesFrom(at[0], at[1], at[2], *lookAt)
-                                                                    : std::pair{target->yaw, target->pitch};
-        // The world change first: it re-sends the position itself, so teleporting afterwards would
-        // be a second, redundant move.
-        const bool moved = destination != nullptr && destination->name() != target->worldName &&
-                           target->connection().switchWorld &&
-                           target->connection().switchWorld(*destination, at[0], at[1], at[2]);
-        if (!moved && target->connection().teleportTo) {
-            target->connection().teleportTo(at[0], at[1], at[2], angles.first, angles.second);
-        }
+                                                                    : std::pair{target.yaw(), target.pitch()};
+        teleportMove::move(
+            context, target,
+            {.world = destination, .x = at[0], .y = at[1], .z = at[2], .yaw = angles.first, .pitch = angles.second});
     }
-    const Component who = targets.size() == 1 ? Component::text(targets.front()->name())
-                                              : Component::text(std::to_string(targets.size()));
+    const Component who =
+        targets.size() == 1 ? Component::text(targets.front().name()) : Component::text(std::to_string(targets.size()));
     const Component message =
         Component::translatable(targets.size() == 1 ? "commands.teleport.success.location.single"
                                                     : "commands.teleport.success.location.multiple",
@@ -93,27 +97,23 @@ toPosition(const CommandContext& context, const std::vector<player::PlayerSessio
     return static_cast<std::int32_t>(targets.size());
 }
 
-[[nodiscard]] Parsed<std::int32_t> toPlayer(const CommandContext& context,
-                                            const std::vector<player::PlayerSession*>& targets,
-                                            player::PlayerSession& destination) {
-    for (player::PlayerSession* target : targets) {
-        // parity: `TeleportCommand` moves to the entity, and an entity in another dimension takes
-        // you to that dimension. Teleporting the coordinates alone dropped you at their numbers in
-        // your own world, next to nobody.
-        if (target->worldName != destination.worldName) {
-            const auto found = context.environment().options().worlds.find(destination.worldName);
-            if (found != context.environment().options().worlds.end() && target->connection().switchWorld) {
-                static_cast<void>(
-                    target->connection().switchWorld(*found->second, destination.x, destination.y, destination.z));
-            }
-        }
-        if (target->connection().teleportTo) {
-            target->connection().teleportTo(destination.x, destination.y, destination.z, destination.yaw,
-                                            destination.pitch);
-        }
+[[nodiscard]] Parsed<std::int32_t> toEntity(const CommandContext& context, const std::vector<CommandTarget>& targets,
+                                            const CommandTarget& destination) {
+    // parity: `TeleportCommand.teleportToEntity` takes each target into the destination's level.
+    const auto& worlds = context.environment().options().worlds;
+    const auto found = worlds.find(destination.worldName());
+    world::LoadedWorld* into = found == worlds.end() ? nullptr : found->second;
+    for (const CommandTarget& target : targets) {
+        teleportMove::move(context, target,
+                           {.world = into,
+                            .x = destination.x(),
+                            .y = destination.y(),
+                            .z = destination.z(),
+                            .yaw = destination.yaw(),
+                            .pitch = destination.pitch()});
     }
-    const Component who = targets.size() == 1 ? Component::text(targets.front()->name())
-                                              : Component::text(std::to_string(targets.size()));
+    const Component who =
+        targets.size() == 1 ? Component::text(targets.front().name()) : Component::text(std::to_string(targets.size()));
     context.success(Component::translatable(targets.size() == 1 ? "commands.teleport.success.entity.single"
                                                                 : "commands.teleport.success.entity.multiple",
                                             {who, Component::text(destination.name())}),
@@ -121,10 +121,10 @@ toPosition(const CommandContext& context, const std::vector<player::PlayerSessio
     return static_cast<std::int32_t>(targets.size());
 }
 
-/// The one player a `single = true` selector matched, or null when it matched nobody.
-[[nodiscard]] player::PlayerSession* only(const CommandContext& context, std::string_view name) {
-    const std::vector<player::PlayerSession*>& matched = playersOf(context, name);
-    return matched.size() == 1 ? matched.front() : nullptr;
+/// The one entity a `single = true` selector matched, or null when it matched nobody.
+[[nodiscard]] const CommandTarget* only(const CommandContext& context, std::string_view name) {
+    const std::vector<CommandTarget>& matched = targetsOf(context, name);
+    return matched.size() == 1 ? &matched.front() : nullptr;
 }
 
 } // namespace
@@ -136,9 +136,9 @@ void TeleportCommand::build(const CommandNodeBuilder& root) const {
     const auto destinations = [](const CommandNodeBuilder& node, bool named) {
         node.executes([named](const CommandContext& context) -> Parsed<std::int32_t> {
             if (named) {
-                return toPosition(context, playersOf(context, "targets"), nullptr, std::nullopt, std::nullopt);
+                return toPosition(context, targetsOf(context, "targets"), nullptr, std::nullopt, std::nullopt);
             }
-            const Parsed<player::PlayerSession*> self = context.requireEntity();
+            const Parsed<CommandTarget> self = teleportMove::self(context);
             if (!self.has_value()) {
                 return std::unexpected{self.error()};
             }
@@ -149,9 +149,9 @@ void TeleportCommand::build(const CommandNodeBuilder& root) const {
                 auto* const* found = context.get<world::LoadedWorld*>("world");
                 world::LoadedWorld* into = found == nullptr ? nullptr : *found;
                 if (named) {
-                    return toPosition(context, playersOf(context, "targets"), into, std::nullopt, std::nullopt);
+                    return toPosition(context, targetsOf(context, "targets"), into, std::nullopt, std::nullopt);
                 }
-                const Parsed<player::PlayerSession*> self = context.requireEntity();
+                const Parsed<CommandTarget> self = teleportMove::self(context);
                 if (!self.has_value()) {
                     return std::unexpected{self.error()};
                 }
@@ -162,23 +162,23 @@ void TeleportCommand::build(const CommandNodeBuilder& root) const {
 
     root.argument("location", vec3Argument(),
                   [destinations](const CommandNodeBuilder& location) { destinations(location, false); });
-    root.argument("destination", playersArgument(true), [](const CommandNodeBuilder& destination) {
+    root.argument("destination", entitiesArgument(true), [](const CommandNodeBuilder& destination) {
         destination.executes([](const CommandContext& context) -> Parsed<std::int32_t> {
-            const Parsed<player::PlayerSession*> self = context.requireEntity();
+            const Parsed<CommandTarget> self = teleportMove::self(context);
             if (!self.has_value()) {
                 return std::unexpected{self.error()};
             }
-            player::PlayerSession* to = only(context, "destination");
-            return to == nullptr ? 0 : toPlayer(context, {*self}, *to);
+            const CommandTarget* to = only(context, "destination");
+            return to == nullptr ? 0 : toEntity(context, {*self}, *to);
         });
     });
-    root.argument("targets", playersArgument(false), [destinations](const CommandNodeBuilder& targets) {
+    root.argument("targets", entitiesArgument(false), [destinations](const CommandNodeBuilder& targets) {
         targets.argument("location", vec3Argument(), [destinations](const CommandNodeBuilder& location) {
             destinations(location, true);
             location.argument("rotation", rotationArgument(), [](const CommandNodeBuilder& rotation) {
                 rotation.executes([](const CommandContext& context) {
                     const auto* facing = context.get<std::pair<float, float>>("rotation");
-                    return toPosition(context, playersOf(context, "targets"), nullptr,
+                    return toPosition(context, targetsOf(context, "targets"), nullptr,
                                       facing == nullptr ? std::nullopt : std::optional{*facing}, std::nullopt);
                 });
             });
@@ -190,7 +190,7 @@ void TeleportCommand::build(const CommandNodeBuilder& root) const {
                         if (target == nullptr) {
                             return 0;
                         }
-                        return toPosition(context, playersOf(context, "targets"), nullptr, std::nullopt,
+                        return toPosition(context, targetsOf(context, "targets"), nullptr, std::nullopt,
                                           target->resolve(context.source()));
                     });
                 });
@@ -203,7 +203,7 @@ void TeleportCommand::build(const CommandNodeBuilder& root) const {
                             return 0;
                         }
                         const CommandTarget& at = matched->front();
-                        return toPosition(context, playersOf(context, "targets"), nullptr, std::nullopt,
+                        return toPosition(context, targetsOf(context, "targets"), nullptr, std::nullopt,
                                           std::array<double, 3>{at.x(), at.y() + (eyes ? kEyeHeight : 0.0), at.z()});
                     };
                     entity.argument("facingEntity", entitiesArgument(true), [aim](const CommandNodeBuilder& named) {
@@ -218,10 +218,10 @@ void TeleportCommand::build(const CommandNodeBuilder& root) const {
                 });
             });
         });
-        targets.argument("destination", playersArgument(true), [](const CommandNodeBuilder& destination) {
+        targets.argument("destination", entitiesArgument(true), [](const CommandNodeBuilder& destination) {
             destination.executes([](const CommandContext& context) -> Parsed<std::int32_t> {
-                player::PlayerSession* to = only(context, "destination");
-                return to == nullptr ? 0 : toPlayer(context, playersOf(context, "targets"), *to);
+                const CommandTarget* to = only(context, "destination");
+                return to == nullptr ? 0 : toEntity(context, targetsOf(context, "targets"), *to);
             });
         });
     });
