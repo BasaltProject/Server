@@ -51,7 +51,7 @@ TEST_CASE("each kind carries what vanilla gives it") {
 
     CHECK(projectiles::snowball().gravity == doctest::Approx(0.03));
     CHECK_FALSE(projectiles::snowball().sticks);
-    CHECK(projectiles::all().size() == 10);
+    CHECK(projectiles::all().size() == 11);
 }
 
 TEST_CASE("the whole table of kinds, since a wrong number here is a projectile that flies wrong") {
@@ -74,7 +74,8 @@ TEST_CASE("the whole table of kinds, since a wrong number here is a projectile t
                                  {"fireball", 0.0, 0.95, false, 0.1},
                                  {"small_fireball", 0.0, 0.95, false, 0.1},
                                  // parity: a wind charge keeps all of its speed and adds nothing back.
-                                 {"wind_charge", 0.0, 1.0, false}};
+                                 {"wind_charge", 0.0, 1.0, false},
+                                 {"dragon_fireball", 0.0, 0.95, false, 0.1}};
 
     CHECK(table.size() == projectiles::all().size());
     for (const Row& row : table) {

@@ -86,6 +86,7 @@ basalt_module(server-world
     src/terrain/decoration/StoneBlockTags.cpp
     src/terrain/decoration/end/EndDecoration.cpp
     src/terrain/decoration/end/EndSurfaceStructuresDecoration.cpp
+    src/terrain/decoration/end/EndSpikes.cpp
     src/terrain/decoration/nether/NetherForestVegetation.cpp
     src/terrain/decoration/nether/NetherHugeFungus.cpp
     src/terrain/decoration/nether/NetherLavaSpring.cpp

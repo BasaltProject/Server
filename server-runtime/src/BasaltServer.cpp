@@ -465,14 +465,30 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         NaturalSpawningSystem::Options{.nextSeed = [] { return scratchSeed(); }});
     combat_ = std::make_unique<CombatSystem>(
         *broadcaster_, *explosions_, CombatSystem::Hooks{},
-        CombatSystem::Options{.nextInt =
-                                  [](std::int32_t bound) {
-                                      return bound <= 0 ? 0
-                                                        : static_cast<std::int32_t>(scratchRandom()() %
-                                                                                    static_cast<std::uint64_t>(bound));
-                                  },
-                              .nextSeed = [] { return scratchSeed(); },
-                              .blockTags = &vanillaData_.blockTags});
+        CombatSystem::Options{
+            .nextInt =
+                [](std::int32_t bound) {
+                    return bound <= 0
+                               ? 0
+                               : static_cast<std::int32_t>(scratchRandom()() % static_cast<std::uint64_t>(bound));
+                },
+            .nextSeed = [] { return scratchSeed(); },
+            .blockTags = &vanillaData_.blockTags,
+            .dragonFireballLanded =
+                [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                       const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& fireball) {
+                    clouds_->fireballLanded(world, watchers, living, fireball);
+                },
+            .crystalDestroyed =
+                [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                       const entity::ServerEntity& crystal, std::optional<std::int32_t> byPlayer) {
+                    endFight_->crystalDestroyed(world, watchers, crystal, byPlayer);
+                }});
+    clouds_ = std::make_unique<AreaEffectCloudSystem>(
+        playerRegistry_, *combat_, AreaEffectCloudSystem::Options{.entityTags = &vanillaData_.entityTags});
+    endFight_ = std::make_unique<EndFightSystem>(
+        playerRegistry_, *broadcaster_, *combat_, *explosions_, *clouds_,
+        EndFightSystem::Options{.nextSeed = [] { return scratchSeed(); }, .blockTags = &vanillaData_.blockTags});
     redstone_ = std::make_unique<RedstoneTickSystem>(
         playerRegistry_, vanillaData_.recipes, *broadcaster_, chunkSimulation_,
         // parity: `BaseCommandBlock.performCommand`, which stands the source at the middle of the

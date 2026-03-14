@@ -45,8 +45,16 @@ enum class Hit : std::uint8_t {
     Explodes,
 };
 
-/// parity: `EndCrystal.hurtServer`, whatever the damage: any hit that counts destroys it.
-[[nodiscard]] Hit hurt(entity::ServerEntity& crystal, bool byDragon, bool byExplosion);
+/// parity: `EndCrystal.hurtServer`, whatever the damage: any hit that counts destroys it. An
+/// invulnerable crystal (the ones a respawn raises) only answers to a creative player.
+[[nodiscard]] Hit hurt(entity::ServerEntity& crystal, bool byDragon, bool byExplosion, bool byCreative = false);
+
+[[nodiscard]] bool isInvulnerable(const entity::ServerEntity& crystal);
+
+void setInvulnerable(entity::ServerEntity& crystal, bool invulnerable);
+
+/// parity: `EndCrystal.setShowBottom`.
+void setShowBottom(entity::ServerEntity& crystal, bool show);
 
 /// The fire a crystal keeps under itself while the world has a dragon fight, or nothing when the
 /// block was not air. Answers the state written.

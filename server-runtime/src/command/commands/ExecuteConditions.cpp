@@ -224,7 +224,7 @@ void ExecuteCommand::buildConditions(const CommandNodeBuilder& builder, CommandN
     });
 
     builder.literal("entity", [&execute, positive](const CommandNodeBuilder& form) {
-        form.argument("entities", entitiesArgument(), [&execute, positive](const CommandNodeBuilder& entities) {
+        form.argument("entities", optionalEntitiesArgument(), [&execute, positive](const CommandNodeBuilder& entities) {
             conditional(entities, execute, positive, [](const CommandContext& context) -> std::optional<std::int32_t> {
                 const std::size_t count = targetsOf(context, "entities").size();
                 return count > 0 ? std::optional{static_cast<std::int32_t>(count)} : std::nullopt;

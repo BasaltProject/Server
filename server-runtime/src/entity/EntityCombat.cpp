@@ -1,5 +1,6 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/entity/Attributes.hpp>
+#include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
@@ -42,9 +43,25 @@ void knockback(ServerEntity& entity, double power, double towardsX, double towar
 }
 
 Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, std::optional<double> sourceZ,
-            const Hooks& hooks, std::string_view cause, const std::optional<std::string>& attackerName) {
+            const Hooks& hooks, std::string_view cause, const std::optional<std::string>& attackerName,
+            const bool byPlayer) {
     if (entity.removed || entity.health <= 0.0) {
         return {};
+    }
+    // parity: `EnderDragon.hurtServer` is a hit on the body, and only a player or an explosion
+    // (`always_hurts_ender_dragons`) takes health off. Anything else still counts as having hit.
+    if (entity.dragon != nullptr) {
+        const enderDragon::Part part = entity.dragon->hitPart.value_or(enderDragon::Part::Body);
+        entity.dragon->hitPart.reset();
+        const std::optional<float> onBody =
+            enderDragon::damageFor(*entity.dragon, part, amount, cause == "projectile" || cause == "wind_charge");
+        if (!onBody.has_value()) {
+            return {};
+        }
+        if (!byPlayer && cause != "explosion") {
+            return {.landed = true};
+        }
+        amount = *onBody;
     }
     // Every hit a mob takes comes through here, so this is the one place that has to ask. A plugin
     // may stop it or change how much it is worth; what it cannot do is see a hit that was never
@@ -72,13 +89,24 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
     if (reduced <= 0.0F) {
         return {};
     }
+    const double before = entity.health;
     entity.health -= static_cast<double>(reduced);
-    const bool died = entity.health <= 0.0;
+    bool died = entity.health <= 0.0;
     if (died) {
         entity.health = 0.0;
     }
+    if (entity.dragon != nullptr) {
+        // parity: `EnderDragon.handleKillingBlow`: a flying dragon is left on one health to die.
+        if (died && enderDragon::refusesDeath(*entity.dragon)) {
+            entity.health = 1.0;
+            died = false;
+        }
+        enderDragon::afterHurt(*entity.dragon, static_cast<float>(before), static_cast<float>(entity.health));
+    }
     // parity: the 0.4 every hit is worth, taken before the attacker's own extra knockback.
-    if (!cooling) {
+    // parity: `EnderDragon.knockback`, which a sitting dragon ignores.
+    const bool planted = entity.dragon != nullptr && enderDragon::isSitting(entity.dragon->phase);
+    if (!cooling && !planted) {
         knockback(entity, kDefaultKnockback, sourceX.value_or(entity.x) - entity.x,
                   sourceZ.value_or(entity.z) - entity.z);
     }

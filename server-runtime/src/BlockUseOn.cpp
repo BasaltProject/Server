@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
+#include <basalt/server/runtime/EndFightSystem.hpp>
 #include <basalt/server/runtime/ItemUseTimers.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/PlayerBlockItemUse.hpp>
@@ -15,6 +16,7 @@
 #include <basalt/server/runtime/player/PlayerBuckets.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/PlayerSpawnItems.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
@@ -436,6 +438,24 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
     const bool isBoat = heldBlock->path().ends_with("_boat") || heldBlock->path() == "bamboo_raft" ||
                         heldBlock->path() == "bamboo_chest_raft";
     if (isBoat && placeBoat(*session, *heldBlock, heldSlot, *held, hit)) {
+        ack();
+        return;
+    }
+    // parity: `EndCrystalItem.useOn`, and in a world with a dragon fight, `tryRespawn` after it.
+    if (heldBlock == Identifier::vanilla("end_crystal")) {
+        if (world::LoadedWorld* world = owner_->currentWorld();
+            world != nullptr &&
+            player::placeEndCrystalFor(breakContext(), *session, *world, heldSlot, *held,
+                                       player::BlockHit{.x = hit.pos.x,
+                                                        .y = hit.pos.y,
+                                                        .z = hit.pos.z,
+                                                        .direction = hit.direction,
+                                                        .clickX = hit.clickX,
+                                                        .clickY = hit.clickY,
+                                                        .clickZ = hit.clickZ}) &&
+            world->dragonFight() != nullptr && owner_->options().endFight != nullptr) {
+            owner_->options().endFight->tryRespawn(*world);
+        }
         ack();
         return;
     }

@@ -98,6 +98,22 @@ constexpr std::array<Torch, 4> kTorches{{
 
 } // namespace
 
+std::optional<std::array<std::int32_t, 3>> locate(const WorldState& world, server::world::ChunkHeight bounds) {
+    // The pillar's top, then down its height: the pillar starts on the layer the portal fills.
+    for (std::int32_t y = bounds.maxY(); y >= bounds.minY(); --y) {
+        if (world.blockState(0, y, 0) == registry::blocks::bedrock().stateId) {
+            return std::array<std::int32_t, 3>{0, y - (kPillarHeight - 1), 0};
+        }
+    }
+    return std::nullopt;
+}
+
+bool isActive(const WorldState& world, std::int32_t originY) { return world.blockState(1, originY, 0) == endPortal(); }
+
+std::int32_t exitPortalY(WorldState& world, server::world::ChunkHeight bounds) { return originY(world, bounds); }
+
+void placeAt(WorldState& world, std::int32_t originY, bool active) { static_cast<void>(place(world, originY, active)); }
+
 bool exists(const WorldState& world, server::world::ChunkHeight bounds) {
     for (std::int32_t y = bounds.minY(); y <= bounds.maxY(); ++y) {
         if (world.blockState(0, y, 0) == registry::blocks::bedrock().stateId) {

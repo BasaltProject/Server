@@ -37,6 +37,12 @@ struct RuntimeEntityMetadata {
     /// parity: `EndCrystal`'s beam and base, which change while a dragon is being called back.
     std::optional<std::optional<wire::protocol::play::BlockPos>> crystalBeam;
     std::optional<bool> crystalBottom;
+    /// parity: `EnderDragon.DATA_PHASE`, which the client animates by.
+    std::optional<std::int32_t> dragonPhase;
+    /// parity: `AreaEffectCloud`'s radius, waiting flag and particle.
+    std::optional<float> cloudRadius;
+    std::optional<bool> cloudWaiting;
+    std::optional<wire::protocol::play::SetEntityDataPacket::ParticleValue> cloudParticle;
 
     /// Initial non-default fields, or every field whose live value changed since `previous`.
     [[nodiscard]] std::vector<wire::protocol::play::SetEntityDataPacket::Entry>

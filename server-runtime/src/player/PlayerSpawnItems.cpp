@@ -1,11 +1,13 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSpawnItems.hpp>
+#include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/ItemFrames.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/Rails.hpp>
@@ -97,6 +99,65 @@ bool placeBoatFor(const BreakContext& context, PlayerSession& player, world::Loa
     world::vibrations::emit(world.state(), "entity_place", hit.x + static_cast<double>(hit.clickX),
                             hit.y + static_cast<double>(hit.clickY), hit.z + static_cast<double>(hit.clickZ),
                             world.gameTime());
+    return true;
+}
+
+bool placeEndCrystalFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world,
+                        const std::int32_t heldSlot, const storage::StoredItemStack& held, const BlockHit& hit) {
+    const std::optional<std::int32_t> clicked = world.state().blockState(hit.x, hit.y, hit.z);
+    const reg::BlockState* obsidian = reg::blocks::named("obsidian");
+    if (!clicked.has_value() ||
+        (*clicked != reg::blocks::bedrock().stateId && (obsidian == nullptr || *clicked != obsidian->stateId))) {
+        return false;
+    }
+    const std::int32_t x = hit.x;
+    const std::int32_t y = hit.y + 1;
+    const std::int32_t z = hit.z;
+    const std::optional<std::int32_t> above = world.state().blockState(x, y, z);
+    if (!above.has_value() || !reg::blocks::isAir(*above)) {
+        return false;
+    }
+    // parity: the one-by-two box above the block has to hold no entity at all.
+    const auto overlaps = [x, y, z](double ex, double ey, double ez, double width, double height) {
+        const double half = width / 2.0;
+        return ex + half > x && ex - half < x + 1.0 && ey + height > y && ey < y + 2.0 && ez + half > z &&
+               ez - half < z + 1.0;
+    };
+    for (const entity::ServerEntity* other : world.state().entities()) {
+        if (!other->removed && overlaps(other->x, other->y, other->z, other->width(), other->height())) {
+            return false;
+        }
+    }
+    for (const world::DroppedItem& item : world.state().items()) {
+        if (overlaps(item.x, item.y, item.z, 0.25, 0.25)) {
+            return false;
+        }
+    }
+    if (context.registry != nullptr) {
+        for (const PlayerSession* other : context.registry->snapshot()) {
+            if (other->worldName == world.name() && !other->dead && overlaps(other->x, other->y, other->z, 0.6, 1.8)) {
+                return false;
+            }
+        }
+    }
+    const reg::EntityTypeEntry* entry = reg::entityTypes::of(Identifier::vanilla("end_crystal"));
+    if (entry == nullptr || context.registry == nullptr) {
+        return false;
+    }
+    auto crystal =
+        std::make_unique<entity::ServerEntity>(context.registry->allocateEntityId(), wire::common::Uuid::random(),
+                                               entry->id, entry->protocolId, x + 0.5, static_cast<double>(y), z + 0.5);
+    world::endCrystals::setShowBottom(*crystal, false);
+    world.state().spawnEntity(std::move(crystal));
+    heardBySculk(context, world, "entity_place", x, y, z);
+    if (player.gamemode != Gamemode::Creative) {
+        storage::StoredItemStack left = held;
+        left.count = held.count - 1;
+        player.inventory.set(heldSlot, held.count <= 1 ? std::nullopt : std::optional{left});
+        if (context.slotChanged) {
+            context.slotChanged(player, heldSlot);
+        }
+    }
     return true;
 }
 

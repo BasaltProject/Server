@@ -75,6 +75,11 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
                    "/region/ now: move the .linear files there, or the world regenerates from its seed.";
         });
     }
+    if (declaration_.dimension == config::WorldDimension::End) {
+        dragonFight_ = std::make_unique<DragonFight>(
+            metadata_.dragonFight.has_value() ? DragonFight::decode(*metadata_.dragonFight) : DragonFight{});
+        dragonFight_->shuffleGateways(metadata_.seed);
+    }
     weather_.raining = metadata_.raining;
     weather_.rainTime = metadata_.rainTime;
     weather_.thundering = metadata_.thundering;
@@ -167,6 +172,9 @@ void LoadedWorld::saveMetadata() {
     saved.difficulty = difficulty_;
     saved.difficultyLocked = difficultyLocked_;
     saved.defaultGamemode = defaultGamemode_;
+    if (dragonFight_ != nullptr) {
+        saved.dragonFight = dragonFight_->encode();
+    }
     metadata_ = saved;
     static_cast<void>(saved.writeTo(worldRoot_));
 }

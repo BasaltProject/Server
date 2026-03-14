@@ -44,6 +44,9 @@ bool WorldMetadata::writeTo(const std::string& worldRoot) const {
     trader.putInt("spawn_delay", wanderingTraderSpawnDelay);
     trader.putInt("spawn_chance", wanderingTraderSpawnChance);
     root.set("WanderingTrader", wire::nbt::NbtTag::ofCompound(std::move(trader)));
+    if (dragonFight.has_value()) {
+        root.set("DragonFight", wire::nbt::NbtTag::ofCompound(*dragonFight));
+    }
     gameRules.writeTo(root);
 
     wire::io::fileIO::createDirectories(worldRoot);
@@ -102,6 +105,9 @@ std::optional<WorldMetadata> WorldMetadata::read(const std::string& worldRoot) {
     if (const wire::nbt::NbtCompound* trader = root->getCompound("WanderingTrader"); trader != nullptr) {
         metadata.wanderingTraderSpawnDelay = trader->getInt("spawn_delay", 24000);
         metadata.wanderingTraderSpawnChance = trader->getInt("spawn_chance", 25);
+    }
+    if (const wire::nbt::NbtCompound* fight = root->getCompound("DragonFight"); fight != nullptr) {
+        metadata.dragonFight = *fight;
     }
     return metadata;
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/entity/DragonState.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
@@ -37,6 +38,14 @@ public:
         std::function<std::int64_t()> nextSeed;
         /// What the `blocks_wind_charge_explosions` tag holds, the only thing that shortens a gust.
         const world::realBlockTags::TagMembers* blockTags = nullptr;
+        /// Where a dragon fireball burst, for the cloud it leaves.
+        std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                           const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& fireball)>
+            dragonFireballLanded;
+        /// A crystal went, by that player if one was behind it.
+        std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                           const entity::ServerEntity& crystal, std::optional<std::int32_t> byPlayer)>
+            crystalDestroyed;
     };
 
     CombatSystem(BlockChangeBroadcaster& broadcaster, ExplosionSystem& explosions, Hooks hooks, Options options);
@@ -55,7 +64,8 @@ public:
     /// A hit on an end crystal, which destroys it whatever the damage. `byExplosion` leaves it
     /// gone without a blast of its own. parity: `EndCrystal.hurtServer`.
     void hitCrystal(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
-                    entity::ServerEntity& crystal, bool byExplosion, bool byDragon = false);
+                    entity::ServerEntity& crystal, bool byExplosion, bool byDragon = false,
+                    std::optional<std::int32_t> byPlayer = std::nullopt, bool byCreative = false);
 
     /// What a blast does to the entities around it that are not players or items.
     ///
@@ -73,12 +83,18 @@ private:
     struct Target {
         entity::ServerEntity* mob = nullptr;
         player::PlayerSession* player = nullptr;
+        /// Which of a dragon's parts it went through; a dragon itself is never hit.
+        std::optional<entity::enderDragon::Part> dragonPart;
     };
 
     [[nodiscard]] static std::optional<Target> targetAlong(const std::vector<player::PlayerSession*>& watchers,
                                                            const std::vector<entity::ServerEntity*>& living,
                                                            const entity::ServerEntity& projectile, double fromX,
                                                            double fromY, double fromZ);
+
+    /// Whether whoever fired it is a player, which is what an ender dragon asks of a hit.
+    [[nodiscard]] static bool firedByPlayer(const std::vector<player::PlayerSession*>& watchers,
+                                            const entity::ServerEntity& projectile);
 
     /// parity: `Projectile.getOwner`, since an arrow kills for whoever shot it. The arrow itself is
     /// the answer once its owner is gone.

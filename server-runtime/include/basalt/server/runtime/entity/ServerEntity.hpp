@@ -16,6 +16,10 @@
 
 namespace basalt::server::runtime::entity {
 
+namespace enderDragon {
+struct DragonState;
+}
+
 namespace ai {
 class GoalSelector;
 }
@@ -258,6 +262,9 @@ public:
     /// Presentation state inherited from a structure or a save, such as villager biome, cat variant
     /// and equipment. Runtime-owned fields are overlaid whenever it is saved.
     std::optional<wire::nbt::NbtCompound> sourceNbt;
+
+    /// What an ender dragon keeps beyond this, or null for anything else.
+    std::shared_ptr<enderDragon::DragonState> dragon;
 
     /// Attribute base values that were changed from their default. parity: `AttributeMap`, without
     /// modifiers.

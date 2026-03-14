@@ -356,7 +356,8 @@ public:
 /// and in the message they refuse with.
 class SelectorArgument final : public ArgumentType {
 public:
-    SelectorArgument(bool single, bool playersOnly) : single_(single), playersOnly_(playersOnly) {}
+    SelectorArgument(bool single, bool playersOnly, bool optional = false)
+        : single_(single), playersOnly_(playersOnly), optional_(optional) {}
 
     [[nodiscard]] Parsed<ArgumentValue> parse(StringReader& reader, const CommandSource& source,
                                               const CommandEnvironment& environment) const override {
@@ -369,7 +370,7 @@ public:
         if (playersOnly_) {
             std::erase_if(matched, [](const CommandTarget& target) { return target.player() == nullptr; });
         }
-        if (matched.empty() && !source.defersSelectors()) {
+        if (matched.empty() && !optional_ && !source.defersSelectors()) {
             reader.setCursor(start);
             return std::unexpected{CommandSyntaxError{
                 .component = Component::translatable(playersOnly_ ? "argument.entity.notfound.player"
@@ -404,6 +405,8 @@ public:
 private:
     bool single_;
     bool playersOnly_;
+    /// parity: `EntityArgument.getOptionalEntities`, which answers an empty list rather than failing.
+    bool optional_;
 };
 
 class ComponentArgument final : public ArgumentType {
@@ -521,6 +524,16 @@ std::shared_ptr<const ArgumentType> playersArgument(bool single) {
     static const auto one = std::make_shared<const SelectorArgument>(true, true);
     static const auto many = std::make_shared<const SelectorArgument>(false, true);
     return single ? one : many;
+}
+
+std::shared_ptr<const ArgumentType> optionalEntitiesArgument() {
+    static const auto instance = std::make_shared<const SelectorArgument>(false, false, true);
+    return instance;
+}
+
+std::shared_ptr<const ArgumentType> optionalPlayersArgument() {
+    static const auto instance = std::make_shared<const SelectorArgument>(false, true, true);
+    return instance;
 }
 
 std::shared_ptr<const ArgumentType> entitiesArgument(bool single) {

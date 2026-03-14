@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
+#include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <array>
 #include <cstdint>
@@ -60,6 +61,9 @@ struct WorldMetadata {
     /// parity: `WanderingTraderData`, persisted independently of the spawner's 1,200-tick counter.
     std::int32_t wanderingTraderSpawnDelay = 24000;
     std::int32_t wanderingTraderSpawnChance = 25;
+
+    /// parity: the `ender_dragon_fight` saved data, kept only by a world that has the fight.
+    std::optional<wire::nbt::NbtCompound> dragonFight;
 
     friend bool operator==(const WorldMetadata&, const WorldMetadata&) = default;
 

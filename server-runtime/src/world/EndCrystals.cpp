@@ -45,8 +45,27 @@ bool showsBottom(const entity::ServerEntity& crystal) {
     return !crystal.sourceNbt.has_value() || crystal.sourceNbt->getBoolean(kShowBottomKey, true);
 }
 
-Hit hurt(entity::ServerEntity& crystal, bool byDragon, bool byExplosion) {
-    if (byDragon || crystal.removed) {
+bool isInvulnerable(const entity::ServerEntity& crystal) {
+    return crystal.sourceNbt.has_value() && crystal.sourceNbt->getBoolean("Invulnerable");
+}
+
+void setInvulnerable(entity::ServerEntity& crystal, bool invulnerable) {
+    if (!crystal.sourceNbt.has_value()) {
+        crystal.sourceNbt.emplace();
+    }
+    crystal.sourceNbt->putBoolean("Invulnerable", invulnerable);
+}
+
+void setShowBottom(entity::ServerEntity& crystal, bool show) {
+    if (!crystal.sourceNbt.has_value()) {
+        crystal.sourceNbt.emplace();
+    }
+    crystal.sourceNbt->putBoolean(kShowBottomKey, show);
+}
+
+Hit hurt(entity::ServerEntity& crystal, bool byDragon, bool byExplosion, bool byCreative) {
+    // parity: `Entity.isInvulnerableToBase`, which a creative player gets past.
+    if (byDragon || crystal.removed || (isInvulnerable(crystal) && !byCreative)) {
         return Hit::Ignored;
     }
     crystal.removed = true;

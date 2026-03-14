@@ -48,9 +48,12 @@ struct Hooks {
 /// parity: `LivingEntity.hurtServer`. The cooldown is the part worth naming: inside it only a bigger
 /// hit lands, and only by the difference, which is what stops a fast weapon from being strictly
 /// better than a strong one.
+///
+/// `byPlayer` is whether a player is behind the hit, which is all an ender dragon listens to
+/// besides explosions.
 Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX = std::nullopt,
             std::optional<double> sourceZ = std::nullopt, const Hooks& hooks = {}, std::string_view cause = "attack",
-            const std::optional<std::string>& attackerName = std::nullopt);
+            const std::optional<std::string>& attackerName = std::nullopt, bool byPlayer = false);
 
 /// parity: `LivingEntity.knockback`. The coordinates point at whoever swung, and the push is taken
 /// off the speed, so the entity ends up going the other way.

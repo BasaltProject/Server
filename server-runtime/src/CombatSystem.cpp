@@ -18,6 +18,7 @@
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <limits>
@@ -122,8 +123,12 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
             if (target->mob != nullptr && world::endCrystals::isCrystal(target->mob->type())) {
                 hitCrystal(world, watchers, *target->mob, false);
             } else if (target->mob != nullptr) {
+                if (target->mob->dragon != nullptr) {
+                    target->mob->dragon->hitPart = target->dragonPart;
+                }
                 const entity::entityCombat::Result result =
-                    entity::entityCombat::hurt(*target->mob, kWindChargeDamage, fromX, fromZ, hooks_, "wind_charge");
+                    entity::entityCombat::hurt(*target->mob, kWindChargeDamage, fromX, fromZ, hooks_, "wind_charge",
+                                               std::nullopt, firedByPlayer(watchers, entity));
                 if (result.landed) {
                     announceEntityHit(watchers, *target->mob, world::damageTypes::kWindCharge, entity.entityId(),
                                       result.died);
@@ -186,6 +191,19 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
                                                                    .x = fromX,
                                                                    .z = fromZ,
                                                                    .name = shooterName(watchers, living, entity)});
+        }
+        return;
+    }
+    // parity: `DragonFireball.onHit`, which bursts on anything but its own dragon, and whose tick
+    // throws it away once the dragon is gone.
+    if (path == "dragon_fireball") {
+        const std::optional<Target> target = targetAlong(watchers, living, entity, fromX, fromY, fromZ);
+        if (!hit.has_value() && !target.has_value()) {
+            return;
+        }
+        entity.removed = true;
+        if (options_.dragonFireballLanded) {
+            options_.dragonFireballLanded(world, watchers, living, entity);
         }
         return;
     }
@@ -333,6 +351,12 @@ void CombatSystem::landEnderPearl(const std::vector<PlayerSession*>& watchers, S
     }
 }
 
+bool CombatSystem::firedByPlayer(const std::vector<PlayerSession*>& watchers, const ServerEntity& projectile) {
+    return projectile.ownerId.has_value() && std::ranges::any_of(watchers, [&projectile](const PlayerSession* player) {
+               return player->entityId() == *projectile.ownerId;
+           });
+}
+
 std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<PlayerSession*>& watchers,
                                                               const std::vector<ServerEntity*>& living,
                                                               const ServerEntity& projectile, double fromX,
@@ -347,6 +371,22 @@ std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<
         // parity: `Projectile.canHitEntity` asks `isPickable`, which a crystal is too.
         if (!server::registry::entityAttributes::isLiving(candidate->type()) &&
             !world::endCrystals::isCrystal(candidate->type())) {
+            continue;
+        }
+        // parity: `EnderDragon.isPickable` is false; what a projectile meets is one of its parts.
+        if (candidate->dragon != nullptr) {
+            for (std::size_t part = 0; part < entity::enderDragon::kParts; ++part) {
+                const entity::enderDragon::Vec3& centre = candidate->dragon->parts[part];
+                const entity::enderDragon::PartBox& box = entity::enderDragon::kPartBoxes[part];
+                const std::optional<double> at = clip(projectile, fromX, fromY, fromZ, centre.x, centre.y, centre.z,
+                                                      static_cast<double>(box.width), static_cast<double>(box.height));
+                if (at.has_value() && *at < nearest) {
+                    nearest = *at;
+                    found = Target{.mob = candidate,
+                                   .player = nullptr,
+                                   .dragonPart = static_cast<entity::enderDragon::Part>(part)};
+                }
+            }
             continue;
         }
         const std::optional<double> at = clip(projectile, fromX, fromY, fromZ, candidate->x, candidate->y, candidate->z,
@@ -397,12 +437,17 @@ bool CombatSystem::hitEntityAlong(world::LoadedWorld& world, const std::vector<P
 
     if (target->mob != nullptr && world::endCrystals::isCrystal(target->mob->type())) {
         arrow.removed = true;
-        hitCrystal(world, watchers, *target->mob, false);
+        hitCrystal(world, watchers, *target->mob, false, false,
+                   firedByPlayer(watchers, arrow) ? arrow.ownerId : std::nullopt);
         return true;
     }
     if (target->mob != nullptr) {
+        if (target->mob->dragon != nullptr) {
+            target->mob->dragon->hitPart = target->dragonPart;
+        }
         const entity::entityCombat::Result result =
-            entity::entityCombat::hurt(*target->mob, static_cast<float>(damage), fromX, fromZ, hooks_, "projectile");
+            entity::entityCombat::hurt(*target->mob, static_cast<float>(damage), fromX, fromZ, hooks_, "projectile",
+                                       std::nullopt, firedByPlayer(watchers, arrow));
         if (!result.landed) {
             // parity: an arrow that found somebody still inside their hurt cooldown bounces off.
             arrow.velocityX *= kArrowBounce;
@@ -430,13 +475,21 @@ bool CombatSystem::hitEntityAlong(world::LoadedWorld& world, const std::vector<P
 }
 
 void CombatSystem::hitCrystal(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
-                              ServerEntity& crystal, const bool byExplosion, const bool byDragon) {
-    if (world::endCrystals::hurt(crystal, byDragon, byExplosion) != world::endCrystals::Hit::Explodes) {
+                              ServerEntity& crystal, const bool byExplosion, const bool byDragon,
+                              const std::optional<std::int32_t> byPlayer, const bool byCreative) {
+    const world::endCrystals::Hit hit = world::endCrystals::hurt(crystal, byDragon, byExplosion, byCreative);
+    if (hit == world::endCrystals::Hit::Ignored) {
         return;
     }
-    explosions_.blowUp(world, watchers, crystal.x, crystal.y, crystal.z, world::endCrystals::kExplosionPower,
-                       "end_crystal", crystal.entityId());
-    emitVibration(world, "explode", crystal.x, crystal.y, crystal.z);
+    if (hit == world::endCrystals::Hit::Explodes) {
+        explosions_.blowUp(world, watchers, crystal.x, crystal.y, crystal.z, world::endCrystals::kExplosionPower,
+                           "end_crystal", crystal.entityId());
+        emitVibration(world, "explode", crystal.x, crystal.y, crystal.z);
+    }
+    // parity: `EndCrystal.onDestroyedBy`, after the blast, whatever took it.
+    if (options_.crystalDestroyed) {
+        options_.crystalDestroyed(world, watchers, crystal, byPlayer);
+    }
 }
 
 void CombatSystem::hurtByExplosion(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
