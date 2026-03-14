@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/EndFightSystem.hpp>
+#include <basalt/server/runtime/FishingSystem.hpp>
 #include <basalt/server/runtime/ItemUseTimers.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/PlayerBlockItemUse.hpp>
@@ -507,7 +508,7 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
     PlayerSession* session = owner_->playerSession();
     world::LoadedWorld* world = owner_->currentWorld();
     if (session == nullptr || world == nullptr || useItem.hand != play::Hand::MainHand ||
-        session->gamemode == Gamemode::Spectator || session->gamemode == Gamemode::Adventure) {
+        session->gamemode == Gamemode::Spectator) {
         return;
     }
     const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session->inventory.heldSlot();
@@ -520,7 +521,14 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
     // through and greying the slot afterwards.
     if (owner_->itemUseTimers().onCooldown(*item) || owner_->itemUseTimers().startEating(*session, *item, heldSlot) ||
         owner_->itemUseTimers().startDrawing(*session, *item, heldSlot) ||
-        owner_->itemUseTimers().throwEnderPearl(*session, *item, heldSlot) || !world::buckets::isBucket(*item)) {
+        owner_->itemUseTimers().throwEnderPearl(*session, *item, heldSlot) ||
+        (owner_->options().fishing != nullptr &&
+         owner_->options().fishing->useRod(breakContext(), *session, *world, heldSlot)) ||
+        !world::buckets::isBucket(*item)) {
+        return;
+    }
+    // parity: `BucketItem.use` asks `mayUseItemAt`, which an adventure player never may.
+    if (session->gamemode == Gamemode::Adventure) {
         return;
     }
 

@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/BlockExperience.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/NetherPortals.hpp>
@@ -380,6 +381,14 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
         if (correctTool) {
             dropLootFor(context, world, *brokenBlock, broken.value_or(0), x, y, z,
                         carried.has_value() ? &*carried : nullptr);
+            // parity: `spawnAfterBreak(..., true)` right after the drops, and `popExperience` reads
+            // `block_drops` like the items do.
+            const bool silkTouch = held.has_value() && enchantmentLevel(*held, Identifier::vanilla("silk_touch")) > 0;
+            random::RandomSource random = random::RandomSource::legacy(seedFrom(context));
+            const std::int32_t points = world::blockExperience::onBreak(*brokenBlock, silkTouch, random);
+            if (points > 0 && context.awardExperience && world.gameRules().get(world::gameRules::kBlockDrops)) {
+                context.awardExperience(world, x + 0.5, y + 0.5, z + 0.5, points);
+            }
         }
     }
     if (brokenBlock != nullptr) {

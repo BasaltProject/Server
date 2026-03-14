@@ -316,9 +316,9 @@ NbtCompound encode(const ServerEntity& entity) {
     if (ageableMobs::isAgeable(path)) {
         tag.putInt("Age", entity.age);
     }
+    // parity: `Animal.addAdditionalSaveData`; the wait after breeding is the positive `Age`.
     if (!breeding::foodFor(entity.type()).empty()) {
-        tag.putInt("LoveTicks", entity.loveTicks);
-        tag.putInt("BreedCooldown", entity.breedCooldown);
+        tag.putInt("InLove", entity.loveTicks);
     }
     if (taming::isTamable(entity.type())) {
         tag.putBoolean("Sitting", entity.sitting);
@@ -477,8 +477,8 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
     entity->persistent = numericBoolean(tag, "PersistenceRequired");
     entity->noAi = numericBoolean(tag, "NoAI");
     entity->canPickUpLoot = tag.getBoolean("CanPickUpLoot");
-    entity->loveTicks = numericInt(tag, "LoveTicks");
-    entity->breedCooldown = numericInt(tag, "BreedCooldown");
+    entity->loveTicks = numericInt(tag, "InLove");
+    entity->breedCooldown = std::max(entity->age, 0);
     if (patrols(path)) {
         if (const std::span<const std::int32_t> target = tag.getIntArray("patrol_target"); target.size() >= 3) {
             entity->patrolTarget = std::array<std::int32_t, 3>{target[0], target[1], target[2]};

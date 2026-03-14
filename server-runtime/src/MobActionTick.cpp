@@ -19,6 +19,7 @@
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
+#include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
@@ -254,6 +255,11 @@ void MobActionSystem::breed(world::LoadedWorld& world, ServerEntity& animal, Ser
     baby->age = entity::breeding::kBabyAge;
     world.state().spawnEntity(std::move(baby));
     entity::breeding::afterBreeding(animal, partner);
+    // parity: `Animal.finalizeSpawnChildFromBreeding`, one orb of one to seven points.
+    if (world.gameRules().get(world::gameRules::kMobDrops) && hooks_.spawnOrb) {
+        random::RandomSource random = freshRandom();
+        hooks_.spawnOrb(world, animal.x, animal.y, animal.z, random.nextInt(7) + 1);
+    }
 }
 
 } // namespace basalt::server::runtime

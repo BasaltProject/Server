@@ -93,6 +93,7 @@ class BlockChangeBroadcaster;
 class ContainerMenuController;
 class CombatSystem;
 class EndFightSystem;
+class FishingSystem;
 class ExplosionSystem;
 class BlockInteractionHandler;
 class ItemUseTimers;
@@ -245,6 +246,8 @@ public:
         CombatSystem* combat = nullptr;
         /// The dragon fight, which a crystal set down beside the exit portal may call back.
         EndFightSystem* endFight = nullptr;
+        /// Casting and reeling in.
+        FishingSystem* fishing = nullptr;
         /// Experience left as orbs at a point.
         std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t amount)>
             awardExperience;

@@ -56,6 +56,8 @@ private:
 /// parity: `LootContextParams`. The only one this evaluator reads is `BLOCK_STATE`, which is what
 /// tells the lower half of a door from the upper; a roll with no block behind it leaves it empty and
 /// every state predicate answers no.
+struct LootTable;
+
 struct LootContext {
     std::map<std::string, std::string> blockState;
     /// Whether somebody is behind the break: the player mining it or the projectile that hit it.
@@ -65,6 +67,11 @@ struct LootContext {
     /// parity: `LootParams.withDynamicDrop`, the drops a block hands the roll itself rather than
     /// naming in its table. The only one in the game is a decorated pot's four sherds.
     std::map<std::string, std::vector<ItemStack>> dynamic;
+    /// The tables a `loot_table` entry names. parity: `LootContext.getResolver`.
+    std::function<const LootTable*(const wire::common::Identifier& id)> tables;
+    /// Whether the fishing hook behind the roll is in open water, or nothing without a hook.
+    /// parity: `FishingHookPredicate.inOpenWater`.
+    std::optional<bool> inOpenWater;
 };
 
 /// A predicate gating a pool or entry. parity: `LootItemCondition`. The rest need an entity context
@@ -92,6 +99,8 @@ public:
         BlockStateProperty,
         /// Always true: what is around the block that broke does not reach this evaluator.
         LocationCheck,
+        /// parity: `entity_properties` with `type_specific/fishing_hook`, the only one it models.
+        FishingHookOpenWater,
     };
 
     [[nodiscard]] static LootCondition randomChance(NumberProvider chance);
@@ -106,6 +115,7 @@ public:
     [[nodiscard]] static LootCondition randomChanceWithEnchantedBonus(float chance);
     [[nodiscard]] static LootCondition blockStateProperty(std::map<std::string, std::string> expected);
     [[nodiscard]] static LootCondition locationCheck();
+    [[nodiscard]] static LootCondition fishingHookOpenWater(bool expected);
 
     [[nodiscard]] Kind kind() const noexcept { return kind_; }
 
@@ -173,6 +183,8 @@ struct LootEntry {
     std::optional<wire::common::Identifier> item;
     /// parity: `DynamicLoot`, an entry whose stacks come from the block rather than from the table.
     std::optional<std::string> dynamicName;
+    /// parity: `NestedLootTable`, an entry whose stacks are another table's roll.
+    std::optional<wire::common::Identifier> table;
     std::int32_t weight = 1;
     std::int32_t quality = 0;
     std::vector<LootCondition> conditions;
@@ -213,6 +225,11 @@ struct LootTable {
     /// The named stream this table rolls on. parity: `LootTable.randomSequence`, which is what makes
     /// the same world drop the same thing in the same order.
     std::optional<wire::common::Identifier> randomSequence;
+
+    /// Every stack the pools make, with the table's functions applied and nothing filtered.
+    /// parity: `LootTable.getRandomItemsRaw`, which is also what a nested entry runs.
+    void generateRaw(random::RandomSource& random, float luck, std::optional<float> explosionRadius,
+                     const LootPool::Output& output, const LootContext& context = {}) const;
 
     [[nodiscard]] std::vector<ItemStack> generate(random::RandomSource& random, float luck = 0.0F,
                                                   std::optional<float> explosionRadius = std::nullopt,

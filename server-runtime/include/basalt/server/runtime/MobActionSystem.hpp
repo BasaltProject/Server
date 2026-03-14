@@ -49,6 +49,8 @@ public:
         std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& animal,
                            const entity::ServerEntity& partner)>
             breedAllowed;
+        /// One experience orb of that value. parity: `new ExperienceOrb`.
+        std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t value)> spawnOrb;
     };
 
     /// The rolls a mob's turn needs, none of which is part of the level's own stream.

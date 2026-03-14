@@ -188,8 +188,16 @@ Parsed<LootCondition> parseCondition(const JsonObject& condition) {
     // nothing and snow mined by hand leaves snowballs. A predicate with anything in it is a gap.
     if (*type == "minecraft:entity_properties") {
         const JsonObject* predicate = asObject(condition.find("predicate"));
-        return predicate == nullptr || predicate->empty() ? LootCondition::thisEntityExists()
-                                                          : LootCondition::entityProperties();
+        if (predicate == nullptr || predicate->empty()) {
+            return LootCondition::thisEntityExists();
+        }
+        const JsonObject* hook = asObject(predicate->find("minecraft:type_specific/fishing_hook"));
+        const JsonValue* openWater = hook == nullptr ? nullptr : hook->find("in_open_water");
+        const bool* expected = openWater == nullptr ? nullptr : openWater->get<bool>();
+        if (expected != nullptr && predicate->size() == 1 && hook->size() == 1) {
+            return LootCondition::fishingHookOpenWater(*expected);
+        }
+        return LootCondition::entityProperties();
     }
     // parity: the conditions a mob's own table carries, about what died and what killed it.
     if (*type == "minecraft:damage_source_properties") {
@@ -388,6 +396,28 @@ Parsed<LootEntry> parseEntry(const JsonObject& entry) {
         }
         LootEntry built;
         built.dynamicName = *name;
+        built.weight = static_cast<std::int32_t>(asNumber(entry.find("weight")).value_or(1.0));
+        built.quality = static_cast<std::int32_t>(asNumber(entry.find("quality")).value_or(0.0));
+        built.conditions = std::move(*conditions);
+        built.functions = std::move(*functions);
+        return built;
+    }
+    if (*type == "minecraft:loot_table") {
+        const std::optional<std::string> value = asString(entry.find("value"));
+        if (!value.has_value()) {
+            return std::unexpected(LootTableParseError{"Only a named nested loot table is supported"});
+        }
+        const std::expected<wire::common::Identifier, wire::common::IdentifierError> table =
+            wire::common::Identifier::parse(*value);
+        if (!table.has_value()) {
+            return std::unexpected(LootTableParseError{"Malformed loot table name: " + *value});
+        }
+        Parsed<std::vector<LootFunction>> functions = parseFunctions(entry.find("functions"));
+        if (!functions.has_value()) {
+            return std::unexpected(functions.error());
+        }
+        LootEntry built;
+        built.table = *table;
         built.weight = static_cast<std::int32_t>(asNumber(entry.find("weight")).value_or(1.0));
         built.quality = static_cast<std::int32_t>(asNumber(entry.find("quality")).value_or(0.0));
         built.conditions = std::move(*conditions);

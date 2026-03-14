@@ -20,6 +20,14 @@ namespace basalt::server::runtime::player {
 class PlayerSession;
 }
 
+namespace basalt::server::world {
+class ChunkBlockEntity;
+}
+
+namespace basalt::server::runtime::world {
+class LoadedWorld;
+}
+
 namespace basalt::server::runtime {
 
 class ClientSession;
@@ -250,6 +258,10 @@ private:
     void fillPluginMenu(const std::map<std::int32_t, PluginMenuItem>& items);
 
     [[nodiscard]] std::optional<world::furnaces::State> furnaceState() const;
+
+    /// Gives the taker the experience a furnace has banked. parity:
+    /// `AbstractFurnaceBlockEntity.awardUsedRecipesAndPopExperience`.
+    void payFurnace(world::LoadedWorld& world, server::world::ChunkBlockEntity& entity);
 
     /// Which half of a double chest a menu slot belongs to, and where in it.
     [[nodiscard]] std::optional<std::pair<wire::protocol::play::BlockPos, std::int32_t>>

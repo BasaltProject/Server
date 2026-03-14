@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/entity/AreaEffectClouds.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
+#include <basalt/server/runtime/entity/FishingHooks.hpp>
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -445,6 +446,16 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
         entries.push_back(
             Entry{.index = kOrbValueDataIndex, .value = SetEntityDataPacket::IntValue{.value = *orbValue}});
     }
+    if (hookedEntity.has_value() && (previous == nullptr || previous->hookedEntity != hookedEntity) &&
+        (previous != nullptr || *hookedEntity != 0)) {
+        entries.push_back(Entry{.index = fishingHooks::kHookedDataIndex,
+                                .value = SetEntityDataPacket::IntValue{.value = *hookedEntity}});
+    }
+    if (hookBiting.has_value() && (previous == nullptr || previous->hookBiting != hookBiting) &&
+        (previous != nullptr || *hookBiting)) {
+        entries.push_back(Entry{.index = fishingHooks::kBitingDataIndex,
+                                .value = SetEntityDataPacket::BoolValue{.value = *hookBiting}});
+    }
     // parity: a fresh dragon is defined hovering, so only a different phase is news.
     if (dragonPhase.has_value() && (previous == nullptr || previous->dragonPhase != dragonPhase) &&
         (previous != nullptr || *dragonPhase != static_cast<std::int32_t>(enderDragon::Phase::Hover))) {
@@ -467,6 +478,10 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     }
     if (entity.type().path() == "experience_orb" && entity.sourceNbt.has_value()) {
         live.orbValue = entity.sourceNbt->getShort("Value");
+    }
+    if (entity.hook != nullptr) {
+        live.hookedEntity = entity.hook->hookedIn.has_value() ? *entity.hook->hookedIn + 1 : 0;
+        live.hookBiting = entity.hook->biting;
     }
     if (entity.dragon != nullptr) {
         live.dragonPhase = static_cast<std::int32_t>(entity.dragon->phase);

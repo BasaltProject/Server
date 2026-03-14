@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/EnvironmentTickSystem.hpp>
 #include <basalt/server/runtime/ExperienceOrbSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
+#include <basalt/server/runtime/FishingSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/MobTickSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
@@ -244,6 +245,7 @@ private:
     std::optional<bedrock::BedrockRecipeList> bedrockRecipes_;
     std::unique_ptr<NaturalSpawningSystem> spawning_;
     std::unique_ptr<ExperienceOrbSystem> orbs_;
+    std::unique_ptr<FishingSystem> fishing_;
     std::unique_ptr<CombatSystem> combat_;
     std::unique_ptr<AreaEffectCloudSystem> clouds_;
     std::unique_ptr<EndFightSystem> endFight_;

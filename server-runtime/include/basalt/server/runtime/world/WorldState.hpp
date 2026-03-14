@@ -349,6 +349,8 @@ public:
         std::int32_t y = 0;
         std::int32_t z = 0;
         std::vector<server::world::loot::ItemStack> stacks;
+        /// A furnace's cooking not yet paid out. parity: `AbstractFurnaceBlockEntity.preRemoveSideEffects`.
+        std::vector<std::pair<std::string, std::int32_t>> recipesUsed;
     };
 
     [[nodiscard]] std::vector<Spilled> takeSpilledContents();

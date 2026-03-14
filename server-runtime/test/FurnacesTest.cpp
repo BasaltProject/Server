@@ -1,5 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
+#include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 
 #include <doctest.h>
@@ -482,4 +483,34 @@ TEST_CASE("only the fuel, the smelt and the fire flipping count as a change") {
     // The tick the smelt finishes on is a change again.
     state.cookingTimer = state.cookingTotalTime - 1;
     CHECK(furnaces::tick(state, bookOf(recipe, "beef")).changed);
+}
+
+TEST_CASE("each smelt is banked by recipe name and saved with the furnace") {
+    Recipe steak = cooking("cooked_beef");
+    steak.id = "minecraft:cooked_beef";
+    steak.experience = 0.35F;
+    furnaces::State state = beefAndCoal();
+    state.items[furnaces::kInputSlot] = stack("beef", 2);
+    state.cookingTotalTime = 1;
+    steak.cookingTime = 1;
+    static_cast<void>(furnaces::tick(state, bookOf(steak, "beef")));
+    static_cast<void>(furnaces::tick(state, bookOf(steak, "beef")));
+    REQUIRE(state.recipesUsed.size() == 1);
+    CHECK(state.recipesUsed.front().second == 2);
+
+    // parity: `RecipesUsed`, a compound of counts by recipe name.
+    nbt::NbtCompound data;
+    furnaces::write(state, data);
+    CHECK(data.getCompound("RecipesUsed")->getInt("minecraft:cooked_beef") == 2);
+    CHECK(furnaces::recipesUsedIn(data) == state.recipesUsed);
+
+    // Two steaks at 0.35 are 0.7: nothing whole, and a 70% chance of one.
+    basalt::server::random::RandomSource random = basalt::server::random::RandomSource::legacy(9);
+    std::int32_t paid = 0;
+    for (std::int32_t roll = 0; roll < 1000; ++roll) {
+        paid += furnaces::experienceFor(2, 0.35F, random);
+    }
+    CHECK(paid > 600);
+    CHECK(paid < 800);
+    CHECK(furnaces::experienceFor(4, 1.0F, random) == 4);
 }

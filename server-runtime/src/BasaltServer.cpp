@@ -462,6 +462,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                  .nextDouble = [] { return scratchDouble(); }});
     orbs_ = std::make_unique<ExperienceOrbSystem>(
         playerRegistry_, ExperienceOrbSystem::Options{.nextSeed = [] { return scratchSeed(); }});
+    fishing_ = std::make_unique<FishingSystem>(playerRegistry_, *orbs_,
+                                               FishingSystem::Options{.nextSeed = [] { return scratchSeed(); }});
     spawning_ = std::make_unique<NaturalSpawningSystem>(
         playerRegistry_, vanillaData_.biomeSpawns, chunkSimulation_, *spawnEquipment_, NaturalSpawningSystem::Hooks{},
         NaturalSpawningSystem::Options{.nextSeed = [] { return scratchSeed(); }});
@@ -528,9 +530,13 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         EnvironmentTickSystem::Options{.nextSeed = [] { return scratchSeed(); },
                                        .difficulty = [this] { return difficulty_; }},
         logger_);
+    MobActionSystem::Hooks mobHooks;
+    mobHooks.spawnOrb = [this](world::LoadedWorld& world, double x, double y, double z, std::int32_t value) {
+        orbs_->spawn(world, x, y, z, value);
+    };
     mobActions_ =
         std::make_unique<MobActionSystem>(playerRegistry_, *broadcaster_, *explosions_, *spawning_, *combat_, *raids_,
-                                          vanillaData_.lootTables, model.allWorlds, MobActionSystem::Hooks{},
+                                          vanillaData_.lootTables, model.allWorlds, std::move(mobHooks),
                                           MobActionSystem::Options{.nextSeed = [] { return scratchSeed(); },
                                                                    .nextDouble = [] { return scratchDouble(); }});
     mobTicks_ = std::make_unique<MobTickSystem>(*mobActions_);

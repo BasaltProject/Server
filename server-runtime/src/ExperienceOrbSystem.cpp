@@ -99,22 +99,34 @@ void ExperienceOrbSystem::award(world::LoadedWorld& world, double x, double y, d
                 break;
             }
         }
-        if (merged) {
-            continue;
+        if (!merged) {
+            spawnLocked(world, x, y, z, value);
         }
-        auto orb = std::make_unique<ServerEntity>(players_->allocateEntityId(), wire::common::Uuid::random(), entry->id,
-                                                  entry->protocolId, x, y, z, random_.nextFloat() * 360.0F, 0.0F);
-        // parity: a small random kick, up and to the side.
-        orb->velocityX = ((random_.nextDouble() * 0.2) - 0.1) * 2.0;
-        orb->velocityY = random_.nextDouble() * 0.2 * 2.0;
-        orb->velocityZ = ((random_.nextDouble() * 0.2) - 0.1) * 2.0;
-        wire::nbt::NbtCompound& tag = tagOf(*orb);
-        tag.putShort("Health", kDefaultHealth);
-        tag.putShort("Age", 0);
-        tag.putShort("Value", static_cast<std::int16_t>(value));
-        tag.putInt("Count", 1);
-        static_cast<void>(world.state().spawnEntity(std::move(orb)));
     }
+}
+
+void ExperienceOrbSystem::spawn(world::LoadedWorld& world, double x, double y, double z, std::int32_t value) {
+    const std::scoped_lock guard{lock_};
+    spawnLocked(world, x, y, z, value);
+}
+
+void ExperienceOrbSystem::spawnLocked(world::LoadedWorld& world, double x, double y, double z, std::int32_t value) {
+    const registry::EntityTypeEntry* entry = registry::entityTypes::of(Identifier::vanilla("experience_orb"));
+    if (entry == nullptr) {
+        return;
+    }
+    auto orb = std::make_unique<ServerEntity>(players_->allocateEntityId(), wire::common::Uuid::random(), entry->id,
+                                              entry->protocolId, x, y, z, random_.nextFloat() * 360.0F, 0.0F);
+    // parity: a small random kick, up and to the side.
+    orb->velocityX = ((random_.nextDouble() * 0.2) - 0.1) * 2.0;
+    orb->velocityY = random_.nextDouble() * 0.2 * 2.0;
+    orb->velocityZ = ((random_.nextDouble() * 0.2) - 0.1) * 2.0;
+    wire::nbt::NbtCompound& tag = tagOf(*orb);
+    tag.putShort("Health", kDefaultHealth);
+    tag.putShort("Age", 0);
+    tag.putShort("Value", static_cast<std::int16_t>(value));
+    tag.putInt("Count", 1);
+    static_cast<void>(world.state().spawnEntity(std::move(orb)));
 }
 
 void ExperienceOrbSystem::hurt(ServerEntity& orb, float damage) {

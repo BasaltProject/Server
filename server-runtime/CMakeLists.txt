@@ -166,6 +166,7 @@ basalt_module(server-runtime-core
         src/ExplosionSystem.cpp
         src/EndFightSystem.cpp
         src/ExperienceOrbSystem.cpp
+        src/FishingSystem.cpp
         src/EndFightArena.cpp
         src/EndFightRespawn.cpp
         src/AreaEffectCloudSystem.cpp
@@ -271,6 +272,7 @@ basalt_module(server-runtime-core
         src/world/Hoppers.cpp
         src/world/EndPortals.cpp
         src/world/EnchantmentAttributes.cpp
+        src/world/BlockExperience.cpp
         src/world/EndGateways.cpp
         src/world/EndPodium.cpp
         src/world/EndCrystals.cpp
@@ -418,6 +420,7 @@ basalt_module(server-runtime-core
         src/world/VanillaWorldGeneratorFactory.cpp
         src/entity/Breeding.cpp
         src/entity/DeathDrops.cpp
+        src/entity/FishingHooks.cpp
         src/entity/EntityCombat.cpp
         src/entity/MobBrain.cpp
         src/entity/MobCombat.cpp
@@ -1332,6 +1335,12 @@ basalt_test(server-runtime-end-fight-test
 
 target_compile_definitions(server-runtime-end-fight-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
+
+basalt_test(server-runtime-fishing-test
+    SOURCES
+        test/FishingTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
 
 basalt_test(server-runtime-ender-dragon-test
     SOURCES

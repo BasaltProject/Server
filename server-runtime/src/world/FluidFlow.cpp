@@ -541,6 +541,19 @@ std::vector<FluidChange> onBlockChanged(const Context& context, std::int32_t x, 
     return changes;
 }
 
+float heightAt(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::optional<std::int32_t> state = world.blockState(x, y, z);
+    const std::optional<FluidKind> kind = state.has_value() ? kindOf(*state) : std::nullopt;
+    if (!kind.has_value()) {
+        return 0.0F;
+    }
+    const std::optional<std::int32_t> above = world.blockState(x, y + 1, z);
+    if (above.has_value() && kindOf(*above) == kind) {
+        return 1.0F;
+    }
+    return static_cast<float>(amountOf(*state)) / 9.0F;
+}
+
 } // namespace fluidFlow
 
 } // namespace basalt::server::runtime::world

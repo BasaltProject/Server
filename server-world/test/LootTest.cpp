@@ -10,6 +10,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 using namespace basalt::server::world::loot;
 namespace rng = basalt::server::random;
@@ -305,4 +306,45 @@ TEST_CASE("an empty entity predicate asks only whether somebody is behind the br
                           "predicate":{"type":"minecraft:player"}}]}]})");
     REQUIRE(fussy.has_value());
     CHECK(fussy->generate(random, 0.0F, std::nullopt, byHand).empty());
+}
+
+TEST_CASE("a nested table rolls on the same random, and the open-water question gates the treasure") {
+    // parity: `gameplay/fishing`, whose entries are other tables and whose treasure needs open water.
+    const std::expected<LootTable, LootTableParseError> fishing = lootTableJson::parse(
+        R"({"pools":[{"rolls":1,"entries":[
+             {"type":"minecraft:loot_table","value":"minecraft:gameplay/fishing/fish","weight":85},
+             {"type":"minecraft:loot_table","value":"minecraft:gameplay/fishing/treasure","weight":5,"quality":2,
+              "conditions":[{"condition":"minecraft:entity_properties","entity":"this",
+                             "predicate":{"minecraft:type_specific/fishing_hook":{"in_open_water":true}}}]}]}]})");
+    const std::expected<LootTable, LootTableParseError> fish =
+        lootTableJson::parse(R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:cod"}]}]})");
+    const std::expected<LootTable, LootTableParseError> treasure = lootTableJson::parse(
+        R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:nautilus_shell"}]}]})");
+    REQUIRE(fishing.has_value());
+    REQUIRE(fish.has_value());
+    REQUIRE(treasure.has_value());
+
+    LootContext context;
+    context.tables = [&](const basalt::wire::common::Identifier& id) -> const LootTable* {
+        if (id.path() == "gameplay/fishing/fish") {
+            return &*fish;
+        }
+        return id.path() == "gameplay/fishing/treasure" ? &*treasure : nullptr;
+    };
+    rng::RandomSource random = rng::RandomSource::legacy(77);
+    context.inOpenWater = false;
+    for (std::int32_t roll = 0; roll < 50; ++roll) {
+        const std::vector<ItemStack> caught = fishing->generate(random, 0.0F, std::nullopt, context);
+        REQUIRE(caught.size() == 1);
+        CHECK(caught.front().item.path() == "cod");
+    }
+    // Luck makes the quality-two treasure heavy enough to come up among a few hundred rolls.
+    context.inOpenWater = true;
+    std::int32_t shells = 0;
+    for (std::int32_t roll = 0; roll < 300; ++roll) {
+        for (const ItemStack& caught : fishing->generate(random, 20.0F, std::nullopt, context)) {
+            shells += caught.item.path() == "nautilus_shell" ? 1 : 0;
+        }
+    }
+    CHECK(shells > 50);
 }

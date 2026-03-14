@@ -111,6 +111,13 @@ LootCondition LootCondition::locationCheck() {
     return built;
 }
 
+LootCondition LootCondition::fishingHookOpenWater(bool expected) {
+    LootCondition built;
+    built.kind_ = Kind::FishingHookOpenWater;
+    built.plainChance_ = expected ? 1.0F : 0.0F;
+    return built;
+}
+
 LootCondition LootCondition::randomChanceWithEnchantedBonus(float chance) {
     LootCondition built;
     built.kind_ = Kind::RandomChanceWithEnchantedBonus;
@@ -132,6 +139,8 @@ bool LootCondition::test(random::RandomSource& random, const LootContext& contex
     case Kind::MatchTool:
     case Kind::EntityProperties:
         return false;
+    case Kind::FishingHookOpenWater:
+        return context.inOpenWater.has_value() && *context.inOpenWater == (plainChance_ > 0.0F);
     // parity: `LootItemEntityPropertyCondition` with an empty predicate, which asks only that the
     // entity be there: the player mining the block or the arrow that hit it.
     case Kind::ThisEntityExists:
@@ -352,6 +361,24 @@ void addRandomItem(const LootPool& pool, random::RandomSource& random, float luc
         }
         return;
     }
+    // parity: `NestedLootTable.createItemStack`, the other table rolled on this same context and
+    // random, its stacks going through this entry's functions.
+    if (chosen->table.has_value()) {
+        const LootTable* nested = context.tables ? context.tables(*chosen->table) : nullptr;
+        if (nested == nullptr) {
+            return;
+        }
+        nested->generateRaw(
+            random, luck, explosionRadius,
+            [&](ItemStack stack) {
+                for (const LootFunction& function : chosen->functions) {
+                    stack = function.apply(std::move(stack), random, std::nullopt, context);
+                }
+                finish(std::move(stack));
+            },
+            context);
+        return;
+    }
     finish(chosen->createItemStack(random, context));
 }
 
@@ -371,9 +398,8 @@ void LootPool::generate(random::RandomSource& random, float luck, std::optional<
     }
 }
 
-std::vector<ItemStack> LootTable::generate(random::RandomSource& random, float luck,
-                                           std::optional<float> explosionRadius, const LootContext& context) const {
-    std::vector<ItemStack> output;
+void LootTable::generateRaw(random::RandomSource& random, float luck, std::optional<float> explosionRadius,
+                            const LootPool::Output& output, const LootContext& context) const {
     for (const LootPool& pool : pools) {
         pool.generate(
             random, luck, explosionRadius,
@@ -381,13 +407,24 @@ std::vector<ItemStack> LootTable::generate(random::RandomSource& random, float l
                 for (const LootFunction& function : functions) {
                     stack = function.apply(std::move(stack), random, explosionRadius, context);
                 }
-                // A stack an explosion swallowed whole is not a drop at all.
-                if (stack.count > 0) {
-                    output.push_back(std::move(stack));
-                }
+                output(std::move(stack));
             },
             context);
     }
+}
+
+std::vector<ItemStack> LootTable::generate(random::RandomSource& random, float luck,
+                                           std::optional<float> explosionRadius, const LootContext& context) const {
+    std::vector<ItemStack> output;
+    generateRaw(
+        random, luck, explosionRadius,
+        [&output](ItemStack stack) {
+            // A stack an explosion swallowed whole is not a drop at all.
+            if (stack.count > 0) {
+                output.push_back(std::move(stack));
+            }
+        },
+        context);
     return output;
 }
 

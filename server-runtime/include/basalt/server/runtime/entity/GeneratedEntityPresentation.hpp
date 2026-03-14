@@ -45,6 +45,9 @@ struct RuntimeEntityMetadata {
     std::optional<float> cloudRadius;
     std::optional<bool> cloudWaiting;
     std::optional<wire::protocol::play::SetEntityDataPacket::ParticleValue> cloudParticle;
+    /// parity: `FishingHook`'s hooked entity, as its id plus one, and whether a fish is biting.
+    std::optional<std::int32_t> hookedEntity;
+    std::optional<bool> hookBiting;
 
     /// Initial non-default fields, or every field whose live value changed since `previous`.
     [[nodiscard]] std::vector<wire::protocol::play::SetEntityDataPacket::Entry>

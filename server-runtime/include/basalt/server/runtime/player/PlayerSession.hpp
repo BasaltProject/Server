@@ -85,6 +85,8 @@ public:
 
     /// What they are riding, by entity id. parity: `Entity.vehicle`.
     std::optional<std::int32_t> vehicleId;
+    /// The bobber this player has out, by entity id. parity: `Player.fishing`.
+    std::optional<std::int32_t> fishingHook;
 
     /// The movement keys held, as `player_input` sends them.
     ///
