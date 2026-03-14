@@ -37,6 +37,10 @@ struct DamageContext {
                                        const std::optional<std::int32_t>& sourceEntityId)>
         damaged;
     std::function<std::optional<float>(const PlayerSession& player, float amount)> healed;
+    /// Tells the player one slot of theirs changed, however their edition says it.
+    std::function<void(const PlayerSession& player, std::int32_t slot)> slotChanged;
+    /// Lowers the shield an axe knocked away, and greys it out for that many ticks.
+    std::function<void(PlayerSession& player, std::int32_t cooldownTicks)> disableBlocking;
     /// What dying needs, for the hit that takes the last half heart.
     DeathContext death;
 };

@@ -10,6 +10,7 @@
 #include <basalt/wire/text/Component.hpp>
 
 #include <cstdint>
+#include <random>
 #include <utility>
 
 namespace basalt::server::runtime {
@@ -145,6 +146,13 @@ void VillagerTradeController::selectTrade(std::int32_t index) {
             openTradingWith_.has_value() ? owner_->currentWorld()->state().entity(*openTradingWith_) : nullptr;
         if (villager != nullptr) {
             villager->villagerExperience += offer.experience;
+            // parity: `Villager.rewardTradeXp`, three to six points left at the merchant's feet.
+            if (owner_->options().spawnOrb) {
+                const std::int32_t points =
+                    world::trades::kTradeOrbBase + static_cast<std::int32_t>(std::random_device{}() % 4U);
+                owner_->options().spawnOrb(*owner_->currentWorld(), villager->x, villager->y + 0.5, villager->z,
+                                           points);
+            }
         }
     }
     owner_->sendInventory();

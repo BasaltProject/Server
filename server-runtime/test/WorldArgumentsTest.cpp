@@ -150,6 +150,12 @@ TEST_CASE("an item stack takes the components written after it") {
     REQUIRE(withComponents != nullptr);
     CHECK(withComponents->components.getInt("minecraft:damage") == 5);
 
+    // parity: an enchantment written short is the vanilla one.
+    const ParsedItem* enchanted =
+        fixture.parse<ParsedItem>(command::itemArgument(), "fishing_rod[enchantments={lure:3}]");
+    REQUIRE(enchanted != nullptr);
+    CHECK(enchanted->components.getCompound("minecraft:enchantments")->getInt("minecraft:lure") == 3);
+
     // A component nobody has a codec for is named rather than silently dropped.
     CHECK(fixture.parse<ParsedItem>(command::itemArgument(), "minecraft:stone[minecraft:nonsense=5]") == nullptr);
     CHECK(fixture.parse<ParsedItem>(command::itemArgument(), "minecraft:not_an_item") == nullptr);

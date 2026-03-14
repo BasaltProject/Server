@@ -391,3 +391,20 @@ TEST_CASE("the clauses that need a system this build has not got read as false")
     CHECK(all.find("Unknown command") == std::string::npos);
     CHECK(fixture.dispatcher.execute(fixture.source, "execute on owner run seed") == 0);
 }
+
+TEST_CASE("a source running as an entity is named after it") {
+    // parity: `CommandSourceStack.withEntity`, which is why `execute as @e run say` speaks as a pig.
+    basalt::server::runtime::command::ConsoleCommandSource console;
+    basalt::server::runtime::entity::ServerEntity pig{
+        7, Uuid{7, 7}, basalt::wire::common::Identifier::vanilla("pig"), 0, 0.0, 64.0, 0.0};
+    const basalt::server::runtime::command::ExecutionSource asPig{
+        console, basalt::server::runtime::command::ExecutionSource::Changes{
+                     .entity = basalt::server::runtime::command::CommandTarget{pig}}};
+    const auto* named = std::get_if<Component::Translatable>(&asPig.displayName().payload());
+    REQUIRE(named != nullptr);
+    CHECK(named->key == "entity.minecraft.pig");
+    pig.customName = "Wilbur";
+    const auto* custom = std::get_if<Component::Text>(&asPig.displayName().payload());
+    REQUIRE(custom != nullptr);
+    CHECK(custom->content == "Wilbur");
+}

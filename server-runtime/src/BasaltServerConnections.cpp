@@ -102,6 +102,9 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     options.awardExperience = [this](world::LoadedWorld& world, double x, double y, double z, std::int32_t amount) {
         orbs_->award(world, x, y, z, amount);
     };
+    options.spawnOrb = [this](world::LoadedWorld& world, double x, double y, double z, std::int32_t value) {
+        orbs_->spawn(world, x, y, z, value);
+    };
     options.plugins = pluginHooks();
 
     // On the heap and handed to the registry afterwards: a session that has left is kept for a

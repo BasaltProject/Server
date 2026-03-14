@@ -4,13 +4,17 @@
 #include <basalt/server/runtime/ExperienceOrbSystem.hpp>
 #include <basalt/server/runtime/entity/EntityPhysics.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/item/ItemWear.hpp>
+#include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <memory>
+#include <vector>
 
 namespace basalt::server::runtime {
 namespace {
@@ -18,6 +22,9 @@ namespace {
 using entity::ServerEntity;
 using player::PlayerSession;
 using wire::common::Identifier;
+
+/// parity: `mending`'s `repair_with_xp`, a multiply by two.
+constexpr float kMendingFactor = 2.0F;
 
 /// parity: `ExperienceOrb`'s own numbers.
 constexpr std::int32_t kLifetime = 6000;
@@ -61,6 +68,43 @@ constexpr std::array<std::int32_t, 10> kSizes{2477, 1237, 617, 307, 149, 73, 37,
 [[nodiscard]] bool canMerge(const ServerEntity& orb, std::int32_t id, std::int32_t value) {
     return !orb.removed && ExperienceOrbSystem::isOrb(orb) && (orb.entityId() - id) % kMergeGroups == 0 &&
            ExperienceOrbSystem::valueOf(orb) == value;
+}
+
+/// parity: `ExperienceOrb.repairPlayerItems`: a random damaged piece with mending, two points of
+/// durability a point of experience, and whatever that leaves goes round again.
+std::int32_t repairWithXp(PlayerSession& player, std::int32_t amount, random::RandomSource& random, bool& repaired) {
+    // parity: `EquipmentSlot.VALUES`: main hand, off hand, then feet up to the head.
+    const std::array<std::int32_t, 6> slots{player::PlayerInventory::kHotbarStart + player.inventory.heldSlot(),
+                                            player::PlayerInventory::kOffhandSlot,
+                                            player::PlayerInventory::kArmourStart + 3,
+                                            player::PlayerInventory::kArmourStart + 2,
+                                            player::PlayerInventory::kArmourStart + 1,
+                                            player::PlayerInventory::kArmourStart};
+    std::vector<std::int32_t> mendable;
+    for (const std::int32_t slot : slots) {
+        const std::optional<storage::StoredItemStack>& stack = player.inventory.at(slot);
+        if (stack.has_value() && item::itemWear::isDamageable(*stack) && item::itemWear::damage(*stack) > 0 &&
+            player::enchantmentLevel(*stack, Identifier::vanilla("mending")) > 0) {
+            mendable.push_back(slot);
+        }
+    }
+    if (mendable.empty()) {
+        return amount;
+    }
+    const std::int32_t slot =
+        mendable[static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(mendable.size())))];
+    const storage::StoredItemStack stack = *player.inventory.at(slot);
+    const auto toRepair = std::max(0, static_cast<std::int32_t>(static_cast<float>(amount) * kMendingFactor));
+    const std::int32_t repair = std::min(toRepair, item::itemWear::damage(stack));
+    player.inventory.set(slot, item::itemWear::withDamage(stack, item::itemWear::damage(stack) - repair));
+    repaired = true;
+    if (repair > 0) {
+        const std::int32_t remaining = amount - (repair * amount / toRepair);
+        if (remaining > 0) {
+            return repairWithXp(player, remaining, random, repaired);
+        }
+    }
+    return 0;
 }
 
 } // namespace
@@ -237,7 +281,18 @@ void ExperienceOrbSystem::tick(world::LoadedWorld& world, const std::vector<Play
                 watcher->connection().sendPickupAnimation(orb.entityId(), player->entityId());
             }
         }
-        player->experience.givePoints(value);
+        bool repaired = false;
+        std::int32_t remaining = 0;
+        {
+            const std::scoped_lock guard{lock_};
+            remaining = repairWithXp(*player, value, random_, repaired);
+        }
+        if (repaired && player->connection().sendInventoryAll) {
+            player->connection().sendInventoryAll();
+        }
+        if (remaining > 0) {
+            player->experience.givePoints(remaining);
+        }
         if (player->connection().syncExperience) {
             player->connection().syncExperience();
         }

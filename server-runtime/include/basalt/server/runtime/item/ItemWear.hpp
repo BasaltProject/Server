@@ -22,6 +22,9 @@ namespace itemWear {
 
 [[nodiscard]] std::int32_t damage(const storage::StoredItemStack& stack);
 
+/// The stack with its damage set. parity: `ItemStack.setDamageValue`, which drops the component at zero.
+[[nodiscard]] storage::StoredItemStack withDamage(const storage::StoredItemStack& stack, std::int32_t damage);
+
 /// What breaking one block costs this stack, or zero for an item that does not wear that way.
 [[nodiscard]] std::int32_t costPerBlock(const storage::StoredItemStack& stack);
 

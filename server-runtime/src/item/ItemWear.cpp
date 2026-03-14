@@ -43,6 +43,17 @@ std::int32_t costPerAttack(const storage::StoredItemStack& stack) {
     return entry == nullptr ? 0 : entry->damagePerAttack;
 }
 
+storage::StoredItemStack withDamage(const storage::StoredItemStack& stack, std::int32_t value) {
+    storage::StoredItemStack changed = stack;
+    const std::int32_t clamped = std::clamp(value, 0, maxDamage(stack));
+    if (clamped == 0) {
+        static_cast<void>(changed.components.remove(itemComponents::kDamage));
+    } else {
+        changed.components.putInt(itemComponents::kDamage, clamped);
+    }
+    return changed;
+}
+
 std::optional<storage::StoredItemStack> hurt(const storage::StoredItemStack& stack, std::int32_t amount,
                                              random::RandomSource& random, const Reduce& reduce) {
     if (amount <= 0 || !isDamageable(stack)) {

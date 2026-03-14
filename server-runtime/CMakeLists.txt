@@ -1336,6 +1336,12 @@ basalt_test(server-runtime-end-fight-test
 target_compile_definitions(server-runtime-end-fight-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
 
+basalt_test(server-runtime-shield-test
+    SOURCES
+        test/ShieldTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-fishing-test
     SOURCES
         test/FishingTest.cpp

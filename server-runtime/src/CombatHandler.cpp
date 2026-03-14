@@ -3,8 +3,10 @@
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/CombatHandler.hpp>
+#include <basalt/server/runtime/ItemUseTimers.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
+#include <basalt/server/runtime/player/PlayerCooldowns.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerDeath.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
@@ -143,6 +145,13 @@ player::DamageContext CombatHandler::damageContext() const {
     context.world = [this] { return owner_->currentWorld(); };
     context.damaged = hooks_.damaged;
     context.healed = hooks_.healed;
+    context.slotChanged = [this](const PlayerSession&, std::int32_t slot) { owner_->sendInventorySlot(slot); };
+    context.disableBlocking = [this](PlayerSession& player, std::int32_t ticks) {
+        owner_->itemUseTimers().stopBlocking();
+        const world::LoadedWorld* world = owner_->currentWorld();
+        player::startCooldownFor(player, Identifier::vanilla("shield"), world == nullptr ? 0 : world->gameTime(),
+                                 ticks);
+    };
     context.death.registry = owner_->options().playerRegistry;
     context.death.logger = owner_->logger();
     context.death.lang = owner_->consoleLang();

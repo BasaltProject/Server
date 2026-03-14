@@ -119,6 +119,20 @@ struct ParsedBlock {
                        .start = start};
 }
 
+/// parity: the enchantment map's keys are resource locations, so `{lure:3}` names `minecraft:lure`.
+[[nodiscard]] NbtTag withFullEnchantmentIds(std::string_view component, const NbtTag& value) {
+    const auto* levels = value.get<NbtCompound>();
+    if (levels == nullptr || (component != "minecraft:enchantments" && component != "minecraft:stored_enchantments")) {
+        return value;
+    }
+    NbtCompound normalised;
+    for (const std::string& name : levels->names()) {
+        const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(name);
+        normalised.set(id.has_value() ? id->toString() : name, *levels->find(name));
+    }
+    return NbtTag::ofCompound(std::move(normalised));
+}
+
 /// `[a=1, b={c:2}]`, each value SNBT. Keys are normalised to their full id, as the wire writes them.
 [[nodiscard]] Parsed<NbtCompound> parseComponents(StringReader& reader) {
     NbtCompound components;
@@ -148,7 +162,7 @@ struct ParsedBlock {
         if (!value.has_value()) {
             return std::unexpected{value.error()};
         }
-        components.set(key, *value);
+        components.set(key, withFullEnchantmentIds(key, *value));
         reader.skipWhitespace();
         if (reader.canRead() && reader.peek() == ',') {
             reader.skip();

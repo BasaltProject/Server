@@ -1,4 +1,5 @@
 #include <basalt/server/runtime/command/ExecutionSource.hpp>
+#include <basalt/server/runtime/entity/EntityCombat.hpp>
 
 #include <cstdint>
 #include <utility>
@@ -15,10 +16,22 @@ ExecutionSource::ExecutionSource(const CommandSource& base, Changes changes)
     entity_ = changes.entity.has_value() ? changes.entity : (inner == nullptr ? std::nullopt : inner->entity());
 }
 
-std::string ExecutionSource::name() const { return player_ == nullptr ? base_->name() : player_->name(); }
+// parity: `CommandSourceStack.withEntity` names the source after the entity, whatever it is.
+std::string ExecutionSource::name() const {
+    if (player_ != nullptr) {
+        return player_->name();
+    }
+    return entity_.has_value() ? entity_->name() : base_->name();
+}
 
 wire::text::Component ExecutionSource::displayName() const {
-    return player_ == nullptr ? base_->displayName() : wire::text::Component::text(player_->name());
+    if (player_ != nullptr) {
+        return wire::text::Component::text(player_->name());
+    }
+    if (entity_.has_value() && entity_->entity() != nullptr) {
+        return entity::entityCombat::displayName(*entity_->entity());
+    }
+    return entity_.has_value() ? wire::text::Component::text(entity_->name()) : base_->displayName();
 }
 
 std::int32_t ExecutionSource::permissionLevel() const { return base_->permissionLevel(); }

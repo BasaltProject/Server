@@ -4,9 +4,17 @@
 #include <basalt/server/runtime/command/commands/ItemCommands.hpp>
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/world/Fluids.hpp>
+#include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/wire/common/Mth.hpp>
+#include <basalt/wire/protocol/play/HudPackets.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <limits>
+#include <numbers>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -19,6 +27,43 @@ using wire::text::Component;
 
 /// Vanilla's own cap on `/give`, which exists so a typo cannot ask for two billion items.
 constexpr std::int32_t kMaxCount = 6400;
+
+constexpr auto kRadians = static_cast<float>(std::numbers::pi / 180.0);
+
+/// parity: `Player.drop(stack, false)`, a toss straight ahead from under the eyes, which `/give`
+/// then lets anybody pick up at once.
+void dropAtFeet(const CommandContext& context, const player::PlayerSession& target,
+                const storage::StoredItemStack& stack) {
+    const auto& worlds = context.environment().options().worlds;
+    const auto found = worlds.find(target.worldName);
+    const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
+        wire::common::Identifier::parse(stack.id);
+    if (found == worlds.end() || found->second == nullptr || !id.has_value()) {
+        return;
+    }
+    random::RandomSource random = random::RandomSource::legacy(static_cast<std::int64_t>(std::random_device{}()));
+    const float sinX = wire::common::mth::sin(target.pitch * kRadians);
+    const float cosX = wire::common::mth::cos(target.pitch * kRadians);
+    const float sinY = wire::common::mth::sin(target.yaw * kRadians);
+    const float cosY = wire::common::mth::cos(target.yaw * kRadians);
+    const float angle = random.nextFloat() * (2.0F * std::numbers::pi_v<float>);
+    const float spread = 0.02F * random.nextFloat();
+    const float up = (-sinX * 0.3F) + 0.1F + ((random.nextFloat() - random.nextFloat()) * 0.1F);
+    world::DroppedItem dropped{
+        .entityId = context.environment().players().allocateEntityId(),
+        .uuid = wire::common::Uuid::random(),
+        .item = *id,
+        .count = stack.count,
+        .x = target.x,
+        .y = target.y + world::fluids::eyeHeight(target.sneaking) - static_cast<double>(0.3F),
+        .z = target.z,
+        .velocityX = static_cast<double>((-sinY * cosX * 0.3F) + (wire::common::mth::cos(angle) * spread)),
+        .velocityY = static_cast<double>(up),
+        .velocityZ = static_cast<double>((cosY * cosX * 0.3F) + (wire::common::mth::sin(angle) * spread))};
+    dropped.components = stack.components;
+    dropped.pickupDelay = 0;
+    static_cast<void>(found->second->state().spawnItem(std::move(dropped)));
+}
 
 [[nodiscard]] const std::vector<player::PlayerSession*>& targetsOf(const CommandContext& context) {
     static const std::vector<player::PlayerSession*> none;
@@ -57,12 +102,24 @@ void GiveCommand::build(const CommandNodeBuilder& root) const {
         for (player::PlayerSession* target : targets) {
             const std::int32_t leftOver = target->inventory.add(
                 storage::StoredItemStack{.id = item->id.toString(), .count = count, .components = parsed->components});
-            // Nothing is dropped on the floor, because there are no item entities yet. Saying so
-            // beats a silent disappearance the operator only notices later.
-            if (leftOver > 0) {
-                context.source().sendSystemMessage(Component::text(
-                    target->name() + "'s inventory was full: " + std::to_string(leftOver) + " of " +
-                    std::to_string(count) + " did not fit and were lost, since dropped items do not exist yet."));
+            // parity: `GiveCommand.giveItem` drops what did not fit at the feet, a stack at a time.
+            for (std::int32_t left = leftOver; left > 0; left -= player::PlayerInventory::kMaxStack) {
+                dropAtFeet(context, *target,
+                           storage::StoredItemStack{.id = item->id.toString(),
+                                                    .count = std::min(left, player::PlayerInventory::kMaxStack),
+                                                    .components = parsed->components});
+            }
+            if (leftOver == 0) {
+                random::RandomSource random =
+                    random::RandomSource::legacy(static_cast<std::int64_t>(std::random_device{}()));
+                const float pitch = (((random.nextFloat() - random.nextFloat()) * 0.7F) + 1.0F) * 2.0F;
+                for (const player::PlayerSession* heard : context.environment().players().snapshot()) {
+                    if (heard->worldName == target->worldName) {
+                        player::playSoundFor(*heard, "entity.item.pickup", wire::protocol::play::SoundSource::Players,
+                                             target->x, target->y, target->z, 0.2F, pitch,
+                                             static_cast<std::int64_t>(std::random_device{}()));
+                    }
+                }
             }
             if (target->connection().sendInventoryAll) {
                 target->connection().sendInventoryAll();
