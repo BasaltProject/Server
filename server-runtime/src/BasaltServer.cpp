@@ -483,6 +483,10 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                        const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& fireball) {
                     clouds_->fireballLanded(world, watchers, living, fireball);
                 },
+            .witherSkullLanded =
+                [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                       entity::ServerEntity& skull, entity::ServerEntity* mob,
+                       player::PlayerSession* player) { withers_->skullLanded(world, watchers, skull, mob, player); },
             .awardExperience = [this](world::LoadedWorld& world, double x, double y, double z,
                                       std::int32_t amount) { orbs_->award(world, x, y, z, amount); },
             .crystalDestroyed =
@@ -531,6 +535,12 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                        .difficulty = [this] { return difficulty_; }},
         logger_);
     MobActionSystem::Hooks mobHooks;
+    withers_ = std::make_unique<WitherSystem>(
+        playerRegistry_, *broadcaster_, *explosions_,
+        WitherSystem::Options{.nextSeed = [] { return scratchSeed(); }, .blockTags = &vanillaData_.blockTags});
+    mobHooks.witherShoots = [this](world::LoadedWorld& world, entity::ServerEntity& wither) {
+        withers_->shootAtTarget(world, wither);
+    };
     mobHooks.spawnOrb = [this](world::LoadedWorld& world, double x, double y, double z, std::int32_t value) {
         orbs_->spawn(world, x, y, z, value);
     };

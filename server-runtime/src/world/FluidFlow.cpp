@@ -541,17 +541,19 @@ std::vector<FluidChange> onBlockChanged(const Context& context, std::int32_t x, 
     return changes;
 }
 
-float heightAt(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
-    const std::optional<std::int32_t> state = world.blockState(x, y, z);
-    const std::optional<FluidKind> kind = state.has_value() ? kindOf(*state) : std::nullopt;
+float heightOf(std::int32_t stateId, std::int32_t aboveStateId) {
+    const std::optional<FluidKind> kind = kindOf(stateId);
     if (!kind.has_value()) {
         return 0.0F;
     }
-    const std::optional<std::int32_t> above = world.blockState(x, y + 1, z);
-    if (above.has_value() && kindOf(*above) == kind) {
+    if (kindOf(aboveStateId) == kind) {
         return 1.0F;
     }
-    return static_cast<float>(amountOf(*state)) / 9.0F;
+    return static_cast<float>(amountOf(stateId)) / 9.0F;
+}
+
+float heightAt(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    return heightOf(world.blockState(x, y, z).value_or(0), world.blockState(x, y + 1, z).value_or(0));
 }
 
 } // namespace fluidFlow

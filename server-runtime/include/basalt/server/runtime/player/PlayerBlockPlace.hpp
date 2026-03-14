@@ -50,6 +50,9 @@ struct PlaceContext {
     std::function<void(const PlayerSession& player, std::int32_t x, std::int32_t y, std::int32_t z,
                        std::int32_t stateId)>
         openSign;
+
+    /// A block just went down by hand. parity: `Block.setPlacedBy`, which a wither skull answers.
+    std::function<void(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)> placed;
 };
 
 /// Puts the held block where the click says, as a player placing it does. Answers whether anything

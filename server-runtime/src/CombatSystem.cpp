@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/ExperienceOrbSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/WitherBoss.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
@@ -212,6 +213,18 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         entity.removed = true;
         if (options_.dragonFireballLanded) {
             options_.dragonFireballLanded(world, watchers, living, entity);
+        }
+        return;
+    }
+    if (path == "wither_skull") {
+        const std::optional<Target> target = targetAlong(watchers, living, entity, fromX, fromY, fromZ);
+        if (!hit.has_value() && !target.has_value()) {
+            return;
+        }
+        entity.removed = true;
+        if (options_.witherSkullLanded) {
+            options_.witherSkullLanded(world, watchers, entity, target.has_value() ? target->mob : nullptr,
+                                       target.has_value() ? target->player : nullptr);
         }
         return;
     }
@@ -486,6 +499,7 @@ bool CombatSystem::hitEntityAlong(world::LoadedWorld& world, const std::vector<P
         if (target->mob->dragon != nullptr) {
             target->mob->dragon->hitPart = target->dragonPart;
         }
+        markWitherFriend(world, *target->mob, arrow.ownerId);
         const entity::entityCombat::Result result =
             entity::entityCombat::hurt(*target->mob, static_cast<float>(damage), fromX, fromZ, hooks_, "projectile",
                                        std::nullopt, firedByPlayer(watchers, arrow));
@@ -562,6 +576,7 @@ void CombatSystem::hurtByExplosion(world::LoadedWorld& world, const std::vector<
         if (damage <= 0.0F) {
             continue;
         }
+        markWitherFriend(world, *entity, sourceEntityId);
         const entity::entityCombat::Result result =
             entity::entityCombat::hurt(*entity, damage, x, z, hooks_, "explosion");
         if (!result.landed) {
@@ -569,6 +584,21 @@ void CombatSystem::hurtByExplosion(world::LoadedWorld& world, const std::vector<
         }
         announceEntityHit(watchers, *entity, world::damageTypes::kExplosion, sourceEntityId, result.died);
         emitVibration(world, "entity_damage", entity->x, entity->y, entity->z);
+    }
+}
+
+void CombatSystem::markWitherFriend(world::LoadedWorld& world, ServerEntity& target,
+                                    std::optional<std::int32_t> sourceId) {
+    if (target.wither == nullptr || !sourceId.has_value()) {
+        return;
+    }
+    // parity: `WitherBoss.hurtServer` asks `source.getEntity()`, the owner behind a skull or arrow.
+    const ServerEntity* source = world.state().entity(*sourceId);
+    if (source != nullptr && source->ownerId.has_value()) {
+        source = world.state().entity(*source->ownerId);
+    }
+    if (source != nullptr && entity::witherBoss::isFriend(source->type().path())) {
+        target.wither->nextHitFromFriend = true;
     }
 }
 

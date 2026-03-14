@@ -340,3 +340,24 @@ TEST_CASE("an item outside the region being ticked is left where it is") {
     static_cast<void>(items.tickItems(&everything));
     CHECK(items.items()[1].age == 1);
 }
+
+TEST_CASE("an item floats up to the top of water instead of sinking") {
+    WorldMutex mutex;
+    const std::int32_t stone = stateOf("stone");
+    const std::int32_t water = stateOf("water");
+    // A pool from 64 to 70 on a stone floor, open to the air above.
+    DroppedItemPhysics items{mutex, [stone, water](std::int32_t, std::int32_t y, std::int32_t) {
+                                 return std::optional<std::int32_t>{
+                                     y <= 63 ? stone : (y <= 70 ? water : registry::blocks::air().stateId)};
+                             }};
+    items.spawnItem(drop(1, "stone", 1, 0.5, 66.0, 0.5));
+    // parity: `ItemEntity.setFluidMovement`, a nudge of 0.0005 up a tick while it is not rising fast.
+    static_cast<void>(items.tickItems());
+    CHECK(items.items()[0].y > 66.0);
+    for (std::int32_t tick = 0; tick < 600; ++tick) {
+        static_cast<void>(items.tickItems());
+    }
+    // The surface is at 70 and eight ninths; it bobs with its bottom a little under it.
+    CHECK(items.items()[0].y > 70.3);
+    CHECK(items.items()[0].y < 70.9);
+}

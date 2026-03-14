@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/entity/ai/TargetGoals.hpp>
 #include <basalt/server/runtime/entity/ai/VillagerGoals.hpp>
 #include <basalt/server/runtime/entity/ai/WanderingTraderGoals.hpp>
+#include <basalt/server/runtime/entity/ai/WitherGoals.hpp>
 
 #include <cstdint>
 #include <set>
@@ -55,6 +56,9 @@ constexpr std::int32_t kVexRange = 8;
 constexpr double kVexStep = 0.03;
 constexpr std::int32_t kBatRange = 7;
 constexpr double kBatStep = 0.008;
+/// parity: `WitherBoss.registerGoals`, a shot every two seconds from twenty blocks.
+constexpr std::int32_t kWitherShotInterval = 40;
+constexpr double kWitherRange = 20.0;
 
 /// parity: `PathfindToRaidGoal`, which walks a raider into the village at its own pace.
 constexpr double kRaidSpeed = 1.0;
@@ -462,6 +466,17 @@ bool buildFlier(GoalSelector& selector, std::string_view path) {
         add<FlyingWanderGoal>(selector, 9, kVexRange, kVexStep, false);
         add<HurtByTargetGoal>(selector, 1);
         add<NearestAttackablePlayerGoal>(selector, 2);
+        return true;
+    }
+    // parity: `WitherBoss.registerGoals`.
+    if (path == "wither") {
+        add<WitherDoNothingGoal>(selector, 0);
+        add<RangedAttackGoal>(selector, 2, 1.0, kWitherShotInterval, kWitherShotInterval, kWitherRange);
+        add<FlyingWanderGoal>(selector, 5, kBatRange, kBatStep, false);
+        add<LookAtPlayerGoal>(selector, 6, kLookFar);
+        add<RandomLookAroundGoal>(selector, 7);
+        add<HurtByTargetGoal>(selector, 1);
+        add<WitherTargetGoal>(selector, 2);
         return true;
     }
     if (path == "bat" || path == "allay") {

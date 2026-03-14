@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/World.hpp>
 #include <basalt/server/runtime/world/DroppedItemPhysics.hpp>
+#include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/StuckSpeed.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
@@ -39,6 +40,21 @@ namespace {
         }
     }
     return hits;
+}
+
+constexpr double kFloatDepth = 0.1;
+constexpr double kWaterFluidDrag = 0.99;
+constexpr double kLavaFluidDrag = 0.95;
+constexpr double kFloatLift = 5.0e-4;
+constexpr double kFloatLiftBelow = 0.06;
+
+/// parity: `ItemEntity.setFluidMovement`, which slows it sideways and nudges it up while it sinks.
+void floatIn(DroppedItem& item, double drag) {
+    item.velocityX *= static_cast<double>(static_cast<float>(drag));
+    item.velocityY += item.velocityY < static_cast<double>(static_cast<float>(kFloatLiftBelow))
+                          ? static_cast<double>(static_cast<float>(kFloatLift))
+                          : 0.0;
+    item.velocityZ *= static_cast<double>(static_cast<float>(drag));
 }
 
 [[nodiscard]] double squaredDistance(const DroppedItem& item, double x, double y, double z) {
@@ -169,7 +185,9 @@ std::vector<std::int32_t> DroppedItemPhysics::tickItems(const sched::Region* reg
         item.previousX = item.x;
         item.previousY = item.y;
         item.previousZ = item.z;
-        ++item.age;
+        if (item.age != kUnlimitedLifetimeAge) {
+            ++item.age;
+        }
         if (item.pickupDelay > 0) {
             --item.pickupDelay;
         }
@@ -250,10 +268,42 @@ void DroppedItemPhysics::mergeWithNeighbours(std::size_t index, std::vector<std:
     }
 }
 
+double DroppedItemPhysics::fluidHeight(const DroppedItem& item, FluidKind kind) const {
+    constexpr double kDeflate = 0.001;
+    const double half = (kItemWidth / 2.0) - kDeflate;
+    const double minY = item.y + kDeflate;
+    const double maxY = item.y + kItemHeight - kDeflate;
+    double height = 0.0;
+    for (std::int32_t x = wire::common::mth::floor(item.x - half);
+         x < static_cast<std::int32_t>(std::ceil(item.x + half)); ++x) {
+        for (std::int32_t y = wire::common::mth::floor(minY); y < static_cast<std::int32_t>(std::ceil(maxY)); ++y) {
+            for (std::int32_t z = wire::common::mth::floor(item.z - half);
+                 z < static_cast<std::int32_t>(std::ceil(item.z + half)); ++z) {
+                const std::int32_t state = blockAt_(x, y, z).value_or(0);
+                if (fluidFlow::kindOf(state) != kind) {
+                    continue;
+                }
+                const double top =
+                    y + static_cast<double>(fluidFlow::heightOf(state, blockAt_(x, y + 1, z).value_or(0)));
+                if (top >= minY) {
+                    height = std::max(height, top - minY);
+                }
+            }
+        }
+    }
+    return height;
+}
+
 void DroppedItemPhysics::moveItem(DroppedItem& item) {
-    // parity: `ItemEntity.getDefaultGravity`, applied before the move rather than after it, and on
-    // every tick whether or not the move below happens.
-    item.velocityY -= kGravity;
+    // parity: `ItemEntity.tick`: water over a tenth of the box floats the item and lava does too,
+    // more slowly; anything else is gravity, applied before the move on every tick.
+    if (fluidHeight(item, FluidKind::Water) > kFloatDepth) {
+        floatIn(item, kWaterFluidDrag);
+    } else if (fluidHeight(item, FluidKind::Lava) > kFloatDepth) {
+        floatIn(item, kLavaFluidDrag);
+    } else {
+        item.velocityY -= kGravity;
+    }
 
     // parity: `ItemEntity.tick` only moves an item that is standing still on one tick in four, and
     // the drag below is inside that same branch. It is not an optimisation to skip: an item resting

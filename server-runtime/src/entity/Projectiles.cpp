@@ -122,13 +122,14 @@ const Kind& snowball() {
 }
 
 std::span<const Kind> all() {
-    static const std::array<Kind, 11> kinds{
+    static const std::array<Kind, 12> kinds{
         arrow(), make("spectral_arrow", 0.05, 0.99, true), snowball(), make("egg", 0.03, 0.99, false),
         make("ender_pearl", 0.03, 0.99, false), make("experience_bottle", 0.07, 0.99, false),
         make("potion", 0.05, 0.99, false), fireball(), make("small_fireball", 0.0, 0.95, false, kAcceleration),
         // parity: `AbstractWindCharge` neither slows down nor speeds up: inertia one, acceleration
         // zeroed in its constructor.
-        make("wind_charge", 0.0, 1.0, false), make("dragon_fireball", 0.0, 0.95, false, kAcceleration)};
+        make("wind_charge", 0.0, 1.0, false), make("dragon_fireball", 0.0, 0.95, false, kAcceleration),
+        make("wither_skull", 0.0, 0.95, false, kAcceleration)};
     return kinds;
 }
 
@@ -248,10 +249,12 @@ std::optional<BlockHit> tick(world::WorldState& world, ServerEntity& entity, con
         return std::nullopt;
     }
 
-    const auto slow = [&entity, &kind] {
-        entity.velocityX *= kind.drag;
-        entity.velocityY *= kind.drag;
-        entity.velocityZ *= kind.drag;
+    // parity: `WitherSkull.getInertia`, 0.73 for a blue one.
+    const double drag = entity.dangerousSkull ? static_cast<double>(0.73F) : kind.drag;
+    const auto slow = [&entity, drag] {
+        entity.velocityX *= drag;
+        entity.velocityY *= drag;
+        entity.velocityZ *= drag;
     };
     // parity: `Entity.applyGravity` returns at once when `isNoGravity`, so a projectile with the tag
     // flies dead straight. Measured in `botonflecha`, where a flecha that should hang at half a

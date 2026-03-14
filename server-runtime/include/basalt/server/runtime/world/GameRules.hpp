@@ -43,6 +43,7 @@ namespace gameRules {
 inline constexpr GameRule kAdvanceTime = GameRule::boolean("advance_time", true);
 inline constexpr GameRule kAdvanceWeather = GameRule::boolean("advance_weather", true);
 inline constexpr GameRule kKeepInventory = GameRule::boolean("keep_inventory", false);
+inline constexpr GameRule kNaturalHealthRegeneration = GameRule::boolean("natural_health_regeneration", true);
 inline constexpr GameRule kMaxBlockModifications = GameRule::integer("max_block_modifications", 32768, 1);
 inline constexpr GameRule kMaxCommandSequenceLength = GameRule::integer("max_command_sequence_length", 65536, 0);
 

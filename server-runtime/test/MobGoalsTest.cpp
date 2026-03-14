@@ -111,8 +111,7 @@ struct Fixture {
 } // namespace
 
 TEST_CASE("a mob with nothing written for it gets no goals at all") {
-    // parity: a boss runs on its own phases rather than goals.
-    CHECK(ai::mobGoals::forType(Identifier::vanilla("wither")) == nullptr);
+    // parity: the dragon runs on its own phases rather than goals.
     CHECK(ai::mobGoals::forType(Identifier::vanilla("ender_dragon")) == nullptr);
     CHECK(ai::mobGoals::forType(Identifier::vanilla("dolphin")) == nullptr);
     CHECK(ai::mobGoals::forType(Identifier::vanilla("armor_stand")) == nullptr);

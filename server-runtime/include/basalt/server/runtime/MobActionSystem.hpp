@@ -51,6 +51,8 @@ public:
             breedAllowed;
         /// One experience orb of that value. parity: `new ExperienceOrb`.
         std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t value)> spawnOrb;
+        /// A wither's middle head firing at its target, which is its ranged attack.
+        std::function<void(world::LoadedWorld& world, entity::ServerEntity& wither)> witherShoots;
     };
 
     /// The rolls a mob's turn needs, none of which is part of the level's own stream.

@@ -244,6 +244,34 @@ void noop(std::int32_t, std::int32_t, std::int32_t, std::int32_t) {}
     return true;
 }
 
+/// parity: `DiodeBlock.neighborChanged` and `RedStoneWireBlock.neighborChanged` open with `canSurvive`
+/// and, when it fails, drop the block and remove it instead of reacting. Their `updateShape` only
+/// looks down, so this is the one road that takes them away when the news comes from a side.
+/// Answers whether a diode went, which tells more squares than the dust does; nothing if none did.
+[[nodiscard]] std::optional<bool> dropUnsupportedComponent(const Context& context, const std::int32_t x,
+                                                           const std::int32_t y, const std::int32_t z,
+                                                           const OnBroken& onBroken) {
+    WorldState& world = context.world;
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value()) {
+        return std::nullopt;
+    }
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
+    if (block == nullptr) {
+        return std::nullopt;
+    }
+    const bool diode = block->path() == "repeater" || block->path() == "comparator";
+    if (!diode && block->path() != "redstone_wire") {
+        return std::nullopt;
+    }
+    if (blockSurvival::isSupported(world, x, y, z, *stateId, {}, context.hasSkylight)) {
+        return std::nullopt;
+    }
+    world.setBlockState(x, y, z, registry::blocks::air().stateId);
+    onBroken(*stateId, x, y, z);
+    return diode;
+}
+
 /// parity: `SideChainPartBlock.isBeingUpdatedByNeighbor`'s second half, the part the shelf carried
 /// before the write.
 [[nodiscard]] bool wasConnectedShelf(std::int32_t stateId) {
@@ -538,6 +566,8 @@ void tellInFront(const Context& context, const std::int32_t stateId, const std::
                                              context.random, context.tntExplodes)) {
             if (world.setBlockState(change.x, change.y, change.z, change.stateId)) {
                 (onReshaped ? onReshaped : OnReshaped{noop})(change.stateId, change.x, change.y, change.z);
+                // parity: the reactor wrote with flag two, which still walks the shapes around it.
+                reshapeOnly(context, change.x, change.y, change.z, {}, onReshaped);
             }
         }
     }
@@ -1058,6 +1088,11 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         }
         for (const BlockChange& change : ahead) {
             reshaped(change.stateId, change.x, change.y, change.z);
+            // parity: a reactor answers a neighbour with `level.setBlock(pos, state, 2)`, and flag two
+            // still runs the shape walk over the six squares around it: bit one is the neighbour
+            // notice and nothing else. Without it a bubble column under a trapdoor never heard the
+            // trapdoor open, so it never booked its water. Measured in `columnalado`.
+            reshapeOnly(context, change.x, change.y, change.z, broken, reshaped);
             if (!change.effects.empty()) {
                 effects.push_back(change);
             }
@@ -1091,10 +1126,38 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
         const auto [at, told] = reacting.front();
         reacting.pop_front();
         ++reacted;
+        // parity: the six squares this notice reaches each run their `neighborChanged`, and a diode or
+        // a dust left without footing comes down there, from whichever side the news arrived.
+        // Measured in `diodosuelto`, where a floating repeater and dust stayed put beside a new block.
+        for (const BlockFace face : kUpdateOrder) {
+            const std::int32_t nx = at[0] + registry::stepX(face);
+            const std::int32_t ny = at[1] + registry::stepY(face);
+            const std::int32_t nz = at[2] + registry::stepZ(face);
+            const std::optional<bool> diode = dropUnsupportedComponent(context, nx, ny, nz, broken);
+            if (!diode.has_value()) {
+                continue;
+            }
+            // parity: `Level.removeBlock` writes with flag three, the shape walk and the notice around
+            // the square both; `DiodeBlock` then tells the neighbours of each of its six squares too.
+            reshapeOnly(context, nx, ny, nz, broken, reshaped);
+            reacting.push_back({{nx, ny, nz}, std::nullopt});
+            if (*diode) {
+                for (const BlockFace also : kUpdateOrder) {
+                    reacting.push_back(
+                        {{nx + registry::stepX(also), ny + registry::stepY(also), nz + registry::stepZ(also)},
+                         std::nullopt});
+                }
+            }
+        }
         for (const BlockChange& change :
              redstoneReactors::update(world, context.worldName, at[0], at[1], at[2], context.gameTime, context.random,
                                       context.tntExplodes, false, told)) {
             reshaped(change.stateId, change.x, change.y, change.z);
+            // parity: the same flag-two shape walk as in the reach loop above. This is the loop an
+            // ordinary neighbour notice runs, so it is the one a trapdoor opening beside a new block of
+            // redstone goes through; with the walk only in the other loop, the bubble column under that
+            // trapdoor still never booked its water. Measured in `columnalado`.
+            reshapeOnly(context, change.x, change.y, change.z, broken, reshaped);
             if (!change.effects.empty()) {
                 effects.push_back(change);
             }

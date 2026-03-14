@@ -400,11 +400,13 @@ TEST_CASE("a source running as an entity is named after it") {
     const basalt::server::runtime::command::ExecutionSource asPig{
         console, basalt::server::runtime::command::ExecutionSource::Changes{
                      .entity = basalt::server::runtime::command::CommandTarget{pig}}};
-    const auto* named = std::get_if<Component::Translatable>(&asPig.displayName().payload());
+    const Component byType = asPig.displayName();
+    const auto* named = std::get_if<Component::Translatable>(&byType.payload());
     REQUIRE(named != nullptr);
     CHECK(named->key == "entity.minecraft.pig");
     pig.customName = "Wilbur";
-    const auto* custom = std::get_if<Component::Text>(&asPig.displayName().payload());
+    const Component byName = asPig.displayName();
+    const auto* custom = std::get_if<Component::Text>(&byName.payload());
     REQUIRE(custom != nullptr);
     CHECK(custom->content == "Wilbur");
 }

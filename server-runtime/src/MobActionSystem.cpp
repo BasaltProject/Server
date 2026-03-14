@@ -468,6 +468,13 @@ void MobActionSystem::shootArrow(ServerEntity& mob, double targetX, double targe
     if (world == nullptr) {
         return;
     }
+    // parity: `WitherBoss.performRangedAttack`, skulls rather than arrows.
+    if (mob.wither != nullptr || mob.type().path() == "wither") {
+        if (hooks_.witherShoots) {
+            hooks_.witherShoots(*world, mob);
+        }
+        return;
+    }
     const entity::projectiles::Kind& kind = entity::projectiles::arrow();
     const server::registry::EntityTypeEntry* entry = server::registry::entityTypes::of(kind.type);
     if (entry == nullptr) {

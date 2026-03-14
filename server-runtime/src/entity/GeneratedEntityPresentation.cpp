@@ -269,6 +269,10 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
     }
     if (type == "armor_stand") {
         addArmorStandMetadata(entries, data);
+    } else if (type == "wither") {
+        addIntIfSet(entries, data, "Invul", 19);
+    } else if (type == "wither_skull" && data.getBoolean("dangerous")) {
+        entries.push_back(Entry{.index = 8, .value = SetEntityDataPacket::BoolValue{.value = true}});
     } else if (type == "axolotl") {
         addIntIfSet(entries, data, "Variant", 18);
     } else if (type == "cat") {

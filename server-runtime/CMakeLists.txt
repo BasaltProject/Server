@@ -167,6 +167,8 @@ basalt_module(server-runtime-core
         src/EndFightSystem.cpp
         src/ExperienceOrbSystem.cpp
         src/FishingSystem.cpp
+        src/BossBarView.cpp
+        src/WitherSystem.cpp
         src/EndFightArena.cpp
         src/EndFightRespawn.cpp
         src/AreaEffectCloudSystem.cpp
@@ -273,6 +275,8 @@ basalt_module(server-runtime-core
         src/world/EndPortals.cpp
         src/world/EnchantmentAttributes.cpp
         src/world/BlockExperience.cpp
+        src/world/BlockPatterns.cpp
+        src/world/WitherPatterns.cpp
         src/world/EndGateways.cpp
         src/world/EndPodium.cpp
         src/world/EndCrystals.cpp
@@ -421,6 +425,7 @@ basalt_module(server-runtime-core
         src/entity/Breeding.cpp
         src/entity/DeathDrops.cpp
         src/entity/FishingHooks.cpp
+        src/entity/WitherBoss.cpp
         src/entity/EntityCombat.cpp
         src/entity/MobBrain.cpp
         src/entity/MobCombat.cpp
@@ -438,6 +443,7 @@ basalt_module(server-runtime-core
         src/entity/ai/VillagerGoals.cpp
         src/entity/ai/VillagerSchedule.cpp
         src/entity/ai/WanderingTraderGoals.cpp
+        src/entity/ai/WitherGoals.cpp
         src/world/VillageDataLoader.cpp
         src/world/VillageGolemSpawner.cpp
         src/world/VillageProximity.cpp
@@ -1339,6 +1345,12 @@ target_compile_definitions(server-runtime-end-fight-test
 basalt_test(server-runtime-shield-test
     SOURCES
         test/ShieldTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-wither-test
+    SOURCES
+        test/WitherTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

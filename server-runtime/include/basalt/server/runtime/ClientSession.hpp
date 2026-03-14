@@ -94,6 +94,7 @@ class ContainerMenuController;
 class CombatSystem;
 class EndFightSystem;
 class FishingSystem;
+class WitherSystem;
 class ExplosionSystem;
 class BlockInteractionHandler;
 class ItemUseTimers;
@@ -248,6 +249,8 @@ public:
         EndFightSystem* endFight = nullptr;
         /// Casting and reeling in.
         FishingSystem* fishing = nullptr;
+        /// What a wither skull set down may build.
+        WitherSystem* withers = nullptr;
         /// Experience left as orbs at a point.
         std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t amount)>
             awardExperience;

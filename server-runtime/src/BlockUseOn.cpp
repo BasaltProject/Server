@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/EndFightSystem.hpp>
 #include <basalt/server/runtime/FishingSystem.hpp>
 #include <basalt/server/runtime/ItemUseTimers.hpp>
+#include <basalt/server/runtime/WitherSystem.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/PlayerBlockItemUse.hpp>
 #include <basalt/server/runtime/player/PlayerBlockPlace.hpp>
@@ -164,14 +165,17 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
     };
 
     PlayerSession* session = owner_->playerSession();
-    if (session == nullptr || useItemOn.hand != play::Hand::MainHand || session->gamemode == Gamemode::Spectator ||
-        session->gamemode == Gamemode::Adventure) {
+    if (session == nullptr || session->gamemode == Gamemode::Spectator || session->gamemode == Gamemode::Adventure) {
         ack();
         return;
     }
 
     const play::BlockHitResult& hit = useItemOn.blockHit;
-    const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session->inventory.heldSlot();
+    // parity: a client whose main hand did nothing asks again with the off hand, and then it is that
+    // stack that goes down. The block has already been offered the main hand's click.
+    const bool mainHand = useItemOn.hand == play::Hand::MainHand;
+    const std::int32_t heldSlot =
+        mainHand ? PlayerInventory::kHotbarStart + session->inventory.heldSlot() : PlayerInventory::kOffhandSlot;
     const std::optional<storage::StoredItemStack> held = session->inventory.at(heldSlot);
     const std::optional<std::int32_t> clickedState = owner_->world().blockState(hit.pos.x, hit.pos.y, hit.pos.z);
     // Asked before the click does anything at all: opening a chest, using a door and placing a block
@@ -189,7 +193,7 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
 
     // parity: `ServerPlayerGameMode.useItemOn` runs the block's own use before it considers the item
     // as something to place, and sneaking overrides that and places instead.
-    if (!session->sneaking) {
+    if (!session->sneaking && mainHand) {
         const Identifier* clicked =
             clickedState.has_value() ? reg::blockStateDefinitions::blockOf(*clickedState) : nullptr;
         const std::string path = clicked == nullptr ? std::string{} : std::string{clicked->path()};
@@ -487,6 +491,11 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
     placing.sendInventory = [this](const PlayerSession&) { owner_->sendInventory(); };
     placing.openSign = [this](const PlayerSession&, const std::int32_t x, const std::int32_t y, const std::int32_t z,
                               const std::int32_t stateId) { openNewSign(BlockPos{x, y, z}, stateId); };
+    if (WitherSystem* withers = owner_->options().withers; withers != nullptr) {
+        placing.placed = [withers](world::LoadedWorld& at, std::int32_t x, std::int32_t y, std::int32_t z) {
+            withers->placed(at, x, y, z);
+        };
+    }
     const player::BlockHit where{.x = hit.pos.x,
                                  .y = hit.pos.y,
                                  .z = hit.pos.z,

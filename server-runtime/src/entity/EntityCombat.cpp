@@ -3,10 +3,12 @@
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/WitherBoss.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
 
 #include <algorithm>
 #include <cstdint>
+#include <utility>
 
 namespace basalt::server::runtime::entity::entityCombat {
 namespace {
@@ -62,6 +64,20 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
             return {.landed = true};
         }
         amount = *onBody;
+    }
+    if (entity.wither != nullptr) {
+        // A mob's melee names its type; a projectile or blast owned by one sets the flag instead.
+        const std::string_view attacker = attackerName.has_value() ? std::string_view{*attackerName} : "";
+        const bool friendly = std::exchange(entity.wither->nextHitFromFriend, false) ||
+                              (cause == "mob_attack" && attacker.starts_with("minecraft:") &&
+                               witherBoss::isFriend(attacker.substr(attacker.find(':') + 1)));
+        if (witherBoss::refuses(entity, *entity.wither,
+                                {.fromWitherFriend = friendly,
+                                 .arrowOrWindCharge = cause == "projectile" || cause == "wind_charge",
+                                 .bypassesInvulnerability = cause == "out_of_world" || cause == "generic_kill",
+                                 .witherImmuneType = cause == "drown"})) {
+            return {};
+        }
     }
     // Every hit a mob takes comes through here, so this is the one place that has to ask. A plugin
     // may stop it or change how much it is worth; what it cannot do is see a hit that was never

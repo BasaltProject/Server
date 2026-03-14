@@ -25,6 +25,7 @@
 #include <basalt/server/runtime/SubstituteLabels.hpp>
 #include <basalt/server/runtime/TickLoop.hpp>
 #include <basalt/server/runtime/VanillaGameData.hpp>
+#include <basalt/server/runtime/WitherSystem.hpp>
 #include <basalt/server/runtime/WorldRegistry.hpp>
 #include <basalt/server/runtime/bedrock/BedrockListener.hpp>
 #include <basalt/server/runtime/bedrock/BedrockRecipes.hpp>
@@ -246,6 +247,7 @@ private:
     std::unique_ptr<NaturalSpawningSystem> spawning_;
     std::unique_ptr<ExperienceOrbSystem> orbs_;
     std::unique_ptr<FishingSystem> fishing_;
+    std::unique_ptr<WitherSystem> withers_;
     std::unique_ptr<CombatSystem> combat_;
     std::unique_ptr<AreaEffectCloudSystem> clouds_;
     std::unique_ptr<EndFightSystem> endFight_;

@@ -48,7 +48,8 @@ void tickVitals(PlayerSession& player, const VitalsContext& context) {
             if (player.connection().hurt) {
                 player.connection().hurt(amount, kDeathStarve, world::damageTypes::kStarve, std::nullopt);
             }
-        });
+        },
+        context.naturalRegeneration);
     if (player.food.foodLevel() != foodBefore && context.foodChanged) {
         const std::optional<std::int32_t> wanted = context.foodChanged(player, player.food.foodLevel(), foodBefore);
         if (wanted.has_value() && *wanted != player.food.foodLevel()) {
