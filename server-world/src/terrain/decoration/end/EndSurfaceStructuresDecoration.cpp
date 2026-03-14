@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/DensityChunkSampler.hpp>
 #include <basalt/server/world/terrain/decoration/end/EndDecoration.hpp>
+#include <basalt/server/world/terrain/decoration/end/EndFeatureBlocks.hpp>
 #include <basalt/server/world/terrain/decoration/end/EndSpikes.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 
@@ -51,27 +52,10 @@ void setBlock(Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z, std:
 }
 
 void placeGateway(Chunk& chunk, std::int32_t originX, std::int32_t originY, std::int32_t originZ) {
-    for (std::int32_t z = originZ - 1; z <= originZ + 1; ++z) {
-        for (std::int32_t y = originY - 2; y <= originY + 2; ++y) {
-            for (std::int32_t x = originX - 1; x <= originX + 1; ++x) {
-                const bool sameX = x == originX;
-                const bool sameY = y == originY;
-                const bool sameZ = z == originZ;
-                const bool end = std::abs(y - originY) == 2;
-                std::int32_t stateId = registry::blocks::air().stateId;
-                if (sameX && sameY && sameZ) {
-                    stateId = stateIdOf("end_gateway");
-                } else if (sameY) {
-                    stateId = registry::blocks::air().stateId;
-                } else if (end && sameX && sameZ) {
-                    stateId = stateIdOf("bedrock");
-                } else if ((sameX || sameZ) && !end) {
-                    stateId = stateIdOf("bedrock");
-                }
-                setBlock(chunk, x, y, z, stateId);
-            }
-        }
-    }
+    endGatewayFeature::placeBlocks(originX, originY, originZ,
+                                   [&chunk](std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
+                                       setBlock(chunk, x, y, z, stateId);
+                                   });
     if ((originX >> 4) == chunk.chunkX() && (originZ >> 4) == chunk.chunkZ()) {
         wire::nbt::NbtCompound data;
         data.putString("id", "minecraft:end_gateway");

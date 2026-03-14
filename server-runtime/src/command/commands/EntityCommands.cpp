@@ -126,7 +126,7 @@ void SummonCommand::build(const CommandNodeBuilder& root) const {
         }
         const auto* coordinates = positioned ? context.get<Coordinates>("pos") : nullptr;
         const std::array<double, 3> at =
-            coordinates == nullptr ? context.source().position() : coordinates->resolve(context.source().position());
+            coordinates == nullptr ? context.source().position() : coordinates->resolve(context.source());
         // parity: an item on the floor is an `ItemEntity`, not something generic. Here it is its own
         // kind, so summoning one has to build that kind: as a plain entity it never fell, never
         // merged and no plate or hopper saw it, because those all read the world's item list.
@@ -352,7 +352,7 @@ void RotateCommand::build(const CommandNodeBuilder& root) const {
                     if (target == nullptr || location == nullptr) {
                         return 0;
                     }
-                    const std::array<double, 3> point = location->resolve(context.source().position());
+                    const std::array<double, 3> point = location->resolve(context.source());
                     const auto [yaw, pitch] = anglesTowards(*target, point[0], point[1], point[2]);
                     return rotate(context, yaw, pitch);
                 });

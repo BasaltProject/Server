@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/CommandWiring.hpp>
 #include <basalt/server/runtime/EndFightSystem.hpp>
 #include <basalt/server/runtime/EnvironmentTickSystem.hpp>
+#include <basalt/server/runtime/ExperienceOrbSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/MobTickSystem.hpp>
@@ -242,6 +243,7 @@ private:
     /// Built the first time a Bedrock client asks for it, and the same for every one after.
     std::optional<bedrock::BedrockRecipeList> bedrockRecipes_;
     std::unique_ptr<NaturalSpawningSystem> spawning_;
+    std::unique_ptr<ExperienceOrbSystem> orbs_;
     std::unique_ptr<CombatSystem> combat_;
     std::unique_ptr<AreaEffectCloudSystem> clouds_;
     std::unique_ptr<EndFightSystem> endFight_;

@@ -133,7 +133,7 @@ void WorldBorderCommand::build(const CommandNodeBuilder& root) const {
                 if (coordinates == nullptr) {
                     return 0;
                 }
-                const std::array<double, 3> at = coordinates->resolve(context.source().position());
+                const std::array<double, 3> at = coordinates->resolve(context.source());
                 WorldBorder& border = (*world)->border();
                 if (std::abs(at[0]) > WorldBorder::kMaxCenterCoordinate ||
                     std::abs(at[2]) > WorldBorder::kMaxCenterCoordinate) {

@@ -218,7 +218,7 @@ void SpreadPlayersCommand::build(const CommandNodeBuilder& root) const {
             return std::unexpected{CommandSyntaxError{
                 .component = Component::text("The spread distance must not be larger than the maximum range.")}};
         }
-        const std::array<double, 3> at = center->resolve(context.source().position());
+        const std::array<double, 3> at = center->resolve(context.source());
         std::vector<std::pair<double, double>> positions;
         positions.reserve(matched->size());
         for (std::size_t index = 0; index < matched->size(); index++) {

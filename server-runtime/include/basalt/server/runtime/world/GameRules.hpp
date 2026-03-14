@@ -110,6 +110,9 @@ inline constexpr GameRule kBlockDrops = GameRule::boolean("block_drops", true);
 /// frame still comes off the wall: what they leave behind is what stops.
 inline constexpr GameRule kEntityDrops = GameRule::boolean("entity_drops", true);
 
+/// parity: what a mob leaves when it dies, the dragon's experience included.
+inline constexpr GameRule kMobDrops = GameRule::boolean("mob_drops", true);
+
 /// parity: off in vanilla, which is why lava has no infinite pools.
 inline constexpr GameRule kLavaSourceConversion = GameRule::boolean("lava_source_conversion", false);
 

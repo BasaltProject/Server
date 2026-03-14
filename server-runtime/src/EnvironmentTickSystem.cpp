@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerVitals.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
+#include <basalt/server/runtime/world/EndGateways.hpp>
 #include <basalt/server/runtime/world/EndPortals.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
@@ -38,6 +39,13 @@ constexpr std::int64_t kTimeSyncIntervalTicks = 20;
 
 /// parity: `ServerPlayer.tick` checks the border every ten ticks, not every one.
 constexpr std::int64_t kBorderDamageIntervalTicks = 10;
+
+constexpr double kPlayerHalfWidth = 0.3;
+constexpr double kPlayerHeight = 1.8;
+/// parity: `Entity.checkInsideBlocks` shrinks the box this much before asking the blocks.
+constexpr double kInsideMargin = 1.0E-5;
+/// parity: `PlayerList.broadcast` for a block event, sixty-four blocks.
+constexpr double kBlockEventRange = 64.0;
 
 } // namespace
 
@@ -151,8 +159,16 @@ void EnvironmentTickSystem::tickBorderWall(world::LoadedWorld& world) {
 void EnvironmentTickSystem::tickPortals(world::LoadedWorld& world) {
     const std::int32_t creativeDelay = world.gameRules().number(world::gameRules::kPlayersNetherPortalCreativeDelay);
     const std::int32_t defaultDelay = world.gameRules().number(world::gameRules::kPlayersNetherPortalDefaultDelay);
+    tickGatewayCooldowns(world);
     for (PlayerSession* player : players_->snapshot()) {
         if (player->worldName != world.name()) {
+            continue;
+        }
+        if (const std::optional<std::array<std::int32_t, 3>> gateway = touchGateway(
+                world, {player->x - kPlayerHalfWidth, player->y, player->z - kPlayerHalfWidth,
+                        player->x + kPlayerHalfWidth, player->y + kPlayerHeight, player->z + kPlayerHalfWidth});
+            gateway.has_value() && !player->dead) {
+            travelThroughGateway(world, *player, *gateway);
             continue;
         }
         if (player->portalCooldown > 0) {
@@ -313,6 +329,79 @@ void EnvironmentTickSystem::travelThroughEndPortal(world::LoadedWorld& world, Pl
     if (player.connection().switchWorld) {
         static_cast<void>(player.connection().switchWorld(*target, exit.x, exit.y, exit.z));
     }
+}
+
+void EnvironmentTickSystem::travelThroughGateway(world::LoadedWorld& world, PlayerSession& player,
+                                                 const std::array<std::int32_t, 3>& gateway) {
+    // parity: `Entity.setAsInsidePortal`, where a player still resting only rests longer.
+    if (player.portalCooldown > 0) {
+        player.portalCooldown = world::endGateways::kPlayerDelayTicks;
+        return;
+    }
+    const std::optional<std::array<double, 3>> exit =
+        world::endGateways::destination(world.state(), gateway[0], gateway[1], gateway[2],
+                                        world.declaration().dimension == config::WorldDimension::End);
+    if (!exit.has_value() || (hooks_.portalAllowed && !hooks_.portalAllowed(player, world, world, (*exit)[0],
+                                                                            (*exit)[1], (*exit)[2], "end_gateway"))) {
+        return;
+    }
+    player.portalTicks = 0;
+    player.portalCooldown = world::endGateways::kPlayerDelayTicks;
+    // parity: `EndGatewayBlock.getPortalDestination` keeps the rotation, relative to nothing.
+    if (player.connection().teleportTo) {
+        player.connection().teleportTo((*exit)[0], (*exit)[1], (*exit)[2], player.yaw, player.pitch);
+    }
+}
+
+std::optional<std::array<std::int32_t, 3>> EnvironmentTickSystem::touchGateway(world::LoadedWorld& world,
+                                                                               const std::array<double, 6>& box) {
+    const auto low = [](double value) { return static_cast<std::int32_t>(std::floor(value + kInsideMargin)); };
+    const auto high = [](double value) { return static_cast<std::int32_t>(std::floor(value - kInsideMargin)); };
+    for (std::int32_t x = low(box[0]); x <= high(box[3]); ++x) {
+        for (std::int32_t y = low(box[1]); y <= high(box[4]); ++y) {
+            for (std::int32_t z = low(box[2]); z <= high(box[5]); ++z) {
+                const std::optional<std::int32_t> state = world.state().blockState(x, y, z);
+                if (!state.has_value() || !world::endGateways::isGateway(*state)) {
+                    continue;
+                }
+                {
+                    const std::scoped_lock guard{gatewayLock_};
+                    std::int32_t& cooldown = gatewayCooldowns_[{world.name(), {x, y, z}}];
+                    if (cooldown > 0) {
+                        continue;
+                    }
+                    cooldown = world::endGateways::kCooldownTicks;
+                }
+                for (PlayerSession* watcher : players_->snapshot()) {
+                    const double dx = watcher->x - x;
+                    const double dy = watcher->y - y;
+                    const double dz = watcher->z - z;
+                    if (watcher->worldName == world.name() && watcher->connection().sendBlockEvent &&
+                        (dx * dx) + (dy * dy) + (dz * dz) < kBlockEventRange * kBlockEventRange) {
+                        watcher->connection().sendBlockEvent(x, y, z, *state, world::endGateways::kBeamEvent, 0);
+                    }
+                }
+                return std::array<std::int32_t, 3>{x, y, z};
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<std::array<double, 3>> EnvironmentTickSystem::enterGateway(world::LoadedWorld& world,
+                                                                         const std::array<double, 6>& box) {
+    const std::optional<std::array<std::int32_t, 3>> gateway = touchGateway(world, box);
+    if (!gateway.has_value()) {
+        return std::nullopt;
+    }
+    return world::endGateways::destination(world.state(), (*gateway)[0], (*gateway)[1], (*gateway)[2],
+                                           world.declaration().dimension == config::WorldDimension::End);
+}
+
+void EnvironmentTickSystem::tickGatewayCooldowns(const world::LoadedWorld& world) {
+    const std::scoped_lock guard{gatewayLock_};
+    std::erase_if(gatewayCooldowns_,
+                  [&world](auto& entry) { return entry.first.first == world.name() && --entry.second <= 0; });
 }
 
 void EnvironmentTickSystem::tickTime(world::LoadedWorld& world) {

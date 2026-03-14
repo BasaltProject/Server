@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
+#include <basalt/server/runtime/world/EndGateways.hpp>
 #include <basalt/server/runtime/world/EndPodium.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/world/terrain/decoration/end/EndSpikes.hpp>
@@ -350,33 +351,7 @@ void EndFightSystem::spawnNewGateway(world::LoadedWorld& world, DragonFight& fig
         }
     }
     // parity: `END_GATEWAY_DELAYED`, a gateway with no exit yet, capped with bedrock above and below.
-    const std::int32_t air = registry::blocks::air().stateId;
-    const std::int32_t bedrock = registry::blocks::bedrock().stateId;
-    const registry::BlockState* gatewayBlock = registry::blocks::named("end_gateway");
-    for (std::int32_t dz = -1; dz <= 1; ++dz) {
-        for (std::int32_t dy = -2; dy <= 2; ++dy) {
-            for (std::int32_t dx = -1; dx <= 1; ++dx) {
-                const bool end = std::abs(dy) == 2;
-                std::int32_t stateId = air;
-                if (dx == 0 && dy == 0 && dz == 0) {
-                    stateId = gatewayBlock == nullptr ? air : gatewayBlock->stateId;
-                } else if (dy == 0) {
-                    stateId = air;
-                } else if (end && dx == 0 && dz == 0) {
-                    stateId = bedrock;
-                } else if ((dx == 0 || dz == 0) && !end) {
-                    stateId = bedrock;
-                }
-                static_cast<void>(world.state().setBlockState(x + dx, kGatewayY + dy, z + dz, stateId));
-            }
-        }
-    }
-    if (server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4); chunk != nullptr) {
-        wire::nbt::NbtCompound data;
-        data.putLong("Age", 0LL);
-        chunk->setBlockEntity(server::world::ChunkBlockEntity{
-            x & 15, kGatewayY, z & 15, wire::common::Identifier::vanilla("end_gateway"), std::move(data)});
-    }
+    world::endGateways::place(world.state(), x, kGatewayY, z, std::nullopt, false);
     syncArea(world, x - 1, z - 1, x + 1, z + 1);
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/wire/common/Identifier.hpp>
+#include <basalt/wire/common/Uuid.hpp>
 #include <basalt/wire/text/Component.hpp>
 
 #include <cstdint>
@@ -68,6 +69,13 @@ void knockback(ServerEntity& entity, double power, double towardsX, double towar
 [[nodiscard]] std::string hurtSound(const wire::common::Identifier& type);
 
 [[nodiscard]] std::string deathSound(const wire::common::Identifier& type);
+
+/// parity: `LivingEntity.resolvePlayerResponsibleForDamage`, which keeps a player's hit for five
+/// seconds.
+inline constexpr std::int32_t kPlayerHitMemoryTicks = 100;
+
+/// Remembers that a player hurt it, which is what a kill needs to drop experience.
+void rememberPlayer(ServerEntity& entity, const wire::common::Uuid& player);
 
 /// Counts the invulnerability window down, once per tick.
 void tick(ServerEntity& entity);

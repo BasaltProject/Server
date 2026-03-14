@@ -98,8 +98,8 @@ void ExecuteCommand::buildContextClauses(const CommandNodeBuilder& root, Command
                 if (coordinates == nullptr) {
                     return {};
                 }
-                return {wrapping(context.source(), ExecutionSource::Changes{
-                                                       .position = coordinates->resolve(context.source().position())})};
+                return {wrapping(context.source(),
+                                 ExecutionSource::Changes{.position = coordinates->resolve(context.source())})};
             });
         });
         form.literal("as", [&execute](const CommandNodeBuilder& as) {
@@ -147,7 +147,7 @@ void ExecuteCommand::buildContextClauses(const CommandNodeBuilder& root, Command
                 if (coordinates == nullptr) {
                     return {};
                 }
-                const std::array<double, 3> at = coordinates->resolve(context.source().position());
+                const std::array<double, 3> at = coordinates->resolve(context.source());
                 return {facing(context.source(), at[0], at[1], at[2])};
             });
         });

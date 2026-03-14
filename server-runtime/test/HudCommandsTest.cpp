@@ -259,12 +259,11 @@ TEST_CASE("spawnpoint stores the block it was given, centred") {
     CHECK(fixture.source.lastAsText().find("commands.spawnpoint.success.single") != std::string::npos);
 }
 
-TEST_CASE("spawnpoint with no position takes where each target stands, floored") {
+TEST_CASE("spawnpoint with no position takes where the source stands, floored") {
     Fixture fixture{scratch("hud-commands-spawnpoint-here")};
     PlayerSession& steve = fixture.add("Steve");
-    steve.x = -0.5;
-    steve.y = 70.9;
-    steve.z = 8.2;
+    steve.x = 100.0;
+    fixture.source.at = {-0.5, 70.9, 8.2};
     fixture.dispatcher.registerCommand(std::make_shared<commands::SpawnPointCommand>());
 
     CHECK(fixture.dispatcher.execute(fixture.source, "spawnpoint Steve") == 1);

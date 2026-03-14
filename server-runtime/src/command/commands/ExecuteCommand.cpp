@@ -33,8 +33,7 @@ const std::vector<CommandTarget>& targetsOf(const CommandContext& context, std::
 
 std::array<std::int32_t, 3> blockPosOf(const CommandContext& context, std::string_view name) {
     const auto* coordinates = context.get<BlockCoordinates>(name);
-    return coordinates == nullptr ? std::array<std::int32_t, 3>{0, 0, 0}
-                                  : coordinates->resolve(context.source().position());
+    return coordinates == nullptr ? std::array<std::int32_t, 3>{0, 0, 0} : coordinates->resolve(context.source());
 }
 
 std::shared_ptr<const CommandSource> wrapping(const CommandSource& base, ExecutionSource::Changes changes) {

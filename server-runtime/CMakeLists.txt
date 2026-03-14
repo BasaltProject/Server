@@ -164,6 +164,7 @@ basalt_module(server-runtime-core
         src/EnvironmentTickSystem.cpp
         src/ExplosionSystem.cpp
         src/EndFightSystem.cpp
+        src/ExperienceOrbSystem.cpp
         src/EndFightArena.cpp
         src/EndFightRespawn.cpp
         src/AreaEffectCloudSystem.cpp
@@ -269,6 +270,7 @@ basalt_module(server-runtime-core
         src/world/Hoppers.cpp
         src/world/EndPortals.cpp
         src/world/EnchantmentAttributes.cpp
+        src/world/EndGateways.cpp
         src/world/EndPodium.cpp
         src/world/EndCrystals.cpp
         src/world/DragonFight.cpp
@@ -414,6 +416,7 @@ basalt_module(server-runtime-core
         src/world/VanillaSaveImport.cpp
         src/world/VanillaWorldGeneratorFactory.cpp
         src/entity/Breeding.cpp
+        src/entity/DeathDrops.cpp
         src/entity/EntityCombat.cpp
         src/entity/MobBrain.cpp
         src/entity/MobCombat.cpp
@@ -1310,6 +1313,15 @@ basalt_test(server-runtime-end-portals-test
         test/EndPortalsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
+
+basalt_test(server-runtime-experience-orbs-test
+    SOURCES
+        test/ExperienceOrbsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-experience-orbs-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
 
 basalt_test(server-runtime-end-fight-test
     SOURCES

@@ -38,9 +38,9 @@ public:
 
     AreaEffectCloudSystem(player::PlayerRegistry& players, CombatSystem& combat, Options options);
 
-    /// Puts a cloud in the world and answers its id.
+    /// Puts a cloud in the world and answers its id. `owner` is who its kills are blamed on.
     std::optional<std::int32_t> spawn(world::LoadedWorld& world, const entity::areaEffectClouds::Cloud& settings,
-                                      double x, double y, double z);
+                                      double x, double y, double z, std::optional<std::int32_t> owner = std::nullopt);
 
     void tick(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
               const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& cloud);
@@ -55,7 +55,8 @@ private:
     /// other effect handed on.
     void affect(world::LoadedWorld& world, const entity::ServerEntity& cloud,
                 const entity::areaEffectClouds::Cloud& settings, player::PlayerSession* player,
-                entity::ServerEntity* mob, const std::vector<player::PlayerSession*>& watchers);
+                entity::ServerEntity* mob, const std::vector<player::PlayerSession*>& watchers,
+                const std::vector<entity::ServerEntity*>& living);
 
     player::PlayerRegistry* players_;
     CombatSystem* combat_;

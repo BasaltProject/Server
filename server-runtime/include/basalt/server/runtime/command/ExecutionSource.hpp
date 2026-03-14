@@ -60,7 +60,7 @@ public:
 
     [[nodiscard]] world::LoadedWorld* world() const noexcept { return world_; }
 
-    [[nodiscard]] const std::pair<float, float>& rotation() const noexcept { return rotation_; }
+    [[nodiscard]] std::pair<float, float> rotation() const override { return rotation_; }
 
     [[nodiscard]] bool anchorEyes() const noexcept { return anchorEyes_; }
 

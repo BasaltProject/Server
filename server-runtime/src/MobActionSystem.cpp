@@ -226,6 +226,12 @@ void MobActionSystem::hurtMob(ServerEntity& mob, ServerEntity& target, float dam
         return;
     }
     target.hurtBy = mob.entityId();
+    // parity: a tame wolf's bite counts as its owner's.
+    if (mob.type().path() == "wolf" && mob.owner.has_value()) {
+        if (const std::optional<wire::common::Uuid> owner = wire::common::Uuid::parse(*mob.owner); owner.has_value()) {
+            entity::entityCombat::rememberPlayer(target, *owner);
+        }
+    }
     target.panicTicks = kPanicTicks;
     combat_->announceEntityHit(watchersOf(*world), target, world::damageTypes::kMobAttack, mob.entityId(), result.died);
     // parity: `LivingEntity.hurtServer` raises `ENTITY_DAMAGE` at whoever took the hit.

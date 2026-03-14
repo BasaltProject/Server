@@ -460,6 +460,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                    }},
         ExplosionSystem::Options{.nextSeed = [] { return scratchSeed(); },
                                  .nextDouble = [] { return scratchDouble(); }});
+    orbs_ = std::make_unique<ExperienceOrbSystem>(
+        playerRegistry_, ExperienceOrbSystem::Options{.nextSeed = [] { return scratchSeed(); }});
     spawning_ = std::make_unique<NaturalSpawningSystem>(
         playerRegistry_, vanillaData_.biomeSpawns, chunkSimulation_, *spawnEquipment_, NaturalSpawningSystem::Hooks{},
         NaturalSpawningSystem::Options{.nextSeed = [] { return scratchSeed(); }});
@@ -479,6 +481,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                        const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& fireball) {
                     clouds_->fireballLanded(world, watchers, living, fireball);
                 },
+            .awardExperience = [this](world::LoadedWorld& world, double x, double y, double z,
+                                      std::int32_t amount) { orbs_->award(world, x, y, z, amount); },
             .crystalDestroyed =
                 [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                        const entity::ServerEntity& crystal, std::optional<std::int32_t> byPlayer) {
@@ -488,7 +492,11 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         playerRegistry_, *combat_, AreaEffectCloudSystem::Options{.entityTags = &vanillaData_.entityTags});
     endFight_ = std::make_unique<EndFightSystem>(
         playerRegistry_, *broadcaster_, *combat_, *explosions_, *clouds_,
-        EndFightSystem::Options{.nextSeed = [] { return scratchSeed(); }, .blockTags = &vanillaData_.blockTags});
+        EndFightSystem::Options{
+            .nextSeed = [] { return scratchSeed(); },
+            .blockTags = &vanillaData_.blockTags,
+            .awardExperience = [this](world::LoadedWorld& world, double x, double y, double z,
+                                      std::int32_t amount) { orbs_->award(world, x, y, z, amount); }});
     redstone_ = std::make_unique<RedstoneTickSystem>(
         playerRegistry_, vanillaData_.recipes, *broadcaster_, chunkSimulation_,
         // parity: `BaseCommandBlock.performCommand`, which stands the source at the middle of the

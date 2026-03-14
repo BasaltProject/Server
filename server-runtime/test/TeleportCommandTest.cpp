@@ -180,18 +180,20 @@ TEST_CASE("teleport moves whoever it names to the position it was given") {
     CHECK(fixture.source.lastAsText().find("10.500000") != std::string::npos);
 }
 
-TEST_CASE("a relative coordinate is relative to the entity being moved, not to whoever typed it") {
+TEST_CASE("a relative coordinate is relative to whoever runs it, not to the entity being moved") {
     Fixture fixture{scratch("teleport-command-relative")};
     PlayerSession& steve = fixture.add("Steve");
     steve.x = 100.0;
     steve.y = 70.0;
     steve.z = 100.0;
+    fixture.source.at = {4.0, 60.0, 4.0};
     fixture.dispatcher.registerCommand(std::make_shared<commands::TeleportCommand>());
 
+    // parity: `TeleportCommand.teleportToPos` resolves against the source, once.
     CHECK(fixture.dispatcher.execute(fixture.source, "tp Steve ~ ~5 ~") == 1);
     REQUIRE(fixture.clients[0]->teleports.size() == 1);
-    CHECK(fixture.clients[0]->teleports[0][0] == doctest::Approx(100.0));
-    CHECK(fixture.clients[0]->teleports[0][1] == doctest::Approx(75.0));
+    CHECK(fixture.clients[0]->teleports[0][0] == doctest::Approx(4.0));
+    CHECK(fixture.clients[0]->teleports[0][1] == doctest::Approx(65.0));
 }
 
 TEST_CASE("teleport to a player lands on them, not on their numbers") {

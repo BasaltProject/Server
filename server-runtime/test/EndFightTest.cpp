@@ -10,12 +10,15 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
+#include <basalt/server/runtime/world/EndGateways.hpp>
 #include <basalt/server/runtime/world/EndPodium.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 
 #include <doctest.h>
 
+#include <array>
+#include <cmath>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -179,4 +182,44 @@ TEST_CASE("a fresh end calls up its dragon, and four crystals by the portal call
     }
     CHECK(crystals == 10);
     CHECK(shielded == 0);
+}
+
+TEST_CASE("a gateway with no exit builds an island and a way back, and then always leads there") {
+    Arena arena{scratch("end-gateway-exit")};
+    world::WorldState& state = arena.end->state();
+    world::endGateways::place(state, 100, 75, 0, std::nullopt, false);
+
+    const std::optional<std::array<double, 3>> first = world::endGateways::destination(state, 100, 75, 0, true);
+    REQUIRE(first.has_value());
+    // parity: an empty End pushes the search sixteen chunks past the thousand blocks, so the
+    // island lands at x 1280 and the traveller on top of it.
+    CHECK((*first)[0] > 1260.0);
+    CHECK((*first)[0] < 1300.0);
+    CHECK((*first)[1] == doctest::Approx(76.0));
+
+    // The far gateway stands ten above the island and leads back to the entry.
+    const std::int32_t farX = static_cast<std::int32_t>(std::floor((*first)[0]));
+    const std::int32_t farZ = static_cast<std::int32_t>(std::floor((*first)[2]));
+    bool found = false;
+    for (std::int32_t dx = -8; dx <= 8 && !found; ++dx) {
+        for (std::int32_t dz = -8; dz <= 8 && !found; ++dz) {
+            const std::optional<std::int32_t> block = state.blockState(farX + dx, 85, farZ + dz);
+            if (block.has_value() && world::endGateways::isGateway(*block)) {
+                found = true;
+                const std::optional<std::array<double, 3>> back =
+                    world::endGateways::destination(state, farX + dx, 85, farZ + dz, true);
+                REQUIRE(back.has_value());
+                CHECK(std::abs((*back)[0] - 100.5) < 6.0);
+                CHECK(std::abs((*back)[2] - 0.5) < 6.0);
+            }
+        }
+    }
+    CHECK(found);
+
+    const std::optional<std::array<double, 3>> again = world::endGateways::destination(state, 100, 75, 0, true);
+    REQUIRE(again.has_value());
+    CHECK(*again == *first);
+    // Outside the End a gateway without an exit leads nowhere.
+    world::endGateways::place(state, -100, 75, 0, std::nullopt, false);
+    CHECK_FALSE(world::endGateways::destination(state, -100, 75, 0, false).has_value());
 }

@@ -37,6 +37,8 @@ std::int32_t PlayerCommandSource::permissionLevel() const {
 
 std::array<double, 3> PlayerCommandSource::position() const { return {player_->x, player_->y, player_->z}; }
 
+std::pair<float, float> PlayerCommandSource::rotation() const { return {player_->yaw, player_->pitch}; }
+
 void PlayerCommandSource::sendSystemMessage(const wire::text::Component& message) const {
     player_->sendSystemMessage(message);
 }

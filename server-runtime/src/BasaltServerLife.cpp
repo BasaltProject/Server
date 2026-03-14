@@ -854,6 +854,7 @@ void BasaltServer::startBedrockListener() {
                 }
                 // parity: `HurtByTargetGoal` and `PanicGoal` both read the last thing that hurt it.
                 target->hurtBy = session->entityId();
+                entity::entityCombat::rememberPlayer(*target, session->uuid());
                 // parity: `Player.attack` wears the weapon by one point per hit, and unbreaking
                 // gets its say before the wear lands rather than repairing it afterwards.
                 if (session->gamemode != wire::protocol::play::Gamemode::Creative && held.has_value() &&
@@ -1878,18 +1879,15 @@ void BasaltServer::startBedrockListener() {
                     rollBedrockEnchantment(*session, *where, *windows);
                 }
                 if (applied.grindstoneWorth.has_value() && windows->open.has_value()) {
-                    // parity: `GrindstoneMenu.ResultSlot.onTake` drops the experience as orbs;
-                    // those are not modelled yet, so the points go straight to whoever ground
-                    // it rather than lying on the floor.
+                    // parity: `GrindstoneMenu.ResultSlot.onTake` drops the experience as orbs at
+                    // the middle of the block.
                     const std::int32_t half = (*applied.grindstoneWorth + 1) / 2;
                     const auto roll = static_cast<std::int32_t>(
                         std::uniform_real_distribution<double>{0.0, 1.0}(scratchRandom()) * static_cast<double>(half));
                     const std::int32_t points = world::grindstones::experienceFor(*applied.grindstoneWorth, roll);
-                    if (points > 0) {
-                        session->experience.givePoints(points);
-                        if (session->connection().syncExperience) {
-                            session->connection().syncExperience();
-                        }
+                    if (points > 0 && where != nullptr) {
+                        orbs_->award(*where, windows->open->x + 0.5, windows->open->y + 0.5, windows->open->z + 0.5,
+                                     points);
                     }
                     if (where != nullptr) {
                         const std::int32_t stateId =

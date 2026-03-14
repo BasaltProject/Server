@@ -56,7 +56,8 @@ AreaEffectCloudSystem::AreaEffectCloudSystem(player::PlayerRegistry& players, Co
     : players_(&players), combat_(&combat), options_(options) {}
 
 std::optional<std::int32_t> AreaEffectCloudSystem::spawn(world::LoadedWorld& world, const clouds::Cloud& settings,
-                                                         double x, double y, double z) {
+                                                         double x, double y, double z,
+                                                         std::optional<std::int32_t> owner) {
     const registry::EntityTypeEntry* entry = registry::entityTypes::of(Identifier::vanilla("area_effect_cloud"));
     if (entry == nullptr) {
         return std::nullopt;
@@ -65,6 +66,7 @@ std::optional<std::int32_t> AreaEffectCloudSystem::spawn(world::LoadedWorld& wor
                                                 entry->protocolId, x, y, z);
     cloud->noGravity = true;
     cloud->persistent = true;
+    cloud->ownerId = owner;
     clouds::write(*cloud, settings);
     return world.state().spawnEntity(std::move(cloud)).entityId();
 }
@@ -124,7 +126,7 @@ void AreaEffectCloudSystem::tick(world::LoadedWorld& world, const std::vector<Pl
                 return;
             }
             touched[id] = cloud.tickCount + settings.reapplicationDelay;
-            affect(world, cloud, settings, player, mob, watchers);
+            affect(world, cloud, settings, player, mob, watchers, living);
             if (settings.radiusOnUse != 0.0F) {
                 settings.radius += settings.radiusOnUse;
                 if (settings.radius < clouds::kMinimalRadius) {
@@ -164,7 +166,8 @@ void AreaEffectCloudSystem::tick(world::LoadedWorld& world, const std::vector<Pl
 
 void AreaEffectCloudSystem::affect(world::LoadedWorld& world, const ServerEntity& cloud, const clouds::Cloud& settings,
                                    PlayerSession* player, ServerEntity* mob,
-                                   const std::vector<PlayerSession*>& watchers) {
+                                   const std::vector<PlayerSession*>& watchers,
+                                   const std::vector<ServerEntity*>& living) {
     const clouds::Effect& effect = *settings.effect;
     const bool harm = effect.id == world::mobEffects::instantDamage();
     const bool heal = effect.id == world::mobEffects::instantHealth();
@@ -179,7 +182,10 @@ void AreaEffectCloudSystem::affect(world::LoadedWorld& world, const ServerEntity
             if (player != nullptr && player->connection().hurt) {
                 player->connection().hurt(
                     static_cast<float>(amount), "indirectMagic", kIndirectMagic,
-                    entity::DamageSource{.entityId = cloud.entityId(), .x = cloud.x, .z = cloud.z});
+                    entity::DamageSource{.entityId = cloud.entityId(),
+                                         .x = cloud.x,
+                                         .z = cloud.z,
+                                         .name = CombatSystem::shooterName(watchers, living, cloud)});
             }
             if (mob != nullptr) {
                 const entity::entityCombat::Result result = entity::entityCombat::hurt(
@@ -257,7 +263,8 @@ void AreaEffectCloudSystem::fireballLanded(world::LoadedWorld& world, const std:
             player->connection().sendLevelEvent(kFireballBurstEvent, bx, by, bz, 1);
         }
     }
-    static_cast<void>(spawn(world, settings, x, y, z));
+    // parity: the cloud belongs to whoever threw the fireball.
+    static_cast<void>(spawn(world, settings, x, y, z, fireball.ownerId));
 }
 
 } // namespace basalt::server::runtime

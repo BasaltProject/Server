@@ -124,9 +124,19 @@ std::string hurtSound(const wire::common::Identifier& type) { return "entity." +
 
 std::string deathSound(const wire::common::Identifier& type) { return "entity." + type.path() + ".death"; }
 
+void rememberPlayer(ServerEntity& entity, const wire::common::Uuid& player) {
+    entity.lastHurtByPlayer = player;
+    entity.lastHurtByPlayerTime = kPlayerHitMemoryTicks;
+}
+
 void tick(ServerEntity& entity) {
     if (entity.hurtCooldown > 0) {
         entity.hurtCooldown--;
+    }
+    if (entity.lastHurtByPlayerTime > 0) {
+        entity.lastHurtByPlayerTime--;
+    } else {
+        entity.lastHurtByPlayer.reset();
     }
     if (entity.attackCooldown > 0) {
         entity.attackCooldown--;

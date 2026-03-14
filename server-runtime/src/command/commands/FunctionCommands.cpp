@@ -210,8 +210,7 @@ void FunctionCommand::build(const CommandNodeBuilder& root) const {
                         if (coordinates == nullptr) {
                             return std::nullopt;
                         }
-                        return DataHolderRef{
-                            DataHolderRef::Block{.pos = coordinates->resolve(context.source().position())}};
+                        return DataHolderRef{DataHolderRef::Block{.pos = coordinates->resolve(context.source())}};
                     });
                 });
             });
