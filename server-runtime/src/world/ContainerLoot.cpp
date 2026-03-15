@@ -37,16 +37,17 @@ void fill(LoadedWorld& world, RealLootTables& tables, std::string_view table, st
     rolled->fill(slots, random, context);
 }
 
-void unpack(LoadedWorld& world, RealLootTables& tables, std::int32_t x, std::int32_t y, std::int32_t z,
-            const std::optional<wire::common::Uuid>& player) {
+std::optional<wire::common::Identifier> unpack(LoadedWorld& world, RealLootTables& tables, std::int32_t x,
+                                               std::int32_t y, std::int32_t z,
+                                               const std::optional<wire::common::Uuid>& player) {
     server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4);
     server::world::ChunkBlockEntity* entity = chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
     if (entity == nullptr) {
-        return;
+        return std::nullopt;
     }
     const std::string table{entity->data().getString(kTableKey)};
     if (table.empty()) {
-        return;
+        return std::nullopt;
     }
     const std::string path{entity->type().path()};
     const std::optional<std::int32_t> size = containers::sizeOf(path);
@@ -55,8 +56,11 @@ void unpack(LoadedWorld& world, RealLootTables& tables, std::int32_t x, std::int
     static_cast<void>(entity->data().remove(kTableKey));
     static_cast<void>(entity->data().remove(kSeedKey));
     chunk->markDirty();
+    const std::expected<wire::common::Identifier, wire::common::IdentifierError> rolled =
+        wire::common::Identifier::parse(table);
+    const std::optional<wire::common::Identifier> named = rolled.has_value() ? std::optional{*rolled} : std::nullopt;
     if (!size.has_value()) {
-        return;
+        return named;
     }
     blockInventory::Slots slots = blockInventory::readFor(path, entity->data(), *size);
     fill(world, tables, table, seed, slots, player.has_value(), {x, y, z});
@@ -65,6 +69,7 @@ void unpack(LoadedWorld& world, RealLootTables& tables, std::int32_t x, std::int
     if (again != nullptr) {
         blockInventory::writeFor(path, again->data(), slots);
     }
+    return named;
 }
 
 } // namespace basalt::server::runtime::world::containerLoot

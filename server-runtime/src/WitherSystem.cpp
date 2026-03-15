@@ -31,6 +31,9 @@
 namespace basalt::server::runtime {
 namespace {
 
+/// parity: `WitherSkull.getBlockExplosionResistance`'s own ceiling.
+constexpr float kDangerousResistance = 0.8F;
+
 namespace boss = entity::witherBoss;
 namespace mth = wire::common::mth;
 namespace play = wire::protocol::play;
@@ -425,6 +428,10 @@ void WitherSystem::afterTurn(world::LoadedWorld& world, const std::vector<Player
     updateBar(watchers, wither, progress);
 }
 
+void WitherSystem::keepBar(world::LoadedWorld& world, ServerEntity& wither) {
+    updateBar(watchersOf(world), wither, static_cast<float>(wither.health / boss::kMaxHealth));
+}
+
 void WitherSystem::updateBar(const std::vector<PlayerSession*>& watchers, ServerEntity& wither, float progress) {
     std::set<std::int32_t> seenBy;
     if (!wither.removed && !(wither.dying && wither.health <= 0.0 && wither.deathTime >= 20)) {
@@ -537,9 +544,17 @@ void WitherSystem::skullLanded(world::LoadedWorld& world, const std::vector<Play
         }
     }
     const bool griefing = world.gameRules().get(world::gameRules::kMobGriefing);
-    explosions_->blowUp(world, watchers, skull.x, skull.y, skull.z, kSkullExplosion, "wither_skull", skull.entityId(),
-                        griefing ? world::explosions::Spares{}
-                                 : world::explosions::Spares{[](auto&&...) { return true; }});
+    // parity: `WitherSkull.getBlockExplosionResistance`, which holds anything the wither may break to
+    // `0.8`: that is what lets a blue skull through obsidian.
+    world::explosions::Resistance resistance;
+    if (skull.dangerousSkull) {
+        resistance = [this](std::int32_t stateId, float base) {
+            return tagged(stateId, "minecraft:wither_immune") ? base : std::min(kDangerousResistance, base);
+        };
+    }
+    explosions_->blowUp(
+        world, watchers, skull.x, skull.y, skull.z, kSkullExplosion, "wither_skull", skull.entityId(),
+        griefing ? world::explosions::Spares{} : world::explosions::Spares{[](auto&&...) { return true; }}, resistance);
 }
 
 void WitherSystem::dropStar(world::LoadedWorld& world, const ServerEntity& wither) {

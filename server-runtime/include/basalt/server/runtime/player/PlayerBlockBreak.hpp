@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealItemTags.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
@@ -41,6 +42,8 @@ struct BreakContext {
     world::RealLootTables* lootTables = nullptr;
     const world::realBlockTags::TagMembers* blockTags = nullptr;
     world::RealEnchantments* enchantments = nullptr;
+    /// What a player just did, for the advancements that wait on it. Unset, nothing is granted.
+    world::AdvancementTriggers* triggers = nullptr;
     const world::realItemTags::TagMembers* itemTags = nullptr;
 
     /// The rolls a break makes, none of which is part of the world's own stream.

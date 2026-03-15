@@ -38,8 +38,12 @@ public:
     /// Teaches a recipe an advancement rewards, which is how vanilla unlocks most of the book.
     using AwardRecipe = std::function<void(std::string_view player, const wire::common::Identifier& recipe)>;
 
+    /// Whether an entity type is in a tag, for the matchers written as `#minecraft:raiders`.
+    using EntityTagged = std::function<bool(const wire::common::Identifier& type, std::string_view tag)>;
+
     struct Hooks {
         ItemTagMembers itemTagMembers;
+        EntityTagged entityTagged;
         Announce announce;
         AwardExperience awardExperience;
         AwardRecipe awardRecipe;
@@ -56,6 +60,31 @@ public:
     /// parity: `RecipeUnlockedTrigger`, fired when a recipe enters the book rather than when it is
     /// used.
     void onRecipeUnlocked(std::string_view player, std::string_view uuid, const wire::common::Identifier& recipe);
+
+    /// parity: `KilledTrigger` as `player_killed_entity`: what the player killed.
+    void onKilledEntity(std::string_view player, std::string_view uuid, const wire::common::Identifier& victim);
+
+    /// parity: `TameAnimalTrigger`.
+    void onTamedAnimal(std::string_view player, std::string_view uuid, const wire::common::Identifier& animal);
+
+    /// parity: `SummonedEntityTrigger`, the golem or boss a player just built.
+    void onSummonedEntity(std::string_view player, std::string_view uuid, const wire::common::Identifier& summoned);
+
+    /// parity: `BredAnimalsTrigger`.
+    void onBredAnimals(std::string_view player, std::string_view uuid);
+
+    /// parity: `LootTableTrigger`, a container whose loot this player rolled.
+    void onContainerLoot(std::string_view player, std::string_view uuid, const wire::common::Identifier& table);
+
+    /// parity: `ChangeDimensionTrigger`.
+    void onChangedDimension(std::string_view player, std::string_view uuid, const wire::common::Identifier& from,
+                            const wire::common::Identifier& to);
+
+    /// parity: `ConsumeItemTrigger`, an item eaten or drunk.
+    void onConsumedItem(std::string_view player, std::string_view uuid, const wire::common::Identifier& item);
+
+    /// parity: `FilledBucketTrigger`, the bucket that came back full.
+    void onFilledBucket(std::string_view player, std::string_view uuid, const wire::common::Identifier& bucket);
 
 private:
     /// One criterion of one advancement, as the trigger index refers to it.
@@ -79,6 +108,15 @@ private:
     std::map<wire::common::Identifier, std::vector<CriterionRef>> byItem_;
     /// Every `recipe_unlocked` criterion, by the recipe it waits for.
     std::map<wire::common::Identifier, std::vector<CriterionRef>> byRecipe_;
+    /// The criteria of every other trigger, by kind: a handful each, so a walk is enough.
+    std::map<server::world::advancement::ConditionKind, std::vector<CriterionRef>> byKind_;
+
+    /// Walks one kind, granting every criterion whose condition `accepts` answers for.
+    void fire(std::string_view player, std::string_view uuid, server::world::advancement::ConditionKind kind,
+              const std::function<bool(const server::world::advancement::CriterionCondition&)>& accepts);
+
+    /// parity: an entity predicate that names types, ids or one `#tag`; empty means any.
+    [[nodiscard]] bool matchesType(const std::vector<std::string>& wanted, const wire::common::Identifier& type) const;
 };
 
 } // namespace basalt::server::runtime::world

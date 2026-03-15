@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/GolemPatterns.hpp>
+#include <basalt/server/runtime/world/WitherPatterns.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/server/world/crafting/Crafting.hpp>
 
@@ -56,6 +57,12 @@ struct Hooks {
     /// parity: the bucket entries of `DispenseItemBehavior`, which raise `FLUID_PLACE` and
     /// `FLUID_PICKUP`. A vibration is booked for the turn it arrives, so the turn has to be known.
     std::int64_t gameTime = 0;
+    /// Whether a state is in `minecraft:wither_summon_base_blocks`, for the skull entry. Unset, a
+    /// dispenser never finishes a wither.
+    witherPatterns::IsBase isWitherBase;
+    /// A wither skull a dispenser just put down, which may be the one that summons the boss.
+    /// parity: `WitherSkullBlock.checkSpawn` from the dispenser behaviour.
+    std::function<void(std::int32_t x, std::int32_t y, std::int32_t z)> skullPlaced;
     /// parity: `BlockTags.CONVERTABLE_TO_MUD`, which a dispensed water bottle asks. The tag is the
     /// datapack's, so the caller answers it.
     std::function<bool(const wire::common::Identifier& block)> convertsToMud;

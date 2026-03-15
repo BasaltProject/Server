@@ -243,3 +243,78 @@ TEST_CASE("a trigger this build cannot observe never fires") {
     CHECK(told.announced.empty());
     CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("nether/levitate")).empty());
 }
+
+namespace {
+
+/// One criterion of one trigger, as the vanilla files write them.
+[[nodiscard]] Advancement waitingFor(const std::string& name, const Identifier& trigger,
+                                     const CriterionCondition& condition) {
+    Advancement advancement;
+    advancement.display = AdvancementDisplay{
+        .title = Component::text(name), .description = Component::text(name), .type = "task", .announceToChat = true};
+    advancement.criteria.emplace_back(name, AdvancementCriterion{.trigger = trigger, .condition = condition});
+    advancement.requirements.groups = {{name}};
+    return advancement;
+}
+
+} // namespace
+
+TEST_CASE("a kill grants only the criterion whose entity it matches, tags included") {
+    std::map<Identifier, Advancement> definitions;
+    definitions.emplace(Identifier::vanilla("adventure/kill_a_mob"),
+                        waitingFor("killed", Identifier::vanilla("player_killed_entity"),
+                                   CriterionCondition{.kind = ConditionKind::KilledEntity}));
+    definitions.emplace(
+        Identifier::vanilla("adventure/voluntary_exile"),
+        waitingFor("raider", Identifier::vanilla("player_killed_entity"),
+                   CriterionCondition{.kind = ConditionKind::KilledEntity, .entityTypes = {"#minecraft:raiders"}}));
+    const RealAdvancements advancements{std::move(definitions)};
+    PlayerProgress progress;
+    Told told;
+    AdvancementTriggers::Hooks hooks = told.hooks();
+    hooks.entityTagged = [](const Identifier& type, std::string_view tag) {
+        return tag == "minecraft:raiders" && type.path() == "pillager";
+    };
+    AdvancementTriggers triggers{advancements, progress, hooks};
+
+    triggers.onKilledEntity("Steve", "uuid-1", Identifier::vanilla("zombie"));
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("adventure/kill_a_mob")).size() == 1);
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("adventure/voluntary_exile")).empty());
+
+    triggers.onKilledEntity("Steve", "uuid-1", Identifier::vanilla("pillager"));
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("adventure/voluntary_exile")).size() == 1);
+}
+
+TEST_CASE("the dimension, the chest and the bucket each grant their own") {
+    std::map<Identifier, Advancement> definitions;
+    definitions.emplace(Identifier::vanilla("nether/root"),
+                        waitingFor("entered", Identifier::vanilla("changed_dimension"),
+                                   CriterionCondition{.kind = ConditionKind::ChangedDimension,
+                                                      .toDimension = Identifier::vanilla("the_nether")}));
+    definitions.emplace(Identifier::vanilla("adventure/salvage_sherd"),
+                        waitingFor("rolled", Identifier::vanilla("player_generates_container_loot"),
+                                   CriterionCondition{.kind = ConditionKind::ContainerLoot,
+                                                      .lootTable = Identifier::vanilla("chests/simple_dungeon")}));
+    definitions.emplace(
+        Identifier::vanilla("husbandry/tadpole_in_a_bucket"),
+        waitingFor("filled", Identifier::vanilla("filled_bucket"),
+                   CriterionCondition{.kind = ConditionKind::FilledBucket,
+                                      .matchers = {ItemMatcher{.items = {Identifier::vanilla("tadpole_bucket")}}}}));
+    const RealAdvancements advancements{std::move(definitions)};
+    PlayerProgress progress;
+    Told told;
+    AdvancementTriggers triggers{advancements, progress, told.hooks()};
+
+    triggers.onChangedDimension("Steve", "uuid-1", Identifier::vanilla("overworld"), Identifier::vanilla("the_end"));
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("nether/root")).empty());
+    triggers.onChangedDimension("Steve", "uuid-1", Identifier::vanilla("overworld"), Identifier::vanilla("the_nether"));
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("nether/root")).size() == 1);
+
+    triggers.onContainerLoot("Steve", "uuid-1", Identifier::vanilla("chests/simple_dungeon"));
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("adventure/salvage_sherd")).size() == 1);
+
+    triggers.onFilledBucket("Steve", "uuid-1", Identifier::vanilla("water_bucket"));
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("husbandry/tadpole_in_a_bucket")).empty());
+    triggers.onFilledBucket("Steve", "uuid-1", Identifier::vanilla("tadpole_bucket"));
+    CHECK(progress.grantedCriteria("uuid-1", Identifier::vanilla("husbandry/tadpole_in_a_bucket")).size() == 1);
+}

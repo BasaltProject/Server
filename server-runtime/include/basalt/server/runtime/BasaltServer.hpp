@@ -153,6 +153,7 @@ private:
     struct PendingKill {
         wire::common::Uuid killer;
         std::string victim;
+        wire::common::Identifier victimType;
     };
 
     /// parity: `TntBlock.prime` makes the entity inside the neighbour update that lit the block, so

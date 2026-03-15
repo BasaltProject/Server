@@ -109,6 +109,66 @@ using wire::common::JsonValue;
         }
         return CriterionCondition{.kind = ConditionKind::RecipeUnlocked, .matchers = {}, .recipe = recipe};
     }
+    // parity: the entity predicate of `player_killed_entity`, `tame_animal` and `summoned_entity`.
+    // Only the type is read: a predicate that asks for equipment or components is one this build
+    // cannot answer, and a criterion that never fires is better than one granted to the wrong kill.
+    if (name == "minecraft:player_killed_entity" || name == "minecraft:tame_animal" ||
+        name == "minecraft:summoned_entity") {
+        const ConditionKind kind = name == "minecraft:player_killed_entity" ? ConditionKind::KilledEntity
+                                   : name == "minecraft:tame_animal"        ? ConditionKind::TamedAnimal
+                                                                            : ConditionKind::SummonedEntity;
+        const std::vector<JsonValue>* entity = conditions == nullptr ? nullptr : asArray(conditions->find("entity"));
+        CriterionCondition built{.kind = kind};
+        if (entity == nullptr) {
+            return conditions == nullptr || conditions->empty() ? built : CriterionCondition{};
+        }
+        for (const JsonValue& element : *entity) {
+            const JsonObject* check = element.get<JsonObject>();
+            const JsonObject* predicate = check == nullptr ? nullptr : asObject(check->find("predicate"));
+            if (predicate == nullptr || predicate->size() != 1) {
+                return CriterionCondition{};
+            }
+            const std::string* type = asString(predicate->find("minecraft:entity_type"));
+            if (type == nullptr) {
+                return CriterionCondition{};
+            }
+            built.entityTypes.push_back(*type);
+        }
+        return built;
+    }
+    if (name == "minecraft:player_generates_container_loot") {
+        const std::optional<Identifier> table =
+            conditions == nullptr ? std::nullopt : asIdentifier(conditions->find("loot_table"));
+        return table.has_value() ? CriterionCondition{.kind = ConditionKind::ContainerLoot, .lootTable = table}
+                                 : CriterionCondition{};
+    }
+    if (name == "minecraft:changed_dimension") {
+        CriterionCondition built{.kind = ConditionKind::ChangedDimension};
+        if (conditions != nullptr) {
+            built.fromDimension = asIdentifier(conditions->find("from"));
+            built.toDimension = asIdentifier(conditions->find("to"));
+        }
+        return built;
+    }
+    if (name == "minecraft:consume_item" || name == "minecraft:filled_bucket") {
+        const JsonValue* item = conditions == nullptr ? nullptr : conditions->find("item");
+        CriterionCondition built{.kind = name == "minecraft:consume_item" ? ConditionKind::ConsumedItem
+                                                                          : ConditionKind::FilledBucket};
+        if (item == nullptr) {
+            return built;
+        }
+        std::optional<ItemMatcher> matcher = parseMatcher(*item);
+        if (!matcher.has_value()) {
+            return CriterionCondition{};
+        }
+        built.matchers.push_back(std::move(*matcher));
+        return built;
+    }
+    // parity: `BredAnimalsTrigger`, which the two advancements that use it hand no predicate at all.
+    if (name == "minecraft:bred_animals") {
+        return conditions == nullptr || conditions->empty() ? CriterionCondition{.kind = ConditionKind::BredAnimals}
+                                                            : CriterionCondition{};
+    }
     return CriterionCondition{};
 }
 

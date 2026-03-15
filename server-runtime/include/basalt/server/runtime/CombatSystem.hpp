@@ -128,6 +128,9 @@ private:
     static void rememberShooter(const std::vector<player::PlayerSession*>& watchers,
                                 const entity::ServerEntity& projectile, entity::ServerEntity& target);
 
+    /// parity: `AbstractArrow.onHitEntity`'s failed hit, the arrow turned back.
+    void deflectArrow(entity::ServerEntity& arrow);
+
     bool hitEntityAlong(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                         const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& arrow, double fromX,
                         double fromY, double fromZ);

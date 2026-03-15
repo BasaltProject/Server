@@ -22,7 +22,27 @@ struct ItemMatcher {
 /// parity: `CriterionTriggerInstance`. Deliberately incomplete: a trigger with no case here is
 /// `Unsupported` and never fires, which is the honest answer while the gameplay event behind it does
 /// not exist. The two that do exist cover 3299 of vanilla's 3500-odd criteria.
-enum class ConditionKind : std::uint8_t { InventoryItems, RecipeUnlocked, Unsupported };
+enum class ConditionKind : std::uint8_t {
+    InventoryItems,
+    RecipeUnlocked,
+    /// parity: `KilledTrigger` as `player_killed_entity`.
+    KilledEntity,
+    /// parity: `TameAnimalTrigger`.
+    TamedAnimal,
+    /// parity: `SummonedEntityTrigger`.
+    SummonedEntity,
+    /// parity: `LootTableTrigger` as `player_generates_container_loot`.
+    ContainerLoot,
+    /// parity: `ChangeDimensionTrigger`.
+    ChangedDimension,
+    /// parity: `ConsumeItemTrigger`.
+    ConsumedItem,
+    /// parity: `FilledBucketTrigger`.
+    FilledBucket,
+    /// parity: `BredAnimalsTrigger`, which the only two advancements using it ask nothing else of.
+    BredAnimals,
+    Unsupported,
+};
 
 /// What a criterion is waiting for. One tagged struct rather than a hierarchy: without RTTI the kind
 /// is the tag, and the condition is data the loader reads.
@@ -32,6 +52,13 @@ struct CriterionCondition {
     std::vector<ItemMatcher> matchers;
     /// `minecraft:recipe_unlocked`: the recipe whose entering the book grants this.
     std::optional<wire::common::Identifier> recipe;
+    /// The entity types a kill, a taming or a summon asks for, ids or a single `#tag`. Empty is any.
+    std::vector<std::string> entityTypes;
+    /// `minecraft:player_generates_container_loot`: the table that was rolled.
+    std::optional<wire::common::Identifier> lootTable;
+    /// `minecraft:changed_dimension`: where the player came from and went to, either optional.
+    std::optional<wire::common::Identifier> fromDimension;
+    std::optional<wire::common::Identifier> toDimension;
 };
 
 /// One named criterion: which trigger grants it, and under what condition.

@@ -202,6 +202,10 @@ public:
     /// counter rather than the dead flag: a player can respawn before the scoring pass runs.
     std::atomic<std::int32_t> deathsToScore{0};
     std::optional<std::int32_t> killerEntityId;
+    /// parity: `LivingEntity.lastHurtByPlayer` and its hundred-tick memory, by entity id, which is
+    /// who gets the kill credit.
+    std::optional<std::int32_t> lastHurtByPlayerId;
+    std::atomic<std::int32_t> lastHurtByPlayerTime{0};
 
     /// What this player may not use yet, and the turn of the world each one frees up on.
     ///

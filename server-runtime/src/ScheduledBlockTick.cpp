@@ -302,6 +302,19 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                          return recipes_ == nullptr ? nullptr : recipes_->cookingFor(cooker, stack);
                      },
                  .gameTime = world.gameTime(),
+                 .isWitherBase =
+                     [this](std::int32_t stateId) {
+                         const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+                         return block != nullptr && options_.blockTags != nullptr &&
+                                world::realBlockTags::contains(*options_.blockTags,
+                                                               "minecraft:wither_summon_base_blocks", *block);
+                     },
+                 .skullPlaced =
+                     [this, &world](std::int32_t sx, std::int32_t sy, std::int32_t sz) {
+                         if (options_.skullPlaced) {
+                             options_.skullPlaced(world, sx, sy, sz);
+                         }
+                     },
                  .convertsToMud =
                      [this](const wire::common::Identifier& block) {
                          return options_.blockTags != nullptr &&

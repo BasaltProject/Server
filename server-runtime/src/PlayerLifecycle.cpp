@@ -244,6 +244,17 @@ bool PlayerLifecycle::switchWorld(world::LoadedWorld& target, double x, double y
     if ((!from.has_value() || *from != target.name()) && hooks_.worldChanged) {
         hooks_.worldChanged(*session, target, from);
     }
+    // parity: `ServerPlayer.changeDimension` ends in `CHANGED_DIMENSION.trigger`, which names the
+    // dimension types rather than the worlds.
+    if (world::AdvancementTriggers* triggers = owner_->options().advancementTriggers;
+        triggers != nullptr && previous != nullptr &&
+        previous->declaration().dimension != target.declaration().dimension) {
+        const auto named = [](config::WorldDimension dimension) {
+            return wire::common::Identifier::vanilla(std::string{config::dimensionFacts(dimension).registryPath});
+        };
+        triggers->onChangedDimension(session->name(), session->uuid().toString(),
+                                     named(previous->declaration().dimension), named(target.declaration().dimension));
+    }
     if (previous == nullptr || previous->name() == target.name()) {
         return false;
     }

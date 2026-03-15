@@ -1,6 +1,8 @@
 #include <basalt/server/runtime/ShriekerSystem.hpp>
 #include <basalt/server/runtime/WorldRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
+#include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/ChunkGenerationQueue.hpp>
 #include <basalt/server/runtime/world/ContainerLoot.hpp>
 #include <basalt/wire/io/FileIO.hpp>
@@ -97,11 +99,19 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
         return ShriekerSystem::playerBehind(*holder, *players, entity) != nullptr;
     });
     if (options_.lootTables != nullptr) {
-        world->state().setLootUnpacker(
-            [tables = options_.lootTables, holder = world.get()](std::int32_t x, std::int32_t y, std::int32_t z,
-                                                                 const std::optional<wire::common::Uuid>& player) {
+        world->state().setLootUnpacker([tables = options_.lootTables, triggers = options_.triggers, players = players_,
+                                        holder = world.get()](std::int32_t x, std::int32_t y, std::int32_t z,
+                                                              const std::optional<wire::common::Uuid>& player) {
+            const std::optional<wire::common::Identifier> rolled =
                 world::containerLoot::unpack(*holder, *tables, x, y, z, player);
-            });
+            // parity: `unpackLootTable` fires `GENERATE_LOOT` for the player who opened it.
+            if (!rolled.has_value() || !player.has_value() || triggers == nullptr || players == nullptr) {
+                return;
+            }
+            if (const player::PlayerSession* session = players->get(*player); session != nullptr) {
+                triggers->onContainerLoot(session->name(), player->toString(), *rolled);
+            }
+        });
     }
     if (options_.jukeboxes != nullptr) {
         world->state().setSongOutput([songs = options_.jukeboxes](const std::string& song) { return songs->of(song); });

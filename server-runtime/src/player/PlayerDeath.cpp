@@ -20,6 +20,8 @@ void killPlayer(PlayerSession& session, const std::string_view deathMessageId, c
     // parity: `LivingEntity.die` empties the absorption pool, so respawning starts without it.
     session.absorption = 0.0F;
     session.stats.increment(storage::stats::deaths());
+    // parity: `getKillCredit`, the player who hit them within the last hundred ticks.
+    session.killerEntityId = session.lastHurtByPlayerTime.load() > 0 ? session.lastHurtByPlayerId : std::nullopt;
     session.deathsToScore.fetch_add(1);
     session.stats.reset(storage::stats::timeSinceRest());
     if (session.connection().syncHealth) {

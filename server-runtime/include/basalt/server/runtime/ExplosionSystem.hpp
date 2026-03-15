@@ -58,7 +58,7 @@ public:
     /// `spares` is what the source entity refuses to break, and only a primed tnt cart has one.
     void blowUp(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, double x, double y,
                 double z, float power, std::string_view cause = "explosion", std::int32_t sourceEntityId = 0,
-                const world::explosions::Spares& spares = {});
+                const world::explosions::Spares& spares = {}, const world::explosions::Resistance& resistance = {});
 
 private:
     /// One stack the blast is holding on to until it decides where it lands.

@@ -307,7 +307,8 @@ void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& re
         // parity: `killer.awardKillScore`, the kill credit going to the player who hit it last.
         if (dead->lastHurtByPlayer.has_value() && dead->lastHurtByPlayerTime > 0) {
             const std::lock_guard<std::mutex> guard(pendingKillsLock_);
-            pendingKills_.push_back(PendingKill{.killer = *dead->lastHurtByPlayer, .victim = dead->uuid().toString()});
+            pendingKills_.push_back(PendingKill{
+                .killer = *dead->lastHurtByPlayer, .victim = dead->uuid().toString(), .victimType = dead->type()});
         }
         // parity: `Entity.die` drops the entity's own loot table where it stood.
         const bool mobDrops = world.gameRules().get(world::gameRules::kMobDrops);
@@ -539,6 +540,10 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         // parity: `Mob.aiStep` stops the moment `isDeadOrDying`, so counting to twenty is the whole
         // of a corpse's turn and that already happened above. A dragon dies on its own turn.
         if (entity->dying && !entity::enderDragon::isDragon(entity->type())) {
+            // parity: a dying wither is still there, and so is its bar, until the body goes.
+            if (WitherSystem::isWither(*entity)) {
+                withers_->keepBar(world, *entity);
+            }
             continue;
         }
         // An entity is ticked by whoever owns the ground it is standing on. It may walk out of this

@@ -33,6 +33,9 @@
 namespace basalt::server::runtime::player {
 namespace {
 
+/// parity: `setLastHurtByPlayer(player, 100)`.
+constexpr std::int32_t kPlayerHitMemoryTicks = 100;
+
 using wire::common::Identifier;
 
 /// parity: `LivingEntity.invulnerableDuration`, and the half of it inside which only a bigger hit
@@ -90,6 +93,20 @@ void playAround(const PlayerSession& session, std::string_view sound, float volu
     return hand != nullptr && hand->getString("id").ends_with("_axe") ? kAxeDisableSeconds : 0.0F;
 }
 
+[[nodiscard]] bool facesSource(const PlayerSession& session, double fromX, double fromZ) {
+    constexpr auto kRadians = static_cast<float>(std::numbers::pi / 180.0);
+    const float yaw = -session.yaw * kRadians;
+    const double viewX = static_cast<double>(wire::common::mth::sin(yaw));
+    const double viewZ = static_cast<double>(wire::common::mth::cos(yaw));
+    double toX = fromX - session.x;
+    double toZ = fromZ - session.z;
+    const double length = std::sqrt((toX * toX) + (toZ * toZ));
+    toX = length < 1.0E-5 ? 0.0 : toX / length;
+    toZ = length < 1.0E-5 ? 0.0 : toZ / length;
+    const double angle = std::acos((toX * viewX) + (toZ * viewZ));
+    return angle <= static_cast<double>(kRadians * kBlockingAngleDegrees);
+}
+
 struct Blocked {
     float amount = 0.0F;
     /// Whether the attacker was a body that the shield pushed back against.
@@ -109,20 +126,7 @@ struct Blocked {
         return {};
     }
     // parity: a source with no position is taken as straight behind, which nothing blocks.
-    if (!source.has_value()) {
-        return {};
-    }
-    constexpr auto kRadians = static_cast<float>(std::numbers::pi / 180.0);
-    const float yaw = -session.yaw * kRadians;
-    const double viewX = static_cast<double>(wire::common::mth::sin(yaw));
-    const double viewZ = static_cast<double>(wire::common::mth::cos(yaw));
-    double toX = source->x - session.x;
-    double toZ = source->z - session.z;
-    const double length = std::sqrt((toX * toX) + (toZ * toZ));
-    toX = length < 1.0E-5 ? 0.0 : toX / length;
-    toZ = length < 1.0E-5 ? 0.0 : toZ / length;
-    const double angle = std::acos((toX * viewX) + (toZ * viewZ));
-    if (angle > static_cast<double>(kRadians * kBlockingAngleDegrees)) {
+    if (!source.has_value() || !facesSource(session, source->x, source->z)) {
         return {};
     }
     const float blocked = damage;
@@ -296,6 +300,14 @@ float damageAfterProtection(const PlayerSession& session, const float amount,
     return protection > 0.0F ? player::combat::afterProtection(damage, protection) : damage;
 }
 
+bool shieldFaces(const PlayerSession& session, double fromX, double fromZ) {
+    if (!session.blockingSlot.has_value() || session.blockingTicks < kShieldDelayTicks) {
+        return false;
+    }
+    const std::optional<storage::StoredItemStack> shield = session.inventory.at(*session.blockingSlot);
+    return shield.has_value() && shield->id == "minecraft:shield" && facesSource(session, fromX, fromZ);
+}
+
 void hurtPlayer(PlayerSession& player, const float amount, const std::string_view deathMessageId,
                 const std::optional<Identifier>& damageType, const std::optional<entity::DamageSource>& source,
                 const DamageContext& context) {
@@ -359,6 +371,16 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
     if (damage <= 0.0F) {
         return;
     }
+    // parity: `resolvePlayerResponsibleForDamage`, a player's hit remembered for a hundred ticks.
+    if (source.has_value() && context.registry != nullptr) {
+        for (const PlayerSession* other : context.registry->snapshot()) {
+            if (other->entityId() == source->ownerId.value_or(source->entityId)) {
+                session->lastHurtByPlayerId = other->entityId();
+                session->lastHurtByPlayerTime.store(kPlayerHitMemoryTicks);
+                break;
+            }
+        }
+    }
     session->stats.addDamageTaken(damage);
     // parity: `LivingEntity.hurtServer` raises `ENTITY_DAMAGE` right where the health comes off, so
     // absorption alone makes none. A player is an entity too and this is their half of that line.
@@ -367,7 +389,6 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
     }
     session->setHealth(std::max(session->health() - damage, 0.0F));
     if (session->health() <= 0.0F) {
-        session->killerEntityId = source.has_value() ? std::optional{source->entityId} : std::nullopt;
         killPlayer(*session, deathMessageId, source.has_value() ? source->name : std::nullopt, context.death);
     } else if (session->connection().syncHealth) {
         session->connection().syncHealth();

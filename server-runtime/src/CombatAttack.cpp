@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/CombatHandler.hpp>
 #include <basalt/server/runtime/CombatSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
@@ -433,6 +434,10 @@ bool CombatHandler::tameOrSit(PlayerSession& session, ServerEntity& entity) {
         return true;
     }
     entity.owner = session.uuid().toString();
+    // parity: `TamableAnimal.tame` ends in `TAME_ANIMAL.trigger`.
+    if (world::AdvancementTriggers* triggers = owner_->options().advancementTriggers; triggers != nullptr) {
+        triggers->onTamedAnimal(session.name(), session.uuid().toString(), entity.type());
+    }
     entity.sitting = true;
     entity.targetId.reset();
     entity::ai::navigation::stop(entity);

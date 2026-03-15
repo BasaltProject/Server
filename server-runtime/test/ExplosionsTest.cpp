@@ -121,6 +121,21 @@ TEST_CASE("what resists an explosion stops it, and what cannot be broken is neve
     CHECK(explosions::explode(bedrock.state, -64, 319, 8.5, 8.5, 8.5, 100.0F, other).empty());
 }
 
+TEST_CASE("a source that holds resistance down takes out what would have stopped it") {
+    // parity: `WitherSkull.getBlockExplosionResistance`, which answers at most `0.8` for anything the
+    // wither may break: that is what lets a blue skull through obsidian.
+    Loaded loaded;
+    loaded.fill("obsidian", 0, 15);
+    REQUIRE(loaded.state.setBlockState(8, 8, 8, registry::blocks::air().stateId));
+    rng::RandomSource random = rng::RandomSource::legacy(1);
+    const explosions::Resistance held = [](std::int32_t, float resistance) { return std::min(0.8F, resistance); };
+
+    const std::vector<explosions::Broken> broken =
+        explosions::explode(loaded.state, -64, 319, 8.5, 8.5, 8.5, 1.0F, random, {}, held);
+
+    CHECK_FALSE(broken.empty());
+}
+
 TEST_CASE("an explosion stops at the floor and the roof of the world") {
     Loaded loaded;
     for (std::int32_t x = 0; x <= 15; ++x) {

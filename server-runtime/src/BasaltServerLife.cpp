@@ -400,6 +400,7 @@ player::BreakContext BasaltServer::breakContext() {
     context.blockTags = &vanillaData_.blockTags;
     context.enchantments = &vanillaData_.enchantments;
     context.itemTags = &vanillaData_.itemTags;
+    context.triggers = advancementTriggers_.get();
     context.nextDouble = [] { return std::uniform_real_distribution<double>{0.0, 1.0}(scratchRandom()); };
     context.nextSeed = [] { return static_cast<std::int64_t>(scratchRandom()()); };
     context.awardExperience = [this](world::LoadedWorld& world, double x, double y, double z, std::int32_t amount) {

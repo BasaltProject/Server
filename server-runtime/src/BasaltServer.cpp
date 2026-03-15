@@ -104,6 +104,11 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         // Resolved, not serialized: a client translates the key itself and a log cannot.
         logger_.info([this, &message] { return wire::text::resolvePlainText(message, options_.lang); });
     };
+    triggerHooks.entityTagged = [this](const wire::common::Identifier& type, std::string_view tag) {
+        return world::realEntityTypeTags::membersOf(vanillaData_.entityTags,
+                                                    wire::common::Identifier::parse(tag).value_or(type))
+            .contains(type);
+    };
     triggerHooks.awardExperience = [this](std::string_view name, std::int32_t amount) {
         for (player::PlayerSession* player : playerRegistry_.snapshot()) {
             if (player->name() != name) {
@@ -150,7 +155,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                .timings = &timings_,
                                .generationMetrics = config.generationMetrics,
                                .jukeboxes = &vanillaData_.jukeboxSongs,
-                               .lootTables = &vanillaData_.lootTables},
+                               .lootTables = &vanillaData_.lootTables,
+                               .triggers = advancementTriggers_.get()},
         logger_);
 
     for (const auto& [name, world] : worldRegistry_->worlds()) {
@@ -554,6 +560,12 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                        std::int32_t y, std::int32_t z) {
                     if (shriekers_ != nullptr) {
                         shriekers_->scheduledTick(world, watchers, x, y, z);
+                    }
+                },
+            .skullPlaced =
+                [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+                    if (withers_ != nullptr) {
+                        withers_->placed(world, x, y, z);
                     }
                 },
             .shriekerHeard =
