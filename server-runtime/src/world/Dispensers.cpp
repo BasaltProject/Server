@@ -812,6 +812,7 @@ struct Target {
 /// Puts one item of the stack into the container, answering whether a slot took it.
 [[nodiscard]] bool insertOne(WorldState& world, const Target& into, const ItemStack& stack, BlockFace from,
                              const Hooks& hooks) {
+    world.unpackLoot(into.x, into.y, into.z);
     server::world::Chunk* chunk = world.chunkIfLoaded(into.x >> 4, into.z >> 4);
     server::world::ChunkBlockEntity* blockEntity =
         chunk == nullptr ? nullptr : chunk->blockEntityAt(into.x & 15, into.y, into.z & 15);
@@ -944,6 +945,8 @@ Result fire(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, s
     if (block == nullptr || !isDispenser(block->path())) {
         return result;
     }
+    // parity: `DispenserBlockEntity.getRandomSlot` unpacks its own table first.
+    world.unpackLoot(x, y, z);
     server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
     server::world::ChunkBlockEntity* blockEntity = chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
     if (blockEntity == nullptr) {

@@ -1,5 +1,6 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/entity/Attributes.hpp>
+#include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -111,6 +112,11 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
         return {};
     }
     const double before = entity.health;
+    entity.lastDamageCause = std::string{cause};
+    // parity: `CopperGolem.actuallyHurt`, which drops whatever pose it was working in.
+    if (entity.copperGolem != nullptr) {
+        entity.copperGolem->pose = copperGolems::Pose::Idle;
+    }
     entity.health -= static_cast<double>(reduced);
     bool died = entity.health <= 0.0;
     if (died) {

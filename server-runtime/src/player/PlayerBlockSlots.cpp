@@ -163,7 +163,7 @@ void swapHotbarWithShelf(const BreakContext& context, PlayerSession& player, wor
     for (const world::shelves::Position& part : world::shelves::chainAt(world.state(), x, y, z)) {
         if (world.state().hasSculkSensorNear(part[0], part[1], part[2], world::vibrations::kCalibratedRange)) {
             world::vibrations::emit(world.state(), "entity_interact", part[0] + 0.5, part[1] + 0.5, part[2] + 0.5,
-                                    world.gameTime());
+                                    world.gameTime(), {.entity = player.uuid()});
         }
     }
     if (context.blocks != nullptr) {
@@ -214,7 +214,8 @@ void useShelfFor(const BreakContext& context, PlayerSession& player, world::Load
     // parity: `swapSingleItem` ends in `setChanged(ITEM_INTERACT_FINISH)`. Its one exception, an item
     // whose `use_effects` asks for silence, is a component this server does not carry yet.
     if (world.state().hasSculkSensorNear(x, y, z, world::vibrations::kCalibratedRange)) {
-        world::vibrations::emit(world.state(), "item_interact_finish", x + 0.5, y + 0.5, z + 0.5, world.gameTime());
+        world::vibrations::emit(world.state(), "item_interact_finish", x + 0.5, y + 0.5, z + 0.5, world.gameTime(),
+                                {.entity = player.uuid()});
     }
     if (context.blocks != nullptr) {
         context.blocks->sendEffects(playersIn(context, world.name()), x, y, z, *stateId, result->effects);

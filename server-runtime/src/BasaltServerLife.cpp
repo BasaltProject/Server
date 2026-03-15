@@ -895,7 +895,7 @@ void BasaltServer::startBedrockListener() {
                     }
                 }
                 world::vibrations::emit(world.state(), "entity_damage", target->x, target->y, target->z,
-                                        world.gameTime());
+                                        world.gameTime(), {.entity = target->uuid()});
                 for (player::PlayerSession* watcher : playerRegistry_.snapshot()) {
                     if (watcher->worldName != session->worldName) {
                         continue;

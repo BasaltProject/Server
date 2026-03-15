@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/CombatSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
+#include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
@@ -364,6 +365,9 @@ void MobActionSystem::thunderHit(world::LoadedWorld& world, const std::vector<Pl
         entity::entityCombat::hurt(mob, damage, std::nullopt, std::nullopt, hooks_.combat, "lightning_bolt");
     if (result.landed) {
         combat_->announceEntityHit(watchers, mob, world::damageTypes::kLightningBolt, boltId, result.died);
+    }
+    if (entity::copperGolems::isCopperGolem(mob.type())) {
+        golemStruckByLightning(mob, boltId);
     }
     // parity: `Creeper.thunderHit`, which charges it after the hit.
     if (path == "creeper" && !mob.powered) {

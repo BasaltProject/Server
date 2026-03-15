@@ -147,6 +147,13 @@ void ContainerMenuController::openChest(PlayerSession& session, const BlockPos& 
                           : std::nullopt;
     openBlock = halves.has_value() ? BlockPos{halves->first[0], halves->first[1], halves->first[2]} : pos;
     const bool paired = openBlockSecond.has_value();
+    // parity: `ChestBlock.getMenuProvider` unpacks both halves before the menu reads a slot.
+    if (world != nullptr) {
+        world->state().unpackLoot(openBlock->x, openBlock->y, openBlock->z, session.uuid());
+        if (paired) {
+            world->state().unpackLoot(openBlockSecond->x, openBlockSecond->y, openBlockSecond->z, session.uuid());
+        }
+    }
     openMenu = paired ? Menu::doubleChest(containerId) : Menu::chest(containerId);
     openBlockSize = paired ? Menu::kDoubleChestSize : Menu::kChestSize;
     openBlockData_ = {-1, -1, -1, -1};

@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/MobTickSystem.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
+#include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/MobBrain.hpp>
 #include <basalt/server/runtime/entity/MobCategory.hpp>
@@ -123,6 +124,12 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
     entity::entityCombat::tick(entity);
     if (entity::wardens::isWarden(entity.type())) {
         actions_->tickWarden(world, watchers, entity);
+        if (entity.removed) {
+            return;
+        }
+    }
+    if (entity::copperGolems::isCopperGolem(entity.type())) {
+        actions_->tickCopperGolem(world, entity, random);
         if (entity.removed) {
             return;
         }

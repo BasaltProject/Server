@@ -199,7 +199,8 @@ void ItemUseTimers::emitAt(std::string_view event) {
     if (session == nullptr || world == nullptr) {
         return;
     }
-    world::vibrations::emit(world->state(), event, session->x, session->y, session->z, world->gameTime());
+    world::vibrations::emit(world->state(), event, session->x, session->y, session->z, world->gameTime(),
+                            {.entity = session->uuid()});
 }
 
 bool ItemUseTimers::startBlocking(PlayerSession& session, const Identifier& item, std::int32_t slot) {

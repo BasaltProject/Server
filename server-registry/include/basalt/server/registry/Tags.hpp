@@ -57,6 +57,11 @@ using ElementExists = std::function<bool(const wire::common::Identifier&)>;
 [[nodiscard]] std::expected<std::map<wire::common::Identifier, std::set<wire::common::Identifier>>, TagError>
 resolve(const std::map<wire::common::Identifier, TagFile>& files, const ElementExists& elementExists);
 
+/// The same, keeping each tag's members in the order the files list them, first occurrence winning.
+/// parity: the `LinkedHashSet` `TagLoader.build` fills, which is the order a random pick draws over.
+[[nodiscard]] std::expected<std::map<wire::common::Identifier, std::vector<wire::common::Identifier>>, TagError>
+resolveOrdered(const std::map<wire::common::Identifier, TagFile>& files, const ElementExists& elementExists);
+
 /// Reads the real vanilla tag file schema, `{"replace": bool, "values": [...]}`.
 ///
 /// Each value is either a plain string (an element, or `#id` for a tag reference, always required)

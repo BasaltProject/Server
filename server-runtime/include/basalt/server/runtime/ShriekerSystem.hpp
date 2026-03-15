@@ -1,5 +1,7 @@
 #pragma once
 
+#include <basalt/wire/common/Uuid.hpp>
+
 #include <cstdint>
 #include <functional>
 #include <vector>
@@ -11,7 +13,11 @@ class PlayerSession;
 
 namespace basalt::server::runtime::world {
 class LoadedWorld;
+
+namespace vibrations {
+struct ShriekerArrival;
 }
+} // namespace basalt::server::runtime::world
 
 namespace basalt::server::runtime {
 
@@ -35,6 +41,17 @@ public:
     /// parity: `SculkShriekerBlock.stepOn`, a player walking over one.
     void steppedOn(world::LoadedWorld& world, player::PlayerSession& player, std::int32_t x, std::int32_t y,
                    std::int32_t z);
+
+    /// The player behind a noise's source, if any.
+    ///
+    /// parity: `SculkShriekerBlockEntity.tryGetPlayer`: the player, whoever steers the entity, or
+    /// a projectile's owner. A thrown item remembers no thrower here, so it never counts.
+    [[nodiscard]] static player::PlayerSession* playerBehind(const world::LoadedWorld& world,
+                                                             const player::PlayerRegistry& players,
+                                                             const wire::common::Uuid& source);
+
+    /// A noise that travelled to a shrieker. parity: `VibrationUser.onReceiveVibration`.
+    void heard(world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival);
 
     /// parity: `SculkShriekerBlockEntity.tryShriek`.
     void tryShriek(world::LoadedWorld& world, player::PlayerSession& player, std::int32_t x, std::int32_t y,

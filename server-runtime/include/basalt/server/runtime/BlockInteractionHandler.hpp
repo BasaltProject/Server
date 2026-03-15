@@ -141,6 +141,9 @@ public:
     /// because everything that has to reach a whole world takes one of these, not only breaking.
     [[nodiscard]] player::BreakContext breakContext();
 
+    /// Wears the held tool by `cost`, as using it on a mob does.
+    void wearHeldItem(std::int32_t cost);
+
 private:
     /// The seed a loot roll, a fire's delay or a sound's own random starts from.
     [[nodiscard]] std::int64_t nextSeed() const;
@@ -159,6 +162,7 @@ private:
     [[nodiscard]] bool eyesInWater() const;
 
     void wearHeldItemOnBreak(const wire::common::Identifier& block);
+
 
     /// Sets fire where the flint and steel points, and lights a Nether portal if it lands in a frame.
     void igniteAt(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos, std::int32_t heldSlot,

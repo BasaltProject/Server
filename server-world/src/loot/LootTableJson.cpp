@@ -1,7 +1,8 @@
+#include "LootJsonParts.hpp"
+
 #include <basalt/server/world/loot/LootTableJson.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 
-#include <charconv>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -11,69 +12,20 @@
 namespace basalt::server::world::loot::lootTableJson {
 namespace {
 
+using parts::asArray;
+using parts::asBool;
+using parts::asNumber;
+using parts::asObject;
+using parts::asString;
+using parts::idsOrTag;
+using parts::missing;
+using parts::parseComponentSetter;
+using parts::Parsed;
+using parts::parseEntityPredicate;
+using parts::parseItemPredicate;
+using parts::parseLevelBased;
 using wire::common::JsonObject;
 using wire::common::JsonValue;
-
-/// A parse either produced the value or named what it could not read.
-template <typename Value>
-using Parsed = std::expected<Value, LootTableParseError>;
-
-[[nodiscard]] LootTableParseError missing(std::string_view what) {
-    return LootTableParseError{std::string{"missing or malformed "} + std::string{what}};
-}
-
-[[nodiscard]] const JsonObject* asObject(const JsonValue* value) {
-    return value == nullptr ? nullptr : value->get<JsonObject>();
-}
-
-[[nodiscard]] const std::vector<JsonValue>* asArray(const JsonValue* value) {
-    return value == nullptr ? nullptr : value->get<std::vector<JsonValue>>();
-}
-
-[[nodiscard]] std::optional<std::string> asString(const JsonValue* value) {
-    if (value == nullptr) {
-        return std::nullopt;
-    }
-    if (const std::string* text = value->get<std::string>(); text != nullptr) {
-        return *text;
-    }
-    return std::nullopt;
-}
-
-/// A JSON number as read by a schema that also accepts it written as a string.
-[[nodiscard]] std::optional<double> asNumber(const JsonValue* value) {
-    if (value == nullptr) {
-        return std::nullopt;
-    }
-    if (const double* real = value->get<double>(); real != nullptr) {
-        return *real;
-    }
-    if (const std::int64_t* whole = value->get<std::int64_t>(); whole != nullptr) {
-        return static_cast<double>(*whole);
-    }
-    if (const std::string* text = value->get<std::string>(); text != nullptr) {
-        double parsed = 0.0;
-        const char* first = text->data();
-        const char* last = first + text->size();
-        if (std::from_chars(first, last, parsed).ec == std::errc{}) {
-            return parsed;
-        }
-    }
-    return std::nullopt;
-}
-
-[[nodiscard]] std::optional<bool> asBool(const JsonValue* value) {
-    if (value == nullptr) {
-        return std::nullopt;
-    }
-    if (const bool* flag = value->get<bool>(); flag != nullptr) {
-        return *flag;
-    }
-    if (const std::string* text = value->get<std::string>(); text != nullptr) {
-        return *text == "true";
-    }
-    return std::nullopt;
-}
 
 [[nodiscard]] Parsed<NumberProvider> parseNumberProvider(const JsonValue& element);
 [[nodiscard]] Parsed<LootCondition> parseCondition(const JsonObject& condition);
@@ -115,6 +67,22 @@ Parsed<NumberProvider> parseNumberProvider(const JsonValue& element) {
             return high;
         }
         return NumberProvider::uniform(std::move(*low), std::move(*high));
+    }
+    if (*type == "minecraft:binomial") {
+        const JsonValue* n = object.find("n");
+        const JsonValue* p = object.find("p");
+        if (n == nullptr || p == nullptr) {
+            return std::unexpected(missing("binomial parameters"));
+        }
+        Parsed<NumberProvider> tries = parseNumberProvider(*n);
+        if (!tries.has_value()) {
+            return tries;
+        }
+        Parsed<NumberProvider> chance = parseNumberProvider(*p);
+        if (!chance.has_value()) {
+            return chance;
+        }
+        return NumberProvider::binomial(std::move(*tries), std::move(*chance));
     }
     return std::unexpected(LootTableParseError{"Unsupported number provider type: " + *type});
 }
@@ -181,7 +149,9 @@ Parsed<LootCondition> parseCondition(const JsonObject& condition) {
         return LootCondition::survivesExplosion();
     }
     if (*type == "minecraft:match_tool") {
-        return LootCondition::matchTool();
+        const JsonObject* predicate = asObject(condition.find("predicate"));
+        return predicate == nullptr ? LootCondition::matchTool()
+                                    : LootCondition::matchTool(parseItemPredicate(*predicate));
     }
     // parity: `LootItemEntityPropertyCondition` with an **empty** predicate is not a question about
     // the entity at all, it is a question about whether there is one: snow broken by a piston leaves
@@ -197,11 +167,36 @@ Parsed<LootCondition> parseCondition(const JsonObject& condition) {
         if (expected != nullptr && predicate->size() == 1 && hook->size() == 1) {
             return LootCondition::fishingHookOpenWater(*expected);
         }
-        return LootCondition::entityProperties();
+        const std::optional<std::string> entity = asString(condition.find("entity"));
+        const LootCondition::Target target =
+            entity == std::optional<std::string>{"attacker"}          ? LootCondition::Target::Attacker
+            : entity == std::optional<std::string>{"direct_attacker"} ? LootCondition::Target::DirectAttacker
+                                                                      : LootCondition::Target::This;
+        return LootCondition::entityMatches(target, parseEntityPredicate(*predicate));
     }
     // parity: the conditions a mob's own table carries, about what died and what killed it.
+    // parity: `DamageSourceCondition`, the damage's tags and the two entities behind it.
     if (*type == "minecraft:damage_source_properties") {
-        return LootCondition::entityProperties();
+        const JsonObject* predicate = asObject(condition.find("predicate"));
+        if (predicate == nullptr) {
+            return LootCondition::entityProperties();
+        }
+        std::vector<std::pair<std::string, bool>> tags;
+        if (const std::vector<JsonValue>* list = asArray(predicate->find("tags")); list != nullptr) {
+            for (const JsonValue& each : *list) {
+                const JsonObject* tag = each.get<JsonObject>();
+                const std::optional<std::string> id = tag == nullptr ? std::nullopt : asString(tag->find("id"));
+                if (!id.has_value()) {
+                    return std::unexpected(missing("damage tag id"));
+                }
+                tags.emplace_back(*id, asBool(tag->find("expected")).value_or(true));
+            }
+        }
+        const auto entity = [predicate](std::string_view key) -> std::optional<EntityPredicate> {
+            const JsonObject* inner = asObject(predicate->find(key));
+            return inner == nullptr ? std::nullopt : std::optional{parseEntityPredicate(*inner)};
+        };
+        return LootCondition::damageSource(std::move(tags), entity("source_entity"), entity("direct_entity"));
     }
     if (*type == "minecraft:killed_by_player") {
         return LootCondition::killedByPlayer();
@@ -253,15 +248,21 @@ Parsed<LootCondition> parseCondition(const JsonObject& condition) {
         if (chances == nullptr || chances->empty()) {
             return std::unexpected(missing("table bonus chances"));
         }
-        const std::optional<double> first = asNumber(&chances->front());
-        if (!first.has_value()) {
-            return std::unexpected(missing("table bonus chance"));
+        std::vector<float> values;
+        for (const JsonValue& chance : *chances) {
+            const std::optional<double> value = asNumber(&chance);
+            if (!value.has_value()) {
+                return std::unexpected(missing("table bonus chance"));
+            }
+            values.push_back(static_cast<float>(*value));
         }
-        return LootCondition::randomChance(NumberProvider::constant(static_cast<float>(*first)));
+        return LootCondition::tableBonus(asString(condition.find("enchantment")).value_or(""), std::move(values));
     }
     if (*type == "minecraft:random_chance_with_enchanted_bonus") {
         const std::optional<double> chance = asNumber(condition.find("unenchanted_chance"));
-        return LootCondition::randomChanceWithEnchantedBonus(static_cast<float>(chance.value_or(0.0)));
+        return LootCondition::randomChanceWithEnchantedBonus(static_cast<float>(chance.value_or(0.0)),
+                                                             parseLevelBased(condition.find("enchanted_chance")),
+                                                             asString(condition.find("enchantment")).value_or(""));
     }
     return std::unexpected(LootTableParseError{"Unsupported loot condition type: " + *type});
 }
@@ -297,9 +298,81 @@ Parsed<LootFunction> parseFunction(const JsonObject& function) {
     }
     // parity: `furnace_smelt`, the cooked drop a mob killed by fire leaves, and the two that only
     // set a component: the item itself is right without them, so they are read and left alone.
-    if (*type == "minecraft:furnace_smelt" || *type == "minecraft:set_potion" ||
-        *type == "minecraft:set_ominous_bottle_amplifier") {
-        return gated(LootFunction::furnaceSmelt());
+    if (*type == "minecraft:furnace_smelt") {
+        return gated(LootFunction::smelt());
+    }
+    if (*type == "minecraft:set_potion" || *type == "minecraft:set_ominous_bottle_amplifier") {
+        return gated(parseComponentSetter(function));
+    }
+    if (*type == "minecraft:enchant_randomly") {
+        return gated(LootFunction::enchantRandomly(idsOrTag(function.find("options")),
+                                                   asBool(function.find("only_compatible")).value_or(true)));
+    }
+    if (*type == "minecraft:enchant_with_levels") {
+        const JsonValue* levels = function.find("levels");
+        if (levels == nullptr) {
+            return std::unexpected(missing("enchant_with_levels levels"));
+        }
+        Parsed<NumberProvider> provider = parseNumberProvider(*levels);
+        if (!provider.has_value()) {
+            return std::unexpected(provider.error());
+        }
+        return gated(LootFunction::enchantWithLevels(std::move(*provider), idsOrTag(function.find("options"))));
+    }
+    if (*type == "minecraft:set_enchantments" || *type == "minecraft:set_stew_effect") {
+        std::vector<std::pair<std::string, NumberProvider>> entries;
+        const bool stew = *type == "minecraft:set_stew_effect";
+        if (stew) {
+            if (const std::vector<JsonValue>* effects = asArray(function.find("effects")); effects != nullptr) {
+                for (const JsonValue& each : *effects) {
+                    const JsonObject* effect = each.get<JsonObject>();
+                    const std::optional<std::string> id =
+                        effect == nullptr ? std::nullopt : asString(effect->find("type"));
+                    const JsonValue* duration = effect == nullptr ? nullptr : effect->find("duration");
+                    if (!id.has_value() || duration == nullptr) {
+                        return std::unexpected(missing("stew effect"));
+                    }
+                    Parsed<NumberProvider> provider = parseNumberProvider(*duration);
+                    if (!provider.has_value()) {
+                        return std::unexpected(provider.error());
+                    }
+                    entries.emplace_back(*id, std::move(*provider));
+                }
+            }
+            return gated(LootFunction::setStewEffect(std::move(entries)));
+        }
+        if (const JsonObject* levels = asObject(function.find("enchantments")); levels != nullptr) {
+            for (std::size_t index = 0; index < levels->names().size(); ++index) {
+                Parsed<NumberProvider> provider = parseNumberProvider(levels->values()[index]);
+                if (!provider.has_value()) {
+                    return std::unexpected(provider.error());
+                }
+                entries.emplace_back(levels->names()[index], std::move(*provider));
+            }
+        }
+        return gated(LootFunction::setEnchantments(std::move(entries), asBool(function.find("add")).value_or(false)));
+    }
+    if (*type == "minecraft:set_damage") {
+        const JsonValue* damage = function.find("damage");
+        if (damage == nullptr) {
+            return std::unexpected(missing("set_damage damage"));
+        }
+        Parsed<NumberProvider> provider = parseNumberProvider(*damage);
+        if (!provider.has_value()) {
+            return std::unexpected(provider.error());
+        }
+        return gated(LootFunction::setDamage(std::move(*provider), asBool(function.find("add")).value_or(false)));
+    }
+    if (*type == "minecraft:set_components" || *type == "minecraft:set_name") {
+        return gated(parseComponentSetter(function));
+    }
+    if (*type == "minecraft:set_instrument") {
+        return gated(LootFunction::setInstrument(asString(function.find("options")).value_or("")));
+    }
+    // parity: `ExplorationMapFunction`, which hands the plain map back when it finds no structure.
+    // This build searches for none, so the map stays blank.
+    if (*type == "minecraft:exploration_map") {
+        return gated(LootFunction::copyFromBlock());
     }
     // parity: `enchanted_count_increase`, the looting bonus every mob's table carries.
     if (*type == "minecraft:enchanted_count_increase") {
@@ -313,7 +386,7 @@ Parsed<LootFunction> parseFunction(const JsonObject& function) {
         }
         const std::optional<double> limit = asNumber(function.find("limit"));
         return gated(LootFunction::enchantedCountIncrease(
-            std::move(*provider),
+            asString(function.find("enchantment")).value_or(""), std::move(*provider),
             limit.has_value() ? std::optional<std::int32_t>{static_cast<std::int32_t>(*limit)} : std::nullopt));
     }
     // parity: `ApplyExplosionDecay`, which is what leaves a crater with only some of what it broke.
@@ -324,7 +397,24 @@ Parsed<LootFunction> parseFunction(const JsonObject& function) {
     // parity: `ApplyBonusCount`, which needs the level of the enchantment on the tool that broke the
     // block. There is none here, and at level zero all three of its formulas leave the count alone.
     if (*type == "minecraft:apply_bonus") {
-        return gated(LootFunction::applyBonus());
+        const std::optional<std::string> formula = asString(function.find("formula"));
+        const JsonObject* parameters = asObject(function.find("parameters"));
+        const auto parameter = [parameters](std::string_view name, double fallback) {
+            return parameters == nullptr ? fallback : asNumber(parameters->find(name)).value_or(fallback);
+        };
+        LootFunction::BonusFormula kind = LootFunction::BonusFormula::OreDrops;
+        std::int32_t number = 0;
+        if (formula == std::optional<std::string>{"minecraft:uniform_bonus_count"}) {
+            kind = LootFunction::BonusFormula::UniformBonusCount;
+            number = static_cast<std::int32_t>(parameter("bonusMultiplier", 1.0));
+        } else if (formula == std::optional<std::string>{"minecraft:binomial_with_bonus_count"}) {
+            kind = LootFunction::BonusFormula::BinomialWithBonusCount;
+            number = static_cast<std::int32_t>(parameter("extra", 0.0));
+        } else if (formula != std::optional<std::string>{"minecraft:ore_drops"}) {
+            return std::unexpected(LootTableParseError{"Unsupported bonus formula"});
+        }
+        return gated(LootFunction::applyBonus(asString(function.find("enchantment")).value_or(""), kind, number,
+                                              static_cast<float>(parameter("probability", 0.0))));
     }
     // parity: `LimitCount`, `IntRange` with either end optional.
     if (*type == "minecraft:limit_count") {
@@ -352,6 +442,8 @@ Parsed<LootFunction> parseFunction(const JsonObject& function) {
     }
     return std::unexpected(LootTableParseError{"Unsupported loot function type: " + *type});
 }
+
+[[nodiscard]] Parsed<LootTable> parseTable(const JsonObject& object);
 
 Parsed<LootEntry> parseEntry(const JsonObject& entry) {
     Parsed<std::vector<LootCondition>> conditions = parseConditions(entry.find("conditions"));
@@ -403,21 +495,53 @@ Parsed<LootEntry> parseEntry(const JsonObject& entry) {
         return built;
     }
     if (*type == "minecraft:loot_table") {
-        const std::optional<std::string> value = asString(entry.find("value"));
-        if (!value.has_value()) {
-            return std::unexpected(LootTableParseError{"Only a named nested loot table is supported"});
-        }
-        const std::expected<wire::common::Identifier, wire::common::IdentifierError> table =
-            wire::common::Identifier::parse(*value);
-        if (!table.has_value()) {
-            return std::unexpected(LootTableParseError{"Malformed loot table name: " + *value});
+        LootEntry built;
+        if (const JsonObject* inlined = asObject(entry.find("value")); inlined != nullptr) {
+            Parsed<LootTable> table = parseTable(*inlined);
+            if (!table.has_value()) {
+                return std::unexpected(table.error());
+            }
+            built.inlineTable = std::make_shared<const LootTable>(std::move(*table));
+        } else {
+            const std::optional<std::string> value = asString(entry.find("value"));
+            const std::expected<wire::common::Identifier, wire::common::IdentifierError> table =
+                value.has_value() ? wire::common::Identifier::parse(*value)
+                                  : std::unexpected(wire::common::IdentifierError::EmptyPart);
+            if (!table.has_value()) {
+                return std::unexpected(missing("loot table name"));
+            }
+            built.table = *table;
         }
         Parsed<std::vector<LootFunction>> functions = parseFunctions(entry.find("functions"));
         if (!functions.has_value()) {
             return std::unexpected(functions.error());
         }
+        built.weight = static_cast<std::int32_t>(asNumber(entry.find("weight")).value_or(1.0));
+        built.quality = static_cast<std::int32_t>(asNumber(entry.find("quality")).value_or(0.0));
+        built.conditions = std::move(*conditions);
+        built.functions = std::move(*functions);
+        return built;
+    }
+    // parity: `EmptyLootItem` and `TagEntry`, both leaves with a weight.
+    if (*type == "minecraft:empty" || *type == "minecraft:tag") {
+        Parsed<std::vector<LootFunction>> functions = parseFunctions(entry.find("functions"));
+        if (!functions.has_value()) {
+            return std::unexpected(functions.error());
+        }
         LootEntry built;
-        built.table = *table;
+        if (*type == "minecraft:tag") {
+            const std::optional<std::string> name = asString(entry.find("name"));
+            const std::expected<wire::common::Identifier, wire::common::IdentifierError> tag =
+                name.has_value() ? wire::common::Identifier::parse(*name)
+                                 : std::unexpected(wire::common::IdentifierError::EmptyPart);
+            if (!tag.has_value()) {
+                return std::unexpected(missing("tag entry name"));
+            }
+            built.tag = *tag;
+            built.expand = asBool(entry.find("expand")).value_or(false);
+        } else {
+            built.empty = true;
+        }
         built.weight = static_cast<std::int32_t>(asNumber(entry.find("weight")).value_or(1.0));
         built.quality = static_cast<std::int32_t>(asNumber(entry.find("quality")).value_or(0.0));
         built.conditions = std::move(*conditions);
@@ -491,19 +615,9 @@ Parsed<LootEntry> parseEntry(const JsonObject& entry) {
     return built;
 }
 
-} // namespace
-
-std::expected<LootTable, LootTableParseError> parse(std::string_view json) {
-    const std::expected<JsonValue, wire::common::JsonError> root = wire::common::parseJson(json);
-    if (!root.has_value()) {
-        return std::unexpected(LootTableParseError{"Malformed loot table JSON"});
-    }
-    const JsonObject* object = root->get<JsonObject>();
-    if (object == nullptr) {
-        return std::unexpected(missing("loot table object"));
-    }
+Parsed<LootTable> parseTable(const JsonObject& object) {
     LootTable table;
-    if (const std::vector<JsonValue>* pools = asArray(object->find("pools")); pools != nullptr) {
+    if (const std::vector<JsonValue>* pools = asArray(object.find("pools")); pools != nullptr) {
         for (const JsonValue& element : *pools) {
             const JsonObject* pool = element.get<JsonObject>();
             if (pool == nullptr) {
@@ -518,19 +632,33 @@ std::expected<LootTable, LootTableParseError> parse(std::string_view json) {
     }
     // parity: `LootTable.randomSequence`, the name of the stream this table rolls on. Every table
     // the game ships carries one; a datapack's may not, and then it rolls on the level's own random.
-    if (const std::optional<std::string> sequence = asString(object->find("random_sequence")); sequence.has_value()) {
+    if (const std::optional<std::string> sequence = asString(object.find("random_sequence")); sequence.has_value()) {
         if (const std::expected<wire::common::Identifier, wire::common::IdentifierError> name =
                 wire::common::Identifier::parse(*sequence);
             name.has_value()) {
             table.randomSequence = *name;
         }
     }
-    Parsed<std::vector<LootFunction>> functions = parseFunctions(object->find("functions"));
+    Parsed<std::vector<LootFunction>> functions = parseFunctions(object.find("functions"));
     if (!functions.has_value()) {
         return std::unexpected(functions.error());
     }
     table.functions = std::move(*functions);
     return table;
+}
+
+} // namespace
+
+std::expected<LootTable, LootTableParseError> parse(std::string_view json) {
+    const std::expected<JsonValue, wire::common::JsonError> root = wire::common::parseJson(json);
+    if (!root.has_value()) {
+        return std::unexpected(LootTableParseError{"Malformed loot table JSON"});
+    }
+    const JsonObject* object = root->get<JsonObject>();
+    if (object == nullptr) {
+        return std::unexpected(missing("loot table object"));
+    }
+    return parseTable(*object);
 }
 
 } // namespace basalt::server::world::loot::lootTableJson

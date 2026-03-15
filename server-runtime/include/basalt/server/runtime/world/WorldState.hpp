@@ -119,6 +119,24 @@ public:
 
     [[nodiscard]] std::int32_t songOutput(const std::string& song) const { return songOutput_ ? songOutput_(song) : 0; }
 
+    /// Rolls a container's pending loot table into it. The tables are the runtime's, so this is a
+    /// callback; unset, a container keeps its table and stays empty.
+    ///
+    /// parity: `RandomizableContainer.unpackLootTable`, which every read of the container's slots
+    /// runs first.
+    using LootUnpacker = std::function<void(std::int32_t x, std::int32_t y, std::int32_t z,
+                                            const std::optional<wire::common::Uuid>& player)>;
+
+    void setLootUnpacker(LootUnpacker unpacker) { lootUnpacker_ = std::move(unpacker); }
+
+    /// Asks the unpacker to fill the container at a position, if it still has a table to roll.
+    void unpackLoot(std::int32_t x, std::int32_t y, std::int32_t z,
+                    const std::optional<wire::common::Uuid>& player = std::nullopt) const {
+        if (lootUnpacker_) {
+            lootUnpacker_(x, y, z, player);
+        }
+    }
+
     /// Whether the entity behind a noise leads back to a player.
     ///
     /// parity: `SculkShriekerBlockEntity.tryGetPlayer`, which also follows a rider, a projectile's
@@ -258,12 +276,9 @@ public:
     /// counts them down. Unset means every loaded chunk, which is what the tests want.
     using Ticking = std::function<bool(std::int32_t chunkX, std::int32_t chunkZ)>;
 
-    /// Opens a turn: every scheduled turn of every ticking chunk counts down one, both lists at once.
+    /// Opens a turn: every scheduled turn of every ticking chunk counts down one.
     ///
-    /// parity: the jar books an absolute `triggerTick`, so nothing a turn books can be shortened by
-    /// that same turn. Counting down here, once and before anything runs, says the same with a
-    /// countdown. It is a step of its own in the tick loop on purpose: hidden inside one of the two
-    /// passes, whoever asked only for the other one would freeze without a word.
+    /// parity: the jar books an absolute `triggerTick`. A step of its own so neither pass can skip it.
     void openTurn(const Ticking& ticking = {});
 
     /// Every fluid tick that comes due this tick, in world coordinates.
@@ -365,6 +380,11 @@ public:
         std::vector<server::world::loot::ItemStack> stacks;
         /// A furnace's cooking not yet paid out. parity: `AbstractFurnaceBlockEntity.preRemoveSideEffects`.
         std::vector<std::pair<std::string, std::int32_t>> recipesUsed;
+        /// A table the container never rolled, with every slot it had, rolled before the spill.
+        /// parity: `Containers.dropContents` reads the slots, which unpacks the table first.
+        std::optional<std::string> lootTable;
+        std::int64_t lootSeed = 0;
+        std::vector<std::optional<server::world::loot::ItemStack>> lootSlots;
     };
 
     [[nodiscard]] std::vector<Spilled> takeSpilledContents();
@@ -406,6 +426,7 @@ private:
     mutable WorldMutex mutex_;
     LoadOrGenerate loadOrGenerate_;
     SongOutput songOutput_;
+    LootUnpacker lootUnpacker_;
     PlayerCheck playerCheck_;
     sched::Owner* owner_ = nullptr;
     sched::Owner* installOwner_ = nullptr;

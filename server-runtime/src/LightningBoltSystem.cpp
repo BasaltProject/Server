@@ -50,7 +50,8 @@ void LightningBoltSystem::tick(world::LoadedWorld& world, const std::vector<Play
             world::lightning::spawnFire(world.state(), mth::floor(bolt.x), mth::floor(bolt.y), mth::floor(bolt.z),
                                         kStrikeFires, random, changes);
         }
-        world::vibrations::emit(world.state(), "lightning_strike", bolt.x, bolt.y, bolt.z, world.gameTime());
+        world::vibrations::emit(world.state(), "lightning_strike", bolt.x, bolt.y, bolt.z, world.gameTime(),
+                                {.entity = bolt.uuid()});
     }
     bolt.boltLife--;
     if (bolt.boltLife < 0) {

@@ -177,6 +177,10 @@ basalt_module(server-world
     src/crafting/SpecialCrafting.cpp
     src/loot/Loot.cpp
     src/loot/LootTableJson.cpp
+    src/loot/LootPredicates.cpp
+    src/loot/LootItemFunctions.cpp
+    src/loot/LootJsonParts.cpp
+    src/loot/LootFill.cpp
     src/terrain/BiomeTemperature.cpp
     src/terrain/DesertPyramidPiece.cpp
     src/terrain/DesertPyramidStructureGenerator.cpp

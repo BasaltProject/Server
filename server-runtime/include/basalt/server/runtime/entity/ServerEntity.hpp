@@ -33,6 +33,10 @@ namespace wardenBrain {
 struct WardenState;
 }
 
+namespace copperGolems {
+struct GolemState;
+}
+
 namespace ai {
 class GoalSelector;
 }
@@ -118,6 +122,10 @@ public:
     /// Ticks left of running away from whatever hurt it. parity: `PanicGoal.shouldPanic`, which
     /// reads `getLastDamageSource`: a source is only kept for as long as it matters.
     std::int32_t panicTicks = 0;
+
+    /// What the last hit that landed was, as `entityCombat::hurt` names it. parity:
+    /// `LivingEntity.lastDamageSource`, which a death roll's `damage_source_properties` reads.
+    std::string lastDamageCause;
 
     /// parity: `LivingEntity.lastHurt`: inside that window only a bigger hit lands, and only the
     /// rest of it.
@@ -315,6 +323,9 @@ public:
 
     /// What a warden's timed behaviours keep, or null for anything else.
     std::shared_ptr<wardenBrain::WardenState> warden;
+
+    /// What a copper golem keeps beyond this, or null for anything else.
+    std::shared_ptr<copperGolems::GolemState> copperGolem;
 
     /// Attribute base values that were changed from their default. parity: `AttributeMap`, without
     /// modifiers.

@@ -409,11 +409,12 @@ void RedstoneTickSystem::tickFootsteps(world::LoadedWorld& world) {
         const auto stepX = static_cast<std::int32_t>(std::floor(player->x));
         const auto stepZ = static_cast<std::int32_t>(std::floor(player->z));
         const std::int32_t stepY = world::pressurePlates::blockUnder(player->y);
+        const world::vibrations::Source source{.entity = player->uuid()};
         if (world::vibrations::stoodOn(world.state(), stepX, stepY, stepZ, player->x, player->y, player->z,
-                                       world.gameTime())) {
+                                       world.gameTime(), source)) {
             continue;
         }
-        world::vibrations::emit(world.state(), "step", player->x, player->y, player->z, world.gameTime());
+        world::vibrations::emit(world.state(), "step", player->x, player->y, player->z, world.gameTime(), source);
     }
     for (const world::BlockChange& change : changes) {
         broadcaster_->announceRedstone(world, watchers, change);
@@ -726,7 +727,14 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
         .songStopped =
             [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z) {
                 broadcaster_->notifyAround(world, watchersOf(world), x, y, z, std::nullopt);
-            }};
+            },
+        .shriekerHeard =
+            [this, &world](const world::vibrations::ShriekerArrival& arrival) {
+                if (options_.shriekerHeard) {
+                    options_.shriekerHeard(world, arrival);
+                }
+            },
+        .ticking = tickingChunks(world, region, 1)};
     random::RandomSource random = freshRandom();
     std::vector<world::BlockChange> changes = world::blockEntityTicks::tick(
         world.state(), world.name(), world.clock(), world.skyDarken(), world.gameTime(), chunks, random, hooks,

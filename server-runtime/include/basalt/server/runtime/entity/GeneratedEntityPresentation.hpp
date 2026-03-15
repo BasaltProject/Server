@@ -55,6 +55,9 @@ struct RuntimeEntityMetadata {
     /// `CLIENT_ANGER_LEVEL`.
     std::optional<wire::protocol::play::Pose> pose;
     std::optional<std::int32_t> wardenAnger;
+    /// parity: `CopperGolem`'s weathering and the pose it works a chest in.
+    std::optional<std::int32_t> copperWeather;
+    std::optional<std::int32_t> copperPose;
 
     /// Initial non-default fields, or every field whose live value changed since `previous`.
     [[nodiscard]] std::vector<wire::protocol::play::SetEntityDataPacket::Entry>

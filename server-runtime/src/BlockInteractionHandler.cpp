@@ -176,7 +176,9 @@ player::BreakContext BlockInteractionHandler::breakContext() {
 
 void BlockInteractionHandler::heardBySculk(std::string_view event, const BlockPos& pos) {
     if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
-        player::heardBySculk(breakContext(), *world, event, pos.x, pos.y, pos.z);
+        const PlayerSession* session = owner_->playerSession();
+        player::heardBySculk(breakContext(), *world, event, pos.x, pos.y, pos.z,
+                             {.entity = session != nullptr ? std::optional{session->uuid()} : std::nullopt});
     }
 }
 
@@ -193,6 +195,12 @@ void BlockInteractionHandler::dropLootFor(const Identifier& block, std::int32_t 
                                           const wire::nbt::NbtCompound* carried) {
     if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
         player::dropLootFor(breakContext(), *world, block, stateId, pos.x, pos.y, pos.z, carried);
+    }
+}
+
+void BlockInteractionHandler::wearHeldItem(std::int32_t cost) {
+    if (PlayerSession* session = owner_->playerSession(); session != nullptr) {
+        player::wearHeldItem(breakContext(), *session, cost);
     }
 }
 

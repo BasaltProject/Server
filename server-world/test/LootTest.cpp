@@ -103,7 +103,9 @@ struct Run {
     const std::expected<LootTable, LootTableParseError> parsed = lootTableJson::parse(found->second);
     REQUIRE(parsed.has_value());
     rng::RandomSource random = rng::RandomSource::legacy(seed);
-    const std::vector<ItemStack> drops = parsed->generate(random, luck, explosionRadius);
+    // The frozen oracle rolled every table as a kill by a player.
+    const std::vector<ItemStack> drops =
+        parsed->generate(random, luck, explosionRadius, LootContext{.killedByPlayer = true});
     std::uint64_t checksum = 14695981039346656037ULL;
     Run result;
     for (const ItemStack& drop : drops) {
@@ -185,8 +187,8 @@ TEST_CASE("the loot tables roll what the frozen kotlin rolls") {
 
     // A type this build does not implement is named rather than silently producing wrong loot.
     SUBCASE("unknownEntry") {
-        CHECK(refusal(R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:tag","name":"minecraft:logs"}]}]})") ==
-              "Unsupported_loot_pool_entry_type:_minecraft:tag");
+        CHECK(refusal(R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:group","children":[]}]}]})") ==
+              "Unsupported_loot_pool_entry_type:_minecraft:group");
     }
 
     SUBCASE("unknownCondition") {
@@ -197,14 +199,14 @@ TEST_CASE("the loot tables roll what the frozen kotlin rolls") {
 
     SUBCASE("unknownFunction") {
         CHECK(refusal(R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:stone",
-               "functions":[{"function":"minecraft:enchant_randomly"}]}]}]})") ==
-              "Unsupported_loot_function_type:_minecraft:enchant_randomly");
+               "functions":[{"function":"minecraft:set_lore"}]}]}]})") ==
+              "Unsupported_loot_function_type:_minecraft:set_lore");
     }
 
     SUBCASE("unknownProvider") {
-        CHECK(refusal(R"({"pools":[{"rolls":{"type":"minecraft:binomial","n":3,"p":0.5},"entries":[
+        CHECK(refusal(R"({"pools":[{"rolls":{"type":"minecraft:score","score":"x"},"entries":[
                {"type":"minecraft:item","name":"minecraft:stone"}]}]})") ==
-              "Unsupported_number_provider_type:_minecraft:binomial");
+              "Unsupported_number_provider_type:_minecraft:score");
     }
 }
 
@@ -347,4 +349,151 @@ TEST_CASE("a nested table rolls on the same random, and the open-water question 
         }
     }
     CHECK(shells > 50);
+}
+
+TEST_CASE("the tool decides silk touch, shears and fortune") {
+    // parity: the shape of every ore table: silk touch keeps the block, otherwise the ore drops.
+    const std::expected<LootTable, LootTableParseError> ore = lootTableJson::parse(
+        R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:alternatives","children":[
+           {"type":"minecraft:item","name":"minecraft:diamond_ore","conditions":[{"condition":"minecraft:match_tool",
+            "predicate":{"predicates":{"minecraft:enchantments":[{"enchantments":"minecraft:silk_touch",
+            "levels":{"min":1}}]}}}]},
+           {"type":"minecraft:item","name":"minecraft:diamond","functions":[{"function":"minecraft:apply_bonus",
+            "enchantment":"minecraft:fortune","formula":"minecraft:ore_drops"}]}]}]}]})");
+    REQUIRE(ore.has_value());
+    rng::RandomSource random = rng::RandomSource::legacy(9);
+    LootContext silk{.tool = basalt::wire::common::Identifier::vanilla("diamond_pickaxe")};
+    silk.toolEnchantments.emplace("minecraft:silk_touch", 1);
+    const std::vector<ItemStack> kept = ore->generate(random, 0.0F, std::nullopt, silk);
+    REQUIRE(kept.size() == 1);
+    CHECK(kept.front().item.path() == "diamond_ore");
+
+    LootContext plain{.tool = basalt::wire::common::Identifier::vanilla("diamond_pickaxe")};
+    const std::vector<ItemStack> mined = ore->generate(random, 0.0F, std::nullopt, plain);
+    REQUIRE(mined.size() == 1);
+    CHECK(mined.front().item.path() == "diamond");
+    CHECK(mined.front().count == 1);
+
+    // Fortune three multiplies by one to four, never less than the base.
+    LootContext lucky{.tool = basalt::wire::common::Identifier::vanilla("diamond_pickaxe")};
+    lucky.toolEnchantments.emplace("minecraft:fortune", 3);
+    std::int32_t most = 0;
+    for (std::int32_t roll = 0; roll < 200; ++roll) {
+        const std::vector<ItemStack> fortunate = ore->generate(random, 0.0F, std::nullopt, lucky);
+        REQUIRE(fortunate.size() == 1);
+        CHECK(fortunate.front().count >= 1);
+        CHECK(fortunate.front().count <= 4);
+        most = std::max(most, fortunate.front().count);
+    }
+    CHECK(most == 4);
+
+    const std::expected<LootTable, LootTableParseError> leaves = lootTableJson::parse(
+        R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:oak_leaves","conditions":[
+           {"condition":"minecraft:match_tool","predicate":{"items":"minecraft:shears"}}]}]}]})");
+    REQUIRE(leaves.has_value());
+    CHECK(leaves->generate(random, 0.0F, std::nullopt, plain).empty());
+    const LootContext shears{.tool = basalt::wire::common::Identifier::vanilla("shears")};
+    CHECK(leaves->generate(random, 0.0F, std::nullopt, shears).size() == 1);
+}
+
+TEST_CASE("a death roll reads the entity that died and the one that killed it") {
+    // parity: the sheep table picks its wool by colour, and only while it has not been sheared.
+    const std::expected<LootTable, LootTableParseError> sheep = lootTableJson::parse(
+        R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:red_wool","conditions":[
+           {"condition":"minecraft:entity_properties","entity":"this","predicate":{
+            "minecraft:components":{"minecraft:sheep/color":"red"},
+            "minecraft:type_specific/sheep":{"sheared":false}}}]}]},
+           {"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:mutton","functions":[
+            {"function":"minecraft:furnace_smelt","conditions":[{"condition":"minecraft:entity_properties",
+             "entity":"this","predicate":{"minecraft:flags":{"is_on_fire":true}}}]},
+            {"function":"minecraft:enchanted_count_increase","enchantment":"minecraft:looting",
+             "count":{"type":"minecraft:constant","value":1}}]}]}]})");
+    REQUIRE(sheep.has_value());
+    rng::RandomSource random = rng::RandomSource::legacy(4);
+    EntityFacts red{.type = basalt::wire::common::Identifier::vanilla("sheep"), .onFire = true};
+    red.components.emplace("minecraft:sheep/color", "red");
+    LootContext context{.thisEntity = red};
+    context.smelt = [](const ItemStack& input) -> std::optional<ItemStack> {
+        if (input.item.path() != "mutton") {
+            return std::nullopt;
+        }
+        return ItemStack{.item = basalt::wire::common::Identifier::vanilla("cooked_mutton"), .count = 1};
+    };
+    context.attacker = EntityFacts{.type = basalt::wire::common::Identifier::vanilla("player")};
+    context.attackerEnchantments.emplace("minecraft:looting", 2);
+    const std::vector<ItemStack> drops = sheep->generate(random, 0.0F, std::nullopt, context);
+    REQUIRE(drops.size() == 2);
+    CHECK(drops[0].item.path() == "red_wool");
+    CHECK(drops[1].item.path() == "cooked_mutton");
+    CHECK(drops[1].count == 3);
+
+    red.sheared = true;
+    red.onFire = false;
+    const std::vector<ItemStack> shorn = sheep->generate(random, 0.0F, std::nullopt, LootContext{.thisEntity = red});
+    REQUIRE(shorn.size() == 1);
+    CHECK(shorn.front().item.path() == "mutton");
+    CHECK(shorn.front().count == 1);
+}
+
+TEST_CASE("a chest roll enchants, wears and names what it makes") {
+    using basalt::wire::common::Identifier;
+    const std::expected<LootTable, LootTableParseError> chest = lootTableJson::parse(
+        R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:book","functions":[
+            {"function":"minecraft:enchant_randomly","options":"#minecraft:on_random_loot"}]}]},
+           {"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:iron_sword","functions":[
+            {"function":"minecraft:set_damage","damage":0.25},
+            {"function":"minecraft:set_enchantments","enchantments":{"minecraft:knockback":2}},
+            {"function":"minecraft:set_name","name":{"translate":"item.sword"},"target":"item_name"}]}]},
+           {"rolls":3,"entries":[{"type":"minecraft:empty","weight":1},
+            {"type":"minecraft:tag","name":"minecraft:discs","expand":true,"weight":1}]}]})");
+    REQUIRE(chest.has_value());
+    const EnchantmentEntry sharpness{.id = Identifier::vanilla("sharpness"), .maxLevel = 5};
+    const Enchanting enchanting{.candidates = [&sharpness](const std::vector<std::string>&) {
+        return std::vector<const EnchantmentEntry*>{&sharpness};
+    }};
+    LootContext context{.enchanting = &enchanting};
+    context.tagMembers = [](std::string_view, const Identifier&) {
+        return std::vector<Identifier>{Identifier::vanilla("music_disc_cat"), Identifier::vanilla("music_disc_13")};
+    };
+    rng::RandomSource random = rng::RandomSource::legacy(11);
+    const std::vector<ItemStack> items = chest->generate(random, 0.0F, std::nullopt, context);
+    REQUIRE(items.size() >= 2);
+    // parity: a book is swapped for an enchanted one, and the level lands in the stored set.
+    CHECK(items[0].item.path() == "enchanted_book");
+    const auto* stored = items[0].components.getCompound("minecraft:stored_enchantments");
+    REQUIRE(stored != nullptr);
+    CHECK(stored->getInt("minecraft:sharpness") >= 1);
+    // parity: a quarter of the durability left is three quarters of it worn off.
+    CHECK(items[1].components.getInt("minecraft:damage") == 187);
+    CHECK(items[1].components.getCompound("minecraft:enchantments")->getInt("minecraft:knockback") == 2);
+    CHECK(items[1].components.contains("minecraft:item_name"));
+    // The empty choice makes nothing, so the rest are only ever the tag's discs.
+    for (std::size_t index = 2; index < items.size(); ++index) {
+        CHECK(items[index].item.path().starts_with("music_disc_"));
+    }
+}
+
+TEST_CASE("a container roll spreads its stacks over the empty slots") {
+    // parity: `LootTable.fill` splits stacks until the roll covers the free slots, and never
+    // touches a slot that already holds something.
+    const std::expected<LootTable, LootTableParseError> chest = lootTableJson::parse(
+        R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:bread","functions":[
+            {"function":"minecraft:set_count","count":20}]}]}]})");
+    REQUIRE(chest.has_value());
+    std::vector<std::optional<ItemStack>> slots(27);
+    slots[4] = ItemStack{.item = basalt::wire::common::Identifier::vanilla("stone"), .count = 1};
+    rng::RandomSource random = rng::RandomSource::legacy(42);
+    chest->fill(slots, random);
+    std::int32_t bread = 0;
+    std::int32_t used = 0;
+    for (const std::optional<ItemStack>& slot : slots) {
+        if (slot.has_value() && slot->item.path() == "bread") {
+            bread += slot->count;
+            ++used;
+        }
+    }
+    CHECK(bread == 20);
+    CHECK(used > 1);
+    REQUIRE(slots[4].has_value());
+    CHECK(slots[4]->item.path() == "stone");
 }

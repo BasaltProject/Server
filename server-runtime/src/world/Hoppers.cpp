@@ -156,6 +156,10 @@ struct Container {
     }
     const std::string_view path = block->path();
     const std::optional<std::int32_t> size = path == "hopper" ? std::optional{kSize} : containers::sizeOf(path);
+    // parity: every slot read of a `RandomizableContainer` unpacks its table first.
+    if (size.has_value()) {
+        world.unpackLoot(x, y, z);
+    }
     server::world::ChunkBlockEntity* entity = size.has_value() ? entityAt(world, x, y, z) : nullptr;
     if (entity == nullptr) {
         return cartAround(world, px, py, pz, x, y, z);
@@ -516,17 +520,10 @@ void noteChange(const Around& around, const BlockChange& change) {
     return false;
 }
 
-/// parity: `getItemsAtAndAbove`: whatever lies in the box goes in, whole stack at a time. The box
-/// travels with the hopper rather than with a square, which is what lets a cart use the same one.
-/// Whether a dropped stack's own box crosses the one given.
-///
-/// parity: `HopperBlockEntity.getItemsAtAndAbove` asks the level with
-/// `getEntitiesOfClass(ItemEntity.class, aabb, ...)`, so what decides is the **box** of the item and
-/// not where its middle is. A stack measures a quarter of a block, so it sticks out an eighth each
-/// way and one lying just outside the column still goes in. Crossed with `AABB.intersects`, strict at
-/// both ends, the same way `arrowButtons::reaches` and `pressurePlates::touches` do it.
-[[nodiscard]] bool itemCrosses(const DroppedItem& item, double minX, double minY, double minZ, double maxX,
-                               double maxY, double maxZ) {
+/// parity: `HopperBlockEntity.getItemsAtAndAbove` tests the item's box, not its middle, with the
+/// strict `AABB.intersects`: a stack just outside the column still goes in.
+[[nodiscard]] bool itemCrosses(const DroppedItem& item, double minX, double minY, double minZ, double maxX, double maxY,
+                               double maxZ) {
     static const double half = registry::entityTypeShapes::widthOf(wire::common::Identifier::vanilla("item")) / 2.0;
     static const double height = registry::entityTypeShapes::heightOf(wire::common::Identifier::vanilla("item"));
     const auto overlaps = [](double lowA, double highA, double lowB, double highB) {

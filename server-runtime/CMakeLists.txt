@@ -159,6 +159,8 @@ basalt_module(server-runtime-core
         src/MobActionTick.cpp
         src/MobActionConversion.cpp
         src/MobActionWarden.cpp
+        src/MobDeathLoot.cpp
+        src/MobActionCopperGolem.cpp
         src/ShriekerSystem.cpp
         src/LightningBoltSystem.cpp
         src/NaturalSpawningMaterialize.cpp
@@ -264,6 +266,8 @@ basalt_module(server-runtime-core
         src/world/RealTimelineTags.cpp
         src/world/SaplingGrowth.cpp
         src/world/RealLootTables.cpp
+        src/world/LootRegistries.cpp
+        src/world/ContainerLoot.cpp
         src/world/RealEnchantments.cpp
         src/world/RealEnchantmentTags.cpp
         src/world/RealDamageTypeTags.cpp
@@ -437,6 +441,7 @@ basalt_module(server-runtime-core
         src/entity/MobConversions.cpp
         src/entity/MobStatusEffects.cpp
         src/entity/WardenBrain.cpp
+        src/entity/CopperGolem.cpp
         src/entity/EntityCombat.cpp
         src/entity/MobBrain.cpp
         src/entity/MobCombat.cpp
@@ -456,6 +461,7 @@ basalt_module(server-runtime-core
         src/entity/ai/WanderingTraderGoals.cpp
         src/entity/ai/WitherGoals.cpp
         src/entity/ai/DolphinGoals.cpp
+        src/entity/ai/CopperGolemGoals.cpp
         src/world/VillageDataLoader.cpp
         src/world/VillageGolemSpawner.cpp
         src/world/VillageProximity.cpp

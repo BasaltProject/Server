@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/world/RandomTicks.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealItemTags.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/world/loot/Loot.hpp>
 
 #include <cstdint>
@@ -73,6 +74,8 @@ public:
         std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            std::int32_t x, std::int32_t y, std::int32_t z)>
             foreignTick;
+        /// A noise that reached a shrieker, handed to whoever knows the players.
+        std::function<void(world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival)> shriekerHeard;
     };
 
     /// `runCommand` is what a command block runs its command with. It is a constructor parameter and

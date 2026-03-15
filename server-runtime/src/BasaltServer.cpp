@@ -1,10 +1,14 @@
 #include <basalt/server/plugins/PluginEventTypes.hpp>
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/BuildInfo.hpp>
+#include <basalt/server/runtime/entity/CopperGolem.hpp>
+#include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/placeholder/AnimationPlaceholders.hpp>
 #include <basalt/server/runtime/placeholder/PlayerPlaceholders.hpp>
 #include <basalt/server/runtime/placeholder/ServerPlaceholders.hpp>
+#include <basalt/server/runtime/player/PlayerContainers.hpp>
 #include <basalt/server/runtime/plugins/PluginsCommand.hpp>
 #include <basalt/server/runtime/world/EndPodium.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
@@ -34,6 +38,14 @@ constexpr std::int32_t kRetainMarginChunks = 4;
 [[nodiscard]] std::int64_t scratchSeed() { return static_cast<std::int64_t>(scratchRandom()()); }
 
 [[nodiscard]] double scratchDouble() { return std::uniform_real_distribution<double>{0.0, 1.0}(scratchRandom()); }
+
+/// A copper golem a pattern just built takes its weathering from the chest it leaves behind.
+void markPatternGolem(entity::ServerEntity* golem) {
+    if (golem != nullptr && entity::copperGolems::isCopperGolem(golem->type())) {
+        random::RandomSource random = random::RandomSource::legacy(scratchSeed());
+        entity::copperGolems::stateOf(*golem, random).fromPattern = true;
+    }
+}
 
 [[nodiscard]] wire::protocol::play::Gamemode gamemodeOf(std::string_view name) {
     if (name == "creative") {
@@ -137,7 +149,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         WorldRegistry::Options{.worldsRoot = options_.worldsRoot,
                                .timings = &timings_,
                                .generationMetrics = config.generationMetrics,
-                               .jukeboxes = &vanillaData_.jukeboxSongs},
+                               .jukeboxes = &vanillaData_.jukeboxSongs,
+                               .lootTables = &vanillaData_.lootTables},
         logger_);
 
     for (const auto& [name, world] : worldRegistry_->worlds()) {
@@ -320,8 +333,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         if (spawning_ == nullptr) {
             return;
         }
-        static_cast<void>(spawning_->spawnMob(world, wire::common::Identifier::vanilla(std::string{type}), x, y, z,
-                                              0.0F, "triggered", {}));
+        markPatternGolem(spawning_->spawnMob(world, wire::common::Identifier::vanilla(std::string{type}), x, y, z, 0.0F,
+                                             "triggered", {}));
     };
     wiring.requestRestart = [this] { requestRestart(); };
     wiring.onConfigsReloaded = [this] { worldRegistry_->onConfigsReloaded(); };
@@ -445,8 +458,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                     if (spawning_ == nullptr) {
                         return;
                     }
-                    static_cast<void>(spawning_->spawnMob(world, wire::common::Identifier::vanilla(std::string{type}),
-                                                          x, y, z, 0.0F, "triggered", {}));
+                    markPatternGolem(spawning_->spawnMob(world, wire::common::Identifier::vanilla(std::string{type}), x,
+                                                         y, z, 0.0F, "triggered", {}));
                 }},
         BlockChangeBroadcaster::Options{.nextSeed = [] { return scratchSeed(); },
                                         .blockTags = &vanillaData_.blockTags});
@@ -524,25 +537,31 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             return successes;
         },
         RedstoneTickSystem::Hooks{},
-        RedstoneTickSystem::Options{.nextSeed = [] { return scratchSeed(); },
-                                    .jukeboxes = &vanillaData_.jukeboxSongs,
-                                    .itemTags = &vanillaData_.itemTags,
-                                    .blockTags = &vanillaData_.blockTags,
-                                    .steppedOn =
-                                        [this](world::LoadedWorld& world, player::PlayerSession& player, std::int32_t x,
-                                               std::int32_t y, std::int32_t z) {
-                                            if (shriekers_ != nullptr) {
-                                                shriekers_->steppedOn(world, player, x, y, z);
-                                            }
-                                        },
-                                    .foreignTick =
-                                        [this](world::LoadedWorld& world,
-                                               const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
-                                               std::int32_t y, std::int32_t z) {
-                                            if (shriekers_ != nullptr) {
-                                                shriekers_->scheduledTick(world, watchers, x, y, z);
-                                            }
-                                        }});
+        RedstoneTickSystem::Options{
+            .nextSeed = [] { return scratchSeed(); },
+            .jukeboxes = &vanillaData_.jukeboxSongs,
+            .itemTags = &vanillaData_.itemTags,
+            .blockTags = &vanillaData_.blockTags,
+            .steppedOn =
+                [this](world::LoadedWorld& world, player::PlayerSession& player, std::int32_t x, std::int32_t y,
+                       std::int32_t z) {
+                    if (shriekers_ != nullptr) {
+                        shriekers_->steppedOn(world, player, x, y, z);
+                    }
+                },
+            .foreignTick =
+                [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, std::int32_t x,
+                       std::int32_t y, std::int32_t z) {
+                    if (shriekers_ != nullptr) {
+                        shriekers_->scheduledTick(world, watchers, x, y, z);
+                    }
+                },
+            .shriekerHeard =
+                [this](world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival) {
+                    if (shriekers_ != nullptr) {
+                        shriekers_->heard(world, arrival);
+                    }
+                }});
     raids_ = std::make_unique<RaidSystem>(playerRegistry_, *broadcaster_, *spawning_, RaidSystem::Hooks{},
                                           RaidSystem::Options{.nextSeed = [] { return scratchSeed(); }}, logger_);
     statusEffects_ = std::make_unique<StatusEffectSystem>(
@@ -565,6 +584,21 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                       return mobActions_ != nullptr &&
                                              mobActions_->addMobEffect(world, watchers, mob, effect);
                                   }});
+    // parity: `ContainerOpenersCounter` over a chest a copper golem works: the lid and its sound.
+    mobHooks.openersChanged = [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                     std::int32_t openers) {
+        const std::optional<std::int32_t> stateId = world.state().blockState(x, y, z);
+        const wire::common::Identifier* block =
+            stateId.has_value() ? registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
+        if (block == nullptr) {
+            return;
+        }
+        player::OpenersContext context;
+        context.blocks = breakContext();
+        context.nextFloat = [] { return std::uniform_real_distribution<float>{0.0F, 1.0F}(scratchRandom()); };
+        context.nextSeed = [] { return static_cast<std::int64_t>(scratchRandom()()); };
+        player::announceOpeners(context, world, x, y, z, block->path(), openers);
+    };
     mobHooks.witherShoots = [this](world::LoadedWorld& world, entity::ServerEntity& wither) {
         withers_->shootAtTarget(world, wither);
     };
@@ -575,7 +609,10 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         std::make_unique<MobActionSystem>(playerRegistry_, *broadcaster_, *explosions_, *spawning_, *combat_, *raids_,
                                           vanillaData_.lootTables, model.allWorlds, std::move(mobHooks),
                                           MobActionSystem::Options{.nextSeed = [] { return scratchSeed(); },
-                                                                   .nextDouble = [] { return scratchDouble(); }});
+                                                                   .entityTags = &vanillaData_.entityTags,
+                                                                   .nextDouble = [] { return scratchDouble(); },
+                                                                   .recipes = &vanillaData_.recipes,
+                                                                   .damageTypeTags = &vanillaData_.damageTypeTags});
     shriekers_ = std::make_unique<ShriekerSystem>(playerRegistry_, *broadcaster_, *spawning_, *mobActions_,
                                                   ShriekerSystem::Options{.nextSeed = [] { return scratchSeed(); }});
     lightning_ = std::make_unique<LightningBoltSystem>(*broadcaster_, *mobActions_);

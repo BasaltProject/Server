@@ -47,7 +47,7 @@ void settle(const BreakContext& context, PlayerSession& player, world::LoadedWor
         const world::FluidChange& at = result.changes.front();
         if (world.state().hasSculkSensorNear(at.x, at.y, at.z, world::vibrations::kCalibratedRange)) {
             world::vibrations::emit(world.state(), item.path() == "bucket" ? "fluid_pickup" : "fluid_place", at.x + 0.5,
-                                    at.y + 0.5, at.z + 0.5, world.gameTime());
+                                    at.y + 0.5, at.z + 0.5, world.gameTime(), {.entity = player.uuid()});
         }
     }
     for (const world::FluidChange& change : result.changes) {

@@ -2,6 +2,7 @@
 
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WorldClock.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/server/world/crafting/Crafting.hpp>
@@ -63,6 +64,11 @@ struct Hooks {
     /// The turn a song ran out on: the block keeps its disc but stops feeding the redstone, so
     /// whatever it was powering has to be told. parity: `JukeboxBlockEntity.onSongChanged`.
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z)> songStopped;
+    /// A noise that reached a shrieker: whether it shrieks depends on the players, which this
+    /// module does not know. Called after every block entity has had its turn.
+    std::function<void(const vibrations::ShriekerArrival& arrival)> shriekerHeard;
+    /// The chunks that tick this turn, which a shrieker's noise waits on. Unset, every loaded one.
+    WorldState::Ticking ticking;
 };
 
 /// Ticks every block entity in `chunks` that has something to do, answering the blocks that changed.

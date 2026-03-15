@@ -305,7 +305,7 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
         context.placed(world, placeAt.x, placeAt.y, placeAt.z);
     }
     // parity: `GameEvent.BLOCK_PLACE`, thirteen: a block going down is louder than one coming up.
-    heardBySculk(context.blocks, world, "block_place", placeAt.x, placeAt.y, placeAt.z);
+    heardBySculk(context.blocks, world, "block_place", placeAt.x, placeAt.y, placeAt.z, {.entity = player.uuid()});
     if (world::signs::isSign(blockStateId) && context.openSign) {
         context.openSign(*session, placeAt.x, placeAt.y, placeAt.z, blockStateId);
     }

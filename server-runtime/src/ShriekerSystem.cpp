@@ -8,14 +8,20 @@
 #include <basalt/server/runtime/entity/EntityCollision.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/SculkShriekers.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
+#include <basalt/server/storage/StoredPlayer.hpp>
 
+#include <algorithm>
+#include <array>
 #include <cmath>
+#include <string_view>
 
 namespace basalt::server::runtime {
 namespace {
@@ -40,7 +46,82 @@ namespace shriekers = world::sculkShriekers;
     }
 }
 
+/// Whether a mob wears something in an equipment slot, as saved.
+[[nodiscard]] bool wears(const entity::ServerEntity& mob, std::string_view slot) {
+    const wire::nbt::NbtCompound* equipment =
+        mob.sourceNbt.has_value() ? mob.sourceNbt->getCompound("equipment") : nullptr;
+    return equipment != nullptr && equipment->getCompound(slot) != nullptr;
+}
+
+[[nodiscard]] bool holds(const PlayerSession& player, std::string_view item) {
+    const std::optional<storage::StoredItemStack>& main = player.inventory.heldItem();
+    const std::optional<storage::StoredItemStack>& off = player.inventory.at(player::PlayerInventory::kOffhandSlot);
+    return (main.has_value() && main->id == item) || (off.has_value() && off->id == item);
+}
+
+/// parity: `getControllingPassenger` of the vehicles a player can steer; a plain mob only lets a
+/// mob steer it.
+[[nodiscard]] bool steers(const entity::ServerEntity& vehicle, const PlayerSession& rider) {
+    const std::string_view path = vehicle.type().path();
+    if (path.ends_with("_boat") || path.ends_with("_raft")) {
+        return true;
+    }
+    if (path == "pig") {
+        return wears(vehicle, "saddle") && holds(rider, "minecraft:carrot_on_a_stick");
+    }
+    if (path == "strider") {
+        return wears(vehicle, "saddle") && holds(rider, "minecraft:warped_fungus_on_a_stick");
+    }
+    if (path == "happy_ghast") {
+        return wears(vehicle, "body");
+    }
+    static constexpr std::array<std::string_view, 11> kSaddled{
+        "horse",      "donkey", "mule",         "skeleton_horse", "zombie_horse",   "camel",
+        "camel_husk", "llama",  "trader_llama", "nautilus",       "zombie_nautilus"};
+    return std::ranges::find(kSaddled, path) != kSaddled.end() && wears(vehicle, "saddle");
+}
+
 } // namespace
+
+PlayerSession* ShriekerSystem::playerBehind(const world::LoadedWorld& world, const player::PlayerRegistry& players,
+                                            const wire::common::Uuid& source) {
+    if (PlayerSession* player = players.get(source); player != nullptr) {
+        return player->worldName == world.name() ? player : nullptr;
+    }
+    const auto byEntityId = [&](std::int32_t entityId) -> PlayerSession* {
+        for (PlayerSession* player : players.snapshot()) {
+            if (player->entityId() == entityId && player->worldName == world.name()) {
+                return player;
+            }
+        }
+        return nullptr;
+    };
+    for (const entity::ServerEntity* entity : world.state().entities()) {
+        if (entity->uuid() != source) {
+            continue;
+        }
+        if (!entity->passengerIds.empty()) {
+            if (PlayerSession* rider = byEntityId(entity->passengerIds.front());
+                rider != nullptr && steers(*entity, *rider)) {
+                return rider;
+            }
+        }
+        return entity->ownerId.has_value() ? byEntityId(*entity->ownerId) : nullptr;
+    }
+    return nullptr;
+}
+
+void ShriekerSystem::heard(world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival) {
+    // parity: `projectileOwner != null ? projectileOwner : sourceEntity`.
+    const std::optional<wire::common::Uuid>& source =
+        arrival.source.projectileOwner.has_value() ? arrival.source.projectileOwner : arrival.source.entity;
+    if (!source.has_value()) {
+        return;
+    }
+    if (PlayerSession* player = playerBehind(world, *players_, *source); player != nullptr) {
+        tryShriek(world, *player, arrival.x, arrival.y, arrival.z);
+    }
+}
 
 ShriekerSystem::ShriekerSystem(player::PlayerRegistry& players, BlockChangeBroadcaster& broadcaster,
                                NaturalSpawningSystem& spawning, MobActionSystem& mobs, Options options)

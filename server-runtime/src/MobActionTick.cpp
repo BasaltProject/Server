@@ -72,7 +72,8 @@ void MobActionSystem::tickFire(world::LoadedWorld& world, const std::vector<Play
             if (result.landed) {
                 combat_->announceEntityHit(watchers, mob, world::damageTypes::kOnFire, -1, result.died);
                 // parity: `LivingEntity.hurtServer` raises `ENTITY_DAMAGE` at whoever took the hit.
-                world::vibrations::emit(world.state(), "entity_damage", mob.x, mob.y, mob.z, world.gameTime());
+                world::vibrations::emit(world.state(), "entity_damage", mob.x, mob.y, mob.z, world.gameTime(),
+                                        {.entity = mob.uuid()});
             }
         }
     }
@@ -303,7 +304,8 @@ void MobActionSystem::trailSnow(world::LoadedWorld& world, const ServerEntity& g
         // squares around it after, which is the order `Level.setBlock` does the two in.
         broadcaster_->announceBlock(watchers, world::BlockChange{.x = x, .y = y, .z = z, .stateId = snow->stateId});
         broadcaster_->notifyAround(world, watchers, x, y, z, here);
-        world::vibrations::emit(world.state(), "block_place", x + 0.5, y + 0.5, z + 0.5, world.gameTime());
+        world::vibrations::emit(world.state(), "block_place", x + 0.5, y + 0.5, z + 0.5, world.gameTime(),
+                                {.entity = golem.uuid()});
     }
 }
 
@@ -317,7 +319,8 @@ void MobActionSystem::dropDeathLoot(world::LoadedWorld& world, const ServerEntit
     random::RandomSource scratch = freshRandom();
     random::RandomSource& random =
         table->randomSequence.has_value() ? world.randomSequences().of(*table->randomSequence) : scratch;
-    for (const server::world::loot::ItemStack& stack : table->generate(random)) {
+    const server::world::loot::LootContext context = deathLootContext(world, entity);
+    for (const server::world::loot::ItemStack& stack : table->generate(random, 0.0F, std::nullopt, context)) {
         if (server::registry::items::registry().byName(stack.item) == nullptr) {
             continue;
         }
@@ -327,7 +330,8 @@ void MobActionSystem::dropDeathLoot(world::LoadedWorld& world, const ServerEntit
                                                    .count = stack.count,
                                                    .x = entity.x,
                                                    .y = entity.y + (entity.height() / 2.0),
-                                                   .z = entity.z});
+                                                   .z = entity.z,
+                                                   .components = stack.components});
     }
 }
 

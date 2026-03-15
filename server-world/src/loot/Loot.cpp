@@ -22,9 +22,28 @@ NumberProvider NumberProvider::uniform(NumberProvider min, NumberProvider max) {
     return built;
 }
 
+NumberProvider NumberProvider::binomial(NumberProvider n, NumberProvider p) {
+    NumberProvider built;
+    built.kind_ = Kind::Binomial;
+    built.min_ = std::make_shared<const NumberProvider>(std::move(n));
+    built.max_ = std::make_shared<const NumberProvider>(std::move(p));
+    return built;
+}
+
 std::int32_t NumberProvider::getInt(random::RandomSource& random) const {
     if (kind_ == Kind::Constant) {
         return static_cast<std::int32_t>(std::floor(value_));
+    }
+    if (kind_ == Kind::Binomial) {
+        const std::int32_t tries = min_->getInt(random);
+        const float chance = max_->getFloat(random);
+        std::int32_t hits = 0;
+        for (std::int32_t index = 0; index < tries; ++index) {
+            if (random.nextFloat() < chance) {
+                ++hits;
+            }
+        }
+        return hits;
     }
     const std::int32_t low = min_->getInt(random);
     const std::int32_t high = max_->getInt(random);
@@ -34,6 +53,9 @@ std::int32_t NumberProvider::getInt(random::RandomSource& random) const {
 float NumberProvider::getFloat(random::RandomSource& random) const {
     if (kind_ == Kind::Constant) {
         return value_;
+    }
+    if (kind_ == Kind::Binomial) {
+        return static_cast<float>(getInt(random));
     }
     const float low = min_->getFloat(random);
     const float high = max_->getFloat(random);
@@ -118,6 +140,64 @@ LootCondition LootCondition::fishingHookOpenWater(bool expected) {
     return built;
 }
 
+LootCondition LootCondition::matchTool(ItemPredicate predicate) {
+    LootCondition built;
+    built.kind_ = Kind::MatchTool;
+    built.item_ = std::make_shared<const ItemPredicate>(std::move(predicate));
+    return built;
+}
+
+LootCondition LootCondition::entityMatches(Target target, EntityPredicate predicate) {
+    LootCondition built;
+    built.kind_ = Kind::EntityMatches;
+    built.target_ = target;
+    built.entity_ = std::make_shared<const EntityPredicate>(std::move(predicate));
+    return built;
+}
+
+LootCondition LootCondition::damageSource(std::vector<std::pair<std::string, bool>> tags,
+                                          std::optional<EntityPredicate> source,
+                                          std::optional<EntityPredicate> direct) {
+    LootCondition built;
+    built.kind_ = Kind::DamageSource;
+    built.damageTags_ = std::move(tags);
+    if (source.has_value()) {
+        built.entity_ = std::make_shared<const EntityPredicate>(std::move(*source));
+    }
+    if (direct.has_value()) {
+        built.direct_ = std::make_shared<const EntityPredicate>(std::move(*direct));
+    }
+    return built;
+}
+
+LootCondition LootCondition::tableBonus(std::string enchantment, std::vector<float> chances) {
+    LootCondition built;
+    built.kind_ = Kind::TableBonus;
+    built.enchantment_ = std::move(enchantment);
+    built.chances_ = std::move(chances);
+    return built;
+}
+
+LootCondition LootCondition::randomChanceWithEnchantedBonus(float unenchanted, LevelBasedValue enchanted,
+                                                            std::string enchantment) {
+    LootCondition built;
+    built.kind_ = Kind::RandomChanceWithEnchantedBonus;
+    built.plainChance_ = unenchanted;
+    built.enchanted_ = enchanted;
+    built.enchantment_ = std::move(enchantment);
+    return built;
+}
+
+namespace {
+
+[[nodiscard]] std::int32_t levelIn(const std::map<std::string, std::int32_t, std::less<>>& levels,
+                                   std::string_view enchantment) {
+    const auto found = levels.find(enchantment);
+    return found == levels.end() ? 0 : found->second;
+}
+
+} // namespace
+
 LootCondition LootCondition::randomChanceWithEnchantedBonus(float chance) {
     LootCondition built;
     built.kind_ = Kind::RandomChanceWithEnchantedBonus;
@@ -129,14 +209,41 @@ bool LootCondition::test(random::RandomSource& random, const LootContext& contex
     switch (kind_) {
     case Kind::RandomChance:
         return random.nextFloat() < chance_.getFloat(random);
-    case Kind::SurvivesExplosion:
     case Kind::KilledByPlayer:
+        return context.killedByPlayer;
+    case Kind::SurvivesExplosion:
     // parity: `LocationCheck` asks about the squares around the block, which this evaluator has no
     // way to look at. Both tables that use one ask whether the other half of a tall plant is still
     // there, and it is: the half being broken is what put this roll here.
     case Kind::LocationCheck:
         return true;
+    // parity: `MatchTool` with no tool fails, and so does a predicate this build cannot read.
     case Kind::MatchTool:
+        return item_ != nullptr && item_->test(context.tool, context.toolEnchantments, context.tags);
+    case Kind::EntityMatches: {
+        const std::optional<EntityFacts>& entity = target_ == Target::This       ? context.thisEntity
+                                                   : target_ == Target::Attacker ? context.attacker
+                                                                                 : context.directAttacker;
+        return entity_ != nullptr && entity_->test(entity, context.tags);
+    }
+    // parity: `DamageSourcePredicate.matches`, false without a damage source at all.
+    case Kind::DamageSource: {
+        if (!context.damageTagged) {
+            return false;
+        }
+        for (const auto& [tag, expected] : damageTags_) {
+            if (context.damageTagged(tag) != expected) {
+                return false;
+            }
+        }
+        return (direct_ == nullptr || direct_->test(context.directAttacker, context.tags)) &&
+               (entity_ == nullptr || entity_->test(context.attacker, context.tags));
+    }
+    case Kind::TableBonus: {
+        const std::int32_t level = levelIn(context.toolEnchantments, enchantment_);
+        const std::size_t index = std::min(static_cast<std::size_t>(level), chances_.size() - 1);
+        return random.nextFloat() < chances_[index];
+    }
     case Kind::EntityProperties:
         return false;
     case Kind::FishingHookOpenWater:
@@ -160,7 +267,10 @@ bool LootCondition::test(random::RandomSource& random, const LootContext& contex
     case Kind::AllOf:
         return std::all_of(terms_.begin(), terms_.end(),
                            [&](const LootCondition& term) { return term.test(random, context); });
-    case Kind::RandomChanceWithEnchantedBonus:
+    case Kind::RandomChanceWithEnchantedBonus: {
+        const std::int32_t level = levelIn(context.attackerEnchantments, enchantment_);
+        return random.nextFloat() < (level > 0 ? enchanted_.at(level) : plainChance_);
+    }
     default:
         return random.nextFloat() < plainChance_;
     }
@@ -192,9 +302,33 @@ LootFunction LootFunction::furnaceSmelt() {
     return built;
 }
 
+LootFunction LootFunction::smelt() {
+    LootFunction built;
+    built.kind_ = Kind::Smelt;
+    return built;
+}
+
 LootFunction LootFunction::applyBonus() {
     LootFunction built;
     built.kind_ = Kind::ApplyBonus;
+    return built;
+}
+
+LootFunction LootFunction::applyBonus(std::string enchantment, BonusFormula formula, std::int32_t multiplierOrExtra,
+                                      float probability) {
+    LootFunction built;
+    built.kind_ = Kind::ApplyBonus;
+    built.enchantment_ = std::move(enchantment);
+    built.formula_ = formula;
+    built.bonusNumber_ = multiplierOrExtra;
+    built.probability_ = probability;
+    return built;
+}
+
+LootFunction LootFunction::enchantedCountIncrease(std::string enchantment, NumberProvider count,
+                                                  std::optional<std::int32_t> limit) {
+    LootFunction built = enchantedCountIncrease(std::move(count), limit);
+    built.enchantment_ = std::move(enchantment);
     return built;
 }
 
@@ -224,11 +358,21 @@ ItemStack LootFunction::apply(ItemStack stack, random::RandomSource& random, std
         }
     }
     switch (kind_) {
-    case Kind::EnchantedCountIncrease:
-        // parity: the killer's enchantment level times the roll. Nothing carries one into a loot
-        // roll yet, so the level is zero and this adds nothing, which is what an unenchanted kill
-        // does in vanilla. `count_` and `limit_` are kept for when a tool reaches this.
+    case Kind::EnchantedCountIncrease: {
+        // parity: the attacker's level times the roll, rounded, then the optional cap.
+        const std::int32_t level =
+            context.attacker.has_value() ? levelIn(context.attackerEnchantments, enchantment_) : 0;
+        if (level == 0) {
+            return stack;
+        }
+        // parity: `Math.round(float)`, half up.
+        stack.count +=
+            static_cast<std::int32_t>(std::floor((static_cast<float>(level) * count_.getFloat(random)) + 0.5F));
+        if (limit_.has_value() && *limit_ > 0) {
+            stack.count = std::min(stack.count, *limit_);
+        }
         return stack;
+    }
     case Kind::ExplosionDecay: {
         if (!explosionRadius.has_value() || *explosionRadius <= 0.0F) {
             return stack;
@@ -243,11 +387,52 @@ ItemStack LootFunction::apply(ItemStack stack, random::RandomSource& random, std
         stack.count = std::max(kept, 0);
         return stack;
     }
+    case Kind::ApplyBonus: {
+        // parity: `ApplyBonusCount`, by the level of the enchantment on the tool.
+        const std::int32_t level = levelIn(context.toolEnchantments, enchantment_);
+        switch (formula_) {
+        case BonusFormula::OreDrops:
+            if (level > 0) {
+                stack.count *= std::max(random.nextInt(level + 2) - 1, 0) + 1;
+            }
+            break;
+        case BonusFormula::UniformBonusCount:
+            stack.count += random.nextInt((bonusNumber_ * level) + 1);
+            break;
+        case BonusFormula::BinomialWithBonusCount:
+            for (std::int32_t index = 0; index < level + bonusNumber_; ++index) {
+                if (random.nextFloat() < probability_) {
+                    stack.count++;
+                }
+            }
+            break;
+        }
+        return stack;
+    }
+    case Kind::Smelt: {
+        // parity: `SmeltItemFunction.run`, the result with the input's count, or the input unchanged.
+        if (stack.count <= 0 || !context.smelt) {
+            return stack;
+        }
+        const std::optional<ItemStack> result = context.smelt(stack);
+        if (!result.has_value()) {
+            return stack;
+        }
+        ItemStack smelted = *result;
+        smelted.count = stack.count;
+        return smelted;
+    }
+    case Kind::EnchantRandomly:
+    case Kind::EnchantWithLevels:
+    case Kind::SetEnchantments:
+        return enchant(std::move(stack), random, context);
+    case Kind::SetDamage:
+    case Kind::SetComponents:
+    case Kind::SetStewEffect:
+    case Kind::SetInstrument:
+        return setComponent(std::move(stack), random, context);
     case Kind::CopyFromBlock:
     case Kind::FurnaceSmelt:
-    // parity: `ApplyBonusCount` scales by the enchantment level on the tool that broke the block,
-    // and with a level of zero every one of its three formulas answers the count it was given.
-    case Kind::ApplyBonus:
         return stack;
     // parity: `LimitCount`, the clamp on whatever the functions before it left.
     case Kind::LimitCount:
@@ -308,9 +493,20 @@ namespace {
     return nullptr;
 }
 
+/// A tag's items, in the tag's order.
+[[nodiscard]] std::vector<wire::common::Identifier> tagItems(const LootEntry& entry, const LootContext& context) {
+    return context.tagMembers ? context.tagMembers("item", *entry.tag) : std::vector<wire::common::Identifier>{};
+}
+
+/// One weighed choice: an entry, or one item of an expanded tag entry.
+struct Choice {
+    const LootEntry* entry = nullptr;
+    std::optional<wire::common::Identifier> item;
+};
+
 void addRandomItem(const LootPool& pool, random::RandomSource& random, float luck, std::optional<float> explosionRadius,
                    const LootPool::Output& output, const LootContext& context) {
-    std::vector<const LootEntry*> validEntries;
+    std::vector<Choice> validEntries;
     std::int32_t totalWeight = 0;
     for (const LootEntry& rawEntry : pool.entries) {
         const LootEntry* entry = resolve(rawEntry, random, context);
@@ -318,26 +514,36 @@ void addRandomItem(const LootPool& pool, random::RandomSource& random, float luc
             continue;
         }
         const std::int32_t weight = entry->weightFor(luck);
-        if (weight > 0) {
-            validEntries.push_back(entry);
-            totalWeight += weight;
+        if (weight <= 0) {
+            continue;
         }
+        // parity: `TagEntry.expand`, one choice per item of the tag, each weighing what the entry does.
+        if (entry->tag.has_value() && entry->expand) {
+            for (const wire::common::Identifier& item : tagItems(*entry, context)) {
+                validEntries.push_back(Choice{.entry = entry, .item = item});
+                totalWeight += weight;
+            }
+            continue;
+        }
+        validEntries.push_back(Choice{.entry = entry});
+        totalWeight += weight;
     }
     if (totalWeight == 0 || validEntries.empty()) {
         return;
     }
 
-    const LootEntry* chosen = validEntries.front();
+    Choice picked = validEntries.front();
     if (validEntries.size() > 1) {
         std::int32_t index = random.nextInt(totalWeight);
-        for (const LootEntry* entry : validEntries) {
-            index -= entry->weightFor(luck);
+        for (const Choice& choice : validEntries) {
+            index -= choice.entry->weightFor(luck);
             if (index < 0) {
-                chosen = entry;
+                picked = choice;
                 break;
             }
         }
     }
+    const LootEntry* chosen = picked.entry;
 
     const auto finish = [&](ItemStack stack) {
         for (const LootFunction& function : pool.functions) {
@@ -363,8 +569,10 @@ void addRandomItem(const LootPool& pool, random::RandomSource& random, float luc
     }
     // parity: `NestedLootTable.createItemStack`, the other table rolled on this same context and
     // random, its stacks going through this entry's functions.
-    if (chosen->table.has_value()) {
-        const LootTable* nested = context.tables ? context.tables(*chosen->table) : nullptr;
+    if (chosen->table.has_value() || chosen->inlineTable != nullptr) {
+        const LootTable* nested = chosen->inlineTable != nullptr ? chosen->inlineTable.get()
+                                  : context.tables               ? context.tables(*chosen->table)
+                                                                 : nullptr;
         if (nested == nullptr) {
             return;
         }
@@ -377,6 +585,28 @@ void addRandomItem(const LootPool& pool, random::RandomSource& random, float luc
                 finish(std::move(stack));
             },
             context);
+        return;
+    }
+    const auto decorated = [&](const wire::common::Identifier& item) {
+        ItemStack stack{.item = item, .count = 1};
+        for (const LootFunction& function : chosen->functions) {
+            stack = function.apply(std::move(stack), random, std::nullopt, context);
+        }
+        finish(std::move(stack));
+    };
+    if (picked.item.has_value()) {
+        decorated(*picked.item);
+        return;
+    }
+    // parity: `TagEntry.createItemStack` without expanding, every item of the tag at once.
+    if (chosen->tag.has_value()) {
+        for (const wire::common::Identifier& item : tagItems(*chosen, context)) {
+            decorated(item);
+        }
+        return;
+    }
+    // parity: `EmptyLootItem`, which hands the consumer nothing.
+    if (chosen->empty) {
         return;
     }
     finish(chosen->createItemStack(random, context));

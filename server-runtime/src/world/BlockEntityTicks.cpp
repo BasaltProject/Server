@@ -125,6 +125,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
             }
         }
     }
+    std::vector<vibrations::ShriekerArrival> shrieks;
     for (const std::array<std::int32_t, 2>& position : chunks) {
         server::world::Chunk* chunk = world.chunkIfLoaded(position[0], position[1]);
         if (chunk == nullptr || chunk->blockEntityCount() == 0) {
@@ -141,6 +142,15 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 if (const std::optional<BlockChange> heard = vibrations::travelTick(world, x, y, z, gameTime);
                     heard.has_value()) {
                     changes.push_back(*heard);
+                }
+                continue;
+            }
+            // parity: `SculkShriekerBlockEntity`'s ticker, the same countdown.
+            if (path == "sculk_shrieker") {
+                if (std::optional<vibrations::ShriekerArrival> arrival =
+                        vibrations::shriekerTravelTick(world, x, y, z, gameTime, hooks.ticking);
+                    arrival.has_value()) {
+                    shrieks.push_back(std::move(*arrival));
                 }
                 continue;
             }
@@ -322,6 +332,13 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
             if (turned.has_value()) {
                 changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = *turned});
             }
+        }
+    }
+    // parity: the jar shrieks inside the walk, on the shrieker's own turn. Deferring only differs if
+    // a later block entity in the same walk reads the shrieker, which none does today.
+    if (hooks.shriekerHeard) {
+        for (const vibrations::ShriekerArrival& arrival : shrieks) {
+            hooks.shriekerHeard(arrival);
         }
     }
     return changes;
