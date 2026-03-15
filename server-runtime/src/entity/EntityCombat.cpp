@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/WardenBrain.hpp>
 #include <basalt/server/runtime/entity/WitherBoss.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
 
@@ -64,6 +65,10 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
             return {.landed = true};
         }
         amount = *onBody;
+    }
+    // parity: `Warden.isInvulnerableTo`, untouchable while it is rising or burrowing.
+    if (wardenBrain::isDiggingOrEmerging(entity) && cause != "out_of_world" && cause != "generic_kill") {
+        return {};
     }
     if (entity.wither != nullptr) {
         // A mob's melee names its type; a projectile or blast owned by one sets the flag instead.

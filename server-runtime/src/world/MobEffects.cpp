@@ -20,6 +20,13 @@ constexpr auto kNames =
                                      "darkness",        "trial_omen",     "raid_omen",      "wind_charged",
                                      "weaving",         "oozing",         "infested",       "breath_of_the_nautilus"});
 
+/// parity: the colour each `MobEffects` entry is registered with, in the same order.
+constexpr std::array<std::int32_t, 40> kColors{
+    3402751,  9154528,  14270531, 4866583,  16762624, 16262179, 11101546, 16646020, 5578058, 13458603,
+    9520880,  16750848, 10017472, 16185078, 2039587,  12779366, 5797459,  4738376,  8889187, 7561558,
+    16284963, 2445989,  16262179, 9740385,  13565951, 5882118,  12624973, 15978425, 1950417, 8954814,
+    745784,   4521796,  2696993,  1484454,  14565464, 12438015, 7891290,  10092451, 9214860, 65518};
+
 /// One instance per name, built once, so a caller may hold on to a reference.
 [[nodiscard]] const std::vector<wire::common::Identifier>& instances() {
     static const std::vector<wire::common::Identifier> built = [] {
@@ -71,6 +78,8 @@ const wire::common::Identifier& poison() { return named("poison"); }
 
 const wire::common::Identifier& wither() { return named("wither"); }
 
+const wire::common::Identifier& darkness() { return named("darkness"); }
+
 const wire::common::Identifier& hunger() { return named("hunger"); }
 
 const wire::common::Identifier& instantHealth() { return named("instant_health"); }
@@ -90,5 +99,23 @@ const wire::common::Identifier& heroOfTheVillage() { return named("hero_of_the_v
 const wire::common::Identifier& resistance() { return named("resistance"); }
 
 const wire::common::Identifier& absorption() { return named("absorption"); }
+
+std::optional<std::int32_t> colorOf(const wire::common::Identifier& effect) {
+    const std::optional<std::int32_t> id = protocolIdOf(effect);
+    if (!id.has_value() || *id < 0 || static_cast<std::size_t>(*id) >= kColors.size()) {
+        return std::nullopt;
+    }
+    return kColors[static_cast<std::size_t>(*id)];
+}
+
+std::optional<std::string_view> ownParticleOf(const wire::common::Identifier& effect) {
+    if (effect.path() == "trial_omen") {
+        return "trial_omen";
+    }
+    if (effect.path() == "raid_omen") {
+        return "raid_omen";
+    }
+    return std::nullopt;
+}
 
 } // namespace basalt::server::runtime::world::mobEffects

@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/player/PlayerStats.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
+#include <basalt/server/runtime/world/WardenSpawnTracker.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/common/Uuid.hpp>
@@ -190,6 +191,10 @@ public:
 
     /// Status effects this player carries, by effect id. parity: `LivingEntity.activeEffects`.
     std::map<wire::common::Identifier, world::ActiveEffect> effects;
+
+    /// How close this player is to summoning a warden. parity: `ServerPlayer.wardenSpawnTracker`,
+    /// kept for the session only.
+    world::wardenSpawnTracker::Tracker wardenTracker;
 
     /// How long this player has been standing in a portal, and how long until one works again.
     ///

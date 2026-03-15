@@ -97,6 +97,8 @@ public:
     void teleported(ServerEntity&) override {}
 
     void shootArrow(ServerEntity&, double, double, double, float) override {}
+
+    void wardenRoar(ServerEntity&, std::int32_t) override {}
 };
 
 struct Fixture {

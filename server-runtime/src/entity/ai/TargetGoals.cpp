@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/entity/MobCombat.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/WardenBrain.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/TargetGoals.hpp>
 
@@ -227,14 +228,31 @@ namespace {
 
 } // namespace
 
+bool WardenBusyGoal::canUse(MobContext& mob) {
+    const wardenBrain::WardenState* state = mob.mob.warden.get();
+    return state != nullptr && (wardenBrain::isDiggingOrEmerging(mob.mob) || state->roarTicks > 0);
+}
+
+void WardenBusyGoal::start(MobContext& mob) { navigation::stop(mob.mob); }
+
 bool AngerTargetGoal::canUse(MobContext& mob) { return suspect(mob).has_value(); }
 
 bool AngerTargetGoal::canContinueToUse(MobContext& mob) { return suspect(mob).has_value(); }
 
-void AngerTargetGoal::start(MobContext& mob) { mob.mob.targetId = suspect(mob); }
+void AngerTargetGoal::start(MobContext& mob) { tick(mob); }
 
 void AngerTargetGoal::stop(MobContext& mob) { mob.mob.targetId.reset(); }
 
-void AngerTargetGoal::tick(MobContext& mob) { mob.mob.targetId = suspect(mob); }
+void AngerTargetGoal::tick(MobContext& mob) {
+    const std::optional<std::int32_t> angriest = suspect(mob);
+    // parity: `SetRoarTarget`: somebody new is roared at first, and fought only once the roar ends.
+    if (angriest.has_value() && !mob.mob.targetId.has_value()) {
+        if (!wardenBrain::isBusy(mob.mob)) {
+            mob.actions.wardenRoar(mob.mob, *angriest);
+        }
+        return;
+    }
+    mob.mob.targetId = angriest;
+}
 
 } // namespace basalt::server::runtime::entity::ai

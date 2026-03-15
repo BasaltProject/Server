@@ -4,6 +4,8 @@
 #include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <cstdint>
+#include <map>
+#include <optional>
 #include <string_view>
 #include <vector>
 
@@ -40,7 +42,10 @@ bool add(ServerEntity& mob, const world::ActiveEffect& effect);
 
 [[nodiscard]] bool has(const ServerEntity& mob, const wire::common::Identifier& effect);
 
+/// Removes one effect and the attribute modifiers it brought.
 bool remove(ServerEntity& mob, const wire::common::Identifier& effect);
+
+void clear(ServerEntity& mob);
 
 /// One point of health or one hit a tick owes the mob.
 struct TickEffect {
@@ -53,6 +58,21 @@ struct TickEffect {
 /// Counts every effect down and answers what their ticks do, in the order the effects run.
 /// `expired` gets the effects that ran out.
 [[nodiscard]] std::vector<TickEffect> tick(ServerEntity& mob, std::vector<wire::common::Identifier>& expired);
+
+/// The swirl the clients draw for a set of effects.
+struct Swirl {
+    struct Particle {
+        wire::common::Identifier particle;
+        /// The colour of an `entity_effect`, or nothing for a particle with no options.
+        std::optional<std::int32_t> argb;
+    };
+
+    std::vector<Particle> particles;
+    bool allAmbient = true;
+};
+
+/// parity: `LivingEntity.updateSynchronizedMobEffectParticles`.
+[[nodiscard]] Swirl swirlOf(const std::map<wire::common::Identifier, world::ActiveEffect>& carried);
 
 /// parity: `active_effects`, the saved form.
 [[nodiscard]] wire::nbt::NbtTag encode(const ServerEntity& mob);

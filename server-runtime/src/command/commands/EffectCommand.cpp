@@ -136,7 +136,7 @@ struct Targets {
     for (entity::ServerEntity* mob : targets.mobs) {
         if (effect == nullptr) {
             cleared += static_cast<std::int32_t>(mob->effects.size());
-            mob->effects.clear();
+            entity::mobStatusEffects::clear(*mob);
         } else if (entity::mobStatusEffects::remove(*mob, *effect)) {
             cleared++;
         }

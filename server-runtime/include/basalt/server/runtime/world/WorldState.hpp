@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/world/WorldMutex.hpp>
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/loot/Loot.hpp>
+#include <basalt/wire/common/Uuid.hpp>
 
 #include <atomic>
 #include <cstdint>
@@ -117,6 +118,19 @@ public:
     void setSongOutput(SongOutput songOutput) { songOutput_ = std::move(songOutput); }
 
     [[nodiscard]] std::int32_t songOutput(const std::string& song) const { return songOutput_ ? songOutput_(song) : 0; }
+
+    /// Whether the entity behind a noise leads back to a player.
+    ///
+    /// parity: `SculkShriekerBlockEntity.tryGetPlayer`, which also follows a rider, a projectile's
+    /// owner and a thrown item's thrower. The world knows none of those, so the answer is the
+    /// runtime's; without one no noise ever counts as a player's.
+    using PlayerCheck = std::function<bool(const wire::common::Uuid& entity)>;
+
+    void setPlayerCheck(PlayerCheck playerCheck) { playerCheck_ = std::move(playerCheck); }
+
+    [[nodiscard]] bool leadsToPlayer(const wire::common::Uuid& entity) const {
+        return playerCheck_ && playerCheck_(entity);
+    }
 
     [[nodiscard]] std::vector<server::world::Chunk*> chunks() const;
 
@@ -392,6 +406,7 @@ private:
     mutable WorldMutex mutex_;
     LoadOrGenerate loadOrGenerate_;
     SongOutput songOutput_;
+    PlayerCheck playerCheck_;
     sched::Owner* owner_ = nullptr;
     sched::Owner* installOwner_ = nullptr;
     std::function<std::int32_t()> regionCount_;

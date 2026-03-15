@@ -122,9 +122,9 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
     entity.tickCount++;
     entity::entityCombat::tick(entity);
     if (entity::wardens::isWarden(entity.type())) {
-        entity::wardens::tick(entity);
-        if (entity.touchCooldown > 0) {
-            entity.touchCooldown--;
+        actions_->tickWarden(world, watchers, entity);
+        if (entity.removed) {
+            return;
         }
     }
     if (entity.panicTicks > 0) {

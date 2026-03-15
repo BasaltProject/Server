@@ -363,7 +363,7 @@ void RedstoneTickSystem::tickFootsteps(world::LoadedWorld& world) {
         return;
     }
     std::vector<world::BlockChange> changes;
-    for (const PlayerSession* player : watchers) {
+    for (PlayerSession* player : watchers) {
         if (player->gamemode == Gamemode::Spectator || !player->onGround) {
             continue;
         }
@@ -392,6 +392,13 @@ void RedstoneTickSystem::tickFootsteps(world::LoadedWorld& world) {
         // angrier at whoever took it. Sneaking makes no vibration, so it hears nothing.
         if (!player->sneaking) {
             hearFootstep(world, *player);
+            // parity: `Block.stepOn` for the blocks outside redstone, the sculk shrieker among them,
+            // on `Entity.getOnPos`, a fifth of a block under the feet.
+            if (options_.steppedOn) {
+                options_.steppedOn(world, *player, static_cast<std::int32_t>(std::floor(player->x)),
+                                   static_cast<std::int32_t>(std::floor(player->y - kOnPosDepth)),
+                                   static_cast<std::int32_t>(std::floor(player->z)));
+            }
         }
         if (!world.state().hasSculkSensorNear(player->x, player->y, player->z, world::vibrations::kCalibratedRange)) {
             continue;

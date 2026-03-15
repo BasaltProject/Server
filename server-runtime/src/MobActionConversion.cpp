@@ -298,6 +298,10 @@ void MobActionSystem::tickMobEffects(world::LoadedWorld& world, const std::vecto
                 result.died);
         }
     }
+    // parity: `LivingEntity.onAttributeUpdated`, which takes back health a lost boost held up.
+    if (!expired.empty()) {
+        mob.health = std::min(mob.health, mob.attributeWithModifiers("minecraft:max_health"));
+    }
     static_cast<void>(world);
 }
 

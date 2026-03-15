@@ -7,7 +7,9 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <map>
+#include <span>
 #include <string>
 #include <unordered_map>
 
@@ -117,17 +119,44 @@ constexpr std::array<registry::BlockFace, 6> kFaces{registry::BlockFace::Down,  
     return block == sensor() || block == calibrated();
 }
 
-/// What a sensor has written down: either the noise on its way or the best one heard this turn.
+[[nodiscard]] const wire::common::Identifier& shrieker() {
+    static const wire::common::Identifier instance = wire::common::Identifier::vanilla("sculk_shrieker");
+    return instance;
+}
+
+/// What a listener has written down: either the noise on its way or the best one heard this turn.
 ///
-/// parity: `VibrationInfo`, minus the two uuids. They exist for the resonance through amethyst and
-/// for the advancement, and this build models neither.
+/// parity: `VibrationInfo`.
 struct Noise {
     std::string event;
     float distance = 0.0F;
     double x = 0.0;
     double y = 0.0;
     double z = 0.0;
+    Source source;
 };
+
+/// parity: `UUIDUtil.CODEC`, four ints with the high word first.
+void putUuid(wire::nbt::NbtCompound& tag, std::string_view key, const std::optional<wire::common::Uuid>& uuid) {
+    if (!uuid.has_value()) {
+        return;
+    }
+    tag.putIntArray(key, {static_cast<std::int32_t>(static_cast<std::uint32_t>(uuid->high() >> 32)),
+                          static_cast<std::int32_t>(static_cast<std::uint32_t>(uuid->high())),
+                          static_cast<std::int32_t>(static_cast<std::uint32_t>(uuid->low() >> 32)),
+                          static_cast<std::int32_t>(static_cast<std::uint32_t>(uuid->low()))});
+}
+
+[[nodiscard]] std::optional<wire::common::Uuid> uuidAt(const wire::nbt::NbtCompound& tag, std::string_view key) {
+    const std::span<const std::int32_t> parts = tag.getIntArray(key);
+    if (parts.size() != 4) {
+        return std::nullopt;
+    }
+    const auto word = [parts](std::size_t at) {
+        return static_cast<std::uint64_t>(static_cast<std::uint32_t>(parts[at]));
+    };
+    return wire::common::Uuid{(word(0) << 32) | word(1), (word(2) << 32) | word(3)};
+}
 
 [[nodiscard]] wire::nbt::NbtCompound written(const Noise& noise) {
     wire::nbt::NbtCompound tag;
@@ -137,6 +166,8 @@ struct Noise {
                        wire::nbt::NbtList{wire::nbt::NbtType::Double,
                                           {wire::nbt::NbtTag::ofDouble(noise.x), wire::nbt::NbtTag::ofDouble(noise.y),
                                            wire::nbt::NbtTag::ofDouble(noise.z)}}));
+    putUuid(tag, "source", noise.source.entity);
+    putUuid(tag, "projectile_owner", noise.source.projectileOwner);
     return tag;
 }
 
@@ -156,7 +187,13 @@ struct Noise {
         const double* value = (*pos)[index].get<double>();
         return value == nullptr ? 0.0 : *value;
     };
-    return Noise{.event = std::string{name}, .distance = tag->getFloat("distance"), .x = at(0), .y = at(1), .z = at(2)};
+    return Noise{.event = std::string{name},
+                 .distance = tag->getFloat("distance"),
+                 .x = at(0),
+                 .y = at(1),
+                 .z = at(2),
+                 .source =
+                     Source{.entity = uuidAt(*tag, "source"), .projectileOwner = uuidAt(*tag, "projectile_owner")}};
 }
 
 /// The sensor's own block entity, made on the spot if the world never gave it one.
@@ -185,7 +222,8 @@ struct Noise {
 
 [[nodiscard]] std::optional<BlockChange> activate(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                   std::int32_t stateId, const wire::common::Identifier& block,
-                                                  std::int32_t frequency, double distance, std::int64_t gameTime) {
+                                                  std::int32_t frequency, double distance, std::int64_t gameTime,
+                                                  const Source& source) {
     const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
     const auto phase = properties.find("sculk_sensor_phase");
     if (phase == properties.end() || phase->second != "inactive") {
@@ -214,10 +252,13 @@ struct Noise {
             const std::int32_t az = z + registry::stepZ(face);
             if (const std::optional<std::int32_t> beside = world.blockState(ax, ay, az);
                 beside.has_value() && resonates(*beside)) {
-                emit(world, resonance, ax + 0.5, ay + 0.5, az + 0.5, gameTime);
+                emit(world, resonance, ax + 0.5, ay + 0.5, az + 0.5, gameTime, source);
             }
         }
     }
+    // parity: `level.gameEvent(sourceEntity, SCULK_SENSOR_TENDRILS_CLICKING, pos)`, from the middle of
+    // the square and still carrying who made the first noise. Only a shrieker hears it.
+    emit(world, kTendrilsClicking, x + 0.5, y + 0.5, z + 0.5, gameTime, source);
     return BlockChange{.x = x, .y = y, .z = z, .stateId = *turned};
 }
 
@@ -276,13 +317,13 @@ void wake(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, con
 
 void offer(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::int32_t sensorZ,
            const wire::common::Identifier& block, std::string_view event, double x, double y, double z,
-           std::int64_t gameTime, bool refuseWhileCarrying);
+           std::int64_t gameTime, bool refuseWhileCarrying, const Source& source);
 
 /// parity: `VibrationSystem.Listener.handleGameEvent` over `VibrationSelector.addCandidate`. Nothing
 /// lights up here: the sensor writes the noise down and waits its turn.
 void hear(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::int32_t sensorZ, std::int32_t stateId,
           const wire::common::Identifier& block, std::string_view event, double x, double y, double z,
-          std::int64_t gameTime) {
+          std::int64_t gameTime, const Source& source) {
     const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
     const auto phase = properties.find("sculk_sensor_phase");
     if (phase == properties.end() || phase->second != "inactive") {
@@ -318,7 +359,25 @@ void hear(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::in
     if (occluded(world, x, y, z, sensorX, sensorY, sensorZ)) {
         return;
     }
-    offer(world, sensorX, sensorY, sensorZ, block, event, x, y, z, gameTime, true);
+    offer(world, sensorX, sensorY, sensorZ, block, event, x, y, z, gameTime, true, source);
+}
+
+/// parity: `handleGameEvent` for a shrieker, whose `canReceiveVibration` asks two things: that it is
+/// not already shrieking, and that the noise leads back to a player.
+void hearShrieker(WorldState& world, std::int32_t shriekerX, std::int32_t shriekerY, std::int32_t shriekerZ,
+                  std::int32_t stateId, double x, double y, double z, std::int64_t gameTime, const Source& source) {
+    const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
+    if (const auto shrieking = properties.find("shrieking");
+        shrieking == properties.end() || shrieking->second != "false") {
+        return;
+    }
+    if (!source.entity.has_value() || !world.leadsToPlayer(*source.entity)) {
+        return;
+    }
+    if (occluded(world, x, y, z, shriekerX, shriekerY, shriekerZ)) {
+        return;
+    }
+    offer(world, shriekerX, shriekerY, shriekerZ, shrieker(), kTendrilsClicking, x, y, z, gameTime, true, source);
 }
 
 /// The write half of `VibrationSelector.addCandidate`. `refuseWhileCarrying` is what tells the two
@@ -326,7 +385,7 @@ void hear(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::in
 /// `forceScheduleVibration` (which is what stepping straight on the sensor uses) does not ask.
 void offer(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::int32_t sensorZ,
            const wire::common::Identifier& block, std::string_view event, double x, double y, double z,
-           std::int64_t gameTime, bool refuseWhileCarrying) {
+           std::int64_t gameTime, bool refuseWhileCarrying, const Source& source) {
     wire::nbt::NbtCompound* data = dataOf(world, sensorX, sensorY, sensorZ, block);
     if (data == nullptr) {
         return;
@@ -355,8 +414,9 @@ void offer(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::i
             return;
         }
     }
-    selector.set("event", wire::nbt::NbtTag::ofCompound(written(
-                              Noise{.event = std::string{event}, .distance = distance, .x = x, .y = y, .z = z})));
+    selector.set("event",
+                 wire::nbt::NbtTag::ofCompound(written(Noise{
+                     .event = std::string{event}, .distance = distance, .x = x, .y = y, .z = z, .source = source})));
     selector.putLong("tick", gameTime);
     listener.set("selector", wire::nbt::NbtTag::ofCompound(std::move(selector)));
     data->set(kListenerKey, wire::nbt::NbtTag::ofCompound(std::move(listener)));
@@ -364,9 +424,12 @@ void offer(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::i
 }
 
 /// parity: `VibrationSystem.Ticker.tick`: pick what was heard last turn, then move it one block
-/// closer, and light the sensor on the turn it arrives.
-[[nodiscard]] std::optional<BlockChange> travel(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                                const wire::common::Identifier& block, std::int64_t gameTime) {
+/// closer, whatever the listener is.
+///
+/// `mayLand` is `receiveVibration`'s own gate: when it says no, the noise stays written down with
+/// its countdown spent and tries again next turn. Answers the noise that landed, if one did.
+[[nodiscard]] std::optional<Noise> countDown(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                             std::int64_t gameTime, const std::function<bool()>& mayLand) {
     wire::nbt::NbtCompound* data = heldBy(world, x, y, z);
     if (data == nullptr) {
         return std::nullopt;
@@ -405,9 +468,25 @@ void offer(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::i
         data->set(kListenerKey, wire::nbt::NbtTag::ofCompound(std::move(listener)));
         return std::nullopt;
     }
+    if (mayLand && !mayLand()) {
+        listener.set("event", wire::nbt::NbtTag::ofCompound(written(*current)));
+        listener.putInt("event_delay", 0);
+        data->set(kListenerKey, wire::nbt::NbtTag::ofCompound(std::move(listener)));
+        return std::nullopt;
+    }
     listener.remove("event");
     listener.putInt("event_delay", 0);
     data->set(kListenerKey, wire::nbt::NbtTag::ofCompound(std::move(listener)));
+    return current;
+}
+
+/// A sensor's countdown, which lights it on the turn the noise lands.
+[[nodiscard]] std::optional<BlockChange> travel(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                                const wire::common::Identifier& block, std::int64_t gameTime) {
+    const std::optional<Noise> current = countDown(world, x, y, z, gameTime, {});
+    if (!current.has_value()) {
+        return std::nullopt;
+    }
     // parity: `VibrationSystem.Listener.distanceBetweenInBlocks`. The signal is how far the two
     // **squares** were, which is not the distance the noise travelled.
     const double toX = static_cast<double>(x) - std::floor(current->x);
@@ -418,7 +497,7 @@ void offer(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::i
         return std::nullopt;
     }
     return activate(world, x, y, z, *now, block, frequencyOf(current->event),
-                    std::sqrt((toX * toX) + (toY * toY) + (toZ * toZ)), gameTime);
+                    std::sqrt((toX * toX) + (toY * toY) + (toZ * toZ)), gameTime, current->source);
 }
 } // namespace
 
@@ -441,14 +520,41 @@ std::int32_t frequencyOf(std::string_view event) {
     return found == frequencies().end() ? 0 : found->second;
 }
 
-void emit(WorldState& world, std::string_view event, double x, double y, double z, std::int64_t gameTime) {
+void emit(WorldState& world, std::string_view event, double x, double y, double z, std::int64_t gameTime,
+          const Source& source) {
+    const auto blockX = static_cast<std::int32_t>(std::floor(x));
+    const auto blockY = static_cast<std::int32_t>(std::floor(y));
+    const auto blockZ = static_cast<std::int32_t>(std::floor(z));
+    // parity: the tags `vibrations` and `shrieker_can_listen` share nothing, so a click only ever
+    // reaches shriekers and every other noise only ever reaches sensors.
+    if (event == kTendrilsClicking) {
+        for (std::int32_t offsetY = -kShriekerRange; offsetY <= kShriekerRange; ++offsetY) {
+            for (std::int32_t offsetZ = -kShriekerRange; offsetZ <= kShriekerRange; ++offsetZ) {
+                for (std::int32_t offsetX = -kShriekerRange; offsetX <= kShriekerRange; ++offsetX) {
+                    if ((offsetX * offsetX) + (offsetY * offsetY) + (offsetZ * offsetZ) >
+                        kShriekerRange * kShriekerRange) {
+                        continue;
+                    }
+                    const std::int32_t atX = blockX + offsetX;
+                    const std::int32_t atY = blockY + offsetY;
+                    const std::int32_t atZ = blockZ + offsetZ;
+                    const std::optional<std::int32_t> stateId = world.blockState(atX, atY, atZ);
+                    if (!stateId.has_value()) {
+                        continue;
+                    }
+                    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
+                    if (block != nullptr && *block == shrieker()) {
+                        hearShrieker(world, atX, atY, atZ, *stateId, x, y, z, gameTime, source);
+                    }
+                }
+            }
+        }
+        return;
+    }
     const std::int32_t frequency = frequencyOf(event);
     if (frequency <= 0) {
         return;
     }
-    const auto blockX = static_cast<std::int32_t>(std::floor(x));
-    const auto blockY = static_cast<std::int32_t>(std::floor(y));
-    const auto blockZ = static_cast<std::int32_t>(std::floor(z));
     // parity: the calibrated sensor hears twice as far, so the walk is the wider of the two and each
     // sensor answers for its own radius below.
     for (std::int32_t offsetY = -kCalibratedRange; offsetY <= kCalibratedRange; ++offsetY) {
@@ -477,14 +583,14 @@ void emit(WorldState& world, std::string_view event, double x, double y, double 
                 if (reach > radius * radius) {
                     continue;
                 }
-                hear(world, sensorX, sensorY, sensorZ, *stateId, *block, event, x, y, z, gameTime);
+                hear(world, sensorX, sensorY, sensorZ, *stateId, *block, event, x, y, z, gameTime, source);
             }
         }
     }
 }
 
 bool stoodOn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, double entityX, double entityY,
-             double entityZ, std::int64_t gameTime) {
+             double entityZ, std::int64_t gameTime, const Source& source) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return false;
@@ -499,7 +605,7 @@ bool stoodOn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, 
     if (phase == properties.end() || phase->second != "inactive") {
         return false;
     }
-    offer(world, x, y, z, *block, "step", entityX, entityY, entityZ, gameTime, false);
+    offer(world, x, y, z, *block, "step", entityX, entityY, entityZ, gameTime, false, source);
     return true;
 }
 
@@ -553,6 +659,35 @@ std::optional<BlockChange> travelTick(WorldState& world, std::int32_t x, std::in
         return std::nullopt;
     }
     return travel(world, x, y, z, *block, gameTime);
+}
+
+std::optional<ShriekerArrival> shriekerTravelTick(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                                  std::int64_t gameTime, const WorldState::Ticking& ticking) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    if (!stateId.has_value()) {
+        return std::nullopt;
+    }
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
+    if (block == nullptr || *block != shrieker()) {
+        return std::nullopt;
+    }
+    // parity: `requiresAdjacentChunksToBeTicking`, which only the shrieker turns on: the noise waits
+    // until the three by three chunks around it are all running.
+    const auto neighboursRun = [&world, &ticking, chunkX = x >> 4, chunkZ = z >> 4] {
+        for (std::int32_t atX = chunkX - 1; atX <= chunkX + 1; ++atX) {
+            for (std::int32_t atZ = chunkZ - 1; atZ <= chunkZ + 1; ++atZ) {
+                if (world.chunkIfLoaded(atX, atZ) == nullptr || (ticking && !ticking(atX, atZ))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    };
+    const std::optional<Noise> landed = countDown(world, x, y, z, gameTime, neighboursRun);
+    if (!landed.has_value()) {
+        return std::nullopt;
+    }
+    return ShriekerArrival{.x = x, .y = y, .z = z, .source = landed->source};
 }
 
 } // namespace basalt::server::runtime::world::vibrations

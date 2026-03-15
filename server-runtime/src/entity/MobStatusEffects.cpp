@@ -4,10 +4,14 @@
 #include <basalt/wire/nbt/NbtType.hpp>
 
 #include <algorithm>
+#include <array>
+#include <string>
 
 namespace basalt::server::runtime::entity::mobStatusEffects {
 namespace {
 
+using entity::AttributeModifier;
+using entity::AttributeOperation;
 using wire::common::Identifier;
 using wire::nbt::NbtCompound;
 using wire::nbt::NbtTag;
@@ -17,10 +21,66 @@ namespace effects = world::mobEffects;
 constexpr std::int32_t kRegenerationInterval = 50;
 constexpr std::int32_t kPoisonInterval = 25;
 constexpr std::int32_t kWitherInterval = 40;
+/// parity: `MobEffect.AMBIENT_ALPHA`, `Mth.floor(38.25F)`.
+constexpr std::int32_t kAmbientAlpha = 38;
 
 [[nodiscard]] bool onInterval(std::int32_t ticks, std::int32_t base, std::int32_t amplifier) {
     const std::int32_t interval = amplifier >= 31 ? 0 : base >> amplifier;
     return interval <= 0 || ticks % interval == 0;
+}
+
+struct Template {
+    std::string_view effect;
+    std::string_view attribute;
+    std::string_view id;
+    double amount;
+    AttributeOperation operation;
+};
+
+/// parity: the `addAttributeModifier` calls in `MobEffects`, each scaled by the level.
+constexpr std::array kTemplates{
+    Template{"speed", "minecraft:movement_speed", "minecraft:effect.speed", static_cast<double>(0.2F),
+             AttributeOperation::AddMultipliedTotal},
+    Template{"slowness", "minecraft:movement_speed", "minecraft:effect.slowness", static_cast<double>(-0.15F),
+             AttributeOperation::AddMultipliedTotal},
+    Template{"haste", "minecraft:attack_speed", "minecraft:effect.haste", static_cast<double>(0.1F),
+             AttributeOperation::AddMultipliedTotal},
+    Template{"mining_fatigue", "minecraft:attack_speed", "minecraft:effect.mining_fatigue", static_cast<double>(-0.1F),
+             AttributeOperation::AddMultipliedTotal},
+    Template{"strength", "minecraft:attack_damage", "minecraft:effect.strength", 3.0, AttributeOperation::AddValue},
+    Template{"jump_boost", "minecraft:safe_fall_distance", "minecraft:effect.jump_boost", 1.0,
+             AttributeOperation::AddValue},
+    Template{"weakness", "minecraft:attack_damage", "minecraft:effect.weakness", -4.0, AttributeOperation::AddValue},
+    Template{"health_boost", "minecraft:max_health", "minecraft:effect.health_boost", 4.0,
+             AttributeOperation::AddValue},
+    Template{"absorption", "minecraft:max_absorption", "minecraft:effect.absorption", 4.0,
+             AttributeOperation::AddValue},
+    Template{"luck", "minecraft:luck", "minecraft:effect.luck", 1.0, AttributeOperation::AddValue},
+    Template{"unluck", "minecraft:luck", "minecraft:effect.unluck", -1.0, AttributeOperation::AddValue}};
+
+/// parity: `MobEffect.addAttributeModifiers`, replacing whatever the effect had set before.
+void applyModifiers(ServerEntity& mob, const Identifier& effect, std::int32_t amplifier) {
+    for (const Template& modifier : kTemplates) {
+        if (effect.path() != modifier.effect) {
+            continue;
+        }
+        mob.attributeModifiers[std::string{modifier.attribute}].insert_or_assign(
+            std::string{modifier.id}, AttributeModifier{.id = std::string{modifier.id},
+                                                        .amount = modifier.amount * static_cast<double>(amplifier + 1),
+                                                        .operation = modifier.operation});
+    }
+}
+
+/// parity: `MobEffect.removeAttributeModifiers`.
+void removeModifiers(ServerEntity& mob, const Identifier& effect) {
+    for (const Template& modifier : kTemplates) {
+        if (effect.path() != modifier.effect) {
+            continue;
+        }
+        if (const auto found = mob.attributeModifiers.find(modifier.attribute); found != mob.attributeModifiers.end()) {
+            found->second.erase(std::string{modifier.id});
+        }
+    }
 }
 
 [[nodiscard]] bool shorterThan(const world::ActiveEffect& one, const world::ActiveEffect& other) {
@@ -76,6 +136,7 @@ bool add(ServerEntity& mob, const world::ActiveEffect& effect) {
     const auto found = mob.effects.find(effect.effect);
     if (found == mob.effects.end()) {
         mob.effects.emplace(effect.effect, effect);
+        applyModifiers(mob, effect.effect, effect.amplifier);
         return true;
     }
     world::ActiveEffect& current = found->second;
@@ -87,6 +148,9 @@ bool add(ServerEntity& mob, const world::ActiveEffect& effect) {
     } else if (shorterThan(current, effect) && effect.amplifier == current.amplifier) {
         current.remainingTicks = effect.remainingTicks;
         changed = true;
+    }
+    if (changed) {
+        applyModifiers(mob, current.effect, current.amplifier);
     }
     if ((!effect.ambient && current.ambient) || changed) {
         current.ambient = effect.ambient;
@@ -102,7 +166,17 @@ bool add(ServerEntity& mob, const world::ActiveEffect& effect) {
 
 bool has(const ServerEntity& mob, const Identifier& effect) { return mob.effects.contains(effect); }
 
-bool remove(ServerEntity& mob, const Identifier& effect) { return mob.effects.erase(effect) > 0; }
+bool remove(ServerEntity& mob, const Identifier& effect) {
+    removeModifiers(mob, effect);
+    return mob.effects.erase(effect) > 0;
+}
+
+void clear(ServerEntity& mob) {
+    for (const auto& [id, active] : mob.effects) {
+        removeModifiers(mob, id);
+    }
+    mob.effects.clear();
+}
 
 std::vector<TickEffect> tick(ServerEntity& mob, std::vector<Identifier>& expired) {
     std::vector<TickEffect> owed;
@@ -128,12 +202,34 @@ std::vector<TickEffect> tick(ServerEntity& mob, std::vector<Identifier>& expired
         }
         if (!active.infinite() && active.remainingTicks <= 0) {
             expired.push_back(active.effect);
+            removeModifiers(mob, active.effect);
             it = mob.effects.erase(it);
         } else {
             ++it;
         }
     }
     return owed;
+}
+
+Swirl swirlOf(const std::map<Identifier, world::ActiveEffect>& carried) {
+    Swirl swirl;
+    swirl.allAmbient = true;
+    for (const auto& [id, active] : carried) {
+        swirl.allAmbient = swirl.allAmbient && active.ambient;
+        if (!active.visible) {
+            continue;
+        }
+        if (const std::optional<std::string_view> own = effects::ownParticleOf(id); own.has_value()) {
+            swirl.particles.push_back({.particle = Identifier::vanilla(std::string{*own})});
+            continue;
+        }
+        // parity: `MobEffect`'s default particle, the colour at full or at the ambient alpha.
+        const std::uint32_t alpha = active.ambient ? static_cast<std::uint32_t>(kAmbientAlpha) : 255U;
+        const auto rgb = static_cast<std::uint32_t>(effects::colorOf(id).value_or(0)) & 0xFFFFFFU;
+        swirl.particles.push_back({.particle = Identifier::vanilla("entity_effect"),
+                                   .argb = static_cast<std::int32_t>((alpha << 24U) | rgb)});
+    }
+    return swirl;
 }
 
 NbtTag encode(const ServerEntity& mob) {
@@ -166,6 +262,7 @@ void decode(ServerEntity& mob, const NbtCompound& tag) {
         if (!id.has_value()) {
             continue;
         }
+        applyModifiers(mob, *id, entry->getByte("amplifier"));
         mob.effects.insert_or_assign(*id, world::ActiveEffect{.effect = *id,
                                                               .amplifier = entry->getByte("amplifier"),
                                                               .remainingTicks = entry->getInt("duration", 1),

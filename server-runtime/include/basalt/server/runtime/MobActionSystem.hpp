@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/MobConversions.hpp>
+#include <basalt/server/runtime/entity/WardenBrain.hpp>
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/wire/common/Identifier.hpp>
@@ -108,6 +109,19 @@ public:
 
     void shootArrow(entity::ServerEntity& mob, double targetX, double targetY, double targetZ, float power) override;
 
+    void wardenRoar(entity::ServerEntity& warden, std::int32_t targetId) override;
+
+    /// parity: a warden summoned by a shrieker, which rises out of the ground.
+    void wardenEmerges(world::LoadedWorld& world, entity::ServerEntity& warden);
+
+    /// parity: `Warden.hurtServer`'s own reaction to whoever hit it.
+    static void wardenStruck(entity::ServerEntity& warden, std::int32_t attackerId, bool direct,
+                             double distanceSquared);
+
+    /// The warden's anger, timed behaviours and darkness. parity: `Warden.customServerAiStep`.
+    void tickWarden(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                    entity::ServerEntity& warden);
+
     /// parity: `SnowGolem.aiStep`, the layer of snow it leaves on every square it stands on.
     void trailSnow(world::LoadedWorld& world, const entity::ServerEntity& golem);
 
@@ -196,6 +210,16 @@ private:
     [[nodiscard]] static std::int32_t lightAt(world::LoadedWorld& world, const std::array<std::int32_t, 3>& position);
 
     [[nodiscard]] random::RandomSource freshRandom() const;
+
+    /// Whether a warden's swing may land now, running what the swing sets off when it does.
+    bool wardenSwings(world::LoadedWorld& world, entity::ServerEntity& mob);
+
+    void runWardenActions(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                          entity::ServerEntity& warden, const std::vector<entity::wardenBrain::Action>& actions);
+
+    /// parity: `SonicBoom.tick`'s blast.
+    void sonicBlast(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                    entity::ServerEntity& warden);
 
     [[nodiscard]] std::int32_t cureProgress(world::LoadedWorld& world, const entity::ServerEntity& mob);
 

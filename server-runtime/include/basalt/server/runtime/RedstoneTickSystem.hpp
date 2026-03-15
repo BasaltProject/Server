@@ -65,6 +65,14 @@ public:
         const world::realItemTags::TagMembers* itemTags = nullptr;
         /// The block tags, which is what a dispensed water bottle asks before it makes mud.
         const world::realBlockTags::TagMembers* blockTags = nullptr;
+        /// A player's step onto a block, for the blocks whose `stepOn` is not redstone's.
+        std::function<void(world::LoadedWorld& world, player::PlayerSession& player, std::int32_t x, std::int32_t y,
+                           std::int32_t z)>
+            steppedOn;
+        /// A booked turn of a block this system does not own.
+        std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                           std::int32_t x, std::int32_t y, std::int32_t z)>
+            foreignTick;
     };
 
     /// `runCommand` is what a command block runs its command with. It is a constructor parameter and

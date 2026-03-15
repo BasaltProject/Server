@@ -205,6 +205,7 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
                 step("Portal tick", [this, &world] { environment_->tickPortals(world); });
                 step("Drowning tick", [this, &world] { environment_->tickSubmersion(world); });
                 step("Footstep tick", [this, &world] { redstone_->tickFootsteps(world); });
+                step("Warden warning tick", [this, &world] { shriekers_->tickTrackers(world); });
             }
             step("Inhabited-time tick", [this, &world, &region] { redstone_->tickInhabitedTime(world, region); });
             // parity: `ServerLevel.tick` runs the booked block turns first, the fluids after them and

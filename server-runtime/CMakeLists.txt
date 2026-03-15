@@ -158,6 +158,8 @@ basalt_module(server-runtime-core
         src/MobTickSystem.cpp
         src/MobActionTick.cpp
         src/MobActionConversion.cpp
+        src/MobActionWarden.cpp
+        src/ShriekerSystem.cpp
         src/LightningBoltSystem.cpp
         src/NaturalSpawningMaterialize.cpp
         src/NaturalSpawningSystem.cpp
@@ -279,6 +281,8 @@ basalt_module(server-runtime-core
         src/world/BlockExperience.cpp
         src/world/BlockPatterns.cpp
         src/world/WitherPatterns.cpp
+        src/world/SculkShriekers.cpp
+        src/world/WardenSpawnTracker.cpp
         src/world/EndGateways.cpp
         src/world/EndPodium.cpp
         src/world/EndCrystals.cpp
@@ -432,6 +436,7 @@ basalt_module(server-runtime-core
         src/entity/MobBreathing.cpp
         src/entity/MobConversions.cpp
         src/entity/MobStatusEffects.cpp
+        src/entity/WardenBrain.cpp
         src/entity/EntityCombat.cpp
         src/entity/MobBrain.cpp
         src/entity/MobCombat.cpp
@@ -1352,6 +1357,18 @@ target_compile_definitions(server-runtime-end-fight-test
 basalt_test(server-runtime-shield-test
     SOURCES
         test/ShieldTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-sculk-shrieker-test
+    SOURCES
+        test/SculkShriekerTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-warden-brain-test
+    SOURCES
+        test/WardenBrainTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

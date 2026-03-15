@@ -48,6 +48,13 @@ struct RuntimeEntityMetadata {
     /// parity: `FishingHook`'s hooked entity, as its id plus one, and whether a fish is biting.
     std::optional<std::int32_t> hookedEntity;
     std::optional<bool> hookBiting;
+    /// parity: `LivingEntity.DATA_EFFECT_PARTICLES` and `DATA_EFFECT_AMBIENCE_ID`, the effect swirl.
+    std::optional<wire::protocol::play::SetEntityDataPacket::ParticlesValue> effectParticles;
+    std::optional<bool> effectsAmbient;
+    /// parity: `Entity.DATA_POSE`, for the mobs whose pose this server changes, and the warden's
+    /// `CLIENT_ANGER_LEVEL`.
+    std::optional<wire::protocol::play::Pose> pose;
+    std::optional<std::int32_t> wardenAnger;
 
     /// Initial non-default fields, or every field whose live value changed since `previous`.
     [[nodiscard]] std::vector<wire::protocol::play::SetEntityDataPacket::Entry>

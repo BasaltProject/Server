@@ -29,6 +29,10 @@ namespace witherBoss {
 struct WitherState;
 }
 
+namespace wardenBrain {
+struct WardenState;
+}
+
 namespace ai {
 class GoalSelector;
 }
@@ -308,6 +312,9 @@ public:
 
     /// What a wither keeps beyond this, or null for anything else.
     std::shared_ptr<witherBoss::WitherState> wither;
+
+    /// What a warden's timed behaviours keep, or null for anything else.
+    std::shared_ptr<wardenBrain::WardenState> warden;
 
     /// Attribute base values that were changed from their default. parity: `AttributeMap`, without
     /// modifiers.

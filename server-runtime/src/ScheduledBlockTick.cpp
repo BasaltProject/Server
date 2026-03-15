@@ -36,6 +36,7 @@
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/RedstoneReactors.hpp>
 #include <basalt/server/runtime/world/ScheduledBlocks.hpp>
+#include <basalt/server/runtime/world/SculkShriekers.hpp>
 #include <basalt/server/runtime/world/Tripwires.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
@@ -233,6 +234,10 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
             // parity: `checkPressed` ends in `updateNeighbourForOutputSignal` whatever it decided, so
             // a comparator reading a container minecart parked here follows what is inside it.
             world::redstoneComponents::scheduleComparatorsAround(world.state(), world.name(), x, y, z, containerSignal);
+        }
+        // parity: `SculkShriekerBlock.tick`, the end of a shriek and the warden's answer to it.
+        if (here != 0 && world::sculkShriekers::isShrieker(here) && options_.foreignTick) {
+            options_.foreignTick(world, watchers, x, y, z);
         }
         // parity: `SculkSensorBlock.tick`: thirty ticks awake, then ten of cooldown, plus the turn
         // the vibration on its way spends. `activate` and `deactivate` both end in `updateNeighbours`,

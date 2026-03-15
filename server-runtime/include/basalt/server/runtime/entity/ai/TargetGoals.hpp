@@ -102,6 +102,18 @@ private:
 ///
 /// parity: `WardenAi`'s anger, not a target goal at all in vanilla. The point is the same either
 /// way: a warden that has not heard you does not know you are there, however close you stand.
+/// parity: the warden's emerge, dig, roar and sonic boom, which hold its other behaviours still.
+class WardenBusyGoal final : public Goal {
+public:
+    [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move, GoalFlag::Look, GoalFlag::Jump}; }
+
+    [[nodiscard]] bool canUse(MobContext& mob) override;
+
+    [[nodiscard]] bool requiresUpdateEveryTick() const override { return true; }
+
+    void start(MobContext& mob) override;
+};
+
 class AngerTargetGoal final : public Goal {
 public:
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Target}; }

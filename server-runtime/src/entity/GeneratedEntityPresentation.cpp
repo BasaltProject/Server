@@ -6,7 +6,9 @@
 #include <basalt/server/runtime/entity/FishingHooks.hpp>
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
+#include <basalt/server/runtime/entity/MobStatusEffects.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/WardenBrain.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
 
 #include <array>
@@ -17,6 +19,10 @@
 
 namespace basalt::server::runtime::entity {
 namespace {
+
+/// parity: `LivingEntity.DATA_EFFECT_PARTICLES` and `DATA_EFFECT_AMBIENCE_ID`.
+constexpr std::uint8_t kEffectParticlesDataIndex = 10;
+constexpr std::uint8_t kEffectAmbienceDataIndex = 11;
 
 /// parity: `ExperienceOrb.DATA_VALUE`.
 constexpr std::uint8_t kOrbValueDataIndex = 8;
@@ -482,6 +488,25 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
         entries.push_back(Entry{.index = fishingHooks::kBitingDataIndex,
                                 .value = SetEntityDataPacket::BoolValue{.value = *hookBiting}});
     }
+    if (effectParticles.has_value() && (previous == nullptr || previous->effectParticles != effectParticles) &&
+        (previous != nullptr || !effectParticles->particles.empty())) {
+        entries.push_back(Entry{.index = kEffectParticlesDataIndex, .value = *effectParticles});
+    }
+    if (effectsAmbient.has_value() && (previous == nullptr || previous->effectsAmbient != effectsAmbient) &&
+        (previous != nullptr || *effectsAmbient)) {
+        entries.push_back(Entry{.index = kEffectAmbienceDataIndex,
+                                .value = SetEntityDataPacket::BoolValue{.value = *effectsAmbient}});
+    }
+    if (pose.has_value() && (previous == nullptr || previous->pose != pose) &&
+        (previous != nullptr || *pose != wire::protocol::play::Pose::Standing)) {
+        entries.push_back(
+            Entry{.index = SetEntityDataPacket::kPoseIndex, .value = SetEntityDataPacket::PoseValue{.pose = *pose}});
+    }
+    if (wardenAnger.has_value() && (previous == nullptr || previous->wardenAnger != wardenAnger) &&
+        (previous != nullptr || *wardenAnger != 0)) {
+        entries.push_back(Entry{.index = wardenBrain::kAngerDataIndex,
+                                .value = SetEntityDataPacket::IntValue{.value = *wardenAnger}});
+    }
     // parity: a fresh dragon is defined hovering, so only a different phase is news.
     if (dragonPhase.has_value() && (previous == nullptr || previous->dragonPhase != dragonPhase) &&
         (previous != nullptr || *dragonPhase != static_cast<std::int32_t>(enderDragon::Phase::Hover))) {
@@ -504,6 +529,35 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     }
     if (entity.type().path() == "experience_orb" && entity.sourceNbt.has_value()) {
         live.orbValue = entity.sourceNbt->getShort("Value");
+    }
+    if (server::registry::entityAttributes::isLiving(entity.type())) {
+        const mobStatusEffects::Swirl swirl = mobStatusEffects::swirlOf(entity.effects);
+        SetEntityDataPacket::ParticlesValue particles;
+        for (const mobStatusEffects::Swirl::Particle& particle : swirl.particles) {
+            const server::registry::ParticleType* type = server::registry::particleTypes::of(particle.particle);
+            if (type == nullptr) {
+                continue;
+            }
+            particles.particles.push_back(SetEntityDataPacket::ParticleValue{
+                .particleId = type->protocolId,
+                .options = particle.argb.has_value()
+                               ? std::optional{wire::protocol::play::ParticleOptions{
+                                     wire::protocol::play::ParticleOptions::Color{*particle.argb}}}
+                               : std::nullopt});
+        }
+        live.effectParticles = std::move(particles);
+        // parity: `areAllEffectsAmbient` over no effects at all answers false on a fresh entity.
+        live.effectsAmbient = !entity.effects.empty() && swirl.allAmbient;
+    }
+    if (wardens::isWarden(entity.type())) {
+        live.pose = wardenBrain::poseOf(entity);
+        // parity: `AngerManagement.getActiveAnger`: the target's, or the only suspect's.
+        if (entity.targetId.has_value()) {
+            live.wardenAnger = wardens::angerAt(entity, *entity.targetId);
+        } else {
+            live.wardenAnger =
+                entity.anger.has_value() && entity.anger->size() == 1 ? entity.anger->begin()->second : 0;
+        }
     }
     if (entity.hook != nullptr) {
         live.hookedEntity = entity.hook->hookedIn.has_value() ? *entity.hook->hookedIn + 1 : 0;

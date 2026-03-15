@@ -106,6 +106,9 @@ public:
 
     /// parity: `AbstractSkeleton.performRangedAttack`, an arrow at 1.6 with the difficulty's spread.
     virtual void shootArrow(ServerEntity& mob, double targetX, double targetY, double targetZ, float power) = 0;
+
+    /// parity: `Roar.start`, the warden's roar at somebody it is about to fight.
+    virtual void wardenRoar(ServerEntity& /*warden*/, std::int32_t /*targetId*/) {}
 };
 
 /// Everything one mob's goals are allowed to see this tick.
