@@ -130,6 +130,23 @@ void strike(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, b
     }
 }
 
+void spawnFire(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t additionalSources,
+               random::RandomSource& random, std::vector<BlockChange>& changes) {
+    const auto light = [&](std::int32_t fx, std::int32_t fy, std::int32_t fz) {
+        if (fires::ignite(world, fx, fy, fz, random)) {
+            changes.push_back(
+                BlockChange{.x = fx, .y = fy, .z = fz, .stateId = world.blockState(fx, fy, fz).value_or(0)});
+        }
+    };
+    light(x, y, z);
+    for (std::int32_t source = 0; source < additionalSources; ++source) {
+        const std::int32_t dx = random.nextInt(3) - 1;
+        const std::int32_t dy = random.nextInt(3) - 1;
+        const std::int32_t dz = random.nextInt(3) - 1;
+        light(x + dx, y + dy, z + dz);
+    }
+}
+
 std::optional<BlockChange> releaseRod(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value() || !isRod(*stateId)) {

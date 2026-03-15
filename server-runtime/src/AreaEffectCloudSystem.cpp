@@ -205,12 +205,16 @@ void AreaEffectCloudSystem::affect(world::LoadedWorld& world, const ServerEntity
         }
         return;
     }
+    const auto ticks = static_cast<std::int32_t>(static_cast<float>(effect.duration) * settings.potionDurationScale);
     if (player != nullptr && player->connection().addEffect) {
-        const auto ticks =
-            static_cast<std::int32_t>(static_cast<float>(effect.duration) * settings.potionDurationScale);
         player->connection().addEffect(effect.id, ticks, effect.amplifier);
     }
-    static_cast<void>(world);
+    if (mob != nullptr) {
+        static_cast<void>(combat_->giveMobEffect(
+            world, watchers, *mob,
+            world::ActiveEffect{.effect = effect.id, .amplifier = effect.amplifier, .remainingTicks = ticks},
+            cloud.entityId()));
+    }
 }
 
 void AreaEffectCloudSystem::fireballLanded(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,

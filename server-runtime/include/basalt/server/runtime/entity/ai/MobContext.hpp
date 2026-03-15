@@ -33,6 +33,8 @@ struct PlayerView {
     bool targetable = true;
     std::optional<wire::common::Identifier> heldItem;
     bool sneaking = false;
+    /// parity: `Player.isSwimming`, sprinting in water.
+    bool swimming = false;
     /// Where they are looking, which is what an enderman reads.
     float yaw = 0.0F;
     float pitch = 0.0F;

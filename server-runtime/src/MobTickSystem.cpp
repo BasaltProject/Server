@@ -131,6 +131,11 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
         entity.panicTicks--;
     }
     actions_->tickFire(world, watchers, entity, random);
+    actions_->tickMobEffects(world, watchers, entity);
+    actions_->tickBreath(world, watchers, entity, random);
+    if (actions_->tickConversion(world, watchers, entity)) {
+        return;
+    }
     // parity: `SnowGolem.aiStep` is the living entity's own turn, not the goals', so it lays its snow
     // even where nothing is driving it.
     if (entity.type().path() == "snow_golem") {

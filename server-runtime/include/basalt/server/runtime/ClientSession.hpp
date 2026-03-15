@@ -95,6 +95,7 @@ class CombatSystem;
 class EndFightSystem;
 class FishingSystem;
 class WitherSystem;
+class MobActionSystem;
 class ExplosionSystem;
 class BlockInteractionHandler;
 class ItemUseTimers;
@@ -251,6 +252,8 @@ public:
         FishingSystem* fishing = nullptr;
         /// What a wither skull set down may build.
         WitherSystem* withers = nullptr;
+        /// What a mob does when something is used on it.
+        MobActionSystem* mobs = nullptr;
         /// Experience left as orbs at a point.
         std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t amount)>
             awardExperience;

@@ -55,6 +55,8 @@ namespace damageTypes {
 
 inline const wire::common::Identifier kOutsideBorder = wire::common::Identifier::vanilla("outside_border");
 inline const wire::common::Identifier kDrown = wire::common::Identifier::vanilla("drown");
+inline const wire::common::Identifier kLightningBolt = wire::common::Identifier::vanilla("lightning_bolt");
+inline const wire::common::Identifier kDryOut = wire::common::Identifier::vanilla("dry_out");
 inline const wire::common::Identifier kLava = wire::common::Identifier::vanilla("lava");
 inline const wire::common::Identifier kOnFire = wire::common::Identifier::vanilla("on_fire");
 inline const wire::common::Identifier kMagic = wire::common::Identifier::vanilla("magic");

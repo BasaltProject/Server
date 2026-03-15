@@ -1,7 +1,9 @@
 #pragma once
 
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
+#include <basalt/server/runtime/entity/MobConversions.hpp>
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
+#include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
 
@@ -113,6 +115,43 @@ public:
     void tickFire(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                   entity::ServerEntity& mob, random::RandomSource& random);
 
+    /// A zombie drowning, a skeleton freezing or a piglin out of the Nether turning into another
+    /// mob. Answers whether this mob is gone because it did.
+    bool tickConversion(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                        entity::ServerEntity& mob);
+
+    /// Turns the mob into another in place, `finish` touching the new one's saved form first.
+    /// parity: `Mob.convertTo`.
+    bool convertMob(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                    entity::ServerEntity& mob, const entity::mobConversions::Conversion& conversion,
+                    const std::function<void(wire::nbt::NbtCompound& converted)>& finish);
+
+    /// A golden apple given to a zombie villager. Answers whether it started the cure and the apple
+    /// is spent. parity: `ZombieVillager.mobInteract`.
+    bool startCure(world::LoadedWorld& world, entity::ServerEntity& mob, const wire::common::Uuid& player);
+
+    /// parity: `Zombie.killedEntity`: a villager a zombie kills may rise as one. Answers whether it did.
+    bool infectVillager(world::LoadedWorld& world, const entity::ServerEntity& zombie, entity::ServerEntity& villager);
+
+    /// parity: `Entity.thunderHit` and its overrides: what a bolt does to a mob it touches.
+    void thunderHit(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                    entity::ServerEntity& mob, std::int32_t boltId);
+
+    /// Gives a mob an effect, applying an instant one on the spot. Answers whether it took.
+    /// parity: `LivingEntity.addEffect`.
+    bool addMobEffect(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                      entity::ServerEntity& mob, const world::ActiveEffect& effect, std::int32_t sourceId = -1);
+
+    /// parity: `LivingEntity.tickEffects`.
+    void tickMobEffects(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                        entity::ServerEntity& mob);
+
+    /// The mob's air, and a dolphin drying out on land and flopping about there.
+    /// parity: the air half of `LivingEntity.baseTick`, the `handleAirSupply` overrides and
+    /// `Dolphin.tick`.
+    void tickBreath(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                    entity::ServerEntity& dolphin, random::RandomSource& random);
+
     /// parity: `LivingEntity.aiStep`'s travel half, which runs for a mob this build has no goals
     /// for as much as for one it does.
     void travelMob(world::LoadedWorld& world, entity::ServerEntity& mob, double speed);
@@ -157,6 +196,8 @@ private:
     [[nodiscard]] static std::int32_t lightAt(world::LoadedWorld& world, const std::array<std::int32_t, 3>& position);
 
     [[nodiscard]] random::RandomSource freshRandom() const;
+
+    [[nodiscard]] std::int32_t cureProgress(world::LoadedWorld& world, const entity::ServerEntity& mob);
 
     player::PlayerRegistry* players_;
     BlockChangeBroadcaster* broadcaster_;

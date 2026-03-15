@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/entity/Attributes.hpp>
+#include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/common/Uuid.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
@@ -152,6 +153,27 @@ public:
     std::int32_t fireTicks = 0;
 
     std::int32_t airSupply = kDefaultMaxAir;
+    /// parity: `Dolphin.MOISTNESS_LEVEL`, the two minutes it lasts out of water, and `GOT_FISH`.
+    std::int32_t moistness = 2400;
+    /// parity: `Zombie.inWaterTime`, `Skeleton.inPowderSnowTime` or the piglins' and hoglin's
+    /// `timeInOverworld`, whichever this mob counts, and the countdown once it has started to turn.
+    std::int32_t conversionClock = 0;
+    std::int32_t conversionCountdown = -1;
+    /// Status effects it carries, by effect. parity: `LivingEntity.activeEffects`.
+    std::map<wire::common::Identifier, world::ActiveEffect> effects;
+    /// parity: `Creeper.DATA_IS_POWERED`, saved as `powered`.
+    bool powered = false;
+    /// The bolt that last touched it, so a mooshroom turns once per bolt. parity: `lastLightningBoltUUID`.
+    std::int32_t lastLightningBolt = 0;
+    /// parity: `LightningBolt.life` and `flashes`, for a bolt.
+    std::int32_t boltLife = 2;
+    std::int32_t boltFlashes = -1;
+    /// parity: `IsImmuneToZombification`.
+    bool immuneToZombification = false;
+    /// parity: `LivingEntity.zza` and `yya` as a smooth swimmer last left them.
+    double swimForward = 0.0;
+    double swimUp = 0.0;
+    bool gotFish = false;
     /// parity: `Mob.canPickUpLoot`; dolphin enables it in its constructor.
     bool canPickUpLoot = false;
 

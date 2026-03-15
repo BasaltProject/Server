@@ -1,4 +1,5 @@
 #include <basalt/server/runtime/entity/Breeding.hpp>
+#include <basalt/server/runtime/entity/ai/DolphinGoals.hpp>
 #include <basalt/server/runtime/entity/ai/FlyingGoals.hpp>
 #include <basalt/server/runtime/entity/ai/GoalSelector.hpp>
 #include <basalt/server/runtime/entity/ai/Goals.hpp>
@@ -531,6 +532,21 @@ bool buildSwimmer(GoalSelector& selector, std::string_view path) {
     static const Names kFish{"cod", "salmon", "tropical_fish", "pufferfish", "tadpole"};
     if (kFish.contains(path)) {
         add<SwimAboutGoal>(selector, 4, kFishPush);
+        return true;
+    }
+    // parity: `Dolphin.registerGoals`, less the treasure hunt, the play with items and the boat
+    // following this build has nothing for.
+    if (path == "dolphin") {
+        add<BreathAirGoal>(selector, 0);
+        add<TryFindWaterGoal>(selector, 0);
+        add<DolphinSwimWithPlayerGoal>(selector, 2, 4.0);
+        add<RandomSwimmingGoal>(selector, 4, 1.0, 10);
+        add<RandomLookAroundGoal>(selector, 4);
+        add<LookAtPlayerGoal>(selector, 5, 6.0);
+        add<DolphinJumpGoal>(selector, 5, 10);
+        add<MeleeAttackGoal>(selector, 6, 1.2);
+        add<AvoidEntityGoal>(selector, 9, Names{"guardian"}, 8.0, 1.0, 1.0);
+        add<HurtByTargetGoal>(selector, 1);
         return true;
     }
     if (path == "guardian" || path == "elder_guardian") {

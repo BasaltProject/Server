@@ -982,6 +982,17 @@ void BasaltServer::startBedrockListener() {
                 }
                 const std::expected<wire::common::Identifier, wire::common::IdentifierError> item =
                     wire::common::Identifier::parse(held->id);
+                const std::int32_t heldSlot = player::PlayerInventory::kHotbarStart + session->inventory.heldSlot();
+                // parity: `ZombieVillager.mobInteract`, where the apple is taken only when the cure starts.
+                if (item.has_value() && item->path() == "golden_apple" && target->type().path() == "zombie_villager") {
+                    if (mobActions_->startCure(*found->second, *target, session->uuid()) &&
+                        session->gamemode != wire::protocol::play::Gamemode::Creative) {
+                        storage::StoredItemStack left = *held;
+                        left.count = held->count - 1;
+                        session->inventory.set(heldSlot, left.count <= 0 ? std::nullopt : std::optional{left});
+                    }
+                    return;
+                }
                 if (!item.has_value() || !entity::breeding::isFood(target->type(), *item) ||
                     !entity::breeding::canFallInLove(*target)) {
                     return;

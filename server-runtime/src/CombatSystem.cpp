@@ -263,7 +263,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
             return;
         }
         entity.removed = true;
-        splashPotion(watchers, entity);
+        splashPotion(world, watchers, living, entity);
         return;
     }
     if (kind.sticks && hitEntityAlong(world, watchers, living, entity, fromX, fromY, fromZ)) {
@@ -336,9 +336,36 @@ void CombatSystem::lightWhereItLanded(world::LoadedWorld& world, const std::vect
     }
 }
 
-void CombatSystem::splashPotion(const std::vector<PlayerSession*>& watchers, const ServerEntity& bottle) {
+bool CombatSystem::giveMobEffect(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                                 ServerEntity& mob, const world::ActiveEffect& effect, std::int32_t sourceId) const {
+    return options_.mobEffect && options_.mobEffect(world, watchers, mob, effect, sourceId);
+}
+
+void CombatSystem::splashPotion(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                                const std::vector<ServerEntity*>& living, const ServerEntity& bottle) {
     if (!bottle.potionEffect.has_value()) {
         return;
+    }
+    // parity: `applySplash` reaches every living thing in range, mobs as much as players.
+    for (ServerEntity* mob : living) {
+        if (mob->removed || mob->dying || !server::registry::entityAttributes::isLiving(mob->type())) {
+            continue;
+        }
+        const double dx = mob->x - bottle.x;
+        const double dy = mob->y - bottle.y;
+        const double dz = mob->z - bottle.z;
+        const double distanceSquared = (dx * dx) + (dy * dy) + (dz * dz);
+        if (distanceSquared > kSplashRange * kSplashRange) {
+            continue;
+        }
+        const double share = 1.0 - (std::sqrt(distanceSquared) / kSplashRange);
+        const auto ticks = static_cast<std::int32_t>(kSplashDuration * share);
+        if (ticks > 0) {
+            static_cast<void>(giveMobEffect(
+                world, watchers, *mob,
+                world::ActiveEffect{.effect = Identifier::vanilla(*bottle.potionEffect), .remainingTicks = ticks},
+                bottle.entityId()));
+        }
     }
     for (PlayerSession* player : watchers) {
         const double dx = player->x - bottle.x;

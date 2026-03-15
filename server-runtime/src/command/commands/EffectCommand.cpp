@@ -1,7 +1,12 @@
+#include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/CommandTarget.hpp>
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 #include <basalt/server/runtime/command/commands/EffectCommand.hpp>
+#include <basalt/server/runtime/entity/EntityCombat.hpp>
+#include <basalt/server/runtime/entity/MobStatusEffects.hpp>
+#include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
@@ -27,30 +32,43 @@ constexpr std::int32_t kMaxAmplifier = 255;
 /// parity: `HealOrHarmMobEffect`, three hearts' worth doubled by each level.
 constexpr float kInstantAmount = 6.0F;
 
-/// The targets as players, refusing anything else by name rather than silently doing nothing.
-[[nodiscard]] std::expected<std::vector<player::PlayerSession*>, CommandSyntaxError>
-playersOf(const CommandContext& context) {
+/// The targets: players, and the living mobs, which carry effects of their own.
+struct Targets {
     std::vector<player::PlayerSession*> players;
+    std::vector<entity::ServerEntity*> mobs;
+    std::string firstName;
+
+    [[nodiscard]] std::size_t size() const { return players.size() + mobs.size(); }
+};
+
+[[nodiscard]] std::expected<Targets, CommandSyntaxError> targetsOf(const CommandContext& context) {
+    Targets targets;
     const auto* matched = context.get<std::vector<CommandTarget>>("targets");
     if (matched == nullptr) {
-        return players;
+        return targets;
     }
     for (const CommandTarget& target : *matched) {
-        player::PlayerSession* session = target.player();
-        if (session == nullptr) {
-            return std::unexpected{CommandSyntaxError{
-                .component =
-                    Component::text("Only a player carries effects in this build; " + target.name() + " does not.")}};
+        if (player::PlayerSession* session = target.player(); session != nullptr) {
+            targets.players.push_back(session);
+        } else if (entity::ServerEntity* mob = target.entity();
+                   mob != nullptr && server::registry::entityAttributes::isLiving(mob->type())) {
+            targets.mobs.push_back(mob);
+        } else {
+            continue;
         }
-        players.push_back(session);
+        if (targets.firstName.empty()) {
+            targets.firstName = target.name();
+        }
     }
-    return players;
+    if (targets.size() == 0) {
+        return std::unexpected{CommandSyntaxError{.component = Component::translatable("commands.effect.give.failed")}};
+    }
+    return targets;
 }
 
 /// The name a report uses: the one target, or how many there were.
-[[nodiscard]] Component whoOf(const std::vector<player::PlayerSession*>& targets) {
-    return targets.size() == 1 ? Component::text(targets.front()->name())
-                               : Component::text(std::to_string(targets.size()));
+[[nodiscard]] Component whoOf(const Targets& targets) {
+    return targets.size() == 1 ? Component::text(targets.firstName) : Component::text(std::to_string(targets.size()));
 }
 
 [[nodiscard]] Parsed<std::int32_t> give(const CommandContext& context, std::int32_t durationTicks,
@@ -61,11 +79,27 @@ playersOf(const CommandContext& context) {
             .component = Component::translatable(
                 "effect.effectNotFound", {Component::text(effect == nullptr ? std::string{} : effect->toString())})}};
     }
-    const std::expected<std::vector<player::PlayerSession*>, CommandSyntaxError> targets = playersOf(context);
+    const std::expected<Targets, CommandSyntaxError> targets = targetsOf(context);
     if (!targets.has_value()) {
         return std::unexpected{targets.error()};
     }
-    for (player::PlayerSession* session : *targets) {
+    for (entity::ServerEntity* mob : targets->mobs) {
+        const entity::mobStatusEffects::Instant instant = entity::mobStatusEffects::instantOf(*mob, *effect, amplifier);
+        if (instant.heal > 0.0F) {
+            mob->health = std::min(mob->attributeWithModifiers("minecraft:max_health"),
+                                   mob->health + static_cast<double>(instant.heal));
+        } else if (instant.damage > 0.0F) {
+            static_cast<void>(
+                entity::entityCombat::hurt(*mob, instant.damage, std::nullopt, std::nullopt, {}, "magic"));
+        } else {
+            static_cast<void>(entity::mobStatusEffects::add(*mob, world::ActiveEffect{.effect = *effect,
+                                                                                      .amplifier = amplifier,
+                                                                                      .remainingTicks = durationTicks,
+                                                                                      .visible = visible,
+                                                                                      .showIcon = visible}));
+        }
+    }
+    for (player::PlayerSession* session : targets->players) {
         // parity: the two instantaneous effects act once and are never carried.
         if (*effect == world::mobEffects::instantHealth()) {
             if (session->connection().heal) {
@@ -96,10 +130,18 @@ playersOf(const CommandContext& context) {
     return static_cast<std::int32_t>(targets->size());
 }
 
-[[nodiscard]] Parsed<std::int32_t> clear(const CommandContext& context,
-                                         const std::vector<player::PlayerSession*>& targets, const Identifier* effect) {
+[[nodiscard]] Parsed<std::int32_t> clear(const CommandContext& context, const Targets& targets,
+                                         const Identifier* effect) {
     std::int32_t cleared = 0;
-    for (player::PlayerSession* session : targets) {
+    for (entity::ServerEntity* mob : targets.mobs) {
+        if (effect == nullptr) {
+            cleared += static_cast<std::int32_t>(mob->effects.size());
+            mob->effects.clear();
+        } else if (entity::mobStatusEffects::remove(*mob, *effect)) {
+            cleared++;
+        }
+    }
+    for (player::PlayerSession* session : targets.players) {
         std::vector<Identifier> removed;
         if (effect == nullptr) {
             for (const auto& [id, active] : session->effects) {
@@ -127,25 +169,26 @@ EffectCommand::EffectCommand() : Command("effect", permissionLevel::kGamemasters
 void EffectCommand::build(const CommandNodeBuilder& root) const {
     root.literal("clear", [](const CommandNodeBuilder& form) {
         form.executes([](const CommandContext& context) -> Parsed<std::int32_t> {
-            player::PlayerSession* self = context.source().player();
-            return clear(context,
-                         self == nullptr ? std::vector<player::PlayerSession*>{}
-                                         : std::vector<player::PlayerSession*>{self},
-                         nullptr);
+            Targets self;
+            if (player::PlayerSession* player = context.source().player(); player != nullptr) {
+                self.players.push_back(player);
+                self.firstName = player->name();
+            }
+            return clear(context, self, nullptr);
         });
         form.argument("targets", entitiesArgument(), [](const CommandNodeBuilder& targets) {
             targets.executes([](const CommandContext& context) -> Parsed<std::int32_t> {
-                const auto players = playersOf(context);
-                return players.has_value() ? clear(context, *players, nullptr)
-                                           : Parsed<std::int32_t>{std::unexpected{players.error()}};
+                const auto targets = targetsOf(context);
+                return targets.has_value() ? clear(context, *targets, nullptr)
+                                           : Parsed<std::int32_t>{std::unexpected{targets.error()}};
             });
             targets.argument("effect", resourceArgument("minecraft:mob_effect"), [](const CommandNodeBuilder& effect) {
                 effect.executes([](const CommandContext& context) -> Parsed<std::int32_t> {
-                    const auto players = playersOf(context);
-                    if (!players.has_value()) {
-                        return std::unexpected{players.error()};
+                    const auto targets = targetsOf(context);
+                    if (!targets.has_value()) {
+                        return std::unexpected{targets.error()};
                     }
-                    return clear(context, *players, context.get<Identifier>("effect"));
+                    return clear(context, *targets, context.get<Identifier>("effect"));
                 });
             });
         });

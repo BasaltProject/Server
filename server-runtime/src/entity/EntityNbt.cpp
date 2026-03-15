@@ -2,6 +2,7 @@
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
+#include <basalt/server/runtime/entity/MobStatusEffects.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/WitherBoss.hpp>
 
@@ -342,6 +343,36 @@ NbtCompound encode(const ServerEntity& entity) {
     if (cubeMobs::isCube(entity.type())) {
         tag.putInt("Size", std::max(entity.cubeSize, 1) - 1);
     }
+    // parity: `Zombie`, `Skeleton`, `AbstractPiglin` and `Hoglin`'s conversion clocks.
+    if (path == "zombie" || path == "husk") {
+        tag.putInt("InWaterTime", entity.conversionClock);
+        tag.putInt("DrownedConversionTime", entity.conversionCountdown);
+    }
+    if (path == "skeleton") {
+        tag.putInt("StrayConversionTime", entity.conversionCountdown);
+    }
+    if (path == "zombie_villager") {
+        tag.putInt("ConversionTime", entity.conversionCountdown);
+    }
+    if (path == "piglin" || path == "piglin_brute" || path == "hoglin") {
+        tag.putBoolean("IsImmuneToZombification", entity.immuneToZombification);
+        tag.putInt("TimeInOverworld", entity.conversionClock);
+    }
+    if (server::registry::entityAttributes::isLiving(entity.type())) {
+        if (entity.effects.empty()) {
+            tag.remove("active_effects");
+        } else {
+            tag.set("active_effects", mobStatusEffects::encode(entity));
+        }
+    }
+    // parity: `Creeper.addAdditionalSaveData` writes `powered` whether it is or not.
+    if (path == "creeper") {
+        tag.putBoolean("powered", entity.powered);
+    }
+    if (path == "dolphin") {
+        tag.putBoolean("GotFish", entity.gotFish);
+        tag.putInt("Moistness", entity.moistness);
+    }
     if (entity.wither != nullptr) {
         tag.putInt(std::string{witherBoss::kInvulnerableKey}, entity.wither->invulnerableTicks);
     }
@@ -486,6 +517,27 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
     entity->noAi = numericBoolean(tag, "NoAI");
     entity->canPickUpLoot = tag.getBoolean("CanPickUpLoot");
     entity->loveTicks = numericInt(tag, "InLove");
+    if (path == "zombie" || path == "husk") {
+        entity->conversionClock = numericInt(tag, "InWaterTime");
+        entity->conversionCountdown =
+            tag.contains("DrownedConversionTime") ? numericInt(tag, "DrownedConversionTime") : -1;
+    }
+    if (path == "zombie_villager") {
+        entity->conversionCountdown = tag.contains("ConversionTime") ? numericInt(tag, "ConversionTime") : -1;
+    }
+    if (path == "skeleton") {
+        entity->conversionCountdown = tag.contains("StrayConversionTime") ? numericInt(tag, "StrayConversionTime") : -1;
+    }
+    if (path == "piglin" || path == "piglin_brute" || path == "hoglin") {
+        entity->immuneToZombification = numericBoolean(tag, "IsImmuneToZombification");
+        entity->conversionClock = numericInt(tag, "TimeInOverworld");
+    }
+    entity->powered = path == "creeper" && numericBoolean(tag, "powered");
+    mobStatusEffects::decode(*entity, tag);
+    if (path == "dolphin") {
+        entity->gotFish = numericBoolean(tag, "GotFish");
+        entity->moistness = tag.contains("Moistness") ? numericInt(tag, "Moistness") : 2400;
+    }
     if (path == "wither") {
         entity->wither = std::make_shared<witherBoss::WitherState>();
         entity->wither->invulnerableTicks = numericInt(tag, witherBoss::kInvulnerableKey);

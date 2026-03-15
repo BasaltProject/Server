@@ -42,6 +42,10 @@ inline constexpr std::int32_t kRodTicks = 8;
 void strike(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool lightFires,
             random::RandomSource& random, std::vector<BlockChange>& changes);
 
+/// parity: `LightningBolt.spawnFire`: the bolt's own square, then that many rolls one block around it.
+void spawnFire(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t additionalSources,
+               random::RandomSource& random, std::vector<BlockChange>& changes);
+
 /// The scheduled half: the rod lets its signal go eight ticks after it was struck.
 [[nodiscard]] std::optional<BlockChange> releaseRod(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
 

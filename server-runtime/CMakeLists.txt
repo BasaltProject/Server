@@ -157,6 +157,8 @@ basalt_module(server-runtime-core
         src/ScheduledBlockTick.cpp
         src/MobTickSystem.cpp
         src/MobActionTick.cpp
+        src/MobActionConversion.cpp
+        src/LightningBoltSystem.cpp
         src/NaturalSpawningMaterialize.cpp
         src/NaturalSpawningSystem.cpp
         src/RaidSystem.cpp
@@ -426,6 +428,10 @@ basalt_module(server-runtime-core
         src/entity/DeathDrops.cpp
         src/entity/FishingHooks.cpp
         src/entity/WitherBoss.cpp
+        src/entity/SwimPath.cpp
+        src/entity/MobBreathing.cpp
+        src/entity/MobConversions.cpp
+        src/entity/MobStatusEffects.cpp
         src/entity/EntityCombat.cpp
         src/entity/MobBrain.cpp
         src/entity/MobCombat.cpp
@@ -444,6 +450,7 @@ basalt_module(server-runtime-core
         src/entity/ai/VillagerSchedule.cpp
         src/entity/ai/WanderingTraderGoals.cpp
         src/entity/ai/WitherGoals.cpp
+        src/entity/ai/DolphinGoals.cpp
         src/world/VillageDataLoader.cpp
         src/world/VillageGolemSpawner.cpp
         src/world/VillageProximity.cpp
@@ -1345,6 +1352,30 @@ target_compile_definitions(server-runtime-end-fight-test
 basalt_test(server-runtime-shield-test
     SOURCES
         test/ShieldTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-mob-status-effects-test
+    SOURCES
+        test/MobStatusEffectsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-mob-conversions-test
+    SOURCES
+        test/MobConversionsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-mob-breathing-test
+    SOURCES
+        test/MobBreathingTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-swim-path-test
+    SOURCES
+        test/SwimPathTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

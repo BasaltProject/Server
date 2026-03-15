@@ -33,6 +33,16 @@ void travel(world::WorldState& world, ServerEntity& entity, double forward, doub
 /// eight tenths of the speed back, and what is left of gravity is a slow sink.
 void travelInWater(world::WorldState& world, ServerEntity& entity, double forward, double strafe);
 
+/// parity: `moveRelative` with an upward input, then `move(SELF)`, and nothing else.
+void swimStep(world::WorldState& world, ServerEntity& entity, double forward, double up, double speed);
+
+/// One tick of a smooth swimmer. `forward` and `up` are its `zza` and `yya`.
+///
+/// parity: `Dolphin.travelInWater`: the input at its own speed, the move, nine tenths kept, and a
+/// slow sink while it hunts nothing.
+void travelSwimming(world::WorldState& world, ServerEntity& entity, double forward, double up, double speed,
+                    bool sinks);
+
 /// parity: `LivingEntity.jumpFromGround`, plus the block's own jump factor.
 void jump(world::WorldState& world, ServerEntity& entity);
 

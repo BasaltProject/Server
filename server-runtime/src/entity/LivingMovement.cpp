@@ -145,6 +145,49 @@ void travelInWater(world::WorldState& world, ServerEntity& entity, double forwar
     entity.velocityY = (entity.velocityY * kVerticalWaterDrag) - (kGravity / kSinkShare);
 }
 
+void swimStep(world::WorldState& world, ServerEntity& entity, double forward, double up, double speed) {
+    const double length = (forward * forward) + (up * up);
+    if (length >= 1.0e-7) {
+        const double scale = length > 1.0 ? speed / std::sqrt(length) : speed;
+        const double radians = static_cast<double>(entity.yaw) * std::numbers::pi / 180.0;
+        entity.velocityX -= forward * scale * std::sin(radians);
+        entity.velocityY += up * scale;
+        entity.velocityZ += forward * scale * std::cos(radians);
+    }
+    const Aabb box = Aabb::of(entity.x, entity.y, entity.z, entity.width(), entity.height());
+    const std::array<double, 3> moved =
+        entityCollision::collide(blocksOf(world), box, entity.velocityX, entity.velocityY, entity.velocityZ);
+    entity.x += moved[0];
+    entity.y += moved[1];
+    entity.z += moved[2];
+    entity.onGround = moved[1] != entity.velocityY && entity.velocityY < 0.0;
+    const bool collidedX = !nearlyEqual(moved[0], entity.velocityX);
+    const bool collidedZ = !nearlyEqual(moved[2], entity.velocityZ);
+    entity.horizontallyBlocked = collidedX || collidedZ;
+    if (collidedX) {
+        entity.velocityX = 0.0;
+    }
+    if (collidedZ) {
+        entity.velocityZ = 0.0;
+    }
+    if (moved[1] != entity.velocityY) {
+        entity.velocityY = 0.0;
+    }
+}
+
+void travelSwimming(world::WorldState& world, ServerEntity& entity, double forward, double up, double speed,
+                    bool sinks) {
+    constexpr double kKept = 0.9;
+    constexpr double kSink = 0.005;
+    swimStep(world, entity, forward, up, speed);
+    entity.velocityX *= kKept;
+    entity.velocityY *= kKept;
+    entity.velocityZ *= kKept;
+    if (sinks) {
+        entity.velocityY -= kSink;
+    }
+}
+
 void jump(world::WorldState& world, ServerEntity& entity) {
     if (!entity.onGround) {
         return;
