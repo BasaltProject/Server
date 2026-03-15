@@ -865,8 +865,8 @@ void BasaltServer::startBedrockListener() {
                             if (struck == nullptr) {
                                 continue;
                             }
-                            watcher->connection().playSound(hit.died ? entity::entityCombat::deathSound(struck->type())
-                                                                     : entity::entityCombat::hurtSound(struck->type()),
+                            watcher->connection().playSound(hit.died ? entity::entityCombat::deathSound(*struck)
+                                                                     : entity::entityCombat::hurtSound(*struck),
                                                             struck->x, struck->y, struck->z, 1.0F, 1.0F);
                         }
                     }
@@ -901,8 +901,8 @@ void BasaltServer::startBedrockListener() {
                         continue;
                     }
                     player::playSoundFor(*watcher,
-                                         result.died ? entity::entityCombat::deathSound(target->type())
-                                                     : entity::entityCombat::hurtSound(target->type()),
+                                         result.died ? entity::entityCombat::deathSound(*target)
+                                                     : entity::entityCombat::hurtSound(*target),
                                          wire::protocol::play::SoundSource::Hostile, target->x, target->y, target->z,
                                          1.0F, 1.0F, 0);
                     // parity: `ServerPlayer.crit` and the knockback sound, which is what tells the

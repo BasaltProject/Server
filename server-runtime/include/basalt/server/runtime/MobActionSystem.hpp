@@ -151,6 +151,10 @@ public:
                                             entity::ServerEntity& golem,
                                             const std::optional<wire::common::Identifier>& held);
 
+    /// An axe on a statue that never weathered wakes the golem in it. Answers whether one rose.
+    /// parity: `WeatheringCopperGolemStatueBlock.useItemOn` over `removeStatue`.
+    bool awakenStatue(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
     /// parity: `CopperGolem.thunderHit`.
     void golemStruckByLightning(entity::ServerEntity& golem, std::int32_t boltId);
 

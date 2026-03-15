@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <utility>
 
 namespace basalt::server::runtime::player {
 namespace {
@@ -18,12 +19,29 @@ void PlayerStats::increment(std::string_view key, std::int64_t amount) {
         return;
     }
     const std::lock_guard<std::mutex> guard{lock_};
+    noteChange(key, amount, false);
     const auto found = counters_.find(key);
     if (found == counters_.end()) {
         counters_.emplace(std::string{key}, amount);
         return;
     }
     found->second += amount;
+}
+
+void PlayerStats::noteChange(std::string_view key, std::int64_t delta, bool reset) {
+    auto found = changes_.find(key);
+    if (found == changes_.end()) {
+        found = changes_.emplace(std::string{key}, Change{}).first;
+    }
+    if (reset) {
+        found->second = Change{.reset = true};
+    }
+    found->second.delta += delta;
+}
+
+std::map<std::string, PlayerStats::Change, std::less<>> PlayerStats::takeChanges() {
+    const std::lock_guard<std::mutex> guard{lock_};
+    return std::exchange(changes_, {});
 }
 
 std::int64_t PlayerStats::get(std::string_view key) const {
@@ -34,6 +52,7 @@ std::int64_t PlayerStats::get(std::string_view key) const {
 
 void PlayerStats::reset(std::string_view key) {
     const std::lock_guard<std::mutex> guard{lock_};
+    noteChange(key, 0, true);
     const auto found = counters_.find(key);
     if (found != counters_.end()) {
         counters_.erase(found);
@@ -51,6 +70,7 @@ void PlayerStats::addWalked(double blocks) {
         return;
     }
     walkRemainder_ -= static_cast<double>(whole);
+    noteChange(storage::stats::walkOneCm(), whole, false);
     const auto found = counters_.find(storage::stats::walkOneCm());
     if (found == counters_.end()) {
         counters_.emplace(storage::stats::walkOneCm(), whole);

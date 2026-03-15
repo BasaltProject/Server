@@ -497,3 +497,29 @@ TEST_CASE("a container roll spreads its stacks over the empty slots") {
     REQUIRE(slots[4].has_value());
     CHECK(slots[4]->item.path() == "stone");
 }
+
+TEST_CASE("a location check reads the square the offsets point at, and fails without an origin") {
+    using basalt::wire::common::Identifier;
+    const std::expected<LootTable, LootTableParseError> grass = lootTableJson::parse(
+        R"({"pools":[{"rolls":1,"conditions":[{"condition":"minecraft:location_check","offsetY":1,
+            "predicate":{"block":{"blocks":"minecraft:tall_grass","state":{"half":"upper"}}}}],
+            "entries":[{"type":"minecraft:item","name":"minecraft:short_grass"}]},
+           {"rolls":1,"conditions":[{"condition":"minecraft:location_check",
+            "predicate":{"biomes":["minecraft:jungle"]}}],
+            "entries":[{"type":"minecraft:item","name":"minecraft:bamboo"}]}]})");
+    REQUIRE(grass.has_value());
+    rng::RandomSource random = rng::RandomSource::legacy(1);
+    CHECK(grass->generate(random).empty());
+    LootContext context{.origin = std::array<double, 3>{0.5, 64.5, 0.5}};
+    context.placeAt = [](std::int32_t, std::int32_t y, std::int32_t) {
+        PlaceFacts place{.biome = Identifier::vanilla("plains")};
+        if (y == 65) {
+            place.block = Identifier::vanilla("tall_grass");
+            place.properties = {{"half", "upper"}};
+        }
+        return place;
+    };
+    const std::vector<ItemStack> drops = grass->generate(random, 0.0F, std::nullopt, context);
+    REQUIRE(drops.size() == 1);
+    CHECK(drops.front().item.path() == "short_grass");
+}

@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/BlockStateFamilies.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/ItemTools.hpp>
 #include <basalt/server/registry/Items.hpp>
@@ -209,10 +210,14 @@ void dropLootFor(const BreakContext& context, world::LoadedWorld& world, const I
         lootContext.tool = Identifier::vanilla("air");
     }
     const world::realItemTags::TagMembers* itemTags = context.itemTags;
-    lootContext.tags = [itemTags](std::string_view registry, const Identifier& id, std::string_view tag) {
+    const world::realBlockTags::TagMembers* blockTags = context.blockTags;
+    lootContext.tags = [itemTags, blockTags](std::string_view registry, const Identifier& id, std::string_view tag) {
+        if (registry == "block") {
+            return blockTags != nullptr && world::realBlockTags::contains(*blockTags, tag, id);
+        }
         return registry == "item" && itemTags != nullptr && world::realItemTags::contains(*itemTags, tag, id);
     };
-    context.lootTables->prepare(lootContext);
+    context.lootTables->prepareAt(lootContext, world, x + 0.5, y + 0.5, z + 0.5);
     for (const server::world::loot::ItemStack& stack : table->generate(random, 0.0F, std::nullopt, lootContext)) {
         wire::nbt::NbtCompound components = stack.components;
         if (carried != nullptr && stack.item == block) {
@@ -343,6 +348,14 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
         // dropping whatever it drops is the ordinary break that follows, exactly as in the jar.
         world.state().primeTnt(x, y, z, "prime_fuse");
     }
+    // parity: `DoublePlantBlock.playerWillDestroy` drops the half before either goes, so its
+    // `location_check` still finds the other half; `playerDestroy` then drops nothing.
+    const bool dropsBeforeRemoval = session->gamemode == Gamemode::Survival && broken.has_value() &&
+                                    brokenBlock != nullptr && reg::blockStateFamilies::isDoublePlantState(*broken);
+    if (dropsBeforeRemoval) {
+        const std::optional<storage::StoredItemStack> held = session->inventory.heldItem();
+        dropLootFor(context, world, *brokenBlock, *broken, x, y, z, nullptr, held.has_value() ? &*held : nullptr);
+    }
     const std::int32_t leaves = meltedIce(context, world, broken, x, y, z).value_or(reg::blocks::air().stateId);
     const bool changed = world.state().setBlockState(x, y, z, leaves);
     acknowledge(context);
@@ -386,7 +399,7 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
         announceBlock(context, world.name(), block[0], block[1], block[2], reg::blocks::air().stateId);
     }
 
-    if (session->gamemode == Gamemode::Survival && brokenBlock != nullptr) {
+    if (session->gamemode == Gamemode::Survival && brokenBlock != nullptr && !dropsBeforeRemoval) {
         // parity: `Player.hasCorrectToolForDrops`. A block marked as needing the right tool gives
         // nothing to the wrong one, which is what makes punching stone a waste of time.
         const std::optional<storage::StoredItemStack> held = session->inventory.heldItem();

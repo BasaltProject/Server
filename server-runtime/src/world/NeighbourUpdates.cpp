@@ -2,6 +2,7 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
@@ -341,12 +342,8 @@ struct Walk {
     return towards != BlockFace::Up || kelpAbove;
 }
 
-/// Reshapes the block there, breaks it if nothing holds it, and follows on from what it held.
-/// parity: `LiquidBlock.updateShape`, which books the fluid's own turn whenever this square or the
-/// one the news came from is a **source**. It hangs off the shape walk and not off `neighborChanged`,
-/// so a write that carries no `UPDATE_NEIGHBORS` books it too: that is what keeps a still column of
-/// water holding a pending turn. Measured in `columnaburbujas` and `esponja`, where the jar held the
-/// whole column booked and we held nothing.
+/// parity: `LiquidBlock.updateShape` books the fluid's turn when either square is a source, even on
+/// a write without `UPDATE_NEIGHBORS`; it is what keeps a still column booked.
 void bookLiquidTurn(const Context& context, const std::int32_t x, const std::int32_t y, const std::int32_t z,
                     const BlockFace towards) {
     const std::optional<std::int32_t> here = context.world.blockState(x, y, z);
@@ -381,6 +378,7 @@ void bookLiquidTurn(const Context& context, const std::int32_t x, const std::int
     context.world.scheduleFluidTick(x, y, z, fluidId(*kind, sourceHere), delay);
 }
 
+/// Reshapes the block there, breaks it if nothing holds it, and follows on from what it held.
 void visit(const Walk& walk, std::deque<Position>& pending, std::int32_t x, std::int32_t y, std::int32_t z,
            BlockFace towards) {
     fallingBlocks::scheduleIfFalling(walk.context.world, x, y, z, fallingBlocks::Asked::updateShape);
@@ -449,12 +447,8 @@ std::optional<std::int32_t> connect(const Context& context, std::int32_t x, std:
     }
     std::map<std::string, std::string> wanted;
     for (const auto& [face, name] : kHorizontal) {
-        // parity: `FenceBlock.updateShape` and `IronBarsBlock`'s write **one** property, the one for
-        // the side the news came from, and a vertical side writes none. Redrawing all four joined up
-        // sides nobody had mentioned: a fence written by command with its connections named came out
-        // joined on every side as soon as any one neighbour moved. Measured in `anegadoforma`, where
-        // the jar holds `north=true` alone and this build had all four. No direction is the arriving
-        // block's own pre-shape, which walks all six sides, so there every side is asked.
+        // parity: `FenceBlock` and `IronBarsBlock` redraw only the side the news came from; no
+        // direction means the block's own pre-shape, which asks every side.
         if (towards.has_value() && *towards != face) {
             continue;
         }
@@ -743,10 +737,19 @@ constexpr double kGolemFootroom = 0.05;
             registry::blockStateDefinitions::propertiesOf(match->pumpkinState);
         const auto facing = pumpkin.find("facing");
         if (body != nullptr && facing != pumpkin.end()) {
-            const std::optional<std::int32_t> chest =
-                copperChests::placedState(world, match->body[0], match->body[1], match->body[2],
-                                          copperChests::chestForBlock(body->path()), facing->second);
+            const wire::common::Identifier chestBlock =
+                wire::common::Identifier::vanilla(copperChests::chestForBlock(body->path()));
+            const std::optional<std::int32_t> chest = copperChests::placedState(
+                world, match->body[0], match->body[1], match->body[2], chestBlock.path(), facing->second);
             if (chest.has_value() && world.setBlockState(match->body[0], match->body[1], match->body[2], *chest)) {
+                // parity: `Level.setBlock` gives the new chest its block entity, empty, from the start.
+                if (server::world::Chunk* chunk = world.chunkIfLoaded(match->body[0] >> 4, match->body[2] >> 4);
+                    chunk != nullptr) {
+                    chunk->setBlockEntity(server::world::ChunkBlockEntity{match->body[0] & 15, match->body[1],
+                                                                          match->body[2] & 15, chestBlock,
+                                                                          blockEntityDefaults::of(chestBlock, *chest)});
+                    chunk->markDirty();
+                }
                 reshaped(*chest, match->body[0], match->body[1], match->body[2]);
                 reshapeOnly(context, match->body[0], match->body[1], match->body[2], broken, reshaped);
             }

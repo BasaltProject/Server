@@ -120,6 +120,7 @@ basalt_module(server-runtime-core
         src/BasaltServerConnections.cpp
         src/BasaltServerLife.cpp
         src/BasaltServerTick.cpp
+        src/BasaltServerScores.cpp
         src/BlockInteractionHandler.cpp
         src/BlockUseHelpers.cpp
         src/BlockUseOn.cpp

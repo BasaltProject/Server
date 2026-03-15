@@ -1,4 +1,7 @@
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/LootRegistries.hpp>
+#include <basalt/server/runtime/world/NaturalSpawner.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 #include <basalt/server/world/loot/LootTableJson.hpp>
 
@@ -69,6 +72,22 @@ void RealLootTables::prepare(server::world::loot::LootContext& context) {
     context.enchanting = &registries_->enchanting();
     context.tagMembers = [registries = registries_](std::string_view registry, const Identifier& tag) {
         return registries->tagMembers(registry, tag);
+    };
+}
+
+void RealLootTables::prepareAt(server::world::loot::LootContext& context, LoadedWorld& world, double x, double y,
+                               double z) {
+    prepare(context);
+    context.origin = std::array<double, 3>{x, y, z};
+    context.placeAt = [&world](std::int32_t bx, std::int32_t by, std::int32_t bz) {
+        server::world::loot::PlaceFacts place{.biome = naturalSpawner::biomeAt(world, bx, by, bz)};
+        if (const std::optional<std::int32_t> state = world.state().blockState(bx, by, bz); state.has_value()) {
+            if (const Identifier* block = server::registry::blockStateDefinitions::blockOf(*state); block != nullptr) {
+                place.block = *block;
+            }
+            place.properties = server::registry::blockStateDefinitions::propertiesOf(*state);
+        }
+        return place;
     };
 }
 

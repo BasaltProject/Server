@@ -120,6 +120,7 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
     // Between turns, where nothing this thread handed out is still being walked: what a player who
     // left leaves behind is let go here and nowhere else.
     playerRegistry_.collect();
+    tickScoreCriteria();
 
     // Where each player's packets go is decided here, between turns: no region is running, so
     // handing a session that walked across a border to its new owner cannot land two threads inside
@@ -303,6 +304,11 @@ void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& re
             continue;
         }
         dead->killed = false;
+        // parity: `killer.awardKillScore`, the kill credit going to the player who hit it last.
+        if (dead->lastHurtByPlayer.has_value() && dead->lastHurtByPlayerTime > 0) {
+            const std::lock_guard<std::mutex> guard(pendingKillsLock_);
+            pendingKills_.push_back(PendingKill{.killer = *dead->lastHurtByPlayer, .victim = dead->uuid().toString()});
+        }
         // parity: `Entity.die` drops the entity's own loot table where it stood.
         const bool mobDrops = world.gameRules().get(world::gameRules::kMobDrops);
         const bool living = registry::entityAttributes::isLiving(dead->type());
@@ -366,7 +372,7 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
     for (world::WorldState::Spilled& spilled : world.state().takeSpilledContents()) {
         if (spilled.lootTable.has_value()) {
             world::containerLoot::fill(world, vanillaData_.lootTables, *spilled.lootTable, spilled.lootSeed,
-                                       spilled.lootSlots, false);
+                                       spilled.lootSlots, false, {spilled.x, spilled.y, spilled.z});
             for (std::optional<server::world::loot::ItemStack>& slot : spilled.lootSlots) {
                 if (slot.has_value() && slot->count > 0) {
                     spilled.stacks.push_back(std::move(*slot));

@@ -260,7 +260,7 @@ std::int32_t FishingSystem::retrieve(const player::BreakContext& context, Player
             server::world::loot::LootContext lootContext;
             lootContext.hasEntity = true;
             lootContext.inOpenWater = state->openWater;
-            lootContext.tables = [tables](const Identifier& id) { return tables->byId(id); };
+            tables->prepareAt(lootContext, world, hook.x, hook.y, hook.z);
             for (const server::world::loot::ItemStack& stack :
                  table->generate(roll, static_cast<float>(state->luck), std::nullopt, lootContext)) {
                 const double xa = player.x - hook.x;

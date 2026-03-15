@@ -50,8 +50,12 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace basalt::server::runtime {
 
@@ -134,6 +138,23 @@ private:
     /// after the entities have moved, which is where a mob killed by another one dies.
     void tickDeaths(world::LoadedWorld& world, const sched::Region& region);
 
+    /// The objectives the server keeps itself: deaths, kills, health, food, air, armour and
+    /// experience. parity: `ServerPlayer.doTick`, `die` and `awardKillScore`.
+    void tickScoreCriteria();
+
+    /// Applies `update` to every objective of `criterion` for `holder`, telling whoever shows it.
+    void updateCriterion(std::string_view criterion, std::string_view holder,
+                         const std::function<std::int32_t(std::int32_t)>& update);
+
+    /// parity: `ServerPlayer.awardKillScore`.
+    void awardKillScore(const player::PlayerSession& killer, const std::string& victim, bool victimIsPlayer);
+
+    /// A mob a player killed, waiting for the scoring pass: killer uuid and the mob's holder name.
+    struct PendingKill {
+        wire::common::Uuid killer;
+        std::string victim;
+    };
+
     /// parity: `TntBlock.prime` makes the entity inside the neighbour update that lit the block, so
     /// the fuse and its `PRIME_FUSE` land on that turn. Queued because the block half can run on a
     /// client's thread; drained here, before the world's own turn.
@@ -214,6 +235,8 @@ private:
     wire::common::placeholder::PlaceholderRegistry placeholders_;
     scoreboard::Scoreboard scoreboard_;
     scoreboard::Teams teams_;
+    std::mutex pendingKillsLock_;
+    std::vector<PendingKill> pendingKills_;
     std::unique_ptr<timings::TimingsReport> timingsReport_;
     function::FunctionLibrary functions_;
     std::unique_ptr<command::commands::FunctionRunner> functionRunner_;

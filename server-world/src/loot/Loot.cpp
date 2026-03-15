@@ -133,6 +133,14 @@ LootCondition LootCondition::locationCheck() {
     return built;
 }
 
+LootCondition LootCondition::locationCheck(LocationPredicate predicate, std::array<double, 3> offset) {
+    LootCondition built;
+    built.kind_ = Kind::LocationCheck;
+    built.location_ = std::make_shared<const LocationPredicate>(std::move(predicate));
+    built.offset_ = offset;
+    return built;
+}
+
 LootCondition LootCondition::fishingHookOpenWater(bool expected) {
     LootCondition built;
     built.kind_ = Kind::FishingHookOpenWater;
@@ -212,11 +220,20 @@ bool LootCondition::test(random::RandomSource& random, const LootContext& contex
     case Kind::KilledByPlayer:
         return context.killedByPlayer;
     case Kind::SurvivesExplosion:
-    // parity: `LocationCheck` asks about the squares around the block, which this evaluator has no
-    // way to look at. Both tables that use one ask whether the other half of a tall plant is still
-    // there, and it is: the half being broken is what put this roll here.
-    case Kind::LocationCheck:
-        return true;
+    // parity: `LocationCheck`, false without an origin. The bare factory, which carries no predicate,
+    // still passes.
+    case Kind::LocationCheck: {
+        if (location_ == nullptr) {
+            return true;
+        }
+        if (!context.origin.has_value() || !context.placeAt) {
+            return false;
+        }
+        const auto at = [this, &context](std::size_t axis) {
+            return static_cast<std::int32_t>(std::floor((*context.origin)[axis] + offset_[axis]));
+        };
+        return location_->test(context.placeAt(at(0), at(1), at(2)), context.tags);
+    }
     // parity: `MatchTool` with no tool fails, and so does a predicate this build cannot read.
     case Kind::MatchTool:
         return item_ != nullptr && item_->test(context.tool, context.toolEnchantments, context.tags);

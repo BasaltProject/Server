@@ -98,7 +98,7 @@ void addHeld(EntityFacts& facts, const std::optional<storage::StoredItemStack>& 
         };
     }
     world::RealLootTables* tables = lootTables_;
-    tables->prepare(context);
+    tables->prepareAt(context, world, dead.x, dead.y, dead.z);
     // parity: `damage_source_properties` reads the source of the killing blow, by its damage type.
     if (!dead.lastDamageCause.empty() && options_.damageTypeTags != nullptr) {
         const Identifier type = damageTypeOf(dead.lastDamageCause);

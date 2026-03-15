@@ -322,7 +322,7 @@ private:
         const std::int32_t up = riding ? 1 : golems::kVerticalSearch;
         const std::int32_t chunks = (across / 16) + 1;
         std::optional<Position> best;
-        double closest = std::numeric_limits<float>::max();
+        double closest = static_cast<double>(std::numeric_limits<float>::max());
         for (std::int32_t chunkX = (blockX >> 4) - chunks; chunkX <= (blockX >> 4) + chunks; ++chunkX) {
             for (std::int32_t chunkZ = (blockZ >> 4) - chunks; chunkZ <= (blockZ >> 4) + chunks; ++chunkZ) {
                 const server::world::Chunk* chunk = ctx_.world.chunkIfLoaded(chunkX, chunkZ);

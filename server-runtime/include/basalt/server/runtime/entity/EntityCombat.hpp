@@ -66,6 +66,10 @@ void knockback(ServerEntity& entity, double power, double towardsX, double towar
 /// The sound a mob makes when hit, and when it dies.
 ///
 /// parity: `getHurtSound` and `getDeathSound`, which nearly every mob answers with its own name.
+/// The same for this mob, which a copper golem answers by how weathered it is.
+[[nodiscard]] std::string hurtSound(const ServerEntity& entity);
+[[nodiscard]] std::string deathSound(const ServerEntity& entity);
+
 [[nodiscard]] std::string hurtSound(const wire::common::Identifier& type);
 
 [[nodiscard]] std::string deathSound(const wire::common::Identifier& type);

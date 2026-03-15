@@ -367,6 +367,7 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
     }
     session->setHealth(std::max(session->health() - damage, 0.0F));
     if (session->health() <= 0.0F) {
+        session->killerEntityId = source.has_value() ? std::optional{source->entityId} : std::nullopt;
         killPlayer(*session, deathMessageId, source.has_value() ? source->name : std::nullopt, context.death);
     } else if (session->connection().syncHealth) {
         session->connection().syncHealth();

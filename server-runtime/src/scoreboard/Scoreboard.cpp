@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/scoreboard/Scoreboard.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <limits>
 #include <utility>
@@ -12,11 +13,91 @@ using wire::protocol::play::NumberFormat;
 using wire::protocol::play::ObjectiveRenderType;
 using wire::text::Component;
 
+namespace {
+
+constexpr std::array<std::string_view, 16> kTeamColors{
+    "black",     "dark_blue", "dark_green", "dark_aqua", "dark_red", "dark_purple",  "gold",   "gray",
+    "dark_gray", "blue",      "green",      "aqua",      "red",      "light_purple", "yellow", "white"};
+
+} // namespace
+
 const std::vector<std::string>& Objective::criteria() {
-    static const std::vector<std::string> registered = {"dummy",          "trigger", "deathCount", "playerKillCount",
-                                                        "totalKillCount", "health",  "food",       "air",
-                                                        "armor",          "xp",      "level"};
+    static const std::vector<std::string> registered = [] {
+        std::vector<std::string> names{"dummy",          "trigger", "deathCount", "playerKillCount",
+                                       "totalKillCount", "health",  "food",       "air",
+                                       "armor",          "xp",      "level"};
+        // parity: `registerForEveryTeamColor`, one of each for every colour, the kills first.
+        for (const std::string_view prefix : {std::string_view{"teamkill."}, std::string_view{"killedByTeam."}}) {
+            for (const std::string_view color : kTeamColors) {
+                names.push_back(std::string{prefix} + std::string{color});
+            }
+        }
+        return names;
+    }();
     return registered;
+}
+
+namespace {
+
+/// parity: `Identifier.bySeparator`, the default namespace when the separator is missing or first.
+[[nodiscard]] std::string fullName(std::string_view name) {
+    const std::size_t separator = name.find('.');
+    if (separator == std::string_view::npos) {
+        return "minecraft." + std::string{name};
+    }
+    if (separator == 0) {
+        return "minecraft" + std::string{name};
+    }
+    return std::string{name};
+}
+
+/// parity: the statistic types `Stats` registers.
+constexpr std::array<std::string_view, 9> kStatTypes{"minecraft.mined",  "minecraft.crafted",   "minecraft.used",
+                                                     "minecraft.broken", "minecraft.picked_up", "minecraft.dropped",
+                                                     "minecraft.killed", "minecraft.killed_by", "minecraft.custom"};
+
+} // namespace
+
+std::optional<std::string> Objective::canonical(std::string_view criterion) {
+    if (std::ranges::find(criteria(), criterion) != criteria().end()) {
+        return std::string{criterion};
+    }
+    const std::size_t colon = criterion.find(':');
+    if (colon == std::string_view::npos) {
+        return std::nullopt;
+    }
+    const std::string type = fullName(criterion.substr(0, colon));
+    const std::string value = fullName(criterion.substr(colon + 1));
+    if (std::ranges::find(kStatTypes, type) == kStatTypes.end() || value.ends_with('.')) {
+        return std::nullopt;
+    }
+    return type + ":" + value;
+}
+
+std::string Objective::criterionOfStat(std::string_view statKey) {
+    std::string criterion{statKey};
+    std::ranges::replace(criterion, ':', '.');
+    std::ranges::replace(criterion, '/', ':');
+    return criterion;
+}
+
+std::string_view Objective::teamColorName(wire::protocol::play::TeamColor color) {
+    return kTeamColors[static_cast<std::size_t>(color)];
+}
+
+std::vector<std::pair<std::string, std::int32_t>>
+Scoreboard::forAllObjectives(std::string_view criterion, std::string_view holder,
+                             const std::function<std::int32_t(std::int32_t)>& update) {
+    std::vector<std::pair<std::string, std::int32_t>> touched;
+    for (const std::unique_ptr<Objective>& objective : objectives_) {
+        if (objective->criterion != criterion) {
+            continue;
+        }
+        Score& score = create(holder, objective->name);
+        score.value = update(score.value);
+        touched.emplace_back(objective->name, score.value);
+    }
+    return touched;
 }
 
 bool Objective::isReadOnly(std::string_view criterion) {

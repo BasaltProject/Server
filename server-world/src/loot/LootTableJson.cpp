@@ -237,9 +237,40 @@ Parsed<LootCondition> parseCondition(const JsonObject& condition) {
         }
         return LootCondition::blockStateProperty(std::move(expected));
     }
-    // parity: `LocationCheck`, which this evaluator answers true to; see `LootCondition::test`.
+    // parity: `LocationCheck`, a `LocationPredicate` at the origin moved by the three offsets.
     if (*type == "minecraft:location_check") {
-        return LootCondition::locationCheck();
+        const JsonObject* predicate = asObject(condition.find("predicate"));
+        LocationPredicate location;
+        if (predicate != nullptr) {
+            for (std::size_t index = 0; index < predicate->names().size(); ++index) {
+                const std::string& name = predicate->names()[index];
+                const JsonValue& value = predicate->values()[index];
+                const JsonObject* block = name == "block" ? value.get<JsonObject>() : nullptr;
+                if (name == "biomes") {
+                    location.biomes = idsOrTag(&value);
+                } else if (block != nullptr) {
+                    location.hasBlock = true;
+                    location.blocks = idsOrTag(block->find("blocks"));
+                    if (const JsonObject* state = asObject(block->find("state")); state != nullptr) {
+                        for (std::size_t at = 0; at < state->names().size(); ++at) {
+                            if (const std::optional<std::string> text = asString(&state->values()[at]);
+                                text.has_value()) {
+                                location.state.emplace(state->names()[at], *text);
+                            } else {
+                                location.unsupported = true;
+                            }
+                        }
+                    }
+                    location.unsupported = location.unsupported || block->size() > 2 ||
+                                           (block->size() == 2 && block->find("state") == nullptr);
+                } else {
+                    location.unsupported = true;
+                }
+            }
+        }
+        const auto offset = [&condition](std::string_view key) { return asNumber(condition.find(key)).value_or(0.0); };
+        return LootCondition::locationCheck(std::move(location),
+                                            {offset("offsetX"), offset("offsetY"), offset("offsetZ")});
     }
     // parity: `BonusLevelTableCondition`, whose chance is the entry of its table for the enchantment
     // level of the tool. No tool reaches here, so the level is zero and the first entry is the one.

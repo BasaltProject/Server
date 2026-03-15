@@ -4,6 +4,7 @@
 #include <basalt/wire/text/Component.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -15,9 +16,8 @@ namespace basalt::server::runtime::scoreboard {
 
 /// One objective: a name commands refer to, a criterion, and how the client should draw it.
 ///
-/// The criterion is stored, not honoured: nothing here increments a score on its own yet, so every
-/// objective behaves like `dummy` regardless of what it was created with. That is a documented gap,
-/// and it is why `/scoreboard objectives add x deathCount` is accepted rather than refused.
+/// The server keeps the criteria that are not `dummy` or `trigger` up to date through
+/// `Scoreboard::forAllObjectives`; the per-statistic ones are not offered.
 struct Objective {
     std::string name;
     std::string criterion;
@@ -45,6 +45,17 @@ struct Objective {
     /// parity: `ObjectiveCriteria.getDefaultRenderType`: `health` draws as hearts, the rest as a
     /// number.
     [[nodiscard]] static wire::protocol::play::ObjectiveRenderType defaultRenderType(std::string_view criterion);
+
+    /// parity: `ObjectiveCriteria.byName`: a registered name as it is, a statistic as
+    /// `type:value` with `.` for the namespace separator, written back in full. Nothing when neither.
+    [[nodiscard]] static std::optional<std::string> canonical(std::string_view criterion);
+
+    /// The statistic key a counter keeps for a statistic criterion (`minecraft:custom/minecraft:jump`
+    /// for `minecraft.custom:minecraft.jump`), and the other way round.
+    [[nodiscard]] static std::string criterionOfStat(std::string_view statKey);
+
+    /// parity: `TeamColor.getSerializedName`, which names `teamkill.<colour>` and `killedByTeam.<colour>`.
+    [[nodiscard]] static std::string_view teamColorName(wire::protocol::play::TeamColor color);
 };
 
 /// One holder's score in one objective. parity: `Score`.
@@ -121,6 +132,12 @@ public:
 
     void setNumberFormat(std::string_view holder, std::string_view objectiveName,
                          std::optional<wire::protocol::play::NumberFormat> format);
+
+    /// parity: `forAllObjectives`: every objective of this criterion gets `update` applied to the
+    /// holder's score, created at zero when missing. Answers each objective touched and its new value.
+    std::vector<std::pair<std::string, std::int32_t>>
+    forAllObjectives(std::string_view criterion, std::string_view holder,
+                     const std::function<std::int32_t(std::int32_t)>& update);
 
     /// parity: `/scoreboard players enable`, which creates the score at zero and unlocks it.
     void enableTrigger(std::string_view holder, std::string_view objectiveName);
