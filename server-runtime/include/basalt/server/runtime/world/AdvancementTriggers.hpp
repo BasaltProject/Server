@@ -70,8 +70,21 @@ public:
     /// parity: `SummonedEntityTrigger`, the golem or boss a player just built.
     void onSummonedEntity(std::string_view player, std::string_view uuid, const wire::common::Identifier& summoned);
 
-    /// parity: `BredAnimalsTrigger`.
-    void onBredAnimals(std::string_view player, std::string_view uuid);
+    /// parity: `BredAnimalsTrigger`, whose two parents match either way round.
+    void onBredAnimals(std::string_view player, std::string_view uuid, const wire::common::Identifier& child,
+                       const wire::common::Identifier& parent, const wire::common::Identifier& partner);
+
+    /// parity: `EnterBlockTrigger`, fired once per tick for every block the player stands in.
+    void onEnteredBlock(std::string_view player, std::string_view uuid, const wire::common::Identifier& block);
+
+    /// parity: `RecipeCraftedTrigger`, fired when the result of a recipe is taken out of its slot.
+    void onRecipeCrafted(std::string_view player, std::string_view uuid, const wire::common::Identifier& recipe);
+
+    /// parity: `PlayerTrigger` as `location`, which the jar fires once a second: the biome the
+    /// player stands in, and the structure whose piece is under them. Either may be absent.
+    void onLocation(std::string_view player, std::string_view uuid,
+                    const std::optional<wire::common::Identifier>& biome,
+                    const std::function<bool(const wire::common::Identifier&)>& insideStructure);
 
     /// parity: `LootTableTrigger`, a container whose loot this player rolled.
     void onContainerLoot(std::string_view player, std::string_view uuid, const wire::common::Identifier& table);

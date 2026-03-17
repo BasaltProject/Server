@@ -44,13 +44,13 @@ void turtleEgg(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z
 /// five thousand ticks; the drying and soaking happen on that scheduled turn.
 void driedGhast(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
 
-/// parity: `EyeblossomBlock.randomTick` over the `gameplay/eyeblossom_open` attribute, whose only
-/// source in vanilla's data is the `day` timeline: true from tick 12600, false from 23401.
-///
-/// The attribute system itself is not modelled, but this attribute has exactly one track and it is
-/// one this build already keeps: the world clock.
+/// parity: `EyeblossomBlock.randomTick` over `gameplay/eyeblossom_open`, whose only source is the
+/// `day` timeline (open from 12600 to 23400). Also run from a booked turn (`EyeblossomBlock.tick`).
 void eyeblossom(WorldState& world, const WorldClock& clock, std::int32_t x, std::int32_t y, std::int32_t z,
-                std::int32_t stateId, std::vector<BlockChange>& changes);
+                std::int32_t stateId, random::RandomSource& random, std::vector<BlockChange>& changes);
+
+/// Whether a state is one of the four eyeblossoms, the two in a pot included.
+[[nodiscard]] bool isEyeblossom(std::int32_t stateId);
 
 } // namespace miscGrowth
 

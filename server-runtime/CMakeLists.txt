@@ -258,6 +258,7 @@ basalt_module(server-runtime-core
         src/ui/PlayerUi.cpp
         src/timings/TimingsReport.cpp
         src/world/ChorusFlowerGrowth.cpp
+        src/world/SummonAwards.cpp
         src/world/RealBannerPatterns.cpp
         src/world/RealBiomeSpawns.cpp
         src/world/RealBlockTags.cpp

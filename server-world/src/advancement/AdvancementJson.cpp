@@ -83,6 +83,26 @@ using wire::common::JsonValue;
     return ItemMatcher{.items = {*parsed}, .tag = std::nullopt};
 }
 
+/// The entity types one `entity_properties` list names. Only the type is read: a predicate that asks
+/// for equipment or components is one this build cannot answer, and a criterion that never fires is
+/// better than one granted to the wrong animal. `ok` goes false for anything else.
+[[nodiscard]] std::vector<std::string> parseEntityTypes(const std::vector<JsonValue>& list, bool& ok) {
+    std::vector<std::string> types;
+    for (const JsonValue& element : list) {
+        const JsonObject* check = element.get<JsonObject>();
+        const JsonObject* predicate = check == nullptr ? nullptr : asObject(check->find("predicate"));
+        const std::string* type = predicate == nullptr || predicate->size() != 1
+                                      ? nullptr
+                                      : asString(predicate->find("minecraft:entity_type"));
+        if (type == nullptr) {
+            ok = false;
+            return {};
+        }
+        types.push_back(*type);
+    }
+    return types;
+}
+
 /// The condition a trigger fires under, for the triggers this server can observe. Anything else is
 /// `Unsupported` and never fires, rather than firing on the bare trigger and handing out an
 /// advancement nobody earned.
@@ -110,8 +130,6 @@ using wire::common::JsonValue;
         return CriterionCondition{.kind = ConditionKind::RecipeUnlocked, .matchers = {}, .recipe = recipe};
     }
     // parity: the entity predicate of `player_killed_entity`, `tame_animal` and `summoned_entity`.
-    // Only the type is read: a predicate that asks for equipment or components is one this build
-    // cannot answer, and a criterion that never fires is better than one granted to the wrong kill.
     if (name == "minecraft:player_killed_entity" || name == "minecraft:tame_animal" ||
         name == "minecraft:summoned_entity") {
         const ConditionKind kind = name == "minecraft:player_killed_entity" ? ConditionKind::KilledEntity
@@ -122,19 +140,9 @@ using wire::common::JsonValue;
         if (entity == nullptr) {
             return conditions == nullptr || conditions->empty() ? built : CriterionCondition{};
         }
-        for (const JsonValue& element : *entity) {
-            const JsonObject* check = element.get<JsonObject>();
-            const JsonObject* predicate = check == nullptr ? nullptr : asObject(check->find("predicate"));
-            if (predicate == nullptr || predicate->size() != 1) {
-                return CriterionCondition{};
-            }
-            const std::string* type = asString(predicate->find("minecraft:entity_type"));
-            if (type == nullptr) {
-                return CriterionCondition{};
-            }
-            built.entityTypes.push_back(*type);
-        }
-        return built;
+        bool ok = true;
+        built.entityTypes = parseEntityTypes(*entity, ok);
+        return ok ? built : CriterionCondition{};
     }
     if (name == "minecraft:player_generates_container_loot") {
         const std::optional<Identifier> table =
@@ -164,10 +172,65 @@ using wire::common::JsonValue;
         built.matchers.push_back(std::move(*matcher));
         return built;
     }
-    // parity: `BredAnimalsTrigger`, which the two advancements that use it hand no predicate at all.
+    // parity: `RecipeCraftedTrigger`. A criterion that also names the ingredients is left
+    // unsupported: what was in the grid is gone by the time the result is taken.
+    if (name == "minecraft:recipe_crafted") {
+        const std::optional<Identifier> recipe =
+            conditions == nullptr ? std::nullopt : asIdentifier(conditions->find("recipe_id"));
+        if (!recipe.has_value() || conditions->find("ingredients") != nullptr) {
+            return CriterionCondition{};
+        }
+        return CriterionCondition{.kind = ConditionKind::RecipeCrafted, .recipe = recipe};
+    }
+    // parity: `PlayerTrigger` as `location`, whose predicate this build reads only as far as one
+    // biome or one structure: the two `adventuring_time` and `explore_nether` ask for, plus the four
+    // structure ones. Anything else (equipment, what the player is stepping on) is left unsupported.
+    if (name == "minecraft:location") {
+        const std::vector<JsonValue>* player = conditions == nullptr ? nullptr : asArray(conditions->find("player"));
+        if (player == nullptr || player->size() != 1) {
+            return CriterionCondition{};
+        }
+        const JsonObject* term = player->front().get<JsonObject>();
+        const JsonObject* predicate = term == nullptr ? nullptr : asObject(term->find("predicate"));
+        const JsonObject* where =
+            predicate == nullptr || predicate->size() != 1 ? nullptr : asObject(predicate->find("minecraft:location"));
+        if (where == nullptr || where->size() != 1) {
+            return CriterionCondition{};
+        }
+        CriterionCondition built{.kind = ConditionKind::AtLocation};
+        built.biome = asIdentifier(where->find("biomes"));
+        built.structure = asIdentifier(where->find("structures"));
+        return built.biome.has_value() || built.structure.has_value() ? built : CriterionCondition{};
+    }
+    // parity: `EnterBlockTrigger`. A criterion that also names block properties is one this build
+    // cannot answer, so it is left unsupported rather than granted on the block alone.
+    if (name == "minecraft:enter_block") {
+        const std::optional<Identifier> block =
+            conditions == nullptr ? std::nullopt : asIdentifier(conditions->find("block"));
+        if (!block.has_value() || conditions->find("state") != nullptr) {
+            return CriterionCondition{};
+        }
+        return CriterionCondition{.kind = ConditionKind::EnteredBlock, .block = block};
+    }
+    // parity: `BredAnimalsTrigger`: the newborn, or the pair that made it.
     if (name == "minecraft:bred_animals") {
-        return conditions == nullptr || conditions->empty() ? CriterionCondition{.kind = ConditionKind::BredAnimals}
-                                                            : CriterionCondition{};
+        CriterionCondition built{.kind = ConditionKind::BredAnimals};
+        if (conditions == nullptr || conditions->empty()) {
+            return built;
+        }
+        bool ok = true;
+        const auto read = [&conditions, &ok](std::string_view key) {
+            const std::vector<JsonValue>* list = asArray(conditions->find(key));
+            if (list == nullptr) {
+                ok = ok && conditions->find(key) == nullptr;
+                return std::vector<std::string>{};
+            }
+            return parseEntityTypes(*list, ok);
+        };
+        built.entityTypes = read("child");
+        built.parentTypes = read("parent");
+        built.partnerTypes = read("partner");
+        return ok ? built : CriterionCondition{};
     }
     return CriterionCondition{};
 }

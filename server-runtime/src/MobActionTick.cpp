@@ -343,7 +343,13 @@ void MobActionSystem::breed(world::LoadedWorld& world, ServerEntity& animal, Ser
     auto baby = std::make_unique<ServerEntity>(players_->allocateEntityId(), wire::common::Uuid::random(),
                                                animal.type(), entry->protocolId, animal.x, animal.y, animal.z);
     baby->age = entity::breeding::kBabyAge;
+    const wire::common::Identifier childType = baby->type();
     world.state().spawnEntity(std::move(baby));
+    // parity: `finalizeSpawnChildFromBreeding` credits whoever fed either parent, the first one first.
+    const std::optional<std::string>& cause = animal.loveCause.has_value() ? animal.loveCause : partner.loveCause;
+    if (cause.has_value() && hooks_.bredAnimals) {
+        hooks_.bredAnimals(*cause, animal.type(), partner.type(), childType);
+    }
     entity::breeding::afterBreeding(animal, partner);
     // parity: `Animal.finalizeSpawnChildFromBreeding`, one orb of one to seven points.
     if (world.gameRules().get(world::gameRules::kMobDrops) && hooks_.spawnOrb) {

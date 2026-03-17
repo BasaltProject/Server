@@ -182,6 +182,15 @@ const crafting::Recipe* RealRecipes::smithingFor(const server::world::loot::Item
     return nullptr;
 }
 
+const Identifier* RealRecipes::nameOf(const crafting::Recipe* recipe) const {
+    if (recipe == nullptr || recipes_.empty() || recipe < recipes_.data() ||
+        recipe >= recipes_.data() + recipes_.size()) {
+        return nullptr;
+    }
+    const auto index = static_cast<std::size_t>(recipe - recipes_.data());
+    return index < parsedIds_.size() ? &parsedIds_[index] : nullptr;
+}
+
 std::optional<RealRecipes::Match> RealRecipes::recipeMatching(const crafting::CraftingInput& input) const {
     for (std::size_t index = 0; index < recipes_.size(); ++index) {
         // parity: `RecipeManager.getRecipeFor(RecipeType.CRAFTING, ...)`. Everything the jar ships

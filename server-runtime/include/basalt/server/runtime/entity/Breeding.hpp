@@ -3,6 +3,7 @@
 #include <basalt/wire/common/Identifier.hpp>
 
 #include <cstdint>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -44,8 +45,9 @@ inline constexpr double kBreedDistanceSquared = 9.0;
 /// parent that just bred is counting down, and neither is zero.
 [[nodiscard]] bool canFallInLove(const ServerEntity& animal);
 
-/// parity: `setInLove`, which is what a fed animal comes away with.
-void feed(ServerEntity& animal);
+/// parity: `setInLove`, which is what a fed animal comes away with. `cause` is the player whose
+/// advancement and stat the calf will be, kept as `loveCause` is.
+void feed(ServerEntity& animal, std::optional<std::string> cause = std::nullopt);
 
 /// parity: `canMate`: both in love, the same kind, and not the same animal twice.
 [[nodiscard]] bool canMate(const ServerEntity& animal, const ServerEntity& other);

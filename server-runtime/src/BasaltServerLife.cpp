@@ -998,7 +998,7 @@ void BasaltServer::startBedrockListener() {
                     !entity::breeding::canFallInLove(*target)) {
                     return;
                 }
-                entity::breeding::feed(*target);
+                entity::breeding::feed(*target, session->uuid().toString());
                 if (session->gamemode == wire::protocol::play::Gamemode::Creative) {
                     return;
                 }

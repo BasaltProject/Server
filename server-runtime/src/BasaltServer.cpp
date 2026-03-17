@@ -13,6 +13,7 @@
 #include <basalt/server/runtime/world/EndPodium.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/RecipeBook.hpp>
+#include <basalt/server/runtime/world/SummonAwards.hpp>
 #include <basalt/wire/auth/MojangSessionService.hpp>
 #include <basalt/wire/multiversion/java/JavaTranslators.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
@@ -39,12 +40,18 @@ constexpr std::int32_t kRetainMarginChunks = 4;
 
 [[nodiscard]] double scratchDouble() { return std::uniform_real_distribution<double>{0.0, 1.0}(scratchRandom()); }
 
-/// A copper golem a pattern just built takes its weathering from the chest it leaves behind.
-void markPatternGolem(entity::ServerEntity* golem) {
-    if (golem != nullptr && entity::copperGolems::isCopperGolem(golem->type())) {
+/// A copper golem a pattern just built takes its weathering from the chest it leaves behind, and
+/// whoever is standing around gets the advancement for it.
+void golemSpawned(entity::ServerEntity* golem, world::AdvancementTriggers* triggers,
+                  const std::vector<player::PlayerSession*>& players, std::string_view worldName) {
+    if (golem == nullptr) {
+        return;
+    }
+    if (entity::copperGolems::isCopperGolem(golem->type())) {
         random::RandomSource random = random::RandomSource::legacy(scratchSeed());
         entity::copperGolems::stateOf(*golem, random).fromPattern = true;
     }
+    world::summonAwards::award(triggers, players, worldName, *golem, world::summonAwards::kGolemRange);
 }
 
 [[nodiscard]] wire::protocol::play::Gamemode gamemodeOf(std::string_view name) {
@@ -339,8 +346,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         if (spawning_ == nullptr) {
             return;
         }
-        markPatternGolem(spawning_->spawnMob(world, wire::common::Identifier::vanilla(std::string{type}), x, y, z, 0.0F,
-                                             "triggered", {}));
+        golemSpawned(spawning_->spawnMob(world, wire::common::Identifier::vanilla(std::string{type}), x, y, z, 0.0F,
+                                         "triggered", {}),
+                     advancementTriggers_.get(), playerRegistry_.snapshot(), world.name());
     };
     wiring.requestRestart = [this] { requestRestart(); };
     wiring.onConfigsReloaded = [this] { worldRegistry_->onConfigsReloaded(); };
@@ -464,8 +472,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                     if (spawning_ == nullptr) {
                         return;
                     }
-                    markPatternGolem(spawning_->spawnMob(world, wire::common::Identifier::vanilla(std::string{type}), x,
-                                                         y, z, 0.0F, "triggered", {}));
+                    golemSpawned(spawning_->spawnMob(world, wire::common::Identifier::vanilla(std::string{type}), x, y,
+                                                     z, 0.0F, "triggered", {}),
+                                 advancementTriggers_.get(), playerRegistry_.snapshot(), world.name());
                 }},
         BlockChangeBroadcaster::Options{.nextSeed = [] { return scratchSeed(); },
                                         .blockTags = &vanillaData_.blockTags});
@@ -583,6 +592,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         playerRegistry_, worldsConfig, model.allWorlds, chunkSimulation_, *broadcaster_, *wired_.environment,
         *spawning_, EnvironmentTickSystem::Hooks{},
         EnvironmentTickSystem::Options{.nextSeed = [] { return scratchSeed(); },
+                                       .advancementTriggers = advancementTriggers_.get(),
                                        .difficulty = [this] { return difficulty_; }},
         logger_);
     MobActionSystem::Hooks mobHooks;
@@ -590,6 +600,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         playerRegistry_, *broadcaster_, *explosions_,
         WitherSystem::Options{.nextSeed = [] { return scratchSeed(); },
                               .blockTags = &vanillaData_.blockTags,
+                              .advancementTriggers = advancementTriggers_.get(),
                               .mobEffect =
                                   [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                                          entity::ServerEntity& mob, const world::ActiveEffect& effect) {
@@ -616,6 +627,18 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     };
     mobHooks.spawnOrb = [this](world::LoadedWorld& world, double x, double y, double z, std::int32_t value) {
         orbs_->spawn(world, x, y, z, value);
+    };
+    mobHooks.bredAnimals = [this](std::string_view cause, const wire::common::Identifier& parent,
+                                  const wire::common::Identifier& partner, const wire::common::Identifier& child) {
+        const std::optional<wire::common::Uuid> uuid = wire::common::Uuid::parse(cause);
+        player::PlayerSession* session = uuid.has_value() ? playerRegistry_.get(*uuid) : nullptr;
+        if (session == nullptr) {
+            return;
+        }
+        session->stats.increment(storage::stats::animalsBred());
+        if (advancementTriggers_ != nullptr) {
+            advancementTriggers_->onBredAnimals(session->name(), std::string{cause}, child, parent, partner);
+        }
     };
     mobActions_ =
         std::make_unique<MobActionSystem>(playerRegistry_, *broadcaster_, *explosions_, *spawning_, *combat_, *raids_,

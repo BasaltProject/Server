@@ -1,3 +1,5 @@
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/ChunkSimulationView.hpp>
 #include <basalt/server/runtime/EnvironmentTickSystem.hpp>
@@ -6,6 +8,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerVitals.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/EndGateways.hpp>
 #include <basalt/server/runtime/world/EndPortals.hpp>
@@ -13,10 +16,12 @@
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/NaturalSpawner.hpp>
 #include <basalt/server/runtime/world/NetherPortals.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/SkeletonHorseTrap.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
+#include <basalt/server/world/structure/StructureQueries.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -39,6 +44,9 @@ constexpr std::int64_t kTimeSyncIntervalTicks = 20;
 
 /// parity: `ServerPlayer.tick` checks the border every ten ticks, not every one.
 constexpr std::int64_t kBorderDamageIntervalTicks = 10;
+
+/// parity: `ServerPlayer.doTick` asks the location criteria every twentieth tick.
+constexpr std::int64_t kLocationIntervalTicks = 20;
 
 constexpr double kPlayerHalfWidth = 0.3;
 constexpr double kPlayerHeight = 1.8;
@@ -154,6 +162,63 @@ void EnvironmentTickSystem::tickBorderWall(world::LoadedWorld& world) {
         }
         player->connection().showBorder(border.centerX() - half, border.centerX() + half, border.centerZ() - half,
                                         border.centerZ() + half, border.warningBlocks, withWall);
+    }
+}
+
+void EnvironmentTickSystem::tickLocation(world::LoadedWorld& world) {
+    if (options_.advancementTriggers == nullptr || world.gameTime() % kLocationIntervalTicks != 0) {
+        return;
+    }
+    const server::world::structure::StructureQueries structures{
+        [&world](std::int32_t chunkX, std::int32_t chunkZ) -> const server::world::structure::ChunkStructures* {
+            const server::world::Chunk* chunk = world.state().chunkIfLoaded(chunkX, chunkZ);
+            return chunk == nullptr ? nullptr : &chunk->structures();
+        }};
+    for (const PlayerSession* player : players_->snapshot()) {
+        if (player->worldName != world.name()) {
+            continue;
+        }
+        const server::world::structure::StructurePos at{static_cast<std::int32_t>(std::floor(player->x)),
+                                                        static_cast<std::int32_t>(std::floor(player->y)),
+                                                        static_cast<std::int32_t>(std::floor(player->z))};
+        // parity: `LocationPredicate` reads the biome of the block the player stands on, and asks
+        // the structure manager for a piece rather than for the start's full bounds.
+        const std::optional<wire::common::Identifier> biome = world::naturalSpawner::biomeAt(world, at.x, at.y, at.z);
+        const auto insideStructure = [&structures, &at](const wire::common::Identifier& structure) {
+            return structures.startWithPieceAt(at, structure.path()) != nullptr;
+        };
+        options_.advancementTriggers->onLocation(player->name(), player->uuid().toString(), biome, insideStructure);
+    }
+}
+
+// parity: the jar reaches `onInsideBlock` from `Entity.move`, so it asks on every movement packet
+// rather than on a clock. Asking once a tick instead grants the same criteria a moment earlier at
+// worst: what a criterion reads is the block, and a player who stands in one was moved into it.
+void EnvironmentTickSystem::tickInsideBlocks(world::LoadedWorld& world) {
+    if (options_.advancementTriggers == nullptr) {
+        return;
+    }
+    const auto low = [](double value) { return static_cast<std::int32_t>(std::floor(value + kInsideMargin)); };
+    const auto high = [](double value) { return static_cast<std::int32_t>(std::floor(value - kInsideMargin)); };
+    for (const PlayerSession* player : players_->snapshot()) {
+        if (player->worldName != world.name()) {
+            continue;
+        }
+        for (std::int32_t x = low(player->x - kPlayerHalfWidth); x <= high(player->x + kPlayerHalfWidth); ++x) {
+            for (std::int32_t y = low(player->y); y <= high(player->y + kPlayerHeight); ++y) {
+                for (std::int32_t z = low(player->z - kPlayerHalfWidth); z <= high(player->z + kPlayerHalfWidth); ++z) {
+                    const std::optional<std::int32_t> state = world.state().blockState(x, y, z);
+                    // parity: `onInsideBlock` is behind `insideBlock`, so air is never handed over.
+                    if (!state.has_value() || registry::blocks::isAir(*state)) {
+                        continue;
+                    }
+                    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*state);
+                    if (block != nullptr) {
+                        options_.advancementTriggers->onEnteredBlock(player->name(), player->uuid().toString(), *block);
+                    }
+                }
+            }
+        }
     }
 }
 

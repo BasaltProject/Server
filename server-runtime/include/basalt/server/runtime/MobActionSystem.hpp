@@ -59,6 +59,11 @@ public:
         std::function<bool(const world::LoadedWorld& world, const entity::ServerEntity& animal,
                            const entity::ServerEntity& partner)>
             breedAllowed;
+        /// The player who fed the parents, told what came of it: their stat and their advancement.
+        /// parity: `finalizeSpawnChildFromBreeding`.
+        std::function<void(std::string_view cause, const wire::common::Identifier& parent,
+                           const wire::common::Identifier& partner, const wire::common::Identifier& child)>
+            bredAnimals;
         /// One experience orb of that value. parity: `new ExperienceOrb`.
         std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t value)> spawnOrb;
         /// A wither's middle head firing at its target, which is its ranged attack.

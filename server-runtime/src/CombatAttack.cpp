@@ -3,7 +3,6 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
-#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/CombatHandler.hpp>
 #include <basalt/server/runtime/CombatSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
@@ -22,6 +21,7 @@
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
 #include <basalt/server/runtime/player/PlayerSweep.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
@@ -325,7 +325,7 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
         !entity::breeding::canFallInLove(*entity)) {
         return;
     }
-    entity::breeding::feed(*entity);
+    entity::breeding::feed(*entity, session->uuid().toString());
     if (session->gamemode != Gamemode::Creative) {
         if (held->count <= 1) {
             session->inventory.set(heldSlot, std::nullopt);

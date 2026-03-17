@@ -84,6 +84,7 @@ inline constexpr std::string_view kMined = "minecraft:mined";
 [[nodiscard]] const std::string& jump();
 [[nodiscard]] const std::string& fallOneCm();
 [[nodiscard]] const std::string& enchantItem();
+[[nodiscard]] const std::string& animalsBred();
 
 } // namespace stats
 

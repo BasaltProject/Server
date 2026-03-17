@@ -21,8 +21,9 @@ class PlayerSession;
 } // namespace basalt::server::runtime::player
 
 namespace basalt::server::runtime::world {
+class AdvancementTriggers;
 class LoadedWorld;
-}
+} // namespace basalt::server::runtime::world
 
 namespace basalt::server::runtime::command {
 class CommandEnvironment;
@@ -60,6 +61,8 @@ public:
     /// The storm's own stream, which is not the level's: a strike must not shift what else spawns.
     struct Options {
         std::function<std::int64_t()> nextSeed;
+        /// Where the advancement for standing in a block goes.
+        world::AdvancementTriggers* advancementTriggers = nullptr;
         /// The word the config carries, read fresh every tick: an operator can change it.
         std::function<std::string()> difficulty;
     };
@@ -87,6 +90,14 @@ public:
 
     /// Moves whoever has stood in a portal long enough, and counts down the wait for everyone else.
     void tickPortals(world::LoadedWorld& world);
+
+    /// parity: `Entity.checkInsideBlocks` reaching `ServerPlayer.onInsideBlock`: the blocks a player
+    /// stands in, every tick, which is what the boat recipes and the gateway advancement wait for.
+    void tickInsideBlocks(world::LoadedWorld& world);
+
+    /// parity: `ServerPlayer.doTick`'s `tickCount % 20`, where the biome and structure criteria are
+    /// asked about once a second rather than every tick.
+    void tickLocation(world::LoadedWorld& world);
 
     /// Where an end gateway inside this box sends something, resting that gateway. Nothing when
     /// the box touches no gateway that is ready. parity: `EndGatewayBlock.entityInside`.

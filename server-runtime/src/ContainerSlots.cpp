@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/item/ItemComponents.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
@@ -201,6 +202,7 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
         if (index == Menu::kSmithingResult) {
             // Taking the result is the only way this slot is written, and it costs the inputs.
             if (!stack.has_value()) {
+                awardRecipeCrafted();
                 takeSmithingResult();
             }
             return;
@@ -531,10 +533,13 @@ void ContainerMenuController::recomputeSmithingResult() {
                                    base.has_value() ? &*base : nullptr, addition.has_value() ? &*addition : nullptr);
     if (recipe == nullptr || !base.has_value() || !addition.has_value()) {
         smithingSlots_[Menu::kSmithingResult] = std::nullopt;
+        recipeUsed_.reset();
         return;
     }
     const std::optional<server::world::loot::ItemStack> assembled = recipe->assembleSmithing(*base, *addition);
     smithingSlots_[Menu::kSmithingResult] = assembled.has_value() ? std::optional{storedOf(*assembled)} : std::nullopt;
+    const wire::common::Identifier* name = recipes->nameOf(recipe);
+    recipeUsed_ = name != nullptr && assembled.has_value() ? std::optional{*name} : std::nullopt;
 }
 
 void ContainerMenuController::takeSmithingResult() {
@@ -611,10 +616,12 @@ void ContainerMenuController::recomputeCraftingResult() {
     }
     if (!match.has_value() || !known) {
         craftingResult_.reset();
+        recipeUsed_.reset();
         return;
     }
     const std::optional<server::world::loot::ItemStack> result = recipes->resultFor(input);
     craftingResult_ = result.has_value() ? std::optional{storedOf(*result)} : std::nullopt;
+    recipeUsed_ = craftingResult_.has_value() ? std::optional{match->id} : std::nullopt;
 }
 
 std::vector<std::optional<storage::StoredItemStack>> ContainerMenuController::craftingRemainders() const {
@@ -654,6 +661,15 @@ std::vector<std::optional<storage::StoredItemStack>> ContainerMenuController::cr
     return remainders;
 }
 
+void ContainerMenuController::awardRecipeCrafted() {
+    world::AdvancementTriggers* triggers = owner_->options().advancementTriggers;
+    const PlayerSession* session = owner_->playerSession();
+    if (triggers == nullptr || session == nullptr || !recipeUsed_.has_value()) {
+        return;
+    }
+    triggers->onRecipeCrafted(session->name(), session->uuid().toString(), *recipeUsed_);
+}
+
 void ContainerMenuController::takeCraftingResult(PlayerSession& session) {
     static_cast<void>(session);
     if (!craftingResult_.has_value()) {
@@ -672,6 +688,7 @@ void ContainerMenuController::takeCraftingResult(PlayerSession& session) {
     } else {
         carriedItem_ = result;
     }
+    awardRecipeCrafted();
     // parity: `Recipe.getRemainingItems`: a cell whose item leaves something behind (a bucket, a
     // bottle) keeps it instead of emptying, and the book being copied stays where it was.
     const std::vector<std::optional<storage::StoredItemStack>> remaining = craftingRemainders();
