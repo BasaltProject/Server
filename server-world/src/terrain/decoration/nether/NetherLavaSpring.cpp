@@ -16,7 +16,10 @@ const PathSet& allBiomes() {
     return paths;
 }
 
-/// parity: `spring_lava_nether` reuses the overworld spring's own rock list, netherrack excluded.
+/// parity: the four main nether biomes list `spring_lava`, and that one is the **overworld's**
+/// configured feature, so it validates against the overworld rock list. `spring_lava_nether` is a
+/// different configured feature, netherrack and friends, and only `basalt_deltas` reaches it through
+/// `spring_delta`.
 const PathSet& springRocks() {
     static const PathSet paths = {"stone", "granite", "diorite", "andesite", "deepslate", "tuff", "calcite", "dirt"};
     return paths;
