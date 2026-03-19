@@ -68,6 +68,7 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
       biomeZoomSeed_(obfuscateBiomeSeed(metadata_.seed)), biomeZoomer_(biomeZoomSeed_), gameTime_(metadata_.gameTime),
       difficulty_(metadata_.difficulty.value_or(settings_.difficulty)), difficultyLocked_(metadata_.difficultyLocked),
       defaultGamemode_(metadata_.defaultGamemode) {
+    state_.setHasSkylight(config::dimensionFacts(declaration_.dimension).hasSkylight);
     // Said rather than migrated: a world that looks empty is worse than a line in the log.
     if (wire::io::fileIO::isDirectory(worldRoot_ + "/dimensions")) {
         logger_.warn([this] {

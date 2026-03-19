@@ -70,6 +70,9 @@ public:
 
     explicit WorldState(std::vector<server::world::Chunk> initialChunks = {}, LoadOrGenerate loadOrGenerate = {});
 
+    /// Whether the dimension has a sky, which decides half of `getRawBrightness`.
+    void setHasSkylight(bool hasSkylight) noexcept { hasSkylight_ = hasSkylight; }
+
     WorldState(const WorldState&) = delete;
     WorldState& operator=(const WorldState&) = delete;
     WorldState(WorldState&&) = delete;
@@ -390,6 +393,7 @@ public:
     [[nodiscard]] std::vector<Spilled> takeSpilledContents();
 
 private:
+    bool hasSkylight_ = true;
     /// Refuses an access from anywhere but the owner, and only while strict ownership is on.
     ///
     /// Skipped while a world is split: the owner is the first region's, and a block out in the
