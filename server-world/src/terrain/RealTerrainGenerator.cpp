@@ -363,7 +363,7 @@ void decorate(GeneratedTerrain& terrain, std::int64_t seed, const NeighbourTerra
         }
         decoration::sculkDecoration::decorate(chunk, seed, environment, externalState);
         decoration::caveSpeleothemDecoration::decorate(chunk, seed, environment, externalState);
-        decoration::overworldOreDecoration::decorateInfested(chunk, seed, environment, nullptr, externalState);
+        decoration::overworldOreDecoration::decorateInfested(chunk, seed, environment, externalOceanFloor, externalState);
         decoration::overworldSpringDecoration::decorate(chunk, seed, environment, externalState);
         decoration::overworldVegetalDecoration::decorate(chunk, seed, environment);
     });
