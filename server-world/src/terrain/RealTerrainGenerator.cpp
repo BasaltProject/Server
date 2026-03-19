@@ -8,7 +8,6 @@
 #include <basalt/server/world/terrain/OverworldAquifer.hpp>
 #include <basalt/server/world/terrain/OverworldOreVeinifier.hpp>
 #include <basalt/server/world/terrain/RealTerrainGenerator.hpp>
-#include <basalt/server/world/terrain/decoration/tree/LeafDistances.hpp>
 #include <basalt/server/world/terrain/carver/OverworldCarvers.hpp>
 #include <basalt/server/world/terrain/decoration/CaveLocalModificationDecoration.hpp>
 #include <basalt/server/world/terrain/decoration/CaveSpeleothemDecoration.hpp>
@@ -23,6 +22,7 @@
 #include <basalt/server/world/terrain/decoration/OverworldVegetalDecoration.hpp>
 #include <basalt/server/world/terrain/decoration/SculkDecoration.hpp>
 #include <basalt/server/world/terrain/decoration/SurfaceFreezingDecoration.hpp>
+#include <basalt/server/world/terrain/decoration/tree/LeafDistances.hpp>
 #include <basalt/server/world/terrain/surface/ChunkBiomeEnvironment.hpp>
 #include <basalt/server/world/terrain/surface/SurfaceBuilder.hpp>
 #include <basalt/server/world/terrain/surface/SurfaceRuleData.hpp>
@@ -279,6 +279,9 @@ void decorate(GeneratedTerrain& terrain, std::int64_t seed, const NeighbourTerra
         return neighbours == nullptr ? std::nullopt : neighbours->oceanFloorHeightAt(x, z);
     };
     generationMetrics::measure(generationMetrics::Phase::Decoration, [&] {
+        // parity: one `WorldgenRandom` decorates the whole chunk in the jar, so the spare its
+        // gaussian cached in one feature is handed to the next.
+        const random::RandomSource::SharedGaussian sharedGaussian;
         // One reader for the whole phase. A feature body that reaches past the chunk edge asks the
         // chunk, and the chunk asks this: without it the outside reads as air, which makes a lake
         // preflight reject itself and a grass patch find no ground to stand on.
@@ -363,7 +366,8 @@ void decorate(GeneratedTerrain& terrain, std::int64_t seed, const NeighbourTerra
         }
         decoration::sculkDecoration::decorate(chunk, seed, environment, externalState);
         decoration::caveSpeleothemDecoration::decorate(chunk, seed, environment, externalState);
-        decoration::overworldOreDecoration::decorateInfested(chunk, seed, environment, externalOceanFloor, externalState);
+        decoration::overworldOreDecoration::decorateInfested(chunk, seed, environment, externalOceanFloor,
+                                                             externalState);
         decoration::overworldSpringDecoration::decorate(chunk, seed, environment, externalState);
         decoration::overworldVegetalDecoration::decorate(chunk, seed, environment);
     });

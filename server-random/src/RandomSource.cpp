@@ -36,9 +36,30 @@ RandomSource RandomSource::xoroshiro(std::int64_t seedLo, std::int64_t seedHi) n
 
 RandomSource RandomSource::xoroshiro(Seed128bit seed) noexcept { return xoroshiro(seed.lo, seed.hi); }
 
+namespace {
+
+/// The spare a chunk's decoration shares between its features, and whether one is in scope.
+struct SharedGaussianState {
+    bool active = false;
+    bool have = false;
+    double value = 0.0;
+};
+
+thread_local SharedGaussianState tSharedGaussian;
+
+} // namespace
+
+RandomSource::SharedGaussian::SharedGaussian() noexcept {
+    tSharedGaussian = {.active = true, .have = false, .value = 0.0};
+}
+
+RandomSource::SharedGaussian::~SharedGaussian() noexcept { tSharedGaussian = {}; }
+
 RandomSource RandomSource::worldgen(RandomSource inner) noexcept {
     inner.bitAlgorithms_ = true;
-    inner.resetGaussian();
+    if (!tSharedGaussian.active) {
+        inner.resetGaussian();
+    }
     return inner;
 }
 
@@ -48,7 +69,10 @@ void RandomSource::setSeed(std::int64_t seed) noexcept {
     } else {
         generator_ = Xoroshiro128PlusPlus{upgradeSeedTo128bit(seed)};
     }
-    resetGaussian();
+    // parity: `WorldgenRandom.setSeed` never clears the spare, so a shared one survives the reseed.
+    if (!(bitAlgorithms_ && tSharedGaussian.active)) {
+        resetGaussian();
+    }
 }
 
 std::int64_t RandomSource::rawNextLong() noexcept { return generator_.nextLong(); }
@@ -138,7 +162,13 @@ double RandomSource::nextDouble() noexcept {
 
 double RandomSource::nextGaussian() noexcept {
     // parity: MarsagliaPolarGaussian, the polar method with its cached spare sample.
-    if (haveNextGaussian_) {
+    const bool shared = bitAlgorithms_ && tSharedGaussian.active;
+    if (shared) {
+        if (tSharedGaussian.have) {
+            tSharedGaussian.have = false;
+            return tSharedGaussian.value;
+        }
+    } else if (haveNextGaussian_) {
         haveNextGaussian_ = false;
         return nextGaussian_;
     }
@@ -153,8 +183,13 @@ double RandomSource::nextGaussian() noexcept {
     } while (radiusSquared >= 1.0 || radiusSquared == 0.0);
 
     const double multiplier = std::sqrt(-2.0 * std::log(radiusSquared) / radiusSquared);
-    nextGaussian_ = y * multiplier;
-    haveNextGaussian_ = true;
+    if (shared) {
+        tSharedGaussian.value = y * multiplier;
+        tSharedGaussian.have = true;
+    } else {
+        nextGaussian_ = y * multiplier;
+        haveNextGaussian_ = true;
+    }
     return x * multiplier;
 }
 

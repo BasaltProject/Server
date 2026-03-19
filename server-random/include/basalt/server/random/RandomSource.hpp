@@ -89,6 +89,20 @@ public:
 
     void consumeCount(int rounds) noexcept;
 
+    /// parity: vanilla decorates a chunk with a single `WorldgenRandom`, and its `setSeed` reseeds
+    /// only the source it wraps without calling `super`, so the spare its gaussian cached outlives
+    /// every `setFeatureSeed`. Our sources are one per decoration module, so for the length of one
+    /// chunk's decoration the spare lives here instead.
+    class SharedGaussian {
+    public:
+        SharedGaussian() noexcept;
+        ~SharedGaussian() noexcept;
+        SharedGaussian(const SharedGaussian&) = delete;
+        SharedGaussian& operator=(const SharedGaussian&) = delete;
+        SharedGaussian(SharedGaussian&&) = delete;
+        SharedGaussian& operator=(SharedGaussian&&) = delete;
+    };
+
 private:
     RandomSource() = default;
 
