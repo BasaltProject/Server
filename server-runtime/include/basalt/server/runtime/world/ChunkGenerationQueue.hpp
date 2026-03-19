@@ -110,7 +110,9 @@ private:
     std::shared_ptr<Live> live_ = std::make_shared<Live>();
     mutable std::mutex mutex_;
     std::unordered_map<std::int64_t, std::int32_t> queued_;
-    std::unordered_set<std::int64_t> inProgress_;
+    /// Keyed by priority as well, so the barrier can tell an earlier neighbour from a later one
+    /// once it has left the queue.
+    std::unordered_map<std::int64_t, std::int32_t> inProgress_;
     std::atomic<bool> running_{true};
     std::vector<std::jthread> workers_;
 };

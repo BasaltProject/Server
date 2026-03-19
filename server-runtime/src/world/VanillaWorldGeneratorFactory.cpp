@@ -37,6 +37,7 @@
 #include <basalt/server/world/terrain/VillageStructureGenerator.hpp>
 #include <basalt/server/world/terrain/WoodlandMansionStructureGenerator.hpp>
 
+#include <atomic>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -123,6 +124,10 @@ struct VanillaWorldGeneratorFactory::Built {
     terrain::TerrainStructureGenerators generators;
     std::int64_t seed = 0;
     bool spawnMobs = false;
+    /// Stamped on a chunk as its decoration starts, so a cell two chunks write goes to the one
+    /// that decorated later. Taken before the write a neighbour left for it is delivered, which is
+    /// where the two have to be comparable.
+    std::atomic<std::uint64_t> decorating{0};
 };
 
 VanillaWorldGeneratorFactory::VanillaWorldGeneratorFactory(Jar jar, wire::common::Logger logger)
@@ -363,9 +368,15 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
     answer.generate = [&world](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t gameTime,
                                const std::string& difficulty,
                                const std::function<void(server::world::Chunk&)>& beforeDecoration) {
+        const auto stamped = [&world, &beforeDecoration](server::world::Chunk& chunk) {
+            chunk.setDecorationSequence(++world.decorating);
+            if (beforeDecoration) {
+                beforeDecoration(chunk);
+            }
+        };
         server::world::Chunk chunk = terrain::realTerrainGenerator::generate(
             *world.overworldRouter, *world.overworldSurface, chunkX, chunkZ, world.seed, world.generators,
-            world.neighbours.get(), world.loader->templateLoader(), beforeDecoration);
+            world.neighbours.get(), world.loader->templateLoader(), stamped);
         if (world.spawnMobs) {
             const std::expected<Identifier, wire::common::IdentifierError> biome = Identifier::parse(
                 world.overworldSurface->biomeAt(chunkX << 4, chunk.verticalBounds().maxY(), chunkZ << 4));
@@ -484,9 +495,15 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::nether(st
     answer.generate = [&world](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t gameTime,
                                const std::string& difficulty,
                                const std::function<void(server::world::Chunk&)>& beforeDecoration) {
+        const auto stamped = [&world, &beforeDecoration](server::world::Chunk& chunk) {
+            chunk.setDecorationSequence(++world.decorating);
+            if (beforeDecoration) {
+                beforeDecoration(chunk);
+            }
+        };
         server::world::Chunk chunk = terrain::dimensionTerrainGenerator::nether(
             *world.netherRouter, *world.netherBiomes, chunkX, chunkZ, world.netherSurface.get(), world.seed,
-            world.netherStructures.get(), world.neighbours.get(), beforeDecoration);
+            world.netherStructures.get(), world.neighbours.get(), stamped);
         if (world.spawnMobs) {
             const std::expected<Identifier, wire::common::IdentifierError> biome =
                 Identifier::parse(world.netherBiomes->biomeAt(chunkX << 4, chunk.verticalBounds().maxY(), chunkZ << 4));
@@ -539,8 +556,14 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::end(std::
     };
     answer.generate = [&world](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t, const std::string&,
                                const std::function<void(server::world::Chunk&)>& beforeDecoration) {
+        const auto stamped = [&world, &beforeDecoration](server::world::Chunk& chunk) {
+            chunk.setDecorationSequence(++world.decorating);
+            if (beforeDecoration) {
+                beforeDecoration(chunk);
+            }
+        };
         return terrain::dimensionTerrainGenerator::end(*world.endRouter, *world.endBiomes, chunkX, chunkZ, world.seed,
-                                                       world.endCities.get(), beforeDecoration);
+                                                       world.endCities.get(), stamped);
     };
     built_.push_back(std::move(built));
     return answer;

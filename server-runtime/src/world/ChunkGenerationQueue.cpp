@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <exception>
 #include <limits>
 #include <utility>
@@ -164,7 +165,10 @@ std::size_t ChunkGenerationQueue::pendingCount() const {
 
 std::unordered_set<std::int64_t> ChunkGenerationQueue::pendingKeys() const {
     const std::lock_guard<std::mutex> lock{mutex_};
-    std::unordered_set<std::int64_t> keys = inProgress_;
+    std::unordered_set<std::int64_t> keys;
+    for (const auto& [key, priority] : inProgress_) {
+        keys.insert(key);
+    }
     for (const auto& [key, priority] : queued_) {
         keys.insert(key);
     }
@@ -176,8 +180,12 @@ ChunkGenerationQueue::awaitAll(const std::vector<std::pair<std::int32_t, std::in
     if (positions.empty()) {
         return {};
     }
-    for (std::size_t index = 0; index < positions.size(); ++index) {
-        request(positions[index].first, positions[index].second, static_cast<std::int32_t>(index));
+    // parity: the jar takes a prepared square from its corner, x outermost, and because a chunk only
+    // decorates once its 3x3 reached the previous stage its turns come out in 3x3 blocks rather than
+    // in columns. Adopting that shape was measured on five windows and moves nothing, so the raster
+    // tie-break stays: it is the same order with the blocks flattened.
+    for (const auto& [chunkX, chunkZ] : positions) {
+        request(chunkX, chunkZ, 0);
     }
     // One lock acquisition per poll, not one per position: asking about each position on its own
     // was hundreds of thousands of acquisitions a second. Past the deadline the rest are generated
@@ -221,26 +229,29 @@ void ChunkGenerationQueue::awaitIdle(std::int64_t timeoutMillis) {
     }
 }
 
-/// parity: vanilla decorates a chunk only once its 3x3 neighbourhood reached the previous stage, so
-/// a feature never writes into a neighbour that is not there. Measured on the jar: the spawn 3x3
-/// first, then whole 3x3 blocks. Here the same rule is expressed as an order: a chunk waits for the
-/// neighbours that decorate before it, which are the ones `decoratesBefore` puts first.
+/// parity: vanilla decorates a chunk only once its 3x3 neighbourhood reached the previous stage.
+/// Here that is expressed as an order, and the order is the one the requests carry: lower priority
+/// first, ties by raster. A chunk waits for the neighbours that come before it in that order, which
+/// is what keeps the result the same from one run to the next.
 [[nodiscard]] bool earlierNeighboursDone(const std::unordered_map<std::int64_t, std::int32_t>& queued,
-                                         const std::unordered_set<std::int64_t>& inProgress, std::int32_t chunkX,
-                                         std::int32_t chunkZ) {
+                                         const std::unordered_map<std::int64_t, std::int32_t>& inProgress,
+                                         std::int32_t chunkX, std::int32_t chunkZ, std::int32_t priority) {
+    const std::int64_t self = ChunkGenerationQueue::pack(chunkX, chunkZ);
     for (std::int32_t dx = -1; dx <= 1; ++dx) {
         for (std::int32_t dz = -1; dz <= 1; ++dz) {
             if (dx == 0 && dz == 0) {
                 continue;
             }
-            const std::int32_t nx = chunkX + dx;
-            const std::int32_t nz = chunkZ + dz;
-            const bool earlier = nx != chunkX ? nx < chunkX : nz < chunkZ;
-            if (!earlier) {
+            const std::int64_t key = ChunkGenerationQueue::pack(chunkX + dx, chunkZ + dz);
+            const auto running = inProgress.find(key);
+            const auto waiting = running != inProgress.end() ? running : queued.find(key);
+            if (waiting == queued.end() && running == inProgress.end()) {
                 continue;
             }
-            const std::int64_t key = ChunkGenerationQueue::pack(nx, nz);
-            if (queued.contains(key) || inProgress.contains(key)) {
+            const std::int32_t theirs = running != inProgress.end() ? running->second : waiting->second;
+            // Only an earlier neighbour is waited for. Waiting for a later one instead lets it stamp
+            // itself first, which is exactly the precedence this order is meant to fix.
+            if (theirs < priority || (theirs == priority && rasterBefore(key, self))) {
                 return false;
             }
         }
@@ -257,7 +268,7 @@ std::optional<std::int64_t> ChunkGenerationQueue::takeNext() {
     std::int32_t bestPriority = std::numeric_limits<std::int32_t>::max();
     bool found = false;
     for (const auto& [key, priority] : queued_) {
-        if (!earlierNeighboursDone(queued_, inProgress_, unpackX(key), unpackZ(key))) {
+        if (!earlierNeighboursDone(queued_, inProgress_, unpackX(key), unpackZ(key), priority)) {
             continue;
         }
         if (priority > bestPriority) {
@@ -274,7 +285,7 @@ std::optional<std::int64_t> ChunkGenerationQueue::takeNext() {
         return std::nullopt;
     }
     queued_.erase(bestKey);
-    inProgress_.insert(bestKey);
+    inProgress_.emplace(bestKey, bestPriority);
     return bestKey;
 }
 

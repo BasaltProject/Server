@@ -62,7 +62,7 @@ TEST_CASE("a write that crossed a border lands in the chunk it was aimed at") {
                                                 .stateId = stateOf("oak_log"),
                                                 .replaceAnyState = false,
                                                 .policy = world::GeneratedBlockWritePolicy::Exact};
-    pending.deliverGeneratedBlockWrites(std::array{write}, 0, 0, chunks.accessor());
+    pending.deliverGeneratedBlockWrites(std::array{write}, 1, chunks.accessor());
     CHECK(east.blockStateId(0, 64, 3) == stateOf("oak_log"));
 }
 
@@ -74,15 +74,18 @@ TEST_CASE("a write for a chunk nobody has loaded waits for it") {
     const world::ChunkGeneratedBlockWrite write{
         .x = 16, .y = 64, .z = 3, .expectedStateId = registry::blocks::air().stateId, .stateId = stateOf("oak_log")};
     // Nothing is loaded there yet, so nothing is written and nothing is lost.
-    pending.deliverGeneratedBlockWrites(std::array{write}, 0, 0, chunks.accessor());
+    pending.deliverGeneratedBlockWrites(std::array{write}, 1, chunks.accessor());
 
     world::Chunk& east = chunks.add(1, 0);
+    // It decorates after the chunk that left the write, which is the only way one can be waiting.
+    east.setDecorationSequence(9);
     CHECK(east.blockStateId(0, 64, 3) == registry::blocks::air().stateId);
     pending.applyPendingGeneratedBlockWrites(east, PendingChunkDecorations::WritePhase::BeforeDecoration);
     CHECK(east.blockStateId(0, 64, 3) == stateOf("oak_log"));
 
     // And it is applied once: the second install of the same chunk finds nothing waiting.
     world::Chunk again{1, 0};
+    again.setDecorationSequence(9);
     pending.applyPendingGeneratedBlockWrites(again, PendingChunkDecorations::WritePhase::BeforeDecoration);
     CHECK(again.blockStateId(0, 64, 3) == registry::blocks::air().stateId);
 }
@@ -98,13 +101,13 @@ TEST_CASE("a write only lands where the block it expected is still there") {
     // carving a hole in whatever arrived first.
     const world::ChunkGeneratedBlockWrite exact{
         .x = 16, .y = 64, .z = 3, .expectedStateId = registry::blocks::air().stateId, .stateId = stateOf("oak_log")};
-    pending.deliverGeneratedBlockWrites(std::array{exact}, 0, 0, chunks.accessor());
+    pending.deliverGeneratedBlockWrites(std::array{exact}, 1, chunks.accessor());
     CHECK(east.blockStateId(0, 64, 3) == stateOf("stone"));
 
     // Unless it was told to write over anything, which is what a structure does.
     world::ChunkGeneratedBlockWrite anything = exact;
     anything.replaceAnyState = true;
-    pending.deliverGeneratedBlockWrites(std::array{anything}, 0, 0, chunks.accessor());
+    pending.deliverGeneratedBlockWrites(std::array{anything}, 1, chunks.accessor());
     CHECK(east.blockStateId(0, 64, 3) == stateOf("oak_log"));
 }
 
@@ -122,7 +125,7 @@ TEST_CASE("a write outside the chunk's own height is not written at all") {
                                                   .replaceAnyState = true};
     // Nothing thrown and nothing written: a decoration that overshot the world is not the world's
     // problem to store.
-    pending.deliverGeneratedBlockWrites(std::array{tooHigh}, 0, 0, chunks.accessor());
+    pending.deliverGeneratedBlockWrites(std::array{tooHigh}, 1, chunks.accessor());
     CHECK(east.blockStateId(0, 64, 3) == registry::blocks::air().stateId);
 }
 
@@ -225,7 +228,7 @@ TEST_CASE("a generated entity keeps the identity it was first given") {
 
     // And when the chunk goes, so does what it named.
     pending.forgetGeneratedEntities(PendingChunkDecorations::key(0, 0));
-    const std::vector<GeneratedWorldEntity> renamed = pending.generatedEntities(allocate, 0, 0, 0, chunks.accessor());
+    const std::vector<GeneratedWorldEntity> renamed = pending.generatedEntities(allocate, 0, 0, 1, chunks.accessor());
     REQUIRE(renamed.size() == 1);
     CHECK(renamed[0].entityId != 100);
     // The other chunk's own entity kept its identity through that.
@@ -245,6 +248,7 @@ TEST_CASE("which chunk decorates last decides whose block stays") {
     PendingChunkDecorations pending{mutex};
     LoadedChunks chunks;
     world::Chunk& east = chunks.add(1, 0);
+    east.setDecorationSequence(5);
     // Already decorated: something of its own is in the cell, not the stone the write expected.
     east.setBlockStateId(0, 64, 3, stateOf("andesite"));
 
@@ -255,11 +259,11 @@ TEST_CASE("which chunk decorates last decides whose block stays") {
                                                   .stateId = stateOf("granite"),
                                                   .policy = world::GeneratedBlockWritePolicy::OreBaseStone};
 
-    // From the chunk to the west, which vanilla decorates first: its vein went under this one's.
-    pending.deliverGeneratedBlockWrites(std::array{granite}, 0, 0, chunks.accessor());
+    // From a chunk that decorated before this one: its vein went under this one's.
+    pending.deliverGeneratedBlockWrites(std::array{granite}, 3, chunks.accessor());
     CHECK(east.blockStateId(0, 64, 3) == stateOf("andesite"));
 
-    // From the chunk to the east, which decorates after: its vein goes on top.
-    pending.deliverGeneratedBlockWrites(std::array{granite}, 2, 0, chunks.accessor());
+    // From one that decorated after: its vein goes on top.
+    pending.deliverGeneratedBlockWrites(std::array{granite}, 9, chunks.accessor());
     CHECK(east.blockStateId(0, 64, 3) == stateOf("granite"));
 }

@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -385,6 +386,9 @@ chunkRange(const CommandContext& context, bool single) {
             CommandSyntaxError{.component = Component::translatable("commands.forceload." + verb + ".failure")}};
     }
     if (adding) {
+        // parity: a forced region is materialised in the order the command enumerates it, measured on
+        // the jar in the nether: from the corner, x outermost. The spawn warm-up is the one that goes
+        // in rings, and it is another code path.
         // Generated now, not on next visit: the point of forcing a chunk is that it is there.
         for (const auto& [x, z] : moved) {
             (*world)->generationQueue().request(x, z, 0);
