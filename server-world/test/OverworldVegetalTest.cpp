@@ -146,7 +146,7 @@ TEST_CASE("the overworld vegetal step places what the jar places") {
         const Run result = run("minecraft:jungle");
         CHECK(result.placed == 2971);
         CHECK(result.deferred == 883);
-        CHECK(result.checksum == -1650396896813967803LL);
+        CHECK(result.checksum == -8973945534636578123LL);
     }
 
     SUBCASE("lush_caves") {

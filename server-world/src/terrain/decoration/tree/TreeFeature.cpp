@@ -1,6 +1,7 @@
 #include <basalt/server/registry/BlockStateFamilies.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/JavaHashSetOrder.hpp>
+#include <basalt/server/world/terrain/decoration/tree/TreeBlockRules.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeFeature.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeFeatureDecorators.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeHelpers.hpp>
@@ -8,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <set>
 #include <vector>
 
@@ -91,6 +93,16 @@ private:
     return maxTreeHeight;
 }
 
+/// parity: `LeavesBlock.getOptionalDistanceAt` answers 0 for anything in `PREVENTS_NEARBY_LEAF_DECAY`,
+/// a tag that is exactly `#minecraft:logs`. That is how the pass walks into a trunk this tree never
+/// placed and starts counting again from it.
+[[nodiscard]] std::optional<std::int32_t> optionalDistanceAt(std::int32_t stateId) {
+    if (treeBlockRules::isLogState(stateId)) {
+        return 0;
+    }
+    return registry::blockStateFamilies::leafDistance(stateId);
+}
+
 /// parity: `TreeFeature.updateLeaves`, distance buckets 0 through 6 and six-direction propagation.
 void updateLeaves(Chunk& chunk, const TreeDecoratorContext& context) {
     std::vector<BlockPos> boundsPositions = context.roots;
@@ -159,8 +171,8 @@ void updateLeaves(Chunk& chunk, const TreeDecoratorContext& context) {
             if (!isInside(neighbor) || filled.contains(neighbor)) {
                 continue;
             }
-            const std::optional<std::int32_t> currentDistance = registry::blockStateFamilies::leafDistance(
-                chunk.decorationBlockStateId(neighbor.x, neighbor.y, neighbor.z));
+            const std::optional<std::int32_t> currentDistance =
+                optionalDistanceAt(chunk.decorationBlockStateId(neighbor.x, neighbor.y, neighbor.z));
             if (!currentDistance.has_value()) {
                 continue;
             }

@@ -109,7 +109,7 @@ TEST_CASE("the biome flora places what the frozen kotlin places") {
         });
         CHECK(result.placed == 9674);
         CHECK(result.deferred == 3667);
-        CHECK(result.checksum == -8253365816136753232LL);
+        CHECK(result.checksum == 6043866111068078616LL);
         CHECK(result.after == -953260349);
     }
 
@@ -177,7 +177,7 @@ TEST_CASE("the biome flora places what the frozen kotlin places") {
         });
         CHECK(result.placed == 2990);
         CHECK(result.deferred == 497);
-        CHECK(result.checksum == 4014682889146981933LL);
+        CHECK(result.checksum == -5266849429694132823LL);
         CHECK(result.after == 1134608129);
     }
 
