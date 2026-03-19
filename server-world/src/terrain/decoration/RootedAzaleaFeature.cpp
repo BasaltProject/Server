@@ -96,9 +96,10 @@ const PathSet& treeReplaceable() {
     return paths;
 }
 
+/// parity: `#minecraft:azalea_grows_on`, which does **not** list stone. The root set below does, so
+/// it names it there instead of inheriting it from here.
 const PathSet& azaleaGrowsOn() {
-    static const PathSet paths = {"stone",
-                                  "dirt",
+    static const PathSet paths = {"dirt",
                                   "coarse_dirt",
                                   "rooted_dirt",
                                   "mud",
@@ -137,7 +138,8 @@ const PathSet& rootReplaceable() {
     static const PathSet paths = [] {
         PathSet built = azaleaGrowsOn();
         built.erase("suspicious_sand");
-        for (const std::string_view path : {"granite", "diorite", "andesite", "tuff", "deepslate", "clay", "gravel"}) {
+        for (const std::string_view path :
+             {"stone", "granite", "diorite", "andesite", "tuff", "deepslate", "clay", "gravel"}) {
             built.emplace(path);
         }
         return built;

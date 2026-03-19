@@ -276,8 +276,8 @@ TEST_CASE("the standalone features build what the frozen kotlin builds") {
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == 3144639766256908369LL);
-        CHECK(result.after == 276213909);
+        CHECK(result.checksum == 3493720867087958177LL);
+        CHECK(result.after == 1499221538);
     }
 
     SUBCASE("sulfurPool") {
