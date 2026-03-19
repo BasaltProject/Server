@@ -85,6 +85,16 @@ inline constexpr std::string_view kMined = "minecraft:mined";
 [[nodiscard]] const std::string& fallOneCm();
 [[nodiscard]] const std::string& enchantItem();
 [[nodiscard]] const std::string& animalsBred();
+[[nodiscard]] const std::string& fishCaught();
+
+// parity: `Stats`' distance counters. One step counts towards exactly one of them.
+[[nodiscard]] const std::string& sprintOneCm();
+[[nodiscard]] const std::string& crouchOneCm();
+[[nodiscard]] const std::string& swimOneCm();
+[[nodiscard]] const std::string& walkOnWaterOneCm();
+[[nodiscard]] const std::string& walkUnderWaterOneCm();
+[[nodiscard]] const std::string& climbOneCm();
+[[nodiscard]] const std::string& flyOneCm();
 
 } // namespace stats
 

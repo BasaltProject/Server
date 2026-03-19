@@ -258,7 +258,8 @@ TEST_CASE("an eyeblossom follows the day timeline") {
     const auto turnAt = [&](std::int64_t totalTicks, std::int32_t stateId) {
         REQUIRE(world.setBlockState(8, 64, 8, stateId));
         std::vector<BlockChange> changes;
-        miscGrowth::eyeblossom(world, WorldClock{totalTicks, 1.0F, false}, 8, 64, 8, stateId, changes);
+        rng::RandomSource random = rng::RandomSource::legacy(4);
+        miscGrowth::eyeblossom(world, WorldClock{totalTicks, 1.0F, false}, 8, 64, 8, stateId, random, changes);
         return world.blockState(8, 64, 8);
     };
 
@@ -279,8 +280,9 @@ TEST_CASE("a potted eyeblossom turns in its pot") {
     const std::int32_t potted = stateOf("potted_closed_eyeblossom");
     REQUIRE(world.setBlockState(8, 64, 8, potted));
     std::vector<BlockChange> changes;
+    rng::RandomSource random = rng::RandomSource::legacy(4);
 
-    miscGrowth::eyeblossom(world, WorldClock{13000, 1.0F, false}, 8, 64, 8, potted, changes);
+    miscGrowth::eyeblossom(world, WorldClock{13000, 1.0F, false}, 8, 64, 8, potted, random, changes);
 
     CHECK(world.blockState(8, 64, 8) == stateOf("potted_open_eyeblossom"));
     CHECK(changes.size() == 1);

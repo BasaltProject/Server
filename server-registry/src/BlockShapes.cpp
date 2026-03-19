@@ -208,6 +208,10 @@ bool isCollisionFaceFull(std::int32_t stateId, BlockFace face) {
     return faceCovers(stateId, face, 0, kUnits, 0, kUnits);
 }
 
+bool canAttachTo(std::int32_t stateId, BlockFace face) {
+    return isFaceSturdy(stateId, face) || isCollisionFaceFull(stateId, face);
+}
+
 bool supportsCentre(std::int32_t stateId, BlockFace face) {
     return (table().shapes[shapeOf(stateId)].centre & (1 << static_cast<int>(face))) != 0;
 }

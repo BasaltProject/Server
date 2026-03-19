@@ -50,44 +50,6 @@ TEST_CASE("resetting a counter forgets it altogether") {
     CHECK(stats.get(storage::stats::jump()) == 0);
 }
 
-TEST_CASE("walked distance keeps the centimetres it has not finished") {
-    PlayerStats stats;
-
-    // Three quarters of a centimetre at a time: nothing lands until the fourth step.
-    for (std::int32_t step = 0; step < 3; step++) {
-        stats.addWalked(0.0075);
-    }
-    CHECK(stats.get(storage::stats::walkOneCm()) == 2);
-
-    stats.addWalked(0.0075);
-    CHECK(stats.get(storage::stats::walkOneCm()) == 3);
-}
-
-TEST_CASE("a hundred small steps walk the same distance as one big one") {
-    PlayerStats small;
-    PlayerStats big;
-
-    for (std::int32_t step = 0; step < 100; step++) {
-        small.addWalked(0.1234);
-    }
-    big.addWalked(12.34);
-
-    // Within the one centimetre the remainder has not finished: what matters is that a hundred
-    // steps are not the twelve hundred that truncating each one would give.
-    CHECK(big.get(storage::stats::walkOneCm()) == 1234);
-    CHECK(small.get(storage::stats::walkOneCm()) >= 1233);
-    CHECK(small.get(storage::stats::walkOneCm()) <= 1234);
-}
-
-TEST_CASE("walking backwards or nowhere is not counted") {
-    PlayerStats stats;
-
-    stats.addWalked(0.0);
-    stats.addWalked(-5.0);
-
-    CHECK(stats.get(storage::stats::walkOneCm()) == 0);
-}
-
 TEST_CASE("falling is counted in whole centimetres and drops the rest") {
     PlayerStats stats;
 
@@ -150,7 +112,7 @@ TEST_CASE("two threads counting at once lose nothing") {
         threads.emplace_back([&stats] {
             for (std::int32_t step = 0; step < kEach; step++) {
                 stats.increment(storage::stats::jump());
-                stats.addWalked(0.01);
+                stats.increment(storage::stats::walkOneCm());
             }
         });
     }

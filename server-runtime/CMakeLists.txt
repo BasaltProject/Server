@@ -205,6 +205,7 @@ basalt_module(server-runtime-core
         src/item/ItemComponentPayloads.cpp
         src/function/FunctionLibrary.cpp
         src/player/FoodData.cpp
+        src/player/PlayerMovementStats.cpp
         src/player/PlayerSession.cpp
         src/player/PlayerPersistence.cpp
         src/player/PlayerBlockUpdates.cpp
@@ -1311,6 +1312,12 @@ basalt_test(server-runtime-player-session-test
 basalt_test(server-runtime-player-stats-test
     SOURCES
         test/PlayerStatsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-player-movement-stats-test
+    SOURCES
+        test/PlayerMovementStatsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

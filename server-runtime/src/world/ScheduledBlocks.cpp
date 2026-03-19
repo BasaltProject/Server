@@ -57,6 +57,12 @@ constexpr std::int32_t kRegularHatchTicks = 24000;
 constexpr std::int32_t kBoostedHatchTicks = 12000;
 constexpr std::int32_t kHatchSpreadTicks = 300;
 
+/// parity: `spawnTadpoles`: `nextInt(2, 6)` of them, each one clamped inside its own square.
+constexpr std::int32_t kTadpolesLow = 2;
+constexpr std::int32_t kTadpolesHigh = 5;
+constexpr double kTadpoleInset = 0.2;
+constexpr double kTadpoleReach = 0.7999999970197678;
+
 /// parity: `FrogspawnBlock`'s own two delays.
 constexpr std::int32_t kFrogspawnMinDelay = 3600;
 constexpr std::int32_t kFrogspawnMaxDelay = 12000;
@@ -499,8 +505,39 @@ void frostedIce(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
                             random.nextIntBetweenInclusive(kFrostedRetryLow, kFrostedRetryHigh));
 }
 
+/// parity: `Direction.getYRot`, which is what a dried ghast hands its ghastling.
+[[nodiscard]] float yawOfFacing(std::string_view facing) {
+    if (facing == "south") {
+        return 0.0F;
+    }
+    if (facing == "west") {
+        return 90.0F;
+    }
+    if (facing == "north") {
+        return 180.0F;
+    }
+    return 270.0F;
+}
+
+/// parity: `DriedGhastBlock.spawnGhastling`: `removeBlock` with no drop, then a baby happy ghast at
+/// the bottom centre of the square facing the way the block did.
+void spawnGhastling(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                    const std::int32_t stateId, std::vector<BlockChange>& changes, std::vector<Hatchling>& hatched) {
+    const std::int32_t empty = registry::blocks::air().stateId;
+    if (!world.setBlockState(x, y, z, empty)) {
+        return;
+    }
+    changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = empty});
+    hatched.push_back(Hatchling{.type = wire::common::Identifier::vanilla("happy_ghast"),
+                                .x = static_cast<double>(x) + 0.5,
+                                .y = static_cast<double>(y),
+                                .z = static_cast<double>(z) + 0.5,
+                                .yaw = yawOfFacing(textProperty(stateId, "facing")),
+                                .baby = true});
+}
+
 void driedGhast(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int64_t gameTime,
-                std::vector<BlockChange>& changes) {
+                std::vector<BlockChange>& changes, std::vector<Hatchling>& hatched) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return;
@@ -515,9 +552,13 @@ void driedGhast(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
     }
     const bool soaked = textProperty(*stateId, "waterlogged") == "true";
     std::int32_t wanted = 0;
-    if (soaked && *hydration < kDriedGhastMax) {
+    if (soaked && *hydration >= kDriedGhastMax) {
+        spawnGhastling(world, x, y, z, *stateId, changes, hatched);
+        return;
+    }
+    if (soaked) {
         wanted = *hydration + 1;
-    } else if (!soaked && *hydration > 0) {
+    } else if (*hydration > 0) {
         wanted = *hydration - 1;
     } else {
         return;
@@ -706,7 +747,8 @@ void breakIfStillLoose(WorldState& world, std::int32_t x, std::int32_t y, std::i
     changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = empty});
 }
 
-void frogspawn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std::vector<BlockChange>& changes) {
+void frogspawn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random,
+               std::vector<BlockChange>& changes, std::vector<Hatchling>& hatched) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value() || pathOf(*stateId) != "frogspawn") {
         return;
@@ -716,10 +758,23 @@ void frogspawn(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z
         return;
     }
     changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = empty});
+    // parity: `spawnTadpoles`, two to five of them, each one inside the square and half a block down.
+    const std::int32_t count = random.nextIntBetweenInclusive(kTadpolesLow, kTadpolesHigh);
+    for (std::int32_t index = 0; index < count; ++index) {
+        const double offsetX = std::clamp(random.nextDouble(), kTadpoleInset, kTadpoleReach);
+        const double offsetZ = std::clamp(random.nextDouble(), kTadpoleInset, kTadpoleReach);
+        hatched.push_back(Hatchling{.type = wire::common::Identifier::vanilla("tadpole"),
+                                    .x = static_cast<double>(x) + offsetX,
+                                    .y = static_cast<double>(y) - 0.5,
+                                    .z = static_cast<double>(z) + offsetZ,
+                                    .yaw = static_cast<float>(random.nextIntBetweenInclusive(1, 360)),
+                                    .baby = false,
+                                    .persistent = true});
+    }
 }
 
 void snifferEgg(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random,
-                std::vector<BlockChange>& changes) {
+                std::vector<BlockChange>& changes, std::vector<Hatchling>& hatched) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return;
@@ -738,6 +793,13 @@ void snifferEgg(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t 
             return;
         }
         changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = empty});
+        // parity: `SnifferEggBlock.tick` hatches a calf at the centre of the square, facing anywhere.
+        hatched.push_back(Hatchling{.type = wire::common::Identifier::vanilla("sniffer"),
+                                    .x = static_cast<double>(x) + 0.5,
+                                    .y = static_cast<double>(y) + 0.5,
+                                    .z = static_cast<double>(z) + 0.5,
+                                    .yaw = random.nextFloat() * 360.0F,
+                                    .baby = true});
         return;
     }
     const std::optional<std::int32_t> cracked =

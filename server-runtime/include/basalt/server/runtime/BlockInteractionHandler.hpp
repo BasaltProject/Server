@@ -130,6 +130,10 @@ public:
 
     void handleUseItemOn(const wire::protocol::play::ServerboundUseItemOnPacket& useItemOn);
 
+    /// parity: `ITEM_USED_ON_BLOCK`, raised by the items whose use changes the block clicked.
+    void awardItemUsedOn(const player::PlayerSession& session, const std::optional<std::int32_t>& clickedState,
+                         const wire::common::Identifier& item) const;
+
     void handleUseItem(const wire::protocol::play::ServerboundUseItemPacket& useItem);
 
     void handleSwing(std::int32_t hand);
@@ -162,7 +166,6 @@ private:
     [[nodiscard]] bool eyesInWater() const;
 
     void wearHeldItemOnBreak(const wire::common::Identifier& block);
-
 
     /// Sets fire where the flint and steel points, and lights a Nether portal if it lands in a frame.
     void igniteAt(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos, std::int32_t heldSlot,

@@ -50,6 +50,10 @@ public:
                     const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& dragon);
 
     /// The End's own turn at its fight, before any entity moves. parity: `EnderDragonFight.tick`.
+    /// parity: `EnderDragon.kill`: the dragon alone is removed where it stands instead of playing
+    /// out its death, and the fight is told it was killed. False for anything that is not one.
+    [[nodiscard]] bool killOutright(world::LoadedWorld& world, entity::ServerEntity& entity);
+
     void tickFight(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                    const std::vector<entity::ServerEntity*>& living);
 

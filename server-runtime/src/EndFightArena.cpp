@@ -307,6 +307,17 @@ void EndFightSystem::updateDragon(world::LoadedWorld& world, const ServerEntity&
     fight->ticksSinceDragonSeen = 0;
 }
 
+bool EndFightSystem::killOutright(world::LoadedWorld& world, ServerEntity& entity) {
+    if (!dragons::isDragon(entity.type())) {
+        return false;
+    }
+    dragonKilled(world, entity);
+    entity.health = 0.0;
+    entity.killed = true;
+    entity.removed = true;
+    return true;
+}
+
 void EndFightSystem::dragonKilled(world::LoadedWorld& world, const ServerEntity& dragon) {
     DragonFight* fight = fightOf(world, dragon);
     if (fight == nullptr) {

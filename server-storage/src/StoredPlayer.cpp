@@ -72,4 +72,20 @@ const std::string& stats::enchantItem() { return named("enchant_item"); }
 
 const std::string& stats::animalsBred() { return named("animals_bred"); }
 
+const std::string& stats::fishCaught() { return named("fish_caught"); }
+
+const std::string& stats::sprintOneCm() { return named("sprint_one_cm"); }
+
+const std::string& stats::crouchOneCm() { return named("crouch_one_cm"); }
+
+const std::string& stats::swimOneCm() { return named("swim_one_cm"); }
+
+const std::string& stats::walkOnWaterOneCm() { return named("walk_on_water_one_cm"); }
+
+const std::string& stats::walkUnderWaterOneCm() { return named("walk_under_water_one_cm"); }
+
+const std::string& stats::climbOneCm() { return named("climb_one_cm"); }
+
+const std::string& stats::flyOneCm() { return named("fly_one_cm"); }
+
 } // namespace basalt::server::storage

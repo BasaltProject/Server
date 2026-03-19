@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/world/RandomTicks.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealItemTags.hpp>
+#include <basalt/server/runtime/world/ScheduledBlocks.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/world/loot/Loot.hpp>
 
@@ -76,6 +77,9 @@ public:
             foreignTick;
         /// A wither skull a dispenser put down, for whoever knows how to raise the boss.
         std::function<void(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)> skullPlaced;
+        /// What a hatching block left behind, put in the world. parity: `spawnGhastling` and the two
+        /// like it, which make their entity inside the block's own turn.
+        std::function<void(world::LoadedWorld& world, const world::scheduledBlocks::Hatchling& hatched)> spawnHatchling;
         /// A noise that reached a shrieker, handed to whoever knows the players.
         std::function<void(world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival)> shriekerHeard;
     };
@@ -144,6 +148,9 @@ public:
     void tickInhabitedTime(world::LoadedWorld& world, const sched::Region& region);
 
 private:
+    /// Puts what a hatching block left behind in the world, and empties the list.
+    void releaseHatchlings(world::LoadedWorld& world, std::vector<world::scheduledBlocks::Hatchling>& hatched);
+
     [[nodiscard]] std::vector<player::PlayerSession*> watchersOf(const world::LoadedWorld& world) const;
 
     /// How many things are on the plate at these coordinates, the way its own sensitivity counts.
