@@ -358,6 +358,11 @@ NbtCompound encode(const ServerEntity& entity) {
         tag.putBoolean("IsImmuneToZombification", entity.immuneToZombification);
         tag.putInt("TimeInOverworld", entity.conversionClock);
     }
+    // parity: `Tadpole.addAdditionalSaveData` writes its own `Age`, which is the clock to being a
+    // frog rather than the childhood an animal counts down.
+    if (path == "tadpole") {
+        tag.putInt("Age", entity.conversionClock);
+    }
     if (server::registry::entityAttributes::isLiving(entity.type())) {
         if (entity.effects.empty()) {
             tag.remove("active_effects");
@@ -531,6 +536,9 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
     if (path == "piglin" || path == "piglin_brute" || path == "hoglin") {
         entity->immuneToZombification = numericBoolean(tag, "IsImmuneToZombification");
         entity->conversionClock = numericInt(tag, "TimeInOverworld");
+    }
+    if (path == "tadpole") {
+        entity->conversionClock = numericInt(tag, "Age");
     }
     entity->powered = path == "creeper" && numericBoolean(tag, "powered");
     mobStatusEffects::decode(*entity, tag);

@@ -57,6 +57,26 @@ void cubeMobs::applySize(ServerEntity& entity, std::int32_t size) {
     entity.health = static_cast<double>(actual) * actual;
 }
 
+std::vector<cubeMobs::Split> cubeMobs::splitsOf(const ServerEntity& cube, random::RandomSource& random) {
+    std::vector<Split> splits;
+    if (!isCube(cube.type()) || cube.cubeSize <= kMinSize) {
+        return splits;
+    }
+    // parity: `AbstractCubeMob.remove`: two to four halves, each one offset by a quarter of the
+    // width the cube had, which is its type's width times its size.
+    const auto offset = static_cast<float>(cube.width() * cube.cubeSize) / 2.0F;
+    const std::int32_t half = cube.cubeSize / 2;
+    const std::int32_t count = 2 + random.nextInt(3);
+    splits.reserve(static_cast<std::size_t>(count));
+    for (std::int32_t index = 0; index < count; ++index) {
+        const float dx = ((index % 2) - 0.5F) * offset;
+        const float dz = ((index / 2) - 0.5F) * offset;
+        splits.push_back(Split{
+            .x = cube.x + dx, .y = cube.y + 0.5, .z = cube.z + dz, .yaw = random.nextFloat() * 360.0F, .size = half});
+    }
+    return splits;
+}
+
 bool ageableMobs::isAgeable(std::string_view typePath) {
     static constexpr std::array<std::string_view, 42> kTypes{"armadillo",  "axolotl",      "bee",
                                                              "camel",      "camel_husk",   "cat",

@@ -61,6 +61,9 @@ struct Hooks {
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t levels, const std::string& primary,
                        const std::string& secondary)>
         beaconPulse;
+    /// A beacon that was dark and is now lit, with the tiers it stands on. parity:
+    /// `BeaconBlockEntity.tick`, which raises the criterion only on that edge.
+    std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t levels)> beaconLit;
     /// The turn a song ran out on: the block keeps its disc but stops feeding the redstone, so
     /// whatever it was powering has to be told. parity: `JukeboxBlockEntity.onSongChanged`.
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z)> songStopped;

@@ -39,6 +39,8 @@ struct Conversion {
     std::int32_t levelEvent = 0;
     /// parity: the nausea a zombified piglin or a zoglin wakes up with.
     bool nausea = false;
+    /// parity: `setPersistenceRequired` on what comes out, which a grown tadpole's frog gets.
+    bool persistent = false;
 };
 
 /// The synched flag that makes the client shake it, as an index, or nothing for a mob without one.
@@ -46,6 +48,9 @@ struct Conversion {
 
 /// Whether the mob is shaking. parity: `isUnderWaterConverting` and `isFreezeConverting`.
 [[nodiscard]] bool isShaking(const ServerEntity& mob);
+
+/// parity: `Tadpole.ticksToBeFrog`, twenty minutes of being one.
+inline constexpr std::int32_t kTadpoleTicks = 24000;
 
 /// parity: `ZombieVillager.startConverting`'s three to five minutes.
 inline constexpr std::int32_t kCureMinTicks = 3600;

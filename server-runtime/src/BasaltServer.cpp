@@ -596,6 +596,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                             born.headYaw = hatched.yaw;
                                         });
                 },
+            .advancementTriggers = advancementTriggers_.get(),
             .shriekerHeard =
                 [this](world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival) {
                     if (shriekers_ != nullptr) {

@@ -103,6 +103,19 @@ using wire::common::JsonValue;
     return types;
 }
 
+/// A JSON number as a whole one. Integers arrive as `std::int64_t` and only the ones written with a
+/// decimal point as `double`, so a reader that asks for one shape misses half the files.
+[[nodiscard]] std::optional<std::int32_t> asWholeNumber(const JsonValue* value) {
+    if (value == nullptr) {
+        return std::nullopt;
+    }
+    if (const std::int64_t* whole = value->get<std::int64_t>(); whole != nullptr) {
+        return static_cast<std::int32_t>(*whole);
+    }
+    const double* real = value->get<double>();
+    return real == nullptr ? std::nullopt : std::optional{static_cast<std::int32_t>(*real)};
+}
+
 /// The state values a criterion asks of a block, as `block_state_property` and `location_check`
 /// both spell them: a flat object of strings. `ok` goes false for a value that is not one.
 [[nodiscard]] std::vector<std::pair<std::string, std::string>> parseStateValues(const JsonObject* state, bool& ok) {
@@ -197,6 +210,36 @@ using wire::common::JsonValue;
         }
         built.matchers.push_back(std::move(*matcher));
         return built;
+    }
+    // parity: the three triggers whose criteria in the jar ask for nothing at all: doing the thing is
+    // the whole condition. A file that does add one is left unsupported rather than granted blind.
+    if (name == "minecraft:slept_in_bed" || name == "minecraft:villager_trade" || name == "minecraft:enchanted_item") {
+        const ConditionKind kind = name == "minecraft:slept_in_bed"     ? ConditionKind::SleptInBed
+                                   : name == "minecraft:villager_trade" ? ConditionKind::VillagerTrade
+                                                                        : ConditionKind::EnchantedItem;
+        return conditions == nullptr || conditions->empty() ? CriterionCondition{.kind = kind} : CriterionCondition{};
+    }
+    // parity: `ConstructBeaconTrigger`, whose `level` is either a number or a range.
+    if (name == "minecraft:construct_beacon") {
+        const JsonValue* level = conditions == nullptr ? nullptr : conditions->find("level");
+        CriterionCondition built{.kind = ConditionKind::ConstructedBeacon};
+        if (level == nullptr) {
+            return conditions == nullptr || conditions->empty() ? built : CriterionCondition{};
+        }
+        if (const std::optional<std::int32_t> exact = asWholeNumber(level);
+            exact.has_value() && level->get<JsonObject>() == nullptr) {
+            built.minLevel = *exact;
+            built.maxLevel = *exact;
+            return built;
+        }
+        const JsonObject* range = level->get<JsonObject>();
+        if (range == nullptr) {
+            return CriterionCondition{};
+        }
+        const auto bound = [range](std::string_view key) { return asWholeNumber(range->find(key)); };
+        built.minLevel = bound("min");
+        built.maxLevel = bound("max");
+        return built.minLevel.has_value() || built.maxLevel.has_value() ? built : CriterionCondition{};
     }
     // parity: `ItemUsedOnLocationTrigger` as `placed_block`: one `block_state_property` term, which
     // names the block and may name state values. The two criteria that also ask what is in the

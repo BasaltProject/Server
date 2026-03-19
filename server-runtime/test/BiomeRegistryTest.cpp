@@ -305,9 +305,9 @@ TEST_CASE("the configuration packets go out in the order a client resolves ids i
                     "minecraft:cow_variant,minecraft:chicken_sound_variant,minecraft:chicken_variant,"
                     "minecraft:zombie_nautilus_variant,minecraft:painting_variant,minecraft:trim_material,"
                     "minecraft:damage_type,minecraft:jukebox_song,minecraft:instrument");
-    // 2 clocks, 4 dimensions, 66 biomes, 43 banners, 51 across the animal variants, 1 painting,
+    // 2 clocks, 4 dimensions, 66 biomes, 43 banners, 51 across the animal variants, 51 paintings,
     // 11 trims, 51 damage types, 22 songs and 8 instruments.
-    CHECK(entries == 258);
+    CHECK(entries == 308);
 
     // Every key is namespaced, and every entry carries a value: an entry with none means "the
     // client already knows this one", which is not what any of these are.
@@ -327,9 +327,19 @@ TEST_CASE("the configuration packets go out in the order a client resolves ids i
     CHECK(biomes.entries[29].key == "minecraft:meadow");
     CHECK(biomes.entries.back().key == "minecraft:end_barrens");
 
-    // The painting registry has one entry, and it is named for the asset rather than the registry.
-    CHECK(packets[16].entries.size() == 1);
-    CHECK(packets[16].entries.front().key == "minecraft:humble");
+    // Every painting the jar ships, each with its own size and its own two translation keys. A
+    // client told about one of them draws every other as that one.
+    const auto& paintings = packets[16];
+    REQUIRE(paintings.entries.size() == 51);
+    CHECK(paintings.entries.front().key == "minecraft:alban");
+    CHECK(paintings.entries.back().key == "minecraft:wither");
+    const nbt::NbtCompound& kebab = *paintings.entries[24].value->get<nbt::NbtCompound>();
+    CHECK(*kebab.find("width")->get<std::int32_t>() == 1);
+    CHECK(*kebab.find("height")->get<std::int32_t>() == 1);
+    CHECK(textAt(kebab, "asset_id") == "minecraft:kebab");
+    CHECK(kebab.find("author") != nullptr);
+    // parity: the four elements and the wither are the five the jar signs with nobody.
+    CHECK(paintings.entries.back().value->get<nbt::NbtCompound>()->find("author") == nullptr);
 
     // Every entry's value is its own, not the first one's repeated: the wolf variants are the
     // clearest case, because each names its own asset.

@@ -65,6 +65,14 @@ enum class ConditionKind : std::uint8_t {
     PlacedBlock,
     /// parity: `ItemUsedOnLocationTrigger` as `item_used_on_block`: what was used on what.
     ItemUsedOnBlock,
+    /// parity: `PlayerTrigger` as `slept_in_bed`.
+    SleptInBed,
+    /// parity: `TradeTrigger`, a villager's offer taken.
+    VillagerTrade,
+    /// parity: `EnchantedItemTrigger`.
+    EnchantedItem,
+    /// parity: `ConstructBeaconTrigger`, the tiers under a beacon that just lit.
+    ConstructedBeacon,
     Unsupported,
 };
 
@@ -87,6 +95,9 @@ struct CriterionCondition {
     std::vector<std::string> partnerTypes;
     /// `minecraft:player_generates_container_loot`: the table that was rolled.
     std::optional<wire::common::Identifier> lootTable;
+    /// `minecraft:construct_beacon`: how many tiers the beacon stands on, either end optional.
+    std::optional<std::int32_t> minLevel;
+    std::optional<std::int32_t> maxLevel;
     /// `minecraft:placed_block` and `minecraft:item_used_on_block`: the block it happened on.
     std::optional<BlockMatcher> blockMatcher;
     /// `minecraft:enter_block`: the block the player has to be standing in.

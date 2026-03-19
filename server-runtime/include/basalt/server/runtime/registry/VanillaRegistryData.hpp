@@ -66,7 +66,18 @@ using Entry = std::pair<std::string, wire::nbt::NbtCompound>;
 [[nodiscard]] const std::vector<std::string>& zombieNautilusVariants();
 [[nodiscard]] wire::nbt::NbtCompound zombieNautilusVariant(std::string_view id);
 
-[[nodiscard]] wire::nbt::NbtCompound paintingVariant();
+/// One painting as the client draws it: the id names both the art and its two translation keys.
+struct Painting {
+    std::string_view id;
+    std::int32_t width = 1;
+    std::int32_t height = 1;
+    /// The four elements and the wither are signed by nobody, so their entry has no author.
+    bool hasAuthor = true;
+};
+
+[[nodiscard]] const std::vector<Painting>& paintingVariants();
+
+[[nodiscard]] wire::nbt::NbtCompound paintingVariant(const Painting& painting);
 
 /// Not in the must-be-non-empty set, but several base items carry a default `ProvidesTrimMaterial`
 /// component resolving a specific entry by key, so all eleven items reference are needed. Field

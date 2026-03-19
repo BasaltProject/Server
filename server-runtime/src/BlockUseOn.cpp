@@ -428,8 +428,10 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         ack();
         return;
     }
-    // parity: `ItemFrameItem.useOn`, which hangs it on the face clicked rather than putting a block.
-    if (held.has_value() && heldBlock.has_value() && heldBlock->path().ends_with("item_frame") &&
+    // parity: `ItemFrameItem.useOn` and `PaintingItem.useOn`, which hang on the face clicked rather
+    // than putting a block.
+    if (held.has_value() && heldBlock.has_value() &&
+        (heldBlock->path().ends_with("item_frame") || heldBlock->path() == "painting") &&
         hangFrame(*session, hit, heldSlot, *held, *heldBlock)) {
         ack();
         return;

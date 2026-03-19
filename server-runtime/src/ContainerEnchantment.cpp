@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/item/ItemComponents.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/Enchanting.hpp>
 #include <basalt/server/runtime/world/ItemEnchantability.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -162,6 +163,10 @@ void ContainerMenuController::takeEnchantmentOffer(PlayerSession& session, const
         }
     }
     session.stats.increment(storage::stats::enchantItem());
+    // parity: `EnchantmentMenu.clickMenuButton` ends in `ENCHANTED_ITEM.trigger`.
+    if (world::AdvancementTriggers* triggers = owner_->options().advancementTriggers; triggers != nullptr) {
+        triggers->onEnchantedItem(session.name(), session.uuid().toString());
+    }
     // parity: the seed moves on, which is what gives the next item different offers.
     if (options_.nextSeed) {
         session.enchantmentSeed = static_cast<std::int32_t>(options_.nextSeed());

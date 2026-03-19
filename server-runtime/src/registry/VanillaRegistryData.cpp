@@ -307,11 +307,43 @@ NbtCompound zombieNautilusVariant(std::string_view id) {
     return value;
 }
 
-NbtCompound paintingVariant() {
+const std::vector<Painting>& paintingVariants() {
+    // The jar's `painting_variant` folder, whose entries are all the same shape: the file name is
+    // also the art and the stem of both translation keys.
+    static const std::vector<Painting> built{
+        {"alban", 1, 1},        {"aztec", 1, 1},       {"aztec2", 1, 1},       {"backyard", 3, 4},
+        {"baroque", 2, 2},      {"bomb", 1, 1},        {"bouquet", 3, 3},      {"burning_skull", 4, 4},
+        {"bust", 2, 2},         {"cavebird", 3, 3},    {"changing", 4, 2},     {"cotan", 3, 3},
+        {"courbet", 2, 1},      {"creebet", 2, 1},     {"dennis", 3, 3},       {"donkey_kong", 4, 3},
+        {"earth", 2, 2, false}, {"endboss", 3, 3},     {"fern", 3, 3},         {"fighters", 4, 2},
+        {"finding", 4, 2},      {"fire", 2, 2, false}, {"graham", 1, 2},       {"humble", 2, 2},
+        {"kebab", 1, 1},        {"lowmist", 4, 2},     {"match", 2, 2},        {"meditative", 1, 1},
+        {"orb", 4, 4},          {"owlemons", 3, 3},    {"passage", 4, 2},      {"pigscene", 4, 4},
+        {"plant", 1, 1},        {"pointer", 4, 4},     {"pond", 3, 4},         {"pool", 2, 1},
+        {"prairie_ride", 1, 2}, {"sea", 2, 1},         {"skeleton", 4, 3},     {"skull_and_roses", 2, 2},
+        {"stage", 2, 2},        {"sunflowers", 3, 3},  {"sunset", 2, 1},       {"tides", 3, 3},
+        {"unpacked", 4, 4},     {"void", 2, 2},        {"wanderer", 1, 2},     {"wasteland", 1, 1},
+        {"water", 2, 2, false}, {"wind", 2, 2, false}, {"wither", 2, 2, false}};
+    return built;
+}
+
+NbtCompound paintingVariant(const Painting& painting) {
+    const std::string id{painting.id};
     NbtCompound value;
-    value.putInt("width", 2);
-    value.putInt("height", 2);
-    value.putString("asset_id", "minecraft:humble");
+    value.putInt("width", painting.width);
+    value.putInt("height", painting.height);
+    value.putString("asset_id", "minecraft:" + id);
+    // parity: every title is yellow and every author gray; the keys are the art's own name.
+    value.set(
+        "title",
+        wire::text::componentNbt::serialize(
+            wire::text::Component::translatable("painting.minecraft." + id + ".title").color(wire::text::kYellow)));
+    if (painting.hasAuthor) {
+        value.set(
+            "author",
+            wire::text::componentNbt::serialize(
+                wire::text::Component::translatable("painting.minecraft." + id + ".author").color(wire::text::kGray)));
+    }
     return value;
 }
 

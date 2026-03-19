@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/FoodData.hpp>
+#include <basalt/server/runtime/player/PlayerArrowPickup.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerItemPickup.hpp>
 #include <basalt/server/runtime/player/PlayerMovementStats.hpp>
@@ -276,6 +277,15 @@ void ClientSession::tryPickupNearbyItems() {
     PlayerSession* session = playerSession_.get();
     if (session == nullptr) {
         return;
+    }
+    // parity: an arrow stuck in the ground is taken the same way an item is, and the same animation
+    // says so; what comes back is one arrow rather than a stack.
+    for (const player::PickedArrow& arrow : player::pickupNearbyArrows(*session, world())) {
+        sendInventoryAll();
+        const play::TakeItemEntityPacket collected{
+            .collectedEntityId = arrow.entityId, .collectorEntityId = session->entityId(), .pickupItemCount = 1};
+        sendTo(playersInSameWorld(), play::TakeItemEntityPacket::kId,
+               [&collected](wire::io::ByteBuffer& buffer) { collected.write(buffer); });
     }
     const std::vector<player::PickedItem> taken =
         player::pickupNearbyItems(*session, world(), options_.plugins.pickupAllowed);

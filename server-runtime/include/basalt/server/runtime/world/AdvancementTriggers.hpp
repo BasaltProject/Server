@@ -104,6 +104,15 @@ public:
     void onItemUsedOnBlock(std::string_view player, std::string_view uuid, std::int32_t stateId,
                            const wire::common::Identifier& item);
 
+    /// parity: `PlayerTrigger` as `slept_in_bed`, `TradeTrigger` and `EnchantedItemTrigger`:
+    /// three whose criteria ask nothing beyond the act itself.
+    void onSleptInBed(std::string_view player, std::string_view uuid);
+    void onVillagerTrade(std::string_view player, std::string_view uuid);
+    void onEnchantedItem(std::string_view player, std::string_view uuid);
+
+    /// parity: `ConstructBeaconTrigger`, told to everyone near a beacon that just lit.
+    void onConstructedBeacon(std::string_view player, std::string_view uuid, std::int32_t levels);
+
     /// parity: `PlayerInteractTrigger`, fired only when the interaction did something and the item
     /// is what did it.
     void onInteractedWithEntity(std::string_view player, std::string_view uuid, const wire::common::Identifier& target,

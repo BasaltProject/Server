@@ -21,6 +21,7 @@ class PlayerSession;
 } // namespace basalt::server::runtime::player
 
 namespace basalt::server::runtime::world {
+class AdvancementTriggers;
 class LoadedWorld;
 class RealRecipes;
 } // namespace basalt::server::runtime::world
@@ -80,6 +81,8 @@ public:
         /// What a hatching block left behind, put in the world. parity: `spawnGhastling` and the two
         /// like it, which make their entity inside the block's own turn.
         std::function<void(world::LoadedWorld& world, const world::scheduledBlocks::Hatchling& hatched)> spawnHatchling;
+        /// Where the advancement for lighting a beacon goes, which is to whoever is standing near it.
+        world::AdvancementTriggers* advancementTriggers = nullptr;
         /// A noise that reached a shrieker, handed to whoever knows the players.
         std::function<void(world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival)> shriekerHeard;
     };

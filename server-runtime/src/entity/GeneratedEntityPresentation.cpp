@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
+#include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
 
 #include <array>
@@ -106,6 +107,9 @@ std::optional<std::int32_t> idOf(const Ids& ids, std::string_view name) {
     const auto found = ids.find(name);
     return found == ids.end() ? std::nullopt : std::optional{found->second};
 }
+
+/// parity: `Entity`'s eight fields, then `HangingEntity.DATA_DIRECTION`, then the painting's own.
+constexpr std::uint8_t kPaintingVariantIndex = 9;
 
 void addRegistryMetadata(Entries& into, const NbtCompound& data, std::string_view key, std::uint8_t index,
                          const Ids& ids, RegistryHolder registry) {
@@ -273,6 +277,26 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
 
     if (type == "item_frame" || type == "glow_item_frame") {
         addItemFrameMetadata(entries, data);
+    }
+    // parity: `Painting.DATA_PAINTING_VARIANT_ID`, right after the direction a hanging entity
+    // carries. The id is the entry's place in the registry we sent at login.
+    if (type == "painting") {
+        const std::string variant{data.getString("variant")};
+        const std::string_view wanted = variant.starts_with("minecraft:")
+                                            ? std::string_view{variant}.substr(std::string_view{"minecraft:"}.size())
+                                            : std::string_view{variant};
+        const std::vector<runtime::registry::vanillaRegistryData::Painting>& all =
+            runtime::registry::vanillaRegistryData::paintingVariants();
+        for (std::size_t index = 0; index < all.size(); ++index) {
+            if (all[index].id != wanted) {
+                continue;
+            }
+            entries.push_back(
+                Entry{.index = kPaintingVariantIndex,
+                      .value = SetEntityDataPacket::RegistryIdValue{.value = static_cast<std::int32_t>(index),
+                                                                    .registry = RegistryHolder::PaintingVariant}});
+            break;
+        }
     }
     if (type == "armor_stand") {
         addArmorStandMetadata(entries, data);
