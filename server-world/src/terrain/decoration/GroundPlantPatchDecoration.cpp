@@ -145,7 +145,11 @@ void placeSpec(const PlacementContext& context, PatchRegion& region, random::Ran
         }
         const std::int32_t x = context.chunk().chunkX() * 16 + random.nextInt(16);
         const std::int32_t z = context.chunk().chunkZ() * 16 + random.nextInt(16);
-        const std::int32_t y = context.height(x & 15, z & 15, spec.heightmap);
+        // parity: the three dead bush patches name `WORLD_SURFACE_WG`, the two dry grass ones
+        // `MOTION_BLOCKING`.
+        const std::int32_t y = spec.heightmap == HeightmapType::WorldSurface
+                                   ? context.worldgenHeight(x & 15, z & 15, spec.heightmap)
+                                   : context.height(x & 15, z & 15, spec.heightmap);
         const DecorationPos origin{x, y, z};
         if (std::ranges::find(spec.biomes, biomePath(environment.biomeAt(x, y, z))) == spec.biomes.end()) {
             continue;

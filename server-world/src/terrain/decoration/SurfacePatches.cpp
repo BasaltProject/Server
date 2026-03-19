@@ -88,7 +88,8 @@ void waterlilyPatchDecoration::decorate(Chunk& chunk, std::int64_t seed,
     for (std::int32_t attempt = 0; attempt < 4; ++attempt) {
         const std::int32_t x = chunk.chunkX() * 16 + random.nextInt(16);
         const std::int32_t z = chunk.chunkZ() * 16 + random.nextInt(16);
-        const std::int32_t y = context.height(x & 15, z & 15, HeightmapType::WorldSurface);
+        // parity: both patch_waterlily and patch_leaf_litter name `WORLD_SURFACE_WG`.
+        const std::int32_t y = context.worldgenHeight(x & 15, z & 15, HeightmapType::WorldSurface);
         if (biomes.find(biomePath(environment.biomeAt(x, y, z))) == biomes.end()) {
             continue;
         }
@@ -121,7 +122,8 @@ void leafLitterPatchDecoration::decorate(Chunk& chunk, std::int64_t seed,
     for (std::int32_t attempt = 0; attempt < 2; ++attempt) {
         const std::int32_t x = chunk.chunkX() * 16 + random.nextInt(16);
         const std::int32_t z = chunk.chunkZ() * 16 + random.nextInt(16);
-        const std::int32_t y = context.height(x & 15, z & 15, HeightmapType::WorldSurface);
+        // parity: both patch_waterlily and patch_leaf_litter name `WORLD_SURFACE_WG`.
+        const std::int32_t y = context.worldgenHeight(x & 15, z & 15, HeightmapType::WorldSurface);
         if (biomePath(environment.biomeAt(x, y, z)) != "dark_forest") {
             continue;
         }

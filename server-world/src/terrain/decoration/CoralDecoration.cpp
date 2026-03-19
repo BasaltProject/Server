@@ -278,7 +278,7 @@ void placeMushroom(Chunk& chunk, random::RandomSource& random, const DecorationP
 
 const std::vector<PlacementModifier>& warmOceanModifiers() {
     static const std::vector<PlacementModifier> modifiers = {noiseBasedCountPlacement(20, 400.0), inSquarePlacement(),
-                                                             heightmapPlacement(HeightmapType::OceanFloor)};
+                                                             worldgenHeightmapPlacement(HeightmapType::OceanFloor)};
     return modifiers;
 }
 

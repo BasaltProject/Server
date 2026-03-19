@@ -54,8 +54,9 @@ const std::vector<PlacementModifier>& lightModifiers() {
 }
 
 const std::vector<PlacementModifier>& denseModifiers() {
-    static const std::vector<PlacementModifier> modifiers = {
-        noiseBasedCountPlacement(160, 80.0, 0.3), inSquarePlacement(), heightmapPlacement(HeightmapType::WorldSurface)};
+    static const std::vector<PlacementModifier> modifiers = {noiseBasedCountPlacement(160, 80.0, 0.3),
+                                                             inSquarePlacement(),
+                                                             worldgenHeightmapPlacement(HeightmapType::WorldSurface)};
     return modifiers;
 }
 

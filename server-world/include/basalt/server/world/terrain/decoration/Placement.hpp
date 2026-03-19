@@ -35,6 +35,12 @@ public:
         return chunk_->heightAt(localX, localZ, type);
     }
 
+    /// parity: the `_WG` half of the placement heightmaps, which stops moving after the carvers.
+    /// Which of the two a feature names is in its own placed_feature json, not a rule.
+    [[nodiscard]] std::int32_t worldgenHeight(std::int32_t localX, std::int32_t localZ, HeightmapType type) const {
+        return chunk_->worldgenHeightAt(localX, localZ, type);
+    }
+
 private:
     Chunk* chunk_;
 };
@@ -84,6 +90,9 @@ surfaceRelativeThresholdFilter(HeightmapType heightmap,
 
 /// parity: `HeightmapPlacement`.
 [[nodiscard]] PlacementModifier heightmapPlacement(HeightmapType type = HeightmapType::MotionBlocking);
+
+/// The `_WG` half: the height as the carvers left it. Which one a feature names is in its json.
+[[nodiscard]] PlacementModifier worldgenHeightmapPlacement(HeightmapType type);
 
 /// parity: `NoiseBasedCountPlacement`, using the fixed `Biome.BIOME_INFO_NOISE`.
 [[nodiscard]] PlacementModifier noiseBasedCountPlacement(std::int32_t noiseToCountRatio, double noiseFactor,
