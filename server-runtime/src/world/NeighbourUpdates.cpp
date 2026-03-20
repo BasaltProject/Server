@@ -1,6 +1,7 @@
 #include <basalt/server/registry/BlockConnections.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/BlockSupport.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
@@ -68,6 +69,9 @@ constexpr std::array<BlockFace, 6> kUpdateShapeOrder{BlockFace::West,  BlockFace
 /// The four a connecting block keeps a property for, named as those properties are.
 constexpr std::array<std::pair<BlockFace, std::string_view>, 4> kHorizontal{
     {{BlockFace::North, "north"}, {BlockFace::South, "south"}, {BlockFace::West, "west"}, {BlockFace::East, "east"}}};
+
+/// parity: `Direction.Plane.HORIZONTAL`, which is not the order the four sides are listed in above.
+constexpr std::array<BlockFace, 4> kFlat{BlockFace::North, BlockFace::East, BlockFace::South, BlockFace::West};
 
 using Position = std::array<std::int32_t, 3>;
 
@@ -1042,34 +1046,50 @@ void afterChange(const Context& context, std::int32_t x, std::int32_t y, std::in
     // around **those**, then `updateNeighborsOfNeighboringWires` does the same for every dust in the
     // four horizontals. Measured in `polvollegaabajo`: a lamp beside the block a fresh dust feeds
     // from above never heard about it.
-    const auto wireSpread = [&reach, &world, x, y, z](const std::span<const BlockFace> sides,
-                                                      const std::int32_t wireState) {
+    // parity: `checkCornerChangeAt`, which does nothing unless that square really holds a dust, and
+    // then tells it and its own six.
+    const auto corner = [&reach, &world](const std::int32_t cx, const std::int32_t cy, const std::int32_t cz,
+                                         const std::int32_t wireState) {
+        const std::optional<std::int32_t> here = world.blockState(cx, cy, cz);
+        if (!here.has_value() || !redstoneWire::isWire(*here)) {
+            return;
+        }
+        reach.emplace_back(redstoneComponents::Reach{.x = cx, .y = cy, .z = cz}, wireState);
+        for (const BlockFace face : kFaces) {
+            reach.emplace_back(redstoneComponents::Reach{.x = cx + registry::stepX(face),
+                                                         .y = cy + registry::stepY(face),
+                                                         .z = cz + registry::stepZ(face)},
+                               wireState);
+        }
+    };
+    const auto wireSpread = [&reach, &world, &corner, x, y, z](const std::span<const BlockFace> sides,
+                                                               const std::int32_t wireState) {
         for (const BlockFace face : sides) {
             reach.emplace_back(redstoneComponents::Reach{.x = x + registry::stepX(face),
                                                          .y = y + registry::stepY(face),
                                                          .z = z + registry::stepZ(face)},
                                wireState);
         }
-        for (const BlockFace side : {BlockFace::North, BlockFace::South, BlockFace::West, BlockFace::East}) {
-            const std::int32_t cx = x + registry::stepX(side);
-            const std::int32_t cy = y + registry::stepY(side);
-            const std::int32_t cz = z + registry::stepZ(side);
-            // parity: `checkCornerChangeAt` does nothing unless that square really holds a dust.
-            const std::optional<std::int32_t> corner = world.blockState(cx, cy, cz);
-            if (!corner.has_value() || !redstoneWire::isWire(*corner)) {
-                continue;
-            }
-            reach.emplace_back(redstoneComponents::Reach{.x = cx, .y = cy, .z = cz}, wireState);
-            for (const BlockFace face : kFaces) {
-                reach.emplace_back(redstoneComponents::Reach{.x = cx + registry::stepX(face),
-                                                             .y = cy + registry::stepY(face),
-                                                             .z = cz + registry::stepZ(face)},
-                                   wireState);
-            }
+        // parity: `updateNeighborsOfNeighboringWires` walks the four horizontals **twice**, in
+        // `Direction.Plane.HORIZONTAL` order, and the two passes do not interleave: first the dust
+        // beside it, then the dust the signal climbs to or drops to on that side.
+        for (const BlockFace side : kFlat) {
+            corner(x + registry::stepX(side), y, z + registry::stepZ(side), wireState);
+        }
+        for (const BlockFace side : kFlat) {
+            const std::int32_t sx = x + registry::stepX(side);
+            const std::int32_t sz = z + registry::stepZ(side);
+            // parity: a side that conducts sends the news **up**, one that does not sends it down,
+            // which is the dust that runs over the block or down the step beside it.
+            const std::optional<std::int32_t> beside = world.blockState(sx, y, sz);
+            const bool conducts = beside.has_value() && registry::blockSupport::conductsRedstone(*beside);
+            corner(sx, conducts ? y + 1 : y - 1, sz, wireState);
         }
     };
     if (wireArrived) {
-        static constexpr std::array<BlockFace, 2> kVertical{BlockFace::Down, BlockFace::Up};
+        // parity: `Direction.Plane.VERTICAL` is up and then down, which is the order `onPlace` tells
+        // the two squares in.
+        static constexpr std::array<BlockFace, 2> kVertical{BlockFace::Up, BlockFace::Down};
         wireSpread(kVertical, standing.value_or(0));
     }
     if (wireLeft) {

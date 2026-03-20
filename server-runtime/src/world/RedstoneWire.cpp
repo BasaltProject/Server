@@ -17,7 +17,9 @@ constexpr std::string_view kNone = "none";
 constexpr std::string_view kSide = "side";
 constexpr std::string_view kUp = "up";
 
-constexpr std::array<BlockFace, 4> kSides{BlockFace::North, BlockFace::South, BlockFace::East, BlockFace::West};
+/// parity: `Direction.Plane.HORIZONTAL`, which is the order `updateIndirectNeighbourShapes` walks
+/// the four sides in, and that one reshapes as it goes.
+constexpr std::array<BlockFace, 4> kSides{BlockFace::North, BlockFace::East, BlockFace::South, BlockFace::West};
 
 [[nodiscard]] std::string_view nameOf(BlockFace face) {
     switch (face) {
@@ -67,13 +69,13 @@ constexpr std::array<BlockFace, 4> kSides{BlockFace::North, BlockFace::South, Bl
     return from != nullptr && redstone::isSignalSource(stateId);
 }
 
-[[nodiscard]] bool conducts(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+[[nodiscard]] bool conducts(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     return stateId.has_value() && registry::blockSupport::conductsRedstone(*stateId);
 }
 
 /// parity: `getConnectingSide`, the one that decides side, up or nothing.
-[[nodiscard]] std::string connectingSide(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
+[[nodiscard]] std::string connectingSide(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                          BlockFace face, bool canGoUp) {
     const std::int32_t nx = x + registry::stepX(face);
     const std::int32_t nz = z + registry::stepZ(face);
@@ -137,7 +139,7 @@ constexpr std::array<BlockFace, 4> kSides{BlockFace::North, BlockFace::South, Bl
 /// parity: `getConnectionState`, which always works the four sides out again from the world and
 /// only uses the state it came from to answer one question: was it a dot. A dot that finds nothing
 /// stays a dot; anything else straightens out.
-[[nodiscard]] std::map<std::string, std::string> drawnFrom(WorldState& world, std::int32_t x, std::int32_t y,
+[[nodiscard]] std::map<std::string, std::string> drawnFrom(const WorldState& world, std::int32_t x, std::int32_t y,
                                                            std::int32_t z, bool wasDot) {
     // parity: `canConnectUp`, which is one question asked once: is the way up clear at all.
     const bool canGoUp = !conducts(world, x, y + 1, z);
@@ -196,8 +198,8 @@ bool isWire(std::int32_t stateId) {
     return id != nullptr && *id == block();
 }
 
-std::map<std::string, std::string> connectionsFor(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                                  std::int32_t stateId) {
+std::map<std::string, std::string> connectionsFor(const WorldState& world, std::int32_t x, std::int32_t y,
+                                                  std::int32_t z, std::int32_t stateId) {
     return drawnFrom(world, x, y, z, isDot(registry::blockStateDefinitions::propertiesOf(stateId)));
 }
 

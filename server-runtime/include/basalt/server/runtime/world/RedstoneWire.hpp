@@ -25,7 +25,7 @@ namespace redstoneWire {
 [[nodiscard]] bool isWire(std::int32_t stateId);
 
 /// parity: `getConnectionState`, including the "a dot stays a dot" clause.
-[[nodiscard]] std::map<std::string, std::string> connectionsFor(WorldState& world, std::int32_t x, std::int32_t y,
+[[nodiscard]] std::map<std::string, std::string> connectionsFor(const WorldState& world, std::int32_t x, std::int32_t y,
                                                                 std::int32_t z, std::int32_t stateId);
 
 /// The shape the dust here should have, written if it moved, or nothing when it was already right.
