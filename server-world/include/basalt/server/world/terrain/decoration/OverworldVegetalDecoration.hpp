@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/world/Chunk.hpp>
+#include <basalt/server/world/terrain/decoration/PlacementRegion.hpp>
 #include <basalt/server/world/terrain/surface/SurfaceRuleEnvironment.hpp>
 
 #include <cstdint>
@@ -13,7 +14,8 @@ namespace basalt::server::world::terrain::decoration {
 /// Runs the 106 Overworld `VEGETAL_DECORATION` nodes in FeatureSorter index order.
 namespace overworldVegetalDecoration {
 
-void decorate(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment);
+void decorate(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment,
+              ExternalStateReader externalBlockState = nullptr);
 
 /// The global index and name of every node, in the order this step runs them.
 [[nodiscard]] const std::vector<std::pair<std::int32_t, std::string_view>>& featureOrder();
