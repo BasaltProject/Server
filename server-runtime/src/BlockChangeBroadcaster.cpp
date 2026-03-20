@@ -138,7 +138,7 @@ void BlockChangeBroadcaster::notifyAround(world::LoadedWorld& world,
         [&watchers](std::int32_t stateId, std::int32_t bx, std::int32_t by, std::int32_t bz) {
             sendBlock(watchers, bx, by, bz, stateId);
         },
-        false);
+        world::neighbourUpdates::ArrivedShape::NotPlaced);
     for (const world::BlockChange& change : effects) {
         sendEffects(watchers, change.x, change.y, change.z, change.stateId, change.effects);
     }

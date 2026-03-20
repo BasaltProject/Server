@@ -116,6 +116,12 @@ inline constexpr std::string_view kComparatorOutputKey = "OutputSignal";
 /// Told about every piece of dust that moved, so whatever schedules the components around it can.
 using Notify = std::function<void(std::int32_t x, std::int32_t y, std::int32_t z)>;
 
+/// Whether the square that changed is asked about its own strength.
+///
+/// parity: `RedStoneWireBlock.onPlace` asks it, `updateNeighboursOnBlockSet` tells only the six
+/// around it.
+enum class Asked : std::uint8_t { WithSelf, NeighboursOnly };
+
 /// Settles the dust at these coordinates and every piece it reaches, answering what changed.
 ///
 /// parity: vanilla walks this out one neighbour update at a time, updating a wire and then the wires
@@ -123,7 +129,7 @@ using Notify = std::function<void(std::int32_t x, std::int32_t y, std::int32_t z
 /// moving, and the strengths it stops at are the same, so this walks the connected dust until
 /// nothing moves.
 std::vector<BlockChange> settle(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
-                                std::int32_t z, const Notify& notify = {});
+                                std::int32_t z, const Notify& notify = {}, Asked asked = Asked::WithSelf);
 
 } // namespace redstone
 

@@ -391,12 +391,8 @@ std::int32_t signalFrom(const WorldState& world, std::string_view worldName, std
     if (!stateId.has_value()) {
         return 0;
     }
-    // parity: `RedStoneWireBlock.getSignal` does **not** read the drawn shape it has stored. It runs
-    // `getConnectionState(level, state, pos)`, which works the connection out from the world every
-    // time it is asked and takes only the power and the was-a-dot answer off the state. That is why
-    // vanilla can leave a dust drawn loose that still carries: the drawing goes stale and the signal
-    // does not. Reading the property instead was right only for as long as our own drawing was kept
-    // fresher than the jar keeps its own.
+    // parity: `RedStoneWireBlock.getSignal` works the connection out from the world with
+    // `getConnectionState`, not off the drawn shape, which can be stale and still carry.
     const std::int32_t own =
         isWire(*stateId)
             ? (mutedWire ? 0 : wireSignal(redstoneWire::connectionsFor(world, x, y, z, *stateId), *stateId, from))
@@ -535,7 +531,7 @@ std::vector<std::array<std::int32_t, 3>> reachOf(const WorldState& world, std::i
 }
 
 std::vector<BlockChange> settle(WorldState& world, std::string_view worldName, std::int32_t x, std::int32_t y,
-                                std::int32_t z, const Notify& notify) {
+                                std::int32_t z, const Notify& notify, const Asked asked) {
     // Kept by position and in the order they first moved, which is what a caller sends out.
     std::vector<BlockChange> changes;
     std::map<std::int64_t, std::size_t> changedAt;
@@ -545,10 +541,19 @@ std::vector<BlockChange> settle(WorldState& world, std::string_view worldName, s
     // beside a new source dark. parity: `Level.updateNeighborsAt`, which tells the neighbours rather
     // than the block itself.
     std::vector<std::array<std::int32_t, 3>> queue;
-    for (const std::array<std::int32_t, 3>& position : reachOf(world, x, y, z)) {
+    // parity: `updateNeighboursOnBlockSet` leaves the square itself alone, so it comes out of the
+    // whole opening queue: the step up and down from a neighbour puts it back otherwise.
+    const std::array<std::int32_t, 3> here{x, y, z};
+    const auto open = [&queue, asked, &here](const std::array<std::int32_t, 3>& position) {
+        if (asked == Asked::NeighboursOnly && position == here) {
+            return;
+        }
         queue.push_back(position);
-        queue.push_back({position[0], position[1] + 1, position[2]});
-        queue.push_back({position[0], position[1] - 1, position[2]});
+    };
+    for (const std::array<std::int32_t, 3>& position : reachOf(world, x, y, z)) {
+        open(position);
+        open({position[0], position[1] + 1, position[2]});
+        open({position[0], position[1] - 1, position[2]});
     }
 
     for (std::int32_t round = 0; round < kMaxRounds && !queue.empty(); ++round) {
