@@ -69,10 +69,15 @@ std::vector<cubeMobs::Split> cubeMobs::splitsOf(const ServerEntity& cube, random
     const std::int32_t count = 2 + random.nextInt(3);
     splits.reserve(static_cast<std::size_t>(count));
     for (std::int32_t index = 0; index < count; ++index) {
-        const float dx = ((index % 2) - 0.5F) * offset;
-        const float dz = ((index / 2) - 0.5F) * offset;
-        splits.push_back(Split{
-            .x = cube.x + dx, .y = cube.y + 0.5, .z = cube.z + dz, .yaw = random.nextFloat() * 360.0F, .size = half});
+        // parity: the jar does this in float and only the finished position is a double, so the
+        // widening happens once, at the add, rather than inside the offsets.
+        const float dx = (static_cast<float>(index % 2) - 0.5F) * offset;
+        const float dz = (static_cast<float>(index / 2) - 0.5F) * offset;
+        splits.push_back(Split{.x = cube.x + static_cast<double>(dx),
+                               .y = cube.y + 0.5,
+                               .z = cube.z + static_cast<double>(dz),
+                               .yaw = random.nextFloat() * 360.0F,
+                               .size = half});
     }
     return splits;
 }
