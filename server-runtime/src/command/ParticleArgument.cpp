@@ -74,17 +74,15 @@ using wire::text::Component;
                      number(&(*list)[2]).value_or(0.0F));
 }
 
-/// `block_state`, either a plain id or a `{Name:...}` compound.
-///
-/// Block properties are dropped: this server registers every block by its default state only, so a
-/// waterlogged or facing variant would resolve to the same number anyway.
+/// `block_state`, either a plain id or an `{id:...}` compound. parity: `BlockState.CODEC`.
+/// Properties are dropped: every block resolves to its default state here.
 [[nodiscard]] std::expected<std::int32_t, CommandSyntaxError> blockState(const NbtTag* tag, StringReader& reader) {
     std::optional<std::string> name;
     if (tag != nullptr) {
         if (const auto* text = tag->get<std::string>(); text != nullptr) {
             name = *text;
         } else if (const auto* compound = tag->get<NbtCompound>(); compound != nullptr) {
-            if (const NbtTag* inner = compound->find("Name"); inner != nullptr) {
+            if (const NbtTag* inner = compound->find("id"); inner != nullptr) {
                 if (const auto* named = inner->get<std::string>(); named != nullptr) {
                     name = *named;
                 }

@@ -181,7 +181,10 @@ void ExplosionSystem::collectExplodedBlock(world::LoadedWorld& world, const Iden
     random::RandomSource scratch = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
     random::RandomSource& random =
         table->randomSequence.has_value() ? world.randomSequences().of(*table->randomSequence) : scratch;
-    const server::world::loot::LootContext context{.blockState = reg::blockStateDefinitions::propertiesOf(stateId)};
+    server::world::loot::LootContext context{.blockState = reg::blockStateDefinitions::propertiesOf(stateId)};
+    if (const Identifier* broken = reg::blockStateDefinitions::blockOf(stateId); broken != nullptr) {
+        context.block = *broken;
+    }
     for (const server::world::loot::ItemStack& stack : table->generate(random, 0.0F, power, context)) {
         if (reg::items::registry().byName(stack.item) == nullptr) {
             continue;

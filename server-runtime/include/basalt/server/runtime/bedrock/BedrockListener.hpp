@@ -23,7 +23,7 @@ namespace basalt::server::runtime::bedrock {
 
 /// The Bedrock version this build speaks, which is what a client reads in the server list next to
 /// the protocol number.
-inline constexpr std::string_view kBedrockGameVersion = "1.26.45";
+inline constexpr std::string_view kBedrockGameVersion = "1.26.50";
 
 /// What an operator writes under `[network.bedrock]` in `config/server.toml`.
 struct BedrockOptions {

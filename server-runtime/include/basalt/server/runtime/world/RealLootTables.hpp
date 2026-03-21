@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/world/loot/Loot.hpp>
+#include <basalt/server/world/loot/LootTableJson.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 
@@ -38,8 +39,7 @@ public:
         EntriesUnder entriesUnder;
     };
 
-    explicit RealLootTables(Jar jar, wire::common::Logger logger = wire::common::Logger{"Loot"})
-        : jar_(std::move(jar)), logger_(std::move(logger)) {}
+    explicit RealLootTables(Jar jar, wire::common::Logger logger = wire::common::Logger{"Loot"});
 
     RealLootTables(const RealLootTables&) = delete;
     RealLootTables& operator=(const RealLootTables&) = delete;
@@ -62,6 +62,9 @@ public:
     /// Fills in what every roll asks outside the table: nested tables, enchantments and ordered tags.
     void prepare(server::world::loot::LootContext& context);
 
+    /// The named predicates, item modifiers and number providers the jar's loot data refers to.
+    [[nodiscard]] server::world::loot::LootReferences& references() noexcept { return references_; }
+
     /// The same, plus where the roll happens. parity: `LootContextParams.ORIGIN`.
     void prepareAt(server::world::loot::LootContext& context, LoadedWorld& world, double x, double y, double z);
 
@@ -72,6 +75,7 @@ private:
 
     Jar jar_;
     wire::common::Logger logger_;
+    server::world::loot::LootReferences references_;
     const LootRegistries* registries_ = nullptr;
     // Several connection threads can break a block at once, so the cache has one owner and it is
     // this lock. Map nodes never move, so a table handed out stays valid while another thread reads.

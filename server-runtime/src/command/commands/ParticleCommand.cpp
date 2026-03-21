@@ -48,7 +48,9 @@ void ParticleCommand::build(const CommandNodeBuilder& root) const {
                                                 .offsetX = static_cast<float>(offset[0]),
                                                 .offsetY = static_cast<float>(offset[1]),
                                                 .offsetZ = static_cast<float>(offset[2]),
-                                                .maxSpeed = speed == nullptr ? 0.0F : *speed,
+                                                .maxSpeedX = speed == nullptr ? 0.0F : *speed,
+                                                .maxSpeedY = speed == nullptr ? 0.0F : *speed,
+                                                .maxSpeedZ = speed == nullptr ? 0.0F : *speed,
                                                 .count = count == nullptr ? 1 : *count,
                                                 .overrideLimiter = force,
                                                 .options = parsed->options};

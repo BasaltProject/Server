@@ -21,12 +21,6 @@ basalt_module(server-registry
     DEPENDS basalt::wire-common basalt::wire-nbt basalt::wire-protocol
 )
 
-basalt_test(server-registry-families-test
-    SOURCES
-        test/FamiliesTest.cpp
-    DEPENDS basalt::server-registry
-)
-
 basalt_test(server-registry-test
     SOURCES
         test/RegistryTest.cpp

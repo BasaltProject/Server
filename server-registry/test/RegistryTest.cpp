@@ -546,12 +546,11 @@ TEST_CASE("a waterlogged block does not burn, whatever it is made of") {
     CHECK(fireOdds::burnOdds(*wetFence) == 0);
 }
 
-TEST_CASE("a biome keeps the id saved chunks were written with") {
-    // The original overworld entries keep their ids so saved chunks go on decoding after the nether,
-    // the end and the void were added.
+TEST_CASE("the biome registry follows vanilla's bootstrap order") {
+    // Saved chunks name their biomes, so an id moving when a version inserts one is harmless.
     CHECK(biomes::registry().idOf(Identifier::vanilla("plains")) == 0);
     CHECK(biomes::plains().id == Identifier::vanilla("plains"));
-    CHECK(biomes::registry().size() == 66);
+    CHECK(biomes::registry().size() == 67);
 }
 
 TEST_CASE("a fence joins its own kind and grabs a solid wall") {

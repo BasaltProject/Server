@@ -32,9 +32,11 @@
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <numbers>
+#include <string_view>
 #include <utility>
 
 namespace basalt::server::runtime {
@@ -58,11 +60,29 @@ constexpr double kThrowLift = 0.1;
 constexpr double kThrowEyeHeight = 1.5;
 
 /// parity: `ClientboundPlayerActionPacket`'s own off-hand number.
-constexpr std::int32_t kOffhand = 1;
 
 std::optional<Identifier> parsedOrNothing(const std::string& id) {
     const std::expected<Identifier, wire::common::IdentifierError> parsed = Identifier::parse(id);
     return parsed.has_value() ? std::optional{*parsed} : std::nullopt;
+}
+
+/// parity: the `attack_animation` every item carries, which is the default but for the spears.
+play::SwingAnimation attackAnimationOf(std::string_view itemId) {
+    static constexpr std::array<std::pair<std::string_view, std::int32_t>, 7> kSpears = {{
+        {"minecraft:wooden_spear", 13},
+        {"minecraft:stone_spear", 15},
+        {"minecraft:copper_spear", 17},
+        {"minecraft:iron_spear", 19},
+        {"minecraft:golden_spear", 19},
+        {"minecraft:diamond_spear", 21},
+        {"minecraft:netherite_spear", 23},
+    }};
+    for (const auto& [name, duration] : kSpears) {
+        if (name == itemId) {
+            return play::SwingAnimation{.type = play::SwingAnimationType::Stab, .duration = duration};
+        }
+    }
+    return play::SwingAnimation{};
 }
 
 } // namespace
@@ -250,25 +270,27 @@ void BlockInteractionHandler::dropHeldItem(bool all) {
                      (std::cos(yaw) * std::cos(pitch) * kThrowSpeed) + (std::sin(tossAngle) * tossSpread));
 }
 
-void BlockInteractionHandler::handleSwing(std::int32_t hand) {
-    const PlayerSession* session = owner_->playerSession();
+void BlockInteractionHandler::handlePunch() {
+    PlayerSession* session = owner_->playerSession();
     if (session == nullptr) {
         return;
     }
+    // parity: `handlePunch` resets the attack strength ticker along with the swing.
+    session->ticksSinceSwing = 0;
+    const std::optional<storage::StoredItemStack>& held = session->inventory.heldItem();
+    const play::SwingAnimationPacket packet{
+        .entityId = session->entityId(), .hand = 0, .animation = attackAnimationOf(held.has_value() ? held->id : "")};
     // The swinging client animates its own arm, which is why this goes to the others and not back.
-    const play::AnimatePacket packet{.entityId = session->entityId(),
-                                     .action = hand == kOffhand ? play::AnimatePacket::kSwingOffHand
-                                                                : play::AnimatePacket::kSwingMainHand};
     for (const PlayerSession* other : owner_->playersInSameWorld()) {
         if (other->entityId() == session->entityId()) {
             continue;
         }
         if (other->connection().sendSwing) {
-            other->connection().sendSwing(session->entityId(), hand == kOffhand);
+            other->connection().sendSwing(session->entityId(), false);
             continue;
         }
         if (other->connection().sendPlayPacket) {
-            other->connection().sendPlayPacket(play::AnimatePacket::kId,
+            other->connection().sendPlayPacket(play::SwingAnimationPacket::kId,
                                                [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
         }
     }

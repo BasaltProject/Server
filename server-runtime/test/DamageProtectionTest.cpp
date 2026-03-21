@@ -51,17 +51,17 @@ namespace {
     return definition;
 }
 
-/// A `damage_source_properties` condition testing one tag.
-[[nodiscard]] NbtCompound tagCondition(const std::string& tag, bool expected) {
+/// A `damage_source_properties` condition testing one tag, or one damage type with `direct`.
+[[nodiscard]] NbtCompound tagCondition(const std::string& tag, bool expected, bool direct = false) {
     NbtCompound test;
-    test.putString("id", tag);
+    test.putString("id", direct ? tag : "#" + tag);
     test.putBoolean("expected", expected);
     NbtList tests{NbtType::Compound};
     REQUIRE(tests.push(NbtTag::ofCompound(std::move(test))));
     NbtCompound predicate;
     predicate.set("tags", NbtTag::ofList(std::move(tests)));
     NbtCompound condition;
-    condition.putString("condition", "minecraft:damage_source_properties");
+    condition.putString("type", "minecraft:damage_source_properties");
     condition.set("predicate", NbtTag::ofCompound(std::move(predicate)));
     return condition;
 }
@@ -72,7 +72,7 @@ namespace {
         REQUIRE(list.push(NbtTag::ofCompound(std::move(term))));
     }
     NbtCompound all;
-    all.putString("condition", condition);
+    all.putString("type", condition);
     all.set("terms", NbtTag::ofList(std::move(list)));
     return all;
 }
@@ -209,7 +209,7 @@ TEST_CASE("a requirement on the damage source decides whether the entry counts")
 
     SUBCASE("a predicate that tests nothing lets a typeless hit through") {
         NbtCompound condition;
-        condition.putString("condition", "minecraft:damage_source_properties");
+        condition.putString("type", "minecraft:damage_source_properties");
         condition.set("predicate", NbtTag::ofCompound(NbtCompound{}));
         world.definitions.emplace(kBlastProtection, definitionOf({entry(linearValue(3.0, 0.0), std::move(condition))}));
         CHECK(damageProtection::of(worn, nullptr, world.sources()) == doctest::Approx(3.0F));
@@ -217,14 +217,14 @@ TEST_CASE("a requirement on the damage source decides whether the entry counts")
 
     SUBCASE("a condition with no predicate at all is met") {
         NbtCompound condition;
-        condition.putString("condition", "minecraft:damage_source_properties");
+        condition.putString("type", "minecraft:damage_source_properties");
         world.definitions.emplace(kBlastProtection, definitionOf({entry(linearValue(3.0, 0.0), std::move(condition))}));
         CHECK(damageProtection::of(worn, &kFall, world.sources()) == doctest::Approx(3.0F));
     }
 
     SUBCASE("a condition nobody knows is unmet") {
         NbtCompound condition;
-        condition.putString("condition", "minecraft:random_chance");
+        condition.putString("type", "minecraft:random_chance");
         world.definitions.emplace(kBlastProtection, definitionOf({entry(linearValue(3.0, 0.0), std::move(condition))}));
         CHECK(damageProtection::of(worn, &kExplosion, world.sources()) == doctest::Approx(0.0F));
     }
@@ -243,10 +243,17 @@ TEST_CASE("a requirement on the damage source decides whether the entry counts")
         NbtCompound predicate;
         predicate.set("tags", NbtTag::ofList(std::move(tests)));
         NbtCompound condition;
-        condition.putString("condition", "minecraft:damage_source_properties");
+        condition.putString("type", "minecraft:damage_source_properties");
         condition.set("predicate", NbtTag::ofCompound(std::move(predicate)));
         world.definitions.emplace(kBlastProtection, definitionOf({entry(linearValue(3.0, 0.0), std::move(condition))}));
         CHECK(damageProtection::of(worn, &kExplosion, world.sources()) == doctest::Approx(3.0F));
+    }
+
+    SUBCASE("a test naming one damage type holds for that type alone") {
+        world.definitions.emplace(
+            kBlastProtection, definitionOf({entry(linearValue(3.0, 0.0), tagCondition(kFall.toString(), true, true))}));
+        CHECK(damageProtection::of(worn, &kFall, world.sources()) == doctest::Approx(3.0F));
+        CHECK(damageProtection::of(worn, &kExplosion, world.sources()) == doctest::Approx(0.0F));
     }
 
     SUBCASE("a test with no name is skipped") {
@@ -258,7 +265,7 @@ TEST_CASE("a requirement on the damage source decides whether the entry counts")
         NbtCompound predicate;
         predicate.set("tags", NbtTag::ofList(std::move(tests)));
         NbtCompound condition;
-        condition.putString("condition", "minecraft:damage_source_properties");
+        condition.putString("type", "minecraft:damage_source_properties");
         condition.set("predicate", NbtTag::ofCompound(std::move(predicate)));
         world.definitions.emplace(kBlastProtection, definitionOf({entry(linearValue(3.0, 0.0), std::move(condition))}));
         CHECK(damageProtection::of(worn, &kExplosion, world.sources()) == doctest::Approx(3.0F));
@@ -290,9 +297,9 @@ TEST_CASE("all_of and any_of walk their terms") {
 
     SUBCASE("no terms at all: all_of and any_of both hold") {
         NbtCompound allOf;
-        allOf.putString("condition", "minecraft:all_of");
+        allOf.putString("type", "minecraft:all_of");
         NbtCompound anyOf;
-        anyOf.putString("condition", "minecraft:any_of");
+        anyOf.putString("type", "minecraft:any_of");
         world.definitions.emplace(kBlastProtection, definitionOf({entry(linearValue(1.0, 0.0), std::move(allOf)),
                                                                   entry(linearValue(2.0, 0.0), std::move(anyOf))}));
         CHECK(damageProtection::of(worn, &kExplosion, world.sources()) == doctest::Approx(3.0F));
@@ -309,10 +316,10 @@ TEST_CASE("all_of and any_of walk their terms") {
         NbtList strings{NbtType::String};
         REQUIRE(strings.push(NbtTag::ofString("nonsense")));
         NbtCompound allOf;
-        allOf.putString("condition", "minecraft:all_of");
+        allOf.putString("type", "minecraft:all_of");
         allOf.set("terms", NbtTag::ofList(NbtList{strings}));
         NbtCompound anyOf;
-        anyOf.putString("condition", "minecraft:any_of");
+        anyOf.putString("type", "minecraft:any_of");
         anyOf.set("terms", NbtTag::ofList(std::move(strings)));
         world.definitions.emplace(kBlastProtection, definitionOf({entry(linearValue(1.0, 0.0), std::move(allOf)),
                                                                   entry(linearValue(2.0, 0.0), std::move(anyOf))}));

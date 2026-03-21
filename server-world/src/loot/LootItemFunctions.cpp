@@ -1,5 +1,8 @@
+#include "LootParts.hpp"
+
 #include <basalt/server/registry/Items.hpp>
-#include <basalt/server/world/loot/Loot.hpp>
+#include <basalt/server/world/crafting/Crafting.hpp>
+#include <basalt/server/world/crafting/SpecialCrafting.hpp>
 
 #include <algorithm>
 #include <array>
@@ -49,10 +52,7 @@ void upgrade(NbtCompound& levels, const Identifier& enchantment, std::int32_t le
     levels.putInt(key, std::max(levels.getInt(key), level));
 }
 
-/// parity: `Mth.nextInt`, inclusive and short-circuiting when the ends meet.
-[[nodiscard]] std::int32_t between(random::RandomSource& random, std::int32_t least, std::int32_t most) {
-    return least >= most ? least : random.nextInt(most - least + 1) + least;
-}
+using lootMath::between;
 
 struct Pick {
     const EnchantmentEntry* entry = nullptr;
@@ -138,59 +138,95 @@ struct Pick {
     return std::ranges::find(kInstant, effect) != kInstant.end();
 }
 
+constexpr std::int32_t kMaxOminousAmplifier = 4;
+
+/// parity: `DyeColor.values()`, in ordinal order.
+constexpr std::array<std::string_view, 16> kDyeColours{"white", "orange", "magenta",    "light_blue", "yellow", "lime",
+                                                       "pink",  "gray",   "light_gray", "cyan",       "purple", "blue",
+                                                       "brown", "green",  "red",        "black"};
+
+/// The members of a registry holder set: ids written out, or one `#tag` in the tag's own order.
+[[nodiscard]] std::vector<Identifier> membersOf(const std::vector<std::string>& options, std::string_view registry,
+                                                const LootContext& context) {
+    std::vector<Identifier> members;
+    for (const std::string& option : options) {
+        if (option.starts_with('#')) {
+            const std::expected<Identifier, wire::common::IdentifierError> tag = Identifier::parse(option.substr(1));
+            if (tag.has_value() && context.tagMembers) {
+                for (const Identifier& member : context.tagMembers(registry, *tag)) {
+                    members.push_back(member);
+                }
+            }
+        } else if (const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(option);
+                   id.has_value()) {
+            members.push_back(*id);
+        }
+    }
+    return members;
+}
+
 } // namespace
+
+std::map<std::string, std::int32_t, std::less<>> enchantmentsOf(const ItemStack& stack) {
+    std::map<std::string, std::int32_t, std::less<>> levels;
+    if (const NbtCompound* held = stack.components.getCompound("minecraft:enchantments"); held != nullptr) {
+        for (std::size_t index = 0; index < held->names().size(); ++index) {
+            levels.emplace(held->names()[index], held->getInt(held->names()[index]));
+        }
+    }
+    return levels;
+}
 
 LootFunction LootFunction::enchantRandomly(std::vector<std::string> options, bool onlyCompatible) {
     LootFunction built;
     built.kind_ = Kind::EnchantRandomly;
-    built.options_ = std::move(options);
     built.onlyCompatible_ = onlyCompatible;
+    built.parts_ = std::make_shared<const Parts>(Parts{.options = std::move(options)});
     return built;
 }
 
-LootFunction LootFunction::enchantWithLevels(NumberProvider levels, std::vector<std::string> options) {
+LootFunction LootFunction::enchantWithLevels(IntProvider levels, std::vector<std::string> options) {
     LootFunction built;
     built.kind_ = Kind::EnchantWithLevels;
-    built.count_ = std::move(levels);
-    built.options_ = std::move(options);
+    built.parts_ = std::make_shared<const Parts>(Parts{.count = std::move(levels), .options = std::move(options)});
     return built;
 }
 
-LootFunction LootFunction::setEnchantments(std::vector<std::pair<std::string, NumberProvider>> levels, bool add) {
+LootFunction LootFunction::setEnchantments(std::vector<std::pair<std::string, IntProvider>> levels, bool add) {
     LootFunction built;
     built.kind_ = Kind::SetEnchantments;
-    built.levels_ = std::move(levels);
     built.add_ = add;
+    built.parts_ = std::make_shared<const Parts>(Parts{.levels = std::move(levels)});
     return built;
 }
 
-LootFunction LootFunction::setDamage(NumberProvider damage, bool add) {
+LootFunction LootFunction::setDamage(FloatProvider damage, bool add) {
     LootFunction built;
     built.kind_ = Kind::SetDamage;
-    built.count_ = std::move(damage);
     built.add_ = add;
+    built.parts_ = std::make_shared<const Parts>(Parts{.fraction = std::move(damage)});
     return built;
 }
 
 LootFunction LootFunction::setComponents(NbtCompound components, std::vector<std::string> removed) {
     LootFunction built;
     built.kind_ = Kind::SetComponents;
-    built.components_ = std::make_shared<const NbtCompound>(std::move(components));
-    built.removed_ = std::move(removed);
+    built.parts_ =
+        std::make_shared<const Parts>(Parts{.components = std::move(components), .removed = std::move(removed)});
     return built;
 }
 
-LootFunction LootFunction::setStewEffect(std::vector<std::pair<std::string, NumberProvider>> effects) {
+LootFunction LootFunction::setStewEffect(std::vector<std::pair<std::string, IntProvider>> effects) {
     LootFunction built;
     built.kind_ = Kind::SetStewEffect;
-    built.levels_ = std::move(effects);
+    built.parts_ = std::make_shared<const Parts>(Parts{.levels = std::move(effects)});
     return built;
 }
 
-LootFunction LootFunction::setInstrument(std::string options) {
+LootFunction LootFunction::setInstrument(std::vector<std::string> options) {
     LootFunction built;
     built.kind_ = Kind::SetInstrument;
-    built.options_ = {std::move(options)};
+    built.parts_ = std::make_shared<const Parts>(Parts{.options = std::move(options)});
     return built;
 }
 
@@ -201,9 +237,9 @@ ItemStack LootFunction::enchant(ItemStack stack, random::RandomSource& random, c
             stack.item = Identifier::vanilla("enchanted_book");
         }
         NbtCompound levels = levelsOf(stack);
-        for (const auto& [name, provider] : levels_) {
+        for (const auto& [name, provider] : parts().levels) {
             const std::int32_t base = add_ ? levels.getInt(name) : 0;
-            const std::int32_t level = std::clamp(base + provider.getInt(random), 0, kMaxEnchantmentLevel);
+            const std::int32_t level = std::clamp(base + provider.get(random, context), 0, kMaxEnchantmentLevel);
             if (level <= 0) {
                 static_cast<void>(levels.remove(name));
             } else {
@@ -221,7 +257,7 @@ ItemStack LootFunction::enchant(ItemStack stack, random::RandomSource& random, c
         const bool book = isBook(stack.item);
         const bool checked = !book && onlyCompatible_;
         std::vector<const EnchantmentEntry*> compatible;
-        for (const EnchantmentEntry* entry : enchanting->candidates(options_)) {
+        for (const EnchantmentEntry* entry : enchanting->candidates(parts().options)) {
             if (!checked || (enchanting->supports && enchanting->supports(entry->id, stack.item))) {
                 compatible.push_back(entry);
             }
@@ -242,8 +278,8 @@ ItemStack LootFunction::enchant(ItemStack stack, random::RandomSource& random, c
         return stack;
     }
     // parity: `EnchantmentHelper.enchantItem`.
-    const std::int32_t cost = count_.getInt(random);
-    const std::vector<Pick> picks = select(*enchanting, random, stack.item, cost, options_);
+    const std::int32_t cost = parts().count.get(random, context);
+    const std::vector<Pick> picks = select(*enchanting, random, stack.item, cost, parts().options);
     if (isBook(stack.item)) {
         stack = ItemStack{.item = Identifier::vanilla("enchanted_book"), .count = 1};
     }
@@ -259,6 +295,7 @@ ItemStack LootFunction::enchant(ItemStack stack, random::RandomSource& random, c
 }
 
 ItemStack LootFunction::setComponent(ItemStack stack, random::RandomSource& random, const LootContext& context) const {
+    const Parts& part = parts();
     switch (kind_) {
     case Kind::SetDamage: {
         const std::int32_t maxDamage = server::registry::itemDurability::maxDamageOf(stack.item);
@@ -268,7 +305,7 @@ ItemStack LootFunction::setComponent(ItemStack stack, random::RandomSource& rand
         const float base = add_ ? 1.0F - (static_cast<float>(stack.components.getInt("minecraft:damage")) /
                                           static_cast<float>(maxDamage))
                                 : 0.0F;
-        const float left = 1.0F - std::clamp(count_.getFloat(random) + base, 0.0F, 1.0F);
+        const float left = 1.0F - wire::common::mth::clamp(part.fraction.get(random, context) + base, 0.0F, 1.0F);
         const auto damage = static_cast<std::int32_t>(std::floor(left * static_cast<float>(maxDamage)));
         // parity: a damage of zero matches the prototype, so the patch drops it.
         if (damage <= 0) {
@@ -279,20 +316,20 @@ ItemStack LootFunction::setComponent(ItemStack stack, random::RandomSource& rand
         return stack;
     }
     case Kind::SetComponents:
-        for (std::size_t index = 0; index < components_->names().size(); ++index) {
-            stack.components.set(components_->names()[index], components_->values()[index]);
+        for (std::size_t index = 0; index < part.components.names().size(); ++index) {
+            stack.components.set(part.components.names()[index], part.components.values()[index]);
         }
-        for (const std::string& name : removed_) {
+        for (const std::string& name : part.removed) {
             static_cast<void>(stack.components.remove(name));
         }
         return stack;
     case Kind::SetStewEffect: {
-        if (stack.item != Identifier::vanilla("suspicious_stew") || levels_.empty()) {
+        if (stack.item != Identifier::vanilla("suspicious_stew") || part.levels.empty()) {
             return stack;
         }
         const auto& [effect, provider] =
-            levels_[static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(levels_.size())))];
-        std::int32_t duration = provider.getInt(random);
+            part.levels[static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(part.levels.size())))];
+        std::int32_t duration = provider.get(random, context);
         if (!instantaneous(effect)) {
             duration *= kTicksPerSecond;
         }
@@ -307,24 +344,50 @@ ItemStack LootFunction::setComponent(ItemStack stack, random::RandomSource& rand
         stack.components.set("minecraft:suspicious_stew_effects", NbtTag::ofList(std::move(effects)));
         return stack;
     }
-    case Kind::SetInstrument: {
-        const std::string& option = options_.front();
-        std::vector<Identifier> choices;
-        if (option.starts_with('#')) {
-            const std::expected<Identifier, wire::common::IdentifierError> tag = Identifier::parse(option.substr(1));
-            if (tag.has_value() && context.tagMembers) {
-                choices = context.tagMembers("instrument", *tag);
-            }
-        } else if (const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(option);
-                   id.has_value()) {
-            choices.push_back(*id);
-        }
+    case Kind::SetInstrument:
+    case Kind::SetRandomPotion: {
+        const bool instrument = kind_ == Kind::SetInstrument;
+        const std::vector<Identifier> choices = membersOf(part.options, instrument ? "instrument" : "potion", context);
         if (choices.empty()) {
             return stack;
         }
         const Identifier& picked =
             choices[static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(choices.size())))];
-        stack.components.set("minecraft:instrument", NbtTag::ofString(picked.toString()));
+        if (instrument) {
+            stack.components.set("minecraft:instrument", NbtTag::ofString(picked.toString()));
+            return stack;
+        }
+        // parity: `PotionContents.withPotion`, the rest of what the bottle held kept.
+        const NbtCompound* held = stack.components.getCompound("minecraft:potion_contents");
+        NbtCompound contents = held == nullptr ? NbtCompound{} : *held;
+        contents.putString("potion", picked.toString());
+        stack.components.set("minecraft:potion_contents", NbtTag::ofCompound(std::move(contents)));
+        return stack;
+    }
+    // parity: `SetOminousBottleAmplifierFunction`, the roll clamped to the five levels.
+    case Kind::SetOminousBottleAmplifier:
+        stack.components.putInt("minecraft:ominous_bottle_amplifier",
+                                std::clamp(part.count.get(random, context), 0, kMaxOminousAmplifier));
+        return stack;
+    // parity: `SetRandomDyesFunction`: that many dyes drawn from the sixteen, then mixed in as a
+    // crafting grid would, into a single item.
+    case Kind::SetRandomDyes: {
+        const std::int32_t rolls = part.count.get(random, context);
+        if (rolls <= 0) {
+            return stack;
+        }
+        std::vector<std::int32_t> dyes;
+        for (std::int32_t index = 0; index < rolls; ++index) {
+            const std::string_view colour =
+                kDyeColours[static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(kDyeColours.size())))];
+            dyes.push_back(crafting::hooks::dyeColourOf(Identifier::vanilla(std::string{colour} + "_dye")).value_or(0));
+        }
+        const NbtTag* current = stack.components.find(crafting::specialRecipes::kDyedColor);
+        const std::int32_t* rgb = current == nullptr ? nullptr : current->get<std::int32_t>();
+        stack.count = 1;
+        stack.components.set(crafting::specialRecipes::kDyedColor,
+                             NbtTag::ofInt(crafting::specialRecipes::mixDyes(
+                                 rgb == nullptr ? std::nullopt : std::optional{*rgb}, dyes)));
         return stack;
     }
     default:

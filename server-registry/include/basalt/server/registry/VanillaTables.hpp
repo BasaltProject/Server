@@ -22,7 +22,7 @@ struct FireOddsEntry {
     std::int32_t burnOdds;
 };
 
-/// Every item's real protocol id, straight from the real 26.2 server jar's own data
+/// Every item's real protocol id, straight from the real 26.3 server jar's own data
 /// generator (`net.minecraft.data.Main --reports`, the `registries.json` report):
 /// authoritative, not decompiled/guessed.
 [[nodiscard]] std::span<const std::pair<std::int32_t, std::string_view>> itemIdsTable();
@@ -144,7 +144,7 @@ struct FireOddsEntry {
 /// ring is armed.
 [[nodiscard]] std::span<const std::string_view> portalBlockStateSpecsTable();
 
-/// // parity: every possible 26.2 state definition for every block referenced by a village
+/// // parity: every possible 26.3 state definition for every block referenced by a village
 /// structure palette or processor output. Generated from the official BuiltInRegistries.BLOCK.
 [[nodiscard]] std::span<const std::string_view> villageBlockStateSpecsTable();
 

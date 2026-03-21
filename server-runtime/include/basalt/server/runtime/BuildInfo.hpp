@@ -19,7 +19,7 @@ namespace basalt::server::runtime::buildInfo {
 
 inline constexpr std::string_view kVersion = BASALT_VERSION;
 
-inline constexpr std::string_view kMinecraftVersion = "26.2";
+inline constexpr std::string_view kMinecraftVersion = "26.3";
 
 inline constexpr std::int32_t kProtocolVersion = wire::multiversion::protocolVersions::kNative;
 

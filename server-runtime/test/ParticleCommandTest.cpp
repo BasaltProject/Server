@@ -203,7 +203,7 @@ TEST_CASE("a block particle takes its state either way round") {
     CHECK(state->stateId == basalt::server::registry::blocks::stone().stateId);
 
     const std::optional<ParsedParticle> compound =
-        parseParticle(fixture, R"(minecraft:block{block_state:{Name:"stone"}})");
+        parseParticle(fixture, R"(minecraft:block{block_state:{id:"stone"}})");
     REQUIRE(compound.has_value());
     CHECK(compound->options->as<play::ParticleOptions::BlockState>()->stateId ==
           basalt::server::registry::blocks::stone().stateId);

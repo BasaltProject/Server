@@ -35,21 +35,21 @@ using namespace internal;
     return x >= minX && x < maxX && y >= minY && y < maxY && z >= minZ && z < maxZ;
 }
 
-/// parity: `PistonMovingBlockEntity.saveAdditional` writes the state it carries the way a chunk
-/// palette does, by name and properties, so a world of ours opens in vanilla with the block mid
-/// slide intact. `facing` is the direction's own 3D value, which is what our `BlockFace` counts in.
+/// parity: `PistonMovingBlockEntity.saveAdditional` writes the state it carries with
+/// `NbtUtils.writeBlockState`, so a world of ours opens in vanilla with the block mid slide intact. `facing` is the
+/// direction's own 3D value, which is what our `BlockFace` counts in.
 [[nodiscard]] wire::nbt::NbtCompound carriedTag(std::int32_t stateId, BlockFace direction, bool extending,
                                                 bool source) {
     wire::nbt::NbtCompound state;
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    state.putString("Name", block == nullptr ? "minecraft:air" : block->toString());
+    state.putString("id", block == nullptr ? "minecraft:air" : block->toString());
     if (const std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(stateId);
         !properties.empty()) {
         wire::nbt::NbtCompound tag;
         for (const auto& [name, value] : properties) {
             tag.putString(name, value);
         }
-        state.set("Properties", wire::nbt::NbtTag::ofCompound(std::move(tag)));
+        state.set("properties", wire::nbt::NbtTag::ofCompound(std::move(tag)));
     }
     wire::nbt::NbtCompound data;
     data.set("blockState", wire::nbt::NbtTag::ofCompound(std::move(state)));
@@ -70,12 +70,14 @@ using namespace internal;
     if (state == nullptr) {
         return std::nullopt;
     }
-    const std::string_view name = state->getString("Name");
+    // 26.2 spelled the two fields `Name` and `Properties`.
+    const bool legacy = state->contains("Name");
+    const std::string_view name = state->getString(legacy ? "Name" : "id");
     if (name.empty()) {
         return std::nullopt;
     }
     std::map<std::string, std::string> properties;
-    if (const wire::nbt::NbtCompound* tag = state->getCompound("Properties"); tag != nullptr) {
+    if (const wire::nbt::NbtCompound* tag = state->getCompound(legacy ? "Properties" : "properties"); tag != nullptr) {
         for (std::size_t index = 0; index < tag->size(); ++index) {
             if (const auto* value = tag->values()[index].get<std::string>(); value != nullptr) {
                 properties.emplace(tag->names()[index], *value);

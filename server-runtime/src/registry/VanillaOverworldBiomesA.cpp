@@ -126,6 +126,23 @@ const std::vector<Entry>& overworldBiomesA() {
                            {{"default", MusicTrack{"minecraft:music.overworld.forest", 12000, 24000}}})},
                       {"minecraft:visual/sky_color", BiomeAttribute::color("#7aa5ff")},
                   }},
+        Entry{.path = "dappled_forest",
+              .temperature = 0.6F,
+              .downfall = 0.6F,
+              .hasPrecipitation = true,
+              .waterColor = "#375154",
+              .grassColor = "#df6827",
+              .foliageColor = "#e68e30",
+              .dryFoliageColor = "#8c3a04",
+              .attributes =
+                  {
+                      {"minecraft:audio/background_music",
+                       BiomeAttribute::music(
+                           {{"default", MusicTrack{"minecraft:music.overworld.forest", 12000, 24000}}})},
+                      {"minecraft:visual/fog_color", BiomeAttribute::color("#ccd8e2")},
+                      {"minecraft:visual/sky_color", BiomeAttribute::color("#7ca3ff")},
+                      {"minecraft:visual/water_fog_color", BiomeAttribute::color("#375154")},
+                  }},
         Entry{.path = "dark_forest",
               .temperature = 0.7F,
               .downfall = 0.8F,

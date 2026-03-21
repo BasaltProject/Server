@@ -1,0 +1,167 @@
+#pragma once
+
+#include <basalt/server/random/RandomSource.hpp>
+#include <basalt/server/world/loot/LootContext.hpp>
+
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
+
+namespace basalt::server::world::loot {
+
+class LootCondition;
+class FloatProvider;
+
+/// Where a `score` provider reads its holder from. parity: `ScoreboardNameProvider`: one of the
+/// roll's entities, or a fixed name.
+struct ScoreTarget {
+    std::optional<EntityTarget> entity;
+    std::string name;
+};
+
+/// A whole number worked out from the roll. parity: `ContextIntProvider` and its 23 types.
+///
+/// A value copies cheaply: what it is built from is shared, and a named registry entry is resolved
+/// into its value once, when the data is read.
+class IntProvider {
+public:
+    enum class Kind : std::uint8_t {
+        Constant,
+        Uniform,
+        Binomial,
+        Sum,
+        Product,
+        Minimum,
+        Maximum,
+        Average,
+        Difference,
+        Quotient,
+        FloorQuotient,
+        Modulus,
+        FloorModulus,
+        Power,
+        Negate,
+        Absolute,
+        FromFloat,
+        Conditional,
+        Dispatcher,
+        WeightedList,
+        Score,
+        Storage,
+        EnvironmentAttribute,
+    };
+
+    IntProvider() = default;
+
+    [[nodiscard]] static IntProvider constant(std::int32_t value);
+    [[nodiscard]] static IntProvider uniform(IntProvider min, IntProvider max);
+    [[nodiscard]] static IntProvider binomial(IntProvider n, FloatProvider p);
+    /// `Sum`, `Product`, `Minimum`, `Maximum` and `Average`, over one or more inputs.
+    [[nodiscard]] static IntProvider aggregate(Kind kind, std::vector<IntProvider> inputs);
+    /// `Difference`, `Quotient`, `FloorQuotient`, `Modulus`, `FloorModulus` and `Power`.
+    [[nodiscard]] static IntProvider binary(Kind kind, IntProvider left, IntProvider right);
+    /// `Negate` and `Absolute`.
+    [[nodiscard]] static IntProvider unary(Kind kind, IntProvider input);
+    [[nodiscard]] static IntProvider fromFloat(FloatProvider input);
+    [[nodiscard]] static IntProvider conditional(LootCondition condition, IntProvider onTrue, IntProvider onFalse);
+    [[nodiscard]] static IntProvider dispatcher(std::vector<std::pair<LootCondition, IntProvider>> cases,
+                                                IntProvider fallback);
+    [[nodiscard]] static IntProvider weightedList(std::vector<std::pair<IntProvider, std::int32_t>> distribution);
+    [[nodiscard]] static IntProvider score(ScoreTarget target, std::string objective, IntProvider fallback);
+    [[nodiscard]] static IntProvider storage(wire::common::Identifier id, std::string path, IntProvider fallback);
+    [[nodiscard]] static IntProvider environmentAttribute(wire::common::Identifier attribute);
+
+    [[nodiscard]] Kind kind() const noexcept { return kind_; }
+
+    /// parity: `getInt`, which answers 0 for anything that would have thrown `ArithmeticException`.
+    [[nodiscard]] std::int32_t get(random::RandomSource& random, const LootContext& context) const;
+
+    /// parity: `getIntUnsafe`: nothing where vanilla throws, having used exactly the random vanilla
+    /// used up to the throw.
+    [[nodiscard]] std::optional<std::int32_t> tryGet(random::RandomSource& random, const LootContext& context) const;
+
+private:
+    struct Parts;
+
+    Kind kind_ = Kind::Constant;
+    std::int32_t value_ = 0;
+    std::shared_ptr<const Parts> parts_;
+};
+
+/// A fraction worked out from the roll. parity: `ContextFloatProvider` and its 28 types.
+class FloatProvider {
+public:
+    enum class Kind : std::uint8_t {
+        Constant,
+        Uniform,
+        Sum,
+        Product,
+        Minimum,
+        Maximum,
+        Average,
+        Length,
+        Difference,
+        Quotient,
+        Modulus,
+        Power,
+        Negate,
+        Absolute,
+        Floor,
+        Ceiling,
+        Round,
+        Truncate,
+        SquareRoot,
+        Sine,
+        Cosine,
+        FromInt,
+        Conditional,
+        Dispatcher,
+        WeightedList,
+        EnchantmentLevel,
+        Storage,
+        EnvironmentAttribute,
+    };
+
+    FloatProvider() = default;
+
+    [[nodiscard]] static FloatProvider constant(float value);
+    [[nodiscard]] static FloatProvider uniform(FloatProvider min, FloatProvider max);
+    /// `Sum`, `Product`, `Minimum`, `Maximum`, `Average` and `Length`.
+    [[nodiscard]] static FloatProvider aggregate(Kind kind, std::vector<FloatProvider> inputs);
+    /// `Difference`, `Quotient`, `Modulus` and `Power`.
+    [[nodiscard]] static FloatProvider binary(Kind kind, FloatProvider left, FloatProvider right);
+    /// The one-input operations, `Negate` through `Cosine`.
+    [[nodiscard]] static FloatProvider unary(Kind kind, FloatProvider input);
+    [[nodiscard]] static FloatProvider fromInt(IntProvider input);
+    [[nodiscard]] static FloatProvider conditional(LootCondition condition, FloatProvider onTrue,
+                                                   FloatProvider onFalse);
+    [[nodiscard]] static FloatProvider dispatcher(std::vector<std::pair<LootCondition, FloatProvider>> cases,
+                                                  FloatProvider fallback);
+    [[nodiscard]] static FloatProvider weightedList(std::vector<std::pair<FloatProvider, std::int32_t>> distribution);
+    [[nodiscard]] static FloatProvider enchantmentLevel(LevelBasedValue amount);
+    [[nodiscard]] static FloatProvider storage(wire::common::Identifier id, std::string path, FloatProvider fallback);
+    [[nodiscard]] static FloatProvider environmentAttribute(wire::common::Identifier attribute);
+
+    [[nodiscard]] Kind kind() const noexcept { return kind_; }
+
+    /// parity: `getFloat`: 0 for anything not finite or that would have thrown.
+    [[nodiscard]] float get(random::RandomSource& random, const LootContext& context) const;
+
+    /// parity: `getFloatUnsafe`, NaN and infinities included; nothing only where vanilla throws.
+    [[nodiscard]] std::optional<float> tryGet(random::RandomSource& random, const LootContext& context) const;
+
+    /// parity: `getFloatOrThrow`, which also throws for a value that is not finite.
+    [[nodiscard]] std::optional<float> tryGetFinite(random::RandomSource& random, const LootContext& context) const;
+
+private:
+    struct Parts;
+
+    Kind kind_ = Kind::Constant;
+    float value_ = 0.0F;
+    std::shared_ptr<const Parts> parts_;
+};
+
+} // namespace basalt::server::world::loot

@@ -246,7 +246,7 @@ TEST_CASE("a variant's own entry is built the way the codec reads it") {
 
     CHECK(text(vanillaRegistryData::bannerPattern("globe"), "asset_id") == "minecraft:globe");
     CHECK(text(vanillaRegistryData::bannerPattern("globe"), "translation_key") == "block.minecraft.banner.globe");
-    CHECK(text(vanillaRegistryData::trimMaterial("iron", 15527148), "asset_name") == "iron");
+    CHECK(text(vanillaRegistryData::trimMaterial("iron", 15527148), "palette_id") == "minecraft:trim/iron");
 }
 
 TEST_CASE("the dimension types carry what a client joins a world with") {

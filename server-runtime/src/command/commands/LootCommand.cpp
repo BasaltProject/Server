@@ -114,7 +114,8 @@ void LootCommand::build(const CommandNodeBuilder& root) const {
         }
         random::RandomSource random = random::RandomSource::legacy(
             worldSeed_() ^ ((static_cast<std::int64_t>(at[0]) << 32) | static_cast<std::uint32_t>(at[2])));
-        const server::world::loot::LootContext block{.blockState = reg::blockStateDefinitions::propertiesOf(*stateId)};
+        const server::world::loot::LootContext block{.blockState = reg::blockStateDefinitions::propertiesOf(*stateId),
+                                                     .block = state->block};
         return stacksOf(table->generate(random, 0.0F, std::nullopt, block));
     };
 

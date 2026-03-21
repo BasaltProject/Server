@@ -181,3 +181,46 @@ TEST_CASE("nonsense is refused with a reason rather than half-read") {
     REQUIRE_FALSE(refused.has_value());
     CHECK(refused.error().message.find("not_a_block") != std::string::npos);
 }
+
+TEST_CASE("a palette entry reads in every spelling vanilla has written it") {
+    // parity: `BlockState.CODEC` writes a default state as its bare id and anything else as
+    // `{id, properties}`; a mixed list wraps the bare ones as `{"": id}`; 26.2 wrote `Name`/`Properties`.
+    const auto sectionWith = [](NbtList palette) {
+        Chunk chunk{0, 0};
+        NbtCompound tag = chunkNbt::write(chunk);
+        NbtCompound section = *(*tag.getList("sections"))[0].get<NbtCompound>();
+        NbtCompound states;
+        states.set("palette", NbtTag::ofList(std::move(palette)));
+        section.set("block_states", NbtTag::ofCompound(std::move(states)));
+        NbtList sections{NbtType::Compound, {}};
+        sections.push(NbtTag::ofCompound(std::move(section)));
+        tag.set("sections", NbtTag::ofList(std::move(sections)));
+        return tag;
+    };
+    const auto blockAt = [](const NbtCompound& tag) {
+        const auto read = chunkNbt::read(tag);
+        REQUIRE(read.has_value());
+        return read->blockStateId(0, read->verticalBounds().minY(), 0);
+    };
+
+    NbtList bare{NbtType::String, {}};
+    bare.push(NbtTag::ofString("minecraft:stone"));
+    CHECK(blockAt(sectionWith(std::move(bare))) == basalt::server::registry::blocks::named("stone")->stateId);
+
+    NbtCompound wrappedEntry;
+    wrappedEntry.putString("", "minecraft:dirt");
+    NbtList wrapped{NbtType::Compound, {}};
+    wrapped.push(NbtTag::ofCompound(std::move(wrappedEntry)));
+    CHECK(blockAt(sectionWith(std::move(wrapped))) == basalt::server::registry::blocks::named("dirt")->stateId);
+
+    for (const auto& [idKey, propertiesKey] : {std::pair{"id", "properties"}, std::pair{"Name", "Properties"}}) {
+        NbtCompound properties;
+        properties.putString("axis", "x");
+        NbtCompound entry;
+        entry.putString(idKey, "minecraft:oak_log");
+        entry.set(propertiesKey, NbtTag::ofCompound(std::move(properties)));
+        NbtList full{NbtType::Compound, {}};
+        full.push(NbtTag::ofCompound(std::move(entry)));
+        CHECK(blockAt(sectionWith(std::move(full))) != basalt::server::registry::blocks::named("oak_log")->stateId);
+    }
+}

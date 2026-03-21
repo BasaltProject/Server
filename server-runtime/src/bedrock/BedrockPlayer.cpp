@@ -170,7 +170,8 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
             wire::bedrock::writeBossEvent(body, static_cast<std::int64_t>(kRuntimeEntityId),
                                           bossBarShown_ ? wire::bedrock::BedrockBossAction::UpdatePercentage
                                                         : wire::bedrock::BedrockBossAction::Create,
-                                          wire::text::toLegacyText(wire::text::miniMessage::parse(title)), progress);
+                                          wire::text::toLegacyText(wire::text::miniMessage::parse(title)), progress,
+                                          protocol_);
             mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::BossEvent), body.toVector());
             if (bossBarShown_) {
                 // The percentage and the name are two separate nudges over there, and re-adding the
@@ -178,7 +179,7 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
                 wire::io::ByteBuffer named;
                 wire::bedrock::writeBossEvent(
                     named, static_cast<std::int64_t>(kRuntimeEntityId), wire::bedrock::BedrockBossAction::UpdateName,
-                    wire::text::toLegacyText(wire::text::miniMessage::parse(title)), progress);
+                    wire::text::toLegacyText(wire::text::miniMessage::parse(title)), progress, protocol_);
                 mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::BossEvent), named.toVector());
             }
             bossBarShown_ = true;
@@ -189,7 +190,7 @@ BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context co
             }
             wire::io::ByteBuffer body;
             wire::bedrock::writeBossEvent(body, static_cast<std::int64_t>(kRuntimeEntityId),
-                                          wire::bedrock::BedrockBossAction::Remove, "", 0.0F);
+                                          wire::bedrock::BedrockBossAction::Remove, "", 0.0F, protocol_);
             mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::BossEvent), body.toVector());
             bossBarShown_ = false;
         };

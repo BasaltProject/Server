@@ -199,16 +199,13 @@ void EntityVisibilityTracker::syncSummonedEntities() {
         lastEntityPositions_.insert_or_assign(
             entity->entityId(), std::array<double, 5>{entity->x, entity->y, entity->z, static_cast<double>(entity->yaw),
                                                       static_cast<double>(entity->headYaw)});
-        // parity: the position *sync*, which carries the velocity so the client can interpolate: a
-        // teleport every tick snaps, which is what made a falling block judder down.
+        // parity: the position *sync*, which the client interpolates towards: a teleport every tick
+        // snaps, which is what made a falling block judder down.
         owner_->sendPlayPacket(wire::protocol::play::EntityPositionSyncPacket::kId, [&](wire::io::ByteBuffer& buffer) {
             wire::protocol::play::EntityPositionSyncPacket{.entityId = entity->entityId(),
                                                            .x = entity->x,
                                                            .y = entity->y,
                                                            .z = entity->z,
-                                                           .velocityX = entity->velocityX,
-                                                           .velocityY = entity->velocityY,
-                                                           .velocityZ = entity->velocityZ,
                                                            .yaw = entity->yaw,
                                                            .pitch = entity->pitch,
                                                            .onGround = entity->onGround}

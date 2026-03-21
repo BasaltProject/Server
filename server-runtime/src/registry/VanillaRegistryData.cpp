@@ -357,7 +357,7 @@ const std::vector<std::pair<std::string, std::int32_t>>& trimMaterials() {
 
 NbtCompound trimMaterial(std::string_view id, std::int32_t colorRgb) {
     NbtCompound value;
-    value.putString("asset_name", std::string{id});
+    value.putString("palette_id", "minecraft:trim/" + std::string{id});
     value.set("description", wire::text::componentNbt::serialize(
                                  wire::text::Component::translatable("trim_material.minecraft." + std::string{id})
                                      .color(wire::text::TextColor{colorRgb})));

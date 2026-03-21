@@ -104,7 +104,7 @@ void TagCommand::build(const CommandNodeBuilder& root) const {
                     const auto* matched = context.argument<std::vector<CommandTarget>>("targets");
                     if (matched != nullptr) {
                         for (const CommandTarget& target : *matched) {
-                            carried.insert_range(target.tags());
+                            carried.merge(target.tags());
                         }
                     }
                     return context.matching(std::vector<std::string>{carried.begin(), carried.end()});
@@ -117,7 +117,7 @@ void TagCommand::build(const CommandNodeBuilder& root) const {
                 const std::vector<CommandTarget>& targets = targetsOf(context);
                 std::set<std::string> tags;
                 for (const CommandTarget& target : targets) {
-                    tags.insert_range(target.tags());
+                    tags.merge(target.tags());
                 }
                 std::string joined;
                 for (const std::string& tag : tags) {
