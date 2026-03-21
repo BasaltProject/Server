@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/world/BlockTransformers.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/LootRegistries.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
@@ -63,6 +64,8 @@ public:
     world::RealBiomeSpawns biomeSpawns;
     /// What each villager offers, out of the same jar.
     world::RealVillagerTrades villagerTrades;
+    /// What a hoe, a shovel or an axe turns a block into.
+    world::RealBlockTransformers blockTransformers;
     /// The song data a comparator reads off a playing jukebox.
     world::jukeboxes::SongOutputs jukeboxSongs;
     world::RealRecipes recipes;

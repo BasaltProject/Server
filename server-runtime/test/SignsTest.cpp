@@ -1,5 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/Signs.hpp>
 
@@ -139,4 +140,45 @@ TEST_CASE("a sign block entity carries its own coordinates and an empty sign by 
     const basalt::server::world::ChunkBlockEntity written = signs::blockEntity(
         3, 64, 5, Identifier::vanilla("hanging_sign"), signs::withText(signs::emptyData(), true, {"hi"}));
     CHECK(linesOf(written.data(), "front_text")[0] == "hi");
+}
+
+TEST_CASE("a sign placed from an item carrying 26.3 text components keeps them") {
+    NbtList messages{basalt::wire::nbt::NbtType::String};
+    for (const char* line : {"one", "", "", ""}) {
+        static_cast<void>(messages.push(basalt::wire::nbt::NbtTag::ofString(line)));
+    }
+    NbtCompound front;
+    front.set("messages", basalt::wire::nbt::NbtTag::ofList(std::move(messages)));
+    NbtCompound components;
+    components.set("minecraft:sign_text_front", basalt::wire::nbt::NbtTag::ofCompound(front));
+    components.set("minecraft:waxed", basalt::wire::nbt::NbtTag::ofCompound(NbtCompound{}));
+
+    const NbtCompound data = signs::withComponents(signs::emptyData(), components);
+    CHECK(linesOf(data, "front_text").front() == "one");
+    CHECK(signs::isWaxed(data));
+    CHECK(signs::hasEditableText(data, true));
+}
+
+TEST_CASE("a line that is not plain text is not the player's to edit") {
+    NbtList messages{basalt::wire::nbt::NbtType::Compound};
+    NbtCompound translated;
+    translated.putString("translate", "block.minecraft.stone");
+    static_cast<void>(messages.push(basalt::wire::nbt::NbtTag::ofCompound(translated)));
+    NbtCompound back;
+    back.set("messages", basalt::wire::nbt::NbtTag::ofList(std::move(messages)));
+    NbtCompound components;
+    components.set("minecraft:sign_text_back", basalt::wire::nbt::NbtTag::ofCompound(back));
+
+    const NbtCompound data = signs::withComponents(signs::emptyData(), components);
+    CHECK(signs::hasEditableText(data, true));
+    CHECK_FALSE(signs::hasEditableText(data, false));
+}
+
+TEST_CASE("the side a player edits is the one they stand in front of") {
+    const std::optional<std::int32_t> north =
+        registry::blockStateDefinitions::stateIdOf(Identifier::vanilla("oak_sign"), {{"rotation", "8"}}, std::nullopt);
+    REQUIRE(north.has_value());
+    // parity: rotation eight is 180 degrees, a sign read from the north.
+    CHECK(signs::facesFront(*north, 0, 0, 0.5, -3.0));
+    CHECK_FALSE(signs::facesFront(*north, 0, 0, 0.5, 4.0));
 }

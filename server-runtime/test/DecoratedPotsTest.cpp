@@ -139,3 +139,38 @@ TEST_CASE("a pot keeps its one stack where vanilla keeps it") {
     CHECK(back->item.path() == "emerald");
     CHECK(back->count == 2);
 }
+
+TEST_CASE("a pot drops its sherds left, back, front and right, and nothing for a bare side") {
+    nbt::NbtCompound back;
+    back.putString("id", "minecraft:arms_up_pottery_sherd");
+    nbt::NbtCompound front;
+    front.putString("id", "minecraft:brick");
+    nbt::NbtCompound sides;
+    sides.set("back", nbt::NbtTag::ofCompound(back));
+    sides.set("front", nbt::NbtTag::ofCompound(front));
+    nbt::NbtCompound components;
+    components.set("minecraft:pot_decorations", nbt::NbtTag::ofCompound(sides));
+
+    nbt::NbtCompound data;
+    decoratedPots::decorate(data, components);
+    const std::vector<ItemStack> dropped = decoratedPots::sherds(data);
+    REQUIRE(dropped.size() == 2);
+    CHECK(dropped[0].item == item("arms_up_pottery_sherd"));
+    CHECK(dropped[1].item == item("brick"));
+}
+
+TEST_CASE("a 26.2 pot's list of four still drops all four in the new order") {
+    nbt::NbtList list{nbt::NbtType::String};
+    for (const char* side : {"minecraft:a_sherd", "minecraft:b_sherd", "minecraft:c_sherd", "minecraft:d_sherd"}) {
+        static_cast<void>(list.push(nbt::NbtTag::ofString(side)));
+    }
+    nbt::NbtCompound data;
+    data.set("sherds", nbt::NbtTag::ofList(std::move(list)));
+    const std::vector<ItemStack> dropped = decoratedPots::sherds(data);
+    REQUIRE(dropped.size() == 4);
+    // Back, left, right, front written; left, back, front, right dropped.
+    CHECK(dropped[0].item == item("b_sherd"));
+    CHECK(dropped[1].item == item("a_sherd"));
+    CHECK(dropped[2].item == item("d_sherd"));
+    CHECK(dropped[3].item == item("c_sherd"));
+}

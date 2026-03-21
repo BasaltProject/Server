@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <optional>
 #include <set>
+#include <string_view>
 
 namespace basalt::server::runtime::entity::ai {
 
@@ -58,5 +59,11 @@ public:
 private:
     static void teleportRandomly(MobContext& mob);
 };
+
+/// Where a mob lands teleporting to around `x, y, z`, or nothing when it may not.
+///
+/// parity: 26.3 `LivingEntity.randomTeleport` with the block tag the mob avoids, and the enderman's
+/// `canRandomlyTeleportTo`: no water under its feet.
+[[nodiscard]] std::optional<double> landingFor(MobContext& mob, double x, double y, double z, std::string_view avoided);
 
 } // namespace basalt::server::runtime::entity::ai

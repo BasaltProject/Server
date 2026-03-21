@@ -1,5 +1,8 @@
 #pragma once
 
+#include <basalt/server/runtime/world/Trades.hpp>
+#include <basalt/server/world/loot/Loot.hpp>
+#include <basalt/server/world/loot/LootTableJson.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 
@@ -25,14 +28,30 @@ struct VillagerTrade {
     std::int32_t maxUses = 4;
     std::int32_t experience = 1;
     float priceMultiplier = 0.0F;
+    /// What the given stack carries on top of its item. parity: `ItemStackTemplate.components`.
+    wire::nbt::NbtCompound givesComponents;
+    /// parity: `merchant_predicate`, asked of the villager before the trade is offered at all.
+    std::optional<server::world::loot::LootCondition> merchantPredicate;
+    /// parity: `given_item_modifier`, run over what it gives; an empty result offers nothing.
+    std::vector<server::world::loot::LootFunction> givenItemModifier;
+    /// parity: `double_trade_price_enchantments`, ids or a single `#tag`.
+    std::vector<std::string> doubleTradePriceEnchantments;
 };
+
+/// parity: `TradeSet`, how many of a level's trades a villager picks and from which random sequence.
+struct TradeSet {
+    server::world::loot::IntProvider amount = server::world::loot::IntProvider::constant(2);
+    bool allowDuplicates = false;
+    std::optional<wire::common::Identifier> randomSequence;
+    std::vector<VillagerTrade> trades;
+};
+
+class RealLootTables;
 
 /// Every villager trade the operator's own `server.jar` ships, by profession and level.
 ///
-/// parity: 26.2 moved the trades out of `VillagerTrades` and into data. Each one is a file under
-/// `data/minecraft/villager_trade/<profession>/<level>/`, and the tag
-/// `data/minecraft/tags/villager_trade/<profession>/level_<n>.json` lists which belong to a level.
-/// Datapack content, so it is read from the operator's download rather than committed here.
+/// parity: trades are data since 26.2: files under `data/minecraft/villager_trade/`, grouped into
+/// levels by the `villager_trade/<profession>/level_<n>` tags. Read from the operator's jar, never committed.
 class RealVillagerTrades {
 public:
     /// parity: `VillagerTrade.CODEC`'s own defaults when a trade file does not say: `max_uses` 4
@@ -55,13 +74,29 @@ public:
     /// The trades this profession offers at this level, in the order the tag lists them.
     [[nodiscard]] const std::vector<VillagerTrade>& forProfession(std::string_view profession, std::int32_t level);
 
+    /// parity: `VillagerProfession.getTrades(level)`, the level's `trade_set` file.
+    [[nodiscard]] const TradeSet& tradeSet(std::string_view profession, std::int32_t level);
+
     /// One trade file on its own, so the shape of a trade can be pinned without a jar to read from.
-    [[nodiscard]] static std::optional<VillagerTrade> parse(const wire::common::Identifier& id, std::string_view json);
+    [[nodiscard]] static std::optional<VillagerTrade> parse(const wire::common::Identifier& id, std::string_view json,
+                                                            server::world::loot::LootReferences* references = nullptr);
+
+    /// parity: `VillagerTrade.getOffer`: the predicate, the modifier, the extra cost the modifier
+    /// priced in, and nothing when any of it comes to an empty stack or a price under one.
+    [[nodiscard]] static std::optional<trades::Offer>
+    offerOf(const VillagerTrade& trade, const server::world::loot::LootContext& context, random::RandomSource& random);
+
+    /// Where the named modifiers and predicates come from, and what prepares a roll.
+    void useLootTables(RealLootTables* tables) { lootTables_ = tables; }
+
+    [[nodiscard]] RealLootTables* lootTables() const noexcept { return lootTables_; }
 
 private:
     Jar jar_;
     wire::common::Logger logger_;
     std::map<std::string, std::vector<VillagerTrade>> cache_;
+    std::map<std::string, TradeSet> sets_;
+    RealLootTables* lootTables_ = nullptr;
 };
 
 } // namespace basalt::server::runtime::world

@@ -132,9 +132,12 @@ Parsed<LootFunction> Reader::typedCountFunction(const std::string& type, const J
     }
     if (type == "minecraft:enchant_with_levels") {
         Parsed<IntProvider> levels = intField("levels");
-        return levels.has_value() ? Parsed<LootFunction>{LootFunction::enchantWithLevels(
-                                        std::move(*levels), idsOrTag(object.find("options")))}
-                                  : std::unexpected(levels.error());
+        if (!levels.has_value()) {
+            return std::unexpected(levels.error());
+        }
+        LootFunction built = LootFunction::enchantWithLevels(std::move(*levels), idsOrTag(object.find("options")));
+        built.includeAdditionalCost(asBool(object.find("include_additional_cost_component")).value_or(false));
+        return built;
     }
     if (type == "minecraft:set_ominous_bottle_amplifier") {
         Parsed<IntProvider> amplifier = intField("amplifier");
@@ -205,8 +208,10 @@ Parsed<LootFunction> Reader::typedCountFunction(const std::string& type, const J
         return parseComponentSetter(type, object);
     }
     if (type == "minecraft:enchant_randomly") {
-        return LootFunction::enchantRandomly(idsOrTag(object.find("options")),
-                                             asBool(object.find("only_compatible")).value_or(true));
+        LootFunction built = LootFunction::enchantRandomly(idsOrTag(object.find("options")),
+                                                           asBool(object.find("only_compatible")).value_or(true));
+        built.includeAdditionalCost(asBool(object.find("include_additional_cost_component")).value_or(false));
+        return built;
     }
     if (type == "minecraft:set_instrument") {
         return LootFunction::setInstrument(idsOrTag(object.find("options")));

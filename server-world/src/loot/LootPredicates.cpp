@@ -57,21 +57,54 @@ bool StateMatcher::test(const std::map<std::string, std::string>& state) const {
     });
 }
 
+namespace {
+
+/// parity: `EnchantmentsPredicate`, every requirement met by some enchantment on the item.
+[[nodiscard]] bool meets(const std::vector<EnchantmentRequirement>& requirements,
+                         const std::map<std::string, std::int32_t, std::less<>>& held, const TagLookup& tags) {
+    return std::ranges::all_of(requirements, [&](const EnchantmentRequirement& requirement) {
+        return std::ranges::any_of(held, [&](const auto& one) {
+            const auto id = wire::common::Identifier::parse(one.first);
+            return id.has_value() && matchesIdsOrTag(requirement.enchantments, "enchantment", *id, tags) &&
+                   one.second >= requirement.min.value_or(0) &&
+                   (!requirement.max.has_value() || one.second <= *requirement.max);
+        });
+    });
+}
+
+[[nodiscard]] std::map<std::string, std::int32_t, std::less<>> levelsIn(const wire::nbt::NbtCompound& components,
+                                                                        std::string_view key) {
+    std::map<std::string, std::int32_t, std::less<>> levels;
+    if (const wire::nbt::NbtCompound* held = components.getCompound(key); held != nullptr) {
+        for (const std::string& name : held->names()) {
+            levels.emplace(name, held->getInt(name));
+        }
+    }
+    return levels;
+}
+
+} // namespace
+
 bool ItemPredicate::test(const std::optional<wire::common::Identifier>& item,
                          const std::map<std::string, std::int32_t, std::less<>>& itemEnchantments,
                          const TagLookup& tags) const {
-    if (unsupported || !item.has_value() || !matchesIdsOrTag(items, "item", *item, tags)) {
+    if (unsupported || !item.has_value() || !matchesIdsOrTag(items, "item", *item, tags) ||
+        !storedEnchantments.empty() || !present.empty()) {
         return false;
     }
-    // parity: `EnchantmentsPredicate`, every requirement met by some enchantment on the item.
-    return std::ranges::all_of(enchantments, [&](const EnchantmentRequirement& requirement) {
-        return std::ranges::any_of(itemEnchantments, [&](const auto& held) {
-            const auto id = wire::common::Identifier::parse(held.first);
-            return id.has_value() && matchesIdsOrTag(requirement.enchantments, "enchantment", *id, tags) &&
-                   held.second >= requirement.min.value_or(0) &&
-                   (!requirement.max.has_value() || held.second <= *requirement.max);
-        });
-    });
+    return meets(enchantments, itemEnchantments, tags);
+}
+
+bool ItemPredicate::test(const wire::common::Identifier& item, const wire::nbt::NbtCompound& components,
+                         const TagLookup& tags) const {
+    if (unsupported || !matchesIdsOrTag(items, "item", item, tags)) {
+        return false;
+    }
+    if (!std::ranges::all_of(present, [&components](const std::string& key) { return components.contains(key); })) {
+        return false;
+    }
+    return meets(enchantments, levelsIn(components, "minecraft:enchantments"), tags) &&
+           meets(storedEnchantments, levelsIn(components, "minecraft:stored_enchantments"), tags);
 }
 
 bool EntityPredicate::test(const std::optional<EntityFacts>& entity, const TagLookup& tags) const {
@@ -87,6 +120,12 @@ bool EntityPredicate::test(const std::optional<EntityFacts>& entity, const TagLo
     for (const auto& [name, value] : components) {
         const auto found = entity->components.find(name);
         if (found == entity->components.end() || found->second != value) {
+            return false;
+        }
+    }
+    for (const auto& [name, values] : componentsIn) {
+        const auto found = entity->components.find(name);
+        if (found == entity->components.end() || std::ranges::find(values, found->second) == values.end()) {
             return false;
         }
     }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/wire/common/Identifier.hpp>
+#include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -48,11 +49,20 @@ struct ItemPredicate {
     /// Ids, or a single `#tag`; empty means any item.
     std::vector<std::string> items;
     std::vector<EnchantmentRequirement> enchantments;
+    /// parity: `minecraft:stored_enchantments`, the same test over what a book stores.
+    std::vector<EnchantmentRequirement> storedEnchantments;
+    /// parity: `AnyValue`, a component type with no predicate of its own only has to be there.
+    std::vector<std::string> present;
     /// Set when the predicate asks something this build does not model, which then never matches.
     bool unsupported = false;
 
+    /// Without the stack's components, which is enough for everything but stored enchantments and
+    /// presence, so those never match here.
     [[nodiscard]] bool test(const std::optional<wire::common::Identifier>& item,
                             const std::map<std::string, std::int32_t, std::less<>>& itemEnchantments,
+                            const TagLookup& tags) const;
+
+    [[nodiscard]] bool test(const wire::common::Identifier& item, const wire::nbt::NbtCompound& components,
                             const TagLookup& tags) const;
 };
 
@@ -62,6 +72,8 @@ struct EntityPredicate {
     std::optional<bool> onFire;
     std::optional<bool> baby;
     std::map<std::string, std::string, std::less<>> components;
+    /// parity: `minecraft:predicates` over a component, `villager/variant` naming a holder set.
+    std::map<std::string, std::vector<std::string>, std::less<>> componentsIn;
     std::optional<bool> sheared;
     std::optional<std::int32_t> cubeSize;
     std::optional<bool> captain;

@@ -182,3 +182,37 @@ TEST_CASE("no jar at all answers nothing rather than falling over") {
 
     CHECK(trades.forProfession("farmer", 1).empty());
 }
+
+TEST_CASE("a trade asks its villager first and prices in what its modifier adds") {
+    constexpr std::string_view kSwampOnly = R"({
+        "wants": {"id": "minecraft:emerald", "count": 3},
+        "gives": {"id": "minecraft:book"},
+        "merchant_predicate": {
+            "type": "minecraft:entity_properties",
+            "entity": "this",
+            "predicate": {"minecraft:predicates": {"minecraft:villager/variant": ["minecraft:swamp"]}}
+        },
+        "given_item_modifier": {
+            "type": "minecraft:set_components",
+            "components": {"minecraft:additional_trade_cost": 5}
+        }
+    })";
+    const std::optional<VillagerTrade> trade =
+        RealVillagerTrades::parse(Identifier::vanilla("librarian/1/book"), kSwampOnly);
+    REQUIRE(trade.has_value());
+    REQUIRE(trade->merchantPredicate.has_value());
+
+    basalt::server::random::RandomSource random = basalt::server::random::RandomSource::legacy(0);
+    basalt::server::world::loot::LootContext plains;
+    plains.thisEntity = basalt::server::world::loot::EntityFacts{
+        .type = Identifier::vanilla("villager"), .components = {{"minecraft:villager/variant", "minecraft:plains"}}};
+    CHECK_FALSE(RealVillagerTrades::offerOf(*trade, plains, random).has_value());
+
+    basalt::server::world::loot::LootContext swamp = plains;
+    swamp.thisEntity->components["minecraft:villager/variant"] = "minecraft:swamp";
+    const auto offer = RealVillagerTrades::offerOf(*trade, swamp, random);
+    REQUIRE(offer.has_value());
+    // parity: `ADDITIONAL_TRADE_COST` moves off the result and onto the first price.
+    CHECK(offer->costA.count == 8);
+    CHECK_FALSE(offer->result.components.contains("minecraft:additional_trade_cost"));
+}

@@ -91,6 +91,8 @@ struct LootContext {
     /// Whether the fishing hook behind the roll is in open water, or nothing without a hook.
     /// parity: `FishingHookPredicate.inOpenWater`.
     std::optional<bool> inOpenWater;
+    /// parity: `ADDITIONAL_COST_COMPONENT_ALLOWED`, set only when a villager works out its offers.
+    bool additionalCostAllowed = false;
     /// parity: `LootContextParams.TOOL`, what broke the block, and its enchantments by id.
     std::optional<wire::common::Identifier> tool;
     std::map<std::string, std::int32_t, std::less<>> toolEnchantments;

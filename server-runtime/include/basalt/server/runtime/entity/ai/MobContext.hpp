@@ -128,6 +128,13 @@ public:
 
     /// parity: `Container.setChanged`: the chunk is saved and a comparator reads it again.
     virtual void containerChanged(ServerEntity& /*mob*/, std::int32_t /*x*/, std::int32_t /*y*/, std::int32_t /*z*/) {}
+
+    /// Whether a block is in a block tag, which 26.3 decides teleports and jumps with. Without the
+    /// server's tags nothing is in any, which a goal reads as the tag-free rule.
+    [[nodiscard]] virtual std::optional<bool> blockTagged(std::string_view /*tag*/,
+                                                          const wire::common::Identifier& /*block*/) const {
+        return std::nullopt;
+    }
 };
 
 /// Everything one mob's goals are allowed to see this tick.

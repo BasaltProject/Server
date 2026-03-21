@@ -4,13 +4,18 @@
 
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 namespace basalt::server::runtime::entity {
 class ServerEntity;
+
+namespace villagers {
+struct Offers;
 }
+} // namespace basalt::server::runtime::entity
 
 namespace basalt::server::runtime {
 
@@ -41,7 +46,7 @@ private:
     Hooks hooks_;
     /// The villager this client is trading with, and what it offered.
     std::optional<std::int32_t> openTradingWith_;
-    std::vector<world::trades::Offer> openOffers_;
+    std::shared_ptr<entity::villagers::Offers> openOffers_;
 };
 
 } // namespace basalt::server::runtime

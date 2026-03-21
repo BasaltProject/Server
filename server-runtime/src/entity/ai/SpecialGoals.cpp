@@ -1,5 +1,8 @@
+#include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/entity/Aabb.hpp>
+#include <basalt/server/runtime/entity/EntityCollision.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/SpecialGoals.hpp>
@@ -27,6 +30,8 @@ constexpr float kWaterDamage = 1.0F;
 constexpr std::int32_t kTeleportOnHurtOdds = 5;
 constexpr std::int32_t kDayOdds = 30;
 constexpr std::int32_t kDaylight = 8;
+/// The deepest a teleport looks for ground, the build height being all vanilla bounds it by.
+constexpr std::int32_t kMaxDrop = 4096;
 
 bool isWater(const world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     const std::optional<std::int32_t> state = world.blockState(x, y, z);
@@ -174,7 +179,11 @@ void TeleportAwayGoal::teleportRandomly(MobContext& mob) {
     const double y =
         mob.mob.y + (static_cast<double>(mob.random.nextInt(static_cast<std::int32_t>(kRange))) - (kRange / 2));
     const double z = mob.mob.z + ((mob.random.nextDouble() - 0.5) * kRange);
-    const std::optional<double> landing = groundBelow(mob.world, x, y, z);
+    // parity: 26.3 `Enderman.teleport` over `randomTeleport(..., ENDERMAN_DOES_NOT_TELEPORT_TO)`.
+    if (mob.mob.vehicleId.has_value()) {
+        return;
+    }
+    const std::optional<double> landing = landingFor(mob, x, y, z, "minecraft:enderman_does_not_teleport_to");
     if (!landing.has_value()) {
         return;
     }
@@ -186,6 +195,67 @@ void TeleportAwayGoal::teleportRandomly(MobContext& mob) {
     mob.mob.velocityZ = 0.0;
     navigation::stop(mob.mob);
     mob.actions.teleported(mob.mob);
+}
+
+std::optional<double> landingFor(MobContext& mob, double x, double y, double z, std::string_view avoided) {
+    const world::WorldState& world = mob.world;
+    const auto tagged = [&mob](std::string_view tag, std::int32_t stateId) {
+        const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+        return block != nullptr && mob.actions.blockTagged(tag, *block).value_or(false);
+    };
+    // Without the server's tags, the rule before them: down to anything with a shape.
+    if (!mob.actions.blockTagged(avoided, wire::common::Identifier::vanilla("air")).has_value()) {
+        return groundBelow(world, x, y, z);
+    }
+    // parity: `LivingEntity.randomTeleport`: down until `entities_can_teleport_to`, the height
+    // falling one with every block passed.
+    const auto blockX = static_cast<std::int32_t>(std::floor(x));
+    const auto blockZ = static_cast<std::int32_t>(std::floor(z));
+    auto blockY = static_cast<std::int32_t>(std::floor(y));
+    double feet = y;
+    for (std::int32_t steps = 0;; ++steps) {
+        --blockY;
+        const std::optional<std::int32_t> state = world.blockState(blockX, blockY, blockZ);
+        if (!state.has_value() || steps > kMaxDrop) {
+            return std::nullopt;
+        }
+        if (tagged("minecraft:entities_can_teleport_to", *state)) {
+            if (tagged(avoided, *state)) {
+                return std::nullopt;
+            }
+            break;
+        }
+        feet -= 1.0;
+    }
+    // parity: `checkPositionAndTeleport`: room for the box, no liquid in it, nothing in it the mob
+    // avoids, and for an enderman no water right under its feet.
+    const Aabb box = Aabb::of(x, feet, z, mob.mob.width(), mob.mob.height());
+    const entityCollision::BlockAt blockAt = [&world](std::int32_t bx, std::int32_t by, std::int32_t bz) {
+        return world.blockState(bx, by, bz);
+    };
+    if (entityCollision::collides(blockAt, box)) {
+        return std::nullopt;
+    }
+    for (auto bx = static_cast<std::int32_t>(std::floor(box.minX));
+         bx <= static_cast<std::int32_t>(std::floor(box.maxX)); ++bx) {
+        for (auto by = static_cast<std::int32_t>(std::floor(box.minY));
+             by <= static_cast<std::int32_t>(std::floor(box.maxY)); ++by) {
+            for (auto bz = static_cast<std::int32_t>(std::floor(box.minZ));
+                 bz <= static_cast<std::int32_t>(std::floor(box.maxZ)); ++bz) {
+                const std::int32_t state = world.blockState(bx, by, bz).value_or(0);
+                if (registry::blockFluids::hasFluid(state) || tagged(avoided, state)) {
+                    return std::nullopt;
+                }
+            }
+        }
+    }
+    const std::optional<std::int32_t> below =
+        world.blockState(static_cast<std::int32_t>(std::floor(x)), static_cast<std::int32_t>(std::floor(feet)) - 1,
+                         static_cast<std::int32_t>(std::floor(z)));
+    if (below.has_value() && registry::blockFluids::hasWaterFluid(*below)) {
+        return std::nullopt;
+    }
+    return feet;
 }
 
 } // namespace basalt::server::runtime::entity::ai

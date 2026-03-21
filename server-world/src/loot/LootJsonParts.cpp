@@ -2,6 +2,8 @@
 
 #include <basalt/wire/nbt/JsonToNbt.hpp>
 
+#include <algorithm>
+#include <array>
 #include <charconv>
 #include <cstdint>
 #include <utility>
@@ -108,7 +110,31 @@ std::vector<std::string> idsOrTag(const JsonValue* value) {
     return ids;
 }
 
-/// parity: `ItemPredicate`, reading only `items` and the `minecraft:enchantments` sub-predicate.
+namespace {
+
+/// The component predicate types 26.3 registers, which an empty object does not turn into `AnyValue`.
+[[nodiscard]] bool isPredicateType(std::string_view key) {
+    static constexpr std::array<std::string_view, 15> kTypes{"minecraft:damage",
+                                                             "minecraft:enchantments",
+                                                             "minecraft:stored_enchantments",
+                                                             "minecraft:potion_contents",
+                                                             "minecraft:custom_data",
+                                                             "minecraft:container",
+                                                             "minecraft:bundle_contents",
+                                                             "minecraft:firework_explosion",
+                                                             "minecraft:fireworks",
+                                                             "minecraft:writable_book_content",
+                                                             "minecraft:written_book_content",
+                                                             "minecraft:attribute_modifiers",
+                                                             "minecraft:trim",
+                                                             "minecraft:jukebox_playable",
+                                                             "minecraft:villager/variant"};
+    return std::ranges::find(kTypes, key) != kTypes.end();
+}
+
+} // namespace
+
+/// parity: `ItemPredicate`, reading `items`, the two enchantment sub-predicates and presence.
 ItemPredicate parseItemPredicate(const JsonObject& object) {
     ItemPredicate predicate;
     for (std::size_t index = 0; index < object.names().size(); ++index) {
@@ -124,9 +150,18 @@ ItemPredicate parseItemPredicate(const JsonObject& object) {
             continue;
         }
         for (std::size_t at = 0; at < predicates->names().size(); ++at) {
-            const std::vector<JsonValue>* list = predicates->names()[at] == "minecraft:enchantments"
+            const std::string& key = predicates->names()[at];
+            const bool stored = key == "minecraft:stored_enchantments";
+            const std::vector<JsonValue>* list = key == "minecraft:enchantments" || stored
                                                      ? predicates->values()[at].get<std::vector<JsonValue>>()
                                                      : nullptr;
+            // parity: `DataComponentPredicate`'s `AnyValue`, what a type with no predicate of its own
+            // reads as: `"minecraft:map_id": {}` only asks for the component.
+            if (const JsonObject* empty = predicates->values()[at].get<JsonObject>();
+                list == nullptr && empty != nullptr && empty->size() == 0 && !isPredicateType(key)) {
+                predicate.present.push_back(key);
+                continue;
+            }
             if (list == nullptr) {
                 predicate.unsupported = true;
                 continue;
@@ -148,7 +183,7 @@ ItemPredicate parseItemPredicate(const JsonObject& object) {
                     requirement.min = static_cast<std::int32_t>(*exact);
                     requirement.max = static_cast<std::int32_t>(*exact);
                 }
-                predicate.enchantments.push_back(std::move(requirement));
+                (stored ? predicate.storedEnchantments : predicate.enchantments).push_back(std::move(requirement));
             }
         }
     }
@@ -179,6 +214,15 @@ EntityPredicate parseEntityPredicate(const JsonObject& object) {
             for (std::size_t at = 0; at < inner->names().size(); ++at) {
                 if (const std::optional<std::string> text = asString(&inner->values()[at]); text.has_value()) {
                     predicate.components.emplace(inner->names()[at], *text);
+                } else {
+                    predicate.unsupported = true;
+                }
+            }
+        } else if (name == "minecraft:predicates" && inner != nullptr) {
+            // parity: `VillagerTypePredicate`, the one component predicate an entity is asked about.
+            for (std::size_t at = 0; at < inner->names().size(); ++at) {
+                if (inner->names()[at] == "minecraft:villager/variant") {
+                    predicate.componentsIn.emplace(inner->names()[at], idsOrTag(&inner->values()[at]));
                 } else {
                     predicate.unsupported = true;
                 }

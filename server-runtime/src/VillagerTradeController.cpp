@@ -38,9 +38,8 @@ void VillagerTradeController::openTrades(entity::ServerEntity& villager) {
     // parity: `Villager.mobInteract` over `MerchantMenu`: the offers go out as they are, and what
     // the player then picks is a `select_trade`. The offers themselves come out of the jar's own
     // data, so a farmer offers what a farmer offers.
-    std::vector<world::trades::Offer> offers =
-        entity::villagers::offersFor(*trades, villager.profession, villager.villagerLevel);
-    if (offers.empty()) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    if (world == nullptr || entity::villagers::offersOf(*trades, villager, *world).empty()) {
         return;
     }
     ContainerMenuController& menus = owner_->menus();
@@ -52,7 +51,7 @@ void VillagerTradeController::openTrades(entity::ServerEntity& villager) {
     menus.openBlock.reset();
     menus.openBlockSecond.reset();
     openTradingWith_ = villager.entityId();
-    openOffers_ = std::move(offers);
+    openOffers_ = villager.offers;
     owner_->sendCompressed(OpenScreenPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         OpenScreenPacket{.containerId = menus.openMenu.containerId(),
                          .menuType = wire::protocol::play::menuType::kMerchant,
@@ -64,7 +63,8 @@ void VillagerTradeController::openTrades(entity::ServerEntity& villager) {
 }
 
 void VillagerTradeController::sendOffers() {
-    if (!openTradingWith_.has_value() || openOffers_.empty() || owner_->currentWorld() == nullptr) {
+    if (!openTradingWith_.has_value() || openOffers_ == nullptr || openOffers_->list.empty() ||
+        owner_->currentWorld() == nullptr) {
         return;
     }
     const entity::ServerEntity* villager = owner_->currentWorld()->state().entity(*openTradingWith_);
@@ -72,7 +72,8 @@ void VillagerTradeController::sendOffers() {
         return;
     }
     std::vector<MerchantOffer> wire;
-    for (const world::trades::Offer& offer : openOffers_) {
+    const PlayerSession* session = owner_->playerSession();
+    for (const world::trades::Offer& offer : openOffers_->list) {
         const server::registry::Item* costA = server::registry::items::registry().byName(offer.costA.item);
         const server::registry::Item* result = server::registry::items::registry().byName(offer.result.item);
         if (costA == nullptr || result == nullptr) {
@@ -88,7 +89,14 @@ void VillagerTradeController::sendOffers() {
         }
         wire.push_back(MerchantOffer{
             .costA = MerchantCost{.itemId = costA->protocolId, .count = world::trades::priceOf(offer, offer.costA)},
-            .result = wire::protocol::play::WireItemStack{.itemId = result->protocolId, .count = offer.result.count},
+            .result =
+                session == nullptr
+                    ? wire::protocol::play::WireItemStack{.itemId = result->protocolId, .count = offer.result.count}
+                    : session->inventory
+                          .toWireStack(storage::StoredItemStack{.id = offer.result.item.toString(),
+                                                                .count = offer.result.count,
+                                                                .components = offer.result.components})
+                          .value_or(wire::protocol::play::WireItemStack{}),
             .costB = costB,
             .outOfStock = offer.outOfStock(),
             .uses = offer.uses,
@@ -111,17 +119,19 @@ void VillagerTradeController::sendOffers() {
 
 void VillagerTradeController::selectTrade(std::int32_t index) {
     PlayerSession* session = owner_->playerSession();
-    if (session == nullptr || index < 0 || static_cast<std::size_t>(index) >= openOffers_.size()) {
+    if (session == nullptr || openOffers_ == nullptr || index < 0 ||
+        static_cast<std::size_t>(index) >= openOffers_->list.size()) {
         return;
     }
     if (hooks_.tradeAllowed &&
-        !hooks_.tradeAllowed(owner_->menus().openMenu.containerId(), index,
-                             std::optional{openOffers_[static_cast<std::size_t>(index)].result.item.toString()})) {
+        !hooks_.tradeAllowed(
+            owner_->menus().openMenu.containerId(), index,
+            std::optional{openOffers_->list[static_cast<std::size_t>(index)].result.item.toString()})) {
         return;
     }
     // parity: `MerchantMenu.clickMenuButton`: the offer is checked against what they are carrying,
     // the cost comes out of the inventory, the result goes in, and the offer's own use is counted.
-    world::trades::Offer& offer = openOffers_[static_cast<std::size_t>(index)];
+    world::trades::Offer& offer = openOffers_->list[static_cast<std::size_t>(index)];
     if (offer.outOfStock()) {
         return;
     }
@@ -136,8 +146,8 @@ void VillagerTradeController::selectTrade(std::int32_t index) {
     if (costB.has_value()) {
         static_cast<void>(session->inventory.take(costB->item.toString(), costB->count));
     }
-    const std::int32_t given = session->inventory.add(
-        storage::StoredItemStack{.id = offer.result.item.toString(), .count = offer.result.count});
+    const std::int32_t given = session->inventory.add(storage::StoredItemStack{
+        .id = offer.result.item.toString(), .count = offer.result.count, .components = offer.result.components});
     if (given > 0) {
         owner_->spawnDroppedItem(offer.result.item, given, session->x, session->y, session->z);
     }

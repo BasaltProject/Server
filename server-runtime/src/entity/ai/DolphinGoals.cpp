@@ -179,7 +179,16 @@ bool DolphinJumpGoal::canUse(MobContext& mob) {
     for (const std::int32_t step : {0, 1, 4, 5, 6, 7}) {
         const std::int32_t x = at[0] + (stepX * step);
         const std::int32_t z = at[2] + (stepZ * step);
-        const bool water = swimPath::isSwimmable(mob.world, x, at[1], z);
+        // parity: 26.3 `DolphinJumpGoal.waterIsClear`: water, and nothing in `blocks_dolphin_jump`.
+        const bool water = [&mob, x, z, y = at[1]] {
+            const std::optional<std::int32_t> state = mob.world.blockState(x, y, z);
+            const wire::common::Identifier* block =
+                state.has_value() ? registry::blockStateDefinitions::blockOf(*state) : nullptr;
+            const std::optional<bool> blocks =
+                block == nullptr ? std::nullopt : mob.actions.blockTagged("minecraft:blocks_dolphin_jump", *block);
+            return blocks.has_value() ? swimPath::holdsWater(*state) && !*blocks
+                                      : swimPath::isSwimmable(mob.world, x, y, z);
+        }();
         const auto isAir = [&mob, x, z](std::int32_t y) {
             const std::optional<std::int32_t> state = mob.world.blockState(x, y, z);
             return state.has_value() && registry::blocks::isAir(*state);

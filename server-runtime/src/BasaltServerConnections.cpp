@@ -72,6 +72,7 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     options.lootTables = &vanillaData_.lootTables;
     options.recipes = &vanillaData_.recipes;
     options.villagerTrades = &vanillaData_.villagerTrades;
+    options.blockTransformers = &vanillaData_.blockTransformers;
     options.jukeboxes = &vanillaData_.jukeboxSongs;
     options.whitelistEnforced = [this] { return whitelistEnforced_; };
     options.enchantments = &vanillaData_.enchantments;

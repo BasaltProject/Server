@@ -424,6 +424,13 @@ void MobActionSystem::applyEffect(std::int32_t playerId, std::string_view effect
     }
 }
 
+std::optional<bool> MobActionSystem::blockTagged(std::string_view tag, const wire::common::Identifier& block) const {
+    if (options_.blockTags == nullptr) {
+        return std::nullopt;
+    }
+    return world::realBlockTags::contains(*options_.blockTags, tag, block);
+}
+
 void MobActionSystem::teleported(ServerEntity& mob) {
     world::LoadedWorld* world = worldOf(mob);
     if (world == nullptr) {

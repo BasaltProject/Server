@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
+#include <basalt/server/runtime/world/DecoratedPots.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/Geysers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -239,6 +240,9 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
                 data.putBoolean("auto", *mode == world::commandBlocks::Mode::Repeating);
                 data.putBoolean("TrackOutput", world.gameRules().get(world::gameRules::kSendCommandFeedback));
             }
+            if (world::decoratedPots::isPot(placedBlock.path())) {
+                world::decoratedPots::decorate(data, held.components);
+            }
             chunk->setBlockEntity(server::world::ChunkBlockEntity{placeAt.x & 15, placeAt.y, placeAt.z & 15,
                                                                   placedBlock, std::move(data)});
             if (mode.has_value()) {
@@ -315,8 +319,18 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
     }
     // parity: `GameEvent.BLOCK_PLACE`, thirteen: a block going down is louder than one coming up.
     heardBySculk(context.blocks, world, "block_place", placeAt.x, placeAt.y, placeAt.z, {.entity = player.uuid()});
-    if (world::signs::isSign(blockStateId) && context.openSign) {
-        context.openSign(*session, placeAt.x, placeAt.y, placeAt.z, blockStateId);
+    // parity: `SignBlockEntity.applyImplicitComponents`, then `SignBlock.setPlacedBy`, which only
+    // opens the editor on a sign that is not waxed and whose front a player could have typed.
+    if (const std::optional<Identifier> signType = world::signs::typeOf(blockStateId); signType.has_value()) {
+        const wire::nbt::NbtCompound data = world::signs::withComponents(world::signs::emptyData(), held.components);
+        if (server::world::Chunk* chunk = world.state().chunkIfLoaded(placeAt.x >> 4, placeAt.z >> 4);
+            chunk != nullptr) {
+            chunk->setBlockEntity(
+                world::signs::blockEntity(placeAt.x & 15, placeAt.y, placeAt.z & 15, *signType, data));
+        }
+        if (context.openSign && !world::signs::isWaxed(data) && world::signs::hasEditableText(data, true)) {
+            context.openSign(*session, placeAt.x, placeAt.y, placeAt.z, blockStateId);
+        }
     }
     return true;
 }

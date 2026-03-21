@@ -25,6 +25,7 @@
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
+#include <basalt/server/runtime/world/BlockTransformers.hpp>
 #include <basalt/server/runtime/world/BoneMeal.hpp>
 #include <basalt/server/runtime/world/Buckets.hpp>
 #include <basalt/server/runtime/world/Campfires.hpp>
@@ -450,6 +451,19 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         awardItemUsedOn(*session, clickedState, *heldBlock);
         ack();
         return;
+    }
+    // parity: `Item.useOn` over the `block_transformer` a hoe or a shovel carries: tilling and paths.
+    if (held.has_value() && heldBlock.has_value() && owner_->options().blockTransformers != nullptr &&
+        (heldBlock->path().ends_with("_hoe") || heldBlock->path().ends_with("_shovel"))) {
+        const std::optional<Identifier> transformer = world::RealBlockTransformers::defaultFor(*heldBlock);
+        world::LoadedWorld* here = owner_->currentWorld();
+        if (transformer.has_value() && here != nullptr &&
+            player::transformBlockFor(breakContext(), *session, *here, *owner_->options().blockTransformers,
+                                      *transformer, hit.pos.x, hit.pos.y, hit.pos.z, hit.direction, heldSlot, *held)) {
+            awardItemUsedOn(*session, clickedState, *heldBlock);
+            ack();
+            return;
+        }
     }
     if (held.has_value() && heldBlock->path().ends_with("_axe") && useAxe(*session, hit.pos, heldSlot, *held)) {
         awardItemUsedOn(*session, clickedState, *heldBlock);

@@ -20,6 +20,7 @@
 #include <basalt/server/runtime/command/commands/ScoreCommands.hpp>
 #include <basalt/server/runtime/command/commands/ScoreboardCommand.hpp>
 #include <basalt/server/runtime/command/commands/SessionCommands.hpp>
+#include <basalt/server/runtime/command/commands/PostEffectCommand.hpp>
 #include <basalt/server/runtime/command/commands/StopwatchCommand.hpp>
 #include <basalt/server/runtime/command/commands/TagCommand.hpp>
 #include <basalt/server/runtime/command/commands/TeamCommand.hpp>
@@ -83,6 +84,7 @@ std::vector<std::shared_ptr<const Command>> vanillaCommands(const VanillaCommand
     add(std::make_shared<commands::MsgCommand>());
     add(std::make_shared<commands::TitleCommand>());
     add(std::make_shared<commands::TagCommand>());
+    add(std::make_shared<commands::PostEffectCommand>());
     add(std::make_shared<commands::EffectCommand>());
     add(std::make_shared<commands::ParticleCommand>());
     add(std::make_shared<commands::StopSoundCommand>());

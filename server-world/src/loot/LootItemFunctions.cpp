@@ -13,6 +13,9 @@
 namespace basalt::server::world::loot {
 namespace {
 
+/// parity: `DataComponents.ADDITIONAL_TRADE_COST`, which a villager takes off again as it prices.
+constexpr std::string_view kAdditionalTradeCost = "minecraft:additional_trade_cost";
+
 using wire::common::Identifier;
 using wire::nbt::NbtCompound;
 using wire::nbt::NbtList;
@@ -275,6 +278,10 @@ ItemStack LootFunction::enchant(ItemStack stack, random::RandomSource& random, c
         NbtCompound levels = levelsOf(stack);
         upgrade(levels, picked->id, level);
         storeLevels(stack, std::move(levels));
+        // parity: `EnchantRandomlyFunction.enchantItem`'s price, rolled after the level.
+        if (additionalCost_ && context.additionalCostAllowed) {
+            stack.components.putInt(kAdditionalTradeCost, 2 + random.nextInt(5 + (level * 10)) + (3 * level));
+        }
         return stack;
     }
     // parity: `EnchantmentHelper.enchantItem`.
@@ -283,14 +290,17 @@ ItemStack LootFunction::enchant(ItemStack stack, random::RandomSource& random, c
     if (isBook(stack.item)) {
         stack = ItemStack{.item = Identifier::vanilla("enchanted_book"), .count = 1};
     }
-    if (picks.empty()) {
-        return stack;
+    if (!picks.empty()) {
+        NbtCompound levels = levelsOf(stack);
+        for (const Pick& pick : picks) {
+            upgrade(levels, pick.entry->id, pick.level);
+        }
+        storeLevels(stack, std::move(levels));
     }
-    NbtCompound levels = levelsOf(stack);
-    for (const Pick& pick : picks) {
-        upgrade(levels, pick.entry->id, pick.level);
+    // parity: `EnchantWithLevelsFunction.run` prices the levels it spent into a trade.
+    if (additionalCost_ && context.additionalCostAllowed && stack.count > 0 && cost > 0) {
+        stack.components.putInt(kAdditionalTradeCost, cost);
     }
-    storeLevels(stack, std::move(levels));
     return stack;
 }
 

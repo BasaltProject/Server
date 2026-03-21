@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
+#include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/RealEntityTypeTags.hpp>
 #include <basalt/server/world/loot/Loot.hpp>
@@ -84,6 +85,8 @@ public:
         const world::RealRecipes* recipes = nullptr;
         /// The damage type tags, which a death roll asks about what killed it.
         const world::realDamageTypeTags::TagMembers* damageTypeTags = nullptr;
+        /// The block tags, which decide where a mob may teleport to.
+        const world::realBlockTags::TagMembers* blockTags = nullptr;
     };
 
     /// Which worlds a mob might be in, since a goal only ever hands over the mob itself.
@@ -128,6 +131,9 @@ public:
     void setSleeping(entity::ServerEntity& mob, bool sleeping) override;
 
     void teleported(entity::ServerEntity& mob) override;
+
+    [[nodiscard]] std::optional<bool> blockTagged(std::string_view tag,
+                                                  const wire::common::Identifier& block) const override;
 
     void shootArrow(entity::ServerEntity& mob, double targetX, double targetY, double targetZ, float power) override;
 

@@ -96,6 +96,7 @@ basalt_module(server-runtime-core
         src/command/commands/SaveCommands.cpp
         src/command/commands/StopwatchCommand.cpp
         src/command/commands/TagCommand.cpp
+        src/command/commands/PostEffectCommand.cpp
         src/command/commands/TestCommand.cpp
         src/command/commands/TeamCommand.cpp
         src/command/commands/TeleportCommand.cpp
@@ -314,6 +315,7 @@ basalt_module(server-runtime-core
         src/world/RealTimelines.cpp
         src/world/StructureTemplates.cpp
         src/world/BlockPlacement.cpp
+        src/world/BlockTransformers.cpp
         src/world/RealRecipes.cpp
         src/world/PlacementVariants.cpp
         src/world/PistonSlide.cpp

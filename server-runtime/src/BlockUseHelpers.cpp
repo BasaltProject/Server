@@ -105,7 +105,9 @@ void BlockInteractionHandler::openNewSign(const BlockPos& pos, std::int32_t stat
     if (!type.has_value() || chunk == nullptr) {
         return;
     }
-    chunk->setBlockEntity(world::signs::blockEntity(pos.x & 15, pos.y, pos.z & 15, *type));
+    if (chunk->blockEntityAt(pos.x & 15, pos.y, pos.z & 15) == nullptr) {
+        chunk->setBlockEntity(world::signs::blockEntity(pos.x & 15, pos.y, pos.z & 15, *type));
+    }
     owner_->sendCompressed(play::OpenSignEditorPacket::kId, [&pos](wire::io::ByteBuffer& buffer) {
         play::OpenSignEditorPacket{.pos = pos, .isFrontText = true}.write(buffer);
     });
@@ -116,11 +118,20 @@ bool BlockInteractionHandler::editSign(const BlockPos& pos) {
     server::world::Chunk* chunk = world == nullptr ? nullptr : world->state().chunkIfLoaded(pos.x >> 4, pos.z >> 4);
     const server::world::ChunkBlockEntity* existing =
         chunk == nullptr ? nullptr : chunk->blockEntityAt(pos.x & 15, pos.y, pos.z & 15);
-    if (existing == nullptr || world::signs::isWaxed(existing->data())) {
+    PlayerSession* session = owner_->playerSession();
+    const std::optional<std::int32_t> stateId =
+        world == nullptr ? std::nullopt : world->state().blockState(pos.x, pos.y, pos.z);
+    if (existing == nullptr || session == nullptr || !stateId.has_value() || world::signs::isWaxed(existing->data())) {
         return false;
     }
-    owner_->sendCompressed(play::OpenSignEditorPacket::kId, [&pos](wire::io::ByteBuffer& buffer) {
-        play::OpenSignEditorPacket{.pos = pos, .isFrontText = true}.write(buffer);
+    // parity: `SignBlock.useWithoutItem`: the side the player is facing, and only while a player
+    // could have typed what is on it.
+    const bool front = world::signs::facesFront(*stateId, pos.x, pos.z, session->x, session->z);
+    if (!world::signs::hasEditableText(existing->data(), front)) {
+        return false;
+    }
+    owner_->sendCompressed(play::OpenSignEditorPacket::kId, [&pos, front](wire::io::ByteBuffer& buffer) {
+        play::OpenSignEditorPacket{.pos = pos, .isFrontText = front}.write(buffer);
     });
     return true;
 }
