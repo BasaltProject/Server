@@ -11,4 +11,8 @@ namespace basalt::server::runtime::bedrock {
 /// its own here has to be told separately over there.
 [[nodiscard]] std::optional<std::uint8_t> bedColourOf(std::int32_t stateId);
 
+/// The dye colour of a banner block state, standing or on a wall, or nothing when that state is not
+/// a banner. Same reason as a bed: sixteen blocks here, one block and a tag over there.
+[[nodiscard]] std::optional<std::uint8_t> bannerColourOf(std::int32_t stateId);
+
 } // namespace basalt::server::runtime::bedrock
