@@ -14,10 +14,8 @@ namespace basalt::server::runtime::world {
 
 /// Which state a block goes down as: facing somewhere, on its side, upside down.
 ///
-/// parity: each block's own `getStateForPlacement`, told apart by the properties the block really
-/// has plus the lists inside for the ones that break their family's rule.
-///
-/// Nothing here reads the world back for support, so no block refuses a spot it cannot hold on to.
+/// parity: each block's own `getStateForPlacement`, told apart by the block's real properties plus
+/// lists for the ones that break their family's rule. No block refuses a spot for lack of support.
 namespace blockPlacement {
 
 /// A box, as the six numbers an obstruction test compares: min x, y, z then max x, y, z.
@@ -49,6 +47,10 @@ struct Placement {
     std::int32_t y = 0;
     std::int32_t z = 0;
 };
+
+/// parity: `BlockPlaceContext.getNearestLookingDirections`, for a block placed against `clickedFace`.
+[[nodiscard]] std::array<wire::protocol::play::Direction, 6>
+nearestLookingDirections(float yaw, float pitch, wire::protocol::play::Direction clickedFace);
 
 /// The state `block` should be placed in, or `defaultStateId` when nothing about it orients.
 [[nodiscard]] std::int32_t stateFor(const wire::common::Identifier& block, std::int32_t defaultStateId,
@@ -86,10 +88,8 @@ namespace wallVariants {
 
 /// Where a scaffolding really lands.
 ///
-/// parity: `ScaffoldingBlockItem.updatePlacementContext`, the one placement rule that lives in the
-/// item and not in the block: clicking an existing scaffolding walks along the tower until it finds
-/// room, up instead of sideways unless the player is sneaking, and refuses altogether when the
-/// column has run its seven blocks out.
+/// parity: `ScaffoldingBlockItem.updatePlacementContext`, a rule in the item, not the block: clicking
+/// a scaffolding walks the tower to free room, up (sideways when sneaking), refusing past seven blocks.
 namespace scaffoldingPlacement {
 
 /// parity: `ScaffoldingBlock.STABILITY_MAX_DISTANCE`.

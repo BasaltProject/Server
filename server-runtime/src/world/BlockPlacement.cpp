@@ -62,6 +62,16 @@ constexpr auto kPlayerFacingSuffixes = std::to_array<std::string_view>({"_stairs
 constexpr auto kGrowingHeads =
     std::to_array<std::string_view>({"kelp", "twisting_vines", "weeping_vines", "cave_vines"});
 
+/// parity: `Mth.sin`'s 65,536-entry table; a quarter of it on is the cosine.
+constexpr double kSinScale = 10430.378350470453;
+constexpr std::int64_t kQuarterTable = 16384;
+
+[[nodiscard]] float tableSin(float radians, std::int64_t offset) {
+    const std::int64_t index =
+        (static_cast<std::int64_t>((static_cast<double>(radians) * kSinScale) + static_cast<double>(offset))) & 65535;
+    return static_cast<float>(std::sin(static_cast<double>(index) / kSinScale));
+}
+
 [[nodiscard]] std::string_view nameOf(Direction face) {
     switch (face) {
     case Direction::Down:
@@ -400,6 +410,21 @@ constexpr auto kGrowingHeads =
             properties["facing"] = nameOf(opposite(placement.face));
         }
     }
+    // parity: `ShelfMushroomBlock.getStateForPlacement`: the first horizontal looking direction with a
+    // sturdy face to hang from, the mushroom facing back out of it.
+    if (path == "shelf_mushroom" && world != nullptr) {
+        for (const Direction looking : nearestLookingDirections(placement.yaw, placement.pitch, placement.face)) {
+            if (looking == Direction::Up || looking == Direction::Down) {
+                continue;
+            }
+            const Direction facing = opposite(looking);
+            const std::int32_t support = stateAt(*world, x + stepX(looking), y, z + stepZ(looking));
+            if (registry::blockShapes::isFaceSturdy(support, static_cast<registry::BlockFace>(facing))) {
+                properties["facing"] = nameOf(facing);
+                break;
+            }
+        }
+    }
     // parity: `MangrovePropaguleBlock`, which a player always plants grown.
     if (path == "mangrove_propagule") {
         properties["age"] = "4";
@@ -468,6 +493,48 @@ Direction nearestLooking(float yaw, float pitch) {
         return x > 0 ? Direction::East : Direction::West;
     }
     return z > 0 ? Direction::South : Direction::North;
+}
+
+std::array<Direction, 6> nearestLookingDirections(float yaw, float pitch, Direction clickedFace) {
+    // parity: `Direction.orderedByNearest`, over `Mth.sin`'s table as vanilla works it out.
+    constexpr float kDegreesToRadians = std::numbers::pi_v<float> / static_cast<float>(kHalfTurn);
+    const float pitchRadians = pitch * kDegreesToRadians;
+    const float yawRadians = -yaw * kDegreesToRadians;
+    const float pitchSin = tableSin(pitchRadians, 0);
+    const float pitchCos = tableSin(pitchRadians, kQuarterTable);
+    const float yawSin = tableSin(yawRadians, 0);
+    const float yawCos = tableSin(yawRadians, kQuarterTable);
+    const bool xPositive = yawSin > 0.0F;
+    const bool yPositive = pitchSin < 0.0F;
+    const bool zPositive = yawCos > 0.0F;
+    const float xYaw = xPositive ? yawSin : -yawSin;
+    const float yMagnitude = yPositive ? -pitchSin : pitchSin;
+    const float zYaw = zPositive ? yawCos : -yawCos;
+    const float xMagnitude = xYaw * pitchCos;
+    const float zMagnitude = zYaw * pitchCos;
+    const Direction axisX = xPositive ? Direction::East : Direction::West;
+    const Direction axisY = yPositive ? Direction::Up : Direction::Down;
+    const Direction axisZ = zPositive ? Direction::South : Direction::North;
+    const auto ordered = [](Direction first, Direction second, Direction third) {
+        return std::array<Direction, 6>{first, second, third, opposite(third), opposite(second), opposite(first)};
+    };
+    std::array<Direction, 6> directions{};
+    if (xYaw > zYaw) {
+        if (yMagnitude > xMagnitude) {
+            directions = ordered(axisY, axisX, axisZ);
+        } else {
+            directions = zMagnitude > yMagnitude ? ordered(axisX, axisZ, axisY) : ordered(axisX, axisY, axisZ);
+        }
+    } else if (yMagnitude > zMagnitude) {
+        directions = ordered(axisY, axisZ, axisX);
+    } else {
+        directions = xMagnitude > yMagnitude ? ordered(axisZ, axisX, axisY) : ordered(axisZ, axisY, axisX);
+    }
+    // parity: `BlockPlaceContext.getNearestLookingDirections` moves the clicked block's direction to
+    // the front, which is the placement case every item use here is.
+    const auto into = std::ranges::find(directions, opposite(clickedFace));
+    std::rotate(directions.begin(), into, std::next(into));
+    return directions;
 }
 
 std::int32_t stateFor(const wire::common::Identifier& block, std::int32_t givenDefault, const Placement& placement,

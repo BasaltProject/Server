@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 using namespace basalt::server::runtime::world;
 using basalt::server::world::crafting::Cooker;
@@ -438,11 +439,12 @@ TEST_CASE("a furnace saved mid-smelt comes back the way it went in") {
     nbt::NbtCompound data;
     furnaces::write(state, data);
 
-    // parity: vanilla writes the four counters as shorts, so an imported world reads back the same.
-    CHECK(data.getShort("lit_time_remaining") == 1234);
-    CHECK(data.getShort("lit_total_time") == 1600);
-    CHECK(data.getShort("cooking_time_spent") == 77);
-    CHECK(data.getShort("cooking_total_time") == 200);
+    // parity: 26.3 writes the four counters as ints, and the speed beside them.
+    CHECK(data.getInt("lit_time_remaining") == 1234);
+    CHECK(data.getInt("lit_total_time") == 1600);
+    CHECK(data.getInt("cooking_time_spent") == 77);
+    CHECK(data.getInt("cooking_total_time") == 200);
+    CHECK(data.getFloat("speed_multiplier") == 1.0F);
 
     const furnaces::State back = furnaces::read(data);
     CHECK(back.litTimeRemaining == 1234);
@@ -454,6 +456,50 @@ TEST_CASE("a furnace saved mid-smelt comes back the way it went in") {
     CHECK(back.items[furnaces::kFuelSlot]->item == item("coal"));
     CHECK(back.items[furnaces::kFuelSlot]->count == 5);
     CHECK(back.items[furnaces::kResultSlot]->count == 7);
+}
+
+TEST_CASE("a furnace saved by 26.2 with short counters still reads them") {
+    nbt::NbtCompound data;
+    data.putShort("lit_time_remaining", 50);
+    data.putShort("cooking_time_spent", 9);
+    const furnaces::State state = furnaces::read(data);
+    CHECK(state.litTimeRemaining == 50);
+    CHECK(state.cookingTimer == 9);
+    CHECK(state.speedMultiplier == 1.0F);
+}
+
+TEST_CASE("a smoker burns fuel for half as long and cooks twice as fast") {
+    // parity: `cooking/time_coal` and `cooking/speed_default` under `block/fast_cooking`.
+    CHECK(furnaces::fuelEffect(item("coal"), Cooker::Smelting).burnTicks == kCoalTicks);
+    CHECK(furnaces::fuelEffect(item("coal"), Cooker::Smoking).burnTicks == kCoalTicks / 2);
+    CHECK(furnaces::fuelEffect(item("coal"), Cooker::Blasting).speedMultiplier == 2.0F);
+    CHECK(furnaces::fuelEffect(item("coal"), Cooker::Smelting).speedMultiplier == 1.0F);
+    CHECK(furnaces::fuelEffect(item("stone"), Cooker::Smoking).burnTicks == 0);
+
+    // Half way through at the plain speed, the smoker's fuel halves what is left to go.
+    furnaces::State state = beefAndCoal();
+    state.cookingTimer = 100;
+    const Recipe recipe = cooking("cooked_beef");
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef"), furnaces::kDefaultStackSize, Cooker::Smoking).moved);
+    CHECK(state.litTimeRemaining == kCoalTicks / 2);
+    CHECK(state.speedMultiplier == 2.0F);
+    CHECK(state.cookingTotalTime == 100);
+    // parity: `ceil(100 / 200 * 100)` is 50, then the tick's own step.
+    CHECK(state.cookingTimer == 51);
+    CHECK(furnaces::cookTimeFor(state, bookOf(recipe, "beef")) == 100);
+}
+
+TEST_CASE("fuel left in the slot drops the remainder rather than keeping it") {
+    furnaces::State state = beefAndCoal();
+    state.items[furnaces::kFuelSlot] = stack("lava_bucket", 2);
+    const Recipe recipe = cooking("cooked_beef");
+    std::vector<ItemStack> dropped;
+    CHECK(furnaces::tick(state, bookOf(recipe, "beef"), furnaces::kDefaultStackSize, Cooker::Smelting,
+                         [&dropped](const ItemStack& remainder) { dropped.push_back(remainder); })
+              .moved);
+    REQUIRE(dropped.size() == 1);
+    CHECK(dropped.front().item == item("bucket"));
+    CHECK(state.items[furnaces::kFuelSlot]->item == item("lava_bucket"));
 }
 
 TEST_CASE("a furnace that was never saved reads as a cold empty one") {

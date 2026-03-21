@@ -109,6 +109,8 @@ Menu Menu::crafter(std::int32_t containerId) { return Menu{containerId, 0, 0, bl
 
 Menu Menu::furnace(std::int32_t containerId) { return Menu{containerId, 0, 0, blockWindow(3)}; }
 
+Menu Menu::brewingStand(std::int32_t containerId) { return Menu{containerId, 0, 0, blockWindow(5)}; }
+
 Menu Menu::craftingTable(std::int32_t containerId) {
     std::vector<std::optional<MenuSlot>> slots;
     slots.reserve(kSlotCount);

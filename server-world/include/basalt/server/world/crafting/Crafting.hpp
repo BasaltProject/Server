@@ -78,7 +78,7 @@ enum class SpecialKind : std::uint8_t {
     DecoratedPot,
 };
 
-enum class RecipeKind : std::uint8_t { Shaped, Shapeless, Cooking, Stonecutting, Smithing, Special };
+enum class RecipeKind : std::uint8_t { Shaped, Shapeless, Cooking, Stonecutting, Smithing, Special, Brewing };
 
 /// A recipe: the two ingredient-based crafting-table types, the four cooking ones, the stonecutter's,
 /// the two smithing ones and the eleven special ones, whose rule is code because their ingredients
@@ -109,6 +109,10 @@ struct Recipe {
     Ingredient base;
     Ingredient addition;
     std::optional<wire::common::Identifier> trimPattern;
+
+    /// Brewing: the bottle in `base`, the potions it may hold (ids or one `#tag`, empty for any), and
+    /// the reagent in `ingredient`. parity: 26.3 `BrewingRecipe`, whose output is `result`.
+    std::vector<std::string> potions;
 
     /// Special: the rule, plus whichever of its ingredient fields the file carries.
     SpecialKind specialKind = SpecialKind::RepairItem;

@@ -6,14 +6,19 @@
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/player/PlayerSpawnItems.hpp>
+#include <basalt/server/runtime/world/Cushions.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
+#include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/ItemFrames.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/Paintings.hpp>
 #include <basalt/server/runtime/world/Rails.hpp>
+#include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 
+#include <cmath>
 #include <map>
 #include <memory>
 #include <optional>
@@ -216,6 +221,79 @@ bool hangFrameFor(const BreakContext& context, PlayerSession& player, world::Loa
     world.state().spawnEntity(std::move(frame));
     // parity: `GameEvent.ENTITY_PLACE` from where the frame ended up.
     world::vibrations::emit(world.state(), "entity_place", hangs[0], hangs[1], hangs[2], world.gameTime());
+    if (player.gamemode == Gamemode::Creative) {
+        return true;
+    }
+    storage::StoredItemStack left = held;
+    left.count = held.count - 1;
+    player.inventory.set(heldSlot, held.count <= 1 ? std::nullopt : std::optional{left});
+    if (context.slotChanged) {
+        context.slotChanged(player, heldSlot);
+    }
+    return true;
+}
+
+bool placeCushionFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world,
+                     const std::string_view colour, const std::int32_t heldSlot, const storage::StoredItemStack& held,
+                     const BlockHit& hit) {
+    const reg::EntityTypeEntry* entry = reg::entityTypes::of(world::cushions::type());
+    const std::optional<std::int32_t> clicked = world.state().blockState(hit.x, hit.y, hit.z);
+    if (entry == nullptr || context.registry == nullptr || !clicked.has_value()) {
+        return false;
+    }
+    const world::cushions::Tagged tagged = [&context](std::string_view tag, const Identifier& block) {
+        return context.blockTags != nullptr && world::realBlockTags::contains(*context.blockTags, tag, block);
+    };
+    bool onTop = hit.direction == wire::protocol::play::Direction::Up;
+    double clickY = hit.y + static_cast<double>(hit.clickY);
+    // parity: `recalculateContextForSpecialCollisionShapes`: a hollow block is aimed at through its
+    // collision, so a cushion goes down inside a cauldron rather than on its rim.
+    const Identifier* clickedBlock = reg::blockStateDefinitions::blockOf(*clicked);
+    if (clickedBlock != nullptr && tagged("minecraft:cushion_uses_collision_shape", *clickedBlock)) {
+        const std::array<double, 3> eye{player.x, player.y + world::fluids::eyeHeight(player.sneaking), player.z};
+        const std::array<double, 3> at{hit.x + static_cast<double>(hit.clickX), clickY,
+                                       hit.z + static_cast<double>(hit.clickZ)};
+        const std::array<double, 3> ray{at[0] - eye[0], at[1] - eye[1], at[2] - eye[2]};
+        const double length = std::sqrt((ray[0] * ray[0]) + (ray[1] * ray[1]) + (ray[2] * ray[2]));
+        if (length > 0.0) {
+            constexpr double kBeyond = 0.001;
+            const std::array<double, 3> to{at[0] + (ray[0] / length * kBeyond), at[1] + (ray[1] / length * kBeyond),
+                                           at[2] + (ray[2] / length * kBeyond)};
+            if (const std::optional<world::cushions::Clip> inside =
+                    world::cushions::clipCollision(*clicked, hit.x, hit.y, hit.z, eye, to);
+                inside.has_value()) {
+                onTop = inside->up;
+                clickY = inside->y;
+            }
+        }
+    }
+    if (!onTop) {
+        return false;
+    }
+    // parity: `BlockPlaceContext.getClickedPos`, the clicked block when it would be replaced.
+    const bool replaced = reg::blockShapes::isReplaceable(*clicked);
+    const std::array<std::int32_t, 3> square = replaced ? std::array<std::int32_t, 3>{hit.x, hit.y, hit.z}
+                                                        : std::array<std::int32_t, 3>{hit.x, hit.y + 1, hit.z};
+    const double x = square[0] + 0.5;
+    const double z = square[2] + 0.5;
+    if (!world::cushions::canBePlacedAt(world.state(), x, clickY, z, tagged) ||
+        world::cushions::occupied(world.state(), x, clickY, z)) {
+        return false;
+    }
+    auto cushion = std::make_unique<entity::ServerEntity>(
+        context.registry->allocateEntityId(), wire::common::Uuid::random(), world::cushions::type(), entry->protocolId,
+        x, clickY, z, world::cushions::snappedYaw(player.yaw), 0.0F);
+    wire::nbt::NbtCompound tag = world::cushions::freshTag(colour, square);
+    if (const wire::nbt::NbtTag* name = held.components.find("minecraft:custom_name"); name != nullptr) {
+        tag.set("CustomName", *name);
+    }
+    cushion->sourceNbt = std::move(tag);
+    world.state().spawnEntity(std::move(cushion));
+    for (const PlayerSession* listener : playersIn(context, world.name())) {
+        playSoundFor(*listener, "minecraft:entity.cushion.place", wire::protocol::play::SoundSource::Blocks, x, clickY,
+                     z, 0.75F, 0.8F, context.nextSeed ? context.nextSeed() : 0);
+    }
+    world::vibrations::emit(world.state(), "entity_place", x, clickY, z, world.gameTime(), {.entity = player.uuid()});
     if (player.gamemode == Gamemode::Creative) {
         return true;
     }

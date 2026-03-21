@@ -145,6 +145,7 @@ basalt_module(server-runtime-core
         src/ContainerAnvil.cpp
         src/ContainerBeacon.cpp
         src/ContainerLoom.cpp
+        src/ContainerBrewing.cpp
         src/ContainerGrindstone.cpp
         src/ContainerEnchantment.cpp
         src/ContainerSlots.cpp
@@ -375,6 +376,7 @@ basalt_module(server-runtime-core
         src/world/DecoratedPots.cpp
         src/world/DetectorRails.cpp
         src/world/Crafters.cpp
+        src/world/Cushions.cpp
         src/world/DaylightDetectors.cpp
         src/world/DoubleChests.cpp
         src/world/DripstoneGrowth.cpp

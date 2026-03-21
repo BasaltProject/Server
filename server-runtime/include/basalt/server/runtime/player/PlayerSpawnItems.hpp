@@ -5,6 +5,7 @@
 #include <basalt/wire/common/Identifier.hpp>
 
 #include <cstdint>
+#include <string_view>
 
 namespace basalt::server::runtime::world {
 class LoadedWorld;
@@ -37,6 +38,11 @@ bool placeEndCrystalFor(const BreakContext& context, PlayerSession& player, worl
 bool hangFrameFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world,
                   const wire::common::Identifier& type, std::int32_t heldSlot, const storage::StoredItemStack& held,
                   const BlockHit& hit);
+
+/// Puts a cushion down on top of the block that was clicked. parity: `CushionItem.useOn`.
+bool placeCushionFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world,
+                     std::string_view colour, std::int32_t heldSlot, const storage::StoredItemStack& held,
+                     const BlockHit& hit);
 
 /// Lets a spawn egg out onto the block that was clicked.
 bool useSpawnEggFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world,

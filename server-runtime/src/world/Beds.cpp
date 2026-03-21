@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 
+#include <cmath>
 #include <cstdint>
 #include <map>
 
@@ -24,6 +25,8 @@ std::string_view translationKeyOf(BedProblem problem) {
         return "block.minecraft.bed.no_sleep";
     case BedProblem::TooFarAway:
         return "block.minecraft.bed.too_far_away";
+    case BedProblem::Obstructed:
+        return "block.minecraft.bed.obstructed";
     case BedProblem::Occupied:
         return "block.minecraft.bed.occupied";
     case BedProblem::NotHere:
@@ -71,7 +74,40 @@ std::array<std::int32_t, 3> headOffset(std::int32_t stateId) {
     return {0, 0, 0};
 }
 
-bool explodesIn(config::WorldDimension dimension) { return dimension != config::WorldDimension::Overworld; }
+bool holds(When when, bool darkOutside) {
+    switch (when) {
+    case When::Always:
+        return true;
+    case When::WhenDark:
+        return darkOutside;
+    case When::Never:
+        break;
+    }
+    return false;
+}
+
+Rule ruleFor(config::WorldDimension dimension, bool strawBed) {
+    if (dimension != config::WorldDimension::Overworld) {
+        return Rule{.canSleep = When::Never, .canSetSpawn = When::Never, .destroyOnUse = true};
+    }
+    if (strawBed) {
+        return Rule{.canSleep = When::WhenDark,
+                    .canSetSpawn = When::Never,
+                    .destroyOnLeave = true,
+                    .errorKey = "block.minecraft.bed.no_sleep"};
+    }
+    return Rule{.canSleep = When::WhenDark, .canSetSpawn = When::Always, .errorKey = "block.minecraft.bed.no_sleep"};
+}
+
+bool isStrawBed(std::int32_t stateId) {
+    const wire::common::Identifier* id = registry::blockStateDefinitions::blockOf(stateId);
+    return id != nullptr && id->path() == "straw_bed";
+}
+
+bool reachable(double x, double y, double z, std::int32_t bedX, std::int32_t bedY, std::int32_t bedZ) {
+    return std::abs(x - (bedX + 0.5)) <= kRange && std::abs(y - bedY) <= kVerticalRange &&
+           std::abs(z - (bedZ + 0.5)) <= kRange;
+}
 
 bool isNight(std::int64_t timeOfDay) {
     const std::int64_t inDay = timeOfDay % kDayTicks;

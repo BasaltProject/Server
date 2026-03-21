@@ -93,6 +93,9 @@ private:
     /// and stays on the wall, and an empty one comes off.
     void breakFrame(player::PlayerSession& session, entity::ServerEntity& frame);
 
+    /// parity: `Cushion.hurtServer`: any hit takes it off, and a survival player gets it back.
+    void breakCushion(player::PlayerSession& session, entity::ServerEntity& cushion);
+
     /// The item and the turn a frame is showing, sent to everyone who can see it.
     void broadcastFrame(const entity::ServerEntity& frame);
 

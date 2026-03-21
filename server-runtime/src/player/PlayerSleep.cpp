@@ -1,8 +1,12 @@
+#include <basalt/server/registry/BlockShapes.hpp>
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSleep.hpp>
+#include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/text/Component.hpp>
 
@@ -13,10 +17,32 @@ namespace basalt::server::runtime::player {
 namespace {
 
 /// Says why the bed refused, on that player's own screen.
-void refuse(PlayerSession& player, const world::BedProblem problem) {
+void refuse(PlayerSession& player, const std::string_view key) {
     if (player.connection().sendActionBar) {
-        player.connection().sendActionBar(
-            wire::text::Component::translatable(std::string{world::translationKeyOf(problem)}));
+        player.connection().sendActionBar(wire::text::Component::translatable(std::string{key}));
+    }
+}
+
+/// parity: `Player.freeAt` over `isSuffocating`: `causes_suffocation` and a full collision cube.
+[[nodiscard]] bool suffocatesAt(const BreakContext& context, world::LoadedWorld& world, const std::int32_t x,
+                                const std::int32_t y, const std::int32_t z) {
+    const std::optional<std::int32_t> state = world.state().blockState(x, y, z);
+    const wire::common::Identifier* block =
+        state.has_value() ? server::registry::blockStateDefinitions::blockOf(*state) : nullptr;
+    return block != nullptr && context.blockTags != nullptr &&
+           world::realBlockTags::contains(*context.blockTags, "minecraft:causes_suffocation", *block) &&
+           server::registry::blockShapes::isFullCube(*state);
+}
+
+/// parity: `StrawBedBlock.destroyBed`: its sound, then the head gone and the foot after it, no drops.
+void destroyStrawBed(const BreakContext& context, world::LoadedWorld& world, const std::array<std::int32_t, 3>& head) {
+    for (const PlayerSession* listener : playersIn(context, world.name())) {
+        playSoundFor(*listener, "minecraft:block.straw_bed.break_leave", wire::protocol::play::SoundSource::Blocks,
+                     head[0] + 0.5, head[1] + 0.5, head[2] + 0.5, 1.0F, 1.0F,
+                     context.nextSeed ? context.nextSeed() : 0);
+    }
+    for (const world::BlockChange& change : world::beds::destroy(world.state(), head[0], head[1], head[2])) {
+        announceBlock(context, world.name(), change.x, change.y, change.z, change.stateId);
     }
 }
 
@@ -43,40 +69,54 @@ std::optional<world::BedProblem> sleepInBedFor(const SleepContext& context, Play
     if (!headState.has_value() || !world::beds::isBed(*headState)) {
         return world::BedProblem::NotHere;
     }
+    const bool straw = world::beds::isStrawBed(*headState);
+    const world::beds::Rule rule = world::beds::ruleFor(world.declaration().dimension, straw);
 
-    // parity: `BedBlock.useWithoutItem` does not merely refuse in the Nether or the End: it takes
-    // the bed out and sets off an explosion of five where it stood.
-    if (world::beds::explodesIn(world.declaration().dimension)) {
+    // parity: `AbstractBedBlock.useWithoutItem` asks the rule before anything else: a bed that goes
+    // on use goes, a straw bed quietly and any other with an explosion of five where it stood.
+    if (rule.destroyOnUse) {
+        if (!rule.errorKey.empty()) {
+            refuse(player, rule.errorKey);
+        }
+        if (straw) {
+            destroyStrawBed(context.blocks, world, head);
+            return world::BedProblem::NotHere;
+        }
         for (const world::BlockChange& change : world::beds::destroy(world.state(), head[0], head[1], head[2])) {
             announceBlock(context.blocks, world.name(), change.x, change.y, change.z, change.stateId);
-        }
-        if (player.connection().sendActionBar) {
-            player.connection().sendActionBar(wire::text::Component::translatable("block.minecraft.bed.not_valid"));
         }
         if (context.explode) {
             context.explode(world, head[0] + 0.5, head[1] + 0.5, head[2] + 0.5, player.entityId());
         }
         return world::BedProblem::NotHere;
     }
-
-    // parity: `ServerPlayer.startSleepInBed` sets the spawn point once the bed is reachable and
-    // free, and only then asks whether the night allows sleeping.
     if (world::beds::isOccupied(*headState)) {
-        refuse(player, world::BedProblem::Occupied);
+        refuse(player, world::translationKeyOf(world::BedProblem::Occupied));
         return world::BedProblem::Occupied;
     }
-    const double dx = player.x - (head[0] + 0.5);
-    const double dy = player.y - head[1];
-    const double dz = player.z - (head[2] + 0.5);
-    if ((dx * dx) + (dy * dy) + (dz * dz) > world::beds::kRange * world::beds::kRange) {
-        refuse(player, world::BedProblem::TooFarAway);
+
+    // parity: `ServerPlayer.startSleepInBed`: reach, then room above both halves, then the spawn
+    // point, and only then whether the rule lets anyone sleep.
+    const std::array<std::int32_t, 3> foot{head[0] - step[0], head[1] - step[1], head[2] - step[2]};
+    if (!world::beds::reachable(player.x, player.y, player.z, head[0], head[1], head[2]) &&
+        !world::beds::reachable(player.x, player.y, player.z, foot[0], foot[1], foot[2])) {
+        refuse(player, world::translationKeyOf(world::BedProblem::TooFarAway));
         return world::BedProblem::TooFarAway;
     }
-    if (context.setSpawn) {
+    if (suffocatesAt(context.blocks, world, head[0], head[1] + 1, head[2]) ||
+        suffocatesAt(context.blocks, world, foot[0], foot[1] + 1, foot[2])) {
+        refuse(player, world::translationKeyOf(world::BedProblem::Obstructed));
+        return world::BedProblem::Obstructed;
+    }
+    const bool dark = world::beds::isNight(world.clock().totalTicks()) || world.weather().thundering;
+    const bool setsSpawn = world::beds::holds(rule.canSetSpawn, dark);
+    if (setsSpawn && context.setSpawn) {
         context.setSpawn(player, head[0], head[1], head[2]);
     }
-    if (!world::beds::isNight(world.clock().totalTicks()) && !world.weather().thundering) {
-        refuse(player, world::BedProblem::NotPossibleNow);
+    if (!world::beds::holds(rule.canSleep, dark)) {
+        if (!rule.errorKey.empty()) {
+            refuse(player, rule.errorKey);
+        }
         return world::BedProblem::NotPossibleNow;
     }
 
@@ -89,9 +129,10 @@ std::optional<world::BedProblem> sleepInBedFor(const SleepContext& context, Play
     player.sleepingBed = head;
     player.sleepTicks = 0;
     player.stats.reset(storage::stats::timeSinceRest());
-    // parity: `ServerPlayer.startSleepInBed` raises it on the success branch, so a bed that refused
-    // the player grants nothing.
-    if (context.blocks.triggers != nullptr) {
+    // parity: `AbstractBedBlock.getSleptInBedStatType`, and `SLEPT_IN_BED` only where the bed is a
+    // spawn point: a straw bed counts the night and grants nothing.
+    player.stats.increment(storage::stats::custom(straw ? "sleep_in_straw_bed" : "sleep_in_bed"));
+    if (setsSpawn && context.blocks.triggers != nullptr) {
         context.blocks.triggers->onSleptInBed(player.name(), player.uuid().toString());
     }
     showSleeping(context.blocks, player, world, head);
@@ -107,6 +148,10 @@ void freeBedAt(const BreakContext& context, world::LoadedWorld& world, const std
     const std::int32_t awake = world::beds::withOccupied(*state, false);
     world.state().setBlockState(x, y, z, awake);
     announceBlock(context, world.name(), x, y, z, awake);
+    // parity: `AbstractBedBlock.onStopSleeping`, which is where a straw bed goes.
+    if (world::beds::ruleFor(world.declaration().dimension, world::beds::isStrawBed(*state)).destroyOnLeave) {
+        destroyStrawBed(context, world, {x, y, z});
+    }
 }
 
 void wakeUpFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld* world) {

@@ -233,7 +233,7 @@ void dropLootFor(const BreakContext& context, world::LoadedWorld& world, const I
     }
 }
 
-std::optional<std::int32_t> meltedIce(const BreakContext&, world::LoadedWorld& world,
+std::optional<std::int32_t> meltedIce(const BreakContext& context, world::LoadedWorld& world,
                                       const std::optional<std::int32_t> broken, const std::int32_t x,
                                       const std::int32_t y, const std::int32_t z) {
     // Silk touch is not read yet, so ice always melts here; the Nether evaporates it as vanilla does.
@@ -243,8 +243,17 @@ std::optional<std::int32_t> meltedIce(const BreakContext&, world::LoadedWorld& w
     if (config::dimensionFacts(world.declaration().dimension).hasCeiling) {
         return std::nullopt;
     }
+    // parity: 26.3 `IceBlock.playerDestroy`: `ice_melts_when_destroyed_above` or a liquid block below.
     const std::optional<std::int32_t> below = world.state().blockState(x, y - 1, z);
-    if (!below.has_value() || !server::world::heightmapMatches(server::world::HeightmapType::MotionBlocking, *below)) {
+    const Identifier* belowBlock = below.has_value() ? reg::blockStateDefinitions::blockOf(*below) : nullptr;
+    if (belowBlock == nullptr) {
+        return std::nullopt;
+    }
+    const bool liquid = belowBlock->path() == "water" || belowBlock->path() == "lava";
+    const bool tagged =
+        context.blockTags != nullptr &&
+        world::realBlockTags::contains(*context.blockTags, "minecraft:ice_melts_when_destroyed_above", *belowBlock);
+    if (!liquid && !tagged) {
         return std::nullopt;
     }
     return reg::blocks::water().stateId;

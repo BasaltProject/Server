@@ -341,6 +341,10 @@ std::optional<world::furnaces::State> ContainerMenuController::furnaceState() co
 }
 
 void ContainerMenuController::syncOpenContainer() {
+    if (brewingStandOpen()) {
+        syncBrewingStand();
+        return;
+    }
     sendFurnaceBars();
     PlayerSession* session = owner_->playerSession();
     const std::optional<world::furnaces::State> state = furnaceState();
@@ -504,6 +508,12 @@ bool ContainerMenuController::accepts(const MenuSlot& target, const storage::Sto
                (item::itemWear::isDamageable(stack) ||
                 stack.components.find(item::itemComponents::kEnchantments) != nullptr ||
                 stack.components.find(item::itemComponents::kStoredEnchantments) != nullptr);
+    }
+    // parity: `BrewingStandMenu`'s potion, ingredient and fuel slots.
+    if (brewingStandOpen()) {
+        const std::optional<Identifier> brewed = parsedOrNothing(stack.id);
+        return brewed.has_value() &&
+               world::containers::acceptsThroughFace(world::brewingStands::block().path(), block->index, *brewed, true);
     }
     if (openBlockSize != world::furnaces::kSize) {
         return true;

@@ -28,11 +28,13 @@ namespace {
 }
 
 /// What the fluid rules read while a bucket pours: the world, its gamerules and where it is.
-[[nodiscard]] world::fluidFlow::Context flowingIn(world::LoadedWorld& world, random::RandomSource& random) {
+[[nodiscard]] world::fluidFlow::Context flowingIn(const BreakContext& context, world::LoadedWorld& world,
+                                                  random::RandomSource& random) {
     return world::fluidFlow::Context{.world = world.state(),
                                      .gameRules = world.gameRules(),
                                      .random = random,
-                                     .ultrawarm = world.declaration().dimension == config::WorldDimension::Nether};
+                                     .ultrawarm = world.declaration().dimension == config::WorldDimension::Nether,
+                                     .blockTags = context.blockTags};
 }
 
 /// What the world owes a bucket that did something: the blocks, their neighbours, the sensor that
@@ -86,7 +88,7 @@ bool useBucketFor(const BreakContext& context, PlayerSession& player, world::Loa
         return true;
     }
     random::RandomSource random = random::RandomSource::legacy(context.nextSeed ? context.nextSeed() : 0);
-    const world::fluidFlow::Context flowing = flowingIn(world, random);
+    const world::fluidFlow::Context flowing = flowingIn(context, world, random);
     const std::optional<world::buckets::Result> result =
         world::buckets::use(flowing, item, player.x, player.y + world::fluids::eyeHeight(player.sneaking), player.z,
                             yaw, pitch, player.gamemode == wire::protocol::play::Gamemode::Creative);
@@ -107,7 +109,7 @@ bool useBucketOnFor(const BreakContext& context, PlayerSession& player, world::L
         return true;
     }
     random::RandomSource random = random::RandomSource::legacy(context.nextSeed ? context.nextSeed() : 0);
-    const world::fluidFlow::Context flowing = flowingIn(world, random);
+    const world::fluidFlow::Context flowing = flowingIn(context, world, random);
     const std::optional<world::buckets::Result> result = world::buckets::useOn(
         flowing, item, x, y, z, face, player.gamemode == wire::protocol::play::Gamemode::Creative);
     if (result.has_value()) {

@@ -161,6 +161,16 @@ TEST_CASE("a brew that stops matching is abandoned, not finished") {
     }
 }
 
+TEST_CASE("a brew whose ingredient is swapped for another is abandoned") {
+    brewingStands::State state = loaded();
+    state.fuel = 5;
+    REQUIRE(brewingStands::tick(state));
+    // parity: `serverTick` compares the slot with the ingredient the brew started on.
+    state.items[brewingStands::kIngredientSlot] = stack("sugar");
+    CHECK(brewingStands::tick(state));
+    CHECK(state.brewTime == 0);
+}
+
 TEST_CASE("a bottle with nothing in it brews nothing") {
     // parity: `PotionBrewing.mix` needs a potion to turn: an empty bottle is not water.
     brewingStands::State state;
@@ -218,6 +228,10 @@ TEST_CASE("a stand goes to disk and comes back the same") {
     brewingStands::State state = loaded();
     state.fuel = 7;
     state.brewTime = 123;
+    state.totalBrewTime = 300;
+    state.totalFuel = 11;
+    state.speedMultiplier = 1.5F;
+    state.ingredient = item("nether_wart");
     state.potions[0] = "awkward";
     // The middle bottle holds nothing, which has to survive the round trip as nothing.
     state.potions[1] = std::nullopt;
@@ -230,6 +244,10 @@ TEST_CASE("a stand goes to disk and comes back the same") {
 
     CHECK(back.fuel == 7);
     CHECK(back.brewTime == 123);
+    CHECK(back.totalBrewTime == 300);
+    CHECK(back.totalFuel == 11);
+    CHECK(back.speedMultiplier == 1.5F);
+    CHECK(back.ingredient == item("nether_wart"));
     CHECK(back.potions[0] == "awkward");
     CHECK_FALSE(back.potions[1].has_value());
     CHECK(back.potions[2] == "strength");
@@ -245,6 +263,9 @@ TEST_CASE("a tag that says nothing about the fire reads as cold") {
 
     CHECK(state.fuel == 0);
     CHECK(state.brewTime == 0);
+    // parity: `getIntOr("total_brew_time", 400)` and `getIntOr("total_fuel", 20)`.
+    CHECK(state.totalBrewTime == registry::brewing::kBrewTime);
+    CHECK(state.totalFuel == registry::brewing::kFuelUses);
     CHECK(state.items.size() == brewingStands::kSize);
 }
 

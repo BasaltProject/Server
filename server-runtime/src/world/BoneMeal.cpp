@@ -21,6 +21,8 @@ constexpr std::int32_t kMostAges = 5;
 constexpr std::array<std::string_view, 7> kByAge{
     "wheat", "carrots", "potatoes", "beetroots", "torchflower_crop", "melon_stem", "pumpkin_stem"};
 
+constexpr std::string_view kShelfMushroom = "shelf_mushroom";
+
 [[nodiscard]] std::string pathOf(std::int32_t stateId) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     return block == nullptr ? std::string{} : std::string{block->path()};
@@ -49,6 +51,10 @@ constexpr std::array<std::string_view, 7> kByAge{
 
 bool grows(const std::int32_t stateId) {
     const std::string path = pathOf(stateId);
+    // parity: `ShelfMushroomBlock.isValidBonemealTarget`, any age short of its last.
+    if (path == kShelfMushroom) {
+        return ageOf(stateId).value_or(1) < 1;
+    }
     if (std::ranges::find(kByAge, path) == kByAge.end()) {
         return false;
     }
@@ -70,7 +76,11 @@ std::optional<BlockChange> apply(WorldState& world, const std::int32_t x, const 
     if (block == nullptr || !age.has_value()) {
         return std::nullopt;
     }
-    const std::int32_t grown = std::min(maxAgeOf(*block), *age + random.nextIntBetweenInclusive(kLeastAges, kMostAges));
+    // parity: `ShelfMushroomBlock.performBonemeal` always succeeds and grows one age, rolling nothing.
+    const std::int32_t grown =
+        block->path() == kShelfMushroom
+            ? *age + 1
+            : std::min(maxAgeOf(*block), *age + random.nextIntBetweenInclusive(kLeastAges, kMostAges));
     const std::optional<std::int32_t> turned =
         registry::blockStateDefinitions::stateIdOf(*block, {{"age", std::to_string(grown)}}, *stateId);
     // parity: `setBlock(pos, state, 2)`, which tells the clients and not the neighbours: growing a

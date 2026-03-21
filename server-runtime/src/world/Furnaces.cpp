@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <string>
 #include <utility>
@@ -20,12 +21,18 @@ constexpr std::size_t kInput = static_cast<std::size_t>(kInputSlot);
 constexpr std::size_t kFuel = static_cast<std::size_t>(kFuelSlot);
 constexpr std::size_t kResult = static_cast<std::size_t>(kResultSlot);
 
-/// parity: `AbstractFurnaceBlockEntity`'s own save keys, which it writes as shorts.
+/// parity: `AbstractFurnaceBlockEntity`'s own save keys, ints since 26.3 where 26.2 wrote shorts.
 constexpr std::string_view kLitRemainingKey = "lit_time_remaining";
 constexpr std::string_view kLitTotalKey = "lit_total_time";
 constexpr std::string_view kCookedKey = "cooking_time_spent";
 constexpr std::string_view kCookTotalKey = "cooking_total_time";
 constexpr std::string_view kRecipesUsedKey = "RecipesUsed";
+constexpr std::string_view kSpeedKey = "speed_multiplier";
+
+/// parity: `cooking/fast_burn_time_reduction_factor` and `cooking/fast_speed_multiplier`, what the
+/// `block/fast_cooking` predicate (a smoker or a blast furnace) picks over the plain 1.
+constexpr std::int32_t kFastBurnDivisor = 2;
+constexpr float kFastSpeed = 2.0F;
 
 /// parity: the two ticks a cooling furnace walks its progress back by.
 constexpr std::int32_t kCoolingStep = 2;
@@ -88,16 +95,42 @@ void burn(State& state, const ItemStack& ingredient, const ItemStack& result) {
     state.items[kInput] = shrink(ingredient);
 }
 
-/// parity: `consumeFuel`: a bucket of lava leaves the bucket behind.
-void consumeFuel(State& state, const ItemStack& fuel) {
+/// parity: `consumeFuel`: the remainder takes the slot when the fuel runs out, and is dropped at
+/// the furnace when there is still fuel left.
+void consumeFuel(State& state, const ItemStack& fuel, const DropRemainder& drop) {
     std::optional<ItemStack> left = shrink(fuel);
-    if (!left.has_value()) {
-        const wire::common::Identifier* remainder = registry::craftingRemainders::of(fuel.item);
-        if (remainder != nullptr) {
-            left = ItemStack{.item = *remainder, .count = 1};
+    const wire::common::Identifier* remainder = registry::craftingRemainders::of(fuel.item);
+    if (remainder != nullptr) {
+        const ItemStack made{.item = *remainder, .count = 1};
+        if (!left.has_value()) {
+            left = made;
+        } else if (drop) {
+            drop(made);
         }
     }
     state.items[kFuel] = std::move(left);
+}
+
+/// parity: `getTotalCookTime(recipe, entity)`, the recipe's time divided by the furnace's speed.
+[[nodiscard]] std::int32_t atSpeed(std::int32_t cookingTime, float speed) {
+    if (speed <= 0.0F) {
+        return cookingTime;
+    }
+    return static_cast<std::int32_t>(std::ceil(static_cast<double>(static_cast<float>(cookingTime) / speed)));
+}
+
+/// parity: `getIntOr`, which since 26.3 reads the counters as ints; a 26.2 save wrote shorts, and
+/// the jar's data fixers widen those, so either is taken.
+[[nodiscard]] std::int32_t counterOf(const wire::nbt::NbtCompound& data, std::string_view key) {
+    const wire::nbt::NbtTag* tag = data.find(key);
+    if (tag == nullptr) {
+        return 0;
+    }
+    if (const std::int32_t* whole = tag->get<std::int32_t>(); whole != nullptr) {
+        return *whole;
+    }
+    const std::int16_t* narrow = tag->get<std::int16_t>();
+    return narrow == nullptr ? 0 : *narrow;
 }
 
 } // namespace
@@ -111,13 +144,27 @@ std::optional<Cooker> cookerFor(std::string_view block) {
     return std::nullopt;
 }
 
+FuelEffect fuelEffect(const wire::common::Identifier& fuel, Cooker cooker) {
+    const std::int32_t plain = registry::fuels::burnTicks(fuel);
+    // parity: no `cooking_fuel` at all reads both providers' defaults, 0 and 1.
+    if (plain <= 0) {
+        return FuelEffect{};
+    }
+    // parity: `cooking/time_*` is `div(ticks, conditional(block/fast_cooking, 2, 1))`, int division,
+    // and `cooking/speed_default` the same condition over 2.0 and 1.0.
+    const bool fast = cooker != Cooker::Smelting;
+    return FuelEffect{.burnTicks = fast ? plain / kFastBurnDivisor : plain,
+                      .speedMultiplier = fast ? kFastSpeed : 1.0F};
+}
+
 std::int32_t cookTimeFor(const State& state, const RecipeFor& recipeFor) {
     const std::optional<ItemStack>& ingredient = state.items[kInput];
     const Recipe* recipe = (ingredient.has_value() && recipeFor) ? recipeFor(*ingredient) : nullptr;
-    return recipe == nullptr ? kDefaultCookTime : recipe->cookingTime;
+    return recipe == nullptr ? kDefaultCookTime : atSpeed(recipe->cookingTime, state.speedMultiplier);
 }
 
-Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize) {
+Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize, Cooker cooker,
+            const DropRemainder& drop) {
     bool moved = false;
     bool changed = false;
     const bool wasLit = state.litTimeRemaining > 0;
@@ -150,11 +197,27 @@ Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize)
             if (recipe != nullptr) {
                 if (recipe->result.count > 0 && canBurn(state, maxStackSize, recipe->result)) {
                     if (!isLit && fuel.has_value()) {
-                        const std::int32_t burnTicks = registry::fuels::burnTicks(fuel->item);
-                        state.litTimeRemaining = burnTicks;
-                        state.litTotalTime = burnTicks;
-                        if (burnTicks > 0) {
-                            consumeFuel(state, *fuel);
+                        const FuelEffect effect = fuelEffect(fuel->item, cooker);
+                        state.litTimeRemaining = effect.burnTicks;
+                        state.litTotalTime = effect.burnTicks;
+                        // parity: 26.3 takes the new fuel's speed even when it does not burn, and
+                        // stretches or shrinks the cook in hand keeping how far along it was.
+                        if (state.speedMultiplier != effect.speedMultiplier) {
+                            moved = true;
+                        }
+                        state.speedMultiplier = effect.speedMultiplier;
+                        if (state.cookingTotalTime > 0 && state.cookingTimer < state.cookingTotalTime) {
+                            const float ratio =
+                                static_cast<float>(state.cookingTimer) / static_cast<float>(state.cookingTotalTime);
+                            const std::int32_t total = atSpeed(recipe->cookingTime, state.speedMultiplier);
+                            const auto timer = static_cast<std::int32_t>(
+                                std::ceil(static_cast<double>(ratio * static_cast<float>(total))));
+                            moved = moved || total != state.cookingTotalTime || timer != state.cookingTimer;
+                            state.cookingTotalTime = total;
+                            state.cookingTimer = timer;
+                        }
+                        if (effect.burnTicks > 0) {
+                            consumeFuel(state, *fuel, drop);
                             isLit = true;
                             moved = true;
                             changed = true;
@@ -163,9 +226,9 @@ Ticked tick(State& state, const RecipeFor& recipeFor, std::int32_t maxStackSize)
                     if (isLit) {
                         ++state.cookingTimer;
                         moved = true;
-                        if (state.cookingTimer == state.cookingTotalTime) {
+                        if (state.cookingTimer >= state.cookingTotalTime) {
                             state.cookingTimer = 0;
-                            state.cookingTotalTime = recipe->cookingTime;
+                            state.cookingTotalTime = atSpeed(recipe->cookingTime, state.speedMultiplier);
                             burn(state, *ingredient, recipe->result);
                             // parity: `setRecipeUsed`, one more of this recipe to pay out later.
                             const auto used = std::ranges::find(state.recipesUsed, recipe->id,
@@ -241,20 +304,24 @@ RecipesUsed recipesUsedIn(const wire::nbt::NbtCompound& data) {
 
 State read(const wire::nbt::NbtCompound& data) {
     State state;
-    state.litTimeRemaining = data.getShort(kLitRemainingKey);
-    state.litTotalTime = data.getShort(kLitTotalKey);
-    state.cookingTimer = data.getShort(kCookedKey);
-    state.cookingTotalTime = data.getShort(kCookTotalKey);
+    state.litTimeRemaining = counterOf(data, kLitRemainingKey);
+    state.litTotalTime = counterOf(data, kLitTotalKey);
+    state.cookingTimer = counterOf(data, kCookedKey);
+    state.cookingTotalTime = counterOf(data, kCookTotalKey);
+    const wire::nbt::NbtTag* speed = data.find(kSpeedKey);
+    const float* saved = speed == nullptr ? nullptr : speed->get<float>();
+    state.speedMultiplier = saved == nullptr ? 1.0F : *saved;
     state.items = blockInventory::read(data, kSize);
     state.recipesUsed = recipesUsedIn(data);
     return state;
 }
 
 void write(const State& state, wire::nbt::NbtCompound& data) {
-    data.putShort(kLitRemainingKey, static_cast<std::int16_t>(state.litTimeRemaining));
-    data.putShort(kLitTotalKey, static_cast<std::int16_t>(state.litTotalTime));
-    data.putShort(kCookedKey, static_cast<std::int16_t>(state.cookingTimer));
-    data.putShort(kCookTotalKey, static_cast<std::int16_t>(state.cookingTotalTime));
+    data.putInt(kLitRemainingKey, state.litTimeRemaining);
+    data.putInt(kLitTotalKey, state.litTotalTime);
+    data.putInt(kCookedKey, state.cookingTimer);
+    data.putInt(kCookTotalKey, state.cookingTotalTime);
+    data.putFloat(kSpeedKey, state.speedMultiplier);
     blockInventory::write(data, state.items);
     wire::nbt::NbtCompound used;
     for (const auto& [name, count] : state.recipesUsed) {

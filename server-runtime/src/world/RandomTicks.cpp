@@ -288,7 +288,8 @@ void growSapling(const randomTicks::Context& context, std::int32_t x, std::int32
     if (random.nextInt(saplingGrowth::kGrowthOdds) != 0) {
         return;
     }
-    const std::vector<BlockChange> grown = saplingGrowth::advance(context.world, x, y, z, stateId, random);
+    const std::vector<BlockChange> grown =
+        saplingGrowth::advance(context.world, x, y, z, stateId, random, context.flowering);
     changes.insert(changes.end(), grown.begin(), grown.end());
 }
 
