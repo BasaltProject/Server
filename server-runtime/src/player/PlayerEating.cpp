@@ -1,12 +1,20 @@
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/config/WorldsConfig.hpp>
+#include <basalt/server/runtime/entity/ai/SpecialGoals.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
+#include <basalt/server/runtime/player/PlayerCooldowns.hpp>
 #include <basalt/server/runtime/player/PlayerEating.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/world/BlockPlacement.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -21,6 +29,73 @@ using wire::protocol::play::Gamemode;
 
 /// parity: what a player throws from, which is where a leftover bowl lands when the bag is full.
 constexpr double kThrowEyeHeight = 1.62;
+
+/// parity: `TeleportRandomlyConsumeEffect.apply`'s sixteen tries and `LevelEvent` 2017.
+constexpr std::int32_t kTeleportAttempts = 16;
+constexpr std::int32_t kTeleportParticlesEvent = 2017;
+constexpr std::int32_t kPackRadius = 127;
+/// parity: the Nether's `logical_height`, the one dimension shorter than its build height.
+constexpr std::int32_t kCeilingLogicalHeight = 128;
+
+/// parity: `BlockUtil.clampedPackDifferenceInPosition` with 127 on every axis.
+[[nodiscard]] std::int32_t packedDifference(std::int32_t fromX, std::int32_t fromY, std::int32_t fromZ,
+                                            std::int32_t toX, std::int32_t toY, std::int32_t toZ) {
+    const auto axis = [](std::int32_t from, std::int32_t to) {
+        return (std::clamp(to - from, -kPackRadius, kPackRadius) + kPackRadius) & 0xFF;
+    };
+    return (axis(fromX, toX) << 16) | (axis(fromY, toY) << 8) | axis(fromZ, toZ);
+}
+
+/// parity: 26.3 `TeleportRandomlyConsumeEffect.apply` for a player, avoiding
+/// `consumable_does_not_teleport_to`.
+void teleportRandomly(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world, float diameter) {
+    // A rider would first be taken off; this build has no dismount here yet, so a rider stays put.
+    if (player.vehicleId.has_value() || !player.connection().teleportTo) {
+        return;
+    }
+    const auto next = [&context] { return context.nextDouble ? context.nextDouble() : 0.5; };
+    const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
+    const std::int32_t minY = facts.chunkHeight.minY();
+    const std::int32_t logicalHeight = facts.hasCeiling ? kCeilingLogicalHeight : facts.chunkHeight.height();
+    const entity::ai::BlockTagged tagged = [&context](std::string_view tag, std::int32_t stateId) {
+        const Identifier* block = reg::blockStateDefinitions::blockOf(stateId);
+        return block != nullptr && context.blockTags != nullptr &&
+               world::realBlockTags::contains(*context.blockTags, tag, *block);
+    };
+    const double height =
+        player.sneaking ? world::blockPlacement::kSneakingHeight : world::blockPlacement::kPlayerHeight;
+    for (std::int32_t attempt = 0; attempt < kTeleportAttempts; ++attempt) {
+        const double x = player.x + ((next() - 0.5) * diameter);
+        const double y = std::clamp(player.y + ((next() - 0.5) * diameter), static_cast<double>(minY),
+                                    static_cast<double>(minY + logicalHeight - 1));
+        const double z = player.z + ((next() - 0.5) * diameter);
+        const std::optional<double> landing =
+            entity::ai::randomTeleportLanding(world.state(), tagged, x, y, z, world::blockPlacement::kPlayerWidth,
+                                              height, "minecraft:consumable_does_not_teleport_to", false);
+        if (!landing.has_value()) {
+            continue;
+        }
+        const double fromX = player.x;
+        const double fromY = player.y;
+        const double fromZ = player.z;
+        player.connection().teleportTo(x, *landing, z, player.yaw, player.pitch);
+        world::vibrations::emit(world.state(), "teleport", fromX, fromY, fromZ, world.gameTime(),
+                                {.entity = player.uuid()});
+        const std::int64_t seed = context.nextSeed ? context.nextSeed() : 0;
+        const auto blockOf = [](double coordinate) { return static_cast<std::int32_t>(std::floor(coordinate)); };
+        const std::int32_t packed =
+            packedDifference(blockOf(fromX), blockOf(fromY), blockOf(fromZ), blockOf(x), blockOf(*landing), blockOf(z));
+        for (const PlayerSession* heard : playersIn(context, world.name())) {
+            playSoundFor(*heard, "minecraft:item.chorus_fruit.teleport", wire::protocol::play::SoundSource::Players, x,
+                         *landing, z, 1.0F, 1.0F, seed);
+            if (heard->connection().sendLevelEvent) {
+                heard->connection().sendLevelEvent(kTeleportParticlesEvent, blockOf(fromX), blockOf(fromY),
+                                                   blockOf(fromZ), packed);
+            }
+        }
+        return;
+    }
+}
 
 [[nodiscard]] std::optional<Identifier> parsedOrNothing(const std::string& id) {
     const auto parsed = Identifier::parse(id);
@@ -86,6 +161,13 @@ bool eatHeldItem(const BreakContext& context, PlayerSession& player, world::Load
 
     player.food.eat(food->nutrition, food->saturation);
     applyConsumeEffectsFor(player, food->effects, nextFloat);
+    for (const reg::ConsumeEffect& effect : food->effects) {
+        if (const auto* teleport = effect.as<reg::ConsumeEffect::TeleportRandomly>(); teleport != nullptr) {
+            teleportRandomly(context, player, world, teleport->diameter);
+        }
+    }
+    // parity: `ItemStack.applyAfterUseComponentSideEffects`, the chorus fruit's `use_cooldown`.
+    startCooldownFor(player, *id, world.gameTime());
     if (player.gamemode != Gamemode::Creative) {
         const std::int32_t remaining = eaten.count - 1;
         // parity: `use_remainder` replaces what was eaten: the bowl, the bottle, the bucket.

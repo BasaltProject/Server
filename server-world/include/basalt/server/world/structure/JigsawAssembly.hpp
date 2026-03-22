@@ -65,6 +65,9 @@ struct JigsawRequest {
     /// parity: `PoolAliasLookup`, already resolved for this start. A jigsaw's pool goes through it
     /// before the lookup, and pools that only exist as an alias target are unreachable without it.
     std::map<std::string, std::string, std::less<>> poolAliases;
+    /// parity: `Structure.isValidBiome`, asked of the generation stub (the centre of the start
+    /// piece's box, at the anchor's height) before any child is placed. Unset accepts every start.
+    std::function<bool(const StructurePos&)> acceptStart;
 };
 
 /// parity: `JigsawPlacement`, the breadth-first assembly of `Placer.tryPlacingChildren`, including

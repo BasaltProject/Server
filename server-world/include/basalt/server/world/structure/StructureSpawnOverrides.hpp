@@ -9,7 +9,7 @@
 
 namespace basalt::server::world::structure {
 
-/// parity: the `spawn_overrides` field of the five vanilla structures that carry one. An empty spawn
+/// parity: the `spawn_overrides` field of the six vanilla structures that carry one. An empty spawn
 /// list is meaningful: it silences a whole category inside the structure.
 namespace structureSpawnOverrides {
 
@@ -21,6 +21,8 @@ struct SpawnEntry {
     std::int32_t weight = 0;
     std::int32_t minCount = 0;
     std::int32_t maxCount = 0;
+    /// parity: 26.3's `count` as a `ConstantInt`, which draws nothing from the random.
+    bool constantCount = false;
 
     friend bool operator==(const SpawnEntry&, const SpawnEntry&) = default;
 };

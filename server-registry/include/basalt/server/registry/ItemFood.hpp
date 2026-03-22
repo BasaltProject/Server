@@ -31,7 +31,14 @@ public:
         friend bool operator==(const ClearAll&, const ClearAll&) = default;
     };
 
-    using Payload = std::variant<Apply, Remove, ClearAll>;
+    /// parity: `TeleportRandomlyConsumeEffect`, the chorus fruit's jump.
+    struct TeleportRandomly {
+        float diameter = 16.0F;
+
+        friend bool operator==(const TeleportRandomly&, const TeleportRandomly&) = default;
+    };
+
+    using Payload = std::variant<Apply, Remove, ClearAll, TeleportRandomly>;
 
     explicit ConsumeEffect(Payload payload) : payload_(std::move(payload)) {}
 

@@ -70,17 +70,6 @@ std::int32_t JigsawStructureGenerator::surfaceHeightAt(std::int32_t x, std::int3
     return std::max(y + 1, kSeaLevel);
 }
 
-bool JigsawStructureGenerator::inBiome(std::int32_t candidateChunkX, std::int32_t candidateChunkZ,
-                                       Samplers& samplers) const {
-    const std::int32_t centreX = candidateChunkX * 16 + 8;
-    const std::int32_t centreZ = candidateChunkZ * 16 + 8;
-    const std::int32_t probeY = settings_.heightSource == JigsawHeightSource::Surface
-                                    ? surfaceHeightAt(centreX, centreZ, samplers)
-                                    : settings_.startY;
-    // The tag keeps its namespace and so does the biome name, so neither side is stripped.
-    return biomes_.contains(biomeAt_(centreX, probeY, centreZ));
-}
-
 std::shared_ptr<const std::vector<PlacedStructurePiece>>
 JigsawStructureGenerator::assembledStart(std::int32_t candidateChunkX, std::int32_t candidateChunkZ,
                                          std::int64_t seed) {
@@ -95,8 +84,7 @@ JigsawStructureGenerator::assembledStart(std::int32_t candidateChunkX, std::int3
 
     Samplers samplers;
     std::vector<PlacedStructurePiece> assembled;
-    if (grid_.isStructureChunk(seed, candidateChunkX, candidateChunkZ) &&
-        inBiome(candidateChunkX, candidateChunkZ, samplers)) {
+    if (grid_.isStructureChunk(seed, candidateChunkX, candidateChunkZ)) {
         random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::legacy(0));
         random::setLargeFeatureSeed(random, seed, candidateChunkX, candidateChunkZ);
         // parity: a drawn start height is a uniform provider, so it costs a draw before the
@@ -150,7 +138,12 @@ JigsawStructureGenerator::assembledStart(std::int32_t candidateChunkX, std::int3
                                      .worldMaxY = kOverworldHeight.maxY(),
                                      .useExpansionHack = settings_.useExpansionHack,
                                      .startJigsawName = settings_.startJigsawName,
-                                     .poolAliases = std::move(resolvedAliases)},
+                                     .poolAliases = std::move(resolvedAliases),
+                                     .acceptStart =
+                                         [this](const StructurePos& stub) {
+                                             // The tag keeps its namespace and so does the biome name.
+                                             return biomes_.contains(biomeAt_(stub.x, stub.y, stub.z));
+                                         }},
             random);
     }
 

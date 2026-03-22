@@ -20,6 +20,8 @@ struct SpawnerEntry {
     std::int32_t weight = 0;
     std::int32_t minCount = 0;
     std::int32_t maxCount = 0;
+    /// parity: 26.3's `count` as a `ConstantInt`, whose sample draws nothing from the random.
+    bool constantCount = false;
 
     friend bool operator==(const SpawnerEntry&, const SpawnerEntry&) = default;
 };
@@ -32,12 +34,9 @@ struct MobSpawnCost {
     friend bool operator==(const MobSpawnCost&, const MobSpawnCost&) = default;
 };
 
-/// What each biome can spawn, out of the operator's own `server.jar`.
-///
-/// parity: `MobSpawnSettings`, the `spawners` block of every
-/// `data/minecraft/worldgen/biome/<name>.json`. Datapack content, so it is read from the download
-/// rather than committed, the same as loot tables and recipes. Which of those entries actually
-/// appears is `NaturalSpawner`'s business; this only says what the biome offers.
+/// What each biome can spawn, read from the operator's `server.jar` since it is datapack content.
+/// parity: `MobSpawnSettings`, the `spawners` of `data/minecraft/worldgen/biome/<name>.json`. What
+/// actually appears is `NaturalSpawner`'s business.
 class RealBiomeSpawns {
 public:
     /// parity: `MobSpawnSettings.creatureGenerationProbability`'s own default.

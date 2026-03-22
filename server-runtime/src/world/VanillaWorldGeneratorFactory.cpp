@@ -337,11 +337,11 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
     built->igloos = std::make_unique<terrain::IglooStructureGenerator>(
         quartBiome, biomesOf(tags, "minecraft:has_structure/igloo"), templateOf, surfaceHeight, worldHeight);
     built->ancientCities = std::make_unique<terrain::JigsawStructureGenerator>(
-        ancientCitySettings(), *built->overworldRouter, structure::StructurePlacementGrid{24, 8, 20083232}, blockBiome,
+        ancientCitySettings(), *built->overworldRouter, structure::StructurePlacementGrid{24, 8, 20083232}, quartBiome,
         biomesOf(tags, "minecraft:has_structure/ancient_city"), poolLookup, templateOf);
     built->trialChambers = std::make_unique<terrain::JigsawStructureGenerator>(
         trialChamberSettings(), *built->overworldRouter, structure::StructurePlacementGrid{34, 12, 94251327},
-        blockBiome, biomesOf(tags, "minecraft:has_structure/trial_chambers"), poolLookup, templateOf);
+        quartBiome, biomesOf(tags, "minecraft:has_structure/trial_chambers"), poolLookup, templateOf);
 
     built->generators = terrain::TerrainStructureGenerators{.village = built->village.get(),
                                                             .camp = built->camps.get(),

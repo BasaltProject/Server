@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/entity/ai/Goals.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <set>
 #include <string_view>
@@ -65,5 +66,15 @@ private:
 /// parity: 26.3 `LivingEntity.randomTeleport` with the block tag the mob avoids, and the enderman's
 /// `canRandomlyTeleportTo`: no water under its feet.
 [[nodiscard]] std::optional<double> landingFor(MobContext& mob, double x, double y, double z, std::string_view avoided);
+
+/// Whether a block state is in a block tag.
+using BlockTagged = std::function<bool(std::string_view tag, std::int32_t stateId)>;
+
+/// Where a box of this size lands teleporting to around `x, y, z`, or nothing when it may not.
+/// parity: 26.3 `LivingEntity.randomTeleport` and `checkPositionAndTeleport`; `waterBelowBlocks` is
+/// the enderman's own `canRandomlyTeleportTo`.
+[[nodiscard]] std::optional<double> randomTeleportLanding(const world::WorldState& world, const BlockTagged& tagged,
+                                                          double x, double y, double z, double width, double height,
+                                                          std::string_view avoided, bool waterBelowBlocks);
 
 } // namespace basalt::server::runtime::entity::ai

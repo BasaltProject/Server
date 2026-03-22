@@ -36,7 +36,8 @@ using wire::common::Identifier;
     return value;
 }
 
-/// `apply:effect,ticks,amplifier,probability`, `remove:effect` or `clear`, joined with semicolons.
+/// `apply:effect,ticks,amplifier,probability`, `remove:effect`, `teleport:diameter` or `clear`, joined
+/// with semicolons.
 [[nodiscard]] std::vector<ConsumeEffect> parseEffects(std::string_view encoded) {
     std::vector<ConsumeEffect> effects;
     for (const std::string_view entry : split(encoded, ';')) {
@@ -55,6 +56,10 @@ using wire::common::Identifier;
         const std::string_view body = entry.substr(colon + 1);
         if (kind == "remove") {
             effects.emplace_back(ConsumeEffect::Remove{Identifier::vanilla(std::string{body})});
+            continue;
+        }
+        if (kind == "teleport") {
+            effects.emplace_back(ConsumeEffect::TeleportRandomly{parseFloat(body)});
             continue;
         }
         if (kind != "apply") {

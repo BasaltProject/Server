@@ -6585,7 +6585,7 @@ constexpr std::array<std::string_view, 42> kItemFoodTable = {{
     "bread|5|6.0|false|1.6||",
     "carrot|3|3.6000001|false|1.6||",
     "chicken|2|1.2|false|1.6|apply:hunger,600,0,0.3|",
-    "chorus_fruit|4|2.4|true|1.6||",
+    "chorus_fruit|4|2.4|true|1.6|teleport:16.0|",
     "cod|2|0.4|false|1.6||",
     "cooked_beef|8|12.8|false|1.6||",
     "cooked_chicken|6|7.2000003|false|1.6||",

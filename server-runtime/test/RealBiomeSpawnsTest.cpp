@@ -126,3 +126,32 @@ TEST_CASE("a biome is looked up by its path, whatever namespace it came from") {
     CHECK(spawns.of(Identifier{"basalt", "plains"}).spawners.size() == 3);
     CHECK(spawns.listFor(Identifier::vanilla("plains"), "nothing_of_the_sort").empty());
 }
+
+TEST_CASE("a 26.3 biome keeps its spawns in environment attributes") {
+    // Shaped like the jar's `soul_sand_valley`: a constant and a uniform `count`.
+    const RealBiomeSpawns::Settings settings = RealBiomeSpawns::parse(R"({
+      "attributes": {
+        "minecraft:gameplay/creature_world_gen_spawn_probability": 0.04,
+        "minecraft:gameplay/natural_mob_spawns": {"modifier": "overlay", "argument": {
+          "spawn_costs": {"minecraft:ghast": {"charge": 0.7, "energy_budget": 0.15}},
+          "spawns_by_category": {
+            "creature": [{"type": "minecraft:strider", "count": {"type": "minecraft:uniform",
+                          "max_inclusive": 2, "min_inclusive": 1}, "weight": 60}],
+            "monster": [{"type": "minecraft:ghast", "count": 4, "weight": 50}]
+          }}}
+      }
+    })");
+
+    CHECK(settings.creatureProbability == doctest::Approx(0.04F));
+    REQUIRE(settings.spawners.at("creature").size() == 1);
+    const SpawnerEntry& strider = settings.spawners.at("creature")[0];
+    CHECK(strider.minCount == 1);
+    CHECK(strider.maxCount == 2);
+    CHECK_FALSE(strider.constantCount);
+    REQUIRE(settings.spawners.at("monster").size() == 1);
+    const SpawnerEntry& ghast = settings.spawners.at("monster")[0];
+    CHECK(ghast.minCount == 4);
+    CHECK(ghast.maxCount == 4);
+    CHECK(ghast.constantCount);
+    CHECK(settings.costs.contains(Identifier::vanilla("ghast")));
+}

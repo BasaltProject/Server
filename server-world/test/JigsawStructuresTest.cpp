@@ -184,16 +184,6 @@ single(std::string location, structure::StructureProjection projection = structu
         seed, basalt::server::world::testsupport::rollingFloor(50, 78, 1.0, 0.0));
 }
 
-/// The same surface walk the generators do, so a biome can be pinned to it.
-[[nodiscard]] std::int32_t surfaceOf(std::int64_t seed, std::int32_t x, std::int32_t z) {
-    DensityChunkSampler sampler{router(seed), x >> 4, z >> 4};
-    std::int32_t y = 319;
-    while (y >= -64 && sampler.sample(x & 15, y, z & 15) <= 0.0) {
-        --y;
-    }
-    return std::max(y + 1, 63);
-}
-
 [[nodiscard]] Chunk stoneChunk(std::int32_t chunkX, std::int32_t chunkZ, std::int32_t lowY, std::int32_t terrainTop) {
     Chunk chunk{chunkX, chunkZ};
     for (std::int32_t x = 0; x < 16; ++x) {
@@ -255,8 +245,6 @@ struct Case {
     std::int32_t lowY = 0;
     std::int32_t highY = 0;
     std::int32_t terrainTop = 0;
-    /// The y the biome probe answers at, or nothing when it reads the surface instead.
-    std::optional<std::int32_t> probeY;
     bool searches = false;
 };
 
@@ -274,21 +262,13 @@ struct Case {
         return found == pools->end() ? nullptr : &found->second;
     };
     const std::string biomeName{biome};
-    const std::optional<std::int32_t> probeY = shape.probeY;
-    JigsawStructureGenerator generator{
-        settings,
-        router(seed),
-        grid,
-        [seed, biomeName, probeY](std::int32_t x, std::int32_t y, std::int32_t z) -> std::string {
-            if ((x & 15) != 8 || (z & 15) != 8) {
-                return "minecraft:ocean";
-            }
-            const std::int32_t wanted = probeY.value_or(surfaceOf(seed, x, z));
-            return y == wanted ? biomeName : std::string{"minecraft:ocean"};
-        },
-        std::move(biomes),
-        poolLookup,
-        loader};
+    JigsawStructureGenerator generator{settings,
+                                       router(seed),
+                                       grid,
+                                       [biomeName](std::int32_t, std::int32_t, std::int32_t) { return biomeName; },
+                                       std::move(biomes),
+                                       poolLookup,
+                                       loader};
 
     Run result;
     std::optional<std::pair<std::int32_t, std::int32_t>> found;
@@ -351,8 +331,7 @@ struct Case {
                             .startPool = "minecraft:ancient_city/city_center",
                             .lowY = -50,
                             .highY = 0,
-                            .terrainTop = -10,
-                            .probeY = -27};
+                            .terrainTop = -10};
     return shape;
 }
 
@@ -362,8 +341,7 @@ struct Case {
                             .startPool = "minecraft:trial_chambers/chamber/end",
                             .lowY = -60,
                             .highY = -5,
-                            .terrainTop = -15,
-                            .probeY = -40};
+                            .terrainTop = -15};
     return shape;
 }
 

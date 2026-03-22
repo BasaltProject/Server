@@ -29,6 +29,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <limits>
 
 namespace basalt::server::runtime {
 namespace {
@@ -315,6 +316,45 @@ void ClientSession::tryPickupNearbyItems() {
     }
 }
 
+void ClientSession::sendPlayerPosition(double x, double y, double z, float yaw, float pitch) {
+    std::int32_t teleportId = 0;
+    {
+        const std::lock_guard<std::mutex> guard{teleportMutex_};
+        // parity: `teleport` wraps the id before it reaches `Integer.MAX_VALUE`.
+        if (++awaitingTeleport_ == std::numeric_limits<std::int32_t>::max()) {
+            awaitingTeleport_ = 0;
+        }
+        teleportId = awaitingTeleport_;
+        awaitingPosition_ = std::array<double, 3>{x, y, z};
+    }
+    sendCompressed(play::PlayerPositionPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+        play::PlayerPositionPacket{.teleportId = teleportId, .x = x, .y = y, .z = z, .yaw = yaw, .pitch = pitch}.write(
+            buffer);
+    });
+}
+
+void ClientSession::acceptTeleport(const play::AcceptTeleportationPacket& accept) {
+    PlayerSession* session = playerSession_.get();
+    std::optional<std::array<double, 3>> awaited;
+    {
+        const std::lock_guard<std::mutex> guard{teleportMutex_};
+        if (accept.teleportId != awaitingTeleport_ || !awaitingPosition_.has_value()) {
+            return;
+        }
+        awaited = awaitingPosition_;
+        awaitingPosition_.reset();
+    }
+    if (session == nullptr || !std::isfinite(accept.x) || !std::isfinite(accept.y) || !std::isfinite(accept.z) ||
+        !std::isfinite(accept.yaw) || !std::isfinite(accept.pitch)) {
+        return;
+    }
+    // parity: `absSnapTo` the awaited position first, then `handlePlayerPositionChange` off the ground.
+    session->x = (*awaited)[0];
+    session->y = (*awaited)[1];
+    session->z = (*awaited)[2];
+    updatePosition(accept.x, accept.y, accept.z, accept.yaw, accept.pitch, false);
+}
+
 void ClientSession::updatePosition(double x, double y, double z, float yaw, float pitch, bool onGround) {
     PlayerSession* session = playerSession_.get();
     if (session == nullptr) {
@@ -333,11 +373,7 @@ void ClientSession::updatePosition(double x, double y, double z, float yaw, floa
         !options_.plugins.moveAllowed(*session, session->x, session->y, session->z, x, y, z)) {
         // Put them back where they were, which is what the client is told rather than asked: it has
         // already drawn the step it took.
-        sendCompressed(play::PlayerPositionPacket::kId, [session, yaw, pitch](wire::io::ByteBuffer& buffer) {
-            play::PlayerPositionPacket{
-                .teleportId = 0, .x = session->x, .y = session->y, .z = session->z, .yaw = yaw, .pitch = pitch}
-                .write(buffer);
-        });
+        sendPlayerPosition(session->x, session->y, session->z, yaw, pitch);
         return;
     }
     const std::optional<std::int32_t> feet =

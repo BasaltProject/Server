@@ -6,7 +6,9 @@
 #include <doctest.h>
 
 #include <cstdint>
+#include <functional>
 #include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -296,10 +298,14 @@ struct Run {
     std::string first;
     std::int64_t checksum = 0;
     std::int32_t after = 0;
+    /// The horizontal centre of the start piece's box.
+    std::int32_t centreX = 0;
+    std::int32_t centreZ = 0;
 };
 
 [[nodiscard]] Run run(std::int64_t seed, std::int32_t maxDepth, bool projectStartToHeightmap,
-                      std::int32_t maxDistanceFromCenter, bool useExpansionHack, std::string startJigsawName = {}) {
+                      std::int32_t maxDistanceFromCenter, bool useExpansionHack, std::string startJigsawName = {},
+                      std::function<bool(const StructurePos&)> acceptStart = {}) {
     rng::RandomSource random = rng::RandomSource::worldgen(rng::RandomSource::xoroshiro(seed));
     const JigsawWorld world{.poolLookup = [](std::string_view name) -> const StructureTemplatePool* {
                                 const auto found = pools().find(name);
@@ -316,7 +322,8 @@ struct Run {
                                 .projectStartToHeightmap = projectStartToHeightmap,
                                 .maxDistanceFromCenter = maxDistanceFromCenter,
                                 .useExpansionHack = useExpansionHack,
-                                .startJigsawName = std::move(startJigsawName)};
+                                .startJigsawName = std::move(startJigsawName),
+                                .acceptStart = std::move(acceptStart)};
     const std::vector<PlacedStructurePiece> pieces = assembleJigsaw(world, request, random);
 
     std::uint64_t checksum = 14695981039346656037ULL;
@@ -337,6 +344,10 @@ struct Run {
     result.first = pieces.empty() ? "null" : describe(pieces.front());
     result.checksum = static_cast<std::int64_t>(checksum);
     result.after = random.nextInt();
+    if (!pieces.empty()) {
+        result.centreX = (pieces.front().boundingBox.minX + pieces.front().boundingBox.maxX) / 2;
+        result.centreZ = (pieces.front().boundingBox.minZ + pieces.front().boundingBox.maxZ) / 2;
+    }
     return result;
 }
 
@@ -388,5 +399,30 @@ TEST_CASE("the jigsaw assembly builds what the frozen kotlin builds") {
     SUBCASE("otherSeed") {
         check(run(99, 3, false, 80, false), 7, "minecraft:test/start@0,-1,0/NONE/0,-1,0,8,5,8/1/4",
               4674818880423394264LL, -283459008);
+    }
+}
+
+// parity: `Structure.isValidBiome` judges the stub `JigsawPlacement.addPieces` returns: the centre of
+// the start piece's box, at the anchor's height, which for an anchored start is the start height.
+TEST_CASE("a jigsaw start is judged at its stub before any child is placed") {
+    for (const bool anchored : {false, true}) {
+        CAPTURE(anchored);
+        const std::string anchor = anchored ? "start_b" : "";
+        std::optional<StructurePos> stub;
+        const Run accepted = run(4321, 2, !anchored, 80, false, anchor, [&stub](const StructurePos& at) {
+            stub = at;
+            return true;
+        });
+        REQUIRE(stub.has_value());
+        CHECK(accepted.pieces > 1);
+        const Run plain = run(4321, 2, !anchored, 80, false, anchor);
+        CHECK(accepted.checksum == plain.checksum);
+        CHECK(accepted.after == plain.after);
+        CHECK(stub->x == accepted.centreX);
+        CHECK(stub->z == accepted.centreZ);
+        CHECK(stub->y == (anchored ? 0 : 64));
+
+        const Run refused = run(4321, 2, !anchored, 80, false, anchor, [](const StructurePos&) { return false; });
+        CHECK(refused.pieces == 0);
     }
 }

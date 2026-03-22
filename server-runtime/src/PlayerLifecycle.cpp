@@ -143,15 +143,7 @@ void PlayerLifecycle::respawn() {
         wire::protocol::play::RespawnPacket{.spawnInfo = owner_->spawnInfo(session->gamemode), .dataToKeep = 0}.write(
             buffer);
     });
-    owner_->sendCompressed(wire::protocol::play::PlayerPositionPacket::kId, [&](wire::io::ByteBuffer& buffer) {
-        wire::protocol::play::PlayerPositionPacket{.teleportId = 0,
-                                                   .x = session->x,
-                                                   .y = session->y,
-                                                   .z = session->z,
-                                                   .yaw = session->yaw,
-                                                   .pitch = session->pitch}
-            .write(buffer);
-    });
+    owner_->sendPlayerPosition(session->x, session->y, session->z, session->yaw, session->pitch);
     // parity: `PlayerList.sendLevelInfo` again, which is what a respawn goes through too.
     if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
         owner_->uiState().sendTime(*world);
@@ -271,11 +263,7 @@ bool PlayerLifecycle::switchWorld(world::LoadedWorld& target, double x, double y
                                             .dataToKeep = wire::protocol::play::RespawnPacket::kKeepAllData}
             .write(buffer);
     });
-    owner_->sendCompressed(wire::protocol::play::PlayerPositionPacket::kId, [&](wire::io::ByteBuffer& buffer) {
-        wire::protocol::play::PlayerPositionPacket{
-            .teleportId = 0, .x = x, .y = y, .z = z, .yaw = session->yaw, .pitch = session->pitch}
-            .write(buffer);
-    });
+    owner_->sendPlayerPosition(x, y, z, session->yaw, session->pitch);
     owner_->uiState().sendAbilities();
     owner_->uiState().syncHealth();
     owner_->uiState().syncExperience();
@@ -291,10 +279,7 @@ void PlayerLifecycle::teleportTo(double x, double y, double z, float yaw, float 
     if (hooks_.teleportAllowed && !hooks_.teleportAllowed(session, x, y, z, cause)) {
         return;
     }
-    owner_->sendCompressed(wire::protocol::play::PlayerPositionPacket::kId, [&](wire::io::ByteBuffer& buffer) {
-        wire::protocol::play::PlayerPositionPacket{.teleportId = 0, .x = x, .y = y, .z = z, .yaw = yaw, .pitch = pitch}
-            .write(buffer);
-    });
+    owner_->sendPlayerPosition(x, y, z, yaw, pitch);
     // parity: `Entity.teleportTo` clears the fall, so arriving is never a landing.
     owner_->combat().fallDistance = 0.0;
     // Straight to updatePosition rather than waiting for the client to confirm: the world has to

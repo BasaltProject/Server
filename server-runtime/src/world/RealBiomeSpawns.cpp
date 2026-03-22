@@ -46,14 +46,25 @@ using wire::common::JsonValue;
         const std::optional<std::int64_t> weight = integerOf(fields->find("weight"));
         std::optional<std::int64_t> minCount = integerOf(fields->find("minCount"));
         std::optional<std::int64_t> maxCount = integerOf(fields->find("maxCount"));
+        bool constantCount = false;
         // Since 26.3 the pack size is an int provider: a constant or a uniform range.
         if (const JsonValue* count = fields->find("count"); count != nullptr) {
-            if (const std::optional<std::int64_t> constant = integerOf(count); constant.has_value()) {
+            const JsonObject* provider = count->get<JsonObject>();
+            const JsonValue* kind = provider == nullptr ? nullptr : provider->find("type");
+            const std::string* kindName = kind == nullptr ? nullptr : kind->get<std::string>();
+            std::optional<std::int64_t> constant = integerOf(count);
+            if (kindName != nullptr && (*kindName == "minecraft:constant" || *kindName == "constant")) {
+                constant = integerOf(provider->find("value"));
+            }
+            minCount = std::nullopt;
+            maxCount = std::nullopt;
+            if (constant.has_value()) {
                 minCount = constant;
                 maxCount = constant;
-            } else if (const JsonObject* range = count->get<JsonObject>(); range != nullptr) {
-                minCount = integerOf(range->find("min_inclusive"));
-                maxCount = integerOf(range->find("max_inclusive"));
+                constantCount = true;
+            } else if (kindName != nullptr && (*kindName == "minecraft:uniform" || *kindName == "uniform")) {
+                minCount = integerOf(provider->find("min_inclusive"));
+                maxCount = integerOf(provider->find("max_inclusive"));
             }
         }
         if (named == nullptr || !weight.has_value() || !minCount.has_value() || !maxCount.has_value()) {
@@ -66,7 +77,8 @@ using wire::common::JsonValue;
         entries.push_back(SpawnerEntry{.type = *parsed,
                                        .weight = static_cast<std::int32_t>(*weight),
                                        .minCount = static_cast<std::int32_t>(*minCount),
-                                       .maxCount = static_cast<std::int32_t>(*maxCount)});
+                                       .maxCount = static_cast<std::int32_t>(*maxCount),
+                                       .constantCount = constantCount});
     }
     return entries;
 }

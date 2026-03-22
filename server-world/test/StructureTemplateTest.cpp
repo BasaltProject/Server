@@ -32,13 +32,13 @@ namespace {
 [[nodiscard]] NbtCompound paletteEntry(std::string name,
                                        const std::vector<std::pair<std::string, std::string>>& properties = {}) {
     NbtCompound entry;
-    entry.set("Name", NbtTag::ofString(std::move(name)));
+    entry.set("id", NbtTag::ofString(std::move(name)));
     if (!properties.empty()) {
         NbtCompound tag;
         for (const auto& [key, value] : properties) {
             tag.set(key, NbtTag::ofString(value));
         }
-        entry.set("Properties", NbtTag::ofCompound(std::move(tag)));
+        entry.set("properties", NbtTag::ofCompound(std::move(tag)));
     }
     return entry;
 }

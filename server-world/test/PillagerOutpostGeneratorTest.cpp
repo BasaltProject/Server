@@ -221,16 +221,6 @@ single(std::string location, structure::StructureProjection projection = structu
     return structure::StructurePlacementGrid{32, 8, 165745296, structure::SpreadType::Linear, 0.2F};
 }
 
-/// The same surface walk the generator does, so the biome can be pinned to it.
-[[nodiscard]] std::int32_t surfaceOf(std::int64_t seed, std::int32_t x, std::int32_t z) {
-    DensityChunkSampler sampler{router(seed), x >> 4, z >> 4};
-    std::int32_t y = 319;
-    while (y >= -64 && sampler.sample(x & 15, y, z & 15) <= 0.0) {
-        --y;
-    }
-    return std::max(y + 1, 63);
-}
-
 [[nodiscard]] std::pair<std::int64_t, std::int32_t> fold(const Chunk& chunk) {
     std::uint64_t checksum = 14695981039346656037ULL;
     std::int32_t written = 0;
@@ -275,19 +265,13 @@ struct Run {
 
 [[nodiscard]] Run run(std::int64_t seed, std::string_view biome) {
     const std::string biomeName{biome};
-    JigsawStructureGenerator generator{
-        jigsawStructures::pillagerOutpost(),
-        router(seed),
-        grid(),
-        // Only the centre column of a chunk answers at all, and only right at the surface, so where
-        // the probe stands and what height it reads are both observable.
-        [seed, biomeName](std::int32_t x, std::int32_t y, std::int32_t z) -> std::string {
-            const bool centred = (x & 15) == 8 && (z & 15) == 8;
-            return centred && y == surfaceOf(seed, x, z) ? biomeName : std::string{"minecraft:ocean"};
-        },
-        {"minecraft:plains", "minecraft:taiga"},
-        poolLookup,
-        loader};
+    JigsawStructureGenerator generator{jigsawStructures::pillagerOutpost(),
+                                       router(seed),
+                                       grid(),
+                                       [biomeName](std::int32_t, std::int32_t, std::int32_t) { return biomeName; },
+                                       {"minecraft:plains", "minecraft:taiga"},
+                                       poolLookup,
+                                       loader};
 
     // Centred on the outpost the search finds, so the sweep always covers a real one when the biome
     // allows any at all.

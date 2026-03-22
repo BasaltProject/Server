@@ -207,6 +207,12 @@ std::optional<double> landingFor(MobContext& mob, double x, double y, double z, 
     if (!mob.actions.blockTagged(avoided, wire::common::Identifier::vanilla("air")).has_value()) {
         return groundBelow(world, x, y, z);
     }
+    return randomTeleportLanding(world, tagged, x, y, z, mob.mob.width(), mob.mob.height(), avoided, true);
+}
+
+std::optional<double> randomTeleportLanding(const world::WorldState& world, const BlockTagged& tagged, double x,
+                                            double y, double z, double width, double height, std::string_view avoided,
+                                            bool waterBelowBlocks) {
     // parity: `LivingEntity.randomTeleport`: down until `entities_can_teleport_to`, the height
     // falling one with every block passed.
     const auto blockX = static_cast<std::int32_t>(std::floor(x));
@@ -229,7 +235,7 @@ std::optional<double> landingFor(MobContext& mob, double x, double y, double z, 
     }
     // parity: `checkPositionAndTeleport`: room for the box, no liquid in it, nothing in it the mob
     // avoids, and for an enderman no water right under its feet.
-    const Aabb box = Aabb::of(x, feet, z, mob.mob.width(), mob.mob.height());
+    const Aabb box = Aabb::of(x, feet, z, width, height);
     const entityCollision::BlockAt blockAt = [&world](std::int32_t bx, std::int32_t by, std::int32_t bz) {
         return world.blockState(bx, by, bz);
     };
@@ -248,6 +254,9 @@ std::optional<double> landingFor(MobContext& mob, double x, double y, double z, 
                 }
             }
         }
+    }
+    if (!waterBelowBlocks) {
+        return feet;
     }
     const std::optional<std::int32_t> below =
         world.blockState(static_cast<std::int32_t>(std::floor(x)), static_cast<std::int32_t>(std::floor(feet)) - 1,

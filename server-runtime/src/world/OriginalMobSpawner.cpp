@@ -125,7 +125,7 @@ std::int32_t spawnInto(Chunk& chunk, const std::vector<SpawnerEntry>& entries, f
         if (entry == nullptr) {
             break;
         }
-        const std::int32_t count = entry->minCount + random.nextInt(1 + entry->maxCount - entry->minCount);
+        const std::int32_t count = naturalSpawner::packSize(*entry, random);
         std::int32_t x = minX + random.nextInt(16);
         std::int32_t z = minZ + random.nextInt(16);
         const std::int32_t startX = x;
