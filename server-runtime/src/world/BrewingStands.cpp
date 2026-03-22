@@ -2,9 +2,12 @@
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/world/BrewingStands.hpp>
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <expected>
+#include <utility>
 
 namespace basalt::server::runtime::world::brewingStands {
 namespace {
@@ -54,6 +57,35 @@ using ItemStack = server::world::loot::ItemStack;
     return tiny == nullptr ? fallback : *tiny;
 }
 
+namespace crafting = server::world::crafting;
+
+std::vector<crafting::Recipe>& installed() {
+    static std::vector<crafting::Recipe> recipes;
+    return recipes;
+}
+
+/// The potion a result carries, without its namespace, the way `State::potions` keeps it.
+[[nodiscard]] std::optional<std::string> potionOf(const ItemStack& stack) {
+    const wire::nbt::NbtCompound* contents = stack.components.getCompound(kPotionContents);
+    std::string_view potion = contents == nullptr ? std::string_view{} : contents->getString("potion");
+    if (potion.starts_with("minecraft:")) {
+        potion.remove_prefix(std::string_view{"minecraft:"}.size());
+    }
+    return potion.empty() ? std::nullopt : std::optional{std::string{potion}};
+}
+
+/// parity: `PotionsPredicate.matches`. A potion tag has no loader here, so it matches nothing.
+[[nodiscard]] bool holdsOneOf(const std::vector<std::string>& potions, const std::optional<std::string>& potion) {
+    if (potions.empty()) {
+        return true;
+    }
+    if (!potion.has_value()) {
+        return false;
+    }
+    const std::string qualified = potion->find(':') == std::string::npos ? "minecraft:" + *potion : *potion;
+    return std::ranges::find(potions, qualified) != potions.end();
+}
+
 [[nodiscard]] std::string potionKey(std::int32_t slot) { return std::string{kPotionsKey} + std::to_string(slot); }
 
 /// parity: `doBrew`: every bottle that can turn does, and the ingredient goes.
@@ -68,24 +100,68 @@ void brew(State& state, const DropRemainder& drop) {
         if (!state.items[index].has_value()) {
             continue;
         }
-        const std::optional<registry::brewing::Brew> mixed =
-            registry::brewing::mix(state.items[index]->item, state.potions[index], ingredient->item);
-        if (!mixed.has_value()) {
+        std::optional<ItemStack> turned = brewed(*state.items[index], state.potions[index], ingredient->item);
+        if (!turned.has_value()) {
             continue;
         }
-        server::world::loot::ItemStack turned{.item = mixed->bottle, .count = state.items[index]->count};
-        if (mixed->potion.has_value()) {
-            wire::nbt::NbtCompound contents;
-            contents.putString("potion", "minecraft:" + *mixed->potion);
-            turned.components.set(kPotionContents, wire::nbt::NbtTag::ofCompound(std::move(contents)));
-        }
+        state.potions[index] = potionOf(*turned);
         state.items[index] = std::move(turned);
-        state.potions[index] = mixed->potion;
     }
     state.items[static_cast<std::size_t>(kIngredientSlot)] = spend(*ingredient, drop);
 }
 
 } // namespace
+
+void useRecipes(std::vector<crafting::Recipe> recipes) {
+    std::erase_if(recipes, [](const crafting::Recipe& recipe) { return recipe.kind != crafting::RecipeKind::Brewing; });
+    installed() = std::move(recipes);
+}
+
+std::optional<ItemStack> brewed(const ItemStack& bottle, const std::optional<std::string>& potion,
+                                const wire::common::Identifier& reagent) {
+    if (!installed().empty()) {
+        const ItemStack reagentStack{.item = reagent, .count = 1};
+        for (const crafting::Recipe& recipe : installed()) {
+            if (recipe.base.test(&bottle) && holdsOneOf(recipe.potions, potion) &&
+                recipe.ingredient.test(&reagentStack)) {
+                return recipe.result;
+            }
+        }
+        return std::nullopt;
+    }
+    const std::optional<registry::brewing::Brew> mixed = registry::brewing::mix(bottle.item, potion, reagent);
+    if (!mixed.has_value()) {
+        return std::nullopt;
+    }
+    ItemStack turned{.item = mixed->bottle, .count = bottle.count};
+    if (mixed->potion.has_value()) {
+        wire::nbt::NbtCompound contents;
+        contents.putString("potion", "minecraft:" + *mixed->potion);
+        turned.components.set(kPotionContents, wire::nbt::NbtTag::ofCompound(std::move(contents)));
+    }
+    return turned;
+}
+
+bool isReagent(const wire::common::Identifier& item) {
+    if (installed().empty()) {
+        return registry::brewing::isIngredient(item);
+    }
+    const std::string name = item.toString();
+    return std::ranges::any_of(
+        installed(), [&name](const crafting::Recipe& recipe) { return recipe.ingredient.items.contains(name); });
+}
+
+bool isPotionInput(const wire::common::Identifier& item) {
+    // parity: `#brewing_potion_inputs` as the jar ships it.
+    static constexpr std::array<std::string_view, 4> kInputs{"potion", "splash_potion", "lingering_potion",
+                                                             "glass_bottle"};
+    if (item.namespaceName() == "minecraft" && std::ranges::find(kInputs, item.path()) != kInputs.end()) {
+        return true;
+    }
+    const std::string name = item.toString();
+    return std::ranges::any_of(installed(),
+                               [&name](const crafting::Recipe& recipe) { return recipe.base.items.contains(name); });
+}
 
 const wire::common::Identifier& block() {
     static const wire::common::Identifier instance = wire::common::Identifier::vanilla("brewing_stand");
@@ -130,7 +206,7 @@ bool tick(State& state, const DropRemainder& drop) {
 bool isBrewable(const State& state) {
     const std::optional<server::world::loot::ItemStack>& ingredient =
         state.items[static_cast<std::size_t>(kIngredientSlot)];
-    if (!ingredient.has_value() || !registry::brewing::isIngredient(ingredient->item)) {
+    if (!ingredient.has_value() || !isReagent(ingredient->item)) {
         return false;
     }
     for (std::int32_t slot = 0; slot < kBottles; ++slot) {
@@ -138,7 +214,7 @@ bool isBrewable(const State& state) {
         if (!state.items[index].has_value()) {
             continue;
         }
-        if (registry::brewing::mix(state.items[index]->item, state.potions[index], ingredient->item).has_value()) {
+        if (brewed(*state.items[index], state.potions[index], ingredient->item).has_value()) {
             return true;
         }
     }

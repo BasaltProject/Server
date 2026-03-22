@@ -254,6 +254,13 @@ TEST_CASE("a shape answers the questions a fluid and a torch ask of it") {
     const std::int32_t air = blocks::air().stateId;
     CHECK(blockShapes::isEmptyShape(air));
     CHECK_FALSE(blockShapes::blocksMotion(air));
+    // parity: 26.3 reads it off `#blocks_motion`, which heightmaps follow: signs left it, walls joined.
+    const std::optional<std::int32_t> sign = blocks::defaultStateIdOf(Identifier::vanilla("oak_sign"));
+    const std::optional<std::int32_t> wall = blocks::defaultStateIdOf(Identifier::vanilla("resin_brick_wall"));
+    REQUIRE(sign.has_value());
+    REQUIRE(wall.has_value());
+    CHECK_FALSE(blockShapes::blocksMotion(*sign));
+    CHECK(blockShapes::blocksMotion(*wall));
     // parity: air is replaceable, which is what lets a block be placed into it at all.
     CHECK(blockShapes::isReplaceable(air));
 }

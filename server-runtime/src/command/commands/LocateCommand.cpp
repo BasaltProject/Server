@@ -120,7 +120,9 @@ void LocateCommand::build(const CommandNodeBuilder& root) const {
         form.argument(
             "structure", resourceOrTagKeyArgument("minecraft:worldgen/structure"), [](const CommandNodeBuilder& named) {
                 named.suggestsFromServer([](const SuggestionContext& context) {
-                    std::vector<Identifier> ids = terrain::VillageStructureGenerator::structureIds();
+                    const world::LoadedWorld* world = context.world();
+                    std::vector<Identifier> ids = world == nullptr ? terrain::VillageStructureGenerator::structureIds()
+                                                                   : world->structureSetIds();
                     ids.push_back(stronghold());
                     return context.matchingIds(ids);
                 });
@@ -152,12 +154,12 @@ void LocateCommand::build(const CommandNodeBuilder& root) const {
                         x = found->first * 16;
                         z = found->second * 16;
                     } else {
-                        terrain::VillageStructureGenerator* villages = (*world)->villageGenerator();
-                        if (villages == nullptr) {
+                        const std::vector<Identifier> known = (*world)->structureSetIds();
+                        if (known.empty()) {
                             return std::unexpected{notFound("commands.locate.structure.not_found", *wanted)};
                         }
-                        const std::vector<Identifier>& known = terrain::VillageStructureGenerator::structureIds();
-                        if (std::ranges::find(known, *wanted) == known.end()) {
+                        terrain::VillageStructureGenerator* generator = (*world)->structureSetGenerator(*wanted);
+                        if (generator == nullptr) {
                             std::string listed;
                             for (const Identifier& id : known) {
                                 listed += listed.empty() ? id.toString() : ", " + id.toString();
@@ -168,7 +170,7 @@ void LocateCommand::build(const CommandNodeBuilder& root) const {
                                     "' is not a structure this build generates. Available: " + listed)}};
                         }
                         const std::optional<terrain::LocatedVillage> found =
-                            villages->locate((*world)->metadata().seed, startX >> 4, startZ >> 4, wanted);
+                            generator->locate((*world)->metadata().seed, startX >> 4, startZ >> 4, wanted);
                         if (!found.has_value()) {
                             return std::unexpected{notFound("commands.locate.structure.not_found", *wanted)};
                         }

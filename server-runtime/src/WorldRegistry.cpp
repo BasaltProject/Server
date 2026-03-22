@@ -79,6 +79,7 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
         // The one generation itself uses, so `/place structure` and `/locate structure` act on the
         // same villages the world already has.
         options.villageGenerator = built.villages;
+        options.campGenerator = built.camps;
         options.strongholdGenerator = built.strongholds;
         options.spawnChunkFinder = built.spawnChunk;
         if (built.generate) {

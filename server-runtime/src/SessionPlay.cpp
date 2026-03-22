@@ -654,6 +654,16 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         }
         return;
     }
+    // parity: 26.3 `handleAcceptTeleportPacket` applies the carried position as a move off the ground;
+    // the client no longer follows the confirmation with a move packet of its own.
+    if (packetId == play::AcceptTeleportationPacket::kId) {
+        const std::optional<play::AcceptTeleportationPacket> accept = play::AcceptTeleportationPacket::read(body);
+        if (accept.has_value() && session != nullptr && std::isfinite(accept->x) && std::isfinite(accept->y) &&
+            std::isfinite(accept->z) && std::isfinite(accept->yaw) && std::isfinite(accept->pitch)) {
+            updatePosition(accept->x, accept->y, accept->z, accept->yaw, accept->pitch, false);
+        }
+        return;
+    }
     // parity: `ServerboundMovePlayerPacket.Rot`, which a client sends when it turns on the spot.
     if (packetId == kMovePlayerRotId) {
         const float yaw = body.readFloat();

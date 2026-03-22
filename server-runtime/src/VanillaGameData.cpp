@@ -1,5 +1,6 @@
 #include <basalt/server/assets/ServerJarAssets.hpp>
 #include <basalt/server/runtime/VanillaGameData.hpp>
+#include <basalt/server/runtime/world/BrewingStands.hpp>
 
 #include <utility>
 
@@ -55,6 +56,11 @@ VanillaGameData::VanillaGameData(const Jar& jar, wire::common::Logger logger)
       structureTemplates({.readEntry = jar.readEntry, .dataIds = jar.dataIds}) {
     lootTables.useRegistries(&lootRegistries);
     villagerTrades.useLootTables(&lootTables);
+    std::vector<server::world::crafting::Recipe> brews;
+    for (const server::world::crafting::Recipe* recipe : recipes.brewing()) {
+        brews.push_back(*recipe);
+    }
+    world::brewingStands::useRecipes(std::move(brews));
     // Loud on purpose: a client whose overworld timeline tag is empty renders a sky that never
     // moves, and nothing else in the log would say why.
     const std::set<Identifier>& overworld =

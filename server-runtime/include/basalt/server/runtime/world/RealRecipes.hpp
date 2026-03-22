@@ -84,6 +84,11 @@ public:
         return smithing_;
     }
 
+    /// Every `minecraft:brewing` recipe, in the order they were read.
+    [[nodiscard]] const std::vector<const server::world::crafting::Recipe*>& brewing() const noexcept {
+        return brewing_;
+    }
+
     /// What a smithing table makes of these three slots, or nothing when they are not a recipe.
     [[nodiscard]] const server::world::crafting::Recipe*
     smithingFor(const server::world::loot::ItemStack* templateStack, const server::world::loot::ItemStack* baseStack,
@@ -114,6 +119,7 @@ private:
     std::map<server::world::crafting::Cooker, std::vector<const server::world::crafting::Recipe*>> cooking_;
     std::vector<const server::world::crafting::Recipe*> stonecutting_;
     std::vector<const server::world::crafting::Recipe*> smithing_;
+    std::vector<const server::world::crafting::Recipe*> brewing_;
 };
 
 } // namespace basalt::server::runtime::world

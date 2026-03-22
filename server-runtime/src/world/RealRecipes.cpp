@@ -82,6 +82,9 @@ RealRecipes::RealRecipes(const Jar& jar, wire::common::Logger logger) : logger_(
         case crafting::RecipeKind::Smithing:
             smithing_.push_back(&recipe);
             break;
+        case crafting::RecipeKind::Brewing:
+            brewing_.push_back(&recipe);
+            break;
         default:
             break;
         }

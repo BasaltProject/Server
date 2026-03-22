@@ -53,6 +53,7 @@ public:
                                            const std::function<void(server::world::Chunk&)>& beforeDecoration)>
             generate;
         server::world::terrain::VillageStructureGenerator* villages = nullptr;
+        server::world::terrain::VillageStructureGenerator* camps = nullptr;
         server::world::terrain::StrongholdStructureGenerator* strongholds = nullptr;
         /// parity: `randomState().sampler().findSpawnPosition()`, in chunk coordinates.
         std::function<std::pair<std::int32_t, std::int32_t>()> spawnChunk;
