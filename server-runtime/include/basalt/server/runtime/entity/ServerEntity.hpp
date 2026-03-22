@@ -124,6 +124,9 @@ public:
     /// `PrimedTnt.fuse`.
     std::int32_t fuse = kNoFuse;
 
+    /// parity: `BlockAttachedEntity.ticksSinceLastCheck`, not saved.
+    std::int32_t attachedCheckTicks = 0;
+
     /// parity: `LivingEntity.invulnerableTime`, the half second after a hit when most others miss.
     std::int32_t hurtCooldown = 0;
 

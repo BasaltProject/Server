@@ -57,6 +57,43 @@ bool canHang(const WorldState& world, const std::int32_t x, const std::int32_t y
     return true;
 }
 
+bool survives(const WorldState& world, const entity::ServerEntity& frame) {
+    const wire::nbt::NbtCompound* data = frame.sourceNbt.has_value() ? &*frame.sourceNbt : nullptr;
+    if (data != nullptr && data->getBoolean("Fixed")) {
+        return true;
+    }
+    const auto facing = static_cast<registry::BlockFace>(data == nullptr ? 0 : data->getByte("Facing", 0));
+    const std::array<std::int32_t, 3> square = squareOf(frame);
+    const std::optional<std::int32_t> here = world.blockState(square[0], square[1], square[2]);
+    if (!here.has_value() || !registry::blockShapes::collisionBoxes(*here).empty()) {
+        return false;
+    }
+    const std::optional<std::int32_t> behind = world.blockState(
+        square[0] - registry::stepX(facing), square[1] - registry::stepY(facing), square[2] - registry::stepZ(facing));
+    if (!behind.has_value()) {
+        return true;
+    }
+    const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*behind);
+    const std::string_view path = block == nullptr ? std::string_view{} : block->path();
+    const bool horizontal = facing != registry::BlockFace::Up && facing != registry::BlockFace::Down;
+    if (!registry::blockShapes::isSolidState(*behind) &&
+        !(horizontal && (path == "repeater" || path == "comparator"))) {
+        return false;
+    }
+    // parity: `canCoexist(true)`: only another hanging entity facing the same way is in the way.
+    for (const entity::ServerEntity* other : world.entities()) {
+        if (other == nullptr || other == &frame || other->removed || !isFrame(other->type()) ||
+            squareOf(*other) != square) {
+            continue;
+        }
+        const std::int32_t otherFacing = other->sourceNbt.has_value() ? other->sourceNbt->getByte("Facing", 0) : 0;
+        if (otherFacing == static_cast<std::int32_t>(facing)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 wire::nbt::NbtCompound freshTag(const server::registry::BlockFace facing) {
     wire::nbt::NbtCompound tag;
     tag.putByte("Facing", static_cast<std::int8_t>(facing));

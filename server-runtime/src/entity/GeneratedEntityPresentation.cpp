@@ -285,8 +285,7 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
         if (colour.has_value() && *colour != 0) {
             entries.push_back(Entry{
                 .index = world::cushions::kColorDataIndex,
-                .value = SetEntityDataPacket::RegistryIdValue{
-                    .value = *colour, .registry = static_cast<RegistryHolder>(world::cushions::kDyeColorSerializer)}});
+                .value = SetEntityDataPacket::RegistryIdValue{.value = *colour, .registry = RegistryHolder::DyeColor}});
         }
     }
     // parity: `Painting.DATA_PAINTING_VARIANT_ID`, right after the direction a hanging entity

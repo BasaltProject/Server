@@ -1,10 +1,16 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
+#include <basalt/server/runtime/world/FallLanding.hpp>
 
 #include <doctest.h>
 
 namespace combat = basalt::server::runtime::player::combat;
+namespace fallLanding = basalt::server::runtime::world::fallLanding;
+namespace registry = basalt::server::registry;
+using basalt::wire::common::Identifier;
 
 TEST_CASE("armour is worth less against a big hit than a small one") {
     // parity: `CombatRules.getDamageAfterAbsorb`, whose whole point is that a full set of armour
@@ -128,4 +134,32 @@ TEST_CASE("resistance counts in fifths and stops at nothing") {
     // parity: level four and above takes everything rather than healing the player.
     CHECK(combat::afterResistance(10.0F, 4) == doctest::Approx(0.0F));
     CHECK(combat::afterResistance(10.0F, 40) == doctest::Approx(0.0F));
+}
+
+TEST_CASE("a bed or a shelf mushroom halves the fall, hay a fifth of the damage, slime all of it") {
+    const auto landing = [](const char* path) {
+        const registry::BlockState* block = registry::blocks::named(path);
+        REQUIRE(block != nullptr);
+        return fallLanding::of(block->stateId, false);
+    };
+    // Ten blocks is seven past the safe three.
+    CHECK(fallLanding::damage(10.0, landing("stone"), combat::kSafeFallDistance) == 7);
+    CHECK(fallLanding::damage(10.0, landing("red_bed"), combat::kSafeFallDistance) == 2);
+    CHECK(fallLanding::damage(10.0, landing("shelf_mushroom"), combat::kSafeFallDistance) == 2);
+    CHECK(fallLanding::damage(10.0, landing("straw_bed"), combat::kSafeFallDistance) == 7);
+    CHECK(fallLanding::damage(10.0, landing("hay_block"), combat::kSafeFallDistance) == 1);
+    CHECK(fallLanding::damage(10.0, landing("slime_block"), combat::kSafeFallDistance) == 0);
+
+    const registry::BlockState* slime = registry::blocks::named("slime_block");
+    REQUIRE(slime != nullptr);
+    CHECK(fallLanding::damage(10.0, fallLanding::of(slime->stateId, true), combat::kSafeFallDistance) == 7);
+}
+
+TEST_CASE("the point of a stalagmite adds two and a half blocks and doubles the damage") {
+    const std::optional<std::int32_t> tip = registry::blockStateDefinitions::stateIdOf(
+        Identifier::vanilla("pointed_dripstone"), {{"vertical_direction", "up"}, {"thickness", "tip"}}, std::nullopt);
+    REQUIRE(tip.has_value());
+    const fallLanding::Landing landing = fallLanding::of(*tip, false);
+    CHECK(landing.stalagmite);
+    CHECK(fallLanding::damage(4.0, landing, combat::kSafeFallDistance) == 7);
 }

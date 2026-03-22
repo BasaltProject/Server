@@ -34,21 +34,22 @@ public:
     void build(const CommandNodeBuilder& root) const override;
 };
 
-/// parity: `ItemCommands`.
+/// parity: 26.3 `ItemCommands`: `replace`, `fill` and `override` a block's or entities' slots with an
+/// item or with what another holder has, and `modify` them with an item modifier.
 ///
-/// `replace` and the `from` copies work on both a player and a container. The `modify` forms are
-/// declared and refuse by name: an item modifier is a loot function, and none are loaded here, so
-/// accepting one would copy the stack unchanged and report a success that never happened.
+/// The slots are a `SlotRanges` name; a registered or inline slot source is refused by name. Of the
+/// entities only a player has slots here.
 class ItemCommand final : public Command {
 public:
-    /// `recipes` is only for the furnace: writing its input slot sets the cooking time, which is what
-    /// `setItem` does in the jar. Without one a furnace keeps whatever time it had.
-    explicit ItemCommand(world::RealRecipes* recipes = nullptr);
+    /// `recipes` is only for the furnace: writing its input slot sets the cooking time. `lootTables`
+    /// resolves a modifier named by id; without it only an inline one works.
+    explicit ItemCommand(world::RealRecipes* recipes = nullptr, world::RealLootTables* lootTables = nullptr);
 
     void build(const CommandNodeBuilder& root) const override;
 
 private:
     world::RealRecipes* recipes_ = nullptr;
+    world::RealLootTables* lootTables_ = nullptr;
 };
 
 /// parity: `LootCommand`: four destinations and four sources, each pairing the same way.

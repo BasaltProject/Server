@@ -13,6 +13,7 @@
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/Cushions.hpp>
 #include <basalt/server/runtime/world/DamageProtection.hpp>
+#include <basalt/server/runtime/world/FallLanding.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -122,7 +123,7 @@ void CombatHandler::trackFall(PlayerSession& session, double y, bool onGround,
                                         {.entity = session.uuid()});
             }
         }
-        applyFallDamage(session);
+        applyFallDamage(session, y);
         fallDistance = 0.0;
     }
     if (onGround) {
@@ -130,16 +131,29 @@ void CombatHandler::trackFall(PlayerSession& session, double y, bool onGround,
     }
 }
 
-void CombatHandler::applyFallDamage(PlayerSession& session) {
+void CombatHandler::applyFallDamage(PlayerSession& session, const double landingY) {
     world::LoadedWorld* world = owner_->currentWorld();
     if (world != nullptr && !world->gameRules().get(world::gameRules::kFallDamage)) {
         return;
     }
-    const std::int32_t damage = player::combat::fallDamage(fallDistance);
+    // parity: `Entity.checkFallDamage` hands the fall to the block under the feet, `Block.fallOn`.
+    const std::optional<std::int32_t> under =
+        world == nullptr ? std::nullopt
+                         : world->state().blockState(
+                               static_cast<std::int32_t>(std::floor(session.x)),
+                               static_cast<std::int32_t>(std::floor(landingY - world::fallLanding::kProbeDepth)),
+                               static_cast<std::int32_t>(std::floor(session.z)));
+    const world::fallLanding::Landing landing =
+        under.has_value() ? world::fallLanding::of(*under, session.sneaking) : world::fallLanding::Landing{};
+    const std::int32_t damage = world::fallLanding::damage(fallDistance, landing, player::combat::kSafeFallDistance);
     if (damage <= 0) {
         return;
     }
-    session.stats.addFallen(fallDistance);
+    session.stats.addFallen(fallDistance * landing.distanceScale + landing.extraDistance);
+    if (landing.stalagmite) {
+        owner_->hurt(static_cast<float>(damage), "stalagmite", world::damageTypes::kStalagmite);
+        return;
+    }
     owner_->hurt(static_cast<float>(damage), "fall", world::damageTypes::kFall);
 }
 

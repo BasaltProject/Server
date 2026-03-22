@@ -29,14 +29,27 @@ using wire::nbt::NbtTag;
     return value;
 }
 
-[[nodiscard]] NbtCompound bedRule(std::string_view canSetSpawn, std::string_view canSleep, bool explodes) {
+/// parity: `BedRule`. A bed that cannot be used where it stands is destroyed on use, and a straw
+/// bed also when its sleeper leaves it.
+[[nodiscard]] NbtCompound bedRule(std::string_view canSetSpawn, std::string_view canSleep, bool destroyOnUse,
+                                  bool destroyOnLeave = false) {
     NbtCompound value;
     value.putString("can_set_spawn", std::string{canSetSpawn});
     value.putString("can_sleep", std::string{canSleep});
-    if (explodes) {
-        value.putBoolean("explodes", true);
+    if (destroyOnLeave) {
+        value.putBoolean("destroy_on_leave", true);
+    }
+    if (destroyOnUse) {
+        value.putBoolean("destroy_on_use", true);
     }
     return value;
+}
+
+[[nodiscard]] NbtCompound withNoSleepMessage(NbtCompound rule) {
+    NbtCompound errorMessage;
+    errorMessage.putString("translate", "block.minecraft.bed.no_sleep");
+    rule.set("error_message", NbtTag::ofCompound(std::move(errorMessage)));
+    return rule;
 }
 
 [[nodiscard]] NbtCompound ambientCaveSounds() {
@@ -58,11 +71,10 @@ using wire::nbt::NbtTag;
     backgroundMusic.set("default", NbtTag::ofCompound(music("minecraft:music.game", 12000, 24000)));
     value.set("minecraft:audio/background_music", NbtTag::ofCompound(std::move(backgroundMusic)));
 
-    NbtCompound bed = bedRule("always", "when_dark", false);
-    NbtCompound errorMessage;
-    errorMessage.putString("translate", "block.minecraft.bed.no_sleep");
-    bed.set("error_message", NbtTag::ofCompound(std::move(errorMessage)));
-    value.set("minecraft:gameplay/bed_rule", NbtTag::ofCompound(std::move(bed)));
+    value.set("minecraft:gameplay/bed_rule",
+              NbtTag::ofCompound(withNoSleepMessage(bedRule("always", "when_dark", false))));
+    value.set("minecraft:gameplay/straw_bed_rule",
+              NbtTag::ofCompound(withNoSleepMessage(bedRule("never", "when_dark", false, true))));
 
     value.putBoolean("minecraft:gameplay/nether_portal_spawns_piglin", true);
     value.putBoolean("minecraft:gameplay/respawn_anchor_works", false);
@@ -77,6 +89,7 @@ using wire::nbt::NbtTag;
 [[nodiscard]] NbtCompound netherAttributes() {
     NbtCompound value;
     value.set("minecraft:gameplay/bed_rule", NbtTag::ofCompound(bedRule("never", "never", true)));
+    value.set("minecraft:gameplay/straw_bed_rule", NbtTag::ofCompound(bedRule("never", "never", true)));
     value.putBoolean("minecraft:gameplay/can_start_raid", false);
     value.putBoolean("minecraft:gameplay/fast_lava", true);
     value.putBoolean("minecraft:gameplay/piglins_zombify", false);
@@ -102,6 +115,7 @@ using wire::nbt::NbtTag;
     backgroundMusic.set("default", NbtTag::ofCompound(music("minecraft:music.end", 6000, 24000, true)));
     value.set("minecraft:audio/background_music", NbtTag::ofCompound(std::move(backgroundMusic)));
     value.set("minecraft:gameplay/bed_rule", NbtTag::ofCompound(bedRule("never", "never", true)));
+    value.set("minecraft:gameplay/straw_bed_rule", NbtTag::ofCompound(bedRule("never", "never", true)));
     value.putBoolean("minecraft:gameplay/respawn_anchor_works", false);
     value.putString("minecraft:visual/ambient_light_color", "#3f473f");
     value.putString("minecraft:visual/fog_color", "#181318");

@@ -84,8 +84,8 @@ namespace {
                    "result":{"id":"minecraft:leather_helmet","count":1}})"},
         {"imbue", R"({"type":"minecraft:crafting_imbue","source":"minecraft:lingering_potion",
                    "material":"minecraft:arrow","result":{"id":"minecraft:tipped_arrow","count":8}})"},
-        {"pot", R"({"type":"minecraft:crafting_decorated_pot","back":"minecraft:brick",
-                   "result":{"id":"minecraft:decorated_pot"}})"},
+        {"pot", R"({"type":"minecraft:crafting_decorated_pot","back":"minecraft:brick","left":"minecraft:brick",
+                   "right":"minecraft:brick","front":"minecraft:brick","result":{"id":"minecraft:decorated_pot"}})"},
         {"bookcloning", R"({"type":"minecraft:crafting_special_bookcloning","source":"minecraft:written_book",
                    "material":"minecraft:writable_book","result":{"id":"minecraft:written_book","count":1}})"},
         {"bannerduplicate", R"({"type":"minecraft:crafting_special_bannerduplicate","banner":"#minecraft:banners",
@@ -628,7 +628,7 @@ TEST_CASE("the recipes match and assemble what the frozen kotlin does") {
               "minecraft:tipped_arrowx8{}", "-,-,-,-,-,-,-,-,-", -6866018611245368902LL);
     }
     SUBCASE("pot") {
-        check("pot", "pot", true, "", "special/DECORATED_POT/-;minecraft:brick;-/", "minecraft:decorated_potx1{}",
+        check("pot", "pot", true, "", "special/DECORATED_POT/-;-;-/", "minecraft:decorated_potx1{}",
               "-,-,-,-,-,-,-,-,-", -5253826018343243157LL);
     }
     SUBCASE("mapextending") {

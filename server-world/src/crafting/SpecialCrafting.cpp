@@ -98,12 +98,36 @@ constexpr std::string_view kFlightDuration = "minecraft:fireworks_flight_duratio
     if (input.width() != 3 || input.height() != 3 || input.ingredientCount() != 4) {
         return std::nullopt;
     }
-    for (const loot::ItemStack* side : {input.item(1, 0), input.item(0, 1), input.item(2, 1), input.item(1, 2)}) {
-        if (!tests(recipe.material, side)) {
+    // Back, left, right and front, each tested against its own side's ingredient.
+    const std::array<const loot::ItemStack*, 4> sides{input.item(1, 0), input.item(0, 1), input.item(2, 1),
+                                                      input.item(1, 2)};
+    static constexpr std::array<std::string_view, 4> kSideNames{"back", "left", "right", "front"};
+    if (recipe.ingredients.size() != sides.size()) {
+        return std::nullopt;
+    }
+    NbtCompound decorations;
+    bool allBrick = true;
+    for (std::size_t index = 0; index < sides.size(); ++index) {
+        const loot::ItemStack* side = sides[index];
+        if (side == nullptr || !recipe.ingredients[index].test(side)) {
             return std::nullopt;
         }
+        // parity: `ItemStackTemplate.fromNonEmptyStack(input, 1)`, the item and its components.
+        allBrick = allBrick && side->item.toString() == "minecraft:brick" && side->components.size() == 0;
+        NbtCompound entry;
+        entry.putString("id", side->item.toString());
+        if (side->components.size() > 0) {
+            entry.set("components", NbtTag::ofCompound(side->components));
+        }
+        decorations.set(kSideNames[index], NbtTag::ofCompound(std::move(entry)));
     }
-    return recipe.result;
+    loot::ItemStack result = recipe.result;
+    // parity: `Items.DECORATED_POT` defaults to four bricks, and a patch equal to the default is dropped.
+    if (allBrick && result.item.toString() == "minecraft:decorated_pot") {
+        return result;
+    }
+    result.components.set("minecraft:pot_decorations", NbtTag::ofCompound(std::move(decorations)));
+    return result;
 }
 
 /// parity: `DyeRecipe` and `FireworkStarFadeRecipe`: exactly one thing being coloured and at least

@@ -9,6 +9,10 @@
 #include <cstdint>
 #include <optional>
 
+namespace basalt::server::runtime::entity {
+class ServerEntity;
+}
+
 namespace basalt::server::runtime::world {
 
 /// Hanging a painting: which art fits the wall and where its middle ends up.
@@ -23,6 +27,10 @@ namespace paintings {
                                                                              std::int32_t y, std::int32_t z,
                                                                              server::registry::BlockFace facing,
                                                                              random::RandomSource& random);
+
+/// parity: `HangingEntity.survives` for a painting already on the wall. Another hanging entity
+/// sharing its squares is not asked about here.
+[[nodiscard]] bool survives(const WorldState& world, const entity::ServerEntity& painting);
 
 /// parity: `Painting.calculateBoundingBox`: the square's centre pushed back against the wall, then
 /// half a block along the left and up for each even side.

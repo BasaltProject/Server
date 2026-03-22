@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/Paintings.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <string_view>
 #include <vector>
 
@@ -32,8 +33,8 @@ using Painting = registry::vanillaRegistryData::Painting;
 
 /// parity: `HangingEntity.survives`, block by block: every square behind the art holds it up, every
 /// square it covers is clear, and nothing else hangs in any of them.
-[[nodiscard]] bool survives(const WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
-                            const reg::BlockFace facing, const Painting& painting) {
+[[nodiscard]] bool fits(const WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
+                        const reg::BlockFace facing, const Painting& painting) {
     const reg::BlockFace left = leftOf(facing);
     // parity: `(size - 1) / -2`, which truncates towards zero, so an even side leans one way.
     const std::int32_t firstAcross = (painting.width - 1) / -2;
@@ -75,7 +76,7 @@ std::optional<Painting> fitting(const WorldState& world, const std::int32_t x, c
     std::vector<const Painting*> candidates;
     std::int32_t largest = 0;
     for (const Painting& painting : registry::vanillaRegistryData::paintingVariants()) {
-        if (!survives(world, x, y, z, facing, painting)) {
+        if (!fits(world, x, y, z, facing, painting)) {
             continue;
         }
         largest = std::max(largest, painting.width * painting.height);
@@ -88,6 +89,31 @@ std::optional<Painting> fitting(const WorldState& world, const std::int32_t x, c
         return std::nullopt;
     }
     return *candidates[static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(candidates.size())))];
+}
+
+bool survives(const WorldState& world, const entity::ServerEntity& painting) {
+    // A painting whose facing this build did not write is left to hang.
+    if (!painting.sourceNbt.has_value() || !painting.sourceNbt->contains("Facing")) {
+        return true;
+    }
+    const auto facing = static_cast<reg::BlockFace>(painting.sourceNbt->getByte("Facing"));
+    std::string_view variant = painting.sourceNbt->getString("variant");
+    if (variant.starts_with("minecraft:")) {
+        variant.remove_prefix(std::string_view{"minecraft:"}.size());
+    }
+    const std::vector<Painting>& all = registry::vanillaRegistryData::paintingVariants();
+    const auto art = std::ranges::find(all, variant, &Painting::id);
+    if (art == all.end() || facing == reg::BlockFace::Up || facing == reg::BlockFace::Down) {
+        return true;
+    }
+    // The inverse of `hangingAt`: the half blocks an even side shifts by, taken back off the middle.
+    const reg::BlockFace left = leftOf(facing);
+    const double across = art->width % 2 == 0 ? 0.5 : 0.0;
+    const double up = art->height % 2 == 0 ? 0.5 : 0.0;
+    const auto x = static_cast<std::int32_t>(std::floor(painting.x - (reg::stepX(left) * across)));
+    const auto y = static_cast<std::int32_t>(std::floor(painting.y - up));
+    const auto z = static_cast<std::int32_t>(std::floor(painting.z - (reg::stepZ(left) * across)));
+    return fits(world, x, y, z, facing, *art);
 }
 
 std::array<double, 3> hangingAt(const std::int32_t x, const std::int32_t y, const std::int32_t z,
