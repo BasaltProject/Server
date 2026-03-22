@@ -13,15 +13,24 @@ basalt_module(server-world
         src/ChunkSection.cpp
         src/ChunkTypes.cpp
         src/PalettedContainer.cpp
+        src/BlockStateJson.cpp
+        src/densityfunction/DensityFunctionJson.cpp
+        src/densityfunction/Generators.cpp
+        src/densityfunction/Operators.cpp
+        src/densityfunction/RandomState.cpp
+        src/densityfunction/SamplerContext.cpp
+        src/densityfunction/Structural.cpp
+        src/noise/Interval.cpp
+        src/noise/Noise.cpp
+        src/terrain/NoiseChunk.cpp
+        src/terrain/material/MaterialRuleJson.cpp
+        src/terrain/material/MaterialSystem.cpp
         src/climate/Climate.cpp
     src/climate/SpawnFinder.cpp
         src/climate/OverworldBiomes.cpp
-        src/densityfunction/DensityCache.cpp
-        src/densityfunction/DensityFunction.cpp
         src/light/Light.cpp
         src/light/LightSpread.cpp
         src/light/LightWindow.cpp
-        src/noise/ImprovedNoise.cpp
         src/region/AnvilRegion.cpp
         src/region/ChunkNbt.cpp
         src/region/LinearRegion.cpp
@@ -59,8 +68,7 @@ basalt_module(server-world
     src/structure/TemplateBlockProcessors.cpp
     src/structure/StructureTransform.cpp
     src/structure/VillagePoolJson.cpp
-        src/terrain/carver/NetherCaveCarver.cpp
-    src/terrain/carver/OverworldCarvers.cpp
+        src/terrain/carver/Carvers.cpp
     src/terrain/decoration/AquaticDecoration.cpp
     src/terrain/decoration/AquaticPatchDecoration.cpp
     src/terrain/decoration/AquaticSupport.cpp
@@ -165,13 +173,7 @@ basalt_module(server-world
     src/terrain/DensityChunkSampler.cpp
     src/terrain/NetherBiomeSource.cpp
     src/terrain/TheEndBiomeSource.cpp
-    src/terrain/surface/BadlandsClayBands.cpp
-    src/terrain/surface/SurfaceBuilder.cpp
     src/terrain/surface/ChunkBiomeEnvironment.cpp
-    src/terrain/surface/SurfaceRuleContext.cpp
-    src/terrain/surface/SurfaceRuleData.cpp
-    src/terrain/surface/SurfaceRuleEnvironment.cpp
-    src/terrain/surface/SurfaceRules.cpp
     src/advancement/Advancement.cpp
     src/advancement/AdvancementJson.cpp
     src/crafting/Crafting.cpp
@@ -197,7 +199,6 @@ basalt_module(server-world
     src/terrain/EndCityPieces.cpp
     src/terrain/EndCityStructureGenerator.cpp
     src/terrain/StructureReferenceOrder.cpp
-    src/terrain/TerrainProvider.cpp
     src/terrain/VillageStructureGenerator.cpp
     src/terrain/WoodlandMansionStructureGenerator.cpp
     src/terrain/IglooStructureGenerator.cpp
@@ -220,16 +221,11 @@ basalt_module(server-world
     src/terrain/SwampHutStructureGenerator.cpp
     src/terrain/OverworldBiomeSource.cpp
     src/terrain/NoiseRouterData.cpp
-    src/terrain/OverworldOreVeinifier.cpp
     src/terrain/OceanMonumentStructureGenerator.cpp
     src/terrain/OceanRuinStructureGenerator.cpp
-    src/terrain/OverworldAquifer.cpp
     src/terrain/JigsawStructureGenerator.cpp
     src/terrain/JigsawStructureSettings.cpp
         src/noise/NormalNoise.cpp
-        src/noise/PerlinNoise.cpp
-        src/noise/SimplexNoise.cpp
-    src/noise/PerlinSimplexNoise.cpp
     DEPENDS basalt::server-random basalt::server-registry basalt::wire-common basalt::wire-io
             basalt::wire-protocol basalt::wire-text
 )
@@ -256,9 +252,9 @@ basalt_test(server-world-simple-generators-test
     DEPENDS basalt::server-world
 )
 
-basalt_test(server-world-noise-test
+basalt_test(server-world-levelgen-test
     SOURCES
-        test/NoiseTest.cpp
+        test/LevelgenTest.cpp
     DEPENDS basalt::server-world
 )
 
@@ -640,12 +636,6 @@ basalt_test(server-world-placed-features-test
     DEPENDS basalt::server-world
 )
 
-basalt_test(server-world-ore-vein-column-test
-    SOURCES
-        test/OreVeinColumnTest.cpp
-    DEPENDS basalt::server-world
-)
-
 basalt_test(server-world-overworld-biome-source-test
     SOURCES
         test/OverworldBiomeSourceTest.cpp
@@ -928,18 +918,6 @@ basalt_test(server-world-placement-test
     DEPENDS basalt::server-world
 )
 
-basalt_test(server-world-carver-test
-    SOURCES
-        test/CarverTest.cpp
-    DEPENDS basalt::server-world
-)
-
-basalt_test(server-world-surface-test
-    SOURCES
-        test/SurfaceTest.cpp
-    DEPENDS basalt::server-world
-)
-
 basalt_test(server-world-biome-test
     SOURCES
         test/BiomeTest.cpp
@@ -988,39 +966,9 @@ basalt_test(server-world-end-decoration-test
     DEPENDS basalt::server-world
 )
 
-basalt_test(server-world-aquifer-test
-    SOURCES
-        test/AquiferTest.cpp
-    DEPENDS basalt::server-world
-)
-
-basalt_test(server-world-noise-router-test
-    SOURCES
-        test/NoiseRouterTest.cpp
-    DEPENDS basalt::server-world
-)
-
-basalt_test(server-world-terrain-test
-    SOURCES
-        test/TerrainTest.cpp
-    DEPENDS basalt::server-world
-)
-
 basalt_test(server-world-climate-test
     SOURCES
         test/ClimateTest.cpp
-    DEPENDS basalt::server-world
-)
-
-basalt_test(server-world-density-test
-    SOURCES
-        test/DensityTest.cpp
-    DEPENDS basalt::server-world
-)
-
-basalt_test(server-world-spline-test
-    SOURCES
-        test/SplineTest.cpp
     DEPENDS basalt::server-world
 )
 

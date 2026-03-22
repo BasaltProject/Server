@@ -107,17 +107,17 @@ void check(const Run& result, std::int32_t placed, std::int32_t written, std::si
 TEST_CASE("the mineshaft fill writes what the jar writes") {
     SUBCASE("normal") {
         check(run(4242, MineshaftType::Normal, false, "minecraft:plains", 40), 244, 22655, 2, 5, 0,
-              -5252154790985086062LL);
+              -4082655863954858418LL);
     }
 
     SUBCASE("mesa") {
         check(run(4242, MineshaftType::Mesa, false, "minecraft:badlands", 40), 390, 36630, 4, 4, 0,
-              6487294457901109038LL);
+              7690371897065480798LL);
     }
 
     SUBCASE("flooded") {
         check(run(4242, MineshaftType::Normal, true, "minecraft:plains", 40), 244, 27505, 3, 2, 0,
-              -120515259870943891LL);
+              -6772194417760311980LL);
     }
 
     SUBCASE("deepDark") {

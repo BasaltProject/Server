@@ -19,8 +19,8 @@ public:
     using SurfaceHeightAt = std::function<std::int32_t(std::int32_t, std::int32_t)>;
 
     static constexpr std::string_view kName = "swamp_hut";
-    /// Twenty-first of the 26 structures of `surface_structures`, in registry order.
-    static constexpr std::int32_t kStructureIndex = 20;
+    /// Position among the 44 structures of `surface_structures`, in registry order.
+    static constexpr std::int32_t kStructureIndex = 38;
     static constexpr std::int32_t kSurfaceStructuresStep = 4;
 
     SwampHutStructureGenerator(BiomeAt biomeAt, SurfaceHeightAt surfaceHeightAt);

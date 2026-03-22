@@ -15,7 +15,7 @@ namespace basalt::server::world::terrain::decoration {
 namespace {
 
 constexpr std::int32_t kVegetalDecorationStep = 9;
-constexpr std::int32_t kFeatureIndex = 91;
+constexpr std::int32_t kFeatureIndex = 94;
 
 struct Direction {
     registry::BlockFace face;

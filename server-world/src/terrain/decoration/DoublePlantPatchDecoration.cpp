@@ -61,8 +61,8 @@ struct PatchSpec {
 
 const std::vector<PatchSpec>& specs() {
     static const std::vector<PatchSpec> built = {
-        makeSpec("patch_sunflower", 34, 3, {"sunflower_plains"}, "sunflower"),
-        makeSpec("patch_large_fern", 40, 5,
+        makeSpec("patch_sunflower", 37, 3, {"sunflower_plains"}, "sunflower"),
+        makeSpec("patch_large_fern", 43, 5,
                  {"old_growth_pine_taiga", "old_growth_spruce_taiga", "snowy_taiga", "taiga"}, "large_fern")};
     return built;
 }

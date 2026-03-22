@@ -76,7 +76,7 @@ namespace {
 }
 
 [[nodiscard]] terrain::NetherBiomeLookup fixedBiome(std::string_view biome) {
-    return [biome](std::int32_t, std::int32_t, std::int32_t, densityfunction::DensityCache*) { return biome; };
+    return [biome](std::int32_t, std::int32_t, std::int32_t, densityfunction::SamplerContext*) { return biome; };
 }
 
 struct Run {
@@ -139,91 +139,91 @@ TEST_CASE("the nether vegetal step places what the frozen kotlin places") {
         const Run result = runStep("minecraft:crimson_forest", "crimson_nylium", 12, -1, false);
         CHECK(result.placed == 7232);
         CHECK(result.deferred == 1335);
-        CHECK(result.checksum == -7404685675944845863LL);
+        CHECK(result.checksum == 7096096841821157283LL);
     }
 
     SUBCASE("warpedStep") {
         const Run result = runStep("minecraft:warped_forest", "warped_nylium", 12, -1, false);
         CHECK(result.placed == 6913);
         CHECK(result.deferred == 1109);
-        CHECK(result.checksum == -4187614241718651774LL);
+        CHECK(result.checksum == 3773196905701469707LL);
     }
 
     SUBCASE("wastesStep") {
         const Run result = runStep("minecraft:nether_wastes", "netherrack", 12, -1, false);
         CHECK(result.placed == 6);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 958350344332094253LL);
+        CHECK(result.checksum == -9198142754283494455LL);
     }
 
     SUBCASE("step_spring_lava") {
         const Run result = runStep("minecraft:crimson_forest", "crimson_nylium", 12, 0, false);
         CHECK(result.placed == 6);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 3869784222657742637LL);
+        CHECK(result.checksum == -8480335081749464119LL);
     }
 
     SUBCASE("step_brown_mushroom_normal") {
         const Run result = runStep("minecraft:crimson_forest", "crimson_nylium", 1200, 1, true);
         CHECK(result.placed == 38);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 8576534870259986517LL);
+        CHECK(result.checksum == -1911390607015680227LL);
     }
 
     SUBCASE("step_red_mushroom_normal") {
         const Run result = runStep("minecraft:crimson_forest", "crimson_nylium", 1200, 2, true);
         CHECK(result.placed == 19);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -2715570062783663112LL);
+        CHECK(result.checksum == 6332282559537409956LL);
     }
 
     SUBCASE("step_warped_fungi") {
         const Run result = runStep("minecraft:warped_forest", "warped_nylium", 12, 3, false);
         CHECK(result.placed == 6043);
         CHECK(result.deferred == 1093);
-        CHECK(result.checksum == 8227298611248664821LL);
+        CHECK(result.checksum == -5252296925272484546LL);
     }
 
     SUBCASE("step_warped_forest_vegetation") {
         const Run result = runStep("minecraft:warped_forest", "warped_nylium", 12, 4, false);
         CHECK(result.placed == 604);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 7156205010710502545LL);
+        CHECK(result.checksum == -2440487820237733317LL);
     }
 
     SUBCASE("step_nether_sprouts") {
         const Run result = runStep("minecraft:warped_forest", "warped_nylium", 12, 5, false);
         CHECK(result.placed == 458);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 5246685118307057529LL);
+        CHECK(result.checksum == 2879588653666756185LL);
     }
 
     SUBCASE("step_twisting_vines") {
         const Run result = runStep("minecraft:warped_forest", "warped_nylium", 12, 6, false);
         CHECK(result.placed == 124);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -5072130532261109279LL);
+        CHECK(result.checksum == -222763889848023729LL);
     }
 
     SUBCASE("step_weeping_vines") {
         const Run result = runStep("minecraft:crimson_forest", "crimson_nylium", 12, 7, false);
         CHECK(result.placed == 113);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -4476746853761605433LL);
+        CHECK(result.checksum == -3075416595167290486LL);
     }
 
     SUBCASE("step_crimson_fungi") {
         const Run result = runStep("minecraft:crimson_forest", "crimson_nylium", 12, 8, false);
         CHECK(result.placed == 6510);
         CHECK(result.deferred == 1430);
-        CHECK(result.checksum == 7075750611815158262LL);
+        CHECK(result.checksum == 3159413726163373380LL);
     }
 
     SUBCASE("step_crimson_forest_vegetation") {
         const Run result = runStep("minecraft:crimson_forest", "crimson_nylium", 12, 9, false);
         CHECK(result.placed == 672);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 7144141187861526813LL);
+        CHECK(result.checksum == -238016018246116377LL);
     }
 }
 
@@ -232,7 +232,7 @@ TEST_CASE("one nether feature at one position matches the frozen kotlin") {
         const RunAt result = runAt("crimson_fungi", "crimson_nylium", 41, 12);
         CHECK(result.known == "111111111111");
         CHECK(result.placed == 1134);
-        CHECK(result.checksum == -7031253684136532125LL);
+        CHECK(result.checksum == 8589721459090670465LL);
         CHECK(result.after == 696925691);
     }
 
@@ -240,7 +240,7 @@ TEST_CASE("one nether feature at one position matches the frozen kotlin") {
         const RunAt result = runAt("warped_fungi", "warped_nylium", 41, 12);
         CHECK(result.known == "111111111111");
         CHECK(result.placed == 1044);
-        CHECK(result.checksum == -5031223749357788662LL);
+        CHECK(result.checksum == -5094036391827178774LL);
         CHECK(result.after == 1337090657);
     }
 
@@ -248,7 +248,7 @@ TEST_CASE("one nether feature at one position matches the frozen kotlin") {
         const RunAt result = runAt("crimson_forest_vegetation", "crimson_nylium", 41, 12);
         CHECK(result.known == "111111111111");
         CHECK(result.placed == 190);
-        CHECK(result.checksum == -3839272805402869211LL);
+        CHECK(result.checksum == -2091956120736224009LL);
         CHECK(result.after == 999982830);
     }
 
@@ -256,7 +256,7 @@ TEST_CASE("one nether feature at one position matches the frozen kotlin") {
         const RunAt result = runAt("warped_forest_vegetation", "warped_nylium", 41, 12);
         CHECK(result.known == "111111111111");
         CHECK(result.placed == 190);
-        CHECK(result.checksum == 8393969321175533738LL);
+        CHECK(result.checksum == -6433771778826675110LL);
         CHECK(result.after == 999982830);
     }
 
@@ -264,7 +264,7 @@ TEST_CASE("one nether feature at one position matches the frozen kotlin") {
         const RunAt result = runAt("nether_sprouts", "warped_nylium", 41, 12);
         CHECK(result.known == "111111111111");
         CHECK(result.placed == 175);
-        CHECK(result.checksum == 6133202140963719692LL);
+        CHECK(result.checksum == -7591036934833252433LL);
         CHECK(result.after == 1223358263);
     }
 
@@ -272,7 +272,7 @@ TEST_CASE("one nether feature at one position matches the frozen kotlin") {
         const RunAt result = runAt("twisting_vines", "warped_nylium", 41, 12);
         CHECK(result.known == "111111111111");
         CHECK(result.placed == 1592);
-        CHECK(result.checksum == 4965833883441152649LL);
+        CHECK(result.checksum == -8781706064560435041LL);
         CHECK(result.after == 807997738);
     }
 
@@ -280,7 +280,7 @@ TEST_CASE("one nether feature at one position matches the frozen kotlin") {
         const RunAt result = runAt("weeping_vines", "crimson_nylium", 59, 12);
         CHECK(result.known == "111111111111");
         CHECK(result.placed == 1139);
-        CHECK(result.checksum == -4404535458623968795LL);
+        CHECK(result.checksum == 425873177330755370LL);
         CHECK(result.after == 256062951);
     }
 
@@ -288,7 +288,7 @@ TEST_CASE("one nether feature at one position matches the frozen kotlin") {
         const RunAt result = runAt("spring_lava_nether", "crimson_nylium", 25, 40);
         CHECK(result.known == "1111111111111111111111111111111111111111");
         CHECK(result.placed == 40);
-        CHECK(result.checksum == 62464740516219109LL);
+        CHECK(result.checksum == -7349856536442553843LL);
         CHECK(result.after == 458676622);
     }
 
@@ -296,7 +296,7 @@ TEST_CASE("one nether feature at one position matches the frozen kotlin") {
         const RunAt result = runAt("not_a_feature", "crimson_nylium", 41, 12);
         CHECK(result.known == "000000000000");
         CHECK(result.placed == 0);
-        CHECK(result.checksum == -294225132796139799LL);
+        CHECK(result.checksum == 3105216870131864297LL);
         CHECK(result.after == 300097134);
     }
 }

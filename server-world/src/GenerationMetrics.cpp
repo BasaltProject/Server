@@ -12,15 +12,9 @@ constexpr std::array<std::string_view, generationMetrics::kPhaseCount> kPhaseNam
     "TERRAIN_FILL", "SURFACE_RULES",  "CARVERS",    "STRUCTURES",
     "DECORATION",   "SURFACE_FREEZE", "BIOME_FILL", "NEIGHBOURS"};
 
-/// The names the operator sees, kept in the frozen Kotlin's spelling so a saved report still reads
-/// the same.
-constexpr std::array<std::string_view, 6> kMarkerNames{"INTERPOLATED", "FLAT_CACHE",        "CACHE_2D",
-                                                       "CACHE_ONCE",   "CACHE_ALL_IN_CELL", "BLEND_DENSITY"};
-
 struct Counters {
     bool enabled = false;
     std::array<std::int64_t, generationMetrics::kPhaseCount> phaseNanos{};
-    std::array<std::int64_t, kMarkerNames.size()> markerHits{};
     std::int64_t chunks = 0;
     std::int64_t normalNoiseEvaluations = 0;
     std::int64_t biomeLookups = 0;
@@ -67,10 +61,6 @@ void generationMetrics::countBiomeLookup() noexcept { ++counters().biomeLookups;
 
 void generationMetrics::countClimateComparison() noexcept { ++counters().biomeCandidatesScanned; }
 
-void generationMetrics::countMarker(const densityfunction::MarkerType type) noexcept {
-    ++counters().markerHits[static_cast<std::size_t>(type)];
-}
-
 void generationMetrics::addPhaseNanos(const Phase phase, const std::int64_t nanos) noexcept {
     counters().phaseNanos[static_cast<std::size_t>(phase)] += nanos;
 }
@@ -98,13 +88,6 @@ std::string generationMetrics::report() {
     lines.push_back("  Climate comparisons      " + std::to_string(state.biomeCandidatesScanned / state.chunks));
     lines.push_back("  Heightmap column scans   " + std::to_string(state.heightmapScans / state.chunks));
     lines.push_back("  Heightmap scan steps     " + std::to_string(state.heightmapScanSteps / state.chunks));
-    lines.emplace_back("  Cache markers reached:");
-    for (std::size_t index = 0; index < kMarkerNames.size(); ++index) {
-        const std::int64_t hits = state.markerHits[index];
-        if (hits != 0) {
-            lines.push_back("    " + padded(kMarkerNames[index], 18) + " " + std::to_string(hits / state.chunks));
-        }
-    }
     std::string out;
     for (const std::string& line : lines) {
         if (!out.empty()) {

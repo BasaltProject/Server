@@ -101,10 +101,10 @@ const std::vector<PatchSpec>& specs() {
     static const std::vector<std::string> desert = {"desert"};
     static const std::vector<std::string> badlands = {"badlands", "eroded_badlands", "wooded_badlands"};
     static const std::vector<std::string> swamp = {"swamp"};
-    static const std::vector<PatchSpec> built = {{"patch_sugar_cane_desert", 75, std::nullopt, &desert},
-                                                 {"patch_sugar_cane_badlands", 76, 5, &badlands},
-                                                 {"patch_sugar_cane_swamp", 78, 3, &swamp},
-                                                 {"patch_sugar_cane", 88, 6, &defaultBiomes()}};
+    static const std::vector<PatchSpec> built = {{"patch_sugar_cane_desert", 78, std::nullopt, &desert},
+                                                 {"patch_sugar_cane_badlands", 79, 5, &badlands},
+                                                 {"patch_sugar_cane_swamp", 81, 3, &swamp},
+                                                 {"patch_sugar_cane", 91, 6, &defaultBiomes()}};
     return built;
 }
 

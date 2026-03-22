@@ -1,3 +1,5 @@
+#include <basalt/server/world/densityfunction/SamplerContext.hpp>
+#include <basalt/server/world/noise/JavaMath.hpp>
 #include <basalt/server/world/terrain/StructureBeardifier.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
@@ -5,12 +7,14 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
-#include <limits>
 #include <numbers>
+#include <optional>
 #include <utility>
 
 namespace basalt::server::world::terrain {
 namespace {
+
+namespace jm = noise::javaMath;
 
 constexpr std::int32_t kKernelRadius = 12;
 constexpr std::int32_t kKernelSize = 24;
@@ -31,85 +35,155 @@ const std::array<float, kKernelSize * kKernelSize * kKernelSize>& kernel() {
     return built;
 }
 
-/// parity: `Beardifier.getBuryContribution`, a straight falloff from 1 to 0 over six blocks.
-[[nodiscard]] double buryContribution(double dx, double dy, double dz) {
-    return wire::common::mth::clampedMap(std::sqrt(dx * dx + dy * dy + dz * dz), 0.0, 6.0, 1.0, 0.0);
+/// parity: `Beardifier.getBuryContribution`, in float since 26.3.
+[[nodiscard]] float buryContribution(float dx, float dy, float dz) {
+    const float distanceSquared = dx * dx + dy * dy + dz * dz;
+    return distanceSquared >= 36.0F ? 0.0F
+                                    : 1.0F - static_cast<float>(std::sqrt(static_cast<double>(distanceSquared))) / 6.0F;
 }
 
-[[nodiscard]] double beardContribution(std::int32_t dx, std::int32_t dy, std::int32_t dz, std::int32_t yToGround) {
+[[nodiscard]] float beardContribution(std::int32_t dx, std::int32_t dy, std::int32_t dz, std::int32_t yToGround) {
     const std::int32_t xi = dx + kKernelRadius;
     const std::int32_t yi = dy + kKernelRadius;
     const std::int32_t zi = dz + kKernelRadius;
     if (xi < 0 || xi >= kKernelSize || yi < 0 || yi >= kKernelSize || zi < 0 || zi >= kKernelSize) {
-        return 0.0;
+        return 0.0F;
     }
-    const double offsetY = yToGround + 0.5;
-    const double distanceSquared = dx * dx + offsetY * offsetY + dz * dz;
-    const double value = -offsetY * wire::common::mth::fastInvSqrt(distanceSquared / 2.0) / 2.0;
-    return value * static_cast<double>(
-                       kernel()[static_cast<std::size_t>(zi * kKernelSize * kKernelSize + xi * kKernelSize + yi)]);
+    const float offsetY = static_cast<float>(yToGround) + 0.5F;
+    const float distanceSquared = static_cast<float>(dx) * static_cast<float>(dx) + offsetY * offsetY +
+                                  static_cast<float>(dz) * static_cast<float>(dz);
+    const float value =
+        -offsetY * static_cast<float>(wire::common::mth::fastInvSqrt(static_cast<double>(distanceSquared / 2.0F))) /
+        2.0F;
+    return value * kernel()[static_cast<std::size_t>(zi * kKernelSize * kKernelSize + xi * kKernelSize + yi)];
 }
 
-class Beardifier final : public densityfunction::DensityFunction {
+class Beardifier final : public densityfunction::DensitySampler {
 public:
-    Beardifier(std::vector<BeardifierRigid> pieces, std::vector<BeardifierJunction> junctions)
-        : pieces_(std::move(pieces)), junctions_(std::move(junctions)) {}
+    Beardifier(StructureBeard beard, structure::StructureBoundingBox affected)
+        : beard_(std::move(beard)), affected_(affected) {}
 
-    [[nodiscard]] double compute(densityfunction::FunctionContext& context) const override {
-        double density = 0.0;
-        for (const BeardifierRigid& rigid : pieces_) {
-            if (rigid.adjustment == TerrainAdjustment::None) {
-                continue;
-            }
-            const structure::StructureBoundingBox& box = rigid.box;
-            const std::int32_t dx = std::max(0, std::max(box.minX - context.blockX, context.blockX - box.maxX));
-            const std::int32_t dz = std::max(0, std::max(box.minZ - context.blockZ, context.blockZ - box.maxZ));
-            const std::int32_t groundY = box.minY + rigid.groundLevelDelta;
-            const std::int32_t dyToGround = context.blockY - groundY;
-            std::int32_t dy = dyToGround;
-            if (rigid.adjustment == TerrainAdjustment::BeardBox) {
-                // A box clears the piece's whole height instead of bearding up from its floor, which
-                // is what lets the ancient city sit in a hollow rather than in solid rock.
-                dy = std::max(0, std::max(groundY - context.blockY, context.blockY - box.maxY));
-            } else if (rigid.adjustment == TerrainAdjustment::Encapsulate) {
-                dy = std::max(0, std::max(box.minY - context.blockY, context.blockY - box.maxY));
-            }
-            if (rigid.adjustment == TerrainAdjustment::Encapsulate) {
-                // parity: encapsulate ADDS density instead of carving, so the structure ends up
-                // cased in rock rather than sitting in a hollow. Halving each axis first is what
-                // stretches that casing out to roughly twelve blocks.
-                density += buryContribution(dx / 2.0, dy / 2.0, dz / 2.0) * 0.8;
-            } else if (rigid.adjustment == TerrainAdjustment::Bury) {
-                // parity: bury halves only the vertical axis and takes no 0.8, so it fills the
-                // ground back over the piece rather than clearing a hollow under it.
-                density += buryContribution(dx, dy / 2.0, dz);
-            } else {
-                density += beardContribution(dx, dy, dz, dyToGround) * 0.8;
+    [[nodiscard]] float sampleValue(densityfunction::SamplerContext&, std::int32_t x, std::int32_t y,
+                                    std::int32_t z) const override {
+        return inside(x, y, z) ? sampleUnchecked(x, y, z) : 0.0F;
+    }
+
+    void sampleVolume(densityfunction::SamplerContext&, densityfunction::DensityBuffer& output,
+                      const densityfunction::DensityVolume& volume) const override {
+        output.fill(0.0F);
+        if (affected_.minX > volume.maxBlockX() || affected_.maxX < volume.minBlockX ||
+            affected_.minY > volume.maxBlockY() || affected_.maxY < volume.minBlockY ||
+            affected_.minZ > volume.maxBlockZ() || affected_.maxZ < volume.minBlockZ) {
+            return;
+        }
+        const std::int32_t minX = jm::floorDiv(std::max(0, affected_.minX - volume.minBlockX), volume.stepBlockX);
+        const std::int32_t minY = jm::floorDiv(std::max(0, affected_.minY - volume.minBlockY), volume.stepBlockY);
+        const std::int32_t minZ = jm::floorDiv(std::max(0, affected_.minZ - volume.minBlockZ), volume.stepBlockZ);
+        const std::int32_t maxX =
+            std::min(volume.sizeX - 1, jm::floorDiv(affected_.maxX - volume.minBlockX, volume.stepBlockX));
+        const std::int32_t maxY =
+            std::min(volume.sizeY - 1, jm::floorDiv(affected_.maxY - volume.minBlockY, volume.stepBlockY));
+        const std::int32_t maxZ =
+            std::min(volume.sizeZ - 1, jm::floorDiv(affected_.maxZ - volume.minBlockZ, volume.stepBlockZ));
+        for (std::int32_t z = minZ; z <= maxZ; ++z) {
+            for (std::int32_t x = minX; x <= maxX; ++x) {
+                for (std::int32_t y = minY; y <= maxY; ++y) {
+                    output.set(volume.indexUnchecked(x, y, z),
+                               sampleUnchecked(volume.blockX(x), volume.blockY(y), volume.blockZ(z)));
+                }
             }
         }
-        for (const BeardifierJunction& junction : junctions_) {
-            const std::int32_t dx = context.blockX - junction.x;
-            const std::int32_t dy = context.blockY - junction.groundY;
-            const std::int32_t dz = context.blockZ - junction.z;
-            density += beardContribution(dx, dy, dz, dy) * 0.4;
+    }
+
+private:
+    [[nodiscard]] bool inside(std::int32_t x, std::int32_t y, std::int32_t z) const noexcept {
+        return x >= affected_.minX && x <= affected_.maxX && y >= affected_.minY && y <= affected_.maxY &&
+               z >= affected_.minZ && z <= affected_.maxZ;
+    }
+
+    [[nodiscard]] float sampleUnchecked(std::int32_t x, std::int32_t y, std::int32_t z) const {
+        float density = 0.0F;
+        for (const BeardifierRigid& rigid : beard_.pieces) {
+            const structure::StructureBoundingBox& box = rigid.box;
+            const std::int32_t dx = std::max(0, std::max(box.minX - x, x - box.maxX));
+            const std::int32_t dz = std::max(0, std::max(box.minZ - z, z - box.maxZ));
+            const std::int32_t groundY = box.minY + rigid.groundLevelDelta;
+            const std::int32_t dyToGround = y - groundY;
+            std::int32_t dy = 0;
+            switch (rigid.adjustment) {
+            case TerrainAdjustment::None:
+                break;
+            case TerrainAdjustment::Bury:
+            case TerrainAdjustment::BeardThin:
+                dy = dyToGround;
+                break;
+            case TerrainAdjustment::BeardBox:
+                dy = std::max(0, std::max(groundY - y, y - box.maxY));
+                break;
+            case TerrainAdjustment::Encapsulate:
+                dy = std::max(0, std::max(box.minY - y, y - box.maxY));
+                break;
+            }
+            float contribution = 0.0F;
+            switch (rigid.adjustment) {
+            case TerrainAdjustment::None:
+                break;
+            case TerrainAdjustment::Bury:
+                contribution =
+                    buryContribution(static_cast<float>(dx), static_cast<float>(dy) / 2.0F, static_cast<float>(dz));
+                break;
+            case TerrainAdjustment::BeardThin:
+            case TerrainAdjustment::BeardBox:
+                contribution = beardContribution(dx, dy, dz, dyToGround) * 0.8F;
+                break;
+            case TerrainAdjustment::Encapsulate:
+                contribution = buryContribution(static_cast<float>(dx) / 2.0F, static_cast<float>(dy) / 2.0F,
+                                                static_cast<float>(dz) / 2.0F) *
+                               0.8F;
+                break;
+            }
+            density += contribution;
+        }
+        for (const BeardifierJunction& junction : beard_.junctions) {
+            const std::int32_t dx = x - junction.x;
+            const std::int32_t dy = y - junction.groundY;
+            const std::int32_t dz = z - junction.z;
+            density += beardContribution(dx, dy, dz, dy) * 0.4F;
         }
         return density;
     }
 
-    [[nodiscard]] double minValue() const override { return -std::numeric_limits<double>::infinity(); }
-
-    [[nodiscard]] double maxValue() const override { return std::numeric_limits<double>::infinity(); }
-
-private:
-    std::vector<BeardifierRigid> pieces_;
-    std::vector<BeardifierJunction> junctions_;
+    StructureBeard beard_;
+    structure::StructureBoundingBox affected_;
 };
 
 } // namespace
 
-densityfunction::Function structureBeardifier(std::vector<BeardifierRigid> pieces,
-                                              std::vector<BeardifierJunction> junctions) {
-    return std::make_shared<const Beardifier>(std::move(pieces), std::move(junctions));
+densityfunction::Sampler structureBeardifier(StructureBeard beard) {
+    if (beard.empty()) {
+        return nullptr;
+    }
+    std::optional<structure::StructureBoundingBox> box;
+    const auto include = [&box](const structure::StructureBoundingBox& next) {
+        if (!box.has_value()) {
+            box = next;
+            return;
+        }
+        box = structure::StructureBoundingBox{std::min(box->minX, next.minX), std::min(box->minY, next.minY),
+                                              std::min(box->minZ, next.minZ), std::max(box->maxX, next.maxX),
+                                              std::max(box->maxY, next.maxY), std::max(box->maxZ, next.maxZ)};
+    };
+    for (const BeardifierRigid& rigid : beard.pieces) {
+        include(rigid.box);
+    }
+    for (const BeardifierJunction& junction : beard.junctions) {
+        include(structure::StructureBoundingBox{junction.x, junction.groundY, junction.z, junction.x, junction.groundY,
+                                                junction.z});
+    }
+    // parity: the affected box is everything the pieces touch, inflated by 24.
+    const structure::StructureBoundingBox affected{box->minX - 24, box->minY - 24, box->minZ - 24,
+                                                   box->maxX + 24, box->maxY + 24, box->maxZ + 24};
+    return std::make_shared<const Beardifier>(std::move(beard), affected);
 }
 
 } // namespace basalt::server::world::terrain

@@ -410,7 +410,8 @@ bool placeGeode(LocalModificationRegion& region, random::RandomSource& random, s
     const std::int32_t numPoints = 3 + random.nextInt(2);
     random::RandomSource noiseSource = random::RandomSource::worldgen(random::RandomSource::legacy(seed));
     const std::vector<double> amplitudes{1.0};
-    const noise::NormalNoise noise = noise::NormalNoise::create(noiseSource, -4, amplitudes);
+    const std::shared_ptr<const noise::NoiseStack> noise =
+        noise::NormalNoise::createParity(-4, amplitudes).create(noiseSource);
     std::vector<DecorationPos> crackPoints;
     const double crackSizeAdjustment = static_cast<double>(numPoints) / 6.0;
     const double innerAir = 1.0 / std::sqrt(1.7);
@@ -457,8 +458,8 @@ bool placeGeode(LocalModificationRegion& region, random::RandomSource& random, s
             for (std::int32_t xOffset = -16; xOffset <= 16; ++xOffset) {
                 const DecorationPos position = offset(origin, xOffset, yOffset, zOffset);
                 const double noiseOffset =
-                    noise.getValue(static_cast<double>(position.x), static_cast<double>(position.y),
-                                   static_cast<double>(position.z)) *
+                    static_cast<double>(noise->get(static_cast<double>(position.x), static_cast<double>(position.y),
+                                                   static_cast<double>(position.z))) *
                     0.05;
                 double shellDistance = 0.0;
                 double crackDistance = 0.0;

@@ -125,7 +125,7 @@ TEST_CASE("the processor list processes what the frozen kotlin processes") {
     }
     CHECK(dropped == 227);
     CHECK(changed == 267);
-    CHECK(static_cast<std::int64_t>(checksum) == -2553656745669128920LL);
+    CHECK(static_cast<std::int64_t>(checksum) == 7644178188119490970LL);
     CHECK_FALSE(list.empty());
     CHECK(StructureProcessorList{}.empty());
 
@@ -136,7 +136,7 @@ TEST_CASE("the processor list processes what the frozen kotlin processes") {
         const std::optional<std::int32_t> result = mossify.processAt(cobblestone, air, position);
         mossChecksum = (mossChecksum ^ static_cast<std::uint64_t>(result.value_or(-1))) * 1099511628211ULL;
     }
-    CHECK(static_cast<std::int64_t>(mossChecksum) == -8670449366542220557LL);
+    CHECK(static_cast<std::int64_t>(mossChecksum) == -6949142788833374561LL);
     CHECK_FALSE(mossify.empty());
 }
 
@@ -173,7 +173,8 @@ TEST_CASE("the capped processor chooses what the frozen kotlin chooses") {
         rendered += std::to_string(index) + "=" + std::to_string(rule.outputStateId);
     }
     CHECK(chosen.size() == 18);
-    CHECK(rendered == "0=3368,1=7756,4=3368,5=7756,8=3368,12=3368,13=7756,16=3368,17=7756,20=3368,21=7756,24=3368,25="
-                      "7756,28=3368,29=7756,33=7756,36=3368,37=7756");
+    CHECK(rendered ==
+          "0=4924,1=9490,4=4924,5=9490,8=4924,12=4924,13=9490,16=4924,17=9490,20=4924,21=9490,24=4924,25=9490,2"
+          "8=4924,29=9490,33=9490,36=4924,37=9490");
     CHECK(CappedRules{{}, 0}.choose(candidates, 7777LL, StructurePos{0, 0, 0}).empty());
 }

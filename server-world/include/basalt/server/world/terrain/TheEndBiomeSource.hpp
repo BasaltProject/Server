@@ -1,7 +1,9 @@
 #pragma once
 
 #include <basalt/server/world/densityfunction/DensityFunction.hpp>
+#include <basalt/server/world/densityfunction/RandomState.hpp>
 #include <basalt/server/world/terrain/BiomeZoomer.hpp>
+#include <basalt/server/world/terrain/NoiseRouterData.hpp>
 
 #include <cstdint>
 #include <optional>
@@ -15,9 +17,8 @@ namespace basalt::server::world::terrain {
 /// barrens or small islands with vanilla's own thresholds.
 class TheEndBiomeSource {
 public:
-    explicit TheEndBiomeSource(densityfunction::Function erosion,
-                               std::optional<std::int64_t> biomeZoomSeed = std::nullopt)
-        : erosion_(std::move(erosion)),
+    explicit TheEndBiomeSource(const NoiseRouter& router, std::optional<std::int64_t> biomeZoomSeed = std::nullopt)
+        : erosion_(router.state->sampler(router.erosion)),
           zoomer_(biomeZoomSeed.has_value() ? std::optional<BiomeZoomer>{BiomeZoomer{*biomeZoomSeed}} : std::nullopt) {}
 
     /// Input coordinates are quart positions, matching `BiomeSource.getNoiseBiome`.
@@ -27,7 +28,7 @@ public:
     [[nodiscard]] std::string_view blockBiomeAt(std::int32_t x, std::int32_t y, std::int32_t z) const;
 
 private:
-    densityfunction::Function erosion_;
+    densityfunction::Sampler erosion_;
     std::optional<BiomeZoomer> zoomer_;
 };
 

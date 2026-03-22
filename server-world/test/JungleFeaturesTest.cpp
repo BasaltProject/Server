@@ -106,7 +106,7 @@ TEST_CASE("the jungle melon and vine features match the frozen kotlin") {
         CHECK(melons == 171);
         CHECK(vines == 0);
         CHECK(distinct == 0);
-        CHECK(checksum == -6250613057488940044LL);
+        CHECK(checksum == 6591963276072868100LL);
     }
 
     SUBCASE("melonSparse") {
@@ -119,7 +119,7 @@ TEST_CASE("the jungle melon and vine features match the frozen kotlin") {
         CHECK(melons == 72);
         CHECK(vines == 0);
         CHECK(distinct == 0);
-        CHECK(checksum == 256562214966506555LL);
+        CHECK(checksum == 3075551533963136675LL);
     }
 
     SUBCASE("vines") {
@@ -130,7 +130,7 @@ TEST_CASE("the jungle melon and vine features match the frozen kotlin") {
         CHECK(melons == 0);
         CHECK(vines == 1116);
         CHECK(distinct == 4);
-        CHECK(checksum == -4777911851948820245LL);
+        CHECK(checksum == 6628475556098057707LL);
     }
 }
 
@@ -150,5 +150,5 @@ TEST_CASE("each vine face picks the state the frozen kotlin picks") {
         states.append(ok ? "true" : "false").push_back('/');
         states.append(std::to_string(chunk.blockStateId(8, 80, 8))).push_back(',');
     }
-    CHECK(states == "true/8387,true/8381,true/8385,true/8388,true/8373,false/0,");
+    CHECK(states == "true/10121,true/10115,true/10119,true/10122,true/10107,false/0,");
 }

@@ -28,7 +28,7 @@ Tables::Tables()
                     {"savanna", "savanna", "forest", "jungle", "jungle"},
                     {"desert", "desert", "desert", "desert", "desert"}}},
       middleBiomesVariant{{{"ice_spikes", std::nullopt, "snowy_taiga", std::nullopt, std::nullopt},
-                           {std::nullopt, std::nullopt, std::nullopt, std::nullopt, "old_growth_pine_taiga"},
+                           {"dappled_forest", std::nullopt, std::nullopt, std::nullopt, "old_growth_pine_taiga"},
                            {"sunflower_plains", std::nullopt, std::nullopt, "old_growth_birch_forest", std::nullopt},
                            {std::nullopt, std::nullopt, "plains", "sparse_jungle", "bamboo_jungle"},
                            {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt}}},

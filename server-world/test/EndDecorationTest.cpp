@@ -1,5 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "support/DecorationFixture.hpp"
+#include "support/SyntheticRouter.hpp"
 
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
@@ -23,11 +24,7 @@ namespace registry = basalt::server::registry;
 
 namespace {
 
-[[nodiscard]] densityfunction::Function base3d() {
-    return densityfunction::functions::blendedNoiseUnseeded(0.25, 0.125, 80.0, 160.0, 8.0);
-}
-
-[[nodiscard]] EndNoiseRouter router() { return noiseRouterData::end(base3d(), 0x5DEECE66DLL); }
+[[nodiscard]] NoiseRouter router() { return basalt::server::world::testsupport::endRouter(0x5DEECE66DLL); }
 
 /// An end stone shelf with open air above it, which is where a chorus plant takes root.
 [[nodiscard]] Chunk endChunk(std::int32_t chunkX, std::int32_t chunkZ) {
@@ -75,7 +72,7 @@ struct Fold {
 } // namespace
 
 TEST_CASE("the end raw generation step matches the frozen kotlin") {
-    const TheEndBiomeSource biomeSource{router().erosion};
+    const TheEndBiomeSource biomeSource{router()};
     std::uint64_t checksum = 14695981039346656037ULL;
     std::int32_t endStone = 0;
     std::size_t deferred = 0;
@@ -89,7 +86,7 @@ TEST_CASE("the end raw generation step matches the frozen kotlin") {
     }
     CHECK(endStone == 639);
     CHECK(deferred == 134);
-    CHECK(static_cast<std::int64_t>(checksum) == -8673365144770495280LL);
+    CHECK(static_cast<std::int64_t>(checksum) == -2350987715176942794LL);
 }
 
 TEST_CASE("one end island matches the frozen kotlin") {
@@ -106,12 +103,12 @@ TEST_CASE("one end island matches the frozen kotlin") {
         after = random.nextInt();
     }
     CHECK(endStone == 4005);
-    CHECK(static_cast<std::int64_t>(checksum) == 8335131076812830114LL);
+    CHECK(static_cast<std::int64_t>(checksum) == 1274422041366887508LL);
     CHECK(after == 1395026466);
 }
 
 TEST_CASE("the end platform matches the frozen kotlin") {
-    const TheEndBiomeSource biomeSource{router().erosion};
+    const TheEndBiomeSource biomeSource{router()};
     std::uint64_t checksum = 14695981039346656037ULL;
     std::int32_t obsidian = 0;
     for (std::int32_t chunkX = 5; chunkX <= 7; ++chunkX) {
@@ -141,11 +138,11 @@ TEST_CASE("the end platform matches the frozen kotlin") {
         }
     }
     CHECK(obsidian == 25);
-    CHECK(static_cast<std::int64_t>(checksum) == -8921187286735609796LL);
+    CHECK(static_cast<std::int64_t>(checksum) == 7994176547612088004LL);
 }
 
 TEST_CASE("the end chorus plants match the frozen kotlin") {
-    const TheEndBiomeSource biomeSource{router().erosion};
+    const TheEndBiomeSource biomeSource{router()};
 
     SUBCASE("step") {
         std::uint64_t checksum = 14695981039346656037ULL;
@@ -159,9 +156,9 @@ TEST_CASE("the end chorus plants match the frozen kotlin") {
             chorus += folded.chorus;
             deferred += chunk.takeGeneratedBlockWrites().size();
         }
-        CHECK(chorus == 130);
-        CHECK(deferred == 25);
-        CHECK(static_cast<std::int64_t>(checksum) == 8420514178328436022LL);
+        CHECK(chorus == 104);
+        CHECK(deferred == 0);
+        CHECK(static_cast<std::int64_t>(checksum) == 1436036048102344832LL);
     }
 
     SUBCASE("at") {
@@ -183,7 +180,7 @@ TEST_CASE("the end chorus plants match the frozen kotlin") {
         }
         CHECK(placed == "111111111111");
         CHECK(chorus == 323);
-        CHECK(static_cast<std::int64_t>(checksum) == 1532735756548829917LL);
+        CHECK(static_cast<std::int64_t>(checksum) == 6086701434972160716LL);
         CHECK(after == 1587146041);
     }
 }
@@ -218,11 +215,11 @@ TEST_CASE("the end spikes match the frozen kotlin") {
         CHECK(hit == "000000000001111000011001100010000100010000100001001000001111000000000000000000000");
         CHECK(obsidian == 40499);
         CHECK(entities == 10);
-        CHECK(static_cast<std::int64_t>(checksum) == 8102121997113169522LL);
+        CHECK(static_cast<std::int64_t>(checksum) == 3183473030495876510LL);
     }
 
     SUBCASE("step") {
-        const TheEndBiomeSource biomeSource{router().erosion};
+        const TheEndBiomeSource biomeSource{router()};
         std::uint64_t checksum = 14695981039346656037ULL;
         std::int32_t obsidian = 0;
         std::size_t entities = 0;
@@ -249,6 +246,6 @@ TEST_CASE("the end spikes match the frozen kotlin") {
         }
         CHECK(obsidian == 40499);
         CHECK(entities == 10);
-        CHECK(static_cast<std::int64_t>(checksum) == 3662118613179997810LL);
+        CHECK(static_cast<std::int64_t>(checksum) == -1983311235934239330LL);
     }
 }

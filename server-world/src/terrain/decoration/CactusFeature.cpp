@@ -58,8 +58,8 @@ struct PatchSpec {
 
 const std::vector<PatchSpec>& specs() {
     static const std::vector<PatchSpec> built = {
-        {"patch_cactus_desert", 83, 6, {"desert"}},
-        {"patch_cactus_decorated", 84, 13, {"badlands", "eroded_badlands", "wooded_badlands"}}};
+        {"patch_cactus_desert", 86, 6, {"desert"}},
+        {"patch_cactus_decorated", 87, 13, {"badlands", "eroded_badlands", "wooded_badlands"}}};
     return built;
 }
 

@@ -22,7 +22,7 @@ class EndCityStructureGenerator {
 public:
     using SurfaceHeightOverride = std::function<std::int32_t(std::int32_t, std::int32_t)>;
 
-    EndCityStructureGenerator(EndNoiseRouter router, const TheEndBiomeSource& biomeSource,
+    EndCityStructureGenerator(NoiseRouter router, const TheEndBiomeSource& biomeSource,
                               structure::TemplateLoader templateLoader,
                               SurfaceHeightOverride surfaceHeightOverride = nullptr);
 
@@ -62,7 +62,7 @@ private:
 
     [[nodiscard]] DensityChunkSampler& samplerAt(std::int32_t x, std::int32_t z);
 
-    EndNoiseRouter router_;
+    NoiseRouter router_;
     const TheEndBiomeSource* biomeSource_;
     structure::TemplateLoader templateLoader_;
     SurfaceHeightOverride surfaceHeightOverride_;

@@ -77,49 +77,49 @@ TEST_CASE("the template block processors produce what the frozen kotlin produces
     SUBCASE("ignoreStructureBlock") {
         const Run result = fold(templateBlockProcessors::ignoreStructureBlock());
         CHECK(result.dropped == 96);
-        CHECK(result.checksum == 5023076210339678821LL);
+        CHECK(result.checksum == -6287981430262162411LL);
     }
 
     SUBCASE("ignoreStructureAndAir") {
         const Run result = fold(templateBlockProcessors::ignoreStructureAndAir());
         CHECK(result.dropped == 144);
-        CHECK(result.checksum == 8600528693131678517LL);
+        CHECK(result.checksum == -4741931553604362715LL);
     }
 
     SUBCASE("protectFeatures") {
         const Run result = fold(templateBlockProcessors::protectFeatures());
         CHECK(result.dropped == 360);
-        CHECK(result.checksum == 7311403652384246661LL);
+        CHECK(result.checksum == -7902880183514994131LL);
     }
 
     SUBCASE("lavaSubmerged") {
         const Run result = fold(templateBlockProcessors::lavaSubmerged());
         CHECK(result.dropped == 0);
-        CHECK(result.checksum == 8236651298618264029LL);
+        CHECK(result.checksum == -3939520802191442755LL);
     }
 
     SUBCASE("blackstoneReplace") {
         const Run result = fold(templateBlockProcessors::blackstoneReplace());
         CHECK(result.dropped == 0);
-        CHECK(result.checksum == 903553851891318469LL);
+        CHECK(result.checksum == -1155569631560635467LL);
     }
 
     SUBCASE("ageNone") {
         const Run result = fold(templateBlockProcessors::age(0.0F));
         CHECK(result.dropped == 0);
-        CHECK(result.checksum == -989724562792794156LL);
+        CHECK(result.checksum == -3613894917448562423LL);
     }
 
     SUBCASE("ageHalf") {
         const Run result = fold(templateBlockProcessors::age(0.5F));
         CHECK(result.dropped == 0);
-        CHECK(result.checksum == -9063926867142375741LL);
+        CHECK(result.checksum == -1737015260761531216LL);
     }
 
     SUBCASE("ageAll") {
         const Run result = fold(templateBlockProcessors::age(1.0F));
         CHECK(result.dropped == 0);
-        CHECK(result.checksum == -1475349288588102158LL);
+        CHECK(result.checksum == 509166426706337909LL);
     }
 
     SUBCASE("chain") {
@@ -128,6 +128,6 @@ TEST_CASE("the template block processors produce what the frozen kotlin produces
              templateBlockProcessors::blackstoneReplace(), templateBlockProcessors::age(0.5F),
              templateBlockProcessors::lavaSubmerged()}));
         CHECK(result.dropped == 432);
-        CHECK(result.checksum == -1840941508033851674LL);
+        CHECK(result.checksum == -8946045790835597660LL);
     }
 }

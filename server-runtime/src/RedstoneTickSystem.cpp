@@ -29,6 +29,7 @@
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 #include <basalt/server/runtime/world/Tripwires.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
+#include <basalt/wire/common/Mth.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
 #include <algorithm>

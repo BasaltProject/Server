@@ -78,8 +78,8 @@ struct PatchSpec {
 };
 
 const std::vector<PatchSpec>& specs() {
-    static const std::vector<PatchSpec> built = {{"patch_melon_sparse", 92, 64, {"sparse_jungle"}},
-                                                 {"patch_melon", 93, 6, {"bamboo_jungle", "jungle"}}};
+    static const std::vector<PatchSpec> built = {{"patch_melon_sparse", 95, 64, {"sparse_jungle"}},
+                                                 {"patch_melon", 96, 6, {"bamboo_jungle", "jungle"}}};
     return built;
 }
 

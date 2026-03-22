@@ -29,10 +29,10 @@ void decorate(Chunk& chunk, const TheEndBiomeSource& biomeSource);
 /// parity: `chorus_plant`, the End highlands vegetal decoration feature.
 namespace endVegetalDecoration {
 
-void decorate(Chunk& chunk, std::int64_t seed, const EndNoiseRouter& router, const TheEndBiomeSource& biomeSource);
+void decorate(Chunk& chunk, std::int64_t seed, const NoiseRouter& router, const TheEndBiomeSource& biomeSource);
 
 /// One plant grown at one position rather than scattered over a chunk.
-bool placeAt(Chunk& chunk, random::RandomSource& random, const EndNoiseRouter& router, std::int32_t x, std::int32_t y,
+bool placeAt(Chunk& chunk, random::RandomSource& random, const NoiseRouter& router, std::int32_t x, std::int32_t y,
              std::int32_t z);
 
 } // namespace endVegetalDecoration
@@ -40,7 +40,7 @@ bool placeAt(Chunk& chunk, random::RandomSource& random, const EndNoiseRouter& r
 /// parity: the End's surface structures step, the return gateways and the ten obsidian spikes.
 namespace endSurfaceStructuresDecoration {
 
-void decorate(Chunk& chunk, std::int64_t seed, const EndNoiseRouter& router, const TheEndBiomeSource& biomeSource);
+void decorate(Chunk& chunk, std::int64_t seed, const NoiseRouter& router, const TheEndBiomeSource& biomeSource);
 
 /// Every spike of this seed that reaches into the chunk, which is what `/place feature` runs for
 /// `end_spike`.

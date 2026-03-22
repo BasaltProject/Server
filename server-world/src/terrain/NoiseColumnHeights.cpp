@@ -1,52 +1,50 @@
-#include <basalt/server/world/ChunkHeight.hpp>
-#include <basalt/server/world/terrain/DensityChunkSampler.hpp>
+#include <basalt/server/registry/BlockFluids.hpp>
+#include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/world/terrain/NoiseChunk.hpp>
 #include <basalt/server/world/terrain/NoiseColumnHeights.hpp>
 
-#include <algorithm>
-#include <cstdint>
-
 namespace basalt::server::world::terrain {
-namespace {
 
-constexpr std::int32_t kCellWidth = 4;
-constexpr std::int32_t kCellHeight = 8;
-constexpr std::int32_t kSeaLevel = 63;
-
-[[nodiscard]] DensityChunkSampler samplerFor(const OverworldNoiseRouter& router, std::int32_t chunkX,
-                                             std::int32_t chunkZ) {
-    return DensityChunkSampler{router.finalDensity,       chunkX,     chunkZ,     kOverworldHeight.minY(),
-                               kOverworldHeight.height(), kCellWidth, kCellHeight};
-}
-
-/// The last solid block in the column, or one below the world when the whole column is open.
-[[nodiscard]] std::int32_t topSolidY(DensityChunkSampler& sampler, std::int32_t localX, std::int32_t localZ) {
-    std::int32_t y = kOverworldHeight.maxY();
-    while (y >= kOverworldHeight.minY() && sampler.sample(localX, y, localZ) <= 0.0) {
-        --y;
+std::vector<std::int32_t> NoiseColumnHeights::column(std::int32_t x, std::int32_t z) const {
+    NoiseChunk noiseChunk{*router_, nullptr,
+                          densityfunction::DensityVolume{1, router_->height, 1, x, router_->minY, z}};
+    const std::vector<float> density = noiseChunk.finalDensity();
+    std::vector<std::int32_t> states(density.size());
+    // parity: top down, the order the aquifer's own caches fill in.
+    for (std::int32_t y = router_->height - 1; y >= 0; --y) {
+        const std::optional<std::int32_t> substance = noiseChunk.aquifer().computeSubstance(
+            x, router_->minY + y, z, static_cast<double>(density[static_cast<std::size_t>(y)]));
+        states[static_cast<std::size_t>(y)] = substance.value_or(router_->defaultBlock);
     }
-    return y;
+    return states;
 }
 
-} // namespace
-
-std::int32_t NoiseColumnHeights::surfaceHeight(const std::int32_t x, const std::int32_t z) const {
-    DensityChunkSampler sampler = samplerFor(*router_, x >> 4, z >> 4);
-    // The Overworld's global aquifer fills an open column through sea level, so the world surface
-    // never reads below it even where the solid floor does.
-    return std::max(topSolidY(sampler, x & 15, z & 15) + 1, kSeaLevel);
+std::int32_t NoiseColumnHeights::surfaceHeight(std::int32_t x, std::int32_t z) const {
+    const std::vector<std::int32_t> states = column(x, z);
+    for (std::int32_t y = router_->height - 1; y >= 0; --y) {
+        if (!registry::blocks::isAir(states[static_cast<std::size_t>(y)])) {
+            return router_->minY + y + 1;
+        }
+    }
+    return router_->minY;
 }
 
-std::int32_t NoiseColumnHeights::oceanFloorHeight(const std::int32_t x, const std::int32_t z) const {
-    DensityChunkSampler sampler = samplerFor(*router_, x >> 4, z >> 4);
-    return topSolidY(sampler, x & 15, z & 15) + 1;
+std::int32_t NoiseColumnHeights::oceanFloorHeight(std::int32_t x, std::int32_t z) const {
+    const std::vector<std::int32_t> states = column(x, z);
+    for (std::int32_t y = router_->height - 1; y >= 0; --y) {
+        const std::int32_t state = states[static_cast<std::size_t>(y)];
+        if (!registry::blocks::isAir(state) && !registry::blockFluids::hasFluid(state)) {
+            return router_->minY + y + 1;
+        }
+    }
+    return router_->minY;
 }
 
-bool NoiseColumnHeights::isSolid(const std::int32_t x, const std::int32_t y, const std::int32_t z) const {
-    if (y < kOverworldHeight.minY() || y > kOverworldHeight.maxY()) {
+bool NoiseColumnHeights::isSolid(std::int32_t x, std::int32_t y, std::int32_t z) const {
+    if (y < router_->minY || y >= router_->minY + router_->height) {
         return false;
     }
-    DensityChunkSampler sampler = samplerFor(*router_, x >> 4, z >> 4);
-    return sampler.sample(x & 15, y, z & 15) > 0.0;
+    return column(x, z)[static_cast<std::size_t>(y - router_->minY)] == router_->defaultBlock;
 }
 
 } // namespace basalt::server::world::terrain

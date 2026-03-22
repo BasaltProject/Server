@@ -107,9 +107,9 @@ struct PatchSpec {
 const std::vector<PatchSpec>& specs() {
     static const std::vector<std::string> swamp = {"swamp"};
     static const std::vector<PatchSpec> built = {
-        {"patch_firefly_bush_swamp", 85, 8, 1, HeightmapType::MotionBlocking, false, &swamp},
-        {"patch_firefly_bush_near_water_swamp", 86, std::nullopt, 3, HeightmapType::MotionBlocking, true, &swamp},
-        {"patch_firefly_bush_near_water", 89, std::nullopt, 2, HeightmapType::MotionBlockingNoLeaves, true,
+        {"patch_firefly_bush_swamp", 88, 8, 1, HeightmapType::MotionBlocking, false, &swamp},
+        {"patch_firefly_bush_near_water_swamp", 89, std::nullopt, 3, HeightmapType::MotionBlocking, true, &swamp},
+        {"patch_firefly_bush_near_water", 92, std::nullopt, 2, HeightmapType::MotionBlockingNoLeaves, true,
          &defaultBiomes()}};
     return built;
 }

@@ -116,7 +116,7 @@ TEST_CASE("the shared extra vegetation places what the frozen kotlin places") {
         CHECK(result.totals.cane == 0);
         CHECK(result.totals.cactus == 0);
         CHECK(result.totals.bushes == 0);
-        CHECK(result.checksum == -85100731878241131LL);
+        CHECK(result.checksum == 3578738381038222779LL);
         CHECK(result.after == 2055286257);
         CHECK(result.deferred == 0);
     }
@@ -127,7 +127,7 @@ TEST_CASE("the shared extra vegetation places what the frozen kotlin places") {
         CHECK(result.totals.cane == 45);
         CHECK(result.totals.cactus == 0);
         CHECK(result.totals.bushes == 30);
-        CHECK(result.checksum == -1899922591028084352LL);
+        CHECK(result.checksum == -2358077318708963176LL);
         CHECK(result.after == -536750048);
         CHECK(result.deferred == 0);
     }
@@ -138,7 +138,7 @@ TEST_CASE("the shared extra vegetation places what the frozen kotlin places") {
         CHECK(result.totals.cane == 54);
         CHECK(result.totals.cactus == 0);
         CHECK(result.totals.bushes == 46);
-        CHECK(result.checksum == 5034987587601912063LL);
+        CHECK(result.checksum == -8035072488944382251LL);
         CHECK(result.after == 588904721);
         CHECK(result.deferred == 0);
     }
@@ -149,7 +149,7 @@ TEST_CASE("the shared extra vegetation places what the frozen kotlin places") {
         CHECK(result.totals.cane == 0);
         CHECK(result.totals.cactus == 0);
         CHECK(result.totals.bushes == 44);
-        CHECK(result.checksum == -655585334867819015LL);
+        CHECK(result.checksum == -2154865887007311039LL);
         CHECK(result.after == -276953105);
         CHECK(result.deferred == 0);
     }
@@ -160,7 +160,7 @@ TEST_CASE("the shared extra vegetation places what the frozen kotlin places") {
         CHECK(result.totals.cane == 256);
         CHECK(result.totals.cactus == 12);
         CHECK(result.totals.bushes == 0);
-        CHECK(result.checksum == -7999191116077077141LL);
+        CHECK(result.checksum == 8972483978184471983LL);
         CHECK(result.after == -1230455523);
         CHECK(result.deferred == 0);
     }
@@ -171,7 +171,7 @@ TEST_CASE("the shared extra vegetation places what the frozen kotlin places") {
         CHECK(result.totals.cane == 256);
         CHECK(result.totals.cactus == 23);
         CHECK(result.totals.bushes == 0);
-        CHECK(result.checksum == 8585319796808793808LL);
+        CHECK(result.checksum == 6686611659611689146LL);
         CHECK(result.after == -813907403);
         CHECK(result.deferred == 0);
     }
@@ -182,7 +182,7 @@ TEST_CASE("the shared extra vegetation places what the frozen kotlin places") {
         CHECK(result.totals.cane == 256);
         CHECK(result.totals.cactus == 0);
         CHECK(result.totals.bushes == 0);
-        CHECK(result.checksum == 2603567511138768265LL);
+        CHECK(result.checksum == 7485129438416504129LL);
         CHECK(result.after == -104097446);
         CHECK(result.deferred == 0);
     }
@@ -193,7 +193,7 @@ TEST_CASE("the shared extra vegetation places what the frozen kotlin places") {
         CHECK(result.totals.cane == 60);
         CHECK(result.totals.cactus == 8);
         CHECK(result.totals.bushes == 0);
-        CHECK(result.checksum == 217205284797538251LL);
+        CHECK(result.checksum == 7715796775260124275LL);
         CHECK(result.after == -831851038);
         CHECK(result.deferred == 0);
     }
@@ -204,7 +204,7 @@ TEST_CASE("the shared extra vegetation places what the frozen kotlin places") {
         CHECK(result.totals.cane == 60);
         CHECK(result.totals.cactus == 20);
         CHECK(result.totals.bushes == 0);
-        CHECK(result.checksum == 3120751758315207933LL);
+        CHECK(result.checksum == 8020240781692310841LL);
         CHECK(result.after == -2094109878);
         CHECK(result.deferred == 0);
     }
@@ -215,7 +215,7 @@ TEST_CASE("the shared extra vegetation places what the frozen kotlin places") {
         CHECK(result.totals.cane == 60);
         CHECK(result.totals.cactus == 0);
         CHECK(result.totals.bushes == 0);
-        CHECK(result.checksum == -5217038058455779831LL);
+        CHECK(result.checksum == -8055908383301564595LL);
         CHECK(result.after == 588904721);
         CHECK(result.deferred == 0);
     }
@@ -226,7 +226,7 @@ TEST_CASE("the shared extra vegetation places what the frozen kotlin places") {
         CHECK(result.totals.cane == 96);
         CHECK(result.totals.cactus == 0);
         CHECK(result.totals.bushes == 89);
-        CHECK(result.checksum == -1803343806480084790LL);
+        CHECK(result.checksum == 6321040793946520093LL);
         CHECK(result.after == 202814787);
         CHECK(result.deferred == 0);
     }
@@ -237,7 +237,7 @@ TEST_CASE("the shared extra vegetation places what the frozen kotlin places") {
         CHECK(result.totals.cane == 96);
         CHECK(result.totals.cactus == 0);
         CHECK(result.totals.bushes == 92);
-        CHECK(result.checksum == -5052396864957394479LL);
+        CHECK(result.checksum == -1005060391652967389LL);
         CHECK(result.after == 203695341);
         CHECK(result.deferred == 0);
     }
@@ -248,7 +248,7 @@ TEST_CASE("the shared extra vegetation places what the frozen kotlin places") {
         CHECK(result.totals.cane == 0);
         CHECK(result.totals.cactus == 0);
         CHECK(result.totals.bushes == 88);
-        CHECK(result.checksum == -6467182037061563217LL);
+        CHECK(result.checksum == 1671790454851968293LL);
         CHECK(result.after == -1982035796);
         CHECK(result.deferred == 0);
     }
@@ -259,7 +259,7 @@ TEST_CASE("the shared extra vegetation places what the frozen kotlin places") {
         CHECK(result.totals.cane == 0);
         CHECK(result.totals.cactus == 0);
         CHECK(result.totals.bushes == 44);
-        CHECK(result.checksum == -655585334867819015LL);
+        CHECK(result.checksum == -2154865887007311039LL);
         CHECK(result.after == -276953105);
         CHECK(result.deferred == 0);
     }
@@ -270,7 +270,7 @@ TEST_CASE("the shared extra vegetation places what the frozen kotlin places") {
         CHECK(result.totals.cane == 0);
         CHECK(result.totals.cactus == 0);
         CHECK(result.totals.bushes == 0);
-        CHECK(result.checksum == -305506355951899687LL);
+        CHECK(result.checksum == 1609328623553221673LL);
         CHECK(result.after == -536750048);
         CHECK(result.deferred == 0);
     }

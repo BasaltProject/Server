@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
+#include <basalt/server/runtime/entity/ai/CatGoals.hpp>
 #include <basalt/server/runtime/entity/ai/CopperGolemGoals.hpp>
 #include <basalt/server/runtime/entity/ai/DolphinGoals.hpp>
 #include <basalt/server/runtime/entity/ai/FlyingGoals.hpp>
@@ -229,7 +230,21 @@ bool buildTamed(GoalSelector& selector, const wire::common::Identifier& type, st
         add<NearestAttackableEntityGoal>(selector, 4, Names{"sheep", "rabbit", "skeleton"});
         return true;
     }
-    if (path == "cat" || path == "ocelot") {
+    if (path == "cat") {
+        // parity: `Cat.registerGoals`, with its 26.3 block goals at 5 and 7.
+        add<FloatGoal>(selector, 1);
+        add<SitWhenOrderedToGoal>(selector, 2);
+        add<TemptGoal>(selector, 4, 0.6, entity::breeding::foodFor(type));
+        add<CatLieOnBlockGoal>(selector, 5, 1.1, 8);
+        add<FollowOwnerGoal>(selector, 6, 1.0, 10.0, 5.0);
+        add<CatSitOnBlockGoal>(selector, 7, 0.8);
+        add<BreedGoal>(selector, 10, 0.8);
+        add<RandomStrollGoal>(selector, 11, 0.8);
+        add<LookAtPlayerGoal>(selector, 12, 10.0);
+        add<NearestAttackableEntityGoal>(selector, 1, Names{"rabbit", "chicken", "tadpole"});
+        return true;
+    }
+    if (path == "ocelot") {
         add<FloatGoal>(selector, 1);
         add<SitWhenOrderedToGoal>(selector, 2);
         add<TemptGoal>(selector, 3, 0.6, entity::breeding::foodFor(type));

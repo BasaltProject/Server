@@ -115,7 +115,7 @@ TEST_CASE("the ocean vegetal entries match the frozen kotlin") {
         const Run result = run(aquaticDecoration::ocean(), 6);
         CHECK(result.placed == 373);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 2197940192545367614LL);
+        CHECK(result.checksum == 3814633425965960016LL);
         CHECK(result.after == 881572358);
     }
 
@@ -123,7 +123,7 @@ TEST_CASE("the ocean vegetal entries match the frozen kotlin") {
         const Run result = run(aquaticDecoration::deepOcean(), 6);
         CHECK(result.placed == 427);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -2603591555994823324LL);
+        CHECK(result.checksum == -2391045047473113324LL);
         CHECK(result.after == 881572358);
     }
 
@@ -131,7 +131,7 @@ TEST_CASE("the ocean vegetal entries match the frozen kotlin") {
         const Run result = run(aquaticDecoration::coldOcean(), 6);
         CHECK(result.placed == 379);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -4769625813929216005LL);
+        CHECK(result.checksum == 6212135118081226924LL);
         CHECK(result.after == -1741392533);
     }
 
@@ -139,7 +139,7 @@ TEST_CASE("the ocean vegetal entries match the frozen kotlin") {
         const Run result = run(aquaticDecoration::deepColdOcean(), 6);
         CHECK(result.placed == 403);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 4395512014295771981LL);
+        CHECK(result.checksum == -2175191153298853462LL);
         CHECK(result.after == 1976707368);
     }
 
@@ -147,7 +147,7 @@ TEST_CASE("the ocean vegetal entries match the frozen kotlin") {
         const Run result = run(aquaticDecoration::lukewarmOcean(), 6);
         CHECK(result.placed == 377);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 6893663375568069548LL);
+        CHECK(result.checksum == 4489368018934243979LL);
         CHECK(result.after == 1173500236);
     }
 
@@ -155,7 +155,7 @@ TEST_CASE("the ocean vegetal entries match the frozen kotlin") {
         const Run result = run(aquaticDecoration::deepLukewarmOcean(), 6);
         CHECK(result.placed == 456);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 2269220372660409661LL);
+        CHECK(result.checksum == -3262425696155345017LL);
         CHECK(result.after == 1173500236);
     }
 
@@ -163,7 +163,7 @@ TEST_CASE("the ocean vegetal entries match the frozen kotlin") {
         const Run result = run(aquaticDecoration::river(), 6);
         CHECK(result.placed == 158);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 7908725180626176070LL);
+        CHECK(result.checksum == 7686394614344789615LL);
         CHECK(result.after == 881572358);
     }
 
@@ -171,7 +171,7 @@ TEST_CASE("the ocean vegetal entries match the frozen kotlin") {
         const Run result = run(aquaticDecoration::swamp(), 6);
         CHECK(result.placed == 239);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 8677792919100731775LL);
+        CHECK(result.checksum == 47986671759492525LL);
         CHECK(result.after == -2058856994);
     }
 
@@ -179,7 +179,7 @@ TEST_CASE("the ocean vegetal entries match the frozen kotlin") {
         const Run result = run(aquaticDecoration::warmOcean(), 24);
         CHECK(result.placed == 1002);
         CHECK(result.deferred == 769);
-        CHECK(result.checksum == -7702522312271284110LL);
+        CHECK(result.checksum == 7345160379850984405LL);
         CHECK(result.after == -1242473187);
     }
 }
@@ -209,6 +209,6 @@ TEST_CASE("one aquatic feature at one position matches the frozen kotlin") {
     }
     CHECK(known == "111111111111111111111111111111111000");
     CHECK(placed == 59);
-    CHECK(static_cast<std::int64_t>(checksum) == 5145286995187963922LL);
+    CHECK(static_cast<std::int64_t>(checksum) == -8508083637015307271LL);
     CHECK(after == 4933430);
 }

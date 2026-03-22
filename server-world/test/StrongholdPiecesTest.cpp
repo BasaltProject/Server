@@ -179,18 +179,18 @@ void check(const Run& result, std::int32_t written, std::size_t blockEntities, s
 TEST_CASE("every stronghold room draws what the frozen kotlin draws") {
     SUBCASE("stairsDown") {
         check(run(StrongholdPieceKind::StairsDown, StructureDirection::North, StrongholdDoor::Opening), 275, 0, 0,
-              6082543870560175831LL, -1824631828);
+              -7822406708046913399LL, -1824631828);
     }
 
     SUBCASE("straightStairs") {
         check(run(StrongholdPieceKind::StraightStairsDown, StructureDirection::South, StrongholdDoor::WoodDoor), 440, 0,
-              0, 4233745378238894375LL, 1367554549);
+              0, 1228774412350454967LL, 1367554549);
     }
 
     SUBCASE("straight") {
         check(run(StrongholdPieceKind::Straight, StructureDirection::East, StrongholdDoor::Grates,
                   Options{.leftChild = true, .rightChild = true}),
-              175, 0, 0, -7764669373663107894LL, -1225253890);
+              175, 0, 0, -1486676689707968034LL, -1225253890);
     }
 
     SUBCASE("straightTorches") {
@@ -199,94 +199,94 @@ TEST_CASE("every stronghold room draws what the frozen kotlin draws") {
         CHECK(result.blockEntities == 0);
         CHECK(result.deferred == 0);
         CHECK(result.draws == -2002832741);
-        CHECK(result.checksum == -2489533402617228901LL);
+        CHECK(result.checksum == 3228296681694291465LL);
     }
 
     SUBCASE("leftTurnNorth") {
         check(run(StrongholdPieceKind::LeftTurn, StructureDirection::North, StrongholdDoor::Opening), 125, 0, 0,
-              89205740082300445LL, -1563540256);
+              -4814328370327003494LL, -1563540256);
     }
 
     SUBCASE("leftTurnWest") {
         check(run(StrongholdPieceKind::LeftTurn, StructureDirection::West, StrongholdDoor::Opening), 125, 0, 0,
-              3615791210897693634LL, -1563540256);
+              -7648640418882953589LL, -1563540256);
     }
 
     SUBCASE("rightTurnNorth") {
         check(run(StrongholdPieceKind::RightTurn, StructureDirection::North, StrongholdDoor::Opening), 125, 0, 0,
-              -8519449538854113112LL, -1563540256);
+              -6977579985591403689LL, -1563540256);
     }
 
     SUBCASE("chestCorridor") {
         check(run(StrongholdPieceKind::ChestCorridor, StructureDirection::North, StrongholdDoor::IronDoor), 175, 1, 0,
-              4531248027593343336LL, 1400005628);
+              6182468844020567033LL, 1400005628);
     }
 
     SUBCASE("filler") {
         check(run(StrongholdPieceKind::FillerCorridor, StructureDirection::North, StrongholdDoor::Opening,
                   Options{.steps = 4}),
-              100, 0, 0, -885293379535782747LL, -1257443035);
+              100, 0, 0, -92997234752584491LL, -1257443035);
     }
 
     SUBCASE("prisonHall") {
         check(run(StrongholdPieceKind::PrisonHall, StructureDirection::North, StrongholdDoor::Opening), 495, 0, 0,
-              8030015715878788337LL, -1421634423);
+              6939441259923071338LL, -1421634423);
     }
 
     SUBCASE("roomCrossing0") {
         check(run(StrongholdPieceKind::RoomCrossing, StructureDirection::North, StrongholdDoor::Opening,
                   Options{.roomType = 0}),
-              847, 0, 0, 1916752290442895351LL, 618992086);
+              847, 0, 0, -7968822720024932015LL, 618992086);
     }
 
     SUBCASE("roomCrossing1") {
         check(run(StrongholdPieceKind::RoomCrossing, StructureDirection::North, StrongholdDoor::Opening,
                   Options{.roomType = 1}),
-              847, 0, 0, -5521862151010488668LL, 618992086);
+              847, 0, 0, 2903098822033606670LL, 618992086);
     }
 
     SUBCASE("roomCrossing2") {
         check(run(StrongholdPieceKind::RoomCrossing, StructureDirection::North, StrongholdDoor::Opening,
                   Options{.roomType = 2}),
-              847, 1, 0, -7443673943268616185LL, -1758423617);
+              847, 1, 0, -6289456503443951974LL, -1758423617);
     }
 
     SUBCASE("roomCrossing3") {
         check(run(StrongholdPieceKind::RoomCrossing, StructureDirection::North, StrongholdDoor::Opening,
                   Options{.roomType = 3}),
-              847, 0, 0, -6195490341021988808LL, 618992086);
+              847, 0, 0, -9173343759359332903LL, 618992086);
     }
 
     SUBCASE("roomCrossing4") {
         check(run(StrongholdPieceKind::RoomCrossing, StructureDirection::North, StrongholdDoor::Opening,
                   Options{.roomType = 4}),
-              847, 0, 0, -6195490341021988808LL, 618992086);
+              847, 0, 0, -9173343759359332903LL, 618992086);
     }
 
     SUBCASE("fiveCrossing") {
         check(run(StrongholdPieceKind::FiveCrossing, StructureDirection::North, StrongholdDoor::Opening), 990, 0, 0,
-              8367467418454605493LL, -590291558);
+              -6110292646545857232LL, -590291558);
     }
 
     SUBCASE("libraryShort") {
         check(run(StrongholdPieceKind::Library, StructureDirection::North, StrongholdDoor::Opening), 1260, 1, 0,
-              3581817746058060061LL, 2131326114);
+              -5962210426891443650LL, 2131326114);
     }
 
     SUBCASE("libraryTall") {
         check(run(StrongholdPieceKind::Library, StructureDirection::North, StrongholdDoor::Opening,
                   Options{.tall = true}),
-              2310, 2, 0, -1485232368688712812LL, -1435806088);
+              2310, 2, 0, -8354924805334925365LL, -1435806088);
     }
 
     SUBCASE("portalRoom") {
         check(run(StrongholdPieceKind::PortalRoom, StructureDirection::North, StrongholdDoor::Grates), 1408, 1, 0,
-              -9078935075191681710LL, -1035140312);
+              5546614461288261156LL, -1035140312);
     }
 
     SUBCASE("portalRoomOtherSeed") {
         check(
             run(StrongholdPieceKind::PortalRoom, StructureDirection::North, StrongholdDoor::Grates, Options{.seed = 0}),
-            1408, 1, 0, 1842235762035688541LL, 1552052780);
+            1408, 1, 0, -2178951626122319401LL, 1552052780);
     }
 }

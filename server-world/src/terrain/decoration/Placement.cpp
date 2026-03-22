@@ -1,5 +1,6 @@
+#include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/Blocks.hpp>
-#include <basalt/server/world/noise/SimplexNoise.hpp>
+#include <basalt/server/world/noise/Noise.hpp>
 #include <basalt/server/world/terrain/decoration/Placement.hpp>
 
 #include <cmath>
@@ -14,7 +15,7 @@ namespace {
 const noise::SimplexNoise& biomeInfoNoise() {
     static const noise::SimplexNoise built = [] {
         random::RandomSource source = random::RandomSource::legacy(2345LL);
-        return noise::SimplexNoise{source};
+        return noise::SimplexNoise{source, true};
     }();
     return built;
 }
@@ -158,7 +159,7 @@ PlacementModifier heightmapPlacement(HeightmapType type) {
 PlacementModifier noiseBasedCountPlacement(std::int32_t noiseToCountRatio, double noiseFactor, double noiseOffset) {
     return [noiseToCountRatio, noiseFactor, noiseOffset](const PlacementContext&, random::RandomSource&,
                                                          const DecorationPos& origin) {
-        const double value = biomeInfoNoise().getValue(origin.x / noiseFactor, origin.z / noiseFactor);
+        const auto value = static_cast<double>(biomeInfoNoise().get(origin.x / noiseFactor, origin.z / noiseFactor));
         const auto count = static_cast<std::int32_t>(std::ceil((value + noiseOffset) * noiseToCountRatio));
         return repeated(origin, count);
     };
@@ -167,7 +168,7 @@ PlacementModifier noiseBasedCountPlacement(std::int32_t noiseToCountRatio, doubl
 PlacementModifier noiseThresholdCountPlacement(double noiseLevel, std::int32_t belowNoise, std::int32_t aboveNoise) {
     return [noiseLevel, belowNoise, aboveNoise](const PlacementContext&, random::RandomSource&,
                                                 const DecorationPos& origin) {
-        const double value = biomeInfoNoise().getValue(origin.x / 200.0, origin.z / 200.0);
+        const auto value = static_cast<double>(biomeInfoNoise().get(origin.x / 200.0, origin.z / 200.0));
         return repeated(origin, value < noiseLevel ? belowNoise : aboveNoise);
     };
 }

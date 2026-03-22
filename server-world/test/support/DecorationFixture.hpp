@@ -15,51 +15,20 @@ namespace basalt::server::world::testsupport {
 /// A block state by its vanilla path, for tests that name blocks rather than ids.
 [[nodiscard]] inline std::int32_t stateIdOf(std::string_view path) { return registry::blocks::named(path)->stateId; }
 
-/// The surface environment the decoration tests run against: one fixed biome and flat answers for
-/// everything a step-9 feature asks. Fourteen tests had a byte-identical copy of this before it was
-/// pulled out here, which is both a lot of duplication and a lot of ways for the copies to drift.
+/// The biome environment the decoration tests run against: one fixed biome everywhere.
 class FixedBiomeEnvironment final : public terrain::surface::SurfaceRuleEnvironment {
 public:
-    explicit FixedBiomeEnvironment(std::string biome, std::int32_t surfaceHeight = 70)
-        : biome_(std::move(biome)), surfaceHeight_(surfaceHeight) {}
-
-    [[nodiscard]] std::int32_t surfaceDepthNoise(std::int32_t, std::int32_t) const override { return 0; }
-
-    [[nodiscard]] double surfaceSecondaryNoise(std::int32_t, std::int32_t) const override { return 0.0; }
-
-    [[nodiscard]] double sample2d(std::string_view, std::int32_t, std::int32_t) const override { return 0.0; }
-
-    [[nodiscard]] double sample3d(std::string_view, std::int32_t, std::int32_t, std::int32_t) const override {
-        return 0.0;
-    }
-
-    [[nodiscard]] float verticalGradientRandom(std::string_view, std::int32_t, std::int32_t,
-                                               std::int32_t) const override {
-        return 0.5F;
-    }
-
-    [[nodiscard]] random::RandomSource positionalRandom(std::int32_t x, std::int32_t, std::int32_t z) const override {
-        return random::RandomSource::xoroshiro(x * 31LL + z);
-    }
-
-    [[nodiscard]] std::int32_t estimatedSurfaceHeight(std::int32_t, std::int32_t) const override {
-        return surfaceHeight_;
-    }
+    explicit FixedBiomeEnvironment(std::string biome) : biome_(std::move(biome)) {}
 
     [[nodiscard]] const std::string& biomeAt(std::int32_t, std::int32_t, std::int32_t) const override { return biome_; }
 
     [[nodiscard]] const std::string& noiseBiomeAt(std::int32_t, std::int32_t, std::int32_t,
-                                                  densityfunction::DensityCache*) const override {
+                                                  densityfunction::SamplerContext*) const override {
         return biome_;
     }
 
-    [[nodiscard]] bool isSteep(std::int32_t, std::int32_t) const override { return false; }
-
-    [[nodiscard]] std::int32_t clayBand(std::int32_t, std::int32_t, std::int32_t) const override { return 0; }
-
 private:
     std::string biome_;
-    std::int32_t surfaceHeight_;
 };
 
 /// FNV-1a over a y range of a chunk. Every decoration test folds its result this way, so the

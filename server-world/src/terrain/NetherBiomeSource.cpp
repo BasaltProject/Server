@@ -28,30 +28,28 @@ struct NetherBiomeSource::State {
     std::optional<BiomeZoomer> zoomer;
 };
 
-NetherBiomeSource::NetherBiomeSource(densityfunction::Function temperature, densityfunction::Function vegetation,
-                                     const std::optional<std::int64_t> biomeZoomSeed) {
+NetherBiomeSource::NetherBiomeSource(const NoiseRouter& router, const std::optional<std::int64_t> biomeZoomSeed) {
     auto state = std::make_shared<State>(State{
         .parameters = climate::RTree<BiomeName>::create(netherParameters()),
-        .sampler = climate::Sampler{std::move(temperature), std::move(vegetation), densityfunction::functions::zero(),
-                                    densityfunction::functions::zero(), densityfunction::functions::zero(),
-                                    densityfunction::functions::zero()},
+        .sampler = climate::Sampler{*router.state, router.temperature, router.vegetation, router.continents,
+                                    router.erosion, router.depth, router.ridges},
         .zoomer = biomeZoomSeed.has_value() ? std::optional<BiomeZoomer>{BiomeZoomer{*biomeZoomSeed}} : std::nullopt});
     state_ = std::move(state);
 }
 
 std::string_view NetherBiomeSource::biomeAtQuart(const std::int32_t quartX, const std::int32_t quartY,
                                                  const std::int32_t quartZ,
-                                                 densityfunction::DensityCache* cache) const {
+                                                 densityfunction::SamplerContext* cache) const {
     return state_->parameters->search(state_->sampler.sample(quartX, quartY, quartZ, cache).toArray());
 }
 
 std::string_view NetherBiomeSource::biomeAt(const std::int32_t x, const std::int32_t y, const std::int32_t z,
-                                            densityfunction::DensityCache* cache) const {
+                                            densityfunction::SamplerContext* cache) const {
     return biomeAtQuart(x >> 2, y >> 2, z >> 2, cache);
 }
 
 std::string_view NetherBiomeSource::blockBiomeAt(const std::int32_t x, const std::int32_t y, const std::int32_t z,
-                                                 densityfunction::DensityCache* cache) const {
+                                                 densityfunction::SamplerContext* cache) const {
     if (!state_->zoomer.has_value()) {
         return biomeAt(x, y, z, cache);
     }
@@ -62,20 +60,20 @@ std::string_view NetherBiomeSource::blockBiomeAt(const std::int32_t x, const std
 
 NetherBiomeLookup NetherBiomeSource::lookup() const {
     return [state = state_, self = *this](std::int32_t x, std::int32_t y, std::int32_t z,
-                                          densityfunction::DensityCache* cache) {
+                                          densityfunction::SamplerContext* cache) {
         return self.blockBiomeAt(x, y, z, cache);
     };
 }
 
-NetherBiomeLookup NetherBiomeSource::cached(densityfunction::DensityCache& densityCache) const {
+NetherBiomeLookup NetherBiomeSource::cached(densityfunction::SamplerContext& context) const {
     if (!state_->zoomer.has_value()) {
         return lookup();
     }
     // One worker's own quart cache: the zoom asks for the same quart from many block positions.
     auto noiseBiomes = std::make_shared<std::map<std::int64_t, BiomeName>>();
-    return [self = *this, noiseBiomes, fallback = &densityCache](std::int32_t x, std::int32_t y, std::int32_t z,
-                                                                 densityfunction::DensityCache* cache) {
-        densityfunction::DensityCache* activeCache = cache != nullptr ? cache : fallback;
+    return [self = *this, noiseBiomes, fallback = &context](std::int32_t x, std::int32_t y, std::int32_t z,
+                                                            densityfunction::SamplerContext* cache) {
+        densityfunction::SamplerContext* activeCache = cache != nullptr ? cache : fallback;
         return self.state_->zoomer->biomeAt(
             x, y, z, [&](std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ) -> BiomeName {
                 const std::int64_t key = (static_cast<std::int64_t>(quartX) & 0x1FFFFFLL) |

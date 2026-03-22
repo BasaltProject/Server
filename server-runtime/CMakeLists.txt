@@ -283,7 +283,6 @@ basalt_module(server-runtime-core
         src/world/Dialogs.cpp
         src/world/RealDialogs.cpp
         src/world/RealTestInstances.cpp
-        src/world/RealNoiseParameters.cpp
         src/world/BlockInteractions.cpp
         src/world/ProjectileHits.cpp
         src/world/Furnaces.cpp
@@ -434,7 +433,6 @@ basalt_module(server-runtime-core
         src/world/MobVariantSpawnFinalizer.cpp
         src/world/NaturalSpawner.cpp
         src/world/NetherPortals.cpp
-        src/world/NoiseParametersJson.cpp
         src/world/OriginalMobSpawner.cpp
         src/world/MobSpawnVariantData.cpp
         src/world/SpawnEquipmentEnchantments.cpp
@@ -474,6 +472,7 @@ basalt_module(server-runtime-core
         src/entity/ai/WanderingTraderGoals.cpp
         src/entity/ai/WitherGoals.cpp
         src/entity/ai/DolphinGoals.cpp
+        src/entity/ai/CatGoals.cpp
         src/entity/ai/CopperGolemGoals.cpp
         src/world/VillageDataLoader.cpp
         src/world/VillageGolemSpawner.cpp
@@ -612,12 +611,6 @@ basalt_test(server-runtime-real-dialogs-test
 basalt_test(server-runtime-real-test-instances-test
     SOURCES
         test/RealTestInstancesTest.cpp
-    DEPENDS basalt::server-runtime-core
-)
-
-basalt_test(server-runtime-real-noise-parameters-test
-    SOURCES
-        test/RealNoiseParametersTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
@@ -1546,18 +1539,6 @@ basalt_test(server-runtime-real-villager-trades-test
 basalt_test(server-runtime-ruined-portal-variants-test
     SOURCES
         test/RuinedPortalVariantsTest.cpp
-    DEPENDS basalt::server-runtime-core
-)
-
-basalt_test(server-runtime-real-surface-environment-test
-    SOURCES
-        test/RealSurfaceEnvironmentTest.cpp
-    DEPENDS basalt::server-runtime-core
-)
-
-basalt_test(server-runtime-nether-surface-environment-test
-    SOURCES
-        test/NetherSurfaceEnvironmentTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

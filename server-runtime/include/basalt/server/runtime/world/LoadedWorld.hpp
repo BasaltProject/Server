@@ -43,7 +43,7 @@ namespace basalt::server::runtime::world {
 struct LoadedWorldOptions {
     /// Where this world's generation and saving are recorded. Off unless `/timings` is on.
     wire::common::Timings* timings = nullptr;
-    const server::world::terrain::OverworldNoiseRouter* overworldRouter = nullptr;
+    const server::world::terrain::NoiseRouter* overworldRouter = nullptr;
     const server::world::terrain::surface::SurfaceRuleEnvironment* surfaceEnvironment = nullptr;
     server::world::terrain::VillageStructureGenerator* villageGenerator = nullptr;
     server::world::terrain::StrongholdStructureGenerator* strongholdGenerator = nullptr;
@@ -294,7 +294,7 @@ private:
     wire::common::Logger logger_;
     wire::common::Timings ownTimings_;
     wire::common::Timings& timings_;
-    const server::world::terrain::OverworldNoiseRouter* overworldRouter_ = nullptr;
+    const server::world::terrain::NoiseRouter* overworldRouter_ = nullptr;
     const server::world::terrain::surface::SurfaceRuleEnvironment* surfaceEnvironment_ = nullptr;
     server::world::terrain::VillageStructureGenerator* villageGenerator_ = nullptr;
     server::world::terrain::StrongholdStructureGenerator* strongholdGenerator_ = nullptr;

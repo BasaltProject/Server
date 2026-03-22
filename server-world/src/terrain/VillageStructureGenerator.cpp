@@ -16,8 +16,6 @@ using structure::PlacedStructurePiece;
 using structure::StructureBoundingBox;
 using structure::StructurePos;
 
-constexpr std::int32_t kCellWidth = 4;
-constexpr std::int32_t kCellHeight = 8;
 constexpr std::int32_t kSeaLevel = 63;
 constexpr std::int32_t kBeardRadius = 12;
 constexpr std::int32_t kSurfaceStructuresStep = 4;
@@ -44,10 +42,9 @@ constexpr std::size_t kAssemblyCacheCapacity = 64;
 
 } // namespace
 
-VillageStructureGenerator::VillageStructureGenerator(OverworldNoiseRouter router,
-                                                     structure::StructurePlacementGrid grid, BiomeAt biomeAt,
-                                                     std::int32_t maxDepth, std::int32_t maxDistanceFromCenter,
-                                                     PoolLookup poolLookup,
+VillageStructureGenerator::VillageStructureGenerator(NoiseRouter router, structure::StructurePlacementGrid grid,
+                                                     BiomeAt biomeAt, std::int32_t maxDepth,
+                                                     std::int32_t maxDistanceFromCenter, PoolLookup poolLookup,
                                                      structure::PoolTemplateLoader templateLoader)
     : router_(std::move(router)), grid_(std::move(grid)), biomeAt_(std::move(biomeAt)), maxDepth_(maxDepth),
       maxDistanceFromCenter_(maxDistanceFromCenter), poolLookup_(std::move(poolLookup)),
@@ -58,17 +55,17 @@ const std::vector<VillageStructureGenerator::Variant>& VillageStructureGenerator
         {wire::common::Identifier::vanilla("village_plains"),
          "minecraft:village/plains/town_centers",
          {"plains", "meadow"},
-         22},
-        {wire::common::Identifier::vanilla("village_desert"), "minecraft:village/desert/town_centers", {"desert"}, 21},
+         40},
+        {wire::common::Identifier::vanilla("village_desert"), "minecraft:village/desert/town_centers", {"desert"}, 39},
         {wire::common::Identifier::vanilla("village_savanna"),
          "minecraft:village/savanna/town_centers",
          {"savanna"},
-         23},
+         41},
         {wire::common::Identifier::vanilla("village_snowy"),
          "minecraft:village/snowy/town_centers",
          {"snowy_plains"},
-         24},
-        {wire::common::Identifier::vanilla("village_taiga"), "minecraft:village/taiga/town_centers", {"taiga"}, 25},
+         42},
+        {wire::common::Identifier::vanilla("village_taiga"), "minecraft:village/taiga/town_centers", {"taiga"}, 43},
     };
     return built;
 }
@@ -118,8 +115,7 @@ std::int32_t VillageStructureGenerator::surfaceHeightAt(std::int32_t x, std::int
     if (found == samplers.end()) {
         found = samplers
                     .emplace(std::piecewise_construct, std::forward_as_tuple(key),
-                             std::forward_as_tuple(router_.finalDensity, chunkX, chunkZ, kOverworldHeight.minY(),
-                                                   kOverworldHeight.height(), kCellWidth, kCellHeight))
+                             std::forward_as_tuple(router_, chunkX, chunkZ))
                     .first;
     }
     std::int32_t y = kOverworldHeight.maxY();
@@ -362,14 +358,14 @@ void VillageStructureGenerator::placeInto(Chunk& chunk, const std::vector<Placed
     }
 }
 
-densityfunction::Function VillageStructureGenerator::finalDensityForChunk(std::int32_t chunkX, std::int32_t chunkZ,
-                                                                          std::int64_t seed) {
+void VillageStructureGenerator::addBeard(StructureBeard& beard, std::int32_t chunkX, std::int32_t chunkZ,
+                                         std::int64_t seed) {
     const std::int32_t chunkMinX = chunkX * 16;
     const std::int32_t chunkMinZ = chunkZ * 16;
     const StructureBoundingBox referenceClip = chunkClip(chunkX, chunkZ, 0);
     const StructureBoundingBox nearClip = chunkClip(chunkX, chunkZ, kBeardRadius);
-    std::vector<BeardifierRigid> rigids;
-    std::vector<BeardifierJunction> junctions;
+    std::vector<BeardifierRigid>& rigids = beard.pieces;
+    std::vector<BeardifierJunction>& junctions = beard.junctions;
     for (const std::shared_ptr<const VillageStart>& start : referencedStarts(chunkX, chunkZ, seed, referenceClip)) {
         for (const PlacedStructurePiece& piece : start->pieces) {
             if (!piece.boundingBox.intersects(nearClip)) {
@@ -389,11 +385,6 @@ densityfunction::Function VillageStructureGenerator::finalDensityForChunk(std::i
             }
         }
     }
-    if (rigids.empty() && junctions.empty()) {
-        return router_.finalDensity;
-    }
-    return densityfunction::functions::add(router_.finalDensity,
-                                           structureBeardifier(std::move(rigids), std::move(junctions)));
 }
 
 } // namespace basalt::server::world::terrain

@@ -25,9 +25,16 @@ struct BeardifierJunction {
     std::int32_t z = 0;
 };
 
-/// parity: `Beardifier`'s rigid-piece and junction contributions, as a density function the router
-/// adds on top of the base terrain.
-[[nodiscard]] densityfunction::Function structureBeardifier(std::vector<BeardifierRigid> pieces,
-                                                            std::vector<BeardifierJunction> junctions = {});
+/// The pieces and junctions one chunk's terrain has to adapt to, gathered across structures.
+struct StructureBeard {
+    std::vector<BeardifierRigid> pieces;
+    std::vector<BeardifierJunction> junctions;
+
+    [[nodiscard]] bool empty() const noexcept { return pieces.empty() && junctions.empty(); }
+};
+
+/// parity: `Beardifier`, the sampler bound into a chunk's context as its `beardifier` field. Null
+/// when there is nothing to adapt to, which samples as zero.
+[[nodiscard]] densityfunction::Sampler structureBeardifier(StructureBeard beard);
 
 } // namespace basalt::server::world::terrain

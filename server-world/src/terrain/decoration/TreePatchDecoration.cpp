@@ -85,93 +85,93 @@ const std::vector<treePatchDecoration::FeatureSpec>& treePatchDecoration::featur
                          .frequency = countExtra(2, 0.1F, 1),
                          .biomes = {"sparse_jungle"}});
         built.push_back({.name = "trees_badlands",
-                         .index = 5,
+                         .index = 8,
                          .frequency = countExtra(5, 0.1F, 1),
                          .biomes = {"wooded_badlands"},
                          .survivalSapling = "oak_sapling"});
         built.push_back(
-            {.name = "trees_jungle", .index = 7, .frequency = countExtra(50, 0.1F, 1), .biomes = {"jungle"}});
+            {.name = "trees_jungle", .index = 10, .frequency = countExtra(50, 0.1F, 1), .biomes = {"jungle"}});
         built.push_back({.name = "trees_savanna",
-                         .index = 9,
+                         .index = 12,
                          .frequency = countExtra(1, 0.1F, 1),
                          .biomes = {"savanna", "savanna_plateau"}});
         built.push_back({.name = "pale_garden_vegetation",
-                         .index = 13,
+                         .index = 16,
                          .frequency = countPlacement(16),
                          .biomes = {"pale_garden"}});
         built.push_back({.name = "dark_forest_vegetation",
-                         .index = 17,
+                         .index = 20,
                          .frequency = countPlacement(16),
                          .biomes = {"dark_forest"}});
         built.push_back({.name = "trees_flower_forest",
-                         .index = 19,
+                         .index = 22,
                          .frequency = countExtra(6, 0.1F, 1),
                          .biomes = {"flower_forest"}});
         built.push_back({.name = "birch_tall",
-                         .index = 23,
+                         .index = 26,
                          .frequency = countExtra(10, 0.1F, 1),
                          .biomes = {"old_growth_birch_forest"}});
         built.push_back({.name = "trees_birch",
-                         .index = 24,
+                         .index = 27,
                          .frequency = countExtra(10, 0.1F, 1),
                          .biomes = {"birch_forest"},
                          .survivalSapling = "birch_sapling"});
         built.push_back({.name = "trees_birch_and_oak_leaf_litter",
-                         .index = 25,
+                         .index = 28,
                          .frequency = countExtra(10, 0.1F, 1),
                          .biomes = {"forest"}});
-        built.push_back({.name = "trees_meadow", .index = 37, .frequency = rarityFilter(100), .biomes = {"meadow"}});
+        built.push_back({.name = "trees_meadow", .index = 40, .frequency = rarityFilter(100), .biomes = {"meadow"}});
         built.push_back({.name = "trees_windswept_forest",
-                         .index = 39,
+                         .index = 42,
                          .frequency = countExtra(3, 0.1F, 1),
                          .biomes = {"windswept_forest"}});
         built.push_back({.name = "trees_old_growth_pine_taiga",
-                         .index = 41,
+                         .index = 44,
                          .frequency = countExtra(10, 0.1F, 1),
                          .biomes = {"old_growth_pine_taiga"}});
         built.push_back({.name = "trees_old_growth_spruce_taiga",
-                         .index = 42,
+                         .index = 45,
                          .frequency = countExtra(10, 0.1F, 1),
                          .biomes = {"old_growth_spruce_taiga"}});
         built.push_back({.name = "trees_taiga",
-                         .index = 43,
+                         .index = 46,
                          .frequency = countExtra(10, 0.1F, 1),
                          .biomes = {"snowy_taiga", "taiga"}});
         built.push_back(
-            {.name = "trees_grove", .index = 44, .frequency = countExtra(10, 0.1F, 1), .biomes = {"grove"}});
+            {.name = "trees_grove", .index = 47, .frequency = countExtra(10, 0.1F, 1), .biomes = {"grove"}});
         built.push_back({.name = "trees_windswept_hills",
-                         .index = 45,
+                         .index = 48,
                          .frequency = countExtra(0, 0.1F, 1),
                          .biomes = {"windswept_gravelly_hills", "windswept_hills"}});
         built.push_back({.name = "trees_snowy",
-                         .index = 46,
+                         .index = 49,
                          .frequency = countExtra(0, 0.1F, 1),
                          .biomes = {"ice_spikes", "snowy_plains"},
                          .survivalSapling = "spruce_sapling"});
         built.push_back({.name = "trees_mangrove",
-                         .index = 47,
+                         .index = 50,
                          .frequency = countPlacement(25),
                          .biomes = {"mangrove_swamp"},
                          .maxWaterDepth = 5});
         built.push_back({.name = "trees_swamp",
-                         .index = 48,
+                         .index = 51,
                          .frequency = countExtra(2, 0.1F, 1),
                          .biomes = {"swamp"},
                          .maxWaterDepth = 2,
                          .survivalSapling = "oak_sapling"});
         built.push_back(
             {.name = "trees_water",
-             .index = 50,
+             .index = 53,
              .frequency = countPlacement(IntProvider::weighted({{0, 9}, {1, 1}})),
              .biomes = {"cold_ocean", "deep_cold_ocean", "deep_frozen_ocean", "deep_lukewarm_ocean", "deep_ocean",
                         "frozen_ocean", "frozen_river", "lukewarm_ocean", "ocean", "river", "warm_ocean"}});
         built.push_back({.name = "trees_plains",
-                         .index = 52,
+                         .index = 55,
                          .frequency = countExtra(0, 0.05F, 1),
                          .biomes = {"deep_dark", "dripstone_caves", "plains", "sunflower_plains"},
                          .survivalSapling = "oak_sapling"});
         built.push_back({.name = "trees_cherry",
-                         .index = 56,
+                         .index = 59,
                          .frequency = countExtra(10, 0.1F, 1),
                          .biomes = {"cherry_grove"},
                          .survivalSapling = "cherry_sapling"});

@@ -87,7 +87,7 @@ TEST_CASE("the glow lichen growth matches the frozen kotlin") {
         const auto [lichen, distinct, checksum] = run("minecraft:lush_caves");
         CHECK(lichen == 99);
         CHECK(distinct == 62);
-        CHECK(checksum == -3103511468983081306LL);
+        CHECK(checksum == 8335974245601930525LL);
     }
 
     SUBCASE("the_void") {
@@ -95,7 +95,7 @@ TEST_CASE("the glow lichen growth matches the frozen kotlin") {
         const auto [lichen, distinct, checksum] = run("minecraft:the_void");
         CHECK(lichen == 0);
         CHECK(distinct == 0);
-        CHECK(checksum == -5658646599156230936LL);
+        CHECK(checksum == -2809108535340428696LL);
     }
 }
 

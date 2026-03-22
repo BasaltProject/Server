@@ -28,6 +28,7 @@
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WorldLight.hpp>
+#include <basalt/wire/common/Mth.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
 
 #include <algorithm>

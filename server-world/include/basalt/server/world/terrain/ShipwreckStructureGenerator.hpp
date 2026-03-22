@@ -23,9 +23,9 @@ public:
     using HeightAt = std::function<std::int32_t(std::int32_t, std::int32_t)>;
 
     static constexpr std::string_view kName = "shipwreck";
-    /// Eighteenth and nineteenth of the 26 of `surface_structures`, in registry order.
-    static constexpr std::int32_t kSunkStructureIndex = 17;
-    static constexpr std::int32_t kBeachedStructureIndex = 18;
+    /// Position among the 44 structures of `surface_structures`, in registry order.
+    static constexpr std::int32_t kSunkStructureIndex = 35;
+    static constexpr std::int32_t kBeachedStructureIndex = 36;
     static constexpr std::int32_t kSurfaceStructuresStep = 4;
 
     ShipwreckStructureGenerator(BiomeAt biomeAt, std::set<std::string, std::less<>> oceanBiomes,

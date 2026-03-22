@@ -107,11 +107,11 @@ void check(const Run& result, std::int32_t written, std::size_t blockEntities, s
 } // namespace
 
 TEST_CASE("the buried treasure sinks where the frozen kotlin sinks it") {
-    SUBCASE("beach") { check(run(606, "minecraft:beach", false, 400), 409612, 2, 2, 5315382519711209928LL); }
+    SUBCASE("beach") { check(run(606, "minecraft:beach", false, 400), 409612, 2, 2, -5806695127950562092LL); }
 
-    SUBCASE("hollow") { check(run(606, "minecraft:beach", true, 400), 409612, 2, 2, -5331954140461172280LL); }
+    SUBCASE("hollow") { check(run(606, "minecraft:beach", true, 400), 409612, 2, 2, -1672194806401291052LL); }
 
-    SUBCASE("plains") { check(run(606, "minecraft:plains", false, 400), 409600, 0, 0, -7882979800739019851LL); }
+    SUBCASE("plains") { check(run(606, "minecraft:plains", false, 400), 409600, 0, 0, -4203091179752366155LL); }
 
-    SUBCASE("otherSeed") { check(run(77, "minecraft:beach", false, 400), 409612, 2, 2, -2307450044006345219LL); }
+    SUBCASE("otherSeed") { check(run(77, "minecraft:beach", false, 400), 409612, 2, 2, -3210415400238492609LL); }
 }

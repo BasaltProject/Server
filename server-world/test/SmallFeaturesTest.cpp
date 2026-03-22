@@ -115,7 +115,7 @@ TEST_CASE("every small feature places what the frozen kotlin places") {
         const Run result = run("patch_firefly_bush_near_water");
         CHECK(result.known == "1111");
         CHECK(result.placed == 49);
-        CHECK(result.checksum == -7701576693695337106LL);
+        CHECK(result.checksum == -7025100511288186525LL);
         CHECK(result.after == -1670531482);
     }
 
@@ -123,7 +123,7 @@ TEST_CASE("every small feature places what the frozen kotlin places") {
         const Run result = run("patch_firefly_bush_near_water_swamp");
         CHECK(result.known == "1111");
         CHECK(result.placed == 49);
-        CHECK(result.checksum == -7701576693695337106LL);
+        CHECK(result.checksum == -7025100511288186525LL);
         CHECK(result.after == -1670531482);
     }
 
@@ -131,7 +131,7 @@ TEST_CASE("every small feature places what the frozen kotlin places") {
         const Run result = run("patch_firefly_bush_swamp");
         CHECK(result.known == "1111");
         CHECK(result.placed == 49);
-        CHECK(result.checksum == -7701576693695337106LL);
+        CHECK(result.checksum == -7025100511288186525LL);
         CHECK(result.after == -1670531482);
     }
 
@@ -139,7 +139,7 @@ TEST_CASE("every small feature places what the frozen kotlin places") {
         const Run result = run("patch_leaf_litter");
         CHECK(result.known == "1111");
         CHECK(result.placed == 63);
-        CHECK(result.checksum == 3460478464486807508LL);
+        CHECK(result.checksum == -201483222581976951LL);
         CHECK(result.after == -241829251);
     }
 
@@ -147,7 +147,7 @@ TEST_CASE("every small feature places what the frozen kotlin places") {
         const Run result = run("patch_sugar_cane");
         CHECK(result.known == "1111");
         CHECK(result.placed == 10);
-        CHECK(result.checksum == -2052542142443319353LL);
+        CHECK(result.checksum == -883595909526735809LL);
         CHECK(result.after == -1173546869);
     }
 
@@ -155,7 +155,7 @@ TEST_CASE("every small feature places what the frozen kotlin places") {
         const Run result = run("patch_sugar_cane_badlands");
         CHECK(result.known == "1111");
         CHECK(result.placed == 10);
-        CHECK(result.checksum == -2052542142443319353LL);
+        CHECK(result.checksum == -883595909526735809LL);
         CHECK(result.after == -1173546869);
     }
 
@@ -163,7 +163,7 @@ TEST_CASE("every small feature places what the frozen kotlin places") {
         const Run result = run("patch_sugar_cane_desert");
         CHECK(result.known == "1111");
         CHECK(result.placed == 10);
-        CHECK(result.checksum == -2052542142443319353LL);
+        CHECK(result.checksum == -883595909526735809LL);
         CHECK(result.after == -1173546869);
     }
 
@@ -171,7 +171,7 @@ TEST_CASE("every small feature places what the frozen kotlin places") {
         const Run result = run("patch_sugar_cane_swamp");
         CHECK(result.known == "1111");
         CHECK(result.placed == 10);
-        CHECK(result.checksum == -2052542142443319353LL);
+        CHECK(result.checksum == -883595909526735809LL);
         CHECK(result.after == -1173546869);
     }
 
@@ -179,7 +179,7 @@ TEST_CASE("every small feature places what the frozen kotlin places") {
         const Run result = run("pile_hay");
         CHECK(result.known == "1111");
         CHECK(result.placed == 51);
-        CHECK(result.checksum == -3348370156464482892LL);
+        CHECK(result.checksum == 736564090076318395LL);
         CHECK(result.after == 1537663053);
     }
 
@@ -187,7 +187,7 @@ TEST_CASE("every small feature places what the frozen kotlin places") {
         const Run result = run("pile_ice");
         CHECK(result.known == "1111");
         CHECK(result.placed == 51);
-        CHECK(result.checksum == -6824392487982622795LL);
+        CHECK(result.checksum == 687988466560299700LL);
         CHECK(result.after == 1537663053);
     }
 
@@ -195,7 +195,7 @@ TEST_CASE("every small feature places what the frozen kotlin places") {
         const Run result = run("pile_melon");
         CHECK(result.known == "1111");
         CHECK(result.placed == 49);
-        CHECK(result.checksum == 6629841366777137210LL);
+        CHECK(result.checksum == 1336342824052433316LL);
         CHECK(result.after == -1673786261);
     }
 
@@ -203,7 +203,7 @@ TEST_CASE("every small feature places what the frozen kotlin places") {
         const Run result = run("pile_pumpkin");
         CHECK(result.known == "1111");
         CHECK(result.placed == 51);
-        CHECK(result.checksum == 3965145527266213713LL);
+        CHECK(result.checksum == -2108760041084007425LL);
         CHECK(result.after == 1537663053);
     }
 
@@ -211,7 +211,7 @@ TEST_CASE("every small feature places what the frozen kotlin places") {
         const Run result = run("pile_snow");
         CHECK(result.known == "1111");
         CHECK(result.placed == 36);
-        CHECK(result.checksum == 6227630941023671327LL);
+        CHECK(result.checksum == -180132489155379693LL);
         CHECK(result.after == -1673786261);
     }
 
@@ -219,7 +219,7 @@ TEST_CASE("every small feature places what the frozen kotlin places") {
         const Run result = run("spore_blossom");
         CHECK(result.known == "1111");
         CHECK(result.placed == 4);
-        CHECK(result.checksum == -2939156266347186843LL);
+        CHECK(result.checksum == -1924274389260227959LL);
         CHECK(result.after == 116495287);
     }
 
@@ -227,7 +227,7 @@ TEST_CASE("every small feature places what the frozen kotlin places") {
         const Run result = run("wildflowers_birch_forest");
         CHECK(result.known == "1111");
         CHECK(result.placed == 49);
-        CHECK(result.checksum == -3200092733811139798LL);
+        CHECK(result.checksum == 7326995919195099563LL);
         CHECK(result.after == -241829251);
     }
 
@@ -235,7 +235,7 @@ TEST_CASE("every small feature places what the frozen kotlin places") {
         const Run result = run("wildflowers_meadow");
         CHECK(result.known == "1111");
         CHECK(result.placed == 49);
-        CHECK(result.checksum == -3200092733811139798LL);
+        CHECK(result.checksum == 7326995919195099563LL);
         CHECK(result.after == -241829251);
     }
 
@@ -243,7 +243,7 @@ TEST_CASE("every small feature places what the frozen kotlin places") {
         const Run result = run("not_a_feature");
         CHECK(result.known == "0000");
         CHECK(result.placed == 0);
-        CHECK(result.checksum == -8602589583363825039LL);
+        CHECK(result.checksum == 8101879819703334993LL);
         CHECK(result.after == 116495287);
     }
 }

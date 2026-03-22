@@ -1,4 +1,5 @@
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/world/BlockStateJson.hpp>
 #include <basalt/server/world/structure/VillagePoolJson.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 
@@ -65,6 +66,12 @@ using wire::common::JsonValue;
     return found == nullptr ? registry::blocks::air().stateId : found->stateId;
 }
 
+/// A block state written as a bare id, `{id, properties}` or `{Name, Properties}`; air when absent.
+[[nodiscard]] std::int32_t stateIdOf(const JsonValue* json) {
+    const std::optional<std::int32_t> state = json == nullptr ? std::nullopt : blockStateJson::parse(*json);
+    return state.value_or(registry::blocks::air().stateId);
+}
+
 [[nodiscard]] std::int32_t blockStateIdOf(const JsonObject& json) {
     if (const std::optional<std::string> name = stringAt(json, "Name"); name.has_value()) {
         const std::expected<wire::common::Identifier, wire::common::IdentifierError> block =
@@ -114,12 +121,11 @@ using wire::common::JsonValue;
         return StructureRuleTest::blockMatch(blockStateIdOf(*json));
     }
     if (*type == "minecraft:blockstate_match") {
-        const JsonObject* state = objectAt(*json, "block_state");
+        const JsonValue* state = json->find("block_state");
         if (state == nullptr) {
-            state = objectAt(*json, "state");
+            state = json->find("state");
         }
-        return StructureRuleTest::blockStateMatch(state == nullptr ? registry::blocks::air().stateId
-                                                                   : blockStateIdOf(*state));
+        return StructureRuleTest::blockStateMatch(stateIdOf(state));
     }
     if (*type == "minecraft:tag_match") {
         const std::optional<std::string> tag = stringAt(*json, "tag");
@@ -139,13 +145,13 @@ using wire::common::JsonValue;
             loot = stringAt(*modifier, "loot_table");
         }
     }
-    const JsonObject* output = objectAt(json, "output_state");
-    return StructureProcessorRule{
-        .inputTest = parseRuleTest(objectAt(json, "input_predicate"), resolveTag)
-                         .value_or(StructureRuleTest::blockMatch(registry::blocks::air().stateId)),
-        .locationTest = parseRuleTest(objectAt(json, "location_predicate"), resolveTag),
-        .outputStateId = output == nullptr ? registry::blocks::air().stateId : blockStateIdOf(*output),
-        .appendLootTable = std::move(loot)};
+    const JsonValue* output = json.find("output_state");
+    return StructureProcessorRule{.inputTest =
+                                      parseRuleTest(objectAt(json, "input_predicate"), resolveTag)
+                                          .value_or(StructureRuleTest::blockMatch(registry::blocks::air().stateId)),
+                                  .locationTest = parseRuleTest(objectAt(json, "location_predicate"), resolveTag),
+                                  .outputStateId = stateIdOf(output),
+                                  .appendLootTable = std::move(loot)};
 }
 
 [[nodiscard]] StructureProcessorList parseProcessorListObject(const JsonObject& root,

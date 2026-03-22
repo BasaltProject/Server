@@ -173,14 +173,14 @@ void check(const Run& result, std::int32_t written, std::size_t blockEntities, s
 
 TEST_CASE("the woodland mansions stand where the frozen kotlin puts them") {
     SUBCASE("darkForest") {
-        check(run(555, "minecraft:dark_forest", 75, 100), 151924, 227, 15, 24, 7746739610856060680LL);
+        check(run(555, "minecraft:dark_forest", 75, 100), 151924, 227, 15, 24, -8492544333590560280LL);
     }
 
-    SUBCASE("plains") { check(run(555, "minecraft:plains", 75, 100), 0, 0, 0, 0, 4421841969977296241LL); }
+    SUBCASE("plains") { check(run(555, "minecraft:plains", 75, 100), 0, 0, 0, 0, -7239569130427570831LL); }
 
-    SUBCASE("lowGround") { check(run(555, "minecraft:dark_forest", 50, 100), 0, 0, 0, 0, 4421841969977296241LL); }
+    SUBCASE("lowGround") { check(run(555, "minecraft:dark_forest", 50, 100), 0, 0, 0, 0, -7239569130427570831LL); }
 
     SUBCASE("otherSeed") {
-        check(run(31, "minecraft:dark_forest", 75, 100), 108934, 172, 9, 20, 5955887101684347433LL);
+        check(run(31, "minecraft:dark_forest", 75, 100), 108934, 172, 9, 20, 6825058404666269365LL);
     }
 }

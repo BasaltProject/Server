@@ -74,7 +74,7 @@ TEST_CASE("the flower, mushroom and jungle patches place what the frozen kotlin 
             forestFlowerDecoration::normal()(chunk, random);
         });
         CHECK(plants == 44);
-        CHECK(checksum == 5958697904001729611LL);
+        CHECK(checksum == -4307986728507509021LL);
         CHECK(after == 1006776013);
     }
 
@@ -83,7 +83,7 @@ TEST_CASE("the flower, mushroom and jungle patches place what the frozen kotlin 
             forestFlowerDecoration::flowerForest()(chunk, random);
         });
         CHECK(plants == 156);
-        CHECK(checksum == -590134980737649685LL);
+        CHECK(checksum == -7138557723286881245LL);
         CHECK(after == -1426122566);
     }
 
@@ -92,7 +92,7 @@ TEST_CASE("the flower, mushroom and jungle patches place what the frozen kotlin 
             forestFlowerDecoration::placeAt(chunk, random, DecorationPos{-108, 71, 68});
         });
         CHECK(plants == 36);
-        CHECK(checksum == -2145021934335469461LL);
+        CHECK(checksum == -5311406439055628461LL);
         CHECK(after == 222620013);
     }
 
@@ -110,7 +110,7 @@ TEST_CASE("the flower, mushroom and jungle patches place what the frozen kotlin 
             mushroomDecoration::taiga()(chunk, random);
         });
         CHECK(plants == 116);
-        CHECK(checksum == 965689513208632485LL);
+        CHECK(checksum == -876804869674104955LL);
         CHECK(after == 1485954835);
     }
 
@@ -119,7 +119,7 @@ TEST_CASE("the flower, mushroom and jungle patches place what the frozen kotlin 
             mushroomDecoration::oldGrowth()(chunk, random);
         });
         CHECK(plants == 527);
-        CHECK(checksum == 1651717318914920215LL);
+        CHECK(checksum == 269414219340608243LL);
         CHECK(after == 1633551061);
     }
 
@@ -128,7 +128,7 @@ TEST_CASE("the flower, mushroom and jungle patches place what the frozen kotlin 
             mushroomDecoration::swamp()(chunk, random);
         });
         CHECK(plants == 1135);
-        CHECK(checksum == -1899248003956468723LL);
+        CHECK(checksum == 2269349358665794345LL);
         CHECK(after == -722673447);
     }
 
@@ -137,7 +137,7 @@ TEST_CASE("the flower, mushroom and jungle patches place what the frozen kotlin 
             jungleGrassDecoration::decoration()(chunk, random);
         });
         CHECK(plants == 2754);
-        CHECK(checksum == 2829441298885743888LL);
+        CHECK(checksum == -4474227618756309208LL);
         CHECK(after == 494956733);
     }
 
@@ -146,7 +146,7 @@ TEST_CASE("the flower, mushroom and jungle patches place what the frozen kotlin 
             jungleGrassDecoration::placePatchAt(chunk, random, DecorationPos{-108, 71, 68});
         });
         CHECK(plants == 7);
-        CHECK(checksum == -338084318538720604LL);
+        CHECK(checksum == 5022590607748836497LL);
         CHECK(after == -1538952572);
     }
 }

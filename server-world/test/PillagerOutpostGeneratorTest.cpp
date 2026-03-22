@@ -1,8 +1,9 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "support/SyntheticRouter.hpp"
 
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/Chunk.hpp>
-#include <basalt/server/world/noise/NormalNoise.hpp>
+#include <basalt/server/world/densityfunction/SamplerContext.hpp>
 #include <basalt/server/world/terrain/JigsawStructureGenerator.hpp>
 
 #include <doctest.h>
@@ -211,31 +212,9 @@ single(std::string location, structure::StructureProjection projection = structu
 }
 
 /// A rolling surface around y 60, so which column a height is read from is observable.
-[[nodiscard]] OverworldNoiseRouter router(std::int64_t seed) {
-    const df::Function zero = df::functions::zero();
-    basalt::server::random::RandomSource source = basalt::server::random::RandomSource::xoroshiro(seed);
-    static constexpr std::array<double, 2> kAmplitudes{1.0, 1.0};
-    auto built = std::make_shared<const noise::NormalNoise>(noise::NormalNoise::create(source, -6, kAmplitudes));
-    const df::Function density =
-        df::functions::add(df::functions::yClampedGradient(50, 78, 1.0, -1.0),
-                           df::functions::mul(df::functions::constant(2.0), df::functions::noise(built, 1.0, 0.0)));
-    return OverworldNoiseRouter{.barrierNoise = zero,
-                                .fluidLevelFloodednessNoise = zero,
-                                .fluidLevelSpreadNoise = zero,
-                                .lavaNoise = zero,
-                                .shiftX = zero,
-                                .shiftZ = zero,
-                                .temperature = zero,
-                                .vegetation = zero,
-                                .continents = zero,
-                                .erosion = zero,
-                                .depth = zero,
-                                .ridges = zero,
-                                .preliminarySurfaceLevel = zero,
-                                .finalDensity = density,
-                                .veinToggle = zero,
-                                .veinRidged = zero,
-                                .veinGap = zero};
+[[nodiscard]] NoiseRouter router(std::int64_t seed) {
+    return basalt::server::world::testsupport::syntheticRouter(
+        seed, basalt::server::world::testsupport::rollingFloor(50, 78, 1.0, 0.0));
 }
 
 [[nodiscard]] structure::StructurePlacementGrid grid() {
@@ -244,7 +223,7 @@ single(std::string location, structure::StructureProjection projection = structu
 
 /// The same surface walk the generator does, so the biome can be pinned to it.
 [[nodiscard]] std::int32_t surfaceOf(std::int64_t seed, std::int32_t x, std::int32_t z) {
-    DensityChunkSampler sampler{router(seed).finalDensity, x >> 4, z >> 4, -64, 384, 4, 8};
+    DensityChunkSampler sampler{router(seed), x >> 4, z >> 4};
     std::int32_t y = 319;
     while (y >= -64 && sampler.sample(x & 15, y, z & 15) <= 0.0) {
         --y;
@@ -327,12 +306,17 @@ struct Run {
         result.starts += chunk.structures().starts().size();
     }
     // The beard of the chunk the outpost starts in, sampled over its own cell grid.
-    const df::Function beard = generator.beardified(df::functions::zero(), centre.first, centre.second, seed);
+    StructureBeard beard;
+    generator.addBeard(beard, centre.first, centre.second, seed);
+    const df::Sampler bearded = structureBeardifier(std::move(beard));
+    df::SamplerContext context{df::SamplerContext::Options{}};
     for (std::int32_t y = 48; y <= 80; y += 4) {
         for (std::int32_t x = 0; x < 16; x += 4) {
             for (std::int32_t z = 0; z < 16; z += 4) {
-                df::FunctionContext context{centre.first * 16 + x, y, centre.second * 16 + z};
-                checksum = (checksum ^ std::bit_cast<std::uint64_t>(beard->compute(context))) * 1099511628211ULL;
+                // A chunk no structure reaches has no beardifier at all, which samples as zero.
+                const float value =
+                    bearded ? bearded->sampleValue(context, centre.first * 16 + x, y, centre.second * 16 + z) : 0.0F;
+                checksum = (checksum ^ std::bit_cast<std::uint32_t>(value)) * 1099511628211ULL;
             }
         }
     }
@@ -358,11 +342,11 @@ void check(const Run& result, std::int32_t written, std::size_t starts, std::int
 } // namespace
 
 TEST_CASE("the pillager outposts stand where the frozen kotlin stands them") {
-    SUBCASE("plains") { check(run(1234, "minecraft:plains"), 3765, 12, -2504590478839707292LL, "-11,-32", 2, 24); }
+    SUBCASE("plains") { check(run(1234, "minecraft:plains"), 3765, 12, -1196918007363053241LL, "-11,-32", 2, 24); }
 
     SUBCASE("ocean") { check(run(1234, "minecraft:ocean"), 0, 0, -1334922393077245327LL, "null,null", 10, 0); }
 
-    SUBCASE("otherSeed") { check(run(77, "minecraft:taiga"), 2714, 8, 3768884536514947263LL, "11,11", 1, 18); }
+    SUBCASE("otherSeed") { check(run(77, "minecraft:taiga"), 2714, 7, -5548298109229239124LL, "11,11", 1, 12); }
 
-    SUBCASE("thirdSeed") { check(run(9001, "minecraft:plains"), 2714, 7, 7168263423923816401LL, "1,0", 1, 18); }
+    SUBCASE("thirdSeed") { check(run(9001, "minecraft:plains"), 2714, 7, -4862883459987911101LL, "1,0", 1, 18); }
 }

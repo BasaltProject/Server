@@ -1,8 +1,8 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "support/SyntheticRouter.hpp"
 
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/Chunk.hpp>
-#include <basalt/server/world/noise/NormalNoise.hpp>
 #include <basalt/server/world/terrain/VillageStructureGenerator.hpp>
 
 #include <doctest.h>
@@ -202,35 +202,13 @@ single(std::string location, structure::StructureProjection projection = structu
 }
 
 /// A rolling surface around y 60, so which column a height is read from is observable.
-[[nodiscard]] OverworldNoiseRouter router(std::int64_t seed) {
-    const df::Function zero = df::functions::zero();
-    basalt::server::random::RandomSource source = basalt::server::random::RandomSource::xoroshiro(seed);
-    static constexpr std::array<double, 2> kAmplitudes{1.0, 1.0};
-    auto built = std::make_shared<const noise::NormalNoise>(noise::NormalNoise::create(source, -6, kAmplitudes));
-    const df::Function density =
-        df::functions::add(df::functions::yClampedGradient(50, 78, 1.0, -1.0),
-                           df::functions::mul(df::functions::constant(2.0), df::functions::noise(built, 1.0, 0.0)));
-    return OverworldNoiseRouter{.barrierNoise = zero,
-                                .fluidLevelFloodednessNoise = zero,
-                                .fluidLevelSpreadNoise = zero,
-                                .lavaNoise = zero,
-                                .shiftX = zero,
-                                .shiftZ = zero,
-                                .temperature = zero,
-                                .vegetation = zero,
-                                .continents = zero,
-                                .erosion = zero,
-                                .depth = zero,
-                                .ridges = zero,
-                                .preliminarySurfaceLevel = zero,
-                                .finalDensity = density,
-                                .veinToggle = zero,
-                                .veinRidged = zero,
-                                .veinGap = zero};
+[[nodiscard]] NoiseRouter router(std::int64_t seed) {
+    return basalt::server::world::testsupport::syntheticRouter(
+        seed, basalt::server::world::testsupport::rollingFloor(50, 78, 1.0, 0.0));
 }
 
 [[nodiscard]] std::int32_t surfaceOf(std::int64_t seed, std::int32_t x, std::int32_t z) {
-    DensityChunkSampler sampler{router(seed).finalDensity, x >> 4, z >> 4, -64, 384, 4, 8};
+    DensityChunkSampler sampler{router(seed), x >> 4, z >> 4};
     std::int32_t y = 319;
     while (y >= -64 && sampler.sample(x & 15, y, z & 15) <= 0.0) {
         --y;
@@ -319,12 +297,14 @@ struct Run {
         checksum = (checksum ^ static_cast<std::uint64_t>(chunkChecksum)) * 1099511628211ULL;
         result.written += written;
     }
-    const df::Function density = generator.finalDensityForChunk(centre.first, centre.second, seed);
+    StructureBeard beard;
+    generator.addBeard(beard, centre.first, centre.second, seed);
+    const DensityChunkSampler beardified{router(seed), centre.first, centre.second,
+                                         structureBeardifier(std::move(beard))};
     for (std::int32_t y = 48; y <= 80; y += 4) {
         for (std::int32_t x = 0; x < 16; x += 4) {
             for (std::int32_t z = 0; z < 16; z += 4) {
-                df::FunctionContext context{centre.first * 16 + x, y, centre.second * 16 + z};
-                checksum = (checksum ^ std::bit_cast<std::uint64_t>(density->compute(context))) * 1099511628211ULL;
+                checksum = (checksum ^ std::bit_cast<std::uint64_t>(beardified.sample(x, y, z))) * 1099511628211ULL;
             }
         }
     }
@@ -376,54 +356,54 @@ void check(const Run& result, std::int32_t written, std::int32_t commandWritten,
 
 TEST_CASE("the villages settle where the frozen kotlin settles them") {
     SUBCASE("plains") {
-        check(run(1234, "minecraft:plains"), 3187, 438, "14", 3, "village_plains,3,5", "null,null", 1, 14,
-              2572105914429216257LL);
+        check(run(1234, "minecraft:plains"), 3184, 438, "14", 3, "village_plains,3,5", "null,null", 1, 14,
+              -196860553577654477LL);
     }
 
     SUBCASE("desert") {
-        check(run(1234, "minecraft:desert"), 3187, 438, "14", 3, "village_desert,3,5", "null,null", 1, 14,
-              -702955366503546786LL);
+        check(run(1234, "minecraft:desert"), 3184, 438, "14", 3, "village_desert,3,5", "null,null", 1, 14,
+              -6749051946456810776LL);
     }
 
     SUBCASE("savanna") {
-        check(run(1234, "minecraft:savanna"), 3187, 438, "14", 3, "village_savanna,3,5", "null,null", 1, 14,
-              -743428084452296972LL);
+        check(run(1234, "minecraft:savanna"), 3184, 438, "14", 3, "village_savanna,3,5", "null,null", 1, 14,
+              7049679602001583793LL);
     }
 
     SUBCASE("snowy") {
-        check(run(1234, "minecraft:snowy_plains"), 3187, 438, "14", 3, "village_snowy,3,5", "3,5", 1, 14,
-              -3880535290791681088LL);
+        check(run(1234, "minecraft:snowy_plains"), 3184, 438, "14", 3, "village_snowy,3,5", "3,5", 1, 14,
+              8682671500369845829LL);
     }
 
     SUBCASE("taiga") {
-        check(run(1234, "minecraft:taiga"), 3187, 438, "14", 3, "village_taiga,3,5", "null,null", 1, 14,
-              2269606959772998278LL);
+        check(run(1234, "minecraft:taiga"), 3184, 438, "14", 3, "village_taiga,3,5", "null,null", 1, 14,
+              -8216128194307540567LL);
     }
 
     SUBCASE("meadow") {
-        check(run(1234, "minecraft:meadow"), 3187, 438, "14", 3, "village_plains,3,5", "null,null", 1, 14,
-              2572105914429216257LL);
+        check(run(1234, "minecraft:meadow"), 3184, 438, "14", 3, "village_plains,3,5", "null,null", 1, 14,
+              -196860553577654477LL);
     }
 
     SUBCASE("none") {
         check(run(1234, "minecraft:ocean"), 0, 438, "14", 3, "null,null,null", "null,null", 1, 0,
-              -4703805807626693588LL);
+              8823090479833660112LL);
     }
 
     SUBCASE("otherSeed") {
-        check(run(77, "minecraft:plains"), 3741, 5, "16", 4, "village_plains,18,6", "null,null", 1, 16,
-              7394763408355008542LL);
+        check(run(77, "minecraft:plains"), 3737, 5, "16", 4, "village_plains,18,6", "null,null", 1, 16,
+              5790473476667058360LL);
     }
 
     // A tight grid puts several villages in one sweep, two variants among them, which is the only
     // shape in which the order they are written in can be seen.
     SUBCASE("dense") {
-        check(run(1234, "minecraft:plains", "minecraft:desert", true), 5858, 596, "20", 1, "village_desert,1,2",
-              "null,null", 9, 133, -1227431193829435878LL);
+        check(run(1234, "minecraft:plains", "minecraft:desert", true), 5863, 592, "20", 1, "village_desert,1,2",
+              "null,null", 9, 133, 5566494675979386468LL);
     }
 
     SUBCASE("denseOther") {
-        check(run(77, "minecraft:taiga", "minecraft:savanna", true), 2482, 566, "11", 3, "village_taiga,2,1",
-              "null,null", 9, 134, -1589311780063843896LL);
+        check(run(77, "minecraft:taiga", "minecraft:savanna", true), 2490, 566, "11", 3, "village_taiga,2,1",
+              "null,null", 9, 134, -1046519904409833445LL);
     }
 }

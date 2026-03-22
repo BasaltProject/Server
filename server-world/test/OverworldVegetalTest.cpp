@@ -7,11 +7,13 @@
 
 #include <doctest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <set>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 using namespace basalt::server::world;
 using namespace basalt::server::world::terrain::decoration;
@@ -100,38 +102,50 @@ struct Run {
 
 } // namespace
 
-TEST_CASE("the overworld vegetal step runs its nodes in the frozen kotlin's order") {
-    std::string names;
+TEST_CASE("the overworld vegetal step runs its nodes in the jar's feature order") {
+    // parity: `FeatureSorter` over the 26.3 biomes, step 9. The three dappled forest features have
+    // their slots but no node yet.
+    static constexpr std::string_view kOrder =
+        "glow_lichen,trees_windswept_savanna,bamboo,bamboo_vegetation,trees_sparse_jungle,trees_dappled_forest,br"
+        "own_mushroom_dappled_forest,patch_red_shrub,trees_badlands,bamboo_light,trees_jungle,patch_tall_grass,tr"
+        "ees_savanna,flower_warm,patch_grass_jungle,patch_grass_savanna,pale_garden_vegetation,pale_moss_patch,pa"
+        "le_garden_flowers,flower_pale_garden,dark_forest_vegetation,flower_forest_flowers,trees_flower_forest,fl"
+        "ower_flower_forest,forest_flowers,wildflowers_birch_forest,birch_tall,trees_birch,trees_birch_and_oak_le"
+        "af_litter,patch_tall_grass_2,lush_caves_ceiling_vegetation,cave_vines,lush_caves_clay,lush_caves_vegetat"
+        "ion,rooted_azalea_tree,spore_blossom,classic_vines_cave_feature,patch_sunflower,patch_grass_meadow,flowe"
+        "r_meadow,trees_meadow,wildflowers_meadow,trees_windswept_forest,patch_large_fern,trees_old_growth_pine_t"
+        "aiga,trees_old_growth_spruce_taiga,trees_taiga,trees_grove,trees_windswept_hills,trees_snowy,trees_mangr"
+        "ove,trees_swamp,flower_swamp,trees_water,patch_bush,trees_plains,flower_plains,patch_grass_plain,flower_"
+        "cherry,trees_cherry,flower_default,patch_grass_taiga,patch_grass_forest,patch_grass_taiga_2,patch_grass_"
+        "normal,patch_dead_bush,brown_mushroom_old_growth,red_mushroom_old_growth,patch_waterlily,brown_mushroom_"
+        "swamp,red_mushroom_swamp,patch_grass_badlands,patch_dry_grass_desert,patch_dead_bush_2,patch_dry_grass_b"
+        "adlands,patch_dead_bush_badlands,brown_mushroom_normal,red_mushroom_normal,patch_sugar_cane_desert,patch"
+        "_sugar_cane_badlands,patch_leaf_litter,patch_sugar_cane_swamp,mushroom_island_vegetation,brown_mushroom_"
+        "taiga,red_mushroom_taiga,patch_pumpkin,patch_cactus_desert,patch_cactus_decorated,patch_firefly_bush_swa"
+        "mp,patch_firefly_bush_near_water_swamp,seagrass_swamp,patch_sugar_cane,patch_firefly_bush_near_water,sea"
+        "grass_river,vines,patch_melon_sparse,patch_melon,patch_berry_common,patch_berry_rare,warm_ocean_vegetati"
+        "on,seagrass_warm,sea_pickle,seagrass_deep_warm,kelp_warm,seagrass_normal,seagrass_deep,seagrass_cold,sea"
+        "grass_deep_cold,kelp_cold";
+    std::vector<std::string_view> expected;
+    for (std::size_t start = 0; start <= kOrder.size();) {
+        const std::size_t comma = std::min(kOrder.find(',', start), kOrder.size());
+        expected.push_back(kOrder.substr(start, comma - start));
+        start = comma + 1;
+    }
+    REQUIRE(expected.size() == 109);
+    const std::set<std::string_view> missing{"trees_dappled_forest", "brown_mushroom_dappled_forest",
+                                             "patch_red_shrub"};
+    std::size_t next = 0;
     for (const auto& [index, name] : overworldVegetalDecoration::featureOrder()) {
-        if (!names.empty()) {
-            names += ",";
+        while (next < expected.size() && missing.contains(expected[next])) {
+            ++next;
         }
-        names += name;
+        REQUIRE(next < expected.size());
+        CHECK(name == expected[next]);
+        CHECK(index == static_cast<std::int32_t>(next));
+        ++next;
     }
-    CHECK(names ==
-          "glow_lichen,trees_windswept_savanna,bamboo,bamboo_vegetation,trees_sparse_jungle,trees_badlands,bamboo_"
-          "light,trees_jungle,patch_tall_grass,trees_savanna,flower_warm,patch_grass_jungle,patch_grass_savanna,pale_"
-          "garden_vegetation,pale_moss_patch,pale_garden_flowers,flower_pale_garden,dark_forest_vegetation,flower_"
-          "forest_flowers,trees_flower_forest,flower_flower_forest,forest_flowers,wildflowers_birch_forest,birch_tall,"
-          "trees_birch,trees_birch_and_oak_leaf_litter,patch_tall_grass_2,lush_caves_ceiling_vegetation,cave_vines,"
-          "lush_caves_clay,lush_caves_vegetation,rooted_azalea_tree,spore_blossom,classic_vines_cave_feature,patch_"
-          "sunflower,patch_grass_meadow,flower_meadow,trees_meadow,wildflowers_meadow,trees_windswept_forest,patch_"
-          "large_fern,trees_old_growth_pine_taiga,trees_old_growth_spruce_taiga,trees_taiga,trees_grove,trees_"
-          "windswept_hills,trees_snowy,trees_mangrove,trees_swamp,flower_swamp,trees_water,patch_bush,trees_plains,"
-          "flower_plains,patch_grass_plain,flower_cherry,trees_cherry,flower_default,patch_grass_taiga,patch_grass_"
-          "forest,patch_grass_taiga_2,patch_grass_normal,patch_dead_bush,brown_mushroom_old_growth,red_mushroom_old_"
-          "growth,patch_waterlily,brown_mushroom_swamp,red_mushroom_swamp,patch_grass_badlands,patch_dry_grass_desert,"
-          "patch_dead_bush_2,patch_dry_grass_badlands,patch_dead_bush_badlands,brown_mushroom_normal,red_mushroom_"
-          "normal,patch_sugar_cane_desert,patch_sugar_cane_badlands,patch_leaf_litter,patch_sugar_cane_swamp,mushroom_"
-          "island_vegetation,brown_mushroom_taiga,red_mushroom_taiga,patch_pumpkin,patch_cactus_desert,patch_cactus_"
-          "decorated,patch_firefly_bush_swamp,patch_firefly_bush_near_water_swamp,seagrass_swamp,patch_sugar_cane,"
-          "patch_firefly_bush_near_water,seagrass_river,vines,patch_melon_sparse,patch_melon,patch_berry_common,patch_"
-          "berry_rare,warm_ocean_vegetation,seagrass_warm,sea_pickle,seagrass_deep_warm,kelp_warm,seagrass_normal,"
-          "seagrass_deep,seagrass_cold,seagrass_deep_cold,kelp_cold");
-    CHECK(overworldVegetalDecoration::featureOrder().size() == 106);
-    for (std::size_t index = 0; index < overworldVegetalDecoration::featureOrder().size(); ++index) {
-        REQUIRE(overworldVegetalDecoration::featureOrder()[index].first == static_cast<std::int32_t>(index));
-    }
+    CHECK(overworldVegetalDecoration::featureOrder().size() == expected.size() - missing.size());
 }
 
 TEST_CASE("the overworld vegetal step places what the jar places") {

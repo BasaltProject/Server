@@ -64,16 +64,16 @@ TEST_CASE("the structure spawn overrides match the frozen kotlin") {
 
 TEST_CASE("the mineshaft block set matches the frozen kotlin") {
     const MineshaftBlocks normal{MineshaftType::Normal};
-    CHECK(normal.log() == 137);
+    CHECK(normal.log() == 140);
     CHECK(normal.planks() == 15);
-    CHECK(normal.fence() == 6996);
-    CHECK(normal.fenceWest() == 6995);
-    CHECK(normal.fenceEast() == 6980);
+    CHECK(normal.fence() == 8666);
+    CHECK(normal.fenceWest() == 8665);
+    CHECK(normal.fenceEast() == 8650);
 
     const MineshaftBlocks mesa{MineshaftType::Mesa};
-    CHECK(mesa.log() == 155);
+    CHECK(mesa.log() == 158);
     CHECK(mesa.planks() == 21);
-    CHECK(mesa.fence() == 13963);
-    CHECK(mesa.fenceWest() == 13962);
-    CHECK(mesa.fenceEast() == 13947);
+    CHECK(mesa.fence() == 15842);
+    CHECK(mesa.fenceWest() == 15841);
+    CHECK(mesa.fenceEast() == 15826);
 }

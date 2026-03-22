@@ -118,6 +118,8 @@ public:
 
     void setCasting(entity::ServerEntity& mob, bool casting) override;
 
+    void poseChanged(entity::ServerEntity& mob) override;
+
     void throwPotion(entity::ServerEntity& mob, double targetX, double targetY, double targetZ,
                      std::string_view potion) override;
 

@@ -18,8 +18,6 @@ using structure::StructureBoundingBox;
 using structure::StructurePos;
 
 constexpr std::int32_t kBeardRadius = 12;
-constexpr std::int32_t kCellWidth = 4;
-constexpr std::int32_t kCellHeight = 8;
 constexpr std::int32_t kSeaLevel = 63;
 
 [[nodiscard]] std::int32_t floorDiv(std::int32_t value, std::int32_t divisor) {
@@ -29,7 +27,7 @@ constexpr std::int32_t kSeaLevel = 63;
 
 } // namespace
 
-JigsawStructureGenerator::JigsawStructureGenerator(JigsawStructureSettings settings, OverworldNoiseRouter router,
+JigsawStructureGenerator::JigsawStructureGenerator(JigsawStructureSettings settings, NoiseRouter router,
                                                    structure::StructurePlacementGrid grid, BiomeAt biomeAt,
                                                    std::set<std::string, std::less<>> biomes, PoolLookup poolLookup,
                                                    structure::PoolTemplateLoader templateLoader)
@@ -60,8 +58,7 @@ std::int32_t JigsawStructureGenerator::surfaceHeightAt(std::int32_t x, std::int3
     if (found == samplers.end()) {
         found = samplers
                     .emplace(std::piecewise_construct, std::forward_as_tuple(key),
-                             std::forward_as_tuple(router_.finalDensity, chunkX, chunkZ, kOverworldHeight.minY(),
-                                                   kOverworldHeight.height(), kCellWidth, kCellHeight))
+                             std::forward_as_tuple(router_, chunkX, chunkZ))
                     .first;
     }
     const std::int32_t localX = x & 15;
@@ -254,15 +251,15 @@ void JigsawStructureGenerator::generateInto(Chunk& chunk, std::int32_t chunkX, s
     }
 }
 
-densityfunction::Function JigsawStructureGenerator::beardified(densityfunction::Function base, std::int32_t chunkX,
-                                                               std::int32_t chunkZ, std::int64_t seed) {
+void JigsawStructureGenerator::addBeard(StructureBeard& beard, std::int32_t chunkX, std::int32_t chunkZ,
+                                        std::int64_t seed) {
     // The starts are filtered with the inflated box, not the chunk itself: a chunk with no piece of
     // its own still gets the beard of the pieces within twelve blocks of it.
     const StructureBoundingBox nearClip = chunkClip(chunkX, chunkZ, kBeardRadius);
     const std::int32_t chunkMinX = chunkX * 16;
     const std::int32_t chunkMinZ = chunkZ * 16;
-    std::vector<BeardifierRigid> rigids;
-    std::vector<BeardifierJunction> junctions;
+    std::vector<BeardifierRigid>& rigids = beard.pieces;
+    std::vector<BeardifierJunction>& junctions = beard.junctions;
     for (const auto& [origin, pieces] : nearbyStarts(chunkX, chunkZ, seed, nearClip)) {
         for (const PlacedStructurePiece& piece : *pieces) {
             if (!piece.boundingBox.intersects(nearClip)) {
@@ -285,11 +282,6 @@ densityfunction::Function JigsawStructureGenerator::beardified(densityfunction::
                                              .adjustment = settings_.adjustment});
         }
     }
-    if (rigids.empty() && junctions.empty()) {
-        return base;
-    }
-    return densityfunction::functions::add(std::move(base),
-                                           structureBeardifier(std::move(rigids), std::move(junctions)));
 }
 
 std::optional<std::pair<std::int32_t, std::int32_t>> JigsawStructureGenerator::locate(std::int64_t seed,

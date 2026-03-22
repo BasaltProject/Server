@@ -19,8 +19,8 @@ public:
     using SurfaceHeightAt = std::function<std::int32_t(std::int32_t, std::int32_t)>;
 
     static constexpr std::string_view kName = "jungle_pyramid";
-    /// Fifth of the 26 structures of `surface_structures`, in registry order.
-    static constexpr std::int32_t kStructureIndex = 4;
+    /// Position among the 44 structures of `surface_structures`, in registry order.
+    static constexpr std::int32_t kStructureIndex = 22;
 
     JungleTempleStructureGenerator(BiomeAt biomeAt, std::set<std::string, std::less<>> templeBiomes,
                                    SurfaceHeightAt surfaceHeightAt);

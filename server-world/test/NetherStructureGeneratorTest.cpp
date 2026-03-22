@@ -1,4 +1,5 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include "support/SyntheticRouter.hpp"
 
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/Chunk.hpp>
@@ -146,17 +147,20 @@ namespace {
 
 /// A rough Nether floor that meets the lava sea, cheap enough that the portal replay finishes. Low
 /// on purpose: a portal has to be able to land in lava and in a carved cave.
-[[nodiscard]] NetherNoiseRouter router(std::int64_t seed, double temperature, double vegetation) {
-    basalt::server::random::RandomSource source = basalt::server::random::RandomSource::xoroshiro(seed);
-    static constexpr std::array<double, 2> kAmplitudes{1.0, 1.0};
-    auto noise = std::make_shared<const basalt::server::world::noise::NormalNoise>(
-        basalt::server::world::noise::NormalNoise::create(source, -6, kAmplitudes));
-    const df::Function density =
-        df::functions::add(df::functions::yClampedGradient(0, 64, 1.0, -1.0),
-                           df::functions::mul(df::functions::constant(3.0), df::functions::noise(noise, 0.4, 0.4)));
-    return NetherNoiseRouter{.temperature = df::functions::constant(temperature),
-                             .vegetation = df::functions::constant(vegetation),
-                             .finalDensity = density};
+[[nodiscard]] NoiseRouter router(std::int64_t seed, double temperature, double vegetation) {
+    const std::string density =
+        R"({"type": "minecraft:add", "left": {"type": "minecraft:gradient", "axis": "y", "from_coordinate": 0, )"
+        R"("to_coordinate": 64, "from_value": 1.0, "to_value": -1.0}, "right": {"type": "minecraft:mul", )"
+        R"("left": 3.0, "right": )" +
+        basalt::server::world::testsupport::noiseNode("minecraft:test", 0.4, 0.4) + "}}";
+    return basalt::server::world::testsupport::syntheticRouter(
+        seed, density,
+        {.minY = 0,
+         .height = 128,
+         .seaLevel = 32,
+         .defaultBlock = "minecraft:netherrack",
+         .defaultFluid = "minecraft:lava",
+         .fields = {{"temperature", std::to_string(temperature)}, {"vegetation", std::to_string(vegetation)}}});
 }
 
 /// The generator keeps its grids to itself, so the sweep rebuilds them to centre on.
@@ -221,8 +225,8 @@ struct Run {
 };
 
 [[nodiscard]] Run run(std::int64_t seed, double temperature, double vegetation, std::string_view around) {
-    const NetherNoiseRouter netherRouter = router(seed, temperature, vegetation);
-    const NetherBiomeSource biomeSource{netherRouter.temperature, netherRouter.vegetation};
+    const NoiseRouter netherRouter = router(seed, temperature, vegetation);
+    const NetherBiomeSource biomeSource{netherRouter};
     NetherStructureGenerator generator{netherRouter, biomeSource, loader, poolLookup};
     std::pair<std::int32_t, std::int32_t> centre{0, 0};
     if (around == "complex") {
@@ -263,36 +267,38 @@ void check(const Run& result, std::int32_t written, std::size_t starts, std::siz
 
 TEST_CASE("the nether builds what the frozen kotlin builds") {
     // The fossils sit on their own two-chunk grid, so the origin already covers them.
-    SUBCASE("fossils") { check(run(1234, -0.6, -0.6, "origin"), 96, 0, 0, "soul_sand_valley", 6679867395546642344LL); }
+    SUBCASE("fossils") {
+        check(run(1234, -0.6, -0.6, "origin"), 147, 0, 0, "soul_sand_valley", -1000014710720569397LL);
+    }
 
     // The fortress and the bastion share one cell, and which of the two it holds is a draw.
     SUBCASE("complexWastes") {
-        check(run(1234, 0.0, 0.0, "complex"), 76935, 20, 3, "nether_wastes", -1660649602623238567LL);
+        check(run(1234, 0.0, 0.0, "complex"), 76935, 20, 3, "nether_wastes", 224194287535596918LL);
     }
 
     SUBCASE("complexDeltas") {
-        check(run(1234, -0.6, 0.0, "complex"), 76935, 20, 3, "basalt_deltas", -1660649602623238567LL);
+        check(run(1234, -0.6, 0.0, "complex"), 76935, 20, 3, "basalt_deltas", 224194287535596918LL);
     }
 
-    SUBCASE("complexOther") { check(run(77, 0.0, 0.0, "complex"), 124, 0, 0, "nether_wastes", -5857260898004505592LL); }
+    SUBCASE("complexOther") { check(run(77, 0.0, 0.0, "complex"), 124, 0, 0, "nether_wastes", -2350128045204918792LL); }
 
     SUBCASE("complexThird") {
-        check(run(9001, 0.0, 0.0, "complex"), 124, 0, 0, "nether_wastes", 3256548928499939828LL);
+        check(run(9001, 0.0, 0.0, "complex"), 124, 0, 0, "nether_wastes", -8598750915188226532LL);
     }
 
     SUBCASE("complexFourth") {
-        check(run(5, 0.0, 0.0, "complex"), 88118, 21, 4, "nether_wastes", -5499617691617402773LL);
+        check(run(5, 0.0, 0.0, "complex"), 88118, 21, 4, "nether_wastes", 2828129272907334930LL);
     }
 
-    SUBCASE("complexFifth") { check(run(13, 0.0, 0.0, "complex"), 124, 0, 0, "nether_wastes", 5811698562007319832LL); }
+    SUBCASE("complexFifth") { check(run(13, 0.0, 0.0, "complex"), 124, 0, 0, "nether_wastes", -5353408625150024264LL); }
 
     SUBCASE("complexSixth") {
-        check(run(21, 0.0, 0.0, "complex"), 53397, 17, 0, "nether_wastes", 1322074778136696201LL);
+        check(run(21, 0.0, 0.0, "complex"), 53342, 17, 0, "nether_wastes", -6963310570239858642LL);
     }
 
     // Basalt deltas takes a fortress but never a bastion, which is the one biome gate here.
     SUBCASE("complexFourthDeltas") {
-        check(run(5, -0.6, 0.0, "complex"), 88118, 21, 4, "basalt_deltas", -5499617691617402773LL);
+        check(run(5, -0.6, 0.0, "complex"), 88118, 21, 4, "basalt_deltas", 2828129272907334930LL);
     }
 
     SUBCASE("complexFifthDeltas") {
@@ -300,11 +306,11 @@ TEST_CASE("the nether builds what the frozen kotlin builds") {
     }
 
     SUBCASE("complexSixthDeltas") {
-        check(run(21, -0.6, 0.0, "complex"), 53397, 17, 0, "basalt_deltas", 1322074778136696201LL);
+        check(run(21, -0.6, 0.0, "complex"), 53342, 17, 0, "basalt_deltas", -6963310570239858642LL);
     }
 
     // The ruined portal replays one global placement from its own grid.
-    SUBCASE("portal") { check(run(1234, 0.0, 0.0, "portal"), 277, 0, 1, "nether_wastes", -8537985717273677876LL); }
+    SUBCASE("portal") { check(run(1234, 0.0, 0.0, "portal"), 275, 0, 1, "nether_wastes", 8688172062599339749LL); }
 
-    SUBCASE("portalOther") { check(run(77, 0.4, 0.0, "portal"), 391, 0, 1, "crimson_forest", -5035414161614571861LL); }
+    SUBCASE("portalOther") { check(run(77, 0.4, 0.0, "portal"), 684, 0, 1, "crimson_forest", 2717711693674612529LL); }
 }

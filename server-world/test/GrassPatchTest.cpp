@@ -159,7 +159,7 @@ TEST_CASE("the grass patches place what the frozen kotlin places") {
     SUBCASE("jungleOnly") {
         const auto [grass, fern, deferred, checksum] =
             run("minecraft:jungle", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
-                grassPatchDecoration::decorateFeature(11, chunk, 8642LL, environment);
+                grassPatchDecoration::decorateFeature(14, chunk, 8642LL, environment);
             });
         CHECK(grass == 2684);
         CHECK(fern == 895);

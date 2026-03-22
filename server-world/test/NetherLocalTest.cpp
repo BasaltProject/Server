@@ -55,7 +55,7 @@ namespace {
 }
 
 [[nodiscard]] terrain::NetherBiomeLookup fixedBiome(std::string_view biome) {
-    return [biome](std::int32_t, std::int32_t, std::int32_t, densityfunction::DensityCache*) { return biome; };
+    return [biome](std::int32_t, std::int32_t, std::int32_t, densityfunction::SamplerContext*) { return biome; };
 }
 
 } // namespace
@@ -75,7 +75,7 @@ TEST_CASE("the nether basalt pillar builds what the frozen kotlin builds") {
         }
         CHECK(basalt == 411);
         CHECK(deferred == 0);
-        CHECK(static_cast<std::int64_t>(checksum) == -671703278367918333LL);
+        CHECK(static_cast<std::int64_t>(checksum) == -6370570254058974441LL);
     }
 
     SUBCASE("wastes") {
@@ -92,7 +92,7 @@ TEST_CASE("the nether basalt pillar builds what the frozen kotlin builds") {
         }
         CHECK(basalt == 0);
         CHECK(deferred == 0);
-        CHECK(static_cast<std::int64_t>(checksum) == -5751678071136801443LL);
+        CHECK(static_cast<std::int64_t>(checksum) == 5535535463266102621LL);
     }
 
     SUBCASE("pillarAt") {
@@ -109,7 +109,7 @@ TEST_CASE("the nether basalt pillar builds what the frozen kotlin builds") {
             after = random.nextInt();
         }
         CHECK(basalt == 2614);
-        CHECK(static_cast<std::int64_t>(checksum) == -8936017093853084510LL);
+        CHECK(static_cast<std::int64_t>(checksum) == -3902505656793383440LL);
         CHECK(after == -1046653646);
     }
 }

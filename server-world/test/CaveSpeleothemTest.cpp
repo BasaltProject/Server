@@ -130,63 +130,63 @@ TEST_CASE("the speleothem steps place what the frozen kotlin places") {
         const Run result = run("minecraft:dripstone_caves", -1, false);
         CHECK(result.placed == 5476);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -2852498016737284483LL);
+        CHECK(result.checksum == -3863664998296467291LL);
     }
 
     SUBCASE("sulfurStep") {
         const Run result = run("minecraft:sulfur_caves", -1, false);
         CHECK(result.placed == 881);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -8537432335612971614LL);
+        CHECK(result.checksum == -303786134237502133LL);
     }
 
     SUBCASE("plainsStep") {
         const Run result = run("minecraft:plains", -1, false);
         CHECK(result.placed == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -6632500426052922287LL);
+        CHECK(result.checksum == -8299418820750625711LL);
     }
 
     SUBCASE("dripstoneOutside") {
         const Run result = run("minecraft:dripstone_caves", -1, true);
         CHECK(result.placed == 7723);
         CHECK(result.deferred == 3393);
-        CHECK(result.checksum == -1793590231896716369LL);
+        CHECK(result.checksum == 6104574899761635364LL);
     }
 
     SUBCASE("sulfurOutside") {
         const Run result = run("minecraft:sulfur_caves", -1, true);
         CHECK(result.placed == 1030);
         CHECK(result.deferred == 1405);
-        CHECK(result.checksum == -5836858560800654492LL);
+        CHECK(result.checksum == 2073355982096758970LL);
     }
 
     SUBCASE("index_2") {
         const Run result = run("minecraft:sulfur_caves", 2, false);
         CHECK(result.placed == 729);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -6941234269509455238LL);
+        CHECK(result.checksum == 5767671560785310935LL);
     }
 
     SUBCASE("index_3") {
         const Run result = run("minecraft:sulfur_caves", 3, false);
         CHECK(result.placed == 150);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 5659773137816313926LL);
+        CHECK(result.checksum == 5792723947235717594LL);
     }
 
     SUBCASE("index_4") {
         const Run result = run("minecraft:dripstone_caves", 4, false);
         CHECK(result.placed == 5039);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 7882703885358414341LL);
+        CHECK(result.checksum == -2554401543109662496LL);
     }
 
     SUBCASE("index_5") {
         const Run result = run("minecraft:dripstone_caves", 5, false);
         CHECK(result.placed == 551);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 7058847138785209057LL);
+        CHECK(result.checksum == 4011327289377437954LL);
     }
 }
 
@@ -215,6 +215,6 @@ TEST_CASE("one speleothem feature at one position matches the frozen kotlin") {
     }
     CHECK(known == "111010101111000");
     CHECK(placed == 1164);
-    CHECK(static_cast<std::int64_t>(checksum) == 7311117618408657939LL);
+    CHECK(static_cast<std::int64_t>(checksum) == 1590976470338268781LL);
     CHECK(after == -553721973);
 }

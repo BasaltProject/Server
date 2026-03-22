@@ -81,7 +81,7 @@ TEST_CASE("the underground ores step fills the same chunk as the frozen kotlin")
                         "ore:17,deepslate_iron_ore:20,deepslate_lapis_ore:16,deepslate_redstone_ore:26,dirt:544,gold_"
                         "ore:14,gravel:721,iron_ore:58,lapis_ore:4,redstone_ore:15");
         CHECK(deferred == 0);
-        CHECK(checksum == -9129793627105575744LL);
+        CHECK(checksum == -1044425183117465505LL);
     }
 
     SUBCASE("dripstone_caves") {
@@ -93,7 +93,7 @@ TEST_CASE("the underground ores step fills the same chunk as the frozen kotlin")
                         "20,deepslate_lapis_ore:16,deepslate_redstone_ore:26,dirt:544,gold_ore:14,gravel:721,iron_ore:"
                         "58,lapis_ore:4,redstone_ore:15");
         CHECK(deferred == 0);
-        CHECK(checksum == -7778457022043298158LL);
+        CHECK(checksum == 3340881560419265137LL);
     }
 
     SUBCASE("badlands") {
@@ -105,7 +105,7 @@ TEST_CASE("the underground ores step fills the same chunk as the frozen kotlin")
                         "ore:17,deepslate_iron_ore:20,deepslate_lapis_ore:16,deepslate_redstone_ore:26,dirt:544,gold_"
                         "ore:107,gravel:721,iron_ore:58,lapis_ore:4,redstone_ore:15");
         CHECK(deferred == 0);
-        CHECK(checksum == -7706078015853384128LL);
+        CHECK(checksum == 2782206242456095130LL);
     }
 
     SUBCASE("infested") {
@@ -115,7 +115,7 @@ TEST_CASE("the underground ores step fills the same chunk as the frozen kotlin")
         const auto [checksum, deferred, counts] = report(chunk);
         CHECK(counts == "dirt:256");
         CHECK(deferred == 0);
-        CHECK(checksum == 4969405327263453786LL);
+        CHECK(checksum == -336568363818669604LL);
     }
 
     SUBCASE("regional") {
@@ -136,6 +136,6 @@ TEST_CASE("the underground ores step fills the same chunk as the frozen kotlin")
                         "ore:17,deepslate_iron_ore:20,deepslate_lapis_ore:16,deepslate_redstone_ore:26,dirt:544,gold_"
                         "ore:14,gravel:721,iron_ore:58,lapis_ore:4,redstone_ore:15");
         CHECK(deferred == 2251);
-        CHECK(checksum == -1162384294097065528LL);
+        CHECK(checksum == 2781508927182871967LL);
     }
 }

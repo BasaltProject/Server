@@ -157,7 +157,7 @@ TEST_CASE("the mangrove and cherry trunks match the frozen kotlin") {
         CHECK(result.logs == 61);
         CHECK(result.roots == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -6775629778876321358LL);
+        CHECK(result.checksum == 4575413935826057721LL);
         CHECK(result.after == 1159570266);
         CHECK(result.detail ==
               "6;1:3:0:0 1:4:0:0 1:2:0:0 0:6:0:0 |7;0:2:1:0 0:3:2:0 0:4:2:0 0:2:2:0 0:5:-1:0 0:6:-2:0 0:7:-2:0 "
@@ -172,7 +172,7 @@ TEST_CASE("the mangrove and cherry trunks match the frozen kotlin") {
         CHECK(result.logs == 61);
         CHECK(result.roots == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 2584464326528160722LL);
+        CHECK(result.checksum == -5035174918007769279LL);
         CHECK(result.after == 1159570266);
         CHECK(result.detail ==
               "6;1:3:0:0 1:4:0:0 1:2:0:0 0:6:0:0 |7;0:2:1:0 0:3:2:0 0:4:2:0 0:2:2:0 0:5:-1:0 0:6:-2:0 0:7:-2:0 "
@@ -187,7 +187,7 @@ TEST_CASE("the mangrove and cherry trunks match the frozen kotlin") {
         CHECK(result.logs == 108);
         CHECK(result.roots == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -7967514552460191236LL);
+        CHECK(result.checksum == -2603985132080328450LL);
         CHECK(result.after == -999051014);
         CHECK(result.detail == "8;4:7:0:0 |8;2:7:0:0 |7;4:6:0:0 |7;0:7:0:0 0:6:4:0 0:6:-4:0 |8;0:7:-4:0 0:7:4:0 "
                                "|7;3:7:0:0 |7;0:7:-4:0 |7;0:7:0:0 0:7:-3:0 0:6:3:0 |");
@@ -198,7 +198,7 @@ TEST_CASE("the mangrove and cherry trunks match the frozen kotlin") {
         CHECK(result.logs == 97);
         CHECK(result.roots == 0);
         CHECK(result.deferred == 11);
-        CHECK(result.checksum == 464578910494357924LL);
+        CHECK(result.checksum == -4513964815442560403LL);
         CHECK(result.after == -999051014);
         CHECK(result.detail == "8;4:7:0:0 |8;2:7:0:0 |7;4:6:0:0 |7;0:7:0:0 0:6:4:0 0:6:-4:0 |8;0:7:-4:0 0:7:4:0 "
                                "|7;3:7:0:0 |7;0:7:-4:0 |7;0:7:0:0 0:7:-3:0 0:6:3:0 |");
@@ -218,7 +218,7 @@ TEST_CASE("the mangrove roots match the frozen kotlin") {
         CHECK(result.logs == 0);
         CHECK(result.roots == 329);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 397683177182163859LL);
+        CHECK(result.checksum == 1934005960258252046LL);
         CHECK(result.after == 332870239);
         CHECK(result.detail == "72:true|74:true|74:true|74:true|73:true|74:true|74:false|72:true|");
     }
@@ -228,7 +228,7 @@ TEST_CASE("the mangrove roots match the frozen kotlin") {
         CHECK(result.logs == 0);
         CHECK(result.roots == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -6848695760125221595LL);
+        CHECK(result.checksum == -8963948355211583035LL);
         CHECK(result.after == -1072559115);
         CHECK(result.detail == "72:false|74:false|74:false|74:false|73:false|74:false|74:false|72:false|");
     }

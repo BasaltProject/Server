@@ -500,19 +500,19 @@ TEST_CASE("a piston pointing up lands its blocks from the top down") {
 
 namespace {
 
-/// The state a `moving_piston` is carrying. parity: `PistonMovingBlockEntity` saves it by name and
-/// properties, the way a chunk palette does, not as a state id.
+/// The state a `moving_piston` is carrying. parity: `PistonMovingBlockEntity` saves it with
+/// `NbtUtils.writeBlockState`, by id and properties, not as a state id.
 [[nodiscard]] std::int32_t carriedIn(const basalt::wire::nbt::NbtCompound& data) {
     const basalt::wire::nbt::NbtCompound* state = data.getCompound("blockState");
     REQUIRE(state != nullptr);
     std::map<std::string, std::string> properties;
-    if (const basalt::wire::nbt::NbtCompound* tag = state->getCompound("Properties"); tag != nullptr) {
+    if (const basalt::wire::nbt::NbtCompound* tag = state->getCompound("properties"); tag != nullptr) {
         for (std::size_t index = 0; index < tag->size(); ++index) {
             properties.emplace(tag->names()[index], *tag->values()[index].get<std::string>());
         }
     }
     const std::optional<std::int32_t> stateId = registry::blockStateDefinitions::stateIdOf(
-        *basalt::wire::common::Identifier::parse(state->getString("Name")), properties, std::nullopt);
+        *basalt::wire::common::Identifier::parse(state->getString("id")), properties, std::nullopt);
     REQUIRE(stateId.has_value());
     return *stateId;
 }

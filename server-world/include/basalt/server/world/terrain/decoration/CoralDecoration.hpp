@@ -16,7 +16,7 @@ namespace basalt::server::world::terrain::decoration {
 /// states, the wall-fan facing and the sea pickle count.
 namespace coralDecoration {
 
-inline constexpr std::int32_t kWarmOceanVegetationIndex = 96;
+inline constexpr std::int32_t kWarmOceanVegetationIndex = 99;
 
 void decorate(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment);
 

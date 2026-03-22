@@ -198,8 +198,8 @@ TEST_CASE("the portal frame search finds what the frozen kotlin finds") {
 }
 
 TEST_CASE("the portal block states match the frozen kotlin") {
-    CHECK(PortalShape::portalState(PortalAxis::X) == 7017);
-    CHECK(PortalShape::portalState(PortalAxis::Z) == 7018);
+    CHECK(PortalShape::portalState(PortalAxis::X) == 8687);
+    CHECK(PortalShape::portalState(PortalAxis::Z) == 8688);
     CHECK(PortalShape::isPortal(PortalShape::portalState(PortalAxis::X)));
     CHECK(PortalShape::axisOf(PortalShape::portalState(PortalAxis::X)).value() == PortalAxis::X);
     CHECK(PortalShape::axisOf(PortalShape::portalState(PortalAxis::Z)).value() == PortalAxis::Z);

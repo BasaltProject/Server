@@ -48,7 +48,7 @@ struct TerrainStructureGenerators {
     JigsawStructureGenerator* trialChamber = nullptr;
 };
 
-/// Chunk shape from an `OverworldNoiseRouter`'s final density through `DensityChunkSampler`, then
+/// Chunk shape from an `NoiseRouter`'s final density through `DensityChunkSampler`, then
 /// surface rules, structures and independently seeded decoration dispatchers, in that order.
 /// parity: `ChunkGenerator.applyBiomeDecoration`, whose decoration seed is the plain world seed.
 ///
@@ -59,7 +59,7 @@ namespace realTerrainGenerator {
 /// A chunk carrying everything a configured feature may read before decoration runs.
 class GeneratedTerrain {
 public:
-    GeneratedTerrain(Chunk chunk, std::unique_ptr<densityfunction::DensityCache> cache,
+    GeneratedTerrain(Chunk chunk, std::unique_ptr<densityfunction::SamplerContext> cache,
                      std::unique_ptr<surface::SurfaceRuleEnvironment> environment);
     ~GeneratedTerrain();
     GeneratedTerrain(GeneratedTerrain&&) noexcept;
@@ -74,14 +74,20 @@ public:
 private:
     Chunk chunk_;
     /// The cache outlives the environment that reads it, so both travel with the chunk.
-    std::unique_ptr<densityfunction::DensityCache> cache_;
+    std::unique_ptr<densityfunction::SamplerContext> cache_;
     std::unique_ptr<surface::SurfaceRuleEnvironment> environment_;
 };
+
+/// parity: `NoiseBasedChunkGenerator`'s biomes, noise, surface and carver steps for any dimension,
+/// with `beardifier` bound into the chunk's sampler context.
+[[nodiscard]] GeneratedTerrain buildTerrain(const NoiseRouter& router,
+                                            const surface::SurfaceRuleEnvironment& environment, Chunk chunk,
+                                            densityfunction::Sampler beardifier);
 
 /// Everything a chunk holds before its own decoration: noise shape, surface rules, carvers and
 /// structures. A neighbour is generated only this far when a feature needs to read across the chunk
 /// edge, so reading one never recurses back into decoration.
-[[nodiscard]] GeneratedTerrain generateTerrain(const OverworldNoiseRouter& router,
+[[nodiscard]] GeneratedTerrain generateTerrain(const NoiseRouter& router,
                                                const surface::SurfaceRuleEnvironment& environment, std::int32_t chunkX,
                                                std::int32_t chunkZ, std::int64_t seed = 0,
                                                const TerrainStructureGenerators& generators = {});
@@ -95,7 +101,7 @@ void decorate(GeneratedTerrain& terrain, std::int64_t seed = 0, const NeighbourT
 /// its neighbours already left there. This is where a write we had to queue gets the same standing.
 using BeforeDecoration = std::function<void(Chunk&)>;
 
-[[nodiscard]] Chunk generate(const OverworldNoiseRouter& router, const surface::SurfaceRuleEnvironment& environment,
+[[nodiscard]] Chunk generate(const NoiseRouter& router, const surface::SurfaceRuleEnvironment& environment,
                              std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed = 0,
                              const TerrainStructureGenerators& generators = {},
                              NeighbourTerrainCache* neighbours = nullptr,

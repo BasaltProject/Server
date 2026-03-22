@@ -2,6 +2,7 @@
 #include "support/DecorationFixture.hpp"
 
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/BlockStateFamilies.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/LeafDistances.hpp>
 
@@ -96,10 +97,10 @@ TEST_CASE("the leaf distance pass stamps what the frozen kotlin stamps") {
         CHECK(leafDistances::assign(chunk) == 646);
         auto [checksum, leaves] = fold(chunk);
         CHECK(leaves == 1022);
-        CHECK(checksum == 514877107340895582LL);
+        CHECK(checksum == -2296440850474940467LL);
         // A second pass has nothing left to correct: the first one is a fixed point.
         CHECK(leafDistances::assign(chunk) == 0);
-        CHECK(fold(chunk).first == 514877107340895582LL);
+        CHECK(fold(chunk).first == -2296440850474940467LL);
     }
 
     SUBCASE("spruce") {
@@ -107,10 +108,10 @@ TEST_CASE("the leaf distance pass stamps what the frozen kotlin stamps") {
         CHECK(leafDistances::assign(chunk) == 646);
         auto [checksum, leaves] = fold(chunk);
         CHECK(leaves == 1022);
-        CHECK(checksum == 3500298826586513735LL);
+        CHECK(checksum == -5272596383561444906LL);
         // A second pass has nothing left to correct: the first one is a fixed point.
         CHECK(leafDistances::assign(chunk) == 0);
-        CHECK(fold(chunk).first == 3500298826586513735LL);
+        CHECK(fold(chunk).first == -5272596383561444906LL);
     }
 
     SUBCASE("mangrove") {
@@ -118,10 +119,10 @@ TEST_CASE("the leaf distance pass stamps what the frozen kotlin stamps") {
         CHECK(leafDistances::assign(chunk) == 646);
         auto [checksum, leaves] = fold(chunk);
         CHECK(leaves == 1022);
-        CHECK(checksum == -1372352672412502890LL);
+        CHECK(checksum == -8510742807013424939LL);
         // A second pass has nothing left to correct: the first one is a fixed point.
         CHECK(leafDistances::assign(chunk) == 0);
-        CHECK(fold(chunk).first == -1372352672412502890LL);
+        CHECK(fold(chunk).first == -8510742807013424939LL);
     }
 
     SUBCASE("bare") {
@@ -135,5 +136,29 @@ TEST_CASE("the leaf distance pass stamps what the frozen kotlin stamps") {
         const auto [checksum, leaves] = fold(chunk);
         CHECK(leaves == 0);
         CHECK(checksum == 7977582471708068901LL);
+    }
+}
+
+TEST_CASE("setting a leaf's distance keeps its persistence and waterlogging") {
+    // 26.3 no longer starts the leaf blocks on a multiple of four, which the arithmetic must not assume.
+    namespace blocks = basalt::server::registry::blocks;
+    namespace families = basalt::server::registry::blockStateFamilies;
+    for (const std::string_view leaves : {"oak_leaves", "cherry_leaves", "flowering_azalea_leaves"}) {
+        for (const std::string_view persistent : {"true", "false"}) {
+            for (const std::string_view waterlogged : {"true", "false"}) {
+                const auto state = [&](std::string_view distance) {
+                    return blocks::stateIdOf(basalt::wire::common::Identifier::vanilla(std::string{leaves}),
+                                             {{"distance", std::string{distance}},
+                                              {"persistent", std::string{persistent}},
+                                              {"waterlogged", std::string{waterlogged}}});
+                };
+                CAPTURE(leaves);
+                CAPTURE(persistent);
+                CAPTURE(waterlogged);
+                REQUIRE(state("7").has_value());
+                CHECK(families::withLeafDistance(*state("7"), 3) == state("3"));
+                CHECK(families::leafDistance(*state("5")) == 5);
+            }
+        }
     }
 }

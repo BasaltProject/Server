@@ -137,7 +137,7 @@ TEST_CASE("the foliage placers grow what the frozen kotlin grows") {
         CHECK(result.waterlogged == 12);
         CHECK(result.tracked == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -4836634567560293112LL);
+        CHECK(result.checksum == -4626610349560749057LL);
         CHECK(result.after == -1988451487);
         CHECK(result.shape == "2:3:0,2:3:0,2:3:0,2:3:0,2:3:0,2:3:0,2:3:0,2:3:0,");
     }
@@ -148,7 +148,7 @@ TEST_CASE("the foliage placers grow what the frozen kotlin grows") {
         CHECK(result.waterlogged == 113);
         CHECK(result.tracked == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 8833913305143083897LL);
+        CHECK(result.checksum == -2439323931897177427LL);
         CHECK(result.after == -1988451487);
         CHECK(result.shape == "2:3:0,2:3:0,2:3:0,2:3:0,2:3:0,2:3:0,2:3:0,2:3:0,");
     }
@@ -159,7 +159,7 @@ TEST_CASE("the foliage placers grow what the frozen kotlin grows") {
         CHECK(result.waterlogged == 68);
         CHECK(result.tracked == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -2947193110661350175LL);
+        CHECK(result.checksum == -298286500391387251LL);
         CHECK(result.after == -1988451487);
         CHECK(result.shape == "2:3:0,2:3:0,2:3:0,2:3:0,2:3:0,2:3:0,2:3:0,2:3:0,");
     }
@@ -170,7 +170,7 @@ TEST_CASE("the foliage placers grow what the frozen kotlin grows") {
         CHECK(result.waterlogged == 120);
         CHECK(result.tracked == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -8442176217569527611LL);
+        CHECK(result.checksum == 9116960670086159805LL);
         CHECK(result.after == -1072559115);
         CHECK(result.shape == "2:2:0,2:2:0,2:2:0,2:2:0,2:2:0,2:2:0,2:2:0,2:2:0,");
     }
@@ -181,7 +181,7 @@ TEST_CASE("the foliage placers grow what the frozen kotlin grows") {
         CHECK(result.waterlogged == 120);
         CHECK(result.tracked == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -7604298970681674267LL);
+        CHECK(result.checksum == -7427019861511037683LL);
         CHECK(result.after == 28772538);
         CHECK(result.shape == "2:2:0,2:2:0,2:2:0,2:2:0,2:2:0,2:2:0,2:2:0,2:2:0,");
     }
@@ -192,7 +192,7 @@ TEST_CASE("the foliage placers grow what the frozen kotlin grows") {
         CHECK(result.waterlogged == 0);
         CHECK(result.tracked == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -1874915591775378163LL);
+        CHECK(result.checksum == -6568669471576755139LL);
         CHECK(result.after == 28772538);
         CHECK(result.shape == "2:0:4,2:0:4,2:0:4,2:0:4,2:0:4,2:0:4,2:0:4,2:0:4,");
     }
@@ -203,7 +203,7 @@ TEST_CASE("the foliage placers grow what the frozen kotlin grows") {
         CHECK(result.waterlogged == 64);
         CHECK(result.tracked == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -2175536513936252603LL);
+        CHECK(result.checksum == -7140359248011870691LL);
         CHECK(result.after == 28772538);
         CHECK(result.shape == "2:0:0,2:0:0,2:0:0,2:0:0,2:0:0,2:0:0,2:0:0,2:0:0,");
     }
@@ -215,7 +215,7 @@ TEST_CASE("the foliage placers grow what the frozen kotlin grows") {
         CHECK(result.waterlogged == 35);
         CHECK(result.tracked == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -7403678865623186433LL);
+        CHECK(result.checksum == -2280945771772295571LL);
         CHECK(result.after == -699117507);
         CHECK(result.shape == "2:6:2,2:6:1,2:7:2,2:7:2,2:6:2,2:7:2,2:7:2,2:7:2,");
     }
@@ -227,7 +227,7 @@ TEST_CASE("the foliage placers grow what the frozen kotlin grows") {
         CHECK(result.waterlogged == 57);
         CHECK(result.tracked == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -1831243906510243774LL);
+        CHECK(result.checksum == 978491307263035767LL);
         CHECK(result.after == 1644477171);
         CHECK(result.shape == "1:4:1,9:3:1,9:4:1,3:4:1,5:4:1,9:4:1,6:4:1,4:4:1,");
     }
@@ -238,7 +238,7 @@ TEST_CASE("the foliage placers grow what the frozen kotlin grows") {
         CHECK(result.waterlogged == 120);
         CHECK(result.tracked == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -3689709033082203811LL);
+        CHECK(result.checksum == 9193308149911158925LL);
         CHECK(result.after == 28772538);
         CHECK(result.shape == "1:4:0,1:4:0,1:4:0,1:4:0,1:4:0,1:4:0,1:4:0,1:4:0,");
     }
@@ -249,7 +249,7 @@ TEST_CASE("the foliage placers grow what the frozen kotlin grows") {
         CHECK(result.waterlogged == 120);
         CHECK(result.tracked == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -4466327923984210723LL);
+        CHECK(result.checksum == -4245667970467863091LL);
         CHECK(result.after == -1072559115);
         CHECK(result.shape == "1:4:0,1:4:0,1:4:0,1:4:0,1:4:0,1:4:0,1:4:0,1:4:0,");
     }
@@ -260,7 +260,7 @@ TEST_CASE("the foliage placers grow what the frozen kotlin grows") {
         CHECK(result.waterlogged == 48);
         CHECK(result.tracked == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -8248451278770807475LL);
+        CHECK(result.checksum == 9027224930528866109LL);
         CHECK(result.after == -1072559115);
         CHECK(result.shape == "0:16:0,0:17:0,0:17:0,0:15:0,0:13:0,0:15:0,0:14:0,0:17:0,");
     }
@@ -273,7 +273,7 @@ TEST_CASE("the foliage placers grow what the frozen kotlin grows") {
         CHECK(result.waterlogged == 26);
         CHECK(result.tracked == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 4477555947925922322LL);
+        CHECK(result.checksum == -6280612923116759941LL);
         CHECK(result.after == -1668088671);
         CHECK(result.shape == "3:2:0,3:2:0,3:2:0,3:2:0,3:2:0,3:2:0,3:2:0,3:2:0,");
     }
@@ -287,7 +287,7 @@ TEST_CASE("the foliage placers grow what the frozen kotlin grows") {
         CHECK(result.waterlogged == 25);
         CHECK(result.tracked == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -1923463467217093664LL);
+        CHECK(result.checksum == -2069156847839346049LL);
         CHECK(result.after == 222335619);
         CHECK(result.shape == "3:2:0,3:2:0,3:2:0,3:2:0,3:2:0,3:2:0,3:2:0,3:2:0,");
     }
@@ -300,7 +300,7 @@ TEST_CASE("the foliage placers grow what the frozen kotlin grows") {
         CHECK(result.waterlogged == 106);
         CHECK(result.tracked == 1071);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 7085895198165965840LL);
+        CHECK(result.checksum == 2335565284531428971LL);
         CHECK(result.after == -94297265);
         CHECK(result.shape == "4:5:0,4:5:0,4:5:0,4:5:0,4:5:0,4:5:0,4:5:0,4:5:0,");
     }
@@ -313,7 +313,7 @@ TEST_CASE("the foliage placers grow what the frozen kotlin grows") {
         CHECK(result.waterlogged == 0);
         CHECK(result.tracked == 1103);
         CHECK(result.deferred == 408);
-        CHECK(result.checksum == 5450832197447048158LL);
+        CHECK(result.checksum == 7747540946513007887LL);
         CHECK(result.after == -94297265);
         CHECK(result.shape == "4:5:0,4:5:0,4:5:0,4:5:0,4:5:0,4:5:0,4:5:0,4:5:0,");
     }

@@ -3,10 +3,8 @@
 #include <basalt/server/runtime/world/BiomeZoomSeed.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/NetherSurfaceEnvironment.hpp>
-#include <basalt/server/runtime/world/NoiseParametersJson.hpp>
 #include <basalt/server/runtime/world/OriginalMobSpawner.hpp>
 #include <basalt/server/runtime/world/RealBiomeSpawns.hpp>
-#include <basalt/server/runtime/world/RealNoiseParameters.hpp>
 #include <basalt/server/runtime/world/RealSurfaceEnvironment.hpp>
 #include <basalt/server/runtime/world/RuinedPortalVariants.hpp>
 #include <basalt/server/runtime/world/SpawnEquipment.hpp>
@@ -89,9 +87,9 @@ struct VanillaWorldGeneratorFactory::Built {
     std::unique_ptr<VillageDataLoader> loader;
     std::unique_ptr<BiomeTagLoader> tags;
     std::unique_ptr<RealBiomeSpawns> biomeSpawns;
-    std::unique_ptr<terrain::OverworldNoiseRouter> overworldRouter;
-    std::unique_ptr<terrain::NetherNoiseRouter> netherRouter;
-    std::unique_ptr<terrain::EndNoiseRouter> endRouter;
+    std::unique_ptr<terrain::NoiseRouter> overworldRouter;
+    std::unique_ptr<terrain::NoiseRouter> netherRouter;
+    std::unique_ptr<terrain::NoiseRouter> endRouter;
     std::unique_ptr<terrain::NetherBiomeSource> netherBiomes;
     std::unique_ptr<terrain::TheEndBiomeSource> endBiomes;
     std::unique_ptr<RealSurfaceEnvironment> overworldSurface;
@@ -156,6 +154,12 @@ VanillaWorldGeneratorFactory::CacheStats VanillaWorldGeneratorFactory::cacheStat
     return stats;
 }
 
+server::world::densityfunction::WorldgenReader VanillaWorldGeneratorFactory::worldgenReader() const {
+    return [readText = jar_.readText](std::string_view path) -> std::optional<std::string> {
+        return readText ? readText("data/" + std::string{path} + ".json") : std::nullopt;
+    };
+}
+
 VanillaWorldGeneratorFactory::Generators
 VanillaWorldGeneratorFactory::create(const config::WorldDeclaration& declaration, const WorldMetadata& metadata) {
     const bool spawnMobs = metadata.gameRules.get(gameRules::kSpawnMobs);
@@ -183,42 +187,16 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
         SpawnEquipmentJar{.entriesUnder = nullptr, .readText = jar_.readText});
 
     const std::int64_t biomeZoomSeed = obfuscateBiomeSeed(seed);
-    // parity: `RandomState` forks the factory off a seeded source, so the two longs it draws are what
-    // seeds every noise. Building the factory straight from the level seed generates another world.
-    const random::PositionalRandomFactory positional = random::RandomSource::xoroshiro(seed).forkPositional();
-    // parity: `RandomState` wires `BlendedNoise` from `random.fromHashOf("minecraft:terrain")`.
-    random::RandomSource terrainSource = positional.fromHashOf("minecraft:terrain");
-    const densityfunction::Function base3d =
-        densityfunction::functions::blendedNoise(terrainSource, 0.25, 0.125, 80.0, 160.0, 8.0);
-
-    // The noises outlive the router that samples them, so they are shared rather than borrowed
-    // from a local.
-    const auto noises = std::make_shared<RealNoiseParameters>(jar_.readText, noiseParametersJson::parse, positional);
-    const auto shared = std::make_shared<
-        std::map<std::string, std::shared_ptr<const server::world::noise::NormalNoise>, std::less<>>>();
-    // parity: the overworld's shape is the jar's own noise files. Without them there is no terrain
+    // parity: the overworld's shape is the jar's own `noise_settings`. Without it there is no terrain
     // to make, so the world says so rather than handing back a generator that dereferences nothing.
-    if (noises->get("continentalness") == nullptr) {
-        logger_.warn([] {
-            return std::string{"No worldgen noise in the server jar, so no normal terrain can be generated. "
-                               "The download the EULA step performs is what carries it."};
-        });
+    std::expected<terrain::NoiseRouter, std::string> router =
+        terrain::noiseRouterData::load("minecraft:overworld", seed, worldgenReader());
+    if (!router.has_value()) {
+        logger_.warn([&router] { return "No normal terrain can be generated: " + router.error(); });
         return {};
     }
-    built->overworldRouter = std::make_unique<terrain::OverworldNoiseRouter>(terrain::noiseRouterData::overworld(
-        [noises, shared](std::string_view id) -> std::shared_ptr<const server::world::noise::NormalNoise> {
-            if (const auto found = shared->find(id); found != shared->end()) {
-                return found->second;
-            }
-            const server::world::noise::NormalNoise* made = noises->get(id);
-            std::shared_ptr<const server::world::noise::NormalNoise> held =
-                made == nullptr ? nullptr : std::make_shared<const server::world::noise::NormalNoise>(*made);
-            shared->emplace(std::string{id}, held);
-            return held;
-        },
-        base3d));
-    built->overworldSurface = std::make_unique<RealSurfaceEnvironment>(
-        jar_.readText, noiseParametersJson::parse, positional, *built->overworldRouter, biomeZoomSeed);
+    built->overworldRouter = std::make_unique<terrain::NoiseRouter>(std::move(*router));
+    built->overworldSurface = std::make_unique<RealSurfaceEnvironment>(*built->overworldRouter, biomeZoomSeed);
 
     const RealSurfaceEnvironment& surface = *built->overworldSurface;
     // The return type is spelled out because `auto` would deduce a copy, and a consumer that takes
@@ -392,10 +370,10 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
         return chunk;
     };
     answer.spawnChunk = [&world] {
-        const terrain::OverworldNoiseRouter& router = *world.overworldRouter;
-        const auto [blockX, blockZ] =
-            server::world::climate::spawnFinder::findSpawnPosition(server::world::climate::Sampler{
-                router.temperature, router.vegetation, router.continents, router.erosion, router.depth, router.ridges});
+        const terrain::NoiseRouter& router = *world.overworldRouter;
+        const auto [blockX, blockZ] = server::world::climate::spawnFinder::findSpawnPosition(
+            server::world::climate::Sampler{*router.state, router.temperature, router.vegetation, router.continents,
+                                            router.erosion, router.depth, router.ridges});
         return std::pair{blockX >> 4, blockZ >> 4};
     };
     built_.push_back(std::move(built));
@@ -415,53 +393,15 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::nether(st
         SpawnEquipmentJar{.entriesUnder = nullptr, .readText = jar_.readText});
 
     const std::int64_t biomeZoomSeed = obfuscateBiomeSeed(seed);
-    // parity: `noise_settings/nether.json` has `legacy_random_source = true`.
-    random::RandomSource legacy = random::RandomSource::legacy(seed);
-    const densityfunction::Function base3d =
-        densityfunction::functions::blendedNoise(legacy, 0.25, 0.375, 80.0, 60.0, 8.0);
-    // parity: the Nether's noises are legacy-seeded per id, and its vegetation noise takes seed + 1.
-    const auto netherNoise = [this](std::string_view id,
-                                    std::int64_t noiseSeed) -> std::optional<server::world::noise::NormalNoise> {
-        const std::optional<std::string> json =
-            jar_.readText ? jar_.readText("data/minecraft/worldgen/noise/" + std::string{id} + ".json") : std::nullopt;
-        const std::optional<server::world::noise::NormalNoise::Parameters> parameters =
-            json.has_value() ? noiseParametersJson::parse(*json) : std::nullopt;
-        if (!parameters.has_value()) {
-            return std::nullopt;
-        }
-        random::RandomSource source = random::RandomSource::legacy(noiseSeed);
-        return server::world::noise::NormalNoise::createLegacyNetherBiome(source, parameters->firstOctave,
-                                                                          parameters->amplitudes);
-    };
-    // Held here so the router's own lookups keep pointing at a live noise.
-    auto netherNoises = std::make_shared<
-        std::map<std::string, std::shared_ptr<const server::world::noise::NormalNoise>, std::less<>>>();
-    if (!netherNoise("nether/temperature", seed).has_value()) {
-        logger_.warn([] {
-            return std::string{"No Nether worldgen noise in the server jar, so no Nether terrain can be generated."};
-        });
+    std::expected<terrain::NoiseRouter, std::string> router =
+        terrain::noiseRouterData::load("minecraft:nether", seed, worldgenReader());
+    if (!router.has_value()) {
+        logger_.warn([&router] { return "No Nether terrain can be generated: " + router.error(); });
         return {};
     }
-    built->netherRouter = std::make_unique<terrain::NetherNoiseRouter>(terrain::noiseRouterData::nether(
-        [netherNoises, netherNoise,
-         seed](std::string_view id) -> std::shared_ptr<const server::world::noise::NormalNoise> {
-            if (const auto found = netherNoises->find(id); found != netherNoises->end()) {
-                return found->second;
-            }
-            std::optional<server::world::noise::NormalNoise> made =
-                netherNoise(id, seed + (id == "nether/vegetation" ? 1 : 0));
-            std::shared_ptr<const server::world::noise::NormalNoise> held =
-                made.has_value() ? std::make_shared<const server::world::noise::NormalNoise>(std::move(*made))
-                                 : nullptr;
-            netherNoises->emplace(std::string{id}, held);
-            return held;
-        },
-        base3d));
-    built->netherBiomes = std::make_unique<terrain::NetherBiomeSource>(built->netherRouter->temperature,
-                                                                       built->netherRouter->vegetation, biomeZoomSeed);
-    built->netherSurface = std::make_unique<NetherSurfaceEnvironment>(
-        jar_.readText, noiseParametersJson::parse, random::RandomSource::legacy(seed).forkPositional(),
-        *built->netherRouter, *built->netherBiomes, biomeZoomSeed);
+    built->netherRouter = std::make_unique<terrain::NoiseRouter>(std::move(*router));
+    built->netherBiomes = std::make_unique<terrain::NetherBiomeSource>(*built->netherRouter, biomeZoomSeed);
+    built->netherSurface = std::make_unique<NetherSurfaceEnvironment>(*built->netherBiomes, biomeZoomSeed);
     built->netherStructures = std::make_unique<terrain::NetherStructureGenerator>(
         *built->netherRouter, *built->netherBiomes, built->loader->templateLoader(),
         [&loader = *built->loader](std::string_view name) { return loader.pool(name); });
@@ -475,12 +415,11 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::nether(st
     Built& world = *built;
     // The Nether's springs, patches and blobs read the block next to them, so decoration needs the
     // neighbours' undecorated terrain, exactly like the Overworld's.
-    built->neighbours =
-        std::make_unique<terrain::NeighbourTerrainCache>([&world](std::int32_t neighbourX, std::int32_t neighbourZ) {
-            return terrain::dimensionTerrainGenerator::netherTerrain(*world.netherRouter, *world.netherBiomes,
-                                                                     neighbourX, neighbourZ, world.netherSurface.get(),
-                                                                     world.seed, world.netherStructures.get());
-        });
+    built->neighbours = std::make_unique<terrain::NeighbourTerrainCache>([&world](std::int32_t neighbourX,
+                                                                                  std::int32_t neighbourZ) {
+        return terrain::dimensionTerrainGenerator::netherTerrain(*world.netherRouter, *world.netherBiomes, neighbourX,
+                                                                 neighbourZ, world.seed, world.netherStructures.get());
+    });
     Generators answer;
     answer.useQueuedWrites = [&world](terrain::NeighbourTerrainCache::QueuedAt queuedAt) {
         if (world.neighbours != nullptr) {
@@ -502,8 +441,8 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::nether(st
             }
         };
         server::world::Chunk chunk = terrain::dimensionTerrainGenerator::nether(
-            *world.netherRouter, *world.netherBiomes, chunkX, chunkZ, world.netherSurface.get(), world.seed,
-            world.netherStructures.get(), world.neighbours.get(), stamped);
+            *world.netherRouter, *world.netherBiomes, chunkX, chunkZ, world.seed, world.netherStructures.get(),
+            world.neighbours.get(), stamped);
         if (world.spawnMobs) {
             const std::expected<Identifier, wire::common::IdentifierError> biome =
                 Identifier::parse(world.netherBiomes->biomeAt(chunkX << 4, chunk.verticalBounds().maxY(), chunkZ << 4));
@@ -533,12 +472,14 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::end(std::
     built->loader = std::make_unique<VillageDataLoader>(*built->templates, jar_.readEntry);
 
     const std::int64_t biomeZoomSeed = obfuscateBiomeSeed(seed);
-    // parity: `noise_settings/end.json` has `legacy_random_source = true`.
-    random::RandomSource legacy = random::RandomSource::legacy(seed);
-    const densityfunction::Function base3d =
-        densityfunction::functions::blendedNoise(legacy, 0.25, 0.25, 80.0, 160.0, 4.0);
-    built->endRouter = std::make_unique<terrain::EndNoiseRouter>(terrain::noiseRouterData::end(base3d, seed));
-    built->endBiomes = std::make_unique<terrain::TheEndBiomeSource>(built->endRouter->erosion, biomeZoomSeed);
+    std::expected<terrain::NoiseRouter, std::string> router =
+        terrain::noiseRouterData::load("minecraft:end", seed, worldgenReader());
+    if (!router.has_value()) {
+        logger_.warn([&router] { return "No End terrain can be generated: " + router.error(); });
+        return {};
+    }
+    built->endRouter = std::make_unique<terrain::NoiseRouter>(std::move(*router));
+    built->endBiomes = std::make_unique<terrain::TheEndBiomeSource>(*built->endRouter, biomeZoomSeed);
     built->endCities = std::make_unique<terrain::EndCityStructureGenerator>(*built->endRouter, *built->endBiomes,
                                                                             built->loader->templateLoader());
 

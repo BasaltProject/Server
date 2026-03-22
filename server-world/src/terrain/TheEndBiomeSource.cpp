@@ -1,3 +1,4 @@
+#include <basalt/server/world/densityfunction/SamplerContext.hpp>
 #include <basalt/server/world/terrain/TheEndBiomeSource.hpp>
 
 #include <cstdint>
@@ -26,8 +27,8 @@ std::string_view TheEndBiomeSource::biomeAtQuart(const std::int32_t quartX, cons
 
     const std::int32_t centerX = (chunkX * 2 + 1) * 8;
     const std::int32_t centerZ = (chunkZ * 2 + 1) * 8;
-    densityfunction::FunctionContext context{centerX, blockY, centerZ};
-    const double heightValue = erosion_->compute(context);
+    densityfunction::SamplerContext context{densityfunction::SamplerContext::Options{}};
+    const auto heightValue = static_cast<double>(erosion_->sampleValue(context, centerX, blockY, centerZ));
     if (heightValue > kHighlandsThreshold) {
         return "minecraft:end_highlands";
     }

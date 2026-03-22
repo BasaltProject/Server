@@ -21,7 +21,7 @@ namespace {
 constexpr std::int32_t kVerticalRange = 5;
 constexpr float kVegetationChance = 0.3F;
 constexpr float kExtraEdgeColumnChance = 0.75F;
-constexpr std::int32_t kPaleMossPatchIndex = 14;
+constexpr std::int32_t kPaleMossPatchIndex = 17;
 constexpr std::int32_t kVegetalDecorationStep = 9;
 
 [[nodiscard]] std::int32_t stateIdOf(std::string_view path) {

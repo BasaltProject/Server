@@ -87,13 +87,13 @@ void check(const Run& result, std::int32_t written, std::size_t blockEntities, s
 TEST_CASE("the mineshafts start where the jar starts them") {
     SUBCASE("plains") {
         check(run(12345, 64, [](std::int32_t, std::int32_t, std::int32_t) { return std::string{"minecraft:plains"}; }),
-              6277, 4, 0, -7198636584338907090LL);
+              6277, 4, 0, -4638103438500778441LL);
     }
 
     SUBCASE("badlands") {
         check(
             run(12345, 64, [](std::int32_t, std::int32_t, std::int32_t) { return std::string{"minecraft:badlands"}; }),
-            5736, 0, 2, 2318323481289889176LL);
+            5736, 0, 2, 2096730358540364644LL);
     }
 
     SUBCASE("nether") {
@@ -105,7 +105,7 @@ TEST_CASE("the mineshafts start where the jar starts them") {
     SUBCASE("both") {
         // A biome in both tags, so the type comes from the coin flip and not from the refusal.
         check(run(12345, 64, [](std::int32_t, std::int32_t, std::int32_t) { return std::string{"minecraft:savanna"}; }),
-              6277, 4, 0, -7198636584338907090LL);
+              6277, 4, 0, -4638103438500778441LL);
     }
 
     SUBCASE("layered") {
@@ -114,11 +114,11 @@ TEST_CASE("the mineshafts start where the jar starts them") {
                   [](std::int32_t, std::int32_t y, std::int32_t) {
                       return std::string{y >= 32 ? "minecraft:plains" : "minecraft:badlands"};
                   }),
-              6277, 4, 0, -7198636584338907090LL);
+              6277, 4, 0, -4638103438500778441LL);
     }
 
     SUBCASE("otherSeed") {
         check(run(7, 64, [](std::int32_t, std::int32_t, std::int32_t) { return std::string{"minecraft:plains"}; }), 562,
-              2, 0, 8726084680966971115LL);
+              2, 0, -8009093979489293295LL);
     }
 }

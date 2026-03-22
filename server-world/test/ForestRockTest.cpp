@@ -71,20 +71,20 @@ TEST_CASE("the forest rock matches the frozen kotlin") {
     SUBCASE("pineTaiga") {
         const auto [rock, checksum] = run("minecraft:old_growth_pine_taiga");
         CHECK(rock == 1742);
-        CHECK(checksum == -4814497971009756070LL);
+        CHECK(checksum == 1846982856835562088LL);
     }
 
     SUBCASE("spruceTaiga") {
         const auto [rock, checksum] = run("minecraft:old_growth_spruce_taiga");
         CHECK(rock == 1742);
-        CHECK(checksum == -4814497971009756070LL);
+        CHECK(checksum == 1846982856835562088LL);
     }
 
     SUBCASE("wrong") {
         // plains is in neither old-growth list, so this is the real rejection case.
         const auto [rock, checksum] = run("minecraft:plains");
         CHECK(rock == 0);
-        CHECK(checksum == -1763600487595927371LL);
+        CHECK(checksum == -9024844322599378571LL);
     }
 }
 
@@ -101,6 +101,6 @@ TEST_CASE("the rock blob walks and sizes as the frozen kotlin does") {
         sizes.append(std::to_string(fold(chunk).second - before)).push_back(',');
     }
     CHECK(sizes == "2,10,3,10,10,3,6,28,28,7,8,21,");
-    CHECK(fold(chunk).first == -5573849096066691213LL);
+    CHECK(fold(chunk).first == 4417213654595201512LL);
     CHECK(random.nextInt() == 1247703182);
 }

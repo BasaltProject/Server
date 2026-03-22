@@ -3,30 +3,31 @@
 #include <basalt/server/world/terrain/NoiseRouterData.hpp>
 
 #include <cstdint>
+#include <vector>
 
 namespace basalt::server::world::terrain {
 
-/// parity: `ChunkGenerator.getBaseHeight` over `WORLD_SURFACE_WG`, at any column. A sampler per
-/// query and deliberately no cache: `DensityChunkSampler` reuses one context, so sharing one across
-/// concurrently generating chunks hands back wrong heights rather than crashing.
+/// parity: `NoiseBasedChunkGenerator.getBaseHeight` and `getBaseColumn`: one column's own
+/// `NoiseChunk`, its aquifer included, with no structure bearding the terrain.
 class NoiseColumnHeights {
 public:
-    explicit NoiseColumnHeights(const OverworldNoiseRouter& router) : router_(&router) {}
+    explicit NoiseColumnHeights(const NoiseRouter& router) : router_(&router) {}
 
-    /// The first free block above the ground at this column.
+    /// parity: `WORLD_SURFACE_WG`, one above the topmost non-air block.
     [[nodiscard]] std::int32_t surfaceHeight(std::int32_t x, std::int32_t z) const;
 
-    /// parity: `OCEAN_FLOOR_WG`, the solid floor with no sea-level floor under it. `surfaceHeight`
-    /// lifts an open column to sea level because the aquifer fills it; this one must not, or a
-    /// shipwreck meant for the sea bed would settle on the surface of the water.
+    /// parity: `OCEAN_FLOOR_WG`, one above the topmost block that blocks motion.
     [[nodiscard]] std::int32_t oceanFloorHeight(std::int32_t x, std::int32_t z) const;
 
-    /// Whether the density says this block is solid, which is what a portal's corners are tested
-    /// against.
+    /// Whether the base column holds the dimension's default block here, which is what a ruined
+    /// portal's corners are tested against.
     [[nodiscard]] bool isSolid(std::int32_t x, std::int32_t y, std::int32_t z) const;
 
+    /// The base column's states from the bottom of the noise up.
+    [[nodiscard]] std::vector<std::int32_t> column(std::int32_t x, std::int32_t z) const;
+
 private:
-    const OverworldNoiseRouter* router_;
+    const NoiseRouter* router_;
 };
 
 } // namespace basalt::server::world::terrain

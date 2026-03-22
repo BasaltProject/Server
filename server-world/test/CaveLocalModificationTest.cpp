@@ -136,7 +136,7 @@ TEST_CASE("the local modification steps place what the frozen kotlin places") {
         CHECK(result.placed == 1145);
         CHECK(result.deferred == 7);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == 4772032669129060707LL);
+        CHECK(result.checksum == -5484601712830456174LL);
     }
 
     SUBCASE("geodeOutside") {
@@ -144,7 +144,7 @@ TEST_CASE("the local modification steps place what the frozen kotlin places") {
         CHECK(result.placed == 188);
         CHECK(result.deferred == 1868);
         CHECK(result.ticks == 2);
-        CHECK(result.checksum == -8336036689239024682LL);
+        CHECK(result.checksum == -3891974237154470976LL);
     }
 
     SUBCASE("netherGeode") {
@@ -152,7 +152,7 @@ TEST_CASE("the local modification steps place what the frozen kotlin places") {
         CHECK(result.placed == 0);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == 4752476896554427680LL);
+        CHECK(result.checksum == -4809084022557803335LL);
     }
 
     SUBCASE("dripstoneIndex") {
@@ -160,7 +160,7 @@ TEST_CASE("the local modification steps place what the frozen kotlin places") {
         CHECK(result.placed == 306);
         CHECK(result.deferred == 4);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == 3898881740929741471LL);
+        CHECK(result.checksum == -5903008619050191360LL);
     }
 
     SUBCASE("dripstoneOutside") {
@@ -168,7 +168,7 @@ TEST_CASE("the local modification steps place what the frozen kotlin places") {
         CHECK(result.placed == 8323);
         CHECK(result.deferred == 2788);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == -295792465572877867LL);
+        CHECK(result.checksum == -1876923547493120254LL);
     }
 
     SUBCASE("plainsDripstone") {
@@ -176,7 +176,7 @@ TEST_CASE("the local modification steps place what the frozen kotlin places") {
         CHECK(result.placed == 0);
         CHECK(result.deferred == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == -3949038134034735845LL);
+        CHECK(result.checksum == -8470524865361231206LL);
     }
 }
 
@@ -205,6 +205,6 @@ TEST_CASE("one local modification feature at one position matches the frozen kot
     CHECK(known == "111111000");
     CHECK(placed == 308);
     CHECK(ticks == 0);
-    CHECK(static_cast<std::int64_t>(checksum) == 8470113881525445052LL);
+    CHECK(static_cast<std::int64_t>(checksum) == 4087204779981588003LL);
     CHECK(after == 1678591146);
 }

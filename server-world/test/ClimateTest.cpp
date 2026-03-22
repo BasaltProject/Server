@@ -144,7 +144,7 @@ TEST_CASE("the overworld list matches the frozen kotlin entry for entry") {
         hash ^= static_cast<std::uint64_t>(static_cast<std::int64_t>(ch));
         hash *= 0x100000001B3ULL;
     }
-    CHECK(static_cast<std::int64_t>(hash) == 2101025977827128058LL);
+    CHECK(static_cast<std::int64_t>(hash) == -3349918987853375340LL);
 
     // Named explicitly too, so a failure says which end moved rather than only that one did.
     CHECK(digest.substr(0, digest.find(';')) ==

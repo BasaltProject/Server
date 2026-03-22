@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -207,7 +208,7 @@ TEST_CASE("the nether biomes carry their sounds, music and particles in that ord
 TEST_CASE("the configuration packets go out in the order a client resolves ids in") {
     const std::vector<basalt::wire::protocol::configuration::RegistryDataPacket> packets =
         vanillaConfigurationRegistries::packets();
-    REQUIRE(packets.size() == 21);
+    REQUIRE(packets.size() == 24);
 
     std::vector<std::string> order;
     std::int32_t entries = 0;
@@ -228,18 +229,27 @@ TEST_CASE("the configuration packets go out in the order a client resolves ids i
                     "minecraft:cat_variant,minecraft:cat_sound_variant,minecraft:cow_sound_variant,"
                     "minecraft:cow_variant,minecraft:chicken_sound_variant,minecraft:chicken_variant,"
                     "minecraft:zombie_nautilus_variant,minecraft:painting_variant,minecraft:trim_material,"
-                    "minecraft:damage_type,minecraft:jukebox_song,minecraft:instrument");
-    // 2 clocks, 4 dimensions, 66 biomes, 43 banners, 51 across the animal variants, 51 paintings,
-    // 11 trims, 51 damage types, 22 songs and 8 instruments.
-    CHECK(entries == 308);
+                    "minecraft:damage_type,minecraft:jukebox_song,minecraft:instrument,"
+                    "minecraft:decorated_pot_pattern,minecraft:block_transformer,"
+                    "minecraft:worldgen/block_state_provider");
+    // 2 clocks, 4 dimensions, 67 biomes, 43 banners, 51 across the animal variants, 51 paintings,
+    // 11 trims, 51 damage types, 22 songs, 8 instruments, 23 pot patterns, 3 transformers and 8
+    // state providers.
+    CHECK(entries == 343);
 
-    // Every key is namespaced, and every entry carries a value: an entry with none means "the
-    // client already knows this one", which is not what any of these are.
+    // Every key is namespaced. An entry with no value means "the client already knows this one",
+    // which only the three registries 26.3 sends from the shared vanilla pack are.
+    const std::set<std::string> known{"minecraft:decorated_pot_pattern", "minecraft:block_transformer",
+                                      "minecraft:worldgen/block_state_provider"};
     for (const auto& packet : packets) {
         CAPTURE(packet.registryId);
         CHECK_FALSE(packet.entries.empty());
         for (const auto& entry : packet.entries) {
             CHECK(entry.key.starts_with("minecraft:"));
+            if (known.contains(packet.registryId)) {
+                CHECK_FALSE(entry.value.has_value());
+                continue;
+            }
             REQUIRE(entry.value.has_value());
             CHECK(entry.value->get<nbt::NbtCompound>() != nullptr);
         }
@@ -248,7 +258,7 @@ TEST_CASE("the configuration packets go out in the order a client resolves ids i
     // The biome packet's own order is the palette order, so its index is the id a chunk references.
     const auto& biomes = packets[2];
     CHECK(biomes.entries.front().key == "minecraft:plains");
-    CHECK(biomes.entries[29].key == "minecraft:meadow");
+    CHECK(biomes.entries[30].key == "minecraft:meadow");
     CHECK(biomes.entries.back().key == "minecraft:end_barrens");
 
     // Every painting the jar ships, each with its own size and its own two translation keys. A

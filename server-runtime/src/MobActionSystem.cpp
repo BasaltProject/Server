@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
+#include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
@@ -55,6 +56,8 @@ constexpr std::string_view kSoundSkeletonShoot = "entity.skeleton.shoot";
 
 /// parity: `SpellcasterIllager`'s own spell byte, and the pose it puts the model in.
 constexpr std::uint8_t kSpellIndex = 17;
+/// parity: `Cat.IS_LYING`, the one after the variant.
+constexpr std::uint8_t kCatLyingIndex = 21;
 constexpr std::int8_t kSpellCasting = 1;
 constexpr std::int8_t kSpellNone = 0;
 
@@ -334,6 +337,22 @@ void MobActionSystem::setCasting(ServerEntity& mob, bool casting) {
                    SetEntityDataPacket::Entry{
                        .index = kSpellIndex,
                        .value = SetEntityDataPacket::ByteValue{.value = casting ? kSpellCasting : kSpellNone}});
+}
+
+void MobActionSystem::poseChanged(ServerEntity& mob) {
+    world::LoadedWorld* world = worldOf(mob);
+    if (world == nullptr) {
+        return;
+    }
+    sendEntityData(*world, mob.entityId(),
+                   SetEntityDataPacket::Entry{.index = static_cast<std::uint8_t>(entity::taming::kFlagsIndex),
+                                              .value = SetEntityDataPacket::ByteValue{
+                                                  .value = static_cast<std::int8_t>(entity::taming::flagsOf(mob))}});
+    if (mob.type().path() == "cat") {
+        sendEntityData(*world, mob.entityId(),
+                       SetEntityDataPacket::Entry{.index = kCatLyingIndex,
+                                                  .value = SetEntityDataPacket::BoolValue{.value = mob.lying}});
+    }
 }
 
 void MobActionSystem::throwPotion(ServerEntity& mob, double targetX, double targetY, double targetZ,

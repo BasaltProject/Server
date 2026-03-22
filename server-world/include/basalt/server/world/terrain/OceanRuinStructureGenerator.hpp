@@ -24,9 +24,9 @@ public:
     using OceanFloorAt = std::function<std::int32_t(std::int32_t, std::int32_t)>;
 
     static constexpr std::string_view kName = "ocean_ruin";
-    /// Eighth and ninth of the 26 of `surface_structures`: cold first, then warm.
-    static constexpr std::int32_t kColdStructureIndex = 7;
-    static constexpr std::int32_t kWarmStructureIndex = 8;
+    /// Position among the 44 structures of `surface_structures`, in registry order.
+    static constexpr std::int32_t kColdStructureIndex = 25;
+    static constexpr std::int32_t kWarmStructureIndex = 26;
     static constexpr std::int32_t kSurfaceStructuresStep = 4;
 
     OceanRuinStructureGenerator(BiomeAt biomeAt, std::set<std::string, std::less<>> coldBiomes,

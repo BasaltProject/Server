@@ -6,11 +6,13 @@
 #include <basalt/server/world/terrain/NetherStructureGenerator.hpp>
 #include <basalt/server/world/terrain/StructureBeardifier.hpp>
 #include <basalt/server/world/terrain/StructureReferenceOrder.hpp>
+#include <basalt/server/world/terrain/carver/Carvers.hpp>
 
 #include <algorithm>
 #include <array>
 #include <cstdint>
 #include <limits>
+#include <mutex>
 #include <set>
 #include <string>
 #include <utility>
@@ -26,7 +28,6 @@ using structure::StructureRotation;
 
 constexpr std::int32_t kNetherSeaLevel = 32;
 constexpr std::size_t kSamplerCacheCapacity = 64;
-constexpr std::int32_t kNetherGenerationDepth = 128;
 constexpr std::int32_t kFossilMinY = 32;
 constexpr std::int32_t kFossilMaxY = 125;
 constexpr std::int32_t kFossilSearchCells = 2;
@@ -36,7 +37,7 @@ constexpr std::int32_t kFortressWeight = 2;
 constexpr std::int32_t kNetherComplexTotalWeight = 5;
 constexpr std::string_view kFortressName = "fortress";
 constexpr std::int32_t kFortressStructureIndex = 1;
-constexpr std::int32_t kBastionStructureIndex = 0;
+constexpr std::int32_t kBastionStructureIndex = 18;
 constexpr std::int32_t kSurfaceStructuresStep = 4;
 constexpr std::int32_t kUndergroundDecorationStep = 7;
 constexpr std::int32_t kStructureReferenceRange = 8;
@@ -153,16 +154,34 @@ struct FortressReference {
     const std::vector<netherFortressPieces::Piece>* pieces = nullptr;
 };
 
+/// A biome name that outlives the lookup that produced it, as the carvers keep references.
+[[nodiscard]] const std::string& internedBiome(std::string_view name) {
+    static std::mutex mutex;
+    static std::set<std::string, std::less<>> names;
+    const std::lock_guard<std::mutex> guard{mutex};
+    if (const auto found = names.find(name); found != names.end()) {
+        return *found;
+    }
+    return *names.emplace(name).first;
+}
+
 } // namespace
 
-NetherStructureGenerator::NetherStructureGenerator(NetherNoiseRouter router, const NetherBiomeSource& biomeSource,
+NetherStructureGenerator::NetherStructureGenerator(NoiseRouter router, const NetherBiomeSource& biomeSource,
                                                    structure::TemplateLoader templateLoader, PoolLookup poolLookup)
     : router_(std::move(router)), biomeSource_(&biomeSource), templateLoader_(std::move(templateLoader)),
       poolLookup_(std::move(poolLookup)) {
     ruinedPortals_ = std::make_unique<NetherRuinedPortalGenerator>(
         biomeSource, templateLoader_,
         [this](std::int32_t x, std::int32_t y, std::int32_t z) { return baseStateAt(x, y, z); },
-        [this](Chunk& chunk, std::int64_t seed) { placeBastions(chunk, seed); });
+        [this](Chunk& chunk, std::int64_t seed) { placeBastions(chunk, seed); },
+        [this](Chunk& chunk) {
+            carver::carveShape(
+                chunk, router_,
+                [this](std::int32_t quartX, std::int32_t quartY, std::int32_t quartZ) -> const std::string& {
+                    return internedBiome(biomeSource_->biomeAtQuart(quartX, quartY, quartZ));
+                });
+        });
 }
 
 void NetherStructureGenerator::generateInto(Chunk& chunk, std::int64_t seed) {
@@ -178,11 +197,10 @@ DensityChunkSampler& NetherStructureGenerator::samplerAt(std::int32_t x, std::in
     if (found != samplers_.end()) {
         return *found->second;
     }
-    auto created = std::make_unique<DensityChunkSampler>(router_.finalDensity, key.first, key.second, 0,
-                                                         kNetherGenerationDepth, 4, 8);
-    // One sampler per chunk with no ceiling is a leak in a server that keeps exploring: each holds a
-    // `FunctionContext` and a `DensityCache`. Clearing is safe here, and only here, because the only
-    // caller reads the sampler with `mutex_` still held, so no reference outlives this map.
+    auto created = std::make_unique<DensityChunkSampler>(router_, key.first, key.second);
+    // One sampler per chunk with no ceiling is a leak in a server that keeps exploring: each holds its
+    // chunk's whole density volume. Clearing is safe here, and only here, because the only caller
+    // reads the sampler with `mutex_` still held, so no reference outlives this map.
     if (samplers_.size() >= kSamplerCacheCapacity) {
         samplers_.clear();
     }
@@ -190,10 +208,8 @@ DensityChunkSampler& NetherStructureGenerator::samplerAt(std::int32_t x, std::in
 }
 
 std::int32_t NetherStructureGenerator::baseStateAt(std::int32_t x, std::int32_t y, std::int32_t z) {
-    // Every chunk generation worker shares this generator, so both the sampler map and the sampler
-    // itself need the lock. The map is the obvious half; the sampler is the one that actually
-    // crashed, because it holds one `FunctionContext` and one `DensityCache` for its whole chunk
-    // and two threads inside `sample` walk over each other's cache slots.
+    // Every chunk generation worker shares this generator, so the sampler map needs the lock, and a
+    // sampler must not be cleared out from under a reader.
     double density = 0.0;
     {
         const std::scoped_lock lock{mutex_};
@@ -487,16 +503,13 @@ void NetherStructureGenerator::placeDriedGhast(Chunk& chunk, std::int64_t seed, 
     chunk.setBlockStateId(position.x & 15, position.y, position.z & 15, driedGhast);
 }
 
-densityfunction::Function NetherStructureGenerator::finalDensityForChunk(std::int32_t chunkX, std::int32_t chunkZ,
-                                                                         std::int64_t seed) {
-    std::vector<BeardifierRigid> rigids;
+densityfunction::Sampler NetherStructureGenerator::beardifierForChunk(std::int32_t chunkX, std::int32_t chunkZ,
+                                                                      std::int64_t seed) {
+    StructureBeard beard;
     for (const FossilReference& reference : referencedNetherFossils(chunkX, chunkZ, seed)) {
-        rigids.push_back(BeardifierRigid{.box = reference.boundingBox});
+        beard.pieces.push_back(BeardifierRigid{.box = reference.boundingBox});
     }
-    if (rigids.empty()) {
-        return router_.finalDensity;
-    }
-    return densityfunction::functions::add(router_.finalDensity, structureBeardifier(std::move(rigids)));
+    return structureBeardifier(std::move(beard));
 }
 
 } // namespace basalt::server::world::terrain

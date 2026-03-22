@@ -1,11 +1,10 @@
 #include <basalt/server/random/RandomSource.hpp>
-#include <basalt/server/world/noise/PerlinSimplexNoise.hpp>
-#include <basalt/server/world/noise/SimplexNoise.hpp>
+#include <basalt/server/world/noise/Noise.hpp>
 #include <basalt/server/world/terrain/BiomeClimateData.hpp>
 #include <basalt/server/world/terrain/BiomeTemperature.hpp>
 
-#include <array>
 #include <cstdint>
+#include <memory>
 
 namespace basalt::server::world::terrain::biomeTemperature {
 namespace {
@@ -13,12 +12,11 @@ namespace {
 // Vanilla's own Overworld `sea_level`, hardcoded the same way in the surface rules.
 constexpr std::int32_t kSeaLevel = 63;
 
-/// The three fixed-seed noises are `Biome`'s own static fields, built straight off a legacy source:
-/// the worldgen wrapper degenerates to a passthrough over a bit-based inner source anyway.
+/// parity: `Biome`'s three fixed-seed static noises, simplex since 26.3.
 struct Noises {
-    noise::PerlinSimplexNoise temperature;
-    noise::PerlinSimplexNoise frozenTemperature;
-    noise::SimplexNoise biomeInfo;
+    std::unique_ptr<noise::SimplexNoise> temperature;
+    std::unique_ptr<noise::NoiseStack> frozenTemperature;
+    std::unique_ptr<noise::SimplexNoise> biomeInfo;
 };
 
 const Noises& noises() {
@@ -26,22 +24,23 @@ const Noises& noises() {
         random::RandomSource temperatureSource = random::RandomSource::legacy(1234LL);
         random::RandomSource frozenSource = random::RandomSource::legacy(3456LL);
         random::RandomSource infoSource = random::RandomSource::legacy(2345LL);
-        const std::array<std::int32_t, 1> temperatureOctaves = {0};
-        const std::array<std::int32_t, 3> frozenOctaves = {-2, -1, 0};
-        return Noises{noise::PerlinSimplexNoise{temperatureSource, temperatureOctaves},
-                      noise::PerlinSimplexNoise{frozenSource, frozenOctaves}, noise::SimplexNoise{infoSource}};
+        std::vector<noise::NoiseStack::Layer> frozen;
+        frozen.push_back({std::make_shared<const noise::SimplexNoise>(frozenSource, true), 1.0, 0.14285715F});
+        frozen.push_back({std::make_shared<const noise::SimplexNoise>(frozenSource, true), 0.5, 0.2857143F});
+        frozen.push_back({std::make_shared<const noise::SimplexNoise>(frozenSource, true), 0.25, 0.5714286F});
+        return Noises{std::make_unique<noise::SimplexNoise>(temperatureSource, true),
+                      std::make_unique<noise::NoiseStack>(std::move(frozen)),
+                      std::make_unique<noise::SimplexNoise>(infoSource, true)};
     }();
     return built;
 }
 
 // parity: Biome.TemperatureModifier.FROZEN.modifyTemperature.
 [[nodiscard]] float frozenModifiedTemperature(std::int32_t x, std::int32_t z, float baseTemperature) {
-    const double groundValueLargeVariation = noises().frozenTemperature.getValue(x * 0.05, z * 0.05) * 7.0;
-    const double groundValueEdgeVariation = noises().biomeInfo.getValue(x * 0.2, z * 0.2);
-    if (groundValueLargeVariation + groundValueEdgeVariation < 0.3) {
-        if (noises().biomeInfo.getValue(x * 0.09, z * 0.09) < 0.8) {
-            return 0.2F;
-        }
+    const auto large = static_cast<double>(noises().frozenTemperature->get(x * 0.05, z * 0.05) * 7.0F);
+    const auto edge = static_cast<double>(noises().biomeInfo->get(x * 0.2, z * 0.2));
+    if (large + edge < 0.3 && static_cast<double>(noises().biomeInfo->get(x * 0.09, z * 0.09)) < 0.8) {
+        return 0.2F;
     }
     return baseTemperature;
 }
@@ -53,8 +52,10 @@ const Noises& noises() {
     if (y <= snowLevel) {
         return adjusted;
     }
-    const double v = noises().temperature.getValue(x / 8.0, z / 8.0) * 8.0;
-    return adjusted - static_cast<float>((v + y - snowLevel) * 0.05 / 40.0);
+    const float v = noises().temperature->get(static_cast<double>(static_cast<float>(x) / 8.0F),
+                                              static_cast<double>(static_cast<float>(z) / 8.0F)) *
+                    8.0F;
+    return adjusted - (v + static_cast<float>(y) - static_cast<float>(snowLevel)) * 0.05F / 40.0F;
 }
 
 } // namespace

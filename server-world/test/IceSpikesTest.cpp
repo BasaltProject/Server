@@ -89,14 +89,14 @@ TEST_CASE("the ice spikes step matches the frozen kotlin") {
     SUBCASE("iceSpikes") {
         const auto [ice, checksum] = run("minecraft:ice_spikes");
         CHECK(ice == 26374);
-        CHECK(checksum == -7410410373691817821LL);
+        CHECK(checksum == -5722558532901948091LL);
     }
 
     SUBCASE("wrong") {
         // snowy_plains is not the ice-spikes biome, so this is the real rejection case.
         const auto [ice, checksum] = run("minecraft:snowy_plains");
         CHECK(ice == 0);
-        CHECK(checksum == 4559782898263620777LL);
+        CHECK(checksum == -5036690325832860503LL);
     }
 }
 

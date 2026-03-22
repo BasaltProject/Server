@@ -328,8 +328,9 @@ TEST_CASE("the structure template loads what the frozen kotlin loads") {
         states += std::to_string(block.pos.x) + std::to_string(block.pos.y) + std::to_string(block.pos.z) + ":" +
                   std::to_string(block.stateId);
     }
-    CHECK(states == "000:1,100:3924,200:5746,010:5714,110:6987,210:5342,001:21736,101:4000,201:21725,011:136,111:5362,"
-                    "211:3930,002:3970,102:5746,202:6987");
+    CHECK(states ==
+          "000:1,100:5480,200:7334,010:7302,110:8657,210:6898,001:25093,101:5556,201:25082,011:139,111:6918,211"
+          ":5486,002:5526,102:7334,202:8657");
 }
 
 TEST_CASE("the state transform matches the frozen kotlin") {
@@ -337,62 +338,62 @@ TEST_CASE("the state transform matches the frozen kotlin") {
 
     SUBCASE("NONE_NONE") {
         CHECK(transformRows(template_, StructureMirror::None, StructureRotation::None) ==
-              "1,3924,5746,5714,6987,5342,21736,4000,21725,136,5362,3930,3970,5746,6987");
+              "1,5480,7334,7302,8657,6898,25093,5556,25082,139,6918,5486,5526,7334,8657");
     }
 
     SUBCASE("NONE_CLOCKWISE_90") {
         CHECK(transformRows(template_, StructureMirror::None, StructureRotation::Clockwise90) ==
-              "1,3984,5740,5682,6972,5350,21736,3988,21725,138,5338,3950,3930,5740,6972");
+              "1,5540,7328,7270,8642,6906,25093,5544,25082,141,6894,5506,5486,7328,8642");
     }
 
     SUBCASE("NONE_CLOCKWISE_180") {
         CHECK(transformRows(template_, StructureMirror::None, StructureRotation::Clockwise180) ==
-              "1,3944,5742,5698,6976,5358,21736,4006,21725,136,5346,3910,3950,5742,6976");
+              "1,5500,7330,7286,8646,6914,25093,5562,25082,139,6902,5466,5506,7330,8646");
     }
 
     SUBCASE("NONE_COUNTERCLOCKWISE_90") {
         CHECK(transformRows(template_, StructureMirror::None, StructureRotation::Counterclockwise90) ==
-              "1,3964,5744,5666,6991,5366,21736,3994,21725,138,5354,3970,3910,5744,6991");
+              "1,5520,7332,7254,8661,6922,25093,5550,25082,141,6910,5526,5466,7332,8661");
     }
 
     SUBCASE("LEFT_RIGHT_NONE") {
         CHECK(transformRows(template_, StructureMirror::LeftRight, StructureRotation::None) ==
-              "1,3946,5740,5718,6991,5346,21736,4000,21725,136,5358,3912,3970,5740,6991");
+              "1,5502,7328,7306,8661,6902,25093,5556,25082,139,6914,5468,5526,7328,8661");
     }
 
     SUBCASE("LEFT_RIGHT_CLOCKWISE_90") {
         CHECK(transformRows(template_, StructureMirror::LeftRight, StructureRotation::Clockwise90) ==
-              "1,3966,5742,5686,6987,5354,21736,3988,21725,138,5366,3972,3930,5742,6987");
+              "1,5522,7330,7274,8657,6910,25093,5544,25082,141,6922,5528,5486,7330,8657");
     }
 
     SUBCASE("LEFT_RIGHT_CLOCKWISE_180") {
         CHECK(transformRows(template_, StructureMirror::LeftRight, StructureRotation::Clockwise180) ==
-              "1,3926,5744,5702,6972,5362,21736,4006,21725,136,5342,3932,3950,5744,6972");
+              "1,5482,7332,7290,8642,6918,25093,5562,25082,139,6898,5488,5506,7332,8642");
     }
 
     SUBCASE("LEFT_RIGHT_COUNTERCLOCKWISE_90") {
         CHECK(transformRows(template_, StructureMirror::LeftRight, StructureRotation::Counterclockwise90) ==
-              "1,3986,5746,5670,6976,5338,21736,3994,21725,138,5350,3952,3910,5746,6976");
+              "1,5542,7334,7258,8646,6894,25093,5550,25082,141,6906,5508,5466,7334,8646");
     }
 
     SUBCASE("FRONT_BACK_NONE") {
         CHECK(transformRows(template_, StructureMirror::FrontBack, StructureRotation::None) ==
-              "1,3924,5744,5702,6972,5362,21736,4006,21725,136,5342,3930,3950,5744,6972");
+              "1,5480,7332,7290,8642,6918,25093,5562,25082,139,6898,5486,5506,7332,8642");
     }
 
     SUBCASE("FRONT_BACK_CLOCKWISE_90") {
         CHECK(transformRows(template_, StructureMirror::FrontBack, StructureRotation::Clockwise90) ==
-              "1,3984,5746,5670,6976,5338,21736,3994,21725,138,5350,3950,3910,5746,6976");
+              "1,5540,7334,7258,8646,6894,25093,5550,25082,141,6906,5506,5466,7334,8646");
     }
 
     SUBCASE("FRONT_BACK_CLOCKWISE_180") {
         CHECK(transformRows(template_, StructureMirror::FrontBack, StructureRotation::Clockwise180) ==
-              "1,3944,5740,5718,6991,5346,21736,4000,21725,136,5358,3910,3970,5740,6991");
+              "1,5500,7328,7306,8661,6902,25093,5556,25082,139,6914,5466,5526,7328,8661");
     }
 
     SUBCASE("FRONT_BACK_COUNTERCLOCKWISE_90") {
         CHECK(transformRows(template_, StructureMirror::FrontBack, StructureRotation::Counterclockwise90) ==
-              "1,3964,5742,5686,6987,5354,21736,3988,21725,138,5366,3970,3930,5742,6987");
+              "1,5520,7330,7274,8657,6910,25093,5544,25082,141,6922,5526,5486,7330,8657");
     }
 }
 
@@ -441,7 +442,7 @@ TEST_CASE("the template placement matches the frozen kotlin") {
         CHECK(result.entities == 1);
         CHECK(result.blockEntities == 1);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -2376638906536224206LL);
+        CHECK(result.checksum == 7997708215003342062LL);
         CHECK(result.after == -1652463651);
     }
 
@@ -451,7 +452,7 @@ TEST_CASE("the template placement matches the frozen kotlin") {
         CHECK(result.entities == 1);
         CHECK(result.blockEntities == 1);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 6197703980662079374LL);
+        CHECK(result.checksum == -5452013864433454634LL);
         CHECK(result.after == -1652463651);
     }
 
@@ -461,7 +462,7 @@ TEST_CASE("the template placement matches the frozen kotlin") {
         CHECK(result.entities == 1);
         CHECK(result.blockEntities == 1);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 1268723188746526962LL);
+        CHECK(result.checksum == 1333519633193866014LL);
         CHECK(result.after == -1652463651);
     }
 
@@ -471,7 +472,7 @@ TEST_CASE("the template placement matches the frozen kotlin") {
         CHECK(result.entities == 1);
         CHECK(result.blockEntities == 1);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 942136177624797656LL);
+        CHECK(result.checksum == -712786337524166900LL);
         CHECK(result.after == -1652463651);
     }
 
@@ -481,7 +482,7 @@ TEST_CASE("the template placement matches the frozen kotlin") {
         CHECK(result.entities == 1);
         CHECK(result.blockEntities == 1);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 8127204561022132282LL);
+        CHECK(result.checksum == -502499918426698890LL);
         CHECK(result.after == -1652463651);
     }
 
@@ -491,7 +492,7 @@ TEST_CASE("the template placement matches the frozen kotlin") {
         CHECK(result.entities == 1);
         CHECK(result.blockEntities == 1);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 5491711354307149502LL);
+        CHECK(result.checksum == 6588805142623502190LL);
         CHECK(result.after == -1652463651);
     }
 
@@ -501,7 +502,7 @@ TEST_CASE("the template placement matches the frozen kotlin") {
         CHECK(result.entities == 1);
         CHECK(result.blockEntities == 1);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -555258899347265586LL);
+        CHECK(result.checksum == 4900943506505253174LL);
         CHECK(result.after == -1652463651);
     }
 
@@ -511,7 +512,7 @@ TEST_CASE("the template placement matches the frozen kotlin") {
         CHECK(result.entities == 1);
         CHECK(result.blockEntities == 1);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -1914167208539048344LL);
+        CHECK(result.checksum == 167431415336113236LL);
         CHECK(result.after == -1652463651);
     }
 
@@ -521,7 +522,7 @@ TEST_CASE("the template placement matches the frozen kotlin") {
         CHECK(result.entities == 1);
         CHECK(result.blockEntities == 1);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 3392911486023411394LL);
+        CHECK(result.checksum == -5094287750135331190LL);
         CHECK(result.after == -1652463651);
     }
 
@@ -531,7 +532,7 @@ TEST_CASE("the template placement matches the frozen kotlin") {
         CHECK(result.entities == 1);
         CHECK(result.blockEntities == 1);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -1966866960533234100LL);
+        CHECK(result.checksum == -5854677159728559996LL);
         CHECK(result.after == -1652463651);
     }
 
@@ -541,7 +542,7 @@ TEST_CASE("the template placement matches the frozen kotlin") {
         CHECK(result.entities == 1);
         CHECK(result.blockEntities == 1);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -4677523415639623810LL);
+        CHECK(result.checksum == 3005293928753410350LL);
         CHECK(result.after == -1652463651);
     }
 
@@ -551,7 +552,7 @@ TEST_CASE("the template placement matches the frozen kotlin") {
         CHECK(result.entities == 1);
         CHECK(result.blockEntities == 1);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -7017093043498937454LL);
+        CHECK(result.checksum == 4620678956180869458LL);
         CHECK(result.after == -1652463651);
     }
 }
@@ -574,7 +575,7 @@ TEST_CASE("the terrain-matching and wide-clip placements match the frozen kotlin
         CHECK(folded.placed == 14);
         CHECK(folded.blockEntities == 1);
         CHECK(chunk.takeGeneratedBlockWrites().size() == 0);
-        CHECK(folded.checksum == -317726988352533717LL);
+        CHECK(folded.checksum == 7960210524894379031LL);
         CHECK(random.nextInt() == 325476402);
     }
 
@@ -593,7 +594,7 @@ TEST_CASE("the terrain-matching and wide-clip placements match the frozen kotlin
         CHECK(folded.placed == 7);
         CHECK(folded.blockEntities == 1);
         CHECK(chunk.takeGeneratedBlockWrites().size() == 7);
-        CHECK(folded.checksum == -5345203059856577338LL);
+        CHECK(folded.checksum == -6761461911522555127LL);
         CHECK(random.nextInt() == -32861650);
     }
 }
@@ -609,7 +610,7 @@ TEST_CASE("the decoration placement matches the frozen kotlin") {
     CHECK(folded.placed == 4);
     CHECK(folded.blockEntities == 0);
     CHECK(chunk.takeGeneratedBlockWrites().size() == 10);
-    CHECK(folded.checksum == 6017695835961819702LL);
+    CHECK(folded.checksum == -4351221738467115728LL);
     CHECK(random.nextInt() == -1824420011);
 
     const StructureTemplate empty;

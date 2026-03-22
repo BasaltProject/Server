@@ -89,31 +89,31 @@ const std::vector<FeatureSpec>& specs() {
         constexpr Scan upSturdy{1, 12, Target::SturdyDown};
         constexpr Scan downSolid{-1, 12, Target::Solid};
         std::vector<FeatureSpec> specs;
-        specs.push_back({"lush_caves_ceiling_vegetation", 27, 125, 125, upSolid, -1,
+        specs.push_back({"lush_caves_ceiling_vegetation", 30, 125, 125, upSolid, -1,
                          [](Chunk& chunk, random::RandomSource& random, const DecorationPos& origin) {
                              static_cast<void>(lushVegetationPatchFeature::placeCeilingMoss(chunk, random, origin));
                          }});
-        specs.push_back({"cave_vines", 28, 188, 188, upSturdy, -1,
+        specs.push_back({"cave_vines", 31, 188, 188, upSturdy, -1,
                          [](Chunk& chunk, random::RandomSource& random, const DecorationPos& origin) {
                              static_cast<void>(caveVineColumnFeature::place(chunk, random, origin));
                          }});
-        specs.push_back({"lush_caves_clay", 29, 62, 62, downSolid, 1,
+        specs.push_back({"lush_caves_clay", 32, 62, 62, downSolid, 1,
                          [](Chunk& chunk, random::RandomSource& random, const DecorationPos& origin) {
                              static_cast<void>(lushVegetationPatchFeature::placeClay(chunk, random, origin));
                          }});
-        specs.push_back({"lush_caves_vegetation", 30, 125, 125, downSolid, 1,
+        specs.push_back({"lush_caves_vegetation", 33, 125, 125, downSolid, 1,
                          [](Chunk& chunk, random::RandomSource& random, const DecorationPos& origin) {
                              static_cast<void>(lushVegetationPatchFeature::placeFloorMoss(chunk, random, origin));
                          }});
-        specs.push_back({"rooted_azalea_tree", 31, 1, 2, upSolid, -1,
+        specs.push_back({"rooted_azalea_tree", 34, 1, 2, upSolid, -1,
                          [](Chunk& chunk, random::RandomSource& random, const DecorationPos& origin) {
                              static_cast<void>(rootedAzaleaFeature::place(chunk, random, origin));
                          }});
-        specs.push_back({"spore_blossom", 32, 25, 25, upSolid, -1,
+        specs.push_back({"spore_blossom", 35, 25, 25, upSolid, -1,
                          [](Chunk& chunk, random::RandomSource&, const DecorationPos& origin) {
                              placeSporeBlossom(chunk, origin);
                          }});
-        specs.push_back({"classic_vines_cave_feature", 33, 256, 256, std::nullopt, 0,
+        specs.push_back({"classic_vines_cave_feature", 36, 256, 256, std::nullopt, 0,
                          [](Chunk& chunk, random::RandomSource&, const DecorationPos& origin) {
                              vinePatchDecoration::placeCaveAt(chunk, origin);
                          }});
