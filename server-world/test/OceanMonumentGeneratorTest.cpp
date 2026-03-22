@@ -95,17 +95,17 @@ TEST_CASE("the ocean monuments stand where the frozen kotlin puts them") {
     SUBCASE("deepOcean") {
         check(run(4711, 144,
                   [](std::int32_t, std::int32_t, std::int32_t) { return std::string{"minecraft:deep_ocean"}; }),
-              14350, 3, 16, 1448401856749821290LL);
+              14343, 3, 16, 2780290763281437519LL);
     }
 
     SUBCASE("ocean") {
         check(run(4711, 144, [](std::int32_t, std::int32_t, std::int32_t) { return std::string{"minecraft:ocean"}; }),
-              0, 0, 0, 1153227349664774837LL);
+              0, 0, 0, -2536920516572624203LL);
     }
 
     SUBCASE("plains") {
         check(run(4711, 144, [](std::int32_t, std::int32_t, std::int32_t) { return std::string{"minecraft:plains"}; }),
-              0, 0, 0, 1153227349664774837LL);
+              0, 0, 0, -2536920516572624203LL);
     }
 
     SUBCASE("layered") {
@@ -114,7 +114,7 @@ TEST_CASE("the ocean monuments stand where the frozen kotlin puts them") {
                   [](std::int32_t, std::int32_t quartY, std::int32_t) {
                       return std::string{quartY == 8 ? "minecraft:deep_ocean" : "minecraft:ocean"};
                   }),
-              14350, 3, 16, 1448401856749821290LL);
+              14343, 3, 16, 2780290763281437519LL);
     }
 
     SUBCASE("smallPocket") {
@@ -126,11 +126,11 @@ TEST_CASE("the ocean monuments stand where the frozen kotlin puts them") {
                   [pocketX](std::int32_t quartX, std::int32_t, std::int32_t) {
                       return std::string{std::abs(quartX - pocketX) > 6 ? "minecraft:plains" : "minecraft:deep_ocean"};
                   }),
-              0, 0, 0, 1153227349664774837LL);
+              0, 0, 0, -2536920516572624203LL);
     }
 
     SUBCASE("otherSeed") {
         check(run(8, 144, [](std::int32_t, std::int32_t, std::int32_t) { return std::string{"minecraft:deep_ocean"}; }),
-              14464, 3, 16, -2931064608776548685LL);
+              14447, 3, 16, -8483591205737940600LL);
     }
 }

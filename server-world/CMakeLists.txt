@@ -154,6 +154,8 @@ basalt_module(server-world
     src/terrain/decoration/tree/TreeFeature.cpp
     src/terrain/decoration/tree/TreeFeatureDecorators.cpp
     src/terrain/decoration/tree/TreeFoliagePlacers.cpp
+    src/terrain/decoration/tree/TreePoplarFoliage.cpp
+    src/terrain/decoration/tree/TreeShelfMushroom.cpp
     src/terrain/decoration/tree/TreeHelpers.cpp
     src/terrain/decoration/tree/TreeTrunkPlacers.cpp
     src/terrain/decoration/VillageFeatures.cpp

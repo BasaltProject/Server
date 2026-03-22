@@ -132,11 +132,16 @@ struct Beehive {
     friend bool operator==(const Beehive&, const Beehive&) = default;
 };
 
+struct ShelfMushroom {
+    float probability = 0.0F;
+    friend bool operator==(const ShelfMushroom&, const ShelfMushroom&) = default;
+};
+
 } // namespace decorator
 
 using TreeDecoratorConfiguration =
     std::variant<decorator::AlterGroundToPodzol, decorator::TrunkVines, decorator::LeafVines, decorator::Cocoa,
                  decorator::PaleMoss, decorator::CreakingHeart, decorator::MangrovePropagules,
-                 decorator::GroundLeafLitter, decorator::Beehive>;
+                 decorator::GroundLeafLitter, decorator::Beehive, decorator::ShelfMushroom>;
 
 } // namespace basalt::server::world::terrain::decoration::tree

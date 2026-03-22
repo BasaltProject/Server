@@ -116,7 +116,7 @@ TEST_CASE("the standalone features build what the frozen kotlin builds") {
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
         CHECK(result.ticks == 20);
-        CHECK(result.checksum == 6716135181350909685LL);
+        CHECK(result.checksum == 3929345668090437521LL);
         CHECK(result.after == 1499221538);
     }
 
@@ -126,7 +126,7 @@ TEST_CASE("the standalone features build what the frozen kotlin builds") {
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
         CHECK(result.ticks == 20);
-        CHECK(result.checksum == 6716135181350909685LL);
+        CHECK(result.checksum == 3929345668090437521LL);
         CHECK(result.after == 1499221538);
     }
 
@@ -136,7 +136,7 @@ TEST_CASE("the standalone features build what the frozen kotlin builds") {
         CHECK(result.deferred == 0);
         CHECK(result.entities == 49);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == 6244967410082277792LL);
+        CHECK(result.checksum == 4190682151890380339LL);
         CHECK(result.after == -1789018993);
     }
 
@@ -146,7 +146,7 @@ TEST_CASE("the standalone features build what the frozen kotlin builds") {
         CHECK(result.deferred == 0);
         CHECK(result.entities == 49);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == 6244967410082277792LL);
+        CHECK(result.checksum == 4190682151890380339LL);
         CHECK(result.after == -1789018993);
     }
 
@@ -156,7 +156,7 @@ TEST_CASE("the standalone features build what the frozen kotlin builds") {
         CHECK(result.deferred == 2110);
         CHECK(result.entities == 44);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == -2625562516512525695LL);
+        CHECK(result.checksum == 5839015287887625651LL);
         CHECK(result.after == -1789018993);
     }
 
@@ -166,7 +166,7 @@ TEST_CASE("the standalone features build what the frozen kotlin builds") {
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == 8186997229022751541LL);
+        CHECK(result.checksum == 6517130658125559301LL);
         CHECK(result.after == 1499221538);
     }
 
@@ -186,7 +186,7 @@ TEST_CASE("the standalone features build what the frozen kotlin builds") {
         CHECK(result.deferred == 0);
         CHECK(result.entities == 20);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == -7169104649194670623LL);
+        CHECK(result.checksum == -8336111761803083723LL);
         CHECK(result.after == 1499221538);
     }
 
@@ -196,7 +196,7 @@ TEST_CASE("the standalone features build what the frozen kotlin builds") {
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == -3260000313910670810LL);
+        CHECK(result.checksum == 8942560480783088631LL);
         CHECK(result.after == 379264702);
     }
 
@@ -206,7 +206,7 @@ TEST_CASE("the standalone features build what the frozen kotlin builds") {
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == -3260000313910670810LL);
+        CHECK(result.checksum == 8942560480783088631LL);
         CHECK(result.after == 379264702);
     }
 
@@ -216,7 +216,7 @@ TEST_CASE("the standalone features build what the frozen kotlin builds") {
         CHECK(result.deferred == 2287);
         CHECK(result.entities == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == -2730246052395800981LL);
+        CHECK(result.checksum == 8294694137213519905LL);
         CHECK(result.after == 379264702);
     }
 
@@ -226,7 +226,7 @@ TEST_CASE("the standalone features build what the frozen kotlin builds") {
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == -8287974544193943863LL);
+        CHECK(result.checksum == -6481083117200579711LL);
         CHECK(result.after == 1932267493);
     }
 
@@ -236,7 +236,7 @@ TEST_CASE("the standalone features build what the frozen kotlin builds") {
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == 3247040537533737077LL);
+        CHECK(result.checksum == -3128237738855663899LL);
         CHECK(result.after == 1499221538);
     }
 
@@ -246,7 +246,7 @@ TEST_CASE("the standalone features build what the frozen kotlin builds") {
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == -9036528739786843003LL);
+        CHECK(result.checksum == 8383373646943023311LL);
         CHECK(result.after == 1105996800);
     }
 
@@ -256,7 +256,7 @@ TEST_CASE("the standalone features build what the frozen kotlin builds") {
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == -7522590554827546754LL);
+        CHECK(result.checksum == 8213731732589708374LL);
         CHECK(result.after == -479895210);
     }
 
@@ -266,7 +266,7 @@ TEST_CASE("the standalone features build what the frozen kotlin builds") {
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == -6276291529507889507LL);
+        CHECK(result.checksum == -7169144533839071743LL);
         CHECK(result.after == 525147351);
     }
 
@@ -286,7 +286,7 @@ TEST_CASE("the standalone features build what the frozen kotlin builds") {
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
         CHECK(result.ticks == 0);
-        CHECK(result.checksum == -8392339967193549722LL);
+        CHECK(result.checksum == -4414565510043499753LL);
         CHECK(result.after == 379264702);
     }
 

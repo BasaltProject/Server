@@ -82,9 +82,9 @@ TEST_CASE("the berry and pumpkin patches place what the frozen kotlin places") {
             run("minecraft:taiga", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 berryPatchDecoration::decorate(chunk, 606060LL, environment);
             });
-        CHECK(placed == 278);
+        CHECK(placed == 286);
         CHECK(deferred == 0);
-        CHECK(checksum == -473324326971594819LL);
+        CHECK(checksum == 1595313400299590923LL);
     }
 
     SUBCASE("berrySnowy") {
@@ -92,9 +92,9 @@ TEST_CASE("the berry and pumpkin patches place what the frozen kotlin places") {
             run("minecraft:snowy_taiga", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 berryPatchDecoration::decorate(chunk, 606060LL, environment);
             });
-        CHECK(placed == 14);
+        CHECK(placed == 15);
         CHECK(deferred == 0);
-        CHECK(checksum == -1503199922215968675LL);
+        CHECK(checksum == 277777433545550954LL);
     }
 
     SUBCASE("berryWrong") {
@@ -112,9 +112,9 @@ TEST_CASE("the berry and pumpkin patches place what the frozen kotlin places") {
             run("minecraft:taiga", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 berryPatchDecoration::decorateFeature(chunk, 606060LL, environment, "patch_berry_common");
             });
-        CHECK(placed == 278);
+        CHECK(placed == 286);
         CHECK(deferred == 0);
-        CHECK(checksum == -473324326971594819LL);
+        CHECK(checksum == 1595313400299590923LL);
     }
 
     SUBCASE("pumpkin") {
@@ -122,9 +122,9 @@ TEST_CASE("the berry and pumpkin patches place what the frozen kotlin places") {
             run("minecraft:plains", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 pumpkinPatchDecoration::decorate(chunk, 606060LL, environment);
             });
-        CHECK(placed == 25);
+        CHECK(placed == 32);
         CHECK(deferred == 0);
-        CHECK(checksum == -7426862055943998727LL);
+        CHECK(checksum == -8621475177511468943LL);
     }
 
     SUBCASE("pumpkinWrong") {
@@ -151,9 +151,9 @@ TEST_CASE("the berry and pumpkin patches place what the frozen kotlin places") {
                         return y == 70 ? stateIdOf("grass_block") : registry::blocks::air().stateId;
                     });
             });
-        CHECK(placed == 278);
-        CHECK(deferred == 113);
-        CHECK(checksum == -473324326971594819LL);
+        CHECK(placed == 286);
+        CHECK(deferred == 183);
+        CHECK(checksum == 1595313400299590923LL);
     }
 }
 
@@ -164,6 +164,6 @@ TEST_CASE("one berry and one pumpkin patch at an origin match the frozen kotlin"
     berryPatchDecoration::placeAt(chunk, random, DecorationPos{8, 71, 8});
     pumpkinPatchDecoration::placeAt(chunk, random, DecorationPos{4, 71, 12});
     CHECK(fold(chunk).second == 43);
-    CHECK(fold(chunk).first == -2583229570941417999LL);
+    CHECK(fold(chunk).first == 5653292879061538051LL);
     CHECK(random.nextInt() == -335304423);
 }

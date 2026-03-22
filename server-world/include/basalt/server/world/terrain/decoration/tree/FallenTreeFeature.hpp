@@ -5,6 +5,7 @@
 #include <basalt/server/world/terrain/decoration/IntProvider.hpp>
 
 #include <cstdint>
+#include <optional>
 
 namespace basalt::server::world::terrain::decoration::tree {
 
@@ -13,6 +14,10 @@ struct FallenTreeConfiguration {
     std::int32_t logStateId = 0;
     IntProvider logLength;
     bool stumpVines = false;
+    /// The attached mushroom is always brown, which draws nothing for its kind.
+    bool brownMushroomsOnly = false;
+    /// parity: a `shelf_mushroom` log decorator after the attached mushrooms.
+    std::optional<float> shelfMushroom;
 };
 
 /// The vanilla fallen-tree configurations the Overworld biome selectors use.
@@ -23,6 +28,7 @@ namespace fallenTreeConfigs {
 [[nodiscard]] const FallenTreeConfiguration& superBirch();
 [[nodiscard]] const FallenTreeConfiguration& spruce();
 [[nodiscard]] const FallenTreeConfiguration& jungle();
+[[nodiscard]] const FallenTreeConfiguration& poplar();
 
 } // namespace fallenTreeConfigs
 

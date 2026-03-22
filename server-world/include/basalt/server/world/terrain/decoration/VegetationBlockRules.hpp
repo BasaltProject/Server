@@ -10,6 +10,9 @@ namespace basalt::server::world::terrain::decoration {
 namespace vegetationBlockRules {
 
 /// Whether `generatedStateId` still stands on `belowStateId`. True for anything that is not a plant.
+/// parity: `BushBlock.mayPlaceOn`: the `minecraft:dirt` tag plus farmland.
+[[nodiscard]] bool bushMayPlaceOn(std::int32_t belowStateId);
+
 [[nodiscard]] bool survivesDeferred(std::int32_t generatedStateId, std::int32_t belowStateId);
 
 } // namespace vegetationBlockRules

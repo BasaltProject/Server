@@ -59,10 +59,10 @@ void check(const Chunk& chunk, std::int32_t solid, std::int64_t checksum, std::i
 } // namespace
 
 TEST_CASE("the flat preset lays the stack the frozen kotlin lays") {
-    SUBCASE("origin") { check(flatWorld::generate(0, 0), 1024, 6668202437748408485LL, -1473201475880939227LL); }
-    SUBCASE("far") { check(flatWorld::generate(-13, 7), 1024, 6668202437748408485LL, -1473201475880939227LL); }
+    SUBCASE("origin") { check(flatWorld::generate(0, 0), 1024, 3741048005682530213LL, -1473201475880939227LL); }
+    SUBCASE("far") { check(flatWorld::generate(-13, 7), 1024, 3741048005682530213LL, -1473201475880939227LL); }
     SUBCASE("nether") {
-        check(flatWorld::generate(0, 0, kNetherHeight), 1024, 1863440733611808933LL, 7258231024539104037LL);
+        check(flatWorld::generate(0, 0, kNetherHeight), 1024, 2496904668097573925LL, 7258231024539104037LL);
     }
 }
 

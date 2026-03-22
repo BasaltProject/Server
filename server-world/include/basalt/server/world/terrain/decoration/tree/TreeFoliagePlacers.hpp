@@ -67,6 +67,10 @@ public:
                                               float wideBottomLayerHoleChance, float cornerHoleChance,
                                               float hangingLeavesChance, float hangingLeavesExtensionChance);
 
+    /// parity: `PoplarFoliagePlacer`, a tall rhombus crown with holes in its sides and a log core.
+    [[nodiscard]] static FoliagePlacer poplar(IntProvider radius, IntProvider offset, IntProvider height,
+                                              float sideHoleChance);
+
     [[nodiscard]] std::int32_t foliageRadius(random::RandomSource& random, std::int32_t trunkHeight) const;
 
     [[nodiscard]] std::int32_t foliageHeight(random::RandomSource& random, std::int32_t treeHeight) const;
@@ -75,7 +79,7 @@ public:
 
     void createFoliage(Chunk& chunk, random::RandomSource& random, std::int32_t foliageStateId,
                        const FoliageAttachment& attachment, std::int32_t foliageHeight, std::int32_t leafRadius,
-                       std::int32_t offset, FoliagePositions& foliagePositions) const;
+                       std::int32_t offset, FoliagePositions& foliagePositions, std::int32_t trunkStateId = 0) const;
 
 private:
     enum class Kind : std::uint8_t {
@@ -91,6 +95,7 @@ private:
         RandomSpread,
         WeightedRandomSpread,
         Cherry,
+        Poplar,
     };
 
     [[nodiscard]] bool shouldSkipLocation(random::RandomSource& random, std::int32_t dx, std::int32_t y,
@@ -111,6 +116,10 @@ private:
                                               float hangingLeavesChance, float hangingLeavesExtensionChance,
                                               FoliagePositions& foliagePositions) const;
 
+    void createPoplarFoliage(Chunk& chunk, random::RandomSource& random, std::int32_t foliageStateId,
+                             std::int32_t trunkStateId, const FoliageAttachment& attachment, std::int32_t foliageHeight,
+                             std::int32_t leafRadius, std::int32_t offset, FoliagePositions& foliagePositions) const;
+
     bool tryPlaceExtension(Chunk& chunk, random::RandomSource& random, std::int32_t foliageStateId, float chance,
                            std::int32_t logX, std::int32_t logY, std::int32_t logZ, std::int32_t x, std::int32_t y,
                            std::int32_t z, FoliagePositions& foliagePositions) const;
@@ -126,6 +135,7 @@ private:
     float cornerHoleChance_ = 0.0F;
     float hangingLeavesChance_ = 0.0F;
     float hangingLeavesExtensionChance_ = 0.0F;
+    float sideHoleChance_ = 0.0F;
     std::shared_ptr<const std::vector<std::pair<std::int32_t, std::int32_t>>> weightedStates_;
     std::int32_t totalWeight_ = 0;
 };

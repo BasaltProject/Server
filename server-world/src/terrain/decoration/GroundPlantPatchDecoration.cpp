@@ -2,6 +2,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/GroundPlantPatchDecoration.hpp>
+#include <basalt/server/world/terrain/decoration/VegetationBlockRules.hpp>
 
 #include <algorithm>
 #include <cstdint>
@@ -67,11 +68,14 @@ const std::set<std::string, std::less<>>& supportsDryVegetation() {
     return paths;
 }
 
-enum class Provider : std::uint8_t { DeadBush, DryGrass };
+enum class Provider : std::uint8_t { DeadBush, DryGrass, RedShrub };
 
 [[nodiscard]] std::int32_t providerState(Provider provider, random::RandomSource& random) {
     if (provider == Provider::DeadBush) {
         return stateIdOf("dead_bush");
+    }
+    if (provider == Provider::RedShrub) {
+        return stateIdOf("red_shrub");
     }
     return random.nextInt(2) == 0 ? stateIdOf("short_dry_grass") : stateIdOf("tall_dry_grass");
 }
@@ -90,6 +94,8 @@ struct PatchSpec {
 
 const std::vector<PatchSpec>& specs() {
     static const std::vector<PatchSpec> built = {
+        // parity: `patch_red_shrub`, the dappled forest's bush, on `WORLD_SURFACE_WG` with no rarity.
+        {"patch_red_shrub", 7, 1, 8, {"dappled_forest"}, Provider::RedShrub},
         {"patch_dead_bush",
          65,
          1,
@@ -130,8 +136,12 @@ void placeCandidate(PatchRegion& region, random::RandomSource& random, const Dec
     if (target.y == bounds.minY()) {
         return;
     }
-    const std::string belowPath = pathOf(region.get(DecorationPos{target.x, target.y - 1, target.z}));
-    if (supportsDryVegetation().find(belowPath) == supportsDryVegetation().end()) {
+    const std::int32_t below = region.get(DecorationPos{target.x, target.y - 1, target.z});
+    if (spec.provider == Provider::RedShrub) {
+        if (!vegetationBlockRules::bushMayPlaceOn(below)) {
+            return;
+        }
+    } else if (supportsDryVegetation().find(pathOf(below)) == supportsDryVegetation().end()) {
         return;
     }
     region.set(target, stateId);

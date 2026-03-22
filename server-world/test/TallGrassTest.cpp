@@ -86,11 +86,11 @@ TEST_CASE("the tall grass patches place what the frozen kotlin places") {
             run("minecraft:savanna", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 tallGrassDecoration::decorate(chunk, 24680LL, environment);
             });
-        CHECK(lower == 208);
+        CHECK(lower == 190);
         // Both halves always land together, so this pins the upper write as well as the lower.
-        CHECK(halves == 416);
+        CHECK(halves == 380);
         CHECK(deferred == 0);
-        CHECK(checksum == -2263746228825530651LL);
+        CHECK(checksum == -2189456718603499799LL);
     }
 
     SUBCASE("plains") {
@@ -98,11 +98,11 @@ TEST_CASE("the tall grass patches place what the frozen kotlin places") {
             run("minecraft:plains", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 tallGrassDecoration::decorate(chunk, 24680LL, environment);
             });
-        CHECK(lower == 248);
+        CHECK(lower == 215);
         // Both halves always land together, so this pins the upper write as well as the lower.
-        CHECK(halves == 496);
+        CHECK(halves == 430);
         CHECK(deferred == 0);
-        CHECK(checksum == -7333393768800364769LL);
+        CHECK(checksum == -5110387324682303692LL);
     }
 
     SUBCASE("meadow") {
@@ -110,11 +110,11 @@ TEST_CASE("the tall grass patches place what the frozen kotlin places") {
             run("minecraft:meadow", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 tallGrassDecoration::decorate(chunk, 24680LL, environment);
             });
-        CHECK(lower == 248);
+        CHECK(lower == 215);
         // Both halves always land together, so this pins the upper write as well as the lower.
-        CHECK(halves == 496);
+        CHECK(halves == 430);
         CHECK(deferred == 0);
-        CHECK(checksum == -7333393768800364769LL);
+        CHECK(checksum == -5110387324682303692LL);
     }
 
     SUBCASE("wrong") {
@@ -135,11 +135,11 @@ TEST_CASE("the tall grass patches place what the frozen kotlin places") {
             run("minecraft:savanna", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 tallGrassDecoration::decorateFeature(11, chunk, 24680LL, environment);
             });
-        CHECK(lower == 208);
+        CHECK(lower == 190);
         // Both halves always land together, so this pins the upper write as well as the lower.
-        CHECK(halves == 416);
+        CHECK(halves == 380);
         CHECK(deferred == 0);
-        CHECK(checksum == -2263746228825530651LL);
+        CHECK(checksum == -2189456718603499799LL);
     }
 
     SUBCASE("plainOnly") {
@@ -147,11 +147,11 @@ TEST_CASE("the tall grass patches place what the frozen kotlin places") {
             run("minecraft:plains", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 tallGrassDecoration::decorateFeature(29, chunk, 24680LL, environment);
             });
-        CHECK(lower == 248);
+        CHECK(lower == 215);
         // Both halves always land together, so this pins the upper write as well as the lower.
-        CHECK(halves == 496);
+        CHECK(halves == 430);
         CHECK(deferred == 0);
-        CHECK(checksum == -7333393768800364769LL);
+        CHECK(checksum == -5110387324682303692LL);
     }
 
     SUBCASE("regional") {
@@ -166,11 +166,11 @@ TEST_CASE("the tall grass patches place what the frozen kotlin places") {
                         return y == 70 ? stateIdOf("grass_block") : registry::blocks::air().stateId;
                     });
             });
-        CHECK(lower == 248);
+        CHECK(lower == 215);
         // Both halves always land together, so this pins the upper write as well as the lower.
-        CHECK(halves == 496);
-        CHECK(deferred == 418);
-        CHECK(checksum == -7333393768800364769LL);
+        CHECK(halves == 430);
+        CHECK(deferred == 320);
+        CHECK(checksum == -5110387324682303692LL);
     }
 }
 
@@ -182,6 +182,6 @@ TEST_CASE("one tall grass patch at an origin matches the frozen kotlin") {
     const auto [checksum, lower, halves] = fold(chunk);
     CHECK(lower == 17);
     CHECK(halves == 34);
-    CHECK(checksum == 5434951072032937418LL);
+    CHECK(checksum == -8649927065220509924LL);
     CHECK(random.nextInt() == 2076158532);
 }

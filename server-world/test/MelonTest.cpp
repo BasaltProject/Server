@@ -85,9 +85,9 @@ TEST_CASE("the melon patches place what the frozen kotlin places") {
             run("minecraft:jungle", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 melonPatchDecoration::decorate(chunk, 246810LL, environment);
             });
-        CHECK(melons == 386);
+        CHECK(melons == 332);
         CHECK(deferred == 0);
-        CHECK(checksum == 6943304616990820744LL);
+        CHECK(checksum == -6031046619696617292LL);
     }
 
     SUBCASE("bambooJungle") {
@@ -95,9 +95,9 @@ TEST_CASE("the melon patches place what the frozen kotlin places") {
             run("minecraft:bamboo_jungle", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 melonPatchDecoration::decorate(chunk, 246810LL, environment);
             });
-        CHECK(melons == 386);
+        CHECK(melons == 332);
         CHECK(deferred == 0);
-        CHECK(checksum == 6943304616990820744LL);
+        CHECK(checksum == -6031046619696617292LL);
     }
 
     SUBCASE("sparseJungle") {
@@ -105,9 +105,9 @@ TEST_CASE("the melon patches place what the frozen kotlin places") {
             run("minecraft:sparse_jungle", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 melonPatchDecoration::decorate(chunk, 246810LL, environment);
             });
-        CHECK(melons == 59);
+        CHECK(melons == 34);
         CHECK(deferred == 0);
-        CHECK(checksum == -440752667340172660LL);
+        CHECK(checksum == 4039171990329643798LL);
     }
 
     SUBCASE("wrong") {
@@ -118,7 +118,7 @@ TEST_CASE("the melon patches place what the frozen kotlin places") {
             });
         CHECK(melons == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == -6307630758989541683LL);
+        CHECK(checksum == -229857951973823027LL);
     }
 
     SUBCASE("sparseOnly") {
@@ -126,9 +126,9 @@ TEST_CASE("the melon patches place what the frozen kotlin places") {
             run("minecraft:sparse_jungle", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 melonPatchDecoration::decorateFeature(chunk, 246810LL, environment, "patch_melon_sparse");
             });
-        CHECK(melons == 59);
+        CHECK(melons == 34);
         CHECK(deferred == 0);
-        CHECK(checksum == -440752667340172660LL);
+        CHECK(checksum == 4039171990329643798LL);
     }
 
     SUBCASE("regional") {
@@ -143,9 +143,9 @@ TEST_CASE("the melon patches place what the frozen kotlin places") {
                         return y == 70 ? stateIdOf("grass_block") : registry::blocks::air().stateId;
                     });
             });
-        CHECK(melons == 386);
-        CHECK(deferred == 158);
-        CHECK(checksum == 6943304616990820744LL);
+        CHECK(melons == 332);
+        CHECK(deferred == 154);
+        CHECK(checksum == -6031046619696617292LL);
     }
 }
 
@@ -155,6 +155,6 @@ TEST_CASE("one melon patch at an origin matches the frozen kotlin") {
         basalt::server::random::RandomSource::worldgen(basalt::server::random::RandomSource::legacy(112233LL));
     melonPatchDecoration::placeAt(chunk, random, DecorationPos{8, 71, 8});
     CHECK(fold(chunk).second == 21);
-    CHECK(fold(chunk).first == -5271673066369817519LL);
+    CHECK(fold(chunk).first == -5757573715943776637LL);
     CHECK(random.nextInt() == 1397497237);
 }

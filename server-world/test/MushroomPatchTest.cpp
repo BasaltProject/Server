@@ -91,10 +91,10 @@ TEST_CASE("the mushroom patches place what the jar places") {
             run("minecraft:swamp", 150, [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 mushroomPatchDecoration::decorate(chunk, 424242LL, environment);
             });
-        CHECK(brown == 663);
-        CHECK(red == 11);
+        CHECK(brown == 622);
+        CHECK(red == 7);
         CHECK(deferred == 0);
-        CHECK(checksum == -790048524506497864LL);
+        CHECK(checksum == 8536429973942298870LL);
     }
 
     SUBCASE("oldGrowth") {
@@ -103,10 +103,10 @@ TEST_CASE("the mushroom patches place what the jar places") {
                 [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                     mushroomPatchDecoration::decorate(chunk, 424242LL, environment);
                 });
-        CHECK(brown == 275);
-        CHECK(red == 0);
+        CHECK(brown == 292);
+        CHECK(red == 1);
         CHECK(deferred == 0);
-        CHECK(checksum == 1336003834488943819LL);
+        CHECK(checksum == -8591702080079807144LL);
     }
 
     SUBCASE("taiga") {
@@ -114,10 +114,10 @@ TEST_CASE("the mushroom patches place what the jar places") {
             run("minecraft:taiga", 150, [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 mushroomPatchDecoration::decorate(chunk, 424242LL, environment);
             });
-        CHECK(brown == 67);
+        CHECK(brown == 51);
         CHECK(red == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == 2400042228410082891LL);
+        CHECK(checksum == 170482085313054079LL);
     }
 
     SUBCASE("normal") {
@@ -125,10 +125,10 @@ TEST_CASE("the mushroom patches place what the jar places") {
             run("minecraft:plains", 900, [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 mushroomPatchDecoration::decorate(chunk, 424242LL, environment);
             });
-        CHECK(brown == 8);
-        CHECK(red == 3);
+        CHECK(brown == 12);
+        CHECK(red == 7);
         CHECK(deferred == 0);
-        CHECK(checksum == -3990430930611285808LL);
+        CHECK(checksum == -86993517517332212LL);
     }
 
     SUBCASE("wrong") {
@@ -140,7 +140,7 @@ TEST_CASE("the mushroom patches place what the jar places") {
         CHECK(brown == 0);
         CHECK(red == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == -281519154226748975LL);
+        CHECK(checksum == -4437661020022824495LL);
     }
 
     SUBCASE("before") {
@@ -148,10 +148,10 @@ TEST_CASE("the mushroom patches place what the jar places") {
             run("minecraft:swamp", 150, [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 mushroomPatchDecoration::decorateBeforeMushroomIsland(chunk, 424242LL, environment);
             });
-        CHECK(brown == 663);
-        CHECK(red == 11);
+        CHECK(brown == 622);
+        CHECK(red == 7);
         CHECK(deferred == 0);
-        CHECK(checksum == -790048524506497864LL);
+        CHECK(checksum == 8536429973942298870LL);
     }
 
     SUBCASE("after") {
@@ -159,10 +159,10 @@ TEST_CASE("the mushroom patches place what the jar places") {
             run("minecraft:taiga", 150, [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 mushroomPatchDecoration::decorateAfterMushroomIsland(chunk, 424242LL, environment);
             });
-        CHECK(brown == 67);
+        CHECK(brown == 51);
         CHECK(red == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == 2400042228410082891LL);
+        CHECK(checksum == 170482085313054079LL);
     }
 
     SUBCASE("swampBrownOnly") {
@@ -170,10 +170,10 @@ TEST_CASE("the mushroom patches place what the jar places") {
             run("minecraft:swamp", 150, [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 mushroomPatchDecoration::decorateFeature(chunk, 424242LL, environment, "brown_mushroom_swamp");
             });
-        CHECK(brown == 663);
+        CHECK(brown == 622);
         CHECK(red == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == -2242762940316692021LL);
+        CHECK(checksum == -6091655024332005765LL);
     }
 
     SUBCASE("regional") {
@@ -186,10 +186,10 @@ TEST_CASE("the mushroom patches place what the jar places") {
                                                                : registry::blocks::air().stateId;
                     });
             });
-        CHECK(brown == 936);
-        CHECK(red == 15);
-        CHECK(deferred == 550);
-        CHECK(checksum == 4089898643565213680LL);
+        CHECK(brown == 926);
+        CHECK(red == 12);
+        CHECK(deferred == 527);
+        CHECK(checksum == 7146033248127331675LL);
     }
 }
 
@@ -202,7 +202,7 @@ TEST_CASE("one mushroom patch at an origin places what the jar places") {
     const auto [checksum, brown, red] = fold(chunk);
     CHECK(brown == 0);
     CHECK(red == 15);
-    CHECK(checksum == 6697572261024380394LL);
+    CHECK(checksum == -5990654178466071794LL);
     CHECK(random.nextInt() == -289515299);
 }
 
@@ -214,6 +214,7 @@ TEST_CASE("the placed feature names match the frozen kotlin") {
         }
         rendered.append(id);
     }
-    CHECK(rendered == "brown_mushroom_normal,brown_mushroom_old_growth,brown_mushroom_swamp,brown_mushroom_taiga,red_"
+    CHECK(rendered == "brown_mushroom_dappled_forest,brown_mushroom_normal,brown_mushroom_old_growth,brown_mushroom_"
+                      "swamp,brown_mushroom_taiga,red_"
                       "mushroom_normal,red_mushroom_old_growth,red_mushroom_swamp,red_mushroom_taiga");
 }

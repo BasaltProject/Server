@@ -78,9 +78,9 @@ TEST_CASE("the cactus patches place what the frozen kotlin places") {
             run("minecraft:desert", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 cactusPatchDecoration::decorate(chunk, 5150LL, environment);
             });
-        CHECK(cacti == 8);
+        CHECK(cacti == 20);
         CHECK(deferred == 0);
-        CHECK(checksum == 6481009014018184843LL);
+        CHECK(checksum == 702193098032964839LL);
     }
 
     SUBCASE("badlands") {
@@ -88,9 +88,9 @@ TEST_CASE("the cactus patches place what the frozen kotlin places") {
             run("minecraft:badlands", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 cactusPatchDecoration::decorate(chunk, 5150LL, environment);
             });
-        CHECK(cacti == 15);
+        CHECK(cacti == 10);
         CHECK(deferred == 0);
-        CHECK(checksum == 6321404518005265302LL);
+        CHECK(checksum == -5396689020828939919LL);
     }
 
     SUBCASE("wrongBiome") {
@@ -100,7 +100,7 @@ TEST_CASE("the cactus patches place what the frozen kotlin places") {
             });
         CHECK(cacti == 0);
         CHECK(deferred == 0);
-        CHECK(checksum == 652661689345430365LL);
+        CHECK(checksum == 8735732305145918813LL);
     }
 
     SUBCASE("desertOnly") {
@@ -108,9 +108,9 @@ TEST_CASE("the cactus patches place what the frozen kotlin places") {
             run("minecraft:desert", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 cactusPatchDecoration::decorateFeature(chunk, 5150LL, environment, "patch_cactus_desert");
             });
-        CHECK(cacti == 8);
+        CHECK(cacti == 20);
         CHECK(deferred == 0);
-        CHECK(checksum == 6481009014018184843LL);
+        CHECK(checksum == 702193098032964839LL);
     }
 
     SUBCASE("regional") {
@@ -125,9 +125,9 @@ TEST_CASE("the cactus patches place what the frozen kotlin places") {
                         return y == 70 ? stateIdOf("sand") : registry::blocks::air().stateId;
                     });
             });
-        CHECK(cacti == 9);
-        CHECK(deferred == 21);
-        CHECK(checksum == -8253037260212862318LL);
+        CHECK(cacti == 20);
+        CHECK(deferred == 8);
+        CHECK(checksum == 702193098032964839LL);
     }
 }
 
@@ -144,6 +144,6 @@ TEST_CASE("a cactus column matches the frozen kotlin height by height") {
         heights.append(std::to_string(fold(chunk).second - before)).push_back(',');
     }
     CHECK(heights == "1,4,1,2,2,1,3,2,2,3,2,1,1,1,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,");
-    CHECK(fold(chunk).first == -7898187539568528673LL);
+    CHECK(fold(chunk).first == -6490411303856598549LL);
     CHECK(random.nextInt() == -109705904);
 }

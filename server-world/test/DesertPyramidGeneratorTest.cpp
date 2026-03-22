@@ -136,13 +136,13 @@ void check(const Run& result, std::int32_t written, std::size_t blockEntities, s
 } // namespace
 
 TEST_CASE("the desert pyramids rise where the frozen kotlin raises them") {
-    SUBCASE("desert") { check(run(1234, "minecraft:desert"), 4036, 10, 4, -2680636976981752707LL); }
+    SUBCASE("desert") { check(run(1234, "minecraft:desert"), 4036, 10, 4, 4675157407773050722LL); }
 
     SUBCASE("plains") { check(run(1234, "minecraft:plains"), 0, 0, 0, 5232556985271491768LL); }
 
-    SUBCASE("otherSeed") { check(run(77, "minecraft:desert"), 4033, 10, 4, 4262013205564901323LL); }
+    SUBCASE("otherSeed") { check(run(77, "minecraft:desert"), 3885, 12, 4, 6478775114945368965LL); }
 
-    SUBCASE("thirdSeed") { check(run(9001, "minecraft:desert"), 4390, 12, 4, 2690890512561099224LL); }
+    SUBCASE("thirdSeed") { check(run(9001, "minecraft:desert"), 4208, 10, 4, -237661446369596869LL); }
 
-    SUBCASE("fourthSeed") { check(run(4321, "minecraft:desert"), 3910, 12, 4, -539471175363189311LL); }
+    SUBCASE("fourthSeed") { check(run(4321, "minecraft:desert"), 4055, 10, 4, 6340709082413145088LL); }
 }

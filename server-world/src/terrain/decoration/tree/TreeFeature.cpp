@@ -202,7 +202,7 @@ bool generateTree(Chunk& chunk, random::RandomSource& random, std::int32_t origi
     for (const FoliageAttachment& attachment : attachments) {
         const std::int32_t offset = config.foliagePlacer.offsetOf(random);
         config.foliagePlacer.createFoliage(chunk, random, config.foliageStateId, attachment, foliageHeight, leafRadius,
-                                           offset, foliagePositions);
+                                           offset, foliagePositions, config.trunkStateId);
     }
     return true;
 }

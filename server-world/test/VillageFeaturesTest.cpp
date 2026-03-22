@@ -111,7 +111,7 @@ TEST_CASE("every village pool feature places what the frozen kotlin places") {
         const Run result = run("minecraft:pile_hay");
         CHECK(result.placed == 42);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -5337228931624283299LL);
+        CHECK(result.checksum == 2411977257214866468LL);
         CHECK(result.after == 1402209232);
     }
 
@@ -119,7 +119,7 @@ TEST_CASE("every village pool feature places what the frozen kotlin places") {
         const Run result = run("minecraft:pile_melon");
         CHECK(result.placed == 53);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 4687383055195050442LL);
+        CHECK(result.checksum == 3058132154984115637LL);
         CHECK(result.after == 554997071);
     }
 
@@ -127,7 +127,7 @@ TEST_CASE("every village pool feature places what the frozen kotlin places") {
         const Run result = run("minecraft:pile_snow");
         CHECK(result.placed == 33);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 7468114353759756740LL);
+        CHECK(result.checksum == 9026670717357219699LL);
         CHECK(result.after == 554997071);
     }
 
@@ -135,7 +135,7 @@ TEST_CASE("every village pool feature places what the frozen kotlin places") {
         const Run result = run("minecraft:pile_ice");
         CHECK(result.placed == 42);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 4330642807767456145LL);
+        CHECK(result.checksum == 7305294614784084080LL);
         CHECK(result.after == 1402209232);
     }
 
@@ -143,7 +143,7 @@ TEST_CASE("every village pool feature places what the frozen kotlin places") {
         const Run result = run("minecraft:pile_pumpkin");
         CHECK(result.placed == 42);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 6318093642972972149LL);
+        CHECK(result.checksum == 5739747821615608728LL);
         CHECK(result.after == 1402209232);
     }
 
@@ -151,7 +151,7 @@ TEST_CASE("every village pool feature places what the frozen kotlin places") {
         const Run result = run("minecraft:acacia");
         CHECK(result.placed == 79);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 1876341715946158099LL);
+        CHECK(result.checksum == 8535927025749267061LL);
         CHECK(result.after == -582578140);
     }
 
@@ -159,7 +159,7 @@ TEST_CASE("every village pool feature places what the frozen kotlin places") {
         const Run result = run("minecraft:oak");
         CHECK(result.placed == 58);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 63661520530376354LL);
+        CHECK(result.checksum == -1118435626003463411LL);
         CHECK(result.after == -582578140);
     }
 
@@ -167,7 +167,7 @@ TEST_CASE("every village pool feature places what the frozen kotlin places") {
         const Run result = run("minecraft:spruce");
         CHECK(result.placed == 64);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 6979621724745050119LL);
+        CHECK(result.checksum == -888801837726494928LL);
         CHECK(result.after == -582578140);
     }
 
@@ -175,7 +175,7 @@ TEST_CASE("every village pool feature places what the frozen kotlin places") {
         const Run result = run("minecraft:pine");
         CHECK(result.placed == 37);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -8119617379623644372LL);
+        CHECK(result.checksum == -3726951695764236386LL);
         CHECK(result.after == -582578140);
     }
 
@@ -183,7 +183,7 @@ TEST_CASE("every village pool feature places what the frozen kotlin places") {
         const Run result = run("minecraft:flower_plain");
         CHECK(result.placed == 47);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 8981657393775653698LL);
+        CHECK(result.checksum == 4580291254072301255LL);
         CHECK(result.after == 954366245);
     }
 
@@ -191,7 +191,7 @@ TEST_CASE("every village pool feature places what the frozen kotlin places") {
         const Run result = run("minecraft:patch_cactus");
         CHECK(result.placed == 1);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -1675501890901952608LL);
+        CHECK(result.checksum == -2148401831971419429LL);
         CHECK(result.after == 1039304233);
     }
 
@@ -199,7 +199,7 @@ TEST_CASE("every village pool feature places what the frozen kotlin places") {
         const Run result = run("minecraft:patch_taiga_grass");
         CHECK(result.placed == 19);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -5675209386077902576LL);
+        CHECK(result.checksum == 8058419651057461934LL);
         CHECK(result.after == 1747964721);
     }
 
@@ -207,7 +207,7 @@ TEST_CASE("every village pool feature places what the frozen kotlin places") {
         const Run result = run("minecraft:patch_berry_bush");
         CHECK(result.placed == 46);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -5201678230457354627LL);
+        CHECK(result.checksum == 6190073411655275550LL);
         CHECK(result.after == 134324992);
     }
 
@@ -215,7 +215,7 @@ TEST_CASE("every village pool feature places what the frozen kotlin places") {
         const Run result = run("minecraft:not_a_feature");
         CHECK(result.placed == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 6114860990693194429LL);
+        CHECK(result.checksum == 8400636743055899160LL);
         CHECK(result.after == -582578140);
     }
 }

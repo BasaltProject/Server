@@ -308,6 +308,61 @@ const TreeConfiguration& treeConfigs::cherry() {
     return config;
 }
 
+namespace {
+
+/// parity: `TreeFeatures.poplar`, the three dappled forest trees that differ only by leaf colour.
+[[nodiscard]] TreeConfiguration poplar(std::string_view leaves) {
+    return TreeConfiguration{
+        .trunkStateId = state("poplar_log"),
+        .trunkPlacer = TrunkPlacer::poplar(7, 4, 0, IntProvider::of(4), IntProvider::uniform(1, 4)),
+        .foliageStateId = state(leaves),
+        .foliagePlacer = FoliagePlacer::poplar(IntProvider::weighted({{5, 5}, {6, 5}, {7, 1}, {8, 1}}),
+                                               IntProvider::of(0), IntProvider::uniform(5, 6), 0.15F),
+        .minimumSize = FeatureSize::twoLayers(1, 0, 2),
+        .decorators = {decorator::ShelfMushroom{.probability = 0.4F}},
+        .ignoreVines = true};
+}
+
+/// The poplar with the two leaf litter carpets laid before its shelf mushrooms.
+[[nodiscard]] TreeConfiguration poplarLeafLitter(std::string_view leaves) {
+    TreeConfiguration config = poplar(leaves);
+    config.decorators = leafLitterDecorators();
+    config.decorators.emplace_back(decorator::ShelfMushroom{.probability = 0.4F});
+    return config;
+}
+
+} // namespace
+
+const TreeConfiguration& treeConfigs::redPoplar() {
+    static const TreeConfiguration config = poplar("red_poplar_leaves");
+    return config;
+}
+
+const TreeConfiguration& treeConfigs::orangePoplar() {
+    static const TreeConfiguration config = poplar("orange_poplar_leaves");
+    return config;
+}
+
+const TreeConfiguration& treeConfigs::yellowPoplar() {
+    static const TreeConfiguration config = poplar("yellow_poplar_leaves");
+    return config;
+}
+
+const TreeConfiguration& treeConfigs::redPoplarLeafLitter() {
+    static const TreeConfiguration config = poplarLeafLitter("red_poplar_leaves");
+    return config;
+}
+
+const TreeConfiguration& treeConfigs::orangePoplarLeafLitter() {
+    static const TreeConfiguration config = poplarLeafLitter("orange_poplar_leaves");
+    return config;
+}
+
+const TreeConfiguration& treeConfigs::yellowPoplarLeafLitter() {
+    static const TreeConfiguration config = poplarLeafLitter("yellow_poplar_leaves");
+    return config;
+}
+
 // The same trees again with a different decorator list, which is all these registrations are.
 const TreeConfiguration& treeConfigs::oakLeafLitter() {
     static const TreeConfiguration config = withDecorators(oak(), leafLitterDecorators());

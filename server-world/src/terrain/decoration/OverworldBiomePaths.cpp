@@ -57,7 +57,8 @@ const std::set<std::string, std::less<>>& overworldBiomePaths() {
                                                              "dripstone_caves",
                                                              "lush_caves",
                                                              "deep_dark",
-                                                             "sulfur_caves"};
+                                                             "sulfur_caves",
+                                                             "dappled_forest"};
     return paths;
 }
 

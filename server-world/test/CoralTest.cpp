@@ -105,10 +105,10 @@ struct Run {
 TEST_CASE("the warm ocean coral grows the way the frozen kotlin grows it") {
     SUBCASE("warmOcean") {
         const Run result = run("minecraft:warm_ocean");
-        CHECK(result.coral == 31);
+        CHECK(result.coral == 82);
         CHECK(result.pickles == 2);
-        CHECK(result.deferred == 6);
-        CHECK(result.checksum == 8040447688267136690LL);
+        CHECK(result.deferred == 22);
+        CHECK(result.checksum == -3620415295164952641LL);
     }
 
     SUBCASE("coldOcean") {
@@ -116,7 +116,7 @@ TEST_CASE("the warm ocean coral grows the way the frozen kotlin grows it") {
         CHECK(result.coral == 0);
         CHECK(result.pickles == 0);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -6058816125723604005LL);
+        CHECK(result.checksum == 3625249841740258267LL);
     }
 }
 
@@ -138,7 +138,7 @@ TEST_CASE("one coral growth at one position matches the frozen kotlin") {
     }
     CHECK(coral == 453);
     CHECK(pickles == 12);
-    CHECK(static_cast<std::int64_t>(checksum) == 2361235567080337202LL);
+    CHECK(static_cast<std::int64_t>(checksum) == -3150423251263216618LL);
     CHECK(after == 1275084501);
 }
 
@@ -161,5 +161,5 @@ TEST_CASE("the coral vegetal entry matches the frozen kotlin") {
     CHECK(coral == 403);
     CHECK(pickles == 14);
     CHECK(deferred == 312);
-    CHECK(static_cast<std::int64_t>(checksum) == 5358181184026242928LL);
+    CHECK(static_cast<std::int64_t>(checksum) == 4938892343421358200LL);
 }

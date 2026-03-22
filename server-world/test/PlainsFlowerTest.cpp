@@ -98,10 +98,10 @@ TEST_CASE("the plains and wildflower patches place what the frozen kotlin places
             run([](Chunk& chunk, basalt::server::random::RandomSource& random, const DecorationPos& origin) {
                 plainsDecoration::placeFlowerPlainAt(chunk, random, origin.x, origin.y, origin.z);
             });
-        CHECK(flowers == 1141);
+        CHECK(flowers == 1132);
         CHECK(wild == 0);
-        CHECK(distinct == 9);
-        CHECK(checksum == -4015181884555652972LL);
+        CHECK(distinct == 5);
+        CHECK(checksum == -7454913585254825378LL);
     }
 
     SUBCASE("wildflowersBirch") {
@@ -114,7 +114,7 @@ TEST_CASE("the plains and wildflower patches place what the frozen kotlin places
         CHECK(flowers == 0);
         CHECK(wild == 1141);
         CHECK(distinct == 16);
-        CHECK(checksum == -5877340861771692576LL);
+        CHECK(checksum == -3722645096143717799LL);
     }
 
     SUBCASE("wildflowersMeadow") {
@@ -127,7 +127,7 @@ TEST_CASE("the plains and wildflower patches place what the frozen kotlin places
         CHECK(flowers == 0);
         CHECK(wild == 146);
         CHECK(distinct == 16);
-        CHECK(checksum == 3373838202184361959LL);
+        CHECK(checksum == -5501126426333239231LL);
     }
 }
 
@@ -143,8 +143,8 @@ TEST_CASE("the plains selector picks the same flowers as the frozen kotlin") {
         picks.append(std::to_string(plainsDecoration::flowerStateId(random, DecorationPos{x, 71, z}))).push_back(',');
     }
     CHECK(picks ==
-          "2321,2332,2333,2321,2321,2321,2321,2321,2324,2333,2332,2321,2332,2321,2321,2321,2321,2321,2321,2321,2332,"
-          "2324,2333,2324,2321,2321,2321,2321,2327,2332,2321,2321,2321,2324,2321,2321,2321,2321,2321,2321,");
+          "3813,3824,3825,3813,3813,3813,3813,3813,3816,3825,3824,3813,3824,3813,3813,3813,3813,3813,3813,3813,"
+          "3824,3816,3825,3816,3813,3813,3813,3813,3819,3824,3813,3813,3813,3816,3813,3813,3813,3813,3813,3813,");
     CHECK(random.nextInt() == 1556930442);
 }
 
@@ -154,5 +154,5 @@ TEST_CASE("the flower bed packing matches the frozen kotlin") {
         beds.append(std::to_string(forestFloorDecoration::flowerBedStateId(stateIdOf("wildflowers"), choice)))
             .push_back(',');
     }
-    CHECK(beds == "30323,30335,30327,30331,30324,30336,30328,30332,30325,30337,30329,30333,30326,30338,30330,30334,");
+    CHECK(beds == "33680,33692,33684,33688,33681,33693,33685,33689,33682,33694,33686,33690,33683,33695,33687,33691,");
 }

@@ -179,7 +179,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 0);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
-        CHECK(result.checksum == 6411295579110092646LL);
+        CHECK(result.checksum == -1194399152319782907LL);
         CHECK(result.after == -999051014);
     }
 
@@ -191,7 +191,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 0);
         CHECK(result.deferred == 117);
         CHECK(result.entities == 0);
-        CHECK(result.checksum == -8583603599628368955LL);
+        CHECK(result.checksum == -5393041882164896897LL);
         CHECK(result.after == -999051014);
     }
 
@@ -203,7 +203,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 519);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
-        CHECK(result.checksum == 1747366501814862973LL);
+        CHECK(result.checksum == -5351019725141409490LL);
         CHECK(result.after == 148710611);
     }
 
@@ -215,7 +215,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 0);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
-        CHECK(result.checksum == 3812741506864009768LL);
+        CHECK(result.checksum == 4851093181637399647LL);
         CHECK(result.after == -999051014);
     }
 
@@ -227,7 +227,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 0);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
-        CHECK(result.checksum == 8400960130293672730LL);
+        CHECK(result.checksum == 2602438865184189103LL);
         CHECK(result.after == -1227943783);
     }
 
@@ -239,7 +239,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 499);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
-        CHECK(result.checksum == -3356459664858636602LL);
+        CHECK(result.checksum == 9147453067671959320LL);
         CHECK(result.after == -714775738);
     }
 
@@ -251,7 +251,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 0);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
-        CHECK(result.checksum == 6563960332652933476LL);
+        CHECK(result.checksum == 4087777142399298175LL);
         CHECK(result.after == 755100514);
     }
 
@@ -263,7 +263,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 1745);
         CHECK(result.deferred == 65);
         CHECK(result.entities == 0);
-        CHECK(result.checksum == -1751706674198655354LL);
+        CHECK(result.checksum == -4127809422482040807LL);
         CHECK(result.after == -266944613);
     }
 
@@ -275,7 +275,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 0);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
-        CHECK(result.checksum == -6359139724653898990LL);
+        CHECK(result.checksum == -721531971071746043LL);
         CHECK(result.after == -1320795031);
     }
 
@@ -287,7 +287,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 0);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
-        CHECK(result.checksum == -8652133743162650667LL);
+        CHECK(result.checksum == 6360835582487715509LL);
         CHECK(result.after == 1125084371);
     }
 
@@ -299,7 +299,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 0);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
-        CHECK(result.checksum == -4184727089201385733LL);
+        CHECK(result.checksum == -476427067433294347LL);
         CHECK(result.after == 383312261);
     }
 
@@ -311,7 +311,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 0);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
-        CHECK(result.checksum == -5678106953798412077LL);
+        CHECK(result.checksum == -6988667986974352747LL);
         CHECK(result.after == -1931756187);
     }
 
@@ -323,7 +323,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 609);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
-        CHECK(result.checksum == 8118652976108642971LL);
+        CHECK(result.checksum == -1211248588145595467LL);
         CHECK(result.after == 101411853);
     }
 
@@ -335,7 +335,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 527);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 2);
-        CHECK(result.checksum == 2942935981284325401LL);
+        CHECK(result.checksum == 4975010064339921265LL);
         CHECK(result.after == 71405766);
     }
 
@@ -347,7 +347,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 931);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
-        CHECK(result.checksum == 6398363974594686197LL);
+        CHECK(result.checksum == -3228967253065688355LL);
         CHECK(result.after == -1931756187);
     }
 
@@ -359,7 +359,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 931);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
-        CHECK(result.checksum == -7776606797259235111LL);
+        CHECK(result.checksum == -2793512005397452735LL);
         CHECK(result.after == -1931756187);
     }
 
@@ -371,7 +371,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 0);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
-        CHECK(result.checksum == 5071721963062421707LL);
+        CHECK(result.checksum == -2856751508339058074LL);
         CHECK(result.after == 926377866);
     }
 
@@ -383,7 +383,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 0);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
-        CHECK(result.checksum == 5935093063151317293LL);
+        CHECK(result.checksum == -4333738885373896647LL);
         CHECK(result.after == -166352700);
     }
 
@@ -395,7 +395,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 248);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
-        CHECK(result.checksum == -6916924292673238404LL);
+        CHECK(result.checksum == 9049155331982306187LL);
         CHECK(result.after == -1471146614);
     }
 
@@ -407,7 +407,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 8);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 8);
-        CHECK(result.checksum == 1887346184354870858LL);
+        CHECK(result.checksum == 5461045763849228601LL);
         CHECK(result.after == -1814055817);
     }
 
@@ -419,7 +419,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 365);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
-        CHECK(result.checksum == 9002790310596058456LL);
+        CHECK(result.checksum == 56204193917414355LL);
         CHECK(result.after == -695897682);
     }
 
@@ -431,7 +431,7 @@ TEST_CASE("whole trees match the frozen kotlin, configuration by configuration")
         CHECK(result.decorations == 315);
         CHECK(result.deferred == 0);
         CHECK(result.entities == 0);
-        CHECK(result.checksum == 1374674749762635472LL);
+        CHECK(result.checksum == 638610873204400791LL);
         CHECK(result.after == 1018495569);
     }
 

@@ -429,6 +429,8 @@ void treeDecorators::decorate(Chunk& chunk, random::RandomSource& random, random
                 decorateMangrovePropagules(chunk, random, context.leaves, config);
             } else if constexpr (std::is_same_v<Config, decorator::GroundLeafLitter>) {
                 decorateGroundLeafLitter(chunk, random, context, config);
+            } else if constexpr (std::is_same_v<Config, decorator::ShelfMushroom>) {
+                treeDecorators::decorateShelfMushroom(chunk, random, context.logs, config.probability);
             } else {
                 decorateBeehive(chunk, random, context, config.probability);
             }

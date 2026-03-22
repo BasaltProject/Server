@@ -162,19 +162,19 @@ void check(const Run& result, std::int32_t written, std::size_t blockEntities, s
 } // namespace
 
 TEST_CASE("the igloos stand where the frozen kotlin puts them") {
-    SUBCASE("snowy") { check(run(1234, "minecraft:snowy_plains", 71, 36), 324, 0, 1, 687411231015099441LL); }
+    SUBCASE("snowy") { check(run(1234, "minecraft:snowy_plains", 71, 36), 324, 0, 1, 1909464990203033713LL); }
 
     SUBCASE("plains") { check(run(1234, "minecraft:plains", 71, 36), 0, 0, 0, 6717651259440025137LL); }
 
     SUBCASE("basement") {
         // A seed whose coin flip drew a basement, so the shaft, the laboratory and its chest run.
-        check(run(3, "minecraft:snowy_plains", 71, 36), 1053, 1, 1, 1274888143906236726LL);
+        check(run(3, "minecraft:snowy_plains", 71, 36), 1053, 1, 1, -2030513675610861548LL);
     }
 
     SUBCASE("shallowBasement") {
         // A shallower shaft from a different draw of the eight-deep range.
-        check(run(5, "minecraft:snowy_plains", 71, 36), 945, 1, 1, -3583466738290399274LL);
+        check(run(5, "minecraft:snowy_plains", 71, 36), 945, 1, 1, -453986296067728306LL);
     }
 
-    SUBCASE("otherSeed") { check(run(8, "minecraft:snowy_plains", 71, 36), 719, 0, 1, -3776427628907478231LL); }
+    SUBCASE("otherSeed") { check(run(8, "minecraft:snowy_plains", 71, 36), 719, 0, 1, -1643830816775094671LL); }
 }

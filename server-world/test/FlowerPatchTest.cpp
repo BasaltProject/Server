@@ -95,9 +95,9 @@ TEST_CASE("the flower dispatcher places what the frozen kotlin places") {
             run("minecraft:plains", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 flowerPatchDecoration::decorate(chunk, 31415LL, environment);
             });
-        CHECK(plants == 90);
+        CHECK(plants == 59);
         CHECK(distinct == 5);
-        CHECK(checksum == -691338145868065748LL);
+        CHECK(checksum == -5934652879681126108LL);
     }
 
     SUBCASE("flower_forest") {
@@ -105,9 +105,9 @@ TEST_CASE("the flower dispatcher places what the frozen kotlin places") {
             run("minecraft:flower_forest", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 flowerPatchDecoration::decorate(chunk, 31415LL, environment);
             });
-        CHECK(plants == 1376);
-        CHECK(distinct == 17);
-        CHECK(checksum == -858492802344710212LL);
+        CHECK(plants == 1234);
+        CHECK(distinct == 16);
+        CHECK(checksum == 5149342853149220809LL);
     }
 
     SUBCASE("pale_garden") {
@@ -115,9 +115,9 @@ TEST_CASE("the flower dispatcher places what the frozen kotlin places") {
             run("minecraft:pale_garden", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 flowerPatchDecoration::decorate(chunk, 31415LL, environment);
             });
-        CHECK(plants == 82);
+        CHECK(plants == 175);
         CHECK(distinct == 1);
-        CHECK(checksum == -6068939504580472659LL);
+        CHECK(checksum == -7815929162278799054LL);
     }
 
     SUBCASE("meadow") {
@@ -125,9 +125,9 @@ TEST_CASE("the flower dispatcher places what the frozen kotlin places") {
             run("minecraft:meadow", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 flowerPatchDecoration::decorate(chunk, 31415LL, environment);
             });
-        CHECK(plants == 1485);
+        CHECK(plants == 1508);
         CHECK(distinct == 22);
-        CHECK(checksum == 984346595539249580LL);
+        CHECK(checksum == -6095387782716881028LL);
     }
 
     SUBCASE("swamp") {
@@ -135,9 +135,9 @@ TEST_CASE("the flower dispatcher places what the frozen kotlin places") {
             run("minecraft:swamp", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 flowerPatchDecoration::decorate(chunk, 31415LL, environment);
             });
-        CHECK(plants == 15);
+        CHECK(plants == 14);
         CHECK(distinct == 1);
-        CHECK(checksum == 6296407148957639162LL);
+        CHECK(checksum == 7514673858542546111LL);
     }
 
     SUBCASE("cherry_grove") {
@@ -145,9 +145,9 @@ TEST_CASE("the flower dispatcher places what the frozen kotlin places") {
             run("minecraft:cherry_grove", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 flowerPatchDecoration::decorate(chunk, 31415LL, environment);
             });
-        CHECK(plants == 6308);
+        CHECK(plants == 6438);
         CHECK(distinct == 16);
-        CHECK(checksum == 373919877022979333LL);
+        CHECK(checksum == 4997414353607254742LL);
     }
 
     SUBCASE("birch_forest") {
@@ -155,9 +155,9 @@ TEST_CASE("the flower dispatcher places what the frozen kotlin places") {
             run("minecraft:birch_forest", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 flowerPatchDecoration::decorate(chunk, 31415LL, environment);
             });
-        CHECK(plants == 795);
+        CHECK(plants == 835);
         CHECK(distinct == 19);
-        CHECK(checksum == 2415602295132863267LL);
+        CHECK(checksum == -1353130369538111414LL);
     }
 
     SUBCASE("savanna") {
@@ -165,9 +165,9 @@ TEST_CASE("the flower dispatcher places what the frozen kotlin places") {
             run("minecraft:savanna", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 flowerPatchDecoration::decorate(chunk, 31415LL, environment);
             });
-        CHECK(plants == 39);
+        CHECK(plants == 59);
         CHECK(distinct == 2);
-        CHECK(checksum == -7342609011951262000LL);
+        CHECK(checksum == -4747357365955432518LL);
     }
 
     SUBCASE("taiga") {
@@ -175,9 +175,9 @@ TEST_CASE("the flower dispatcher places what the frozen kotlin places") {
             run("minecraft:taiga", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 flowerPatchDecoration::decorate(chunk, 31415LL, environment);
             });
-        CHECK(plants == 9);
-        CHECK(distinct == 2);
-        CHECK(checksum == 8276354525032017813LL);
+        CHECK(plants == 0);
+        CHECK(distinct == 0);
+        CHECK(checksum == 7031911460422995829LL);
     }
 
     SUBCASE("wrong") {
@@ -188,7 +188,7 @@ TEST_CASE("the flower dispatcher places what the frozen kotlin places") {
             });
         CHECK(plants == 0);
         CHECK(distinct == 0);
-        CHECK(checksum == -412150404418202251LL);
+        CHECK(checksum == 7031911460422995829LL);
     }
 
     SUBCASE("only_flower_default") {
@@ -196,9 +196,9 @@ TEST_CASE("the flower dispatcher places what the frozen kotlin places") {
             run("minecraft:taiga", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 flowerPatchDecoration::decorateFeature(chunk, 31415LL, environment, "flower_default");
             });
-        CHECK(plants == 9);
-        CHECK(distinct == 2);
-        CHECK(checksum == 8276354525032017813LL);
+        CHECK(plants == 0);
+        CHECK(distinct == 0);
+        CHECK(checksum == 7031911460422995829LL);
     }
 
     SUBCASE("only_flower_plains") {
@@ -206,9 +206,9 @@ TEST_CASE("the flower dispatcher places what the frozen kotlin places") {
             run("minecraft:plains", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 flowerPatchDecoration::decorateFeature(chunk, 31415LL, environment, "flower_plains");
             });
-        CHECK(plants == 90);
+        CHECK(plants == 59);
         CHECK(distinct == 5);
-        CHECK(checksum == -691338145868065748LL);
+        CHECK(checksum == -5934652879681126108LL);
     }
 
     SUBCASE("only_wildflowers_meadow") {
@@ -216,9 +216,9 @@ TEST_CASE("the flower dispatcher places what the frozen kotlin places") {
             run("minecraft:meadow", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 flowerPatchDecoration::decorateFeature(chunk, 31415LL, environment, "wildflowers_meadow");
             });
-        CHECK(plants == 775);
+        CHECK(plants == 714);
         CHECK(distinct == 16);
-        CHECK(checksum == 2116393320709447652LL);
+        CHECK(checksum == -7754519945110039281LL);
     }
 
     SUBCASE("only_pale_garden_flowers") {
@@ -226,8 +226,8 @@ TEST_CASE("the flower dispatcher places what the frozen kotlin places") {
             run("minecraft:pale_garden", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 flowerPatchDecoration::decorateFeature(chunk, 31415LL, environment, "pale_garden_flowers");
             });
-        CHECK(plants == 80);
+        CHECK(plants == 174);
         CHECK(distinct == 1);
-        CHECK(checksum == -1569706160278244887LL);
+        CHECK(checksum == -1160043390819255525LL);
     }
 }

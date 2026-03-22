@@ -90,9 +90,9 @@ TEST_CASE("the bush patch places what the frozen kotlin places") {
             run("minecraft:plains", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 bushPatchDecoration::decorate(chunk, 353535LL, environment);
             });
-        CHECK(bushes == 86);
+        CHECK(bushes == 73);
         CHECK(deferred == 0);
-        CHECK(checksum == 9097187992672340721LL);
+        CHECK(checksum == 6789849725947661927LL);
     }
 
     SUBCASE("forest") {
@@ -100,9 +100,9 @@ TEST_CASE("the bush patch places what the frozen kotlin places") {
             run("minecraft:forest", [](Chunk& chunk, const testsupport::FixedBiomeEnvironment& environment) {
                 bushPatchDecoration::decorate(chunk, 353535LL, environment);
             });
-        CHECK(bushes == 86);
+        CHECK(bushes == 73);
         CHECK(deferred == 0);
-        CHECK(checksum == 9097187992672340721LL);
+        CHECK(checksum == 6789849725947661927LL);
     }
 
     SUBCASE("wrong") {
@@ -128,9 +128,9 @@ TEST_CASE("the bush patch places what the frozen kotlin places") {
                         return y == 70 ? stateIdOf("grass_block") : registry::blocks::air().stateId;
                     });
             });
-        CHECK(bushes == 86);
-        CHECK(deferred == 41);
-        CHECK(checksum == 9097187992672340721LL);
+        CHECK(bushes == 73);
+        CHECK(deferred == 52);
+        CHECK(checksum == 6789849725947661927LL);
     }
 }
 
@@ -140,6 +140,6 @@ TEST_CASE("one bush patch at an origin matches the frozen kotlin") {
         basalt::server::random::RandomSource::worldgen(basalt::server::random::RandomSource::legacy(24680LL));
     bushPatchDecoration::placeAt(chunk, random, DecorationPos{8, 71, 8});
     CHECK(fold(chunk).second == 2);
-    CHECK(fold(chunk).first == 407732382784741739LL);
+    CHECK(fold(chunk).first == -8779142859507342871LL);
     CHECK(random.nextInt() == -1866235707);
 }

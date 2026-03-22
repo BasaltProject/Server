@@ -65,7 +65,8 @@ const std::set<std::string, std::less<>>& knownBiomes() {
                                                              "deep_lukewarm_ocean",
                                                              "warm_ocean",
                                                              "frozen_ocean",
-                                                             "deep_frozen_ocean"};
+                                                             "deep_frozen_ocean",
+                                                             "dappled_forest"};
     return paths;
 }
 

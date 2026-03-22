@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/JavaHashSetOrder.hpp>
 #include <basalt/server/world/terrain/decoration/tree/FallenTreeFeature.hpp>
+#include <basalt/server/world/terrain/decoration/tree/TreeFeatureDecorators.hpp>
 #include <basalt/server/world/terrain/decoration/tree/TreeHelpers.hpp>
 
 #include <array>
@@ -74,7 +75,8 @@ void decorateStumpVines(Chunk& chunk, random::RandomSource& random, std::int32_t
     }
 }
 
-void decorateAttachedMushrooms(Chunk& chunk, random::RandomSource& random, const std::vector<LogPos>& logs) {
+void decorateAttachedMushrooms(Chunk& chunk, random::RandomSource& random, const std::vector<LogPos>& logs,
+                               bool brownOnly) {
     std::vector<LogPos> shuffled = javaHashSetOrder(logs);
     for (std::size_t size = shuffled.size(); size >= 2; --size) {
         const std::size_t swapTo = static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(size)));
@@ -87,7 +89,7 @@ void decorateAttachedMushrooms(Chunk& chunk, random::RandomSource& random, const
             continue;
         }
         setBlock(chunk, log.x, log.y + 1, log.z,
-                 random.nextInt(3) < 2 ? state("red_mushroom") : state("brown_mushroom"));
+                 !brownOnly && random.nextInt(3) < 2 ? state("red_mushroom") : state("brown_mushroom"));
     }
 }
 
@@ -131,7 +133,15 @@ bool placeConfigured(Chunk& chunk, random::RandomSource& random, std::int32_t or
         setBlock(chunk, log.x, log.y, log.z, sidewaysState);
         fallenLogs.push_back(log);
     }
-    decorateAttachedMushrooms(chunk, random, fallenLogs);
+    decorateAttachedMushrooms(chunk, random, fallenLogs, config.brownMushroomsOnly);
+    if (config.shelfMushroom.has_value()) {
+        // parity: the decorator context keeps the log set's hash order, all logs sharing one y.
+        std::vector<BlockPos> logs;
+        for (const LogPos& log : javaHashSetOrder(fallenLogs)) {
+            logs.push_back(BlockPos{.x = log.x, .y = log.y, .z = log.z});
+        }
+        treeDecorators::decorateShelfMushroom(chunk, random, logs, *config.shelfMushroom);
+    }
     return true;
 }
 
@@ -164,6 +174,14 @@ const FallenTreeConfiguration& fallenTreeConfigs::spruce() {
 const FallenTreeConfiguration& fallenTreeConfigs::jungle() {
     static const FallenTreeConfiguration config{
         .logStateId = state("jungle_log"), .logLength = IntProvider::uniform(4, 11), .stumpVines = true};
+    return config;
+}
+
+const FallenTreeConfiguration& fallenTreeConfigs::poplar() {
+    static const FallenTreeConfiguration config{.logStateId = state("poplar_log"),
+                                                .logLength = IntProvider::uniform(4, 7),
+                                                .brownMushroomsOnly = true,
+                                                .shelfMushroom = 0.8F};
     return config;
 }
 

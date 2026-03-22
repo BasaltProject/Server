@@ -44,6 +44,7 @@ const PathSet& groundPlantPaths() {
                                   "torchflower",
                                   "closed_eyeblossom",
                                   "open_eyeblossom",
+                                  "red_shrub",
                                   "tall_grass",
                                   "large_fern",
                                   "sunflower",
@@ -77,6 +78,11 @@ bool vegetationBlockRules::survivesDeferred(const std::int32_t generatedStateId,
     }
     const std::optional<registry::BlockState> below = stateOf(belowStateId);
     return below.has_value() && supportPaths().find(below->block.path()) != supportPaths().end();
+}
+
+bool vegetationBlockRules::bushMayPlaceOn(const std::int32_t belowStateId) {
+    const std::optional<registry::BlockState> below = stateOf(belowStateId);
+    return below.has_value() && supportPaths().contains(below->block.path());
 }
 
 } // namespace basalt::server::world::terrain::decoration

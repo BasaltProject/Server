@@ -9,7 +9,6 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -103,8 +102,7 @@ struct Run {
 } // namespace
 
 TEST_CASE("the overworld vegetal step runs its nodes in the jar's feature order") {
-    // parity: `FeatureSorter` over the 26.3 biomes, step 9. The three dappled forest features have
-    // their slots but no node yet.
+    // parity: `FeatureSorter` over the 26.3 biomes, step 9.
     static constexpr std::string_view kOrder =
         "glow_lichen,trees_windswept_savanna,bamboo,bamboo_vegetation,trees_sparse_jungle,trees_dappled_forest,br"
         "own_mushroom_dappled_forest,patch_red_shrub,trees_badlands,bamboo_light,trees_jungle,patch_tall_grass,tr"
@@ -133,54 +131,49 @@ TEST_CASE("the overworld vegetal step runs its nodes in the jar's feature order"
         start = comma + 1;
     }
     REQUIRE(expected.size() == 109);
-    const std::set<std::string_view> missing{"trees_dappled_forest", "brown_mushroom_dappled_forest",
-                                             "patch_red_shrub"};
     std::size_t next = 0;
     for (const auto& [index, name] : overworldVegetalDecoration::featureOrder()) {
-        while (next < expected.size() && missing.contains(expected[next])) {
-            ++next;
-        }
         REQUIRE(next < expected.size());
         CHECK(name == expected[next]);
         CHECK(index == static_cast<std::int32_t>(next));
         ++next;
     }
-    CHECK(overworldVegetalDecoration::featureOrder().size() == expected.size() - missing.size());
+    CHECK(overworldVegetalDecoration::featureOrder().size() == expected.size());
 }
 
 TEST_CASE("the overworld vegetal step places what the jar places") {
     SUBCASE("plains") {
         const Run result = run("minecraft:plains");
-        CHECK(result.placed == 68);
+        CHECK(result.placed == 84);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -2061496627550257704LL);
+        CHECK(result.checksum == -3085601431237329800LL);
     }
 
     SUBCASE("jungle") {
         const Run result = run("minecraft:jungle");
-        CHECK(result.placed == 2971);
-        CHECK(result.deferred == 883);
-        CHECK(result.checksum == -8973945534636578123LL);
+        CHECK(result.placed == 3555);
+        CHECK(result.deferred == 924);
+        CHECK(result.checksum == -1649547176337113120LL);
     }
 
     SUBCASE("lush_caves") {
         const Run result = run("minecraft:lush_caves");
-        CHECK(result.placed == 4011);
+        CHECK(result.placed == 4903);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == -2518120076210245304LL);
+        CHECK(result.checksum == 4965875280460067962LL);
     }
 
     SUBCASE("swamp") {
         const Run result = run("minecraft:swamp");
-        CHECK(result.placed == 756);
-        CHECK(result.deferred == 167);
-        CHECK(result.checksum == 8064041867149315264LL);
+        CHECK(result.placed == 765);
+        CHECK(result.deferred == 130);
+        CHECK(result.checksum == -4480742402627872429LL);
     }
 
     SUBCASE("warm_ocean") {
         const Run result = run("minecraft:warm_ocean");
-        CHECK(result.placed == 56);
+        CHECK(result.placed == 70);
         CHECK(result.deferred == 0);
-        CHECK(result.checksum == 5129051271633250079LL);
+        CHECK(result.checksum == 6043574910200996638LL);
     }
 }

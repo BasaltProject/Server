@@ -83,7 +83,8 @@ struct AquaticSpec {
     AquaticKind kind;
     std::vector<std::string> biomes;
     std::int32_t bodyCount = 1;
-    float tallProbability = 0.0F;
+    /// parity: the tall seagrass entry's weight in the 26.3 selector, out of a total of 100.
+    std::int32_t tallWeight = 0;
     std::optional<std::int32_t> rarity;
     std::optional<std::int32_t> noiseToCountRatio;
 };
@@ -95,26 +96,26 @@ const std::vector<AquaticSpec>& specs() {
          .kind = AquaticKind::Seagrass,
          .biomes = {"mangrove_swamp", "swamp"},
          .bodyCount = 64,
-         .tallProbability = 0.6F},
+         .tallWeight = 60},
         {.name = "seagrass_river",
          .index = 93,
          .kind = AquaticKind::Seagrass,
          .biomes = {"river"},
          .bodyCount = 48,
-         .tallProbability = 0.4F},
+         .tallWeight = 40},
         {.name = "seagrass_warm",
          .index = 100,
          .kind = AquaticKind::Seagrass,
          .biomes = {"lukewarm_ocean", "warm_ocean"},
          .bodyCount = 80,
-         .tallProbability = 0.3F},
+         .tallWeight = 30},
         {.name = "sea_pickle", .index = 101, .kind = AquaticKind::SeaPickle, .biomes = {"warm_ocean"}, .rarity = 16},
         {.name = "seagrass_deep_warm",
          .index = 102,
          .kind = AquaticKind::Seagrass,
          .biomes = {"deep_lukewarm_ocean"},
          .bodyCount = 80,
-         .tallProbability = 0.8F},
+         .tallWeight = 80},
         {.name = "kelp_warm",
          .index = 103,
          .kind = AquaticKind::Kelp,
@@ -125,25 +126,25 @@ const std::vector<AquaticSpec>& specs() {
          .kind = AquaticKind::Seagrass,
          .biomes = {"ocean"},
          .bodyCount = 48,
-         .tallProbability = 0.3F},
+         .tallWeight = 30},
         {.name = "seagrass_deep",
          .index = 105,
          .kind = AquaticKind::Seagrass,
          .biomes = {"deep_ocean"},
          .bodyCount = 48,
-         .tallProbability = 0.8F},
+         .tallWeight = 80},
         {.name = "seagrass_cold",
          .index = 106,
          .kind = AquaticKind::Seagrass,
          .biomes = {"cold_ocean"},
          .bodyCount = 32,
-         .tallProbability = 0.3F},
+         .tallWeight = 30},
         {.name = "seagrass_deep_cold",
          .index = 107,
          .kind = AquaticKind::Seagrass,
          .biomes = {"deep_cold_ocean"},
          .bodyCount = 40,
-         .tallProbability = 0.8F},
+         .tallWeight = 80},
         {.name = "kelp_cold",
          .index = 108,
          .kind = AquaticKind::Kelp,
@@ -152,41 +153,45 @@ const std::vector<AquaticSpec>& specs() {
     return built;
 }
 
-[[nodiscard]] bool canSeagrassSurvive(const AquaticRegion& region, const DecorationPos& position, ChunkHeight bounds) {
-    return position.y > bounds.minY() &&
-           aquaticsupport::seagrassSupport(region.get(DecorationPos{position.x, position.y - 1, position.z}));
+[[nodiscard]] std::int32_t below(const AquaticRegion& region, const DecorationPos& position) {
+    return region.get(DecorationPos{position.x, position.y - 1, position.z});
 }
 
-[[nodiscard]] bool canSeaPickleSurvive(const AquaticRegion& region, const DecorationPos& position, ChunkHeight bounds) {
-    return position.y > bounds.minY() &&
-           aquaticsupport::seaPickleSupport(region.get(DecorationPos{position.x, position.y - 1, position.z}));
+[[nodiscard]] DecorationPos above(const DecorationPos& position) { return {position.x, position.y + 1, position.z}; }
+
+/// parity: the 26.3 `offset` of the aquatic patches, a zero-width y trapezoid included: it still draws.
+[[nodiscard]] DecorationPos offsetWithinSeven(random::RandomSource& random, const DecorationPos& origin) {
+    const std::int32_t dx = random.nextInt(8) - random.nextInt(8);
+    const std::int32_t dy = random.nextInt(1) - random.nextInt(1);
+    const std::int32_t dz = random.nextInt(8) - random.nextInt(8);
+    return {origin.x + dx, origin.y + dy, origin.z + dz};
 }
 
-[[nodiscard]] bool canKelpSurvive(const AquaticRegion& region, const DecorationPos& position, ChunkHeight bounds) {
-    return position.y > bounds.minY() &&
-           aquaticsupport::kelpSupport(region.get(DecorationPos{position.x, position.y - 1, position.z}));
-}
-
-void placeSeagrass(AquaticRegion& region, random::RandomSource& random, const DecorationPos& origin,
-                   float tallProbability, ChunkHeight bounds) {
-    const std::int32_t x = origin.x + random.nextInt(8) - random.nextInt(8);
-    const std::int32_t z = origin.z + random.nextInt(8) - random.nextInt(8);
-    const DecorationPos target{x, region.oceanFloor(x, z), z};
-    if (!isWaterBlock(region.get(target))) {
-        return;
+/// parity: `HeightmapPlacement` on `OCEAN_FLOOR`, which drops a column with nothing above the floor.
+[[nodiscard]] std::optional<DecorationPos> onOceanFloor(const AquaticRegion& region, const DecorationPos& position,
+                                                        ChunkHeight bounds) {
+    const std::int32_t y = region.oceanFloor(position.x, position.z);
+    if (y <= bounds.minY()) {
+        return std::nullopt;
     }
-    // parity: the tall roll happens before the survival test, so a rejected position still consumes
-    // its draw.
-    const bool tall = random.nextDouble() < static_cast<double>(tallProbability);
-    if (!canSeagrassSurvive(region, target, bounds)) {
-        return;
-    }
+    return DecorationPos{position.x, y, position.z};
+}
+
+/// parity: `seagrass_*`, a weighted pick between a tall plant that wants water above and a short one.
+void placeSeagrass(AquaticRegion& region, random::RandomSource& random, const DecorationPos& target,
+                   std::int32_t tallWeight, ChunkHeight bounds) {
+    const bool tall = random.nextInt(100) < tallWeight;
+    const bool survives = target.y > bounds.minY() && aquaticsupport::seagrassSupport(below(region, target));
     if (!tall) {
-        region.set(target, stateIdOf("seagrass"));
+        if (survives) {
+            region.set(target, stateIdOf("seagrass"));
+        }
         return;
     }
-    const DecorationPos above{target.x, target.y + 1, target.z};
-    if (!isWaterBlock(region.get(above))) {
+    // parity: the tall entry's own filter, then `SimpleBlockFeature`'s double plant check, which
+    // wants the same fluid above, so a flowing block does not do.
+    if (!isWaterBlock(region.get(above(target))) || !survives ||
+        region.get(above(target)) != registry::blocks::water().stateId) {
         return;
     }
     region.set(target, stateIdOf("tall_seagrass"));
@@ -195,50 +200,48 @@ void placeSeagrass(AquaticRegion& region, random::RandomSource& random, const De
     if (!upper.has_value()) {
         throw std::runtime_error{"missing tall seagrass upper half"};
     }
-    region.set(above, *upper);
+    region.set(above(target), *upper);
 }
 
-void placeSeaPickles(AquaticRegion& region, random::RandomSource& random, const DecorationPos& origin,
-                     ChunkHeight bounds) {
-    for (std::int32_t attempt = 0; attempt < 20; ++attempt) {
-        const std::int32_t x = origin.x + random.nextInt(8) - random.nextInt(8);
-        const std::int32_t z = origin.z + random.nextInt(8) - random.nextInt(8);
-        const DecorationPos target{x, region.oceanFloor(x, z), z};
-        const std::int32_t stateId = stateIdOf("sea_pickle") + random.nextInt(4) * 2;
-        if (isWaterBlock(region.get(target)) && canSeaPickleSurvive(region, target, bounds)) {
-            region.set(target, stateId);
-        }
+/// parity: `sea_pickle`, a simple block whose pickle count is drawn before the survival test.
+void placeSeaPickle(AquaticRegion& region, random::RandomSource& random, const DecorationPos& target,
+                    ChunkHeight bounds) {
+    const std::int32_t stateId = stateIdOf("sea_pickle") + random.nextInt(4) * 2;
+    if (target.y > bounds.minY() && aquaticsupport::seaPickleSupport(below(region, target))) {
+        region.set(target, stateId);
     }
 }
 
-void placeKelp(AquaticRegion& region, random::RandomSource& random, const DecorationPos& origin, ChunkHeight bounds) {
-    DecorationPos position{origin.x, region.oceanFloor(origin.x, origin.z), origin.z};
-    if (!isWaterBlock(region.get(position))) {
-        return;
+/// parity: the kelp placement filter: water here and above, and a sturdy floor that is not magma.
+[[nodiscard]] bool kelpCanStart(const AquaticRegion& region, const DecorationPos& position, ChunkHeight bounds) {
+    return isWaterBlock(region.get(position)) && isWaterBlock(region.get(above(position))) &&
+           position.y > bounds.minY() && aquaticsupport::seagrassSupport(below(region, position));
+}
+
+/// parity: `BlockColumnFeature` with kelp's two layers, a 0..9 stalk and one tip, truncated from the
+/// stalk first where the column runs out of water two blocks up.
+void placeKelp(AquaticRegion& region, random::RandomSource& random, const DecorationPos& origin) {
+    std::int32_t stalk = random.nextInt(10);
+    std::int32_t tip = 1;
+    const std::int32_t total = stalk + tip;
+    for (std::int32_t step = 0; step < total; ++step) {
+        const DecorationPos next{origin.x, origin.y + 1 + step, origin.z};
+        if (!isWaterBlock(region.get(next)) || !isWaterBlock(region.get(above(next)))) {
+            std::int32_t remove = total - step;
+            const std::int32_t fromStalk = std::min(stalk, remove);
+            stalk -= fromStalk;
+            remove -= fromStalk;
+            tip -= std::min(tip, remove);
+            break;
+        }
     }
-    const std::int32_t height = 1 + random.nextInt(10);
-    for (std::int32_t level = 0; level <= height; ++level) {
-        const DecorationPos above{position.x, position.y + 1, position.z};
-        if (isWaterBlock(region.get(position)) && isWaterBlock(region.get(above)) &&
-            canKelpSurvive(region, position, bounds)) {
-            if (level == height) {
-                region.set(position, stateIdOf("kelp") + 20 + random.nextInt(4));
-            } else {
-                region.set(position, stateIdOf("kelp_plant"));
-            }
-            position = above;
-            continue;
-        }
-        if (level <= 0) {
-            return;
-        }
-        const DecorationPos previous{position.x, position.y - 1, position.z};
-        const DecorationPos belowPrevious{previous.x, previous.y - 1, previous.z};
-        if (canKelpSurvive(region, previous, bounds) &&
-            !registry::blockStateFamilies::isKelpState(region.get(belowPrevious))) {
-            region.set(previous, stateIdOf("kelp") + 20 + random.nextInt(4));
-        }
-        return;
+    DecorationPos position = origin;
+    for (std::int32_t level = 0; level < stalk; ++level) {
+        region.set(position, stateIdOf("kelp_plant"));
+        position = above(position);
+    }
+    if (tip > 0) {
+        region.set(position, stateIdOf("kelp") + 20 + random.nextInt(4));
     }
 }
 
@@ -258,32 +261,37 @@ void decorateSpecs(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEn
         if (spec->rarity.has_value() && random.nextFloat() >= 1.0F / static_cast<float>(*spec->rarity)) {
             continue;
         }
-        std::int32_t outerCount = 1;
-        if (spec->noiseToCountRatio.has_value()) {
-            outerCount = static_cast<std::int32_t>(
+        const auto inBiome = [&environment, spec](const DecorationPos& position) {
+            return std::ranges::find(spec->biomes, biomePath(environment.biomeAt(position.x, position.y,
+                                                                                 position.z))) != spec->biomes.end();
+        };
+        const auto inSquare = [&random, &chunkOrigin] {
+            const std::int32_t x = chunkOrigin.x + random.nextInt(16);
+            const std::int32_t z = chunkOrigin.z + random.nextInt(16);
+            return DecorationPos{x, chunkOrigin.y, z};
+        };
+        if (spec->kind == AquaticKind::Kelp) {
+            const std::int32_t count = static_cast<std::int32_t>(
                 noiseBasedCountPlacement(*spec->noiseToCountRatio, 80.0)(context, random, chunkOrigin).size());
+            for (std::int32_t index = 0; index < count; ++index) {
+                const std::optional<DecorationPos> target = onOceanFloor(region, inSquare(), bounds);
+                if (target.has_value() && kelpCanStart(region, *target, bounds) && inBiome(*target)) {
+                    placeKelp(region, random, *target);
+                }
+            }
+            continue;
         }
-        for (std::int32_t outer = 0; outer < outerCount; ++outer) {
-            const std::int32_t x = chunk.chunkX() * 16 + random.nextInt(16);
-            const std::int32_t z = chunk.chunkZ() * 16 + random.nextInt(16);
-            // parity: every seagrass, kelp and sea pickle patch names `OCEAN_FLOOR_WG`.
-            const std::int32_t y = context.worldgenHeight(x & 15, z & 15, HeightmapType::OceanFloor);
-            if (std::ranges::find(spec->biomes, biomePath(environment.biomeAt(x, y, z))) == spec->biomes.end()) {
+        const DecorationPos square = inSquare();
+        const std::int32_t count = spec->kind == AquaticKind::SeaPickle ? 20 : spec->bodyCount;
+        for (std::int32_t index = 0; index < count; ++index) {
+            const std::optional<DecorationPos> target = onOceanFloor(region, offsetWithinSeven(random, square), bounds);
+            if (!target.has_value() || !isWaterBlock(region.get(*target)) || !inBiome(*target)) {
                 continue;
             }
-            const DecorationPos origin{x, y, z};
-            switch (spec->kind) {
-            case AquaticKind::Seagrass:
-                for (std::int32_t body = 0; body < spec->bodyCount; ++body) {
-                    placeSeagrass(region, random, origin, spec->tallProbability, bounds);
-                }
-                break;
-            case AquaticKind::SeaPickle:
-                placeSeaPickles(region, random, origin, bounds);
-                break;
-            case AquaticKind::Kelp:
-                placeKelp(region, random, origin, bounds);
-                break;
+            if (spec->kind == AquaticKind::SeaPickle) {
+                placeSeaPickle(region, random, *target, bounds);
+            } else {
+                placeSeagrass(region, random, *target, spec->tallWeight, bounds);
             }
         }
     }

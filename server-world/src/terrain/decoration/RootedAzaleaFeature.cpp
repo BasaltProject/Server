@@ -92,7 +92,11 @@ const PathSet& treeReplaceable() {
                                   "crimson_roots",
                                   "leaf_litter",
                                   "short_dry_grass",
-                                  "tall_dry_grass"};
+                                  "tall_dry_grass",
+                                  "orange_poplar_leaves",
+                                  "red_poplar_leaves",
+                                  "yellow_poplar_leaves",
+                                  "shelf_mushroom"};
     return paths;
 }
 

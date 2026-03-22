@@ -94,56 +94,56 @@ TEST_CASE("the single-block vegetation feature places what the frozen kotlin pla
                 return r.nextInt(3) < 2 ? stateIdOf("poppy") : stateIdOf("dandelion");
             }});
         CHECK(placed == 127);
-        CHECK(checksum == 4942062415265984999LL);
+        CHECK(checksum == 5745190688952293942LL);
         CHECK(after == 1789394068);
     }
 
     SUBCASE("deadBush") {
         const auto [placed, checksum, after] = run(SimpleBlockFeature{constant("dead_bush")});
         CHECK(placed == 169);
-        CHECK(checksum == 5656803359154873394LL);
+        CHECK(checksum == -2658649164892400968LL);
         CHECK(after == -1367481220);
     }
 
     SUBCASE("lilyPad") {
         const auto [placed, checksum, after] = run(SimpleBlockFeature{constant("lily_pad")});
         CHECK(placed == 43);
-        CHECK(checksum == -2648131822595495688LL);
+        CHECK(checksum == -2155808239726704297LL);
         CHECK(after == -1367481220);
     }
 
     SUBCASE("mushroom") {
         const auto [placed, checksum, after] = run(SimpleBlockFeature{constant("red_mushroom")});
         CHECK(placed == 213);
-        CHECK(checksum == 501162659521026725LL);
+        CHECK(checksum == -3603772468154836584LL);
         CHECK(after == -1367481220);
     }
 
     SUBCASE("leafLitter") {
         const auto [placed, checksum, after] = run(SimpleBlockFeature{constant("leaf_litter")});
         CHECK(placed == 213);
-        CHECK(checksum == -4046527946432313433LL);
+        CHECK(checksum == -8788786237218315415LL);
         CHECK(after == -1367481220);
     }
 
     SUBCASE("tallGrass") {
         const auto [placed, checksum, after] = run(SimpleBlockFeature{constant("tall_grass"), true});
         CHECK(placed == 127);
-        CHECK(checksum == 103875343881789033LL);
+        CHECK(checksum == -2372492973173071718LL);
         CHECK(after == -1367481220);
     }
 
     SUBCASE("paleMoss") {
         const auto [placed, checksum, after] = run(SimpleBlockFeature{constant("pale_moss_carpet")});
         CHECK(placed == 256);
-        CHECK(checksum == 4446049513061390016LL);
+        CHECK(checksum == 1630725434913062025LL);
         CHECK(after == -1367481220);
     }
 
     SUBCASE("tickedGrass") {
         const auto [placed, checksum, after] = run(SimpleBlockFeature{constant("short_grass"), false, true});
         CHECK(placed == 127);
-        CHECK(checksum == 1459387768364207288LL);
+        CHECK(checksum == -155089451568313660LL);
         CHECK(after == -1367481220);
     }
 }
@@ -173,6 +173,6 @@ TEST_CASE("the pale moss carpet grows sides and a topper against a wall") {
         }
     }
     CHECK(placed == 144);
-    CHECK(fold(chunk, 62, 68) == 4554191091728307524LL);
+    CHECK(fold(chunk, 62, 68) == 9024416733529971098LL);
     CHECK(random.nextInt() == 435936527);
 }

@@ -26,7 +26,7 @@ namespace {
 constexpr std::array<std::string_view, 6> kContextualIds{"chorus_plant", "end_spike",        "fossil_lower",
                                                          "fossil_upper", "freeze_top_layer", "rooted_sulfur_spring"};
 
-constexpr std::array<std::string_view, 259> kIds{"acacia",
+constexpr std::array<std::string_view, 262> kIds{"acacia",
                                                  "acacia_checked",
                                                  "amethyst_geode",
                                                  "bamboo",
@@ -42,6 +42,7 @@ constexpr std::array<std::string_view, 259> kIds{"acacia",
                                                  "birch_tall",
                                                  "blackstone_blobs",
                                                  "blue_ice",
+                                                 "brown_mushroom_dappled_forest",
                                                  "brown_mushroom_nether",
                                                  "brown_mushroom_normal",
                                                  "brown_mushroom_old_growth",
@@ -198,6 +199,7 @@ constexpr std::array<std::string_view, 259> kIds{"acacia",
                                                  "patch_melon",
                                                  "patch_melon_sparse",
                                                  "patch_pumpkin",
+                                                 "patch_red_shrub",
                                                  "patch_soul_fire",
                                                  "patch_sugar_cane",
                                                  "patch_sugar_cane_badlands",
@@ -258,6 +260,7 @@ constexpr std::array<std::string_view, 259> kIds{"acacia",
                                                  "trees_birch",
                                                  "trees_birch_and_oak_leaf_litter",
                                                  "trees_cherry",
+                                                 "trees_dappled_forest",
                                                  "trees_flower_forest",
                                                  "trees_grove",
                                                  "trees_jungle",
@@ -385,7 +388,7 @@ TEST_CASE("every placed feature places what the jar places") {
         deferred += chunk.takeGeneratedBlockWrites().size();
         after = random.nextInt();
     }
-    CHECK(deferred == 71);
-    CHECK(static_cast<std::int64_t>(checksum) == -6878351793896522959LL);
-    CHECK(after == -1699011601);
+    CHECK(deferred == 72);
+    CHECK(static_cast<std::int64_t>(checksum) == 8988211321824996014LL);
+    CHECK(after == 1531331155);
 }

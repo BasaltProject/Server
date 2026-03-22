@@ -17,6 +17,10 @@ namespace treeDecorators {
 void decorate(Chunk& chunk, random::RandomSource& random, random::RandomSource& mossyCarpetRandom,
               const TreeDecoratorContext& context, const TreeDecoratorConfiguration& decorator);
 
+/// parity: `ShelfMushroomDecorator`. A fallen log is told apart by its first and last log sharing a y.
+void decorateShelfMushroom(Chunk& chunk, random::RandomSource& random, const std::vector<BlockPos>& logs,
+                           float probability);
+
 /// parity: `TreeDecorator`'s shuffle, which is `Util.shuffle`, not `Collections.shuffle`.
 void shuffle(std::vector<BlockPos>& values, random::RandomSource& random);
 
