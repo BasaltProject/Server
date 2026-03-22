@@ -122,6 +122,10 @@ public:
                                                         StructurePos position,
                                                         random::RandomSource* shared = nullptr) const;
 
+    /// The `append_loot` table of the rule that matches here, tested with the same positional random.
+    [[nodiscard]] std::optional<std::string> appendedLootAt(std::int32_t inputStateId, std::int32_t worldStateId,
+                                                            StructurePos position) const;
+
     /// parity: `processor_list/mossify_{20,70,10}_percent.json`, verbatim.
     [[nodiscard]] static StructureProcessorList mossify(float probability);
 

@@ -32,7 +32,7 @@ const BlockSet& geodeCannotReplace() {
 
 } // namespace
 
-bool oreBlockRules::canReplaceDeferred(GeneratedBlockWritePolicy policy, std::int32_t actualStateId) {
+bool oreBlockRules::canReplaceDeferred(GeneratedBlockWritePolicy policy, std::int32_t actualStateId, std::int32_t y) {
     const std::optional<registry::BlockState> block = registry::blocks::byStateId(actualStateId);
     if (!block.has_value()) {
         return false;
@@ -41,10 +41,14 @@ bool oreBlockRules::canReplaceDeferred(GeneratedBlockWritePolicy policy, std::in
     switch (policy) {
     case GeneratedBlockWritePolicy::OreBaseStone:
         return contains(baseStone(), path);
+    // parity: the 26.3 ore targets, which take tuff by height instead of by tag.
     case GeneratedBlockWritePolicy::OreStone:
-        return contains(stoneReplaceables(), path);
+        return contains(stoneBlockTags::heightSpecificOreReplaceables(), path) ? y >= 0 && y <= 2031
+                                                                               : contains(stoneReplaceables(), path);
     case GeneratedBlockWritePolicy::OreDeepslate:
-        return contains(deepslateReplaceables(), path);
+        return contains(stoneBlockTags::heightSpecificOreReplaceables(), path)
+                   ? y >= -2032 && y <= 8
+                   : contains(deepslateReplaceables(), path);
     case GeneratedBlockWritePolicy::Geode:
         return !contains(geodeCannotReplace(), path);
     case GeneratedBlockWritePolicy::Exact:

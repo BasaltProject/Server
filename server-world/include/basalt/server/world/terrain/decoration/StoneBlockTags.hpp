@@ -19,4 +19,8 @@ using PathSet = std::set<std::string, std::less<>>;
 /// parity: block tag `deepslate_ore_replaceables`.
 [[nodiscard]] const PathSet& deepslateOreReplaceables();
 
+/// parity: `minecraft:height_specific_ore_replaceables`: tuff, which since 26.3 takes the stone or the
+/// deepslate ore by height rather than by tag.
+[[nodiscard]] const PathSet& heightSpecificOreReplaceables();
+
 } // namespace basalt::server::world::terrain::decoration::stoneBlockTags

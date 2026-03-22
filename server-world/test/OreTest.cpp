@@ -3,7 +3,9 @@
 
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/world/terrain/decoration/OverworldOreConfigs.hpp>
 #include <basalt/server/world/terrain/decoration/OverworldOreDecoration.hpp>
+#include <basalt/server/world/terrain/decoration/StoneBlockTags.hpp>
 
 #include <doctest.h>
 
@@ -12,6 +14,7 @@
 #include <optional>
 #include <string>
 #include <tuple>
+#include <utility>
 
 using namespace basalt::server::world;
 using namespace basalt::server::world::terrain::decoration;
@@ -138,4 +141,26 @@ TEST_CASE("the underground ores step fills the same chunk as the frozen kotlin")
         CHECK(deferred == 2251);
         CHECK(checksum == 2781508927182871967LL);
     }
+}
+
+TEST_CASE("the 26.3 paired ore targets take tuff by height and a plain blob takes it anywhere") {
+    namespace tags = basalt::server::world::terrain::decoration::stoneBlockTags;
+    using basalt::server::world::terrain::decoration::Target;
+    using basalt::server::world::terrain::decoration::targetMatches;
+    const Target stone{&tags::stoneOreReplaceables(), 1, std::pair{0, 2031}};
+    const Target deepslate{&tags::deepslateOreReplaceables(), 2, std::pair{-2032, 8}};
+    const Target blob{&tags::baseStoneOverworld(), 3, std::nullopt};
+
+    CHECK(targetMatches(stone, "tuff", 0));
+    CHECK(targetMatches(stone, "tuff", 2031));
+    CHECK_FALSE(targetMatches(stone, "tuff", -1));
+    CHECK(targetMatches(deepslate, "tuff", 8));
+    CHECK(targetMatches(deepslate, "tuff", -64));
+    CHECK_FALSE(targetMatches(deepslate, "tuff", 9));
+    CHECK(targetMatches(blob, "tuff", 100));
+    CHECK(targetMatches(blob, "tuff", -60));
+
+    CHECK(targetMatches(stone, "granite", -60));
+    CHECK_FALSE(targetMatches(stone, "deepslate", 0));
+    CHECK(targetMatches(deepslate, "deepslate", 100));
 }

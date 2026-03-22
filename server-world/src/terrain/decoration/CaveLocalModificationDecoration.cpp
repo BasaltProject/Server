@@ -178,7 +178,7 @@ public:
 
     bool safeSet(const DecorationPos& position, std::int32_t stateId) {
         const std::optional<std::int32_t> current = get(position);
-        if (!current.has_value() || !oreBlockRules::canReplaceDeferred(GeneratedBlockWritePolicy::Geode, *current)) {
+        if (!current.has_value() || !oreBlockRules::canReplaceDeferred(GeneratedBlockWritePolicy::Geode, *current, 0)) {
             return false;
         }
         // A neighbour that does not exist yet reads as air, so testing here decides nothing for it.

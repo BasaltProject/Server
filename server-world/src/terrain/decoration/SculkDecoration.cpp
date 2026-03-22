@@ -330,8 +330,8 @@ void ChargeCursor::update(SculkRegion& region, const DecorationPos& origin, rand
     updateDelay_ = 1;
 }
 
-/// One sculk patch grown from an origin: the body of the patch, without the search for a spot.
-bool placeSculkPatchAt(SculkRegion& region, random::RandomSource& random, const DecorationPos& origin) {
+/// The sculk body of a patch grown from an origin, without the catalyst.
+bool growSculkPatch(SculkRegion& region, random::RandomSource& random, const DecorationPos& origin) {
     if (!region.canSpreadFrom(origin)) {
         return false;
     }
@@ -341,9 +341,61 @@ bool placeSculkPatchAt(SculkRegion& region, random::RandomSource& random, const 
             cursor.update(region, origin, random);
         }
     }
-    if (random.nextFloat() <= 0.5F && region.hasFullCollision(offsetBy(origin, kDirections[0]))) {
+    return true;
+}
+
+[[nodiscard]] bool hasSturdyFloor(const SculkRegion& region, const DecorationPos& position) {
+    return region.hasSturdyFace(offsetBy(position, kDirections[0]), kDirections[1]);
+}
+
+/// parity: 26.3's catalyst step: a `random_chance` of one half, strictly below, then a sturdy top
+/// face under the catalyst.
+void placeCatalyst(SculkRegion& region, random::RandomSource& random, const DecorationPos& origin) {
+    if (random.nextFloat() < 0.5F && hasSturdyFloor(region, origin)) {
         region.set(origin, sculk::states().catalyst);
     }
+}
+
+/// parity: the ancient city's shrieker step: one to three tries within two blocks on every axis,
+/// each wanting air on a sturdy floor.
+void placeShriekers(SculkRegion& region, random::RandomSource& random, const DecorationPos& origin) {
+    const std::int32_t count = random.nextInt(3) + 1;
+    for (std::int32_t index = 0; index < count; ++index) {
+        const std::int32_t dx = random.nextInt(5) - 2;
+        const std::int32_t dy = random.nextInt(5) - 2;
+        const std::int32_t dz = random.nextInt(5) - 2;
+        const DecorationPos target{origin.x + dx, origin.y + dy, origin.z + dz};
+        const std::optional<std::int32_t> here = region.get(target);
+        if (!here.has_value() || !registry::blocks::isAir(*here) || !hasSturdyFloor(region, target)) {
+            continue;
+        }
+        static const std::int32_t summoning = [] {
+            const std::optional<std::int32_t> state =
+                registry::blocks::stateIdOf(wire::common::Identifier::vanilla("sculk_shrieker"),
+                                            {{"can_summon", "true"}, {"shrieking", "false"}, {"waterlogged", "false"}});
+            return state.value_or(sculk::states().shrieker);
+        }();
+        region.set(target, summoning);
+    }
+}
+
+/// parity: `sculk_patch_deep_dark`, a `sequence` of the patch and then the catalyst.
+bool placeSculkPatchAt(SculkRegion& region, random::RandomSource& random, const DecorationPos& origin) {
+    if (!growSculkPatch(region, random, origin)) {
+        return false;
+    }
+    placeCatalyst(region, random, origin);
+    return true;
+}
+
+/// parity: `sculk_patch_ancient_city`, the patch and then an `overlay` of the catalyst and the
+/// summoning shriekers.
+bool placeAncientCitySculkPatchAt(SculkRegion& region, random::RandomSource& random, const DecorationPos& origin) {
+    if (!growSculkPatch(region, random, origin)) {
+        return false;
+    }
+    placeCatalyst(region, random, origin);
+    placeShriekers(region, random, origin);
     return true;
 }
 
@@ -415,8 +467,11 @@ void sculkDecoration::decorate(Chunk& chunk, const std::int64_t seed,
 bool sculkDecoration::placeAt(Chunk& chunk, random::RandomSource& random, const DecorationPos& origin,
                               const std::string_view placedFeature) {
     SculkRegion region{chunk, nullptr};
-    if (placedFeature == "sculk_patch_deep_dark" || placedFeature == "sculk_patch_ancient_city") {
+    if (placedFeature == "sculk_patch_deep_dark") {
         return placeSculkPatchAt(region, random, origin);
+    }
+    if (placedFeature == "sculk_patch_ancient_city") {
+        return placeAncientCitySculkPatchAt(region, random, origin);
     }
     if (placedFeature == "sculk_vein") {
         return sculk::placeMultifaceGrowth(region, random, origin);

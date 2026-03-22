@@ -154,6 +154,18 @@ std::optional<std::int32_t> StructureProcessorList::processAt(const std::int32_t
     return process(inputStateId, worldStateId, random);
 }
 
+std::optional<std::string> StructureProcessorList::appendedLootAt(const std::int32_t inputStateId,
+                                                                  const std::int32_t worldStateId,
+                                                                  const StructurePos position) const {
+    random::RandomSource random = positionalRandom(position);
+    for (const StructureProcessorRule& rule : rules_) {
+        if (rule.apply(inputStateId, worldStateId, random).has_value()) {
+            return rule.appendLootTable;
+        }
+    }
+    return std::nullopt;
+}
+
 StructureProcessorList StructureProcessorList::mossify(const float probability) {
     const auto blockId = [](std::string_view path) {
         const registry::BlockState* found = registry::blocks::named(path);

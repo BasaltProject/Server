@@ -321,7 +321,8 @@ struct ProcessedBlock {
 /// parity: `AppendLoot`, the block entity modifier a processor rule carries. It builds the tag even
 /// when the template block had none, and takes the seed from the same positional random the rule was
 /// tested with.
-void placeAppendedLoot(Chunk& chunk, std::int32_t stateId, StructurePos worldPos, const std::string& table) {
+void placeAppendedLoot(Chunk& chunk, std::int32_t stateId, StructurePos worldPos, const std::string& table,
+                       const std::optional<NbtCompound>& existing = std::nullopt) {
     static const std::map<std::string, std::string, std::less<>> types{{"suspicious_sand", "brushable_block"},
                                                                        {"suspicious_gravel", "brushable_block"}};
     const auto type = types.find(pathOf(stateId));
@@ -330,7 +331,8 @@ void placeAppendedLoot(Chunk& chunk, std::int32_t stateId, StructurePos worldPos
     }
     random::RandomSource lootRandom = random::RandomSource::worldgen(
         random::RandomSource::legacy(random::positionalSeed(worldPos.x, worldPos.y, worldPos.z)));
-    NbtCompound data;
+    NbtCompound data = existing.value_or(NbtCompound{});
+    data.remove("id");
     data.set("LootTable", NbtTag::ofString(table));
     data.set("LootTableSeed", NbtTag::ofLong(lootRandom.nextLong()));
     chunk.setDecorationBlockEntity(
@@ -613,6 +615,7 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
 
     std::vector<Resolved> resolved;
     resolved.reserve(processedBlocks.size());
+    std::map<std::size_t, std::string> ruleLoot;
     for (const ProcessedBlock& entry : processedBlocks) {
         const StructureBlockInfo& blockInfo = *entry.block;
         const std::int32_t processorLocalX = entry.processorPos.x & 15;
@@ -646,6 +649,12 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
                     ? blockInfo.properties
                     : registry::blockStateDefinitions::propertiesOf(*processedStateId);
             stateId = transformedStateId(*processedStateId, properties, placement.mirror, placement.rotation);
+            // parity: a plain `RuleProcessor` rule hands its `append_loot` to the block it outputs.
+            if (std::optional<std::string> loot =
+                    processors.appendedLootAt(blockInfo.stateId, worldStateId, entry.processorPos);
+                loot.has_value()) {
+                ruleLoot[resolved.size()] = std::move(*loot);
+            }
         } else {
             stateId = transformedStateId(blockInfo.stateId, blockInfo.properties, placement.mirror, placement.rotation);
         }
@@ -670,7 +679,7 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
         cappedStates.push_back(entry.stateId);
     }
     // The loot a capped rule hands its output, kept by index so the entity goes down with the block.
-    std::map<std::size_t, std::string> cappedLoot;
+    std::map<std::size_t, std::string> cappedLoot = std::move(ruleLoot);
     if (placement.worldSeed.has_value()) {
         for (const CappedRules& capped : processors.capped()) {
             for (const auto& [index, rule] : capped.choose(cappedStates, *placement.worldSeed, placement.position)) {
@@ -709,7 +718,7 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
         }
         placeBlockEntityInto(chunk, *entry.block, finalStateId, entry.worldPos, placement.random, false);
         if (const auto loot = cappedLoot.find(index); loot != cappedLoot.end()) {
-            placeAppendedLoot(chunk, finalStateId, entry.worldPos, loot->second);
+            placeAppendedLoot(chunk, finalStateId, entry.worldPos, loot->second, entry.block->blockEntityNbt);
         }
     }
     placeEntities(chunk, placement.position, placement.rotation, placement.mirror, placement.pivot, &placement.clipTo);

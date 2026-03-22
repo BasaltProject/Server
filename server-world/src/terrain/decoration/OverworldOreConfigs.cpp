@@ -89,18 +89,25 @@ const BlockSet& allBiomesExcept(std::string_view name) {
 }
 
 [[nodiscard]] ConfiguredOre singleTarget(std::int32_t size, float discard, std::string_view block) {
-    return ConfiguredOre{size, discard, {Target{&baseStoneOverworld(), stateIdOf(block)}}};
+    return ConfiguredOre{size, discard, {Target{&baseStoneOverworld(), stateIdOf(block), std::nullopt}}};
 }
 
 [[nodiscard]] ConfiguredOre pairedTarget(std::int32_t size, float discard, std::string_view stoneBlock,
                                          std::string_view deepslateBlock) {
     return ConfiguredOre{size,
                          discard,
-                         {Target{&stoneOreReplaceables(), stateIdOf(stoneBlock)},
-                          Target{&deepslateOreReplaceables(), stateIdOf(deepslateBlock)}}};
+                         {Target{&stoneOreReplaceables(), stateIdOf(stoneBlock), std::pair{0, 2031}},
+                          Target{&deepslateOreReplaceables(), stateIdOf(deepslateBlock), std::pair{-2032, 8}}}};
 }
 
 } // namespace
+
+bool targetMatches(const Target& target, std::string_view blockPath, std::int32_t y) {
+    if (target.heightSpecific.has_value() && stoneBlockTags::heightSpecificOreReplaceables().contains(blockPath)) {
+        return y >= target.heightSpecific->first && y <= target.heightSpecific->second;
+    }
+    return target.replaceable->contains(blockPath);
+}
 
 const BlockSet& allBiomes() {
     static const BlockSet blocks = {"plains",

@@ -102,13 +102,13 @@ struct Run {
 
 } // namespace
 
-TEST_CASE("the warm ocean coral grows the way the frozen kotlin grows it") {
+TEST_CASE("the warm ocean coral grows through its 26.3 selector and block decoration") {
     SUBCASE("warmOcean") {
         const Run result = run("minecraft:warm_ocean");
-        CHECK(result.coral == 82);
-        CHECK(result.pickles == 2);
-        CHECK(result.deferred == 22);
-        CHECK(result.checksum == -3620415295164952641LL);
+        CHECK(result.coral == 66);
+        CHECK(result.pickles == 1);
+        CHECK(result.deferred == 0);
+        CHECK(result.checksum == -7602448174750216477LL);
     }
 
     SUBCASE("coldOcean") {
@@ -120,7 +120,7 @@ TEST_CASE("the warm ocean coral grows the way the frozen kotlin grows it") {
     }
 }
 
-TEST_CASE("one coral growth at one position matches the frozen kotlin") {
+TEST_CASE("one coral growth at one position follows the 26.3 selector") {
     std::uint64_t checksum = 14695981039346656037ULL;
     std::int32_t coral = 0;
     std::int32_t pickles = 0;
@@ -136,13 +136,13 @@ TEST_CASE("one coral growth at one position matches the frozen kotlin") {
         pickles += folded.pickles;
         after = random.nextInt();
     }
-    CHECK(coral == 453);
-    CHECK(pickles == 12);
-    CHECK(static_cast<std::int64_t>(checksum) == -3150423251263216618LL);
-    CHECK(after == 1275084501);
+    CHECK(coral == 468);
+    CHECK(pickles == 7);
+    CHECK(static_cast<std::int64_t>(checksum) == 523249719683037877LL);
+    CHECK(after == 949668451);
 }
 
-TEST_CASE("the coral vegetal entry matches the frozen kotlin") {
+TEST_CASE("the coral vegetal entry follows the 26.3 selector") {
     const BiomeVegetalDecoration step = coralDecoration::vegetalDecoration();
     std::uint64_t checksum = 14695981039346656037ULL;
     std::int32_t coral = 0;
@@ -158,8 +158,8 @@ TEST_CASE("the coral vegetal entry matches the frozen kotlin") {
         pickles += folded.pickles;
         deferred += chunk.takeGeneratedBlockWrites().size();
     }
-    CHECK(coral == 403);
-    CHECK(pickles == 14);
-    CHECK(deferred == 312);
-    CHECK(static_cast<std::int64_t>(checksum) == 4938892343421358200LL);
+    CHECK(coral == 415);
+    CHECK(pickles == 6);
+    CHECK(deferred == 97);
+    CHECK(static_cast<std::int64_t>(checksum) == -1192326969171252379LL);
 }

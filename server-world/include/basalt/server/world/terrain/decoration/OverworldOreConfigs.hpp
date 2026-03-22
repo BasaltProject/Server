@@ -5,8 +5,11 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 namespace basalt::server::world::terrain::decoration {
@@ -16,7 +19,13 @@ using BlockSet = std::set<std::string, std::less<>>;
 struct Target {
     const BlockSet* replaceable;
     std::int32_t stateId;
+    /// parity: 26.3's `height_match` on `#height_specific_ore_replaceables`: the inclusive y range in
+    /// which this target takes those blocks instead of its tag.
+    std::optional<std::pair<std::int32_t, std::int32_t>> heightSpecific;
 };
+
+/// parity: the 26.3 ore target rule: a height specific block by its y range, anything else by tag.
+[[nodiscard]] bool targetMatches(const Target& target, std::string_view blockPath, std::int32_t y);
 
 struct ConfiguredOre {
     std::int32_t size = 0;
