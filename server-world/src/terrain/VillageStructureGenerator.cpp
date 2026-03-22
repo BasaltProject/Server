@@ -46,11 +46,35 @@ VillageStructureGenerator::VillageStructureGenerator(NoiseRouter router, structu
                                                      BiomeAt biomeAt, std::int32_t maxDepth,
                                                      std::int32_t maxDistanceFromCenter, PoolLookup poolLookup,
                                                      structure::PoolTemplateLoader templateLoader)
+    : VillageStructureGenerator(std::move(router), std::move(grid), std::move(biomeAt), maxDepth, maxDistanceFromCenter,
+                                std::move(poolLookup), std::move(templateLoader), villageVariants()) {}
+
+VillageStructureGenerator::VillageStructureGenerator(NoiseRouter router, structure::StructurePlacementGrid grid,
+                                                     BiomeAt biomeAt, std::int32_t maxDepth,
+                                                     std::int32_t maxDistanceFromCenter, PoolLookup poolLookup,
+                                                     structure::PoolTemplateLoader templateLoader,
+                                                     std::vector<Variant> variants)
     : router_(std::move(router)), grid_(std::move(grid)), biomeAt_(std::move(biomeAt)), maxDepth_(maxDepth),
       maxDistanceFromCenter_(maxDistanceFromCenter), poolLookup_(std::move(poolLookup)),
-      templateLoader_(std::move(templateLoader)) {}
+      templateLoader_(std::move(templateLoader)), variants_(std::move(variants)) {
+    for (const Variant& variant : variants_) {
+        placementVariants_.push_back(&variant);
+    }
+    std::sort(placementVariants_.begin(), placementVariants_.end(), [](const Variant* first, const Variant* second) {
+        return first->structureIndex < second->structureIndex;
+    });
+}
 
-const std::vector<VillageStructureGenerator::Variant>& VillageStructureGenerator::variants() {
+std::vector<wire::common::Identifier> VillageStructureGenerator::ids() const {
+    std::vector<wire::common::Identifier> all;
+    all.reserve(variants_.size());
+    for (const Variant& variant : variants_) {
+        all.push_back(variant.id);
+    }
+    return all;
+}
+
+const std::vector<VillageStructureGenerator::Variant>& VillageStructureGenerator::villageVariants() {
     static const std::vector<Variant> built{
         {wire::common::Identifier::vanilla("village_plains"),
          "minecraft:village/plains/town_centers",
@@ -70,26 +94,11 @@ const std::vector<VillageStructureGenerator::Variant>& VillageStructureGenerator
     return built;
 }
 
-const std::vector<const VillageStructureGenerator::Variant*>& VillageStructureGenerator::placementVariants() {
-    static const std::vector<const Variant*> built = [] {
-        std::vector<const Variant*> all;
-        all.reserve(variants().size());
-        for (const Variant& variant : variants()) {
-            all.push_back(&variant);
-        }
-        std::sort(all.begin(), all.end(), [](const Variant* first, const Variant* second) {
-            return first->structureIndex < second->structureIndex;
-        });
-        return all;
-    }();
-    return built;
-}
-
 const std::vector<wire::common::Identifier>& VillageStructureGenerator::structureIds() {
     static const std::vector<wire::common::Identifier> built = [] {
         std::vector<wire::common::Identifier> all;
-        all.reserve(variants().size());
-        for (const Variant& variant : variants()) {
+        all.reserve(villageVariants().size());
+        for (const Variant& variant : villageVariants()) {
             all.push_back(variant.id);
         }
         return all;
@@ -134,12 +143,31 @@ const VillageStructureGenerator::Variant* VillageStructureGenerator::selectVaria
                                                                                    Samplers& samplers) const {
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::legacy(0));
     random::setLargeFeatureSeed(random, seed, candidateChunkX, candidateChunkZ);
-    const std::int32_t centreX = candidateChunkX * 16 + 8;
-    const std::int32_t centreZ = candidateChunkZ * 16 + 8;
-    const std::string biome = withoutNamespace(biomeAt_(centreX, surfaceHeightAt(centreX, centreZ, samplers), centreZ));
+    // parity: `Structure.isValidBiome` reads the biome at the generation stub, which
+    // `JigsawPlacement.addPieces` puts at the centre of the start piece's box, projected to the
+    // surface. Each variant draws its own start piece from its own copy of the structure random.
+    const auto inBiome = [&](const Variant& variant) {
+        const structure::StructureTemplatePool* pool = poolLookup_(variant.startPool);
+        if (pool == nullptr) {
+            return false;
+        }
+        random::RandomSource startRandom = random::RandomSource::worldgen(random::RandomSource::legacy(0));
+        random::setLargeFeatureSeed(startRandom, seed, candidateChunkX, candidateChunkZ);
+        const structure::StructureRotation rotation = structure::structureRotations::random(startRandom);
+        const structure::StructurePoolElement& element = pool->getRandomTemplate(startRandom);
+        if (element.kind() == structure::StructurePoolElement::Kind::Empty) {
+            return false;
+        }
+        const StructureBoundingBox box = element.getBoundingBox(
+            templateLoader_, StructurePos{candidateChunkX * 16, 0, candidateChunkZ * 16}, rotation);
+        const std::int32_t centreX = (box.maxX + box.minX) / 2;
+        const std::int32_t centreZ = (box.maxZ + box.minZ) / 2;
+        return variant.biomes.contains(
+            withoutNamespace(biomeAt_(centreX, surfaceHeightAt(centreX, centreZ, samplers), centreZ)));
+    };
     std::vector<const Variant*> options;
-    options.reserve(variants().size());
-    for (const Variant& variant : variants()) {
+    options.reserve(variants_.size());
+    for (const Variant& variant : variants_) {
         options.push_back(&variant);
     }
     std::int32_t total = static_cast<std::int32_t>(options.size());
@@ -155,7 +183,7 @@ const VillageStructureGenerator::Variant* VillageStructureGenerator::selectVaria
             ++index;
         }
         const Variant* variant = options[index];
-        if (variant->biomes.contains(biome)) {
+        if (inBiome(*variant)) {
             return variant;
         }
         options.erase(options.begin() + static_cast<std::ptrdiff_t>(index));
@@ -256,7 +284,7 @@ void VillageStructureGenerator::generateInto(Chunk& chunk, std::int32_t chunkX, 
     const std::vector<std::shared_ptr<const VillageStart>> starts = referencedStarts(chunkX, chunkZ, seed, clip);
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::xoroshiro(seed));
     const std::int64_t decorationSeed = random::setDecorationSeed(random, seed, chunkX * 16, chunkZ * 16);
-    for (const Variant* variant : placementVariants()) {
+    for (const Variant* variant : placementVariants_) {
         random::setFeatureSeed(random, decorationSeed, variant->structureIndex, kSurfaceStructuresStep);
         for (const std::shared_ptr<const VillageStart>& start : starts) {
             if (start->variant != variant) {
@@ -322,7 +350,7 @@ std::optional<std::vector<PlacedStructurePiece>>
 VillageStructureGenerator::assembleAt(const wire::common::Identifier& structure, std::int32_t chunkX,
                                       std::int32_t chunkZ, std::int64_t seed) const {
     const Variant* found = nullptr;
-    for (const Variant& variant : variants()) {
+    for (const Variant& variant : variants_) {
         if (variant.id == structure) {
             found = &variant;
             break;

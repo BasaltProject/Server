@@ -73,9 +73,9 @@ TEST_CASE("the nether basalt pillar builds what the frozen kotlin builds") {
             basalt += chunkBasalt;
             deferred += chunk.takeGeneratedBlockWrites().size();
         }
-        CHECK(basalt == 411);
+        CHECK(basalt == 332);
         CHECK(deferred == 0);
-        CHECK(static_cast<std::int64_t>(checksum) == -6370570254058974441LL);
+        CHECK(static_cast<std::int64_t>(checksum) == 8757461921920074297LL);
     }
 
     SUBCASE("wastes") {
@@ -108,8 +108,8 @@ TEST_CASE("the nether basalt pillar builds what the frozen kotlin builds") {
             basalt += chunkBasalt;
             after = random.nextInt();
         }
-        CHECK(basalt == 2614);
-        CHECK(static_cast<std::int64_t>(checksum) == -3902505656793383440LL);
-        CHECK(after == -1046653646);
+        CHECK(basalt == 2597);
+        CHECK(static_cast<std::int64_t>(checksum) == 2382979694484101278LL);
+        CHECK(after == 2098350802);
     }
 }

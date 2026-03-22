@@ -1,7 +1,7 @@
 #include <basalt/server/random/WorldgenSeeds.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/world/structure/StructureProcessor.hpp>
 #include <basalt/server/world/terrain/decoration/DesertWellDecoration.hpp>
-#include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <array>
 #include <cstdint>
@@ -13,11 +13,19 @@
 namespace basalt::server::world::terrain::decoration {
 namespace {
 
+using structure::StructurePos;
+using structure::StructureRotation;
+
 constexpr std::int32_t kSurfaceStructuresStep = 4;
 constexpr std::int32_t kGlobalIndex = 2;
 
-constexpr std::array<std::pair<std::int32_t, std::int32_t>, 4> kHorizontalDirections = {
-    {{0, -1}, {1, 0}, {0, 1}, {-1, 0}}};
+/// parity: `Rotation.values()`, the order `TemplateFeature` draws its rotation from.
+constexpr std::array<StructureRotation, 4> kRotations{StructureRotation::None, StructureRotation::Clockwise90,
+                                                      StructureRotation::Clockwise180,
+                                                      StructureRotation::Counterclockwise90};
+
+/// parity: the suspicious sand's five spots, the centre first and then west, south, east and north.
+constexpr std::array<std::pair<std::int32_t, std::int32_t>, 5> kSandOffsets{{{0, 0}, {-1, 0}, {0, 1}, {1, 0}, {0, -1}}};
 
 [[nodiscard]] std::int32_t stateIdOf(std::string_view path) {
     const registry::BlockState* found = registry::blocks::named(path);
@@ -27,8 +35,6 @@ constexpr std::array<std::pair<std::int32_t, std::int32_t>, 4> kHorizontalDirect
     return found->stateId;
 }
 
-/// parity: El pozo abarca varios bloques alrededor de su origen, asi que cae sobre el borde a menudo.
-/// Vanilla escribe ahi por el `WorldGenLevel`; recortar pierde el trozo que asoma. Coordenadas de mundo.
 [[nodiscard]] std::int32_t get(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z) {
     const ChunkHeight bounds = chunk.verticalBounds();
     if (y < bounds.minY() || y > bounds.maxY()) {
@@ -37,114 +43,80 @@ constexpr std::array<std::pair<std::int32_t, std::int32_t>, 4> kHorizontalDirect
     return chunk.decorationBlockStateId(x, y, z);
 }
 
-void set(Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId) {
-    const ChunkHeight bounds = chunk.verticalBounds();
-    if (y >= bounds.minY() && y <= bounds.maxY()) {
-        chunk.setDecorationBlockStateId(x, y, z, stateId);
+/// parity: the rule the two suspicious sand templates carry: the sand keeps its state and gains the
+/// well's archaeology loot table.
+const structure::StructureProcessorList& suspiciousSandProcessors() {
+    static const structure::StructureProcessorList list{{structure::StructureProcessorRule{
+        .inputTest = structure::StructureRuleTest::blockMatch(stateIdOf("suspicious_sand")),
+        .outputStateId = stateIdOf("suspicious_sand"),
+        .appendLootTable = "minecraft:archaeology/desert_well"}}};
+    return list;
+}
+
+/// parity: `Rotation.rotate` of a horizontal direction, as a step.
+[[nodiscard]] std::pair<std::int32_t, std::int32_t> rotateStep(std::pair<std::int32_t, std::int32_t> step,
+                                                               StructureRotation rotation) {
+    const auto [dx, dz] = step;
+    switch (rotation) {
+    case StructureRotation::None:
+        return {dx, dz};
+    case StructureRotation::Clockwise90:
+        return {-dz, dx};
+    case StructureRotation::Clockwise180:
+        return {-dx, -dz};
+    case StructureRotation::Counterclockwise90:
+        return {dz, -dx};
     }
+    return {dx, dz};
 }
 
-[[nodiscard]] bool isAir(const Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z) {
-    return registry::blocks::isAir(get(chunk, x, y, z));
-}
-
-/// parity: `BlockPos.asLong`, which is what seeds the buried loot.
-[[nodiscard]] std::int64_t packedBlockPosition(std::int32_t x, std::int32_t y, std::int32_t z) {
-    return ((static_cast<std::int64_t>(x) & 0x3FFFFFFLL) << 38) | ((static_cast<std::int64_t>(z) & 0x3FFFFFFLL) << 12) |
-           (static_cast<std::int64_t>(y) & 0xFFFLL);
-}
-
-/// Coordinates are world ones, like the rest of the well.
-void placeSuspiciousSand(Chunk& chunk, std::int32_t x, std::int32_t y, std::int32_t z) {
-    const ChunkHeight bounds = chunk.verticalBounds();
-    if (y < bounds.minY() || y > bounds.maxY()) {
+/// parity: `TemplateFeature`: a weighted pick of its one template, a random rotation, and the
+/// template centred on the origin by half its size along the rotated west and north.
+void placeTemplate(Chunk& chunk, random::RandomSource& random, StructurePos origin, std::string_view name,
+                   const structure::TemplateLoader& templates, const structure::StructureProcessorList* processors) {
+    static_cast<void>(random.nextInt(1));
+    const StructureRotation rotation = kRotations[static_cast<std::size_t>(random.nextInt(4))];
+    const structure::StructureTemplate* found = templates(wire::common::Identifier::vanilla(std::string{name}));
+    if (found == nullptr) {
         return;
     }
-    const std::int32_t stateId = stateIdOf("suspicious_sand");
-    chunk.setDecorationBlockStateId(x, y, z, stateId);
-    wire::nbt::NbtCompound data;
-    data.putString("LootTable", "minecraft:archaeology/desert_well");
-    data.putLong("LootTableSeed", packedBlockPosition(x, y, z));
-    // The brushable block entity travels with its sand, so one that landed in a neighbour still
-    // carries its loot table when that chunk arrives.
-    chunk.setDecorationBlockEntity(x, y, z, stateId, wire::common::Identifier::vanilla("brushable_block"),
-                                   std::move(data));
+    const auto [westX, westZ] = rotateStep({-1, 0}, rotation);
+    const auto [northX, northZ] = rotateStep({0, -1}, rotation);
+    const StructurePos size = found->size();
+    const StructurePos position{origin.x + westX * (size.x / 2) + northX * (size.z / 2), origin.y,
+                                origin.z + westZ * (size.x / 2) + northZ * (size.z / 2)};
+    const ChunkHeight bounds = chunk.verticalBounds();
+    structure::TemplatePlacement placement;
+    placement.position = position;
+    placement.rotation = rotation;
+    placement.pivot = StructurePos{0, 0, 0};
+    // parity: a feature writes as far as the region reaches, the chunk and one ring around it.
+    placement.clipTo =
+        structure::StructureBoundingBox{chunk.chunkX() * 16 - 16, bounds.minY(), chunk.chunkZ() * 16 - 16,
+                                        chunk.chunkX() * 16 + 31, bounds.maxY(), chunk.chunkZ() * 16 + 31};
+    placement.processors = processors;
+    placement.settingsRandom = &random;
+    found->placeInto(chunk, placement);
 }
 
 } // namespace
 
-void desertWellDecoration::placeAt(Chunk& chunk, random::RandomSource& random, std::int32_t originX,
-                                   std::int32_t suppliedY, std::int32_t originZ) {
-    const ChunkHeight bounds = chunk.verticalBounds();
-    std::int32_t originY = suppliedY + 1;
-    while (isAir(chunk, originX, originY, originZ) && originY > bounds.minY() + 2) {
-        --originY;
-    }
-    if (get(chunk, originX, originY, originZ) != stateIdOf("sand")) {
+void desertWellDecoration::placeAt(Chunk& chunk, random::RandomSource& random, std::int32_t x, std::int32_t y,
+                                   std::int32_t z, const structure::TemplateLoader& templates) {
+    if (!templates) {
         return;
     }
-    // Refuses to build over a hollow: any column in the 5 by 5 footprint with two air blocks under
-    // it aborts the whole well.
-    for (std::int32_t offsetX = -2; offsetX <= 2; ++offsetX) {
-        for (std::int32_t offsetZ = -2; offsetZ <= 2; ++offsetZ) {
-            if (isAir(chunk, originX + offsetX, originY - 1, originZ + offsetZ) &&
-                isAir(chunk, originX + offsetX, originY - 2, originZ + offsetZ)) {
-                return;
-            }
-        }
+    // parity: the 26.3 `desert_well`, an `overlay` of the well and two suspicious sand blocks.
+    placeTemplate(chunk, random, StructurePos{x, y - 2, z}, "desert_well/well", templates, nullptr);
+    for (const std::int32_t depth : {1, 2}) {
+        const auto [dx, dz] = kSandOffsets[static_cast<std::size_t>(random.nextInt(kSandOffsets.size()))];
+        placeTemplate(chunk, random, StructurePos{x + dx, y - depth, z + dz}, "desert_well/suspicious_sand", templates,
+                      &suspiciousSandProcessors());
     }
-
-    for (std::int32_t offsetY = -2; offsetY <= 0; ++offsetY) {
-        for (std::int32_t offsetX = -2; offsetX <= 2; ++offsetX) {
-            for (std::int32_t offsetZ = -2; offsetZ <= 2; ++offsetZ) {
-                set(chunk, originX + offsetX, originY + offsetY, originZ + offsetZ, stateIdOf("sandstone"));
-            }
-        }
-    }
-    set(chunk, originX, originY, originZ, registry::blocks::water().stateId);
-    for (const auto& [offsetX, offsetZ] : kHorizontalDirections) {
-        set(chunk, originX + offsetX, originY, originZ + offsetZ, registry::blocks::water().stateId);
-    }
-    set(chunk, originX, originY - 1, originZ, stateIdOf("sand"));
-    for (const auto& [offsetX, offsetZ] : kHorizontalDirections) {
-        set(chunk, originX + offsetX, originY - 1, originZ + offsetZ, stateIdOf("sand"));
-    }
-
-    for (std::int32_t offsetX = -2; offsetX <= 2; ++offsetX) {
-        for (std::int32_t offsetZ = -2; offsetZ <= 2; ++offsetZ) {
-            if (offsetX == -2 || offsetX == 2 || offsetZ == -2 || offsetZ == 2) {
-                set(chunk, originX + offsetX, originY + 1, originZ + offsetZ, stateIdOf("sandstone"));
-            }
-        }
-    }
-    set(chunk, originX + 2, originY + 1, originZ, stateIdOf("sandstone_slab"));
-    set(chunk, originX - 2, originY + 1, originZ, stateIdOf("sandstone_slab"));
-    set(chunk, originX, originY + 1, originZ + 2, stateIdOf("sandstone_slab"));
-    set(chunk, originX, originY + 1, originZ - 2, stateIdOf("sandstone_slab"));
-
-    for (std::int32_t offsetX = -1; offsetX <= 1; ++offsetX) {
-        for (std::int32_t offsetZ = -1; offsetZ <= 1; ++offsetZ) {
-            set(chunk, originX + offsetX, originY + 4, originZ + offsetZ,
-                offsetX == 0 && offsetZ == 0 ? stateIdOf("sandstone") : stateIdOf("sandstone_slab"));
-        }
-    }
-    for (std::int32_t offsetY = 1; offsetY <= 3; ++offsetY) {
-        set(chunk, originX - 1, originY + offsetY, originZ - 1, stateIdOf("sandstone"));
-        set(chunk, originX - 1, originY + offsetY, originZ + 1, stateIdOf("sandstone"));
-        set(chunk, originX + 1, originY + offsetY, originZ - 1, stateIdOf("sandstone"));
-        set(chunk, originX + 1, originY + offsetY, originZ + 1, stateIdOf("sandstone"));
-    }
-
-    static constexpr std::array<std::pair<std::int32_t, std::int32_t>, 5> kWaterOffsets = {
-        {{0, 0}, {1, 0}, {0, 1}, {-1, 0}, {0, -1}}};
-    const auto& shallow = kWaterOffsets[static_cast<std::size_t>(random.nextInt(kWaterOffsets.size()))];
-    placeSuspiciousSand(chunk, originX + shallow.first, originY - 1, originZ + shallow.second);
-    const auto& deep = kWaterOffsets[static_cast<std::size_t>(random.nextInt(kWaterOffsets.size()))];
-    placeSuspiciousSand(chunk, originX + deep.first, originY - 2, originZ + deep.second);
 }
 
-void desertWellDecoration::decorate(Chunk& chunk, std::int64_t seed,
-                                    const surface::SurfaceRuleEnvironment& environment) {
+void desertWellDecoration::decorate(Chunk& chunk, std::int64_t seed, const surface::SurfaceRuleEnvironment& environment,
+                                    const structure::TemplateLoader& templates) {
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::xoroshiro(seed));
     const std::int64_t decorationSeed =
         random::setDecorationSeed(random, seed, chunk.chunkX() * 16, chunk.chunkZ() * 16);
@@ -154,15 +126,33 @@ void desertWellDecoration::decorate(Chunk& chunk, std::int64_t seed,
     }
     const std::int32_t localX = random.nextInt(16);
     const std::int32_t localZ = random.nextInt(16);
-    const std::int32_t suppliedY = chunk.heightAt(localX, localZ, HeightmapType::WorldSurface);
-    const std::int32_t worldX = chunk.chunkX() * 16 + localX;
-    const std::int32_t worldZ = chunk.chunkZ() * 16 + localZ;
-    const std::string& biome = environment.biomeAt(worldX, suppliedY, worldZ);
+    const std::int32_t height = chunk.heightAt(localX, localZ, HeightmapType::MotionBlocking);
+    if (height <= chunk.verticalBounds().minY()) {
+        return;
+    }
+    const std::int32_t x = chunk.chunkX() * 16 + localX;
+    const std::int32_t y = height - 1;
+    const std::int32_t z = chunk.chunkZ() * 16 + localZ;
+    // parity: the placement's own filter: sand here, and nothing but solid ground in the 5 by 5 by 2
+    // box under it.
+    if (get(chunk, x, y, z) != stateIdOf("sand")) {
+        return;
+    }
+    for (std::int32_t dx = -2; dx <= 2; ++dx) {
+        for (std::int32_t dz = -2; dz <= 2; ++dz) {
+            for (std::int32_t dy = -2; dy <= -1; ++dy) {
+                if (registry::blocks::isAir(get(chunk, x + dx, y + dy, z + dz))) {
+                    return;
+                }
+            }
+        }
+    }
+    const std::string& biome = environment.biomeAt(x, y, z);
     const std::size_t colon = biome.find(':');
     if ((colon == std::string::npos ? biome : biome.substr(colon + 1)) != "desert") {
         return;
     }
-    placeAt(chunk, random, worldX, suppliedY, worldZ);
+    placeAt(chunk, random, x, y, z, templates);
 }
 
 } // namespace basalt::server::world::terrain::decoration

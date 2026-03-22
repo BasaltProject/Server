@@ -40,10 +40,11 @@ struct QueuedPiece {
     std::int32_t order = 0;
 };
 
-/// parity: `JigsawBlock.canAttach`.
+/// parity: `JigsawBlock.canAttach`. 26.3 lets a jigsaw without a name, a feature element's, take
+/// any target.
 [[nodiscard]] bool canAttach(const PlacedJigsaw& source, const PlacedJigsaw& target) {
     return source.front == opposite(target.front) && (source.rollable || source.top == target.top) &&
-           source.target == target.name;
+           (target.name.empty() || source.target == target.name);
 }
 
 [[nodiscard]] StructurePos plus(StructurePos first, StructurePos second) {

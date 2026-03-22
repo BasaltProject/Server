@@ -30,6 +30,8 @@ namespace basalt::server::world::terrain {
 /// leaves its slot null and the step is skipped.
 struct TerrainStructureGenerators {
     VillageStructureGenerator* village = nullptr;
+    /// The 26.3 `abandoned_camp` set, the same multi-structure generator as the villages.
+    VillageStructureGenerator* camp = nullptr;
     MineshaftStructureGenerator* mineshaft = nullptr;
     RuinedPortalStructureGenerator* ruinedPortal = nullptr;
     SwampHutStructureGenerator* swampHut = nullptr;

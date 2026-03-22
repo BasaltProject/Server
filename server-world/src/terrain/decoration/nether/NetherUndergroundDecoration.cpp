@@ -309,7 +309,8 @@ void placeGlowstoneBlob(Chunk& chunk, random::RandomSource& random, std::int32_t
     setBlock(chunk, originX, originY, originZ, glowstone);
     for (std::int32_t attempt = 0; attempt < 1500; ++attempt) {
         const std::int32_t x = originX + random.nextInt(8) - random.nextInt(8);
-        const std::int32_t y = originY - random.nextInt(12);
+        // parity: the 26.3 `random_neighbor_spread` draws x, y and z in order, its y a uniform -11..0.
+        const std::int32_t y = originY + random.nextInt(12) - 11;
         const std::int32_t z = originZ + random.nextInt(8) - random.nextInt(8);
         if (!isAir(chunk, x, y, z)) {
             continue;

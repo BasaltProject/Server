@@ -2,25 +2,79 @@
 #include "support/DecorationFixture.hpp"
 
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/world/structure/StructureTemplate.hpp>
 #include <basalt/server/world/terrain/decoration/DesertWellDecoration.hpp>
+#include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <doctest.h>
 
 #include <cstdint>
+#include <set>
 #include <string>
 #include <tuple>
 
 using namespace basalt::server::world;
 using namespace basalt::server::world::terrain::decoration;
 using basalt::server::world::testsupport::stateIdOf;
+using basalt::wire::nbt::NbtCompound;
+using basalt::wire::nbt::NbtList;
+using basalt::wire::nbt::NbtTag;
+using basalt::wire::nbt::NbtType;
 namespace registry = basalt::server::registry;
+namespace rng = basalt::server::random;
 
 namespace {
 
-/// Sand over stone, with a hollow carved under one corner: the well refuses to build where any
-/// column of its 5 by 5 footprint has two air blocks beneath, so a solid plain would never reach
-/// that abort.
-[[nodiscard]] Chunk sandChunk(std::int32_t chunkX, std::int32_t chunkZ, bool hollow) {
+[[nodiscard]] NbtTag intList(std::int32_t x, std::int32_t y, std::int32_t z) {
+    return NbtTag::ofList(NbtList{NbtType::Int, {NbtTag::ofInt(x), NbtTag::ofInt(y), NbtTag::ofInt(z)}});
+}
+
+/// A template of one block kind filling its box, written here rather than read from any jar.
+[[nodiscard]] structure::StructureTemplate filled(std::int32_t sizeX, std::int32_t sizeY, std::int32_t sizeZ,
+                                                  const std::string& block, const NbtCompound* blockEntity) {
+    NbtCompound paletteEntry;
+    paletteEntry.set("Name", NbtTag::ofString(block));
+    NbtList blocks{NbtType::Compound};
+    for (std::int32_t x = 0; x < sizeX; ++x) {
+        for (std::int32_t y = 0; y < sizeY; ++y) {
+            for (std::int32_t z = 0; z < sizeZ; ++z) {
+                NbtCompound entry;
+                entry.set("pos", intList(x, y, z));
+                entry.set("state", NbtTag::ofInt(0));
+                if (blockEntity != nullptr) {
+                    entry.set("nbt", NbtTag::ofCompound(*blockEntity));
+                }
+                blocks.push(NbtTag::ofCompound(std::move(entry)));
+            }
+        }
+    }
+    NbtCompound nbt;
+    nbt.set("size", intList(sizeX, sizeY, sizeZ));
+    nbt.set("blocks", NbtTag::ofList(std::move(blocks)));
+    nbt.set("palette", NbtTag::ofList(NbtList{NbtType::Compound, {NbtTag::ofCompound(std::move(paletteEntry))}}));
+    nbt.set("entities", NbtTag::ofList(NbtList{NbtType::Compound, {}}));
+    structure::StructureTemplate built;
+    built.load(nbt);
+    return built;
+}
+
+/// The two templates the feature asks for, by the names the 26.3 data gives them.
+[[nodiscard]] structure::TemplateLoader loader() {
+    static const structure::StructureTemplate well = filled(5, 2, 3, "minecraft:sandstone", nullptr);
+    static const structure::StructureTemplate sand = [] {
+        NbtCompound brushable;
+        brushable.set("id", NbtTag::ofString("minecraft:brushable_block"));
+        return filled(1, 1, 1, "minecraft:suspicious_sand", &brushable);
+    }();
+    return [](const basalt::wire::common::Identifier& id) -> const structure::StructureTemplate* {
+        if (id.path() == "desert_well/well") {
+            return &well;
+        }
+        return id.path() == "desert_well/suspicious_sand" ? &sand : nullptr;
+    };
+}
+
+[[nodiscard]] Chunk sandChunk(std::int32_t chunkX, std::int32_t chunkZ) {
     Chunk chunk{chunkX, chunkZ};
     for (std::int32_t x = 0; x < 16; ++x) {
         for (std::int32_t z = 0; z < 16; ++z) {
@@ -30,94 +84,76 @@ namespace {
             chunk.setBlockStateId(x, 70, z, stateIdOf("sand"));
         }
     }
-    if (hollow) {
-        for (std::int32_t x = 4; x <= 6; ++x) {
-            for (std::int32_t z = 4; z <= 6; ++z) {
-                chunk.setBlockStateId(x, 69, z, registry::blocks::air().stateId);
-                chunk.setBlockStateId(x, 68, z, registry::blocks::air().stateId);
-            }
-        }
-    }
     return chunk;
 }
 
-[[nodiscard]] std::tuple<std::int64_t, std::int32_t, std::int32_t> fold(const Chunk& chunk) {
-    testsupport::Checksum checksum;
-    std::int32_t sandstone = 0;
-    std::int32_t suspicious = 0;
+/// The lowest corner of every block of `stateId`, with how many there are.
+[[nodiscard]] std::tuple<std::int32_t, std::int32_t, std::int32_t, std::int32_t> extent(const Chunk& chunk,
+                                                                                        std::int32_t stateId) {
+    std::int32_t count = 0;
+    std::int32_t lowX = 16;
+    std::int32_t lowY = 400;
+    std::int32_t lowZ = 16;
     for (std::int32_t y = 60; y <= 80; ++y) {
         for (std::int32_t z = 0; z < 16; ++z) {
             for (std::int32_t x = 0; x < 16; ++x) {
-                const std::int32_t id = chunk.blockStateId(x, y, z);
-                checksum.feed(id);
-                if (id == stateIdOf("sandstone") || id == stateIdOf("sandstone_slab")) {
-                    ++sandstone;
-                }
-                if (id == stateIdOf("suspicious_sand")) {
-                    ++suspicious;
+                if (chunk.blockStateId(x, y, z) == stateId) {
+                    ++count;
+                    lowX = std::min(lowX, x);
+                    lowY = std::min(lowY, y);
+                    lowZ = std::min(lowZ, z);
                 }
             }
         }
     }
-    return {checksum.value(), sandstone, suspicious};
-}
-
-[[nodiscard]] std::tuple<std::int32_t, std::int32_t, std::int32_t, std::string, std::int64_t> run(bool hollow) {
-    testsupport::Checksum checksum;
-    std::int32_t sandstone = 0;
-    std::int32_t suspicious = 0;
-    std::int32_t entities = 0;
-    std::string seeds;
-    for (std::int32_t index = 0; index < 30; ++index) {
-        Chunk chunk = sandChunk(index * 3 - 15, index * -5 + 10, hollow);
-        basalt::server::random::RandomSource random =
-            basalt::server::random::RandomSource::worldgen(basalt::server::random::RandomSource::legacy(
-                static_cast<std::int64_t>(818181ULL + static_cast<std::uint64_t>(index) * 6364136223846793005ULL)));
-        // `placeAt` takes world coordinates, like the placed-feature registry hands it.
-        desertWellDecoration::placeAt(chunk, random, chunk.chunkX() * 16 + 5, 70, chunk.chunkZ() * 16 + 5);
-        const auto [chunkChecksum, chunkSandstone, chunkSuspicious] = fold(chunk);
-        checksum.feed(chunkChecksum);
-        sandstone += chunkSandstone;
-        suspicious += chunkSuspicious;
-        for (const ChunkBlockEntity& entity : chunk.blockEntities()) {
-            ++entities;
-            seeds.append(std::to_string(entity.data().getLong("LootTableSeed"))).push_back(',');
-        }
-    }
-    return {sandstone, suspicious, entities, seeds, checksum.value()};
+    return {count, lowX, lowY, lowZ};
 }
 
 } // namespace
 
-TEST_CASE("the desert well matches the frozen kotlin") {
-    SUBCASE("solid") {
-        const auto [sandstone, suspicious, entities, seeds, checksum] = run(false);
-        CHECK(sandstone == 3030);
-        CHECK(suspicious == 60);
-        // Every buried sand carries exactly one brushable block entity.
-        CHECK(entities == 60);
-        CHECK(seeds ==
-              "-64321429548987,-64596307455932,-51127290343355,-51402168250300,-38482906951611,-38208029044668,-"
-              "24739011936187,-24739011927996,-11819750633403,-11819750633404,1649266475077,1649266479172,"
-              "15118283591749,14568527777860,28037544890437,27762666983492,41506562003013,40956806189124,"
-              "54425823297605,54700701208644,67894840414277,67345084600388,80814101708869,80814101708868,"
-              "94008240918597,94008240918596,107202380128325,107202380124228,120671397236805,120396519333956,"
-              "133590658531397,133590658531396,146784797741125,146509919834180,159978936950853,159978936942660,"
-              "172898198245445,172898198245444,186367215353925,186367215362116,199561354559557,199561354559556,"
-              "212480615862341,212755493765188,225949632974917,225949632974916,239143772184645,239143772180548,"
-              "252612789293125,252063033479236,265532050587717,265257172684868,278726189793349,278726189801540,"
-              "291920329007173,291645451096132,305114468208709,305389346115652,318033729507397,318583485321284,");
-        CHECK(checksum == 8062633070561909411LL);
-    }
+TEST_CASE("the 26.3 desert well is its templates, centred and rotated, with two buried sand blocks") {
+    for (std::int64_t seed = 0; seed < 8; ++seed) {
+        CAPTURE(seed);
+        Chunk chunk = sandChunk(0, 0);
+        rng::RandomSource random = rng::RandomSource::worldgen(rng::RandomSource::legacy(seed));
+        desertWellDecoration::placeAt(chunk, random, 8, 70, 8, loader());
 
-    SUBCASE("hollow") {
-        // A hollow under the footprint aborts the whole well, so nothing at all is written.
-        const auto [sandstone, suspicious, entities, seeds, checksum] = run(true);
-        CHECK(sandstone == 0);
-        CHECK(suspicious == 0);
-        // Every buried sand carries exactly one brushable block entity.
-        CHECK(entities == 0);
-        CHECK(seeds == "");
-        CHECK(checksum == 8470561932817895187LL);
+        // parity: `TemplateFeature` draws its one-entry template list, a rotation and the one palette,
+        // and the two sand blocks each draw their spot first.
+        rng::RandomSource expected = rng::RandomSource::worldgen(rng::RandomSource::legacy(seed));
+        static_cast<void>(expected.nextInt(1));
+        const std::int32_t rotation = expected.nextInt(4);
+        static_cast<void>(expected.nextInt(1));
+        for (std::int32_t sand = 0; sand < 2; ++sand) {
+            static_cast<void>(expected.nextInt(5));
+            static_cast<void>(expected.nextInt(1));
+            static_cast<void>(expected.nextInt(4));
+            static_cast<void>(expected.nextInt(1));
+        }
+        CHECK(random.nextInt() == expected.nextInt());
+
+        // Centred by half its size along the rotated west and north: 5 by 3 unrotated, 3 by 5 turned.
+        const auto [wells, lowX, lowY, lowZ] = extent(chunk, stateIdOf("sandstone"));
+        CHECK(lowY == 68);
+        const bool quarterTurn = rotation == 1 || rotation == 3;
+        CHECK(lowX == (quarterTurn ? 7 : 6));
+        CHECK(lowZ == (quarterTurn ? 6 : 7));
+        CHECK(wells + std::get<0>(extent(chunk, stateIdOf("suspicious_sand"))) >= 29);
+
+        std::set<std::int32_t> depths;
+        for (const ChunkBlockEntity& entity : chunk.blockEntities()) {
+            depths.insert(entity.y());
+            CHECK(entity.data().getString("LootTable") == "minecraft:archaeology/desert_well");
+        }
+        CHECK(depths.size() <= 2);
+        CHECK(!depths.empty());
     }
+}
+
+TEST_CASE("the desert well places nothing without its templates") {
+    Chunk chunk = sandChunk(0, 0);
+    rng::RandomSource random = rng::RandomSource::legacy(1);
+    desertWellDecoration::placeAt(chunk, random, 8, 70, 8, nullptr);
+    CHECK(std::get<0>(extent(chunk, stateIdOf("sandstone"))) == 0);
+    CHECK(random.nextInt() == rng::RandomSource::legacy(1).nextInt());
 }

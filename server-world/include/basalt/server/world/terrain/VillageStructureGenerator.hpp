@@ -43,9 +43,27 @@ public:
     /// Vanilla searches 100 cells for a village, which at spacing 34 is a long way out.
     static constexpr std::int32_t kDefaultSearchCells = 100;
 
+    /// One entry of a multi-structure set: its structure, start pool, biomes without namespace and
+    /// index within `surface_structures`.
+    struct Variant {
+        wire::common::Identifier id;
+        std::string startPool;
+        std::set<std::string, std::less<>> biomes;
+        std::int32_t structureIndex = 0;
+    };
+
     VillageStructureGenerator(NoiseRouter router, structure::StructurePlacementGrid grid, BiomeAt biomeAt,
                               std::int32_t maxDepth, std::int32_t maxDistanceFromCenter, PoolLookup poolLookup,
                               structure::PoolTemplateLoader templateLoader);
+
+    /// The same generator over another set of equally weighted jigsaw structures, such as the 26.3
+    /// `abandoned_camp` set. `variants` is in the set's file order, which is the order the draw walks.
+    VillageStructureGenerator(NoiseRouter router, structure::StructurePlacementGrid grid, BiomeAt biomeAt,
+                              std::int32_t maxDepth, std::int32_t maxDistanceFromCenter, PoolLookup poolLookup,
+                              structure::PoolTemplateLoader templateLoader, std::vector<Variant> variants);
+
+    /// The structures this generator makes.
+    [[nodiscard]] std::vector<wire::common::Identifier> ids() const;
 
     /// Cached candidate count and their total placed pieces, for the timings memory breakdown.
     [[nodiscard]] std::pair<std::size_t, std::int64_t> assemblyStats() const;
@@ -95,15 +113,6 @@ public:
     void addBeard(StructureBeard& beard, std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed);
 
 private:
-    /// parity: `villages.json`'s five entries in file order, all weight one, each with its own real
-    /// `has_structure/village_*` biome tag contents.
-    struct Variant {
-        wire::common::Identifier id;
-        std::string startPool;
-        std::set<std::string, std::less<>> biomes;
-        std::int32_t structureIndex = 0;
-    };
-
     struct CandidateKey {
         std::int64_t seed = 0;
         std::int32_t chunkX = 0;
@@ -140,12 +149,9 @@ private:
     /// tried in a seeded weighted draw without replacement until one's `has_structure/village_*`
     /// biome tag matches the biome at the candidate's own centre column, sampled at the
     /// density-derived surface height. No match anywhere means no village at that candidate.
-    /// The five variants in `villages.json` file order, which is the order the draw walks.
-    [[nodiscard]] static const std::vector<Variant>& variants();
-
-    /// The same five sorted by their index within the surface step, which is the order they are
-    /// written in.
-    [[nodiscard]] static const std::vector<const Variant*>& placementVariants();
+    /// parity: `villages.json`'s five entries in file order, all weight one, each with its own real
+    /// `has_structure/village_*` biome tag contents.
+    [[nodiscard]] static const std::vector<Variant>& villageVariants();
 
     [[nodiscard]] const Variant* selectVariant(std::int32_t candidateChunkX, std::int32_t candidateChunkZ,
                                                std::int64_t seed, Samplers& samplers) const;
@@ -166,6 +172,9 @@ private:
     std::int32_t maxDistanceFromCenter_;
     PoolLookup poolLookup_;
     structure::PoolTemplateLoader templateLoader_;
+    std::vector<Variant> variants_;
+    /// The variants sorted by their index within the surface step, which is the order they are written in.
+    std::vector<const Variant*> placementVariants_;
     mutable std::mutex mutex_;
     std::map<CandidateKey, std::shared_ptr<const VillageStart>> cache_;
 };

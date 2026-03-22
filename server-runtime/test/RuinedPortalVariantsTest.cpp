@@ -64,7 +64,7 @@ TEST_CASE("the two variants that pick between two placements weigh them evenly")
         CHECK(variant.setups[0].weight == doctest::Approx(0.5F));
         CHECK(variant.setups[1].weight == doctest::Approx(0.5F));
         CHECK(variant.setups[1].placement == RuinedPortalPlacement::OnLandSurface);
-        CHECK(variant.setups[1].airPocketProbability == doctest::Approx(0.5F));
+        CHECK(variant.setups[1].airPocketProbability == doctest::Approx(0.0F));
         CHECK(variant.setups[0].airPocketProbability == doctest::Approx(1.0F));
         CHECK(variant.setups[0].canBeCold);
         CHECK(variant.setups[1].canBeCold);
@@ -113,7 +113,7 @@ TEST_CASE("each of the five single-placement variants keeps its own numbers") {
 
     const auto nether = only("ruined_portal_nether");
     CHECK(nether.placement == RuinedPortalPlacement::InNether);
-    CHECK(nether.airPocketProbability == doctest::Approx(0.5F));
+    CHECK(nether.airPocketProbability == doctest::Approx(0.0F));
     CHECK(nether.replaceWithBlackstone);
     CHECK(nether.mossiness == doctest::Approx(0.0F));
     CHECK_FALSE(only("ruined_portal_desert").replaceWithBlackstone);

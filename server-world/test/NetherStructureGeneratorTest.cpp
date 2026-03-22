@@ -293,7 +293,7 @@ TEST_CASE("the nether builds what the frozen kotlin builds") {
     SUBCASE("complexFifth") { check(run(13, 0.0, 0.0, "complex"), 124, 0, 0, "nether_wastes", -5353408625150024264LL); }
 
     SUBCASE("complexSixth") {
-        check(run(21, 0.0, 0.0, "complex"), 53342, 17, 0, "nether_wastes", -6963310570239858642LL);
+        check(run(21, 0.0, 0.0, "complex"), 53572, 17, 0, "nether_wastes", -3239511716844573407LL);
     }
 
     // Basalt deltas takes a fortress but never a bastion, which is the one biome gate here.
@@ -306,11 +306,11 @@ TEST_CASE("the nether builds what the frozen kotlin builds") {
     }
 
     SUBCASE("complexSixthDeltas") {
-        check(run(21, -0.6, 0.0, "complex"), 53342, 17, 0, "basalt_deltas", -6963310570239858642LL);
+        check(run(21, -0.6, 0.0, "complex"), 53572, 17, 0, "basalt_deltas", -3239511716844573407LL);
     }
 
     // The ruined portal replays one global placement from its own grid.
-    SUBCASE("portal") { check(run(1234, 0.0, 0.0, "portal"), 275, 0, 1, "nether_wastes", 8688172062599339749LL); }
+    SUBCASE("portal") { check(run(1234, 0.0, 0.0, "portal"), 338, 0, 1, "nether_wastes", 1328847200587368967LL); }
 
-    SUBCASE("portalOther") { check(run(77, 0.4, 0.0, "portal"), 684, 0, 1, "crimson_forest", 2717711693674612529LL); }
+    SUBCASE("portalOther") { check(run(77, 0.4, 0.0, "portal"), 489, 0, 0, "crimson_forest", 335264574150313682LL); }
 }

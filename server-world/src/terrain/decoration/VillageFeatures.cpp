@@ -2,6 +2,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/world/terrain/decoration/CactusFeature.hpp>
+#include <basalt/server/world/terrain/decoration/PlacedFeatures.hpp>
 #include <basalt/server/world/terrain/decoration/PlainsFlowerFeatures.hpp>
 #include <basalt/server/world/terrain/decoration/SimpleBlockFeature.hpp>
 #include <basalt/server/world/terrain/decoration/VillageFeatures.hpp>
@@ -10,6 +11,7 @@
 
 #include <array>
 #include <cstdint>
+#include <expected>
 #include <functional>
 #include <set>
 #include <stdexcept>
@@ -230,8 +232,17 @@ void villageFeatures::place(const std::string_view feature, Chunk& chunk, const 
                     [](random::RandomSource&, const DecorationPos&) { return sweetBerryAge3StateId(); }};
                 static_cast<void>(feature.place(target, r, origin));
             });
+        return;
     }
-    // Village pools only reference the features above; an unknown name places nothing.
+    // parity: any other `feature_pool_element`, such as the 26.3 camps' trees, is its placed
+    // feature run from the piece's own position.
+    if (const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
+            wire::common::Identifier::parse(feature);
+        id.has_value()) {
+        if (const placedFeatures::Placement* placement = placedFeatures::find(*id); placement != nullptr) {
+            (*placement)(chunk, random, x, y, z);
+        }
+    }
 }
 
 } // namespace basalt::server::world::terrain::decoration

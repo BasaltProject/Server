@@ -123,8 +123,10 @@ GeneratedTerrain generateTerrain(const NoiseRouter& router, const surface::Surfa
                                  const TerrainStructureGenerators& generators) {
     // parity: one `Beardifier` per chunk, summing every structure that adapts the terrain.
     StructureBeard beard;
-    if (generators.village != nullptr) {
-        generators.village->addBeard(beard, chunkX, chunkZ, seed);
+    for (VillageStructureGenerator* set : {generators.camp, generators.village}) {
+        if (set != nullptr) {
+            set->addBeard(beard, chunkX, chunkZ, seed);
+        }
     }
     for (JigsawStructureGenerator* bearded :
          {generators.pillagerOutpost, generators.trailRuins, generators.ancientCity, generators.trialChamber}) {
@@ -167,7 +169,7 @@ void decorate(GeneratedTerrain& terrain, std::int64_t seed, const NeighbourTerra
         decoration::caveLocalModificationDecoration::decorate(chunk, seed, environment);
         decoration::forestRockDecoration::decorate(chunk, seed, environment);
         decoration::iceSpikesDecoration::decorate(chunk, seed, environment);
-        decoration::desertWellDecoration::decorate(chunk, seed, environment);
+        decoration::desertWellDecoration::decorate(chunk, seed, environment, templates);
         // The fossil body takes its templates by name, while the world hands them out by identifier.
         const decoration::fossilFeature::TemplateLookup byName =
             templates ? decoration::fossilFeature::TemplateLookup{[&templates](std::string_view name) {
@@ -193,7 +195,10 @@ void decorate(GeneratedTerrain& terrain, std::int64_t seed, const NeighbourTerra
         }
         decoration::overworldUndergroundStructures::decorate(chunk, seed, environment, byName, externalOceanFloor);
         // parity: `surface_structures` is step 4, the village included, so it follows step 3 rather
-        // than opening the whole pass.
+        // than opening the whole pass. The camps are its first eighteen structures.
+        if (generators.camp != nullptr) {
+            generators.camp->generateInto(chunk, chunk.chunkX(), chunk.chunkZ(), seed);
+        }
         if (generators.village != nullptr) {
             generators.village->generateInto(chunk, chunk.chunkX(), chunk.chunkZ(), seed);
         }
