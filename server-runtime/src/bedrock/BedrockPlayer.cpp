@@ -45,6 +45,9 @@ constexpr std::int32_t kChunkRadius = 4;
 constexpr double kMoveEpsilon = 0.01;
 constexpr float kTurnEpsilon = 1.0F;
 
+/// The objective a server-drawn board lives under. One per client, so the name never collides.
+constexpr std::string_view kSidebarObjective = "basalt";
+
 } // namespace
 
 std::uint64_t runtimeIdFor(const std::int32_t entityId) { return static_cast<std::uint64_t>(entityId) + 1; }
@@ -1269,13 +1272,10 @@ void BedrockPlayer::sendAbilities() {
 }
 
 void BedrockPlayer::drawSidebar(const std::string& title, const std::vector<std::string>& lines) {
-    /// The objective a server-drawn board lives under. One per client, so the name never collides.
-    constexpr std::string_view kObjective = "basalt";
-
     const std::string drawn = wire::text::toLegacyText(wire::text::miniMessage::parse(title));
     if (!sidebarTitle_.has_value() || *sidebarTitle_ != drawn) {
         wire::io::ByteBuffer shown;
-        wire::bedrock::writeSetDisplayObjective(shown, "sidebar", kObjective, drawn);
+        wire::bedrock::writeSetDisplayObjective(shown, "sidebar", kSidebarObjective, drawn);
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetDisplayObjective), shown.toVector());
         sidebarTitle_ = drawn;
     }
@@ -1301,12 +1301,12 @@ void BedrockPlayer::drawSidebar(const std::string& title, const std::vector<std:
     }
     if (!gone.empty()) {
         wire::io::ByteBuffer body;
-        wire::bedrock::writeRemoveScores(body, gone);
+        wire::bedrock::writeRemoveScores(body, kSidebarObjective, gone, protocol_);
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetScore), body.toVector());
     }
     if (!changed.empty()) {
         wire::io::ByteBuffer body;
-        wire::bedrock::writeSetScore(body, kObjective, changed);
+        wire::bedrock::writeSetScore(body, kSidebarObjective, changed, protocol_);
         mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetScore), body.toVector());
     }
 
@@ -1327,10 +1327,10 @@ void BedrockPlayer::clearSidebar() {
         gone.push_back(static_cast<std::int64_t>(at) + 1);
     }
     wire::io::ByteBuffer body;
-    wire::bedrock::writeRemoveScores(body, gone);
+    wire::bedrock::writeRemoveScores(body, kSidebarObjective, gone, protocol_);
     mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetScore), body.toVector());
     wire::io::ByteBuffer objective;
-    wire::bedrock::writeRemoveObjective(objective, "basalt");
+    wire::bedrock::writeRemoveObjective(objective, kSidebarObjective);
     mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::RemoveObjective), objective.toVector());
     sidebarShown_.clear();
     sidebarTitle_.reset();

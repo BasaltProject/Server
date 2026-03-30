@@ -49,8 +49,7 @@ constexpr std::int32_t kCeilingLogicalHeight = 128;
 /// parity: 26.3 `TeleportRandomlyConsumeEffect.apply` for a player, avoiding
 /// `consumable_does_not_teleport_to`.
 void teleportRandomly(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world, float diameter) {
-    // A rider would first be taken off; this build has no dismount here yet, so a rider stays put.
-    if (player.vehicleId.has_value() || !player.connection().teleportTo) {
+    if (!player.connection().teleportTo || (player.vehicleId.has_value() && !context.dismount)) {
         return;
     }
     const auto next = [&context] { return context.nextDouble ? context.nextDouble() : 0.5; };
@@ -69,6 +68,10 @@ void teleportRandomly(const BreakContext& context, PlayerSession& player, world:
         const double y = std::clamp(player.y + ((next() - 0.5) * diameter), static_cast<double>(minY),
                                     static_cast<double>(minY + logicalHeight - 1));
         const double z = player.z + ((next() - 0.5) * diameter);
+        // parity: `apply` gets off the mount before each try.
+        if (player.vehicleId.has_value()) {
+            context.dismount(player);
+        }
         const std::optional<double> landing =
             entity::ai::randomTeleportLanding(world.state(), tagged, x, y, z, world::blockPlacement::kPlayerWidth,
                                               height, "minecraft:consumable_does_not_teleport_to", false);

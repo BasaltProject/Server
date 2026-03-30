@@ -191,6 +191,7 @@ player::BreakContext BlockInteractionHandler::breakContext() {
     };
     context.slotChanged = [this](const PlayerSession&, const std::int32_t slot) { owner_->sendInventorySlot(slot); };
     context.stopDigging = [this] { stopDigging(); };
+    context.dismount = [this](player::PlayerSession& player) { owner_->dismount(player); };
     context.awardExperience = owner_->options().awardExperience;
     return context;
 }

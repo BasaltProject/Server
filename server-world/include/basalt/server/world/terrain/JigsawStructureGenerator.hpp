@@ -7,6 +7,7 @@
 #include <basalt/server/world/terrain/DensityChunkSampler.hpp>
 #include <basalt/server/world/terrain/NoiseRouterData.hpp>
 #include <basalt/server/world/terrain/StructureBeardifier.hpp>
+#include <basalt/wire/common/Identifier.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -89,6 +90,9 @@ public:
                              structure::StructurePlacementGrid grid, BiomeAt biomeAt,
                              std::set<std::string, std::less<>> biomes, PoolLookup poolLookup,
                              structure::PoolTemplateLoader templateLoader);
+
+    /// The structure this generator makes, by the id `/locate` names.
+    [[nodiscard]] wire::common::Identifier id() const { return wire::common::Identifier::vanilla(settings_.name); }
 
     /// Cached candidate count and their total placed pieces, for the timings memory breakdown.
     [[nodiscard]] std::pair<std::size_t, std::int64_t> assemblyStats() const;

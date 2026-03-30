@@ -10,6 +10,7 @@
 #include <basalt/server/world/SimpleWorldGenerators.hpp>
 #include <basalt/server/world/climate/Sampler.hpp>
 #include <basalt/server/world/climate/SpawnFinder.hpp>
+#include <basalt/server/world/terrain/JigsawStructureGenerator.hpp>
 #include <basalt/server/world/terrain/RealTerrainGenerator.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 
@@ -56,8 +57,8 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
       logger_(std::move(logger)), timings_(options.timings == nullptr ? ownTimings_ : *options.timings),
       overworldRouter_(options.overworldRouter), surfaceEnvironment_(options.surfaceEnvironment),
       villageGenerator_(options.villageGenerator), campGenerator_(options.campGenerator),
-      strongholdGenerator_(options.strongholdGenerator), spawnChunkFinder_(std::move(options.spawnChunkFinder)),
-      normalGenerator_(std::move(options.normalGenerator)),
+      jigsawGenerators_(std::move(options.jigsawGenerators)), strongholdGenerator_(options.strongholdGenerator),
+      spawnChunkFinder_(std::move(options.spawnChunkFinder)), normalGenerator_(std::move(options.normalGenerator)),
       scheduler_(options.scheduler == nullptr ? ownScheduler_ : *options.scheduler),
       region_(&scheduler_.regionFor(declaration_.name)), levelKey_(levelKeyOf(declaration_, options.vanillaKey)),
       worldRoot_(worldsRoot + "/" + declaration_.name),
@@ -125,6 +126,16 @@ LoadedWorld::structureSetGenerator(const wire::common::Identifier& structure) co
         }
         const std::vector<wire::common::Identifier> ids = generator->ids();
         if (std::ranges::find(ids, structure) != ids.end()) {
+            return generator;
+        }
+    }
+    return nullptr;
+}
+
+server::world::terrain::JigsawStructureGenerator*
+LoadedWorld::jigsawGenerator(const wire::common::Identifier& structure) const {
+    for (server::world::terrain::JigsawStructureGenerator* generator : jigsawGenerators_) {
+        if (generator != nullptr && generator->id() == structure) {
             return generator;
         }
     }

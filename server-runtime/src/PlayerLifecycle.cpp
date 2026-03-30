@@ -166,6 +166,8 @@ void PlayerLifecycle::respawn() {
     owner_->uiState().sendAbilities();
     owner_->uiState().syncHealth();
     owner_->uiState().syncExperience();
+    // parity: `PlayerList.respawn` carries the post effects over and sends them again.
+    owner_->sendPostEffects();
 
     owner_->chunkStreamer().resetForRespawn(spawnX, spawnZ);
 

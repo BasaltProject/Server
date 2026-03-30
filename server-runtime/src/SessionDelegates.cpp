@@ -19,6 +19,7 @@
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/wire/protocol/configuration/ConfigurationPackets.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
@@ -33,6 +34,9 @@
 
 namespace basalt::server::runtime {
 namespace {
+
+/// parity: `updateAwaitingTeleport`'s twenty ticks between resends.
+constexpr std::int64_t kTeleportResendTicks = 20;
 
 namespace play = wire::protocol::play;
 namespace reg = server::registry;
@@ -326,11 +330,41 @@ void ClientSession::sendPlayerPosition(double x, double y, double z, float yaw, 
         }
         teleportId = awaitingTeleport_;
         awaitingPosition_ = std::array<double, 3>{x, y, z};
+        awaitingTeleportTime_ = uiTick;
     }
     sendCompressed(play::PlayerPositionPacket::kId, [&](wire::io::ByteBuffer& buffer) {
         play::PlayerPositionPacket{.teleportId = teleportId, .x = x, .y = y, .z = z, .yaw = yaw, .pitch = pitch}.write(
             buffer);
     });
+}
+
+void ClientSession::sendPostEffects() {
+    const PlayerSession* session = playerSession_.get();
+    if (session == nullptr) {
+        return;
+    }
+    const wire::protocol::configuration::PostEffectsPacket packet{.effects = session->postEffects};
+    sendCompressed(wire::protocol::configuration::PostEffectsPacket::kPlayId,
+                   [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+}
+
+bool ClientSession::updateAwaitingTeleport() {
+    std::optional<std::array<double, 3>> awaited;
+    {
+        const std::lock_guard<std::mutex> guard{teleportMutex_};
+        if (!awaitingPosition_.has_value()) {
+            awaitingTeleportTime_ = uiTick;
+            return false;
+        }
+        if (uiTick - awaitingTeleportTime_ <= kTeleportResendTicks) {
+            return true;
+        }
+        awaited = awaitingPosition_;
+    }
+    const PlayerSession* session = playerSession_.get();
+    sendPlayerPosition((*awaited)[0], (*awaited)[1], (*awaited)[2], session == nullptr ? 0.0F : session->yaw,
+                       session == nullptr ? 0.0F : session->pitch);
+    return true;
 }
 
 void ClientSession::acceptTeleport(const play::AcceptTeleportationPacket& accept) {

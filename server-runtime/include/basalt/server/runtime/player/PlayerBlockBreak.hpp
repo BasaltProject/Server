@@ -73,6 +73,8 @@ struct BreakContext {
     std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t amount)> awardExperience;
     /// Stops the digging clock, which only a door that runs one has.
     std::function<void()> stopDigging;
+    /// Takes the player off whatever they ride. parity: `Entity.stopRiding`.
+    std::function<void(PlayerSession& player)> dismount;
 };
 
 /// Everyone in that world, which is who hears a block go.

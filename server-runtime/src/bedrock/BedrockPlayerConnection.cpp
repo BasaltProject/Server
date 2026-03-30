@@ -160,7 +160,7 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
             }
         }
     };
-    connection.sendDisplayObjective = [mailbox = joining.mailbox, board, showObjective](
+    connection.sendDisplayObjective = [mailbox = joining.mailbox, board, showObjective, protocol = joining.protocol](
                                           const wire::protocol::play::DisplaySlot slot, const std::string& objective) {
         const std::string where{slotName(slot)};
         if (objective.empty()) {
@@ -187,11 +187,11 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
             lines.push_back({.lineId = lineId, .name = holder, .score = 0});
         }
         wire::io::ByteBuffer body;
-        wire::bedrock::writeSetScore(body, objective, lines);
+        wire::bedrock::writeSetScore(body, objective, lines, protocol);
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetScore), body.toVector());
     };
-    connection.sendScore = [mailbox = joining.mailbox, board](const std::string& holder, const std::string& objective,
-                                                              const std::int32_t value) {
+    connection.sendScore = [mailbox = joining.mailbox, board, protocol = joining.protocol](
+                               const std::string& holder, const std::string& objective, const std::int32_t value) {
         std::int64_t& lineId = board->lines[objective][holder];
         if (lineId == 0) {
             lineId = board->nextLine++;
@@ -199,28 +199,25 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
         const std::array<wire::bedrock::BedrockScoreLine, 1> line{
             wire::bedrock::BedrockScoreLine{.lineId = lineId, .name = holder, .score = value}};
         wire::io::ByteBuffer body;
-        wire::bedrock::writeSetScore(body, objective, line);
+        wire::bedrock::writeSetScore(body, objective, line, protocol);
         mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetScore), body.toVector());
     };
-    connection.sendScoreRemoved = [mailbox = joining.mailbox, board](const std::string& holder,
-                                                                     const std::optional<std::string>& objective) {
-        std::vector<std::int64_t> gone;
+    connection.sendScoreRemoved = [mailbox = joining.mailbox, board, protocol = joining.protocol](
+                                      const std::string& holder, const std::optional<std::string>& objective) {
         for (auto& [name, holders] : board->lines) {
             if (objective.has_value() && name != *objective) {
                 continue;
             }
             const auto found = holders.find(holder);
-            if (found != holders.end()) {
-                gone.push_back(found->second);
-                holders.erase(found);
+            if (found == holders.end()) {
+                continue;
             }
+            const std::array<std::int64_t, 1> gone{found->second};
+            holders.erase(found);
+            wire::io::ByteBuffer body;
+            wire::bedrock::writeRemoveScores(body, name, gone, protocol);
+            mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetScore), body.toVector());
         }
-        if (gone.empty()) {
-            return;
-        }
-        wire::io::ByteBuffer body;
-        wire::bedrock::writeRemoveScores(body, gone);
-        mailbox->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::SetScore), body.toVector());
     };
     connection.sendSpawnPosition = [mailbox = joining.mailbox](const world::LoadedWorld& world, const std::int32_t x,
                                                                const std::int32_t y, const std::int32_t z, float) {

@@ -39,6 +39,20 @@ constexpr std::int32_t kOffhand = -106;
 /// slots 100 to 103 and the offhand at -106. Those are folded into the flat layout used here,
 /// because a slot number that is negative or above the inventory size is vanilla's own encoding
 /// trick, not a real position.
+/// parity: 26.3 `ServerPlayer.readAdditionalSaveData`'s `post_effects`, a list of identifiers.
+[[nodiscard]] std::vector<std::string> postEffectsOf(const NbtList* list) {
+    std::vector<std::string> effects;
+    if (list == nullptr) {
+        return effects;
+    }
+    for (const wire::nbt::NbtTag& element : *list) {
+        if (const std::string* effect = element.get<std::string>(); effect != nullptr) {
+            effects.push_back(*effect);
+        }
+    }
+    return effects;
+}
+
 [[nodiscard]] StoredInventory readInventory(const NbtList* items, std::int32_t size) {
     StoredInventory inventory = StoredInventory::empty(size);
     if (items == nullptr) {
@@ -124,6 +138,7 @@ std::expected<StoredPlayer, StorageFormatError> read(std::string_view uuid, std:
         .enderChest = readInventory(listOf(*root, "EnderItems"), StoredPlayer::kEnderChestSlots),
         .stats = {},
         .tags = {},
+        .postEffects = postEffectsOf(listOf(*root, "post_effects")),
     };
 }
 

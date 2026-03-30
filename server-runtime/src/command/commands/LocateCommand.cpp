@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 #include <basalt/server/runtime/command/commands/LocateCommand.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/world/terrain/JigsawStructureGenerator.hpp>
 #include <basalt/server/world/terrain/StrongholdStructureGenerator.hpp>
 #include <basalt/server/world/terrain/VillageStructureGenerator.hpp>
 
@@ -123,6 +124,11 @@ void LocateCommand::build(const CommandNodeBuilder& root) const {
                     const world::LoadedWorld* world = context.world();
                     std::vector<Identifier> ids = world == nullptr ? terrain::VillageStructureGenerator::structureIds()
                                                                    : world->structureSetIds();
+                    if (world != nullptr) {
+                        for (const terrain::JigsawStructureGenerator* jigsaw : world->jigsawGenerators()) {
+                            ids.push_back(jigsaw->id());
+                        }
+                    }
                     ids.push_back(stronghold());
                     return context.matchingIds(ids);
                 });
@@ -150,6 +156,15 @@ void LocateCommand::build(const CommandNodeBuilder& root) const {
                             strongholds == nullptr ? std::nullopt : strongholds->locate(startX, startZ);
                         if (!found.has_value()) {
                             return std::unexpected{notFound("commands.locate.structure.not_found", stronghold())};
+                        }
+                        x = found->first * 16;
+                        z = found->second * 16;
+                    } else if (terrain::JigsawStructureGenerator* jigsaw = (*world)->jigsawGenerator(*wanted);
+                               jigsaw != nullptr) {
+                        const std::optional<std::pair<std::int32_t, std::int32_t>> found =
+                            jigsaw->locate((*world)->metadata().seed, startX >> 4, startZ >> 4);
+                        if (!found.has_value()) {
+                            return std::unexpected{notFound("commands.locate.structure.not_found", *wanted)};
                         }
                         x = found->first * 16;
                         z = found->second * 16;

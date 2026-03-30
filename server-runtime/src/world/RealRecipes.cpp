@@ -150,6 +150,12 @@ const crafting::Recipe* RealRecipes::recipeFor(const Identifier& id) const {
     return found == parsedIds_.end() ? nullptr : &recipes_[static_cast<std::size_t>(found - parsedIds_.begin())];
 }
 
+const std::vector<const crafting::Recipe*>& RealRecipes::cooking(crafting::Cooker cooker) const {
+    static const std::vector<const crafting::Recipe*> none;
+    const auto found = cooking_.find(cooker);
+    return found == cooking_.end() ? none : found->second;
+}
+
 const crafting::Recipe* RealRecipes::cookingFor(crafting::Cooker cooker,
                                                 const server::world::loot::ItemStack& stack) const {
     const auto found = cooking_.find(cooker);
