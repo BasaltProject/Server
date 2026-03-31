@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <utility>
 
 namespace basalt::server::world::structure {
@@ -63,6 +64,14 @@ public:
     /// roll, then the exclusion zone. parity: `StructurePlacement.isStructureChunk`, in that order,
     /// which matters because the later tests are the expensive ones.
     [[nodiscard]] bool isStructureChunk(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const;
+
+    /// The first candidate chunk, ring by ring outwards, where `startsAt` answers yes.
+    ///
+    /// parity: `ChunkGenerator.getNearestGeneratedStructure` for a random spread set, which returns
+    /// the first start found in a ring rather than the nearest one in it.
+    [[nodiscard]] std::optional<std::pair<std::int32_t, std::int32_t>>
+    locate(std::int64_t seed, std::int32_t fromChunkX, std::int32_t fromChunkZ, std::int32_t maxCells,
+           const std::function<bool(std::int32_t, std::int32_t)>& startsAt) const;
 
 private:
     std::int32_t spacing_;

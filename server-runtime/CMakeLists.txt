@@ -19,6 +19,7 @@ basalt_module(server-runtime-core
         src/bedrock/BedrockSeen.cpp
         src/bedrock/BedrockPlayerConnection.cpp
         src/bedrock/BedrockRecipes.cpp
+        src/bedrock/BedrockRecords.cpp
         src/bedrock/BedrockStackRequests.cpp
         src/bedrock/BedrockWindows.cpp
         src/config/AnimationsConfig.cpp

@@ -757,7 +757,12 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
             },
         .songStopped =
             [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z) {
-                broadcaster_->notifyAround(world, watchersOf(world), x, y, z, std::nullopt);
+                const std::vector<PlayerSession*> watchers = watchersOf(world);
+                // parity: `JukeboxSongPlayer.stop`, which tells the clients before the neighbours.
+                broadcaster_->sendEffects(
+                    watchers, x, y, z, world.state().blockState(x, y, z).value_or(0),
+                    {world::blockEffect::Effect{.type = world::blockEffect::Effect::kStopJukeboxSong}});
+                broadcaster_->notifyAround(world, watchers, x, y, z, std::nullopt);
             },
         .shriekerHeard =
             [this, &world](const world::vibrations::ShriekerArrival& arrival) {

@@ -321,7 +321,7 @@ void MobActionSystem::dropDeathLoot(world::LoadedWorld& world, const ServerEntit
     random::RandomSource& random =
         table->randomSequence.has_value() ? world.randomSequences().of(*table->randomSequence) : scratch;
     const server::world::loot::LootContext context = deathLootContext(world, entity);
-    for (const server::world::loot::ItemStack& stack : table->generate(random, 0.0F, std::nullopt, context)) {
+    for (const server::world::loot::ItemStack& stack : table->generate(random, context.luck, std::nullopt, context)) {
         if (server::registry::items::registry().byName(stack.item) == nullptr) {
             continue;
         }

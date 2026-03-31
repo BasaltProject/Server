@@ -15,6 +15,7 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/BlockExperience.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
+#include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/NetherPortals.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
@@ -365,6 +366,8 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
         const std::optional<storage::StoredItemStack> held = session->inventory.heldItem();
         dropLootFor(context, world, *brokenBlock, *broken, x, y, z, nullptr, held.has_value() ? &*held : nullptr);
     }
+    const bool songPlaying = brokenBlock != nullptr && *brokenBlock == world::jukeboxes::block() &&
+                             world::jukeboxes::isPlayingAt(world.state(), x, y, z);
     const std::int32_t leaves = meltedIce(context, world, broken, x, y, z).value_or(reg::blocks::air().stateId);
     const bool changed = world.state().setBlockState(x, y, z, leaves);
     acknowledge(context);
@@ -378,6 +381,14 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
     const std::vector<PlayerSession*> watchers = playersIn(context, world.name());
     for (const PlayerSession* watcher : watchers) {
         sendBlockChangeTo(*watcher, x, y, z, leaves);
+    }
+    // parity: `JukeboxBlockEntity.preRemoveSideEffects` pops the disc, and `stop` tells everyone.
+    if (songPlaying) {
+        for (const PlayerSession* watcher : watchers) {
+            if (watcher->connection().sendLevelEvent) {
+                watcher->connection().sendLevelEvent(world::blockEffect::Effect::kStopJukeboxSong, x, y, z, 0);
+            }
+        }
     }
     // parity: `Level.levelEvent(player, 2001, pos, state)`: the breaker predicts its own puff of
     // particles and its sound, everyone else needs telling.

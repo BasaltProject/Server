@@ -55,7 +55,8 @@ private:
 
     void discard(entity::ServerEntity& hook);
 
-    void cast(const player::BreakContext& context, player::PlayerSession& player, world::LoadedWorld& world);
+    void cast(const player::BreakContext& context, player::PlayerSession& player, world::LoadedWorld& world,
+              std::int32_t slot);
 
     /// parity: `FishingHook.retrieve`. Answers how much the rod wears.
     std::int32_t retrieve(const player::BreakContext& context, player::PlayerSession& player, world::LoadedWorld& world,

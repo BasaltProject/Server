@@ -30,6 +30,8 @@ struct EntityFacts {
     /// What it holds in its main hand, and that item's enchantments by id.
     std::optional<wire::common::Identifier> mainhand;
     std::map<std::string, std::int32_t, std::less<>> mainhandEnchantments;
+    /// parity: `Entity.getScoreboardName`, a player's name or anything else's UUID.
+    std::optional<std::string> scoreName;
 };
 
 /// Whether an id is in a tag of a registry: `item`, `entity_type` or `enchantment`.

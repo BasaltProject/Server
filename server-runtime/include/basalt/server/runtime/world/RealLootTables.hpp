@@ -14,6 +14,10 @@
 #include <utility>
 #include <vector>
 
+namespace basalt::server::runtime::scoreboard {
+class Scoreboard;
+} // namespace basalt::server::runtime::scoreboard
+
 namespace basalt::server::runtime::world {
 
 class LoadedWorld;
@@ -59,6 +63,9 @@ public:
 
     void useRegistries(const LootRegistries* registries) { registries_ = registries; }
 
+    /// What the `score` providers and `entity_scores` read. Only rolled on the tick thread.
+    void useScoreboard(const scoreboard::Scoreboard* scoreboard) { scoreboard_ = scoreboard; }
+
     /// Fills in what every roll asks outside the table: nested tables, enchantments and ordered tags.
     void prepare(server::world::loot::LootContext& context);
 
@@ -77,6 +84,7 @@ private:
     wire::common::Logger logger_;
     server::world::loot::LootReferences references_;
     const LootRegistries* registries_ = nullptr;
+    const scoreboard::Scoreboard* scoreboard_ = nullptr;
     // Several connection threads can break a block at once, so the cache has one owner and it is
     // this lock. Map nodes never move, so a table handed out stays valid while another thread reads.
     std::mutex mutex_;

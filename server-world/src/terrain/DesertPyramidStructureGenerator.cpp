@@ -20,6 +20,8 @@ using structure::StructureDirection;
 using structure::StructurePos;
 
 constexpr std::int32_t kSurfaceStructuresStep = 4;
+/// parity: the Overworld noise settings' `sea_level`.
+constexpr std::int32_t kSeaLevel = 63;
 constexpr std::string_view kBiome = "desert";
 constexpr std::int32_t kReachChunks = 2;
 constexpr std::int32_t kGroundOffsetBound = 3;
@@ -142,10 +144,10 @@ void DesertPyramidStructureGenerator::placeSuspiciousSand(Chunk& chunk, const St
     }
 }
 
-void DesertPyramidStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX,
-                                                std::int32_t chunkZ) const {
+std::optional<DesertPyramidPiece> DesertPyramidStructureGenerator::startPiece(std::int64_t seed, std::int32_t chunkX,
+                                                                              std::int32_t chunkZ) const {
     if (!grid().isStructureChunk(seed, chunkX, chunkZ)) {
-        return;
+        return std::nullopt;
     }
 
     // parity: `Structure.GenerationContext`'s own random, which is what the orientation comes off.
@@ -156,16 +158,34 @@ void DesertPyramidStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed,
     const std::int32_t centreZ = chunkZ * 16 + 8;
     const std::int32_t stubY = surfaceHeightAt_(centreX, centreZ) - 1;
     if (biomePath(biomeAt_(centreX, stubY, centreZ)) != kBiome) {
-        return;
+        return std::nullopt;
+    }
+    // parity: `SinglePieceStructure.findGenerationPoint` refuses a start whose lowest corner, over
+    // the piece's 21 by 21 footprint measured one past its far edges, is below sea level.
+    const std::int32_t minX = chunkX * 16;
+    const std::int32_t minZ = chunkZ * 16;
+    const auto occupied = [this](std::int32_t x, std::int32_t z) { return surfaceHeightAt_(x, z) - 1; };
+    if (std::min({occupied(minX, minZ), occupied(minX, minZ + 21), occupied(minX + 21, minZ),
+                  occupied(minX + 21, minZ + 21)}) < kSeaLevel) {
+        return std::nullopt;
     }
 
     const StructureDirection orientation =
         kHorizontal[static_cast<std::size_t>(startRandom.nextInt(static_cast<std::int32_t>(kHorizontal.size())))];
     DesertPyramidPiece piece{chunkX * 16, chunkZ * 16, orientation, -groundOffset(seed, chunkX, chunkZ)};
     if (!piece.settleOnGround(surfaceHeightAt_)) {
+        return std::nullopt;
+    }
+    return piece;
+}
+
+void DesertPyramidStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX,
+                                                std::int32_t chunkZ) const {
+    std::optional<DesertPyramidPiece> start = startPiece(seed, chunkX, chunkZ);
+    if (!start.has_value()) {
         return;
     }
-
+    DesertPyramidPiece& piece = *start;
     const StructureBoundingBox clip = chunkClip(chunk.chunkX(), chunk.chunkZ());
     if (!piece.bounds().intersects(clip)) {
         return;

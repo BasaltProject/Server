@@ -215,6 +215,29 @@ void WoodlandMansionStructureGenerator::placeMarkers(Chunk& chunk, const structu
     }
 }
 
+namespace {
+
+/// parity: the rotation is drawn before the ground is looked at, so a mansion the ground rejects
+/// still costs the roll.
+[[nodiscard]] StructureRotation drawRotation(random::RandomSource& random) {
+    static constexpr std::array<StructureRotation, 4> kRotations{
+        StructureRotation::None, StructureRotation::Clockwise90, StructureRotation::Clockwise180,
+        StructureRotation::Counterclockwise90};
+    return kRotations[static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(kRotations.size())))];
+}
+
+} // namespace
+
+bool WoodlandMansionStructureGenerator::startsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const {
+    if (!grid().isStructureChunk(seed, chunkX, chunkZ)) {
+        return false;
+    }
+    random::RandomSource startRandom = random::RandomSource::worldgen(random::RandomSource::legacy(0));
+    random::setLargeFeatureSeed(startRandom, seed, chunkX, chunkZ);
+    const std::optional<StructurePos> origin = lowestCornerOf(chunkX, chunkZ, drawRotation(startRandom));
+    return origin.has_value() && mansionBiomes_.contains(biomeAt_(origin->x, origin->y, origin->z));
+}
+
 void WoodlandMansionStructureGenerator::placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX,
                                                   std::int32_t chunkZ) {
     if (!grid().isStructureChunk(seed, chunkX, chunkZ)) {
@@ -224,21 +247,10 @@ void WoodlandMansionStructureGenerator::placeFrom(Chunk& chunk, std::int64_t see
     random::RandomSource startRandom = random::RandomSource::worldgen(random::RandomSource::legacy(0));
     random::setLargeFeatureSeed(startRandom, seed, chunkX, chunkZ);
 
-    const std::int32_t centreX = chunkX * 16 + 8;
-    const std::int32_t centreZ = chunkZ * 16 + 8;
-    if (!mansionBiomes_.contains(biomeAt_(centreX, surfaceHeightAt_(centreX, centreZ) - 1, centreZ))) {
-        return;
-    }
-
-    // parity: the rotation is drawn before the ground is looked at, so a mansion the ground rejects
-    // still costs the roll.
-    static constexpr std::array<StructureRotation, 4> kRotations{
-        StructureRotation::None, StructureRotation::Clockwise90, StructureRotation::Clockwise180,
-        StructureRotation::Counterclockwise90};
-    const StructureRotation rotation =
-        kRotations[static_cast<std::size_t>(startRandom.nextInt(static_cast<std::int32_t>(kRotations.size())))];
+    const StructureRotation rotation = drawRotation(startRandom);
     const std::optional<StructurePos> origin = lowestCornerOf(chunkX, chunkZ, rotation);
-    if (!origin.has_value()) {
+    // parity: `Structure.isValidBiome` reads the stub, which for a mansion is that lowest corner.
+    if (!origin.has_value() || !mansionBiomes_.contains(biomeAt_(origin->x, origin->y, origin->z))) {
         return;
     }
 

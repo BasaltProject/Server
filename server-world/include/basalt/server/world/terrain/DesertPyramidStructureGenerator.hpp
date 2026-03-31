@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <string>
 
 namespace basalt::server::world::terrain {
@@ -27,7 +28,16 @@ public:
 
     [[nodiscard]] static const structure::StructurePlacementGrid& grid();
 
+    /// Whether a pyramid starts in this chunk, which is what `/locate` asks.
+    [[nodiscard]] bool startsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const {
+        return startPiece(seed, chunkX, chunkZ).has_value();
+    }
+
 private:
+    /// The settled piece of a pyramid starting in this chunk, or nothing.
+    [[nodiscard]] std::optional<DesertPyramidPiece> startPiece(std::int64_t seed, std::int32_t chunkX,
+                                                               std::int32_t chunkZ) const;
+
     void placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const;
 
     /// parity: `-random.nextInt(3)` off the placing chunk's own feature random, so in the jar the

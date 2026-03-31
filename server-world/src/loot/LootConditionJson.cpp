@@ -20,6 +20,9 @@ using wire::common::JsonValue;
     if (entity == std::optional<std::string>{"direct_attacker"}) {
         return LootCondition::Target::DirectAttacker;
     }
+    if (entity == std::optional<std::string>{"attacking_player"}) {
+        return LootCondition::Target::AttackingPlayer;
+    }
     if (!entity.has_value() || *entity == "this") {
         return LootCondition::Target::This;
     }

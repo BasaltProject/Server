@@ -30,18 +30,20 @@ public:
     MineshaftStructureGenerator(BiomeAt biomeAt, std::set<std::string, std::less<>> normalBiomes,
                                 std::set<std::string, std::less<>> mesaBiomes,
                                 structure::mineshaftLayout::SurfaceHeightAt surfaceHeightAt = {},
-                                std::int32_t seaLevel = 63);
+                                std::int32_t seaLevel = 63, BiomeAt startBiomeAt = {});
 
     /// Writes into `chunk` whatever any nearby mineshaft puts there.
     void generateInto(Chunk& chunk, std::int64_t seed);
 
-private:
+    [[nodiscard]] const structure::StructurePlacementGrid& grid() const noexcept { return grid_; }
+
     /// Which mineshaft, if any, starts at this chunk. parity: `ChunkGenerator` picks by weight from
     /// the set and retries the other entry when the first one's biome refuses it, so a chunk with a
     /// badlands biome still gets a shaft when the normal one was drawn first and rejected.
     [[nodiscard]] std::optional<structure::MineshaftType> typeAt(std::int64_t seed, std::int32_t chunkX,
                                                                  std::int32_t chunkZ) const;
 
+private:
     [[nodiscard]] bool allows(structure::MineshaftType type, const std::string& biome) const;
 
     /// Whether a shaft of this type survives the biome check at its own start.
@@ -56,6 +58,9 @@ private:
     assemblyOf(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ, structure::MineshaftType type) const;
 
     BiomeAt biomeAt_;
+    /// parity: `Structure.isValidBiome` reads the noise biome at the stub, while the pieces' own
+    /// `mineshaft_blocking` test reads the zoomed one. Unset, the start reads `biomeAt_` too.
+    BiomeAt startBiomeAt_;
     std::set<std::string, std::less<>> normalBiomes_;
     std::set<std::string, std::less<>> mesaBiomes_;
     structure::mineshaftLayout::SurfaceHeightAt surfaceHeightAt_;

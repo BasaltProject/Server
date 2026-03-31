@@ -55,6 +55,10 @@ struct Effect {
     /// parity: `LevelEvent.COMPOSTER_FILL`, whose data says whether the layer went up: the client
     /// turns a one into the success sound and the green sparkles, and a zero into the plain fill.
     static constexpr std::int32_t kComposterFill = 1500;
+    /// parity: `LevelEvent.SOUND_PLAY_JUKEBOX_SONG`, whose data is the song's `jukebox_song` id.
+    static constexpr std::int32_t kPlayJukeboxSong = 1010;
+    /// parity: `LevelEvent.SOUND_STOP_JUKEBOX_SONG`.
+    static constexpr std::int32_t kStopJukeboxSong = 1011;
 
     std::int32_t type = 0;
     std::int32_t data = 0;

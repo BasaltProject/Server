@@ -29,6 +29,9 @@ public:
 
     [[nodiscard]] static const structure::StructurePlacementGrid& grid();
 
+    /// Whether a hut starts in this chunk, which is what `/locate` asks.
+    [[nodiscard]] bool startsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const;
+
 private:
     BiomeAt biomeAt_;
     SurfaceHeightAt surfaceHeightAt_;

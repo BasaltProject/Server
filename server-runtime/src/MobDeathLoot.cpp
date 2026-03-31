@@ -43,7 +43,8 @@ constexpr std::array<std::string_view, 16> kDyeColors{"white", "orange", "magent
                       .onFire = entity.fireTicks > 0,
                       .baby = entity.age < 0,
                       .cubeSize = entity.cubeSize,
-                      .captain = entity.patrolLeader};
+                      .captain = entity.patrolLeader,
+                      .scoreName = entity.uuid().toString()};
     const std::string_view path = entity.type().path();
     if (entity.sourceNbt.has_value()) {
         const wire::nbt::NbtCompound& data = *entity.sourceNbt;
@@ -128,11 +129,16 @@ void addHeld(EntityFacts& facts, const std::optional<storage::StoredItemStack>& 
         }
     }
     if (killer != nullptr) {
-        EntityFacts facts{.type = Identifier::vanilla("player")};
+        // parity: `dropFromLootTable` rolls with the luck of the player behind the kill.
+        context.luck = context.killedByPlayer ? killer->luck() : 0.0F;
+        EntityFacts facts{.type = Identifier::vanilla("player"), .scoreName = killer->name()};
         addHeld(facts, killer->inventory.heldItem());
         context.attackerEnchantments = facts.mainhandEnchantments;
         context.attacker = facts;
         context.directAttacker = facts;
+        if (context.killedByPlayer) {
+            context.attackingPlayer = facts;
+        }
     } else if (dead.hurtBy.has_value()) {
         if (const ServerEntity* mob = world.state().entity(*dead.hurtBy); mob != nullptr) {
             context.attacker = factsOf(world, *mob);

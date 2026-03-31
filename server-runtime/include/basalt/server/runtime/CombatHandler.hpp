@@ -76,6 +76,9 @@ private:
 
     void die(std::string_view deathMessageId, const std::optional<wire::text::Component>& killer);
 
+    /// parity: `Entity.restituteMovementAfterCollisions` calling `Block.bounceOn` on landing.
+    void bounceOn(player::PlayerSession& session, world::LoadedWorld& world, double landingY);
+
     void applyFallDamage(player::PlayerSession& session, double landingY);
 
     /// parity: `Player.attack`'s sweep, which hits what is standing beside what was hit.

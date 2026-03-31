@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <set>
 #include <string>
 
@@ -29,7 +30,16 @@ public:
 
     [[nodiscard]] static const structure::StructurePlacementGrid& grid();
 
+    /// Whether a temple starts in this chunk, which is what `/locate` asks.
+    [[nodiscard]] bool startsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const {
+        return startPiece(seed, chunkX, chunkZ).has_value();
+    }
+
 private:
+    /// The settled piece of a temple starting in this chunk, or nothing.
+    [[nodiscard]] std::optional<JungleTemplePiece> startPiece(std::int64_t seed, std::int32_t chunkX,
+                                                              std::int32_t chunkZ) const;
+
     void placeFrom(Chunk& chunk, std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const;
 
     BiomeAt biomeAt_;

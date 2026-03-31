@@ -103,4 +103,25 @@ bool StructurePlacementGrid::isStructureChunk(const std::int64_t seed, const std
     return exclusionZone_ == nullptr || !exclusionZone_->forbids(seed, chunkX, chunkZ);
 }
 
+std::optional<std::pair<std::int32_t, std::int32_t>>
+StructurePlacementGrid::locate(std::int64_t seed, std::int32_t fromChunkX, std::int32_t fromChunkZ,
+                               std::int32_t maxCells,
+                               const std::function<bool(std::int32_t, std::int32_t)>& startsAt) const {
+    for (std::int32_t ring = 0; ring <= maxCells; ++ring) {
+        for (std::int32_t dx = -ring; dx <= ring; ++dx) {
+            for (std::int32_t dz = -ring; dz <= ring; ++dz) {
+                if (dx != -ring && dx != ring && dz != -ring && dz != ring) {
+                    continue;
+                }
+                const auto [candidateX, candidateZ] =
+                    candidateChunk(seed, fromChunkX + dx * spacing_, fromChunkZ + dz * spacing_);
+                if (startsAt(candidateX, candidateZ)) {
+                    return std::pair{candidateX, candidateZ};
+                }
+            }
+        }
+    }
+    return std::nullopt;
+}
+
 } // namespace basalt::server::world::structure

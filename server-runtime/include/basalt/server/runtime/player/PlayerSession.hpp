@@ -126,6 +126,10 @@ public:
 
     void setMaxHealth(float value);
 
+    /// parity: `Player.getLuck`, the `luck` attribute: its base, plus one a level of Luck and less
+    /// one a level of Bad Luck.
+    [[nodiscard]] float luck() const;
+
     /// Attribute bases a plugin set, by their registry name. Empty for almost every player.
     std::map<std::string, double, std::less<>> attributeBases;
 

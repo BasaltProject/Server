@@ -80,7 +80,7 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
         // same villages the world already has.
         options.villageGenerator = built.villages;
         options.campGenerator = built.camps;
-        options.jigsawGenerators = built.jigsaws;
+        options.structureLocators = built.locators;
         options.strongholdGenerator = built.strongholds;
         options.spawnChunkFinder = built.spawnChunk;
         if (built.generate) {
@@ -104,13 +104,12 @@ std::unique_ptr<world::LoadedWorld> WorldRegistry::buildWorld(const config::Worl
         world->state().setLootUnpacker([tables = options_.lootTables, triggers = options_.triggers, players = players_,
                                         holder = world.get()](std::int32_t x, std::int32_t y, std::int32_t z,
                                                               const std::optional<wire::common::Uuid>& player) {
-            const std::optional<wire::common::Identifier> rolled =
-                world::containerLoot::unpack(*holder, *tables, x, y, z, player);
+            const player::PlayerSession* session =
+                player.has_value() && players != nullptr ? players->get(*player) : nullptr;
+            const std::optional<wire::common::Identifier> rolled = world::containerLoot::unpack(
+                *holder, *tables, x, y, z, player, session == nullptr ? 0.0F : session->luck());
             // parity: `unpackLootTable` fires `GENERATE_LOOT` for the player who opened it.
-            if (!rolled.has_value() || !player.has_value() || triggers == nullptr || players == nullptr) {
-                return;
-            }
-            if (const player::PlayerSession* session = players->get(*player); session != nullptr) {
+            if (rolled.has_value() && session != nullptr && triggers != nullptr) {
                 triggers->onContainerLoot(session->name(), player->toString(), *rolled);
             }
         });

@@ -231,6 +231,9 @@ bool useJukeboxFor(const BreakContext& context, PlayerSession& player, world::Lo
         ejected.has_value()) {
         const world::BlockChange& change = ejected->first;
         announceBlock(context, world.name(), change.x, change.y, change.z, change.stateId);
+        if (context.blocks != nullptr) {
+            context.blocks->sendEffects(playersIn(context, world.name()), x, y, z, change.stateId, change.effects);
+        }
         spawnDroppedItem(context, world, ejected->second, 1, x + 0.5, y + 1.0, z + 0.5, 0.0, 0.0, 0.0, 0,
                          wire::nbt::NbtCompound{});
         notifyAround(context, world, x, y, z, std::nullopt);
@@ -246,6 +249,9 @@ bool useJukeboxFor(const BreakContext& context, PlayerSession& player, world::Lo
         return false;
     }
     announceBlock(context, world.name(), change->x, change->y, change->z, change->stateId);
+    if (context.blocks != nullptr) {
+        context.blocks->sendEffects(playersIn(context, world.name()), x, y, z, change->stateId, change->effects);
+    }
     spendOne(context, player, heldSlot, *held);
     notifyAround(context, world, x, y, z, std::nullopt);
     return true;

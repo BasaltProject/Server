@@ -28,6 +28,12 @@ namespace jukeboxes {
 /// Whether this item is a disc a jukebox takes.
 [[nodiscard]] bool isDisc(const wire::common::Identifier& item);
 
+/// The song's id in the `jukebox_song` registry this server syncs, which a play event carries.
+[[nodiscard]] std::optional<std::int32_t> songNetworkId(std::string_view song);
+
+/// parity: `JukeboxSongPlayer.stop` raises its event only when a song was playing.
+[[nodiscard]] bool isPlayingAt(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
 /// parity: `JukeboxBlock.HAS_RECORD` plus the disc itself, kept in the block entity.
 [[nodiscard]] std::optional<BlockChange> insert(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                                 const wire::common::Identifier& disc);
