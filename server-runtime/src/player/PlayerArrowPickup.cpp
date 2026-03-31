@@ -13,11 +13,12 @@ namespace {
 /// parity: `Player`'s reach for what is on the floor, the same one an item is taken from.
 constexpr double kPickupRadius = 1.5;
 
-/// What an arrow gives back when it is picked up. parity: `AbstractArrow.getPickupItem`, which
-/// hands back the stack it was fired from; this build does not keep a tipped arrow's potion, so a
-/// tipped one comes back plain rather than coming back wrong.
-[[nodiscard]] std::string itemOf(const entity::ServerEntity& arrow) {
-    return arrow.type().path() == "spectral_arrow" ? "minecraft:spectral_arrow" : "minecraft:arrow";
+/// What an arrow gives back when it is picked up. parity: `AbstractArrow.getPickupItem`, the stack
+/// it was fired from, potion and all.
+[[nodiscard]] storage::StoredItemStack itemOf(const entity::ServerEntity& arrow) {
+    const std::string fallback{arrow.type().path() == "spectral_arrow" ? "spectral_arrow" : "arrow"};
+    return storage::StoredItemStack{
+        .id = "minecraft:" + arrow.heldItem.value_or(fallback), .count = 1, .components = arrow.heldItemComponents};
 }
 
 /// An arrow that is not moving at all, which is what being stuck looks like from outside.
@@ -46,15 +47,22 @@ std::vector<PickedArrow> pickupNearbyArrows(PlayerSession& session, world::World
         if ((dx * dx) + (dy * dy) + (dz * dz) > kPickupRadius * kPickupRadius) {
             continue;
         }
-        // parity: `tryPickup` in creative takes the arrow away and gives nothing: the bag is
-        // already full of whatever it wants.
+        // parity: `tryPickup`: a mob's arrow stays, one shot in creative only goes to a creative
+        // player and gives nothing, and the rest goes into the bag or stays.
         const bool creative = session.gamemode == wire::protocol::play::Gamemode::Creative;
-        if (!creative) {
-            const std::int32_t leftover =
-                session.inventory.add(storage::StoredItemStack{.id = itemOf(*candidate), .count = 1, .components = {}});
-            if (leftover > 0) {
+        switch (candidate->arrowPickup) {
+        case entity::ServerEntity::ArrowPickup::Disallowed:
+            continue;
+        case entity::ServerEntity::ArrowPickup::CreativeOnly:
+            if (!creative) {
                 continue;
             }
+            break;
+        case entity::ServerEntity::ArrowPickup::Allowed:
+            if (session.inventory.add(itemOf(*candidate)) > 0 && !creative) {
+                continue;
+            }
+            break;
         }
         candidate->removed = true;
         taken.push_back(PickedArrow{.entityId = candidate->entityId()});

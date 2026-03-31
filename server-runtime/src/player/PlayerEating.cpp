@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 
@@ -29,6 +30,8 @@ using wire::protocol::play::Gamemode;
 
 /// parity: what a player throws from, which is where a leftover bowl lands when the bag is full.
 constexpr double kThrowEyeHeight = 1.62;
+
+constexpr std::int32_t kOminousBottleTicks = 120000;
 
 /// parity: `TeleportRandomlyConsumeEffect.apply`'s sixteen tries and `LevelEvent` 2017.
 constexpr std::int32_t kTeleportAttempts = 16;
@@ -163,6 +166,17 @@ bool eatHeldItem(const BreakContext& context, PlayerSession& player, world::Load
     world::vibrations::emit(world.state(), drunk ? "drink" : "eat", player.x, player.y, player.z, world.gameTime());
 
     player.food.eat(food->nutrition, food->saturation);
+    // parity: `OminousBottleAmplifier.onConsume`, Bad Omen for 100 minutes at the bottle's level.
+    if (id->path() == "ominous_bottle") {
+        const world::ActiveEffect omen{.effect = world::mobEffects::badOmen(),
+                                       .amplifier = eaten.components.getInt("minecraft:ominous_bottle_amplifier"),
+                                       .remainingTicks = kOminousBottleTicks,
+                                       .visible = false};
+        player.effects.insert_or_assign(omen.effect, omen);
+        if (player.connection().sendEffect) {
+            player.connection().sendEffect(omen);
+        }
+    }
     applyConsumeEffectsFor(player, food->effects, nextFloat);
     for (const reg::ConsumeEffect& effect : food->effects) {
         if (const auto* teleport = effect.as<reg::ConsumeEffect::TeleportRandomly>(); teleport != nullptr) {

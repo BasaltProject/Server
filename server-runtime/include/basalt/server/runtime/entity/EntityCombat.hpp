@@ -56,6 +56,10 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX = 
             std::optional<double> sourceZ = std::nullopt, const Hooks& hooks = {}, std::string_view cause = "attack",
             const std::optional<std::string>& attackerName = std::nullopt, bool byPlayer = false);
 
+/// Names who is behind the next `hurt` of `target` and what lands it, for its death roll.
+void blame(ServerEntity& target, std::optional<std::int32_t> causingId, std::int32_t directId,
+           const wire::common::Identifier& directType);
+
 /// parity: `LivingEntity.knockback`. The coordinates point at whoever swung, and the push is taken
 /// off the speed, so the entity ends up going the other way.
 void knockback(ServerEntity& entity, double power, double towardsX, double towardsZ);
@@ -99,6 +103,8 @@ struct DamageSource {
     /// Who shot it, when the hit is a projectile's. parity: `DamageSource.getEntity`, which is the
     /// owner rather than the arrow.
     std::optional<std::int32_t> ownerId;
+    /// An arrow with a pierce level, which no shield stops. parity: `LivingEntity.applyItemBlocking`.
+    bool piercing = false;
 };
 
 } // namespace basalt::server::runtime::entity

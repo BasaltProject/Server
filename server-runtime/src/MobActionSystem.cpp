@@ -206,6 +206,9 @@ void MobActionSystem::hurtPlayer(ServerEntity& mob, std::int32_t playerId, float
     if (!wardenSwings(*world, mob)) {
         return;
     }
+    if (mob.type().path() == "ravager") {
+        ravagerSwings(*world, mob);
+    }
     // parity: `Player.hurtServer`, where the difficulty decides how much of it lands.
     player->connection().hurt(
         player::combat::afterDifficulty(damage, world->difficulty()), kDeathMob, world::damageTypes::kMobAttack,
@@ -224,6 +227,10 @@ void MobActionSystem::hurtMob(ServerEntity& mob, ServerEntity& target, float dam
     if (world == nullptr || !wardenSwings(*world, mob)) {
         return;
     }
+    if (mob.type().path() == "ravager") {
+        ravagerSwings(*world, mob);
+    }
+    entity::entityCombat::blame(target, mob.entityId(), mob.entityId(), mob.type());
     const entity::entityCombat::Result result =
         entity::entityCombat::hurt(target, damage, mob.x, mob.z, hooks_.combat, "mob_attack", mob.type().toString());
     if (!result.landed) {
@@ -523,6 +530,17 @@ void MobActionSystem::shootArrow(ServerEntity& mob, double targetX, double targe
         entity::projectiles::spawn(world->state(), kind, players_->allocateEntityId(), entry->protocolId, mob.x, fromY,
                                    mob.z, dx, dy + (flat * kArrowArc), dz, kArrowPower, arrowSpread(*world), random);
     arrow.ownerId = mob.entityId();
+    // parity: `EnchantmentHelper.getPiercingCount`, off the crossbow in its hand.
+    if (mob.sourceNbt.has_value()) {
+        const wire::nbt::NbtCompound* equipment = mob.sourceNbt->getCompound("equipment");
+        const wire::nbt::NbtCompound* hand = equipment == nullptr ? nullptr : equipment->getCompound("mainhand");
+        const wire::nbt::NbtCompound* components = hand == nullptr ? nullptr : hand->getCompound("components");
+        const wire::nbt::NbtCompound* levels =
+            components == nullptr ? nullptr : components->getCompound("minecraft:enchantments");
+        if (levels != nullptr) {
+            arrow.pierceLevel = static_cast<std::int8_t>(std::clamp(levels->getInt("minecraft:piercing"), 0, 127));
+        }
+    }
     playSound(*world, mob, kSoundSkeletonShoot);
 }
 

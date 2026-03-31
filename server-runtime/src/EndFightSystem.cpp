@@ -334,6 +334,7 @@ void EndFightSystem::strike(world::LoadedWorld& world, const std::vector<PlayerS
                                                       .name = entity::entityCombat::displayName(dragon)});
     };
     const auto hurtMob = [this, &watchers, &dragon](ServerEntity& mob, float damage) {
+        entity::entityCombat::blame(mob, dragon.entityId(), dragon.entityId(), dragon.type());
         const entity::entityCombat::Result result =
             entity::entityCombat::hurt(mob, damage, dragon.x, dragon.z, {}, "mob_attack", dragon.type().toString());
         if (result.landed) {

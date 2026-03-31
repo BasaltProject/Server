@@ -11,6 +11,7 @@ basalt_module(server-registry
         src/ItemFood.cpp
         src/ItemTools.cpp
         src/Items.cpp
+        src/MapColors.cpp
         src/Registries.cpp
         src/Tags.cpp
         src/VanillaBlocks.cpp

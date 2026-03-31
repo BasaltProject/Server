@@ -48,6 +48,8 @@ std::vector<SweepHit> sweepAround(PlayerSession& session, world::LoadedWorld& wo
         if ((dx * dx) + (dz * dz) >= kSweepPlayerRange) {
             continue;
         }
+        entity::entityCombat::blame(*nearby, session.entityId(), session.entityId(),
+                                    wire::common::Identifier::vanilla("player"));
         const entity::entityCombat::Result result =
             entity::entityCombat::hurt(*nearby, damage, session.x, session.z, {}, "sweep", session.name());
         if (!result.landed) {

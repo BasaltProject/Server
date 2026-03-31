@@ -947,6 +947,12 @@ void shoot(const fluidFlow::Context& context, std::int32_t x, std::int32_t y, st
     if (config.carries) {
         shot.heldItem = stack.item.path();
     }
+    // parity: `ArrowItem.asProjectile`, whose arrow keeps the whole stack and may be picked up.
+    if (config.kind->sticks) {
+        shot.heldItem = stack.item.path();
+        shot.heldItemComponents = stack.components;
+        shot.arrowPickup = entity::ServerEntity::ArrowPickup::Allowed;
+    }
 }
 
 } // namespace

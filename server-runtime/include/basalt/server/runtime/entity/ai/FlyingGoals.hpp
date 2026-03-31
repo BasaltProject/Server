@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/entity/ai/Goals.hpp>
 
+#include <array>
 #include <cstdint>
 #include <set>
 
@@ -36,6 +37,29 @@ private:
     double wantedZ_ = 0.0;
     bool arrived_ = true;
     std::int32_t floatDuration_ = 0;
+};
+
+/// parity: `WaterAvoidingRandomFlyingGoal`: one roll in sixty, then a spot eight blocks out within a
+/// quarter turn of where it faces, hovering one to three blocks over the ground, or failing that
+/// one in the air, and flown to.
+class HoverWanderGoal final : public Goal {
+public:
+    explicit HoverWanderGoal(double step);
+
+    [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move}; }
+
+    [[nodiscard]] bool requiresUpdateEveryTick() const override { return true; }
+
+    [[nodiscard]] bool canUse(MobContext& mob) override;
+
+    [[nodiscard]] bool canContinueToUse(MobContext& mob) override;
+
+    void tick(MobContext& mob) override;
+
+private:
+    double step_;
+    std::array<double, 3> wanted_{};
+    bool arrived_ = true;
 };
 
 /// parity: `Ghast.GhastShootFireballGoal`: twenty ticks of charging where it stands, a fireball

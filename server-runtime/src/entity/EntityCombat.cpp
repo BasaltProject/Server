@@ -46,9 +46,15 @@ void knockback(ServerEntity& entity, double power, double towardsX, double towar
     entity.velocityZ = moved[2];
 }
 
+void blame(ServerEntity& target, std::optional<std::int32_t> causingId, std::int32_t directId,
+           const wire::common::Identifier& directType) {
+    target.nextBlame = ServerEntity::Blame{.causingId = causingId, .directId = directId, .directType = directType};
+}
+
 Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, std::optional<double> sourceZ,
             const Hooks& hooks, std::string_view cause, const std::optional<std::string>& attackerName,
             const bool byPlayer) {
+    const ServerEntity::Blame blamed = std::exchange(entity.nextBlame, {});
     if (entity.removed || entity.health <= 0.0) {
         return {};
     }
@@ -113,6 +119,7 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
     }
     const double before = entity.health;
     entity.lastDamageCause = std::string{cause};
+    entity.lastBlame = blamed;
     // parity: `CopperGolem.actuallyHurt`, which drops whatever pose it was working in.
     if (entity.copperGolem != nullptr) {
         entity.copperGolem->pose = copperGolems::Pose::Idle;

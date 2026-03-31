@@ -27,12 +27,9 @@ struct FireOddsEntry {
 /// authoritative, not decompiled/guessed.
 [[nodiscard]] std::span<const std::pair<std::int32_t, std::string_view>> itemIdsTable();
 
-/// Every entity type's protocol id, in `BuiltInRegistries.ENTITY_TYPE` order, which is the order
-/// `EntityTypes` registers them in.
-///
-/// A protocol fact, like the block and item tables beside it: the client resolves a spawned entity
-/// by this number alone, so a wrong one spawns something else entirely. Cross-checked against the
-/// two ids this server already had verified against a real client, `item` (71) and `player` (156).
+/// Every entity type's protocol id, in `BuiltInRegistries.ENTITY_TYPE` order (the order
+/// `EntityTypes` registers them in). The client resolves a spawned entity by this number alone, so a
+/// wrong one spawns something else entirely.
 [[nodiscard]] std::span<const std::pair<std::int32_t, std::string_view>> entityTypeIdsTable();
 
 /// Every particle type's protocol id, in `BuiltInRegistries.PARTICLE_TYPE` order, which is the
@@ -56,12 +53,10 @@ struct FireOddsEntry {
 /// Which block entity type each block owns. A block absent from this list has none.
 [[nodiscard]] std::span<const std::pair<std::string_view, std::string_view>> blockEntityOwnersTable();
 
-/// Every distinct block shape, from the real server jar's own block classes: light
-/// dampening, whether it blocks movement, whether something placed there replaces it,
-/// whether it counts as solid, whether its occlusion shape renders solid, which faces are
-/// sturdy, which support a centre and which support a rigid block, which face-occlusion
-/// shapes are full (down, up, north, south, west, east each time), and the boxes of the
-/// collision shape in thirty-seconds of a block.
+/// Every distinct block shape, from the jar's own block classes: light dampening, blocks motion,
+/// replaceable, solid, solid-rendering occlusion, sturdy / centre-support / rigid-support faces and
+/// full face-occlusion shapes (down, up, north, south, west, east each time), and the collision
+/// boxes in thirty-seconds of a block.
 [[nodiscard]] std::span<const std::string_view> blockShapeSpecsTable();
 
 /// Which of `ALL_BLOCK_SHAPES` each block state uses, two characters per state id in id
@@ -69,12 +64,10 @@ struct FireOddsEntry {
 /// fits here in a few hundred.
 [[nodiscard]] std::string_view blockShapeIndexTable();
 
-/// What each block state needs around it to stay put, asked of the real block classes.
-///
-/// One rule per distinct answer. Each rule is twelve fields: six directions dry, then the same
-/// six with water at and around the position, and a field is empty when that side holds nothing
-/// up, `*` for any block whose face towards it is sturdy, `c` for one that supports a centre,
-/// and `#n` for a member of set n. A state survives when any one of its fields is satisfied.
+/// What each block state needs around it to stay put, one rule per distinct answer: twelve fields,
+/// six directions dry then the same six with water around. A field is empty when that side holds
+/// nothing up, `*` for a sturdy facing face, `c` for centre support, `#n` for a member of set n.
+/// A state survives when any one of its fields is satisfied.
 [[nodiscard]] std::span<const std::string_view> supportRulesTable();
 
 /// Each rule's block sets, as base64 bitsets over block registry ids (not state ids).
@@ -107,6 +100,13 @@ struct FireOddsEntry {
 /// tables `FireBlock` builds at bootstrap: block id, ignite odds, burn odds.
 [[nodiscard]] std::span<const FireOddsEntry> fireOddsTable();
 
+/// Each block state's map colour id, as runs: the first state of a run and the id every state up to
+/// the next run draws. parity: `BlockBehaviour.Properties.mapColor`, code rather than data.
+[[nodiscard]] std::span<const std::pair<std::int32_t, std::int32_t>> blockMapColorsTable();
+
+/// The RGB behind each of the 64 map colour ids. parity: `MapColor.col`.
+[[nodiscard]] std::span<const std::int32_t> mapColorsTable();
+
 /// Which blocks are a fence, a gate, panes, leaves or a wall, and which refuse to be
 /// connected to at all: what `connectsTo` and `attachsTo` ask about, as base64 bitsets over
 /// block registry ids.
@@ -124,11 +124,9 @@ struct FireOddsEntry {
 [[nodiscard]] std::span<const std::string_view> itemArmourTable();
 
 /// Every edible item: `<item>|<nutrition>|<saturation>|<can always eat>|<seconds to eat>|
-/// <what eating it does>|<what it leaves behind>`, from the real item component reports.
-///
-/// The last field is `apply:<effect>,<ticks>,<amplifier>,<probability>`, `remove:<effect>`
-/// or `clear`, several separated by `;`: what a golden apple, a bottle of honey and a bucket
-/// of milk respectively do.
+/// <effects>|<what it leaves behind>`, from the item component reports. Effects are
+/// `apply:<effect>,<ticks>,<amplifier>,<probability>`, `remove:<effect>` or `clear`, `;`-separated
+/// (a golden apple, honey and milk respectively).
 [[nodiscard]] std::span<const std::string_view> itemFoodTable();
 
 /// What each item adds to the hand that holds it: attack damage and attack speed, as

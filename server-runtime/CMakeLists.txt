@@ -17,6 +17,7 @@ basalt_module(server-runtime-core
         src/bedrock/BedrockListener.cpp
         src/bedrock/BedrockPlayer.cpp
         src/bedrock/BedrockSeen.cpp
+        src/bedrock/BedrockShield.cpp
         src/bedrock/BedrockPlayerConnection.cpp
         src/bedrock/BedrockRecipes.cpp
         src/bedrock/BedrockRecords.cpp
@@ -51,6 +52,7 @@ basalt_module(server-runtime-core
         src/entity/Raids.cpp
         src/entity/WanderingTraderLifetime.cpp
         src/entity/ServerEntity.cpp
+        src/entity/ShieldBlows.cpp
         src/config/WorldsConfig.cpp
         src/command/StringReader.cpp
         src/command/ArgumentTypes.cpp
@@ -141,7 +143,9 @@ basalt_module(server-runtime-core
         src/SessionPlay.cpp
         src/SessionDelegates.cpp
         src/ChunkStreamer.cpp
+        src/CombatArrows.cpp
         src/CombatAttack.cpp
+        src/CombatFireballs.cpp
         src/CombatHandler.cpp
         src/CombatSystem.cpp
         src/ContainerClicks.cpp
@@ -164,6 +168,7 @@ basalt_module(server-runtime-core
         src/MobTickSystem.cpp
         src/MobActionTick.cpp
         src/MobActionConversion.cpp
+        src/MobActionRavager.cpp
         src/MobActionWarden.cpp
         src/MobDeathLoot.cpp
         src/MobActionCopperGolem.cpp
@@ -459,6 +464,7 @@ basalt_module(server-runtime-core
         src/entity/MobCombat.cpp
         src/entity/ai/Controls.cpp
         src/entity/ai/FlyingGoals.cpp
+        src/entity/ai/HoverWanderGoal.cpp
         src/entity/ai/GoalSelector.cpp
         src/entity/ai/Goals.cpp
         src/entity/ai/IllagerGoals.cpp

@@ -33,6 +33,7 @@ namespace {
                                                 protocolId, x, y, z);
     // A stuck arrow is one that has stopped: the projectile code zeroes the movement when it lands.
     arrow->velocityY = stuck ? 0.0 : -0.4;
+    arrow->arrowPickup = ServerEntity::ArrowPickup::Allowed;
     return world.spawnEntity(std::move(arrow));
 }
 
@@ -86,10 +87,38 @@ TEST_CASE("a full bag leaves the arrow where it is, and creative takes it withou
     CHECK(pickupNearbyArrows(player, world).empty());
     CHECK_FALSE(stuck.removed);
 
-    // parity: `tryPickup` in creative answers `hasInfiniteMaterials`, so the arrow goes and nothing
+    // parity: `Inventory.add` in creative swallows what does not fit, so the arrow goes and nothing
     // is added to a bag that has no room anyway.
     player.gamemode = Gamemode::Creative;
     CHECK(pickupNearbyArrows(player, world).size() == 1);
     CHECK(stuck.removed);
     CHECK(arrowsHeld(player) == 0);
+}
+
+TEST_CASE("a mob's arrow stays put and a tipped one comes back with its potion") {
+    WorldState world;
+    PlayerSession player{Uuid{4, 4}, "Steve", 1, PlayerConnection{}};
+    player.worldName = "world";
+    player.x = 8.5;
+    player.y = 64.0;
+    player.z = 8.5;
+
+    ServerEntity& skeletons = arrowIn(world, 30, 8.5, 64.0, 8.5, true);
+    skeletons.arrowPickup = ServerEntity::ArrowPickup::Disallowed;
+    CHECK(pickupNearbyArrows(player, world).empty());
+    CHECK_FALSE(skeletons.removed);
+    skeletons.removed = true;
+
+    ServerEntity& tipped = arrowIn(world, 31, 8.5, 64.0, 8.5, true);
+    tipped.heldItem = "tipped_arrow";
+    basalt::wire::nbt::NbtCompound contents;
+    contents.putString("potion", "minecraft:poison");
+    tipped.heldItemComponents.set("minecraft:potion_contents", basalt::wire::nbt::NbtTag::ofCompound(contents));
+    REQUIRE(pickupNearbyArrows(player, world).size() == 1);
+    const std::optional<std::int32_t> slot = player.inventory.indexOf("minecraft:tipped_arrow");
+    REQUIRE(slot.has_value());
+    const basalt::wire::nbt::NbtCompound* held =
+        player.inventory.at(*slot)->components.getCompound("minecraft:potion_contents");
+    REQUIRE(held != nullptr);
+    CHECK(held->getString("potion") == "minecraft:poison");
 }

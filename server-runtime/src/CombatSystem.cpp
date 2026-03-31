@@ -66,17 +66,6 @@ constexpr std::string_view kDeathFall = "fall";
 /// parity: `ThrownEnderpearl.onHit`, five points of fall damage on arrival.
 constexpr float kEnderPearlDamage = 5.0F;
 
-constexpr double kArrowBaseDamage = 2.0;
-
-/// parity: `AbstractArrow.onHitEntity`'s own `scale(0.2)` when the hit did not land.
-constexpr double kArrowBounce = 0.2;
-
-/// parity: `PanicGoal`, which runs for as long as the last hit is remembered.
-constexpr std::int32_t kPanicTicks = 40;
-
-/// parity: `death.attack.arrow`, and `AbstractArrow`'s own two points of damage.
-constexpr std::string_view kDeathArrow = "arrow";
-
 /// parity: `EntityType.PLAYER`, whose box is what a projectile's reach is measured against.
 const Identifier& playerType() {
     static const Identifier kType = Identifier::vanilla("player");
@@ -139,6 +128,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
                 if (target->mob->dragon != nullptr) {
                     target->mob->dragon->hitPart = target->dragonPart;
                 }
+                entity::entityCombat::blame(*target->mob, entity.ownerId, entity.entityId(), entity.type());
                 const entity::entityCombat::Result result =
                     entity::entityCombat::hurt(*target->mob, kWindChargeDamage, fromX, fromZ, hooks_, "wind_charge",
                                                std::nullopt, firedByPlayer(watchers, entity));
@@ -179,6 +169,9 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         }
         entity.removed = true;
         if (path == "fireball") {
+            if (target.has_value()) {
+                hitByLargeFireball(world, watchers, living, entity, *target, fromX, fromZ);
+            }
             explosions_.blowUp(world, watchers, entity.x, entity.y, entity.z, entity.explosionPower, "tnt",
                                entity.entityId());
             return;
@@ -192,6 +185,7 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         // parity: a small fireball burns whoever it hits for five seconds and takes five off.
         if (target->mob != nullptr) {
             target->mob->fireTicks = kSmallFireballFireTicks;
+            entity::entityCombat::blame(*target->mob, entity.ownerId, entity.entityId(), entity.type());
             const entity::entityCombat::Result result =
                 entity::entityCombat::hurt(*target->mob, kSmallFireballDamage, fromX, fromZ, hooks_, "fireball");
             if (result.landed) {
@@ -275,11 +269,23 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         splashPotion(world, watchers, living, entity);
         return;
     }
-    if (kind.sticks && hitEntityAlong(world, watchers, living, entity, fromX, fromY, fromZ)) {
-        return;
+    // parity: `AbstractArrow.stepMoveAndHit`, which keeps going through whatever it pierces.
+    if (kind.sticks) {
+        ArrowHit struck = ArrowHit::Missed;
+        do {
+            struck = hitEntityAlong(world, watchers, living, entity, fromX, fromY, fromZ);
+        } while (struck == ArrowHit::Pierced);
+        if (struck == ArrowHit::Stopped) {
+            return;
+        }
     }
     if (!hit.has_value()) {
         return;
+    }
+    // parity: `AbstractArrow.onHitBlock` forgets its piercing once it sticks.
+    if (kind.sticks) {
+        entity.pierceLevel = 0;
+        entity.piercedIds.clear();
     }
     // parity: `Projectile.onHitBlock` sends `PROJECTILE_LAND` where it landed.
     emitVibration(world, "projectile_land", hit->x, hit->y, hit->z, entity.uuid());
@@ -455,7 +461,8 @@ std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<
     Target found;
     for (ServerEntity* candidate : living) {
         if (candidate->entityId() == projectile.entityId() ||
-            (projectile.ownerId.has_value() && candidate->entityId() == *projectile.ownerId)) {
+            (projectile.ownerId.has_value() && candidate->entityId() == *projectile.ownerId) ||
+            std::ranges::contains(projectile.piercedIds, candidate->entityId())) {
             continue;
         }
         // parity: `Projectile.canHitEntity` asks `isPickable`, which a crystal is too.
@@ -488,7 +495,8 @@ std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<
         found = Target{.mob = candidate, .player = nullptr};
     }
     for (PlayerSession* candidate : watchers) {
-        if ((projectile.ownerId.has_value() && candidate->entityId() == *projectile.ownerId) || candidate->dead) {
+        if ((projectile.ownerId.has_value() && candidate->entityId() == *projectile.ownerId) || candidate->dead ||
+            std::ranges::contains(projectile.piercedIds, candidate->entityId())) {
             continue;
         }
         if (candidate->gamemode == Gamemode::Creative || candidate->gamemode == Gamemode::Spectator) {
@@ -507,100 +515,6 @@ std::optional<CombatSystem::Target> CombatSystem::targetAlong(const std::vector<
         return std::nullopt;
     }
     return found;
-}
-
-void CombatSystem::deflectArrow(ServerEntity& arrow) {
-    // parity: `ProjectileDeflection.REVERSE` then `scale(0.2)`: back at a tenth of the speed, turned
-    // round by a little over half a turn either way.
-    constexpr double kReverse = -0.5;
-    arrow.velocityX *= kReverse * kArrowBounce;
-    arrow.velocityY *= kReverse * kArrowBounce;
-    arrow.velocityZ *= kReverse * kArrowBounce;
-    const float spin = 170.0F + (static_cast<float>(options_.nextInt ? options_.nextInt(1000) : 0) / 1000.0F * 20.0F);
-    arrow.yaw += spin;
-    // parity: an arrow left with almost no speed is gone.
-    constexpr double kStopped = 1.0E-7;
-    if ((arrow.velocityX * arrow.velocityX) + (arrow.velocityY * arrow.velocityY) +
-            (arrow.velocityZ * arrow.velocityZ) <
-        kStopped) {
-        arrow.removed = true;
-    }
-}
-
-bool CombatSystem::hitEntityAlong(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
-                                  const std::vector<ServerEntity*>& living, ServerEntity& arrow, double fromX,
-                                  double fromY, double fromZ) {
-    const std::optional<Target> target = targetAlong(watchers, living, arrow, fromX, fromY, fromZ);
-    if (!target.has_value()) {
-        return false;
-    }
-    // parity: `AbstractArrow.onHitEntity`: the damage is the speed times the arrow's own two points,
-    // rounded up, and a fully drawn bow adds a roll on top of it.
-    const double speed = std::sqrt((arrow.velocityX * arrow.velocityX) + (arrow.velocityY * arrow.velocityY) +
-                                   (arrow.velocityZ * arrow.velocityZ));
-    auto damage = static_cast<std::int32_t>(std::ceil(speed * kArrowBaseDamage));
-    if (arrow.critical && options_.nextInt) {
-        damage += options_.nextInt((damage / 2) + 2);
-    }
-
-    if (target->mob != nullptr && world::endCrystals::isCrystal(target->mob->type())) {
-        arrow.removed = true;
-        hitCrystal(world, watchers, *target->mob, false, false,
-                   firedByPlayer(watchers, arrow) ? arrow.ownerId : std::nullopt);
-        return true;
-    }
-    if (target->mob != nullptr) {
-        if (target->mob->dragon != nullptr) {
-            target->mob->dragon->hitPart = target->dragonPart;
-        }
-        markWitherFriend(world, *target->mob, arrow.ownerId);
-        const entity::entityCombat::Result result =
-            entity::entityCombat::hurt(*target->mob, static_cast<float>(damage), fromX, fromZ, hooks_, "projectile",
-                                       std::nullopt, firedByPlayer(watchers, arrow));
-        if (!result.landed) {
-            // parity: an arrow that found somebody still inside their hurt cooldown bounces off.
-            deflectArrow(arrow);
-            return true;
-        }
-        emitVibration(world, "entity_damage", target->mob->x, target->mob->y, target->mob->z, target->mob->uuid());
-        // parity: `Warden.hurtServer` angers it at whoever shot, and fights them within five blocks.
-        if (arrow.ownerId.has_value() && entity::wardens::isWarden(target->mob->type())) {
-            static_cast<void>(entity::wardens::anger(*target->mob, *arrow.ownerId, entity::wardens::kHurt));
-            for (const PlayerSession* shooter : watchers) {
-                if (shooter->entityId() == *arrow.ownerId) {
-                    const double dx = shooter->x - target->mob->x;
-                    const double dy = shooter->y - target->mob->y;
-                    const double dz = shooter->z - target->mob->z;
-                    MobActionSystem::wardenStruck(*target->mob, *arrow.ownerId, false,
-                                                  (dx * dx) + (dy * dy) + (dz * dz));
-                }
-            }
-        }
-        arrow.removed = true;
-        rememberShooter(watchers, arrow, *target->mob);
-        if (arrow.ownerId.has_value()) {
-            target->mob->hurtBy = *arrow.ownerId;
-        }
-        target->mob->panicTicks = kPanicTicks;
-        announceEntityHit(watchers, *target->mob, world::damageTypes::kArrow, arrow.entityId(), result.died);
-        return true;
-    }
-    // parity: a raised shield makes `hurtServer` answer false, and the arrow turns back.
-    const bool shielded = target->player != nullptr && player::shieldFaces(*target->player, fromX, fromZ);
-    if (target->player != nullptr && target->player->connection().hurt) {
-        target->player->connection().hurt(static_cast<float>(damage), kDeathArrow, world::damageTypes::kArrow,
-                                          entity::DamageSource{.entityId = arrow.entityId(),
-                                                               .x = fromX,
-                                                               .z = fromZ,
-                                                               .name = shooterName(watchers, living, arrow),
-                                                               .ownerId = arrow.ownerId});
-    }
-    if (shielded) {
-        deflectArrow(arrow);
-    } else {
-        arrow.removed = true;
-    }
-    return true;
 }
 
 void CombatSystem::hitCrystal(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
@@ -654,10 +568,23 @@ void CombatSystem::hurtByExplosion(world::LoadedWorld& world, const std::vector<
             continue;
         }
         markWitherFriend(world, *entity, sourceEntityId);
+        // parity: `Explosion.getIndirectSourceEntity`: a projectile's or a primed block's owner, or a
+        // living source itself.
+        if (const ServerEntity* source = world.state().entity(sourceEntityId); source != nullptr) {
+            const std::optional<std::int32_t> causing = source->ownerId.has_value() ? source->ownerId
+                                                        : server::registry::entityAttributes::isLiving(source->type())
+                                                            ? std::optional{source->entityId()}
+                                                            : std::nullopt;
+            entity::entityCombat::blame(*entity, causing, source->entityId(), source->type());
+        }
         const entity::entityCombat::Result result =
             entity::entityCombat::hurt(*entity, damage, x, z, hooks_, "explosion");
         if (!result.landed) {
             continue;
+        }
+        // parity: `resolvePlayerResponsibleForDamage`, the player behind the blast.
+        if (const ServerEntity* source = world.state().entity(sourceEntityId); source != nullptr) {
+            rememberShooter(watchers, *source, *entity);
         }
         announceEntityHit(watchers, *entity, world::damageTypes::kExplosion, sourceEntityId, result.died);
         emitVibration(world, "entity_damage", entity->x, entity->y, entity->z, entity->uuid());

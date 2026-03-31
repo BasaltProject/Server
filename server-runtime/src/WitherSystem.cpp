@@ -522,6 +522,7 @@ void WitherSystem::skullLanded(world::LoadedWorld& world, const std::vector<Play
         if (ownedByLiving && owner != nullptr && boss::isFriend(owner->type().path()) && mob->wither != nullptr) {
             mob->wither->nextHitFromFriend = true;
         }
+        entity::entityCombat::blame(*mob, skull.ownerId, skull.entityId(), skull.type());
         const entity::entityCombat::Result result =
             entity::entityCombat::hurt(*mob, damage, skull.x, skull.z, {}, ownedByLiving ? "wither_skull" : "magic",
                                        owner != nullptr ? std::optional{owner->type().toString()} : std::nullopt);

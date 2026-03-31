@@ -139,6 +139,7 @@ void MobActionSystem::sonicBlast(world::LoadedWorld& world, const std::vector<Pl
         }
         return;
     }
+    entity::entityCombat::blame(*mob, warden.entityId(), warden.entityId(), warden.type());
     const entity::entityCombat::Result result = entity::entityCombat::hurt(
         *mob, brain::kSonicDamage, warden.x, warden.z, hooks_.combat, "sonic_boom", warden.type().toString());
     if (!result.landed) {

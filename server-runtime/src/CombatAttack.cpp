@@ -141,6 +141,13 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
         }
         return;
     }
+    // parity: `Player.attack` turns a redirectable projectile back instead of hurting it.
+    if (CombatSystem::isRedirectable(target->type())) {
+        session->ticksSinceSwing = 0;
+        CombatSystem::deflectByPunch(owner_->playersInSameWorld(), *target, *session);
+        owner_->broadcastSound(kSoundAttackNoDamage, session->x, session->y, session->z, SoundSource::Players);
+        return;
+    }
     if (!server::registry::entityAttributes::isLiving(target->type())) {
         return;
     }
@@ -178,6 +185,7 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     if (target->dragon != nullptr) {
         target->dragon->hitPart = dragonPart;
     }
+    entity::entityCombat::blame(*target, session->entityId(), session->entityId(), Identifier::vanilla("player"));
     const entity::entityCombat::Result result =
         entity::entityCombat::hurt(*target, damage, session->x, session->z, {}, "attack", session->name(), true);
     if (!result.landed) {
