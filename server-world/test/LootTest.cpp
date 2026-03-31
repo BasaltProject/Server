@@ -780,6 +780,11 @@ TEST_CASE("a location check reads position, dimension, structure, light, fluid, 
     CHECK_FALSE(passes(R"({"light":{"light":8}})", place));
     CHECK(passes(R"({"fluid":{"fluids":"minecraft:flowing_lava","state":{"level":"4"}}})", place));
     CHECK_FALSE(passes(R"({"fluid":{"fluids":"minecraft:water"}})", place));
+    place.fluidTagged = [](const Identifier& fluid, std::string_view tag) {
+        return tag == "minecraft:lava" && fluid.path().ends_with("lava");
+    };
+    CHECK(passes(R"({"fluid":{"fluids":"#minecraft:lava"}})", place));
+    CHECK_FALSE(passes(R"({"fluid":{"fluids":"#minecraft:water"}})", place));
     CHECK(passes(R"({"smokey":true,"can_see_sky":false})", place));
     place.loaded = false;
     CHECK_FALSE(passes(R"({"light":{"light":7}})", place));

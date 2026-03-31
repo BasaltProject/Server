@@ -3,6 +3,7 @@
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/CommandTarget.hpp>
 #include <basalt/server/runtime/command/Coordinates.hpp>
@@ -10,10 +11,17 @@
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 #include <basalt/server/runtime/command/WorldArguments.hpp>
 #include <basalt/server/runtime/command/commands/ItemCommands.hpp>
+#include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 
+#include <algorithm>
 #include <cstdint>
+#include <map>
+#include <random>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -29,24 +37,58 @@ using wire::text::Component;
 /// parity: `ItemCommands.MAX_ALLOWED_ITEMSTACKS`, the same cap `/item` uses.
 constexpr std::int32_t kMaxCount = 99;
 
-/// parity: `String.hashCode`, so a table always rolls the same way for a given world seed.
-[[nodiscard]] std::int32_t javaHash(std::string_view text) {
-    std::int32_t hash = 0;
-    for (const char c : text) {
-        hash = static_cast<std::int32_t>(static_cast<std::uint32_t>(hash) * 31U +
-                                         static_cast<std::uint32_t>(static_cast<unsigned char>(c)));
-    }
-    return hash;
-}
-
 [[nodiscard]] std::vector<storage::StoredItemStack>
 stacksOf(const std::vector<server::world::loot::ItemStack>& rolled) {
     std::vector<storage::StoredItemStack> stacks;
     stacks.reserve(rolled.size());
     for (const server::world::loot::ItemStack& one : rolled) {
-        stacks.push_back(storage::StoredItemStack{.id = one.item.toString(), .count = one.count});
+        stacks.push_back(
+            storage::StoredItemStack{.id = one.item.toString(), .count = one.count, .components = one.components});
     }
     return stacks;
+}
+
+/// The player running the command, as a roll sees it.
+[[nodiscard]] std::optional<server::world::loot::EntityFacts> playerFacts(const CommandContext& context) {
+    const player::PlayerSession* player = context.source().player();
+    if (player == nullptr) {
+        return std::nullopt;
+    }
+    server::world::loot::EntityFacts facts{.type = Identifier::vanilla("player"), .scoreName = player->name()};
+    if (const std::optional<storage::StoredItemStack>& held = player->inventory.heldItem(); held.has_value()) {
+        facts.mainhand = Identifier::parse(held->id).value_or(Identifier::vanilla("air"));
+    }
+    return facts;
+}
+
+/// parity: `LootTable.getRandomItems(LootParams)`: the table's own sequence in the command's level,
+/// or the level's random when it names none.
+[[nodiscard]] std::vector<storage::StoredItemStack> roll(const CommandContext& context, world::RealLootTables& tables,
+                                                         const server::world::loot::LootTable& table,
+                                                         server::world::loot::LootContext loot,
+                                                         const std::array<double, 3>& origin) {
+    const Parsed<world::LoadedWorld*> world = context.world();
+    if (world.has_value()) {
+        tables.prepareAt(loot, **world, origin[0], origin[1], origin[2]);
+    } else {
+        tables.prepare(loot);
+    }
+    if (world.has_value() && table.randomSequence.has_value()) {
+        return stacksOf(
+            table.generate((*world)->randomSequences().of(*table.randomSequence), loot.luck, std::nullopt, loot));
+    }
+    random::RandomSource random = random::RandomSource::legacy(static_cast<std::int64_t>(std::random_device{}()));
+    return stacksOf(table.generate(random, loot.luck, std::nullopt, loot));
+}
+
+/// How many slots the container at a position has, or none when it is not one.
+[[nodiscard]] std::int32_t containerSize(const CommandContext& context, const std::array<std::int32_t, 3>& at) {
+    const Parsed<world::LoadedWorld*> world = context.world();
+    const server::world::Chunk* chunk =
+        world.has_value() ? (*world)->state().chunkIfLoaded(at[0] >> 4, at[2] >> 4) : nullptr;
+    const server::world::ChunkBlockEntity* entity =
+        chunk == nullptr ? nullptr : chunk->blockEntityAt(at[0] & 15, at[1], at[2] & 15);
+    return entity == nullptr ? 0 : world::containers::sizeOf(std::string{entity->type().path()}).value_or(0);
 }
 
 [[nodiscard]] std::array<std::int32_t, 3> blockAt(const CommandContext& context, const std::string& name) {
@@ -54,15 +96,52 @@ stacksOf(const std::vector<server::world::loot::ItemStack>& rolled) {
     return coordinates == nullptr ? std::array<std::int32_t, 3>{0, 0, 0} : coordinates->resolve(context.source());
 }
 
+/// Where `mine` and `fish` take their tool from.
+enum class ToolFrom : std::uint8_t { Nothing, Argument, MainHand, OffHand };
+
+/// parity: `LootCommand.getSourceHandItem` and the `tool` argument; without either, an empty hand.
+[[nodiscard]] Parsed<std::optional<storage::StoredItemStack>> toolOf(const CommandContext& context, ToolFrom from) {
+    if (from == ToolFrom::Nothing) {
+        return std::optional<storage::StoredItemStack>{};
+    }
+    if (from == ToolFrom::Argument) {
+        const auto* parsed = context.get<ParsedItem>("tool");
+        if (parsed == nullptr) {
+            return std::optional<storage::StoredItemStack>{};
+        }
+        return std::optional{
+            storage::StoredItemStack{.id = parsed->id.toString(), .count = 1, .components = parsed->components}};
+    }
+    const player::PlayerSession* player = context.source().player();
+    if (player == nullptr) {
+        return std::unexpected{CommandSyntaxError{
+            .component = Component::translatable("commands.drop.no_held_items", {context.source().displayName()})}};
+    }
+    return from == ToolFrom::MainHand ? player->inventory.heldItem()
+                                      : player->inventory.at(player::PlayerInventory::kOffhandSlot);
+}
+
+/// parity: `LootContextParams.TOOL`, which `match_tool` and the fortune and silk touch rolls read.
+void useTool(server::world::loot::LootContext& loot, const std::optional<storage::StoredItemStack>& tool) {
+    if (!tool.has_value() || tool->count <= 0) {
+        loot.tool = Identifier::vanilla("air");
+        return;
+    }
+    loot.tool = Identifier::parse(tool->id).value_or(Identifier::vanilla("air"));
+    for (const auto& [enchantment, level] : player::enchantmentLevels(*tool)) {
+        loot.toolEnchantments.emplace(enchantment.toString(), level);
+    }
+}
+
 } // namespace
 
-LootCommand::LootCommand(world::RealLootTables& lootTables, std::function<std::int64_t()> worldSeed)
-    : Command("loot", permissionLevel::kGamemasters), lootTables_(&lootTables), worldSeed_(std::move(worldSeed)) {}
+LootCommand::LootCommand(world::RealLootTables& lootTables)
+    : Command("loot", permissionLevel::kGamemasters), lootTables_(&lootTables) {}
 
 void LootCommand::build(const CommandNodeBuilder& root) const {
     using Stacks = std::vector<storage::StoredItemStack>;
 
-    const auto rollTable = [this](const CommandContext& context) -> Parsed<Stacks> {
+    const auto rollTable = [this](const CommandContext& context, ToolFrom from) -> Parsed<Stacks> {
         const auto* id = context.get<Identifier>("loot_table");
         const server::world::loot::LootTable* table = id == nullptr ? nullptr : lootTables_->byId(*id);
         if (table == nullptr) {
@@ -70,9 +149,23 @@ void LootCommand::build(const CommandNodeBuilder& root) const {
                 .component = Component::translatable(
                     "commands.drop.no_loot_table", {Component::text(id == nullptr ? std::string{} : id->toString())})}};
         }
-        random::RandomSource random =
-            random::RandomSource::legacy(worldSeed_() ^ static_cast<std::int64_t>(javaHash(id->toString())));
-        return stacksOf(table->generate(random));
+        // parity: `dropChestLoot` and `dropFishingLoot`: the source as `THIS_ENTITY`, and the position
+        // named, or the source's own.
+        server::world::loot::LootContext loot{.hasEntity = context.source().player() != nullptr};
+        loot.thisEntity = playerFacts(context);
+        if (from != ToolFrom::Nothing || context.get<BlockCoordinates>("pos") != nullptr) {
+            const Parsed<std::optional<storage::StoredItemStack>> tool = toolOf(context, from);
+            if (!tool.has_value()) {
+                return std::unexpected{tool.error()};
+            }
+            useTool(loot, *tool);
+        }
+        std::array<double, 3> origin = context.source().position();
+        if (context.get<BlockCoordinates>("pos") != nullptr) {
+            const std::array<std::int32_t, 3> at = blockAt(context, "pos");
+            origin = {at[0] + 0.5, at[1] + 0.5, at[2] + 0.5};
+        }
+        return roll(context, *lootTables_, *table, std::move(loot), origin);
     };
 
     const auto rollEntity = [this](const CommandContext& context) -> Parsed<Stacks> {
@@ -87,12 +180,18 @@ void LootCommand::build(const CommandNodeBuilder& root) const {
                 CommandSyntaxError{.component = Component::translatable("commands.drop.no_loot_table.entity",
                                                                         {Component::text(target.name())})}};
         }
-        random::RandomSource random =
-            random::RandomSource::legacy(worldSeed_() ^ static_cast<std::int64_t>(target.entityId()));
-        return stacksOf(table->generate(random));
+        // parity: `dropKillLoot`: killed by magic, the source as the attacker, from the source's spot.
+        server::world::loot::LootContext loot{.hasEntity = true};
+        loot.thisEntity = server::world::loot::EntityFacts{.type = target.type(), .scoreName = target.uuid()};
+        loot.attacker = playerFacts(context);
+        loot.directAttacker = loot.attacker;
+        loot.attackingPlayer = loot.attacker;
+        loot.killedByPlayer = loot.attacker.has_value();
+        loot.damageType = Identifier::vanilla("magic");
+        return roll(context, *lootTables_, *table, std::move(loot), context.source().position());
     };
 
-    const auto rollBlock = [this](const CommandContext& context) -> Parsed<Stacks> {
+    const auto rollBlock = [this](const CommandContext& context, ToolFrom from) -> Parsed<Stacks> {
         const Parsed<world::LoadedWorld*> world = context.world();
         if (!world.has_value()) {
             return std::unexpected{world.error()};
@@ -112,11 +211,17 @@ void LootCommand::build(const CommandNodeBuilder& root) const {
                 .component = Component::text(state->block.toString() +
                                              " has no loot table this build can roll, so it would drop nothing.")}};
         }
-        random::RandomSource random = random::RandomSource::legacy(
-            worldSeed_() ^ ((static_cast<std::int64_t>(at[0]) << 32) | static_cast<std::uint32_t>(at[2])));
-        const server::world::loot::LootContext block{.blockState = reg::blockStateDefinitions::propertiesOf(*stateId),
-                                                     .block = state->block};
-        return stacksOf(table->generate(random, 0.0F, std::nullopt, block));
+        // parity: `dropBlockLoot`, the block's own drops with the source behind them.
+        server::world::loot::LootContext loot{.blockState = reg::blockStateDefinitions::propertiesOf(*stateId),
+                                              .block = state->block,
+                                              .hasEntity = context.source().player() != nullptr};
+        loot.thisEntity = playerFacts(context);
+        const Parsed<std::optional<storage::StoredItemStack>> tool = toolOf(context, from);
+        if (!tool.has_value()) {
+            return std::unexpected{tool.error()};
+        }
+        useTool(loot, *tool);
+        return roll(context, *lootTables_, *table, std::move(loot), {at[0] + 0.5, at[1] + 0.5, at[2] + 0.5});
     };
 
     const auto report = [](const CommandContext& context, const Stacks& stacks) {
@@ -170,6 +275,7 @@ void LootCommand::build(const CommandNodeBuilder& root) const {
                 .x = at[0],
                 .y = at[1],
                 .z = at[2],
+                .components = stack.components,
             }));
         }
         report(context, stacks);
@@ -178,19 +284,36 @@ void LootCommand::build(const CommandNodeBuilder& root) const {
 
     const auto insert = [report](const CommandContext& context, const Stacks& stacks) -> Parsed<std::int32_t> {
         const std::array<std::int32_t, 3> at = blockAt(context, "targetPos");
-        // The first free slots, so an insert fills a container rather than overwriting what is in it.
-        std::vector<std::pair<std::int32_t, storage::StoredItemStack>> written;
-        std::vector<std::pair<std::int32_t, storage::StoredItemStack>> held = itemSlots::containerItems(context, at);
-        std::int32_t slot = 0;
-        for (const storage::StoredItemStack& stack : stacks) {
-            const auto taken = [&held, &written](std::int32_t candidate) {
-                const auto is = [candidate](const auto& one) { return one.first == candidate; };
-                return std::ranges::any_of(held, is) || std::ranges::any_of(written, is);
-            };
-            while (taken(slot)) {
-                slot++;
+        // parity: `LootCommand.distributeToContainer`: each stack tops up the like stacks in slot
+        // order and goes whole into the first empty slot it meets.
+        std::map<std::int32_t, storage::StoredItemStack> slots;
+        for (auto& [slot, stack] : itemSlots::containerItems(context, at)) {
+            slots.insert_or_assign(slot, std::move(stack));
+        }
+        const std::int32_t size = containerSize(context, at);
+        std::set<std::int32_t> touched;
+        for (storage::StoredItemStack stack : stacks) {
+            const std::int32_t most =
+                reg::itemStacking::maxStackSize(Identifier::parse(stack.id).value_or(Identifier::vanilla("air")));
+            for (std::int32_t slot = 0; slot < size && stack.count > 0; ++slot) {
+                const auto found = slots.find(slot);
+                if (found == slots.end()) {
+                    slots.emplace(slot, stack);
+                    touched.insert(slot);
+                    break;
+                }
+                storage::StoredItemStack& current = found->second;
+                if (current.id == stack.id && current.components == stack.components && current.count < most) {
+                    const std::int32_t moved = std::min(stack.count, most - current.count);
+                    current.count += moved;
+                    stack.count -= moved;
+                    touched.insert(slot);
+                }
             }
-            written.emplace_back(slot, stack);
+        }
+        std::vector<std::pair<std::int32_t, storage::StoredItemStack>> written;
+        for (const std::int32_t slot : touched) {
+            written.emplace_back(slot, slots.at(slot));
         }
         if (const std::optional<CommandSyntaxError> failure = itemSlots::writeContainer(context, at, written);
             failure.has_value()) {
@@ -248,24 +371,29 @@ void LootCommand::build(const CommandNodeBuilder& root) const {
                 return run(context, *rolled);
             };
         };
-        const CommandExecutor fromTable = through(rollTable);
+        const auto fromTable = [through, rollTable](ToolFrom from) -> CommandExecutor {
+            return through([rollTable, from](const CommandContext& context) { return rollTable(context, from); });
+        };
+        const auto fromBlock = [through, rollBlock](ToolFrom from) -> CommandExecutor {
+            return through([rollBlock, from](const CommandContext& context) { return rollBlock(context, from); });
+        };
         const CommandExecutor fromEntity = through(rollEntity);
-        const CommandExecutor fromBlock = through(rollBlock);
 
         node.literal("fish", [this, fromTable](const CommandNodeBuilder& form) {
             form.argument("loot_table", lootTableArgument(), [this, fromTable](const CommandNodeBuilder& table) {
                 table.suggestsFromServer(
                     [this](const SuggestionContext& context) { return context.matchingIds(lootTables_->ids()); });
                 table.argument("pos", blockPosArgument(), [fromTable](const CommandNodeBuilder& pos) {
-                    pos.executes(fromTable);
-                    for (const std::string_view hand : {"mainhand", "offhand"}) {
-                        pos.literal(std::string{hand},
-                                    [fromTable](const CommandNodeBuilder& named) { named.executes(fromTable); });
-                    }
-                    // parity: the tool is parsed and ignored, since loot conditions on it are not
-                    // modelled and it would change nothing.
-                    pos.argument("tool", itemArgument(),
-                                 [fromTable](const CommandNodeBuilder& tool) { tool.executes(fromTable); });
+                    pos.executes(fromTable(ToolFrom::Nothing));
+                    pos.literal("mainhand", [fromTable](const CommandNodeBuilder& named) {
+                        named.executes(fromTable(ToolFrom::MainHand));
+                    });
+                    pos.literal("offhand", [fromTable](const CommandNodeBuilder& named) {
+                        named.executes(fromTable(ToolFrom::OffHand));
+                    });
+                    pos.argument("tool", itemArgument(), [fromTable](const CommandNodeBuilder& tool) {
+                        tool.executes(fromTable(ToolFrom::Argument));
+                    });
                 });
             });
         });
@@ -277,18 +405,21 @@ void LootCommand::build(const CommandNodeBuilder& root) const {
             form.argument("loot_table", lootTableArgument(), [this, fromTable](const CommandNodeBuilder& table) {
                 table.suggestsFromServer(
                     [this](const SuggestionContext& context) { return context.matchingIds(lootTables_->ids()); });
-                table.executes(fromTable);
+                table.executes(fromTable(ToolFrom::Nothing));
             });
         });
         node.literal("mine", [fromBlock](const CommandNodeBuilder& form) {
             form.argument("pos", blockPosArgument(), [fromBlock](const CommandNodeBuilder& pos) {
-                pos.executes(fromBlock);
-                for (const std::string_view hand : {"mainhand", "offhand"}) {
-                    pos.literal(std::string{hand},
-                                [fromBlock](const CommandNodeBuilder& named) { named.executes(fromBlock); });
-                }
-                pos.argument("tool", itemArgument(),
-                             [fromBlock](const CommandNodeBuilder& tool) { tool.executes(fromBlock); });
+                pos.executes(fromBlock(ToolFrom::Nothing));
+                pos.literal("mainhand", [fromBlock](const CommandNodeBuilder& named) {
+                    named.executes(fromBlock(ToolFrom::MainHand));
+                });
+                pos.literal("offhand", [fromBlock](const CommandNodeBuilder& named) {
+                    named.executes(fromBlock(ToolFrom::OffHand));
+                });
+                pos.argument("tool", itemArgument(), [fromBlock](const CommandNodeBuilder& tool) {
+                    tool.executes(fromBlock(ToolFrom::Argument));
+                });
             });
         });
     };

@@ -6,6 +6,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -24,16 +25,24 @@ inline constexpr std::string_view kTableKey = "LootTable";
 inline constexpr std::string_view kSeedKey = "LootTableSeed";
 
 /// Rolls `table` into `slots`. A zero seed rolls on the table's own stream, as the jar does.
-/// `byPlayer` says whether the roll has an entity behind it, and `luck` is that player's.
+/// The player who opened it, as the roll sees them. parity: `THIS_ENTITY` and `withLuck`.
+struct Opener {
+    std::string name;
+    float luck = 0.0F;
+    std::optional<wire::common::Identifier> mainhand;
+};
+
+/// `byPlayer` says whether the roll has an entity behind it, and `opener` is who, when known.
 void fill(LoadedWorld& world, RealLootTables& tables, std::string_view table, std::int64_t seed,
           std::vector<std::optional<server::world::loot::ItemStack>>& slots, bool byPlayer,
-          const std::array<std::int32_t, 3>& at, float luck = 0.0F);
+          const std::array<std::int32_t, 3>& at, const std::optional<Opener>& opener = std::nullopt);
 
 /// parity: `RandomizableContainer.unpackLootTable`, on the block entity at a position. Answers the
 /// table it rolled, for the advancement that waits on one.
 std::optional<wire::common::Identifier> unpack(LoadedWorld& world, RealLootTables& tables, std::int32_t x,
                                                std::int32_t y, std::int32_t z,
-                                               const std::optional<wire::common::Uuid>& player, float luck = 0.0F);
+                                               const std::optional<wire::common::Uuid>& player,
+                                               const std::optional<Opener>& opener = std::nullopt);
 
 } // namespace containerLoot
 

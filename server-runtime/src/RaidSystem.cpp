@@ -45,11 +45,8 @@ constexpr std::int32_t kRaidSpawnDrop = 24;
 /// parity: `BadOmenMobEffect`, whose raid omen lasts thirty seconds.
 constexpr std::int32_t kRaidOmenTicks = 600;
 
-/// How often a bad omen looks for a village, and what counts as one.
+/// How often a bad omen looks for a village.
 constexpr std::int32_t kVillageCheckInterval = 20;
-constexpr std::int32_t kVillageRadius = 16;
-constexpr std::int32_t kVillageHeight = 4;
-constexpr std::int32_t kVillageBeds = 3;
 
 void sendRaidBar(PlayerSession& player, const Raid& raid, BossEventPacket::Operation operation) {
     // A client that draws bars its own way is told what the bar says rather than handed Java's
@@ -332,25 +329,9 @@ void RaidSystem::tickOmens(world::LoadedWorld& world, PlayerSession& player, con
 }
 
 bool RaidSystem::isVillage(world::LoadedWorld& world, double x, double y, double z) {
-    const auto originX = static_cast<std::int32_t>(std::floor(x));
-    const auto originY = static_cast<std::int32_t>(std::floor(y));
-    const auto originZ = static_cast<std::int32_t>(std::floor(z));
-    std::int32_t beds = 0;
-    for (std::int32_t dy = -kVillageHeight; dy <= kVillageHeight; dy++) {
-        for (std::int32_t dx = -kVillageRadius; dx <= kVillageRadius; dx++) {
-            for (std::int32_t dz = -kVillageRadius; dz <= kVillageRadius; dz++) {
-                if (!entity::ai::villageBlocks::matches(world.state(), originX + dx, originY + dy, originZ + dz,
-                                                        entity::ai::villageBlocks::beds())) {
-                    continue;
-                }
-                beds++;
-                if (beds >= kVillageBeds) {
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
+    return world.state().poi().isVillage(world::poi::BlockPos{static_cast<std::int32_t>(std::floor(x)),
+                                                              static_cast<std::int32_t>(std::floor(y)),
+                                                              static_cast<std::int32_t>(std::floor(z))});
 }
 
 } // namespace basalt::server::runtime

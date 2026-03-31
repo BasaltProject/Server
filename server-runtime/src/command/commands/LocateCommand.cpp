@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/command/RegistryArguments.hpp>
 #include <basalt/server/runtime/command/commands/LocateCommand.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/poi/PoiManager.hpp>
 #include <basalt/server/world/terrain/StrongholdStructureGenerator.hpp>
 #include <basalt/server/world/terrain/VillageStructureGenerator.hpp>
 
@@ -28,7 +29,6 @@ constexpr std::int32_t kStepBlocks = 32;
 constexpr std::int32_t kMaxRadiusBlocks = 6400;
 /// parity: `PoiManager.findClosestWithType`'s own radius, in blocks.
 constexpr std::int32_t kPoiRadius = 256;
-constexpr std::int32_t kSectionHeight = 16;
 /// parity: `LocateCommand`'s search, 100 cells of each placement grid.
 constexpr std::int32_t kLocateCells = 100;
 
@@ -223,84 +223,27 @@ void LocateCommand::build(const CommandNodeBuilder& root) const {
                     if (wanted == nullptr) {
                         return 0;
                     }
-                    const std::vector<Identifier> made = reg::pointsOfInterest::blocksOf(*wanted);
-                    if (made.empty()) {
+                    const std::optional<world::poi::PoiType> type = world::poi::poiTypes::byName(wanted->toString());
+                    if (!type.has_value()) {
                         return std::unexpected{notFound("commands.locate.poi.not_found", *wanted)};
                     }
-                    const std::set<Identifier> blocks{made.begin(), made.end()};
-                    const auto isWanted = [&blocks](std::int32_t stateId) {
-                        const std::optional<reg::BlockState> state = reg::blocks::byStateId(stateId);
-                        return state.has_value() && blocks.contains(state->block);
-                    };
-
+                    // parity: `BlockPos.containing` of the source and `findClosestWithType` at any occupancy.
                     const std::array<double, 3> origin = context.source().position();
-                    const std::int32_t startX = rounded(origin[0]);
-                    const std::int32_t startY = rounded(origin[1]);
-                    const std::int32_t startZ = rounded(origin[2]);
-                    std::array<std::int32_t, 3> best{0, 0, 0};
-                    std::int64_t bestDistance = std::numeric_limits<std::int64_t>::max();
-                    const auto consider = [&best, &bestDistance, startX, startY, startZ](std::int32_t x, std::int32_t y,
-                                                                                         std::int32_t z) {
-                        const auto dx = static_cast<std::int64_t>(x - startX);
-                        const auto dy = static_cast<std::int64_t>(y - startY);
-                        const auto dz = static_cast<std::int64_t>(z - startZ);
-                        const std::int64_t distance = (dx * dx) + (dy * dy) + (dz * dz);
-                        if (distance < bestDistance) {
-                            bestDistance = distance;
-                            best = {x, y, z};
-                        }
-                    };
-
-                    for (std::int32_t chunkX = (startX - kPoiRadius) >> 4; chunkX <= ((startX + kPoiRadius) >> 4);
-                         chunkX++) {
-                        for (std::int32_t chunkZ = (startZ - kPoiRadius) >> 4; chunkZ <= ((startZ + kPoiRadius) >> 4);
-                             chunkZ++) {
-                            const server::world::Chunk* chunk = (*world)->state().chunkIfLoaded(chunkX, chunkZ);
-                            if (chunk == nullptr) {
-                                continue;
-                            }
-                            for (std::size_t index = 0; index < chunk->sectionCount(); index++) {
-                                const server::world::ChunkSection& section = chunk->section(index);
-                                if (!section.mayContain(isWanted)) {
-                                    continue;
-                                }
-                                const std::int32_t sectionMinY = chunk->verticalBounds().minY() +
-                                                                 (static_cast<std::int32_t>(index) * kSectionHeight);
-                                for (std::int32_t localY = 0; localY < kSectionHeight; localY++) {
-                                    for (std::int32_t localZ = 0; localZ < 16; localZ++) {
-                                        for (std::int32_t localX = 0; localX < 16; localX++) {
-                                            if (!isWanted(section.blockStateId(localX, localY, localZ))) {
-                                                continue;
-                                            }
-                                            consider((chunkX * 16) + localX, sectionMinY + localY,
-                                                     (chunkZ * 16) + localZ);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Nether portals are the one point of interest this build indexes, so
-                    // they are found even in chunks nobody has loaded. Everything else can
-                    // only be seen where the blocks are.
-                    if (blocks.contains(Identifier::vanilla("nether_portal"))) {
-                        if (const std::optional<std::array<std::int32_t, 3>> indexed =
-                                (*world)->portals().nearest(startX, startY, startZ, kPoiRadius);
-                            indexed.has_value()) {
-                            consider((*indexed)[0], (*indexed)[1], (*indexed)[2]);
-                        }
-                    }
-                    if (bestDistance == std::numeric_limits<std::int64_t>::max()) {
+                    const world::poi::BlockPos from{static_cast<std::int32_t>(std::floor(origin[0])),
+                                                    static_cast<std::int32_t>(std::floor(origin[1])),
+                                                    static_cast<std::int32_t>(std::floor(origin[2]))};
+                    const std::optional<world::poi::BlockPos> found = (*world)->state().poi().findClosest(
+                        world::poi::maskOf(*type), from, kPoiRadius, world::poi::Occupancy::kAny);
+                    if (!found.has_value()) {
                         return std::unexpected{notFound("commands.locate.poi.not_found", *wanted)};
                     }
-                    const std::int32_t distance = rounded(std::sqrt(static_cast<double>(bestDistance)));
-                    context.success(Component::translatable(
-                        "commands.locate.poi.success",
-                        {Component::text(wanted->toString()),
-                         Component::text(std::to_string(best[0]) + ", " + std::to_string(best[1]) + ", " +
-                                         std::to_string(best[2])),
-                         Component::text(std::to_string(distance))}));
+                    const auto dx = static_cast<float>(found->x - from.x);
+                    const auto dz = static_cast<float>(found->z - from.z);
+                    const auto distance = static_cast<std::int32_t>(std::floor(std::sqrt((dx * dx) + (dz * dz))));
+                    context.success(Component::translatable("commands.locate.poi.success",
+                                                            {Component::text(wanted->toString()),
+                                                             Component::text(at(found->x, found->z)),
+                                                             Component::text(std::to_string(distance))}));
                     return distance;
                 });
             });

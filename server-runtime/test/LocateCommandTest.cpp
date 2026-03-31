@@ -1,5 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/World.hpp>
 #include <basalt/server/runtime/command/ExecutionSource.hpp>
@@ -171,11 +172,6 @@ namespace mobEffects = basalt::server::runtime::world::mobEffects;
 
 namespace blocks = basalt::server::registry::blocks;
 
-/// A block by name, for the ones the vanilla table does not name individually.
-[[nodiscard]] std::int32_t stateOf(const std::string& name) {
-    return blocks::stateIdOf(basalt::wire::common::Identifier::vanilla(name), {}).value_or(-1);
-}
-
 TEST_CASE("locate poi finds the nearest block the type is made of") {
     Fixture fixture{scratch("locate-poi")};
     static_cast<void>(fixture.world->state().getOrGenerateChunk(0, 0));
@@ -184,11 +180,14 @@ TEST_CASE("locate poi finds the nearest block the type is made of") {
     CHECK(fixture.dispatcher.execute(fixture.source, "locate poi minecraft:home") == 0);
     CHECK(fixture.source.lastAsText().find("commands.locate.poi.not_found") != std::string::npos);
 
-    // A bed is what `minecraft:home` is made of, so putting one down makes it findable.
-    REQUIRE(fixture.world->state().setBlockState(3, 40, 4, stateOf("red_bed")));
+    // parity: the head of a bed is what `minecraft:home` is made of.
+    const std::int32_t head = basalt::server::registry::blockStateDefinitions::stateIdOf(
+                                  basalt::wire::common::Identifier::vanilla("red_bed"), {{"part", "head"}})
+                                  .value_or(-1);
+    REQUIRE(fixture.world->state().setBlockState(3, 40, 4, head));
     CHECK(fixture.dispatcher.execute(fixture.source, "locate poi minecraft:home") > 0);
     CHECK(fixture.source.lastAsText().find("commands.locate.poi.success") != std::string::npos);
-    CHECK(fixture.source.lastAsText().find("3, 40, 4") != std::string::npos);
+    CHECK(fixture.source.lastAsText().find("3, ~, 4") != std::string::npos);
 }
 
 TEST_CASE("locate poi refuses a type nobody registered") {

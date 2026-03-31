@@ -1,6 +1,10 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
+#include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/MapColors.hpp>
 #include <basalt/server/runtime/world/maps/MapData.hpp>
 #include <basalt/server/runtime/world/maps/MapDecorationTypes.hpp>
+#include <basalt/server/runtime/world/maps/MapRenderer.hpp>
+#include <basalt/server/world/Chunk.hpp>
 
 #include <doctest.h>
 
@@ -78,4 +82,43 @@ TEST_CASE("the saved compound comes back as the same map") {
     MapData again = *loaded;
     CHECK(again.toggleBanner(banner, banner.pos, 0));
     CHECK(again.decorations().empty());
+}
+
+TEST_CASE("the colour scan shades land by slope and shallow water bright") {
+    namespace colors = basalt::server::registry::mapColors;
+    namespace reg = basalt::server::registry;
+    basalt::server::world::Chunk chunk{0, 0};
+    const std::int32_t stone = reg::blocks::stone().stateId;
+    const std::int32_t water = reg::blocks::water().stateId;
+    for (std::int32_t x = 0; x < 16; ++x) {
+        for (std::int32_t z = 0; z < 16; ++z) {
+            chunk.setBlockStateId(x, 62, z, stone);
+            const bool pond = x >= 4 && x < 8 && z >= 4 && z < 8;
+            chunk.setBlockStateId(x, 63, z, pond ? water : stone);
+        }
+    }
+    MapData data = MapData::createFresh(0, 0, 0, true, false, "minecraft:overworld");
+    MapData::Holder& holder = data.holder({}, 1, "Steve");
+    const basalt::server::runtime::world::maps::ScanWorld scan{
+        .chunkAt = [&chunk](std::int32_t x, std::int32_t z) -> const basalt::server::world::Chunk* {
+            return x == 0 && z == 0 ? &chunk : nullptr;
+        },
+        .bannerAt = [](const basalt::server::runtime::world::maps::BlockPos&) { return std::optional<MapBanner>{}; },
+        .minY = -64,
+        .hasCeiling = false};
+    // One column in sixteen each step, so sixteen steps draw the whole chunk.
+    for (std::int32_t step = 0; step < 16; ++step) {
+        basalt::server::runtime::world::maps::mapRenderer::update(data, holder, scan, 8.0, 8.0);
+    }
+    const auto at = [&data](std::int32_t x, std::int32_t z) {
+        return data.colors()[static_cast<std::size_t>((64 + x) + ((64 + z) * 128))];
+    };
+    // parity: the first row after an unloaded chunk climbs from a height of zero, so it is bright.
+    CHECK(at(0, 0) == colors::packed(colors::kStone, colors::Brightness::High));
+    CHECK(at(0, 1) == colors::packed(colors::kStone, colors::Brightness::Normal));
+    CHECK(at(10, 10) == colors::packed(colors::kStone, colors::Brightness::Normal));
+    // parity: one block of water is shallow on either parity of the dither.
+    CHECK(at(4, 4) == colors::packed(colors::kWater, colors::Brightness::High));
+    CHECK(at(5, 4) == colors::packed(colors::kWater, colors::Brightness::High));
+    CHECK(at(0, -1) == 0);
 }

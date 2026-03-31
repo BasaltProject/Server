@@ -6,8 +6,10 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/PotionEffects.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <string_view>
@@ -28,7 +30,63 @@ constexpr double kArrowBounce = 0.2;
 /// parity: `PanicGoal`, which runs for as long as the last hit is remembered.
 constexpr std::int32_t kPanicTicks = 40;
 
+/// parity: `SpectralArrow.duration`, ten seconds of glowing.
+constexpr std::int32_t kGlowingTicks = 200;
+/// parity: the tipped arrow's own `potion_duration_scale`, an eighth of the potion.
+constexpr float kTippedScale = 0.125F;
+/// parity: `HealOrHarmMobEffect`, six to harm and four to heal, doubling a level.
+constexpr float kHarm = 6.0F;
+constexpr float kHeal = 4.0F;
+
+/// parity: `Arrow.doPostHurtEffects` and `SpectralArrow`'s: the potion the arrow carries, or glowing.
+[[nodiscard]] std::vector<world::ActiveEffect> effectsOf(const ServerEntity& arrow) {
+    if (arrow.type().path() == "spectral_arrow") {
+        return {world::ActiveEffect{.effect = wire::common::Identifier::vanilla("glowing"),
+                                    .remainingTicks = kGlowingTicks}};
+    }
+    const wire::nbt::NbtCompound* contents = arrow.heldItemComponents.getCompound("minecraft:potion_contents");
+    if (contents == nullptr) {
+        return {};
+    }
+    const float fallback = arrow.heldItem == std::optional<std::string>{"tipped_arrow"} ? kTippedScale : 1.0F;
+    return world::potionEffects::of(*contents,
+                                    arrow.heldItemComponents.getFloat("minecraft:potion_duration_scale", fallback));
+}
+
 } // namespace
+
+void CombatSystem::arrowEffects(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                                const std::vector<ServerEntity*>& living, const ServerEntity& arrow, ServerEntity* mob,
+                                PlayerSession* player) {
+    for (const world::ActiveEffect& effect : effectsOf(arrow)) {
+        if (mob != nullptr) {
+            static_cast<void>(giveMobEffect(world, watchers, *mob, effect, arrow.entityId()));
+            continue;
+        }
+        if (player == nullptr) {
+            continue;
+        }
+        const bool harm = effect.effect == world::mobEffects::instantDamage();
+        if (harm || effect.effect == world::mobEffects::instantHealth()) {
+            const auto amount = static_cast<float>(1 << std::clamp(effect.amplifier, 0, 30));
+            if (!harm && player->connection().heal) {
+                player->connection().heal(kHeal * amount);
+            } else if (harm && player->connection().hurt) {
+                player->connection().hurt(kHarm * amount, "indirectMagic",
+                                          wire::common::Identifier::vanilla("indirect_magic"),
+                                          entity::DamageSource{.entityId = arrow.entityId(),
+                                                               .x = arrow.x,
+                                                               .z = arrow.z,
+                                                               .name = shooterName(watchers, living, arrow),
+                                                               .ownerId = arrow.ownerId});
+            }
+            continue;
+        }
+        if (player->connection().addEffect) {
+            player->connection().addEffect(effect.effect, effect.remainingTicks, effect.amplifier);
+        }
+    }
+}
 
 void CombatSystem::deflectArrow(ServerEntity& arrow) {
     // parity: `ProjectileDeflection.REVERSE` then `scale(0.2)`: back at a tenth of the speed, turned
@@ -116,6 +174,9 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
         }
         mob.panicTicks = kPanicTicks;
         announceEntityHit(watchers, mob, world::damageTypes::kArrow, arrow.entityId(), result.died);
+        if (!result.died) {
+            arrowEffects(world, watchers, living, arrow, &mob, nullptr);
+        }
         return piercing ? ArrowHit::Pierced : ArrowHit::Stopped;
     }
     // parity: a raised shield makes `hurtServer` answer false and the arrow turns back, unless it
@@ -133,6 +194,9 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
     if (shielded) {
         deflectArrow(arrow);
         return ArrowHit::Stopped;
+    }
+    if (!target->player->dead) {
+        arrowEffects(world, watchers, living, arrow, nullptr, target->player);
     }
     arrow.removed = !piercing;
     return piercing ? ArrowHit::Pierced : ArrowHit::Stopped;

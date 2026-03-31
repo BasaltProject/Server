@@ -362,8 +362,8 @@ Chunk& WorldState::installLocked(Chunk chunk) {
                                                          PendingChunkDecorations::WritePhase::AfterDecoration);
     pendingDecorations_.applyPendingGeneratedBlockEntityWrites(installed);
     pendingDecorations_.applyPendingGeneratedBlockTicks(installed);
-    pendingDecorations_.deliverGeneratedBlockWrites(installed.takeGeneratedBlockWrites(),
-                                                    installed.decorationSequence(), chunkAt);
+    const std::vector<server::world::ChunkGeneratedBlockWrite> spilledWrites = installed.takeGeneratedBlockWrites();
+    pendingDecorations_.deliverGeneratedBlockWrites(spilledWrites, installed.decorationSequence(), chunkAt);
     pendingDecorations_.deliverGeneratedBlockEntityWrites(installed.takeGeneratedBlockEntityWrites(), chunkAt);
     const auto chunkAtPos = [this](std::int32_t otherX, std::int32_t otherZ) {
         return chunkAtLocked(key(otherX, otherZ));
@@ -372,6 +372,17 @@ Chunk& WorldState::installLocked(Chunk chunk) {
     // Every sculk sensor the chunk brought with it, so a footstep next to one that nobody has ever
     // touched is still heard.
     sculkSensors_.rememberChunk(installed);
+    // parity: the points of interest the generator's writes registered, which vanilla collects as
+    // each block is placed. A write that landed in a neighbour already here is noted there too.
+    poi_.chunkInstalled(installed);
+    for (const server::world::ChunkGeneratedBlockWrite& write : spilledWrites) {
+        if ((write.x >> 4) == chunkX && (write.z >> 4) == chunkZ) {
+            continue;
+        }
+        if (const std::optional<std::int32_t> now = blockStateLocked(write.x, write.y, write.z); now.has_value()) {
+            poi_.noteBlockState(poi::BlockPos{write.x, write.y, write.z}, *now);
+        }
+    }
     // The leaf distances settle once every write aimed at this chunk has landed, which is here and
     // not at the end of its own decoration: a neighbour's leaf arrives later and carries a stale one.
     const server::world::terrain::decoration::tree::leafDistances::BlockAt worldBlockAt =
@@ -555,6 +566,7 @@ bool WorldState::setBlockState(std::int32_t x, std::int32_t y, std::int32_t z, s
     }
     const bool changed = chunk->setBlockStateId(x & 15, y, z & 15, stateId);
     if (changed) {
+        poi_.noteBlockChange(poi::BlockPos{x, y, z}, was, stateId);
         // A skylight opening or a torch reaches across chunk borders. Cached whole-chunk light is
         // cheaper than incremental light here, but every cached neighbour that could have read the
         // old block must be discarded together.

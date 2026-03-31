@@ -70,6 +70,7 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
       difficulty_(metadata_.difficulty.value_or(settings_.difficulty)), difficultyLocked_(metadata_.difficultyLocked),
       defaultGamemode_(metadata_.defaultGamemode) {
     state_.setHasSkylight(config::dimensionFacts(declaration_.dimension).hasSkylight);
+    state_.poi().configure(worldRoot_ + "/poi", config::dimensionFacts(declaration_.dimension).chunkHeight);
     // Said rather than migrated: a world that looks empty is worse than a line in the log.
     if (wire::io::fileIO::isDirectory(worldRoot_ + "/dimensions")) {
         logger_.warn([this] {
@@ -390,6 +391,7 @@ void LoadedWorld::saveDirty() {
     save(chunks);
     portals_.save(worldRoot_);
     randomSequences_.save(worldRoot_);
+    state_.poi().save();
 }
 
 std::size_t LoadedWorld::unloadUnreachable(const std::vector<std::pair<std::int32_t, std::int32_t>>& playerPositions,

@@ -135,6 +135,11 @@ private:
     static void rememberShooter(const std::vector<player::PlayerSession*>& watchers,
                                 const entity::ServerEntity& projectile, entity::ServerEntity& target);
 
+    /// parity: `AbstractArrow.doPostHurtEffects`, what an arrow that landed leaves on whoever it hit.
+    void arrowEffects(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                      const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& arrow,
+                      entity::ServerEntity* mob, player::PlayerSession* player);
+
     /// parity: `LargeFireball.onHitEntity`, the direct hit before the blast.
     void hitByLargeFireball(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                             const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& fireball,

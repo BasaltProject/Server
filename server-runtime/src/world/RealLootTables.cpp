@@ -177,7 +177,7 @@ void RealLootTables::prepareAt(server::world::loot::LootContext& context, Loaded
             explorationMaps_(world, stack, request, {x, y, z});
         };
     }
-    context.placeAt = [&world](std::int32_t bx, std::int32_t by, std::int32_t bz) {
+    context.placeAt = [this, &world](std::int32_t bx, std::int32_t by, std::int32_t bz) {
         server::world::loot::PlaceFacts place;
         place.loaded = world.state().chunkIfLoaded(bx >> 4, bz >> 4) != nullptr;
         if (const std::expected<Identifier, wire::common::IdentifierError> dimension =
@@ -197,18 +197,41 @@ void RealLootTables::prepareAt(server::world::loot::LootContext& context, Loaded
         place.light = worldLight::rawBrightness(world.state(), bx, by, bz, sky, world.skyDarken());
         place.canSeeSky = naturalSpawner::canSeeSky(world, bx, by, bz);
         place.smokey = smokeyAt(world.state(), bx, by, bz);
-        place.inStructure = [&world, bx, by, bz](const std::vector<std::string>& wanted) {
+        const LootRegistries* registries = registries_;
+        place.inStructure = [&world, bx, by, bz, registries](const std::vector<std::string>& wanted) {
             const server::world::structure::StructureQueries structures{
                 [&world](std::int32_t chunkX, std::int32_t chunkZ) -> const server::world::structure::ChunkStructures* {
                     const server::world::Chunk* chunk = world.state().chunkIfLoaded(chunkX, chunkZ);
                     return chunk == nullptr ? nullptr : &chunk->structures();
                 }};
             const server::world::structure::StructurePos at{bx, by, bz};
-            // A `#tag` of structures is a gap: none of the loot tables names one.
-            return std::ranges::any_of(wanted, [&structures, &at](const std::string& one) {
-                const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(one);
-                return id.has_value() && structures.startWithPieceAt(at, id->path()) != nullptr;
+            std::vector<Identifier> ids;
+            for (const std::string& one : wanted) {
+                const bool tag = one.starts_with('#');
+                const std::expected<Identifier, wire::common::IdentifierError> id =
+                    Identifier::parse(tag ? std::string_view{one}.substr(1) : std::string_view{one});
+                if (!id.has_value()) {
+                    continue;
+                }
+                if (!tag) {
+                    ids.push_back(*id);
+                } else if (registries != nullptr) {
+                    for (const Identifier& member : registries->tagMembers("worldgen/structure", *id)) {
+                        ids.push_back(member);
+                    }
+                }
+            }
+            return std::ranges::any_of(ids, [&structures, &at](const Identifier& id) {
+                return structures.startWithPieceAt(at, id.path()) != nullptr;
             });
+        };
+        place.fluidTagged = [registries](const Identifier& fluid, std::string_view tag) {
+            const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(tag);
+            if (registries == nullptr || !id.has_value()) {
+                return false;
+            }
+            const std::vector<Identifier> members = registries->tagMembers("fluid", *id);
+            return std::ranges::find(members, fluid) != members.end();
         };
         return place;
     };

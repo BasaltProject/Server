@@ -40,6 +40,8 @@ const Identifier& playerType() {
 }
 
 /// parity: `death.attack.mob`, the message a mob with no name kills you with.
+constexpr std::int32_t kStrayArrowTicks = 600;
+constexpr std::int32_t kBoggedArrowTicks = 100;
 constexpr std::string_view kDeathMob = "mob";
 
 /// parity: `PanicGoal`, which runs for as long as the last hit is remembered.
@@ -530,6 +532,18 @@ void MobActionSystem::shootArrow(ServerEntity& mob, double targetX, double targe
         entity::projectiles::spawn(world->state(), kind, players_->allocateEntityId(), entry->protocolId, mob.x, fromY,
                                    mob.z, dx, dy + (flat * kArrowArc), dz, kArrowPower, arrowSpread(*world), random);
     arrow.ownerId = mob.entityId();
+    // parity: `Stray.getArrow` and `Bogged.getArrow`, thirty seconds of slowness or five of poison.
+    if (mob.type().path() == "stray" || mob.type().path() == "bogged") {
+        const bool stray = mob.type().path() == "stray";
+        wire::nbt::NbtCompound effect;
+        effect.putString("id", stray ? "minecraft:slowness" : "minecraft:poison");
+        effect.putInt("duration", stray ? kStrayArrowTicks : kBoggedArrowTicks);
+        wire::nbt::NbtCompound contents;
+        contents.set("custom_effects", wire::nbt::NbtTag::ofList(wire::nbt::NbtList{
+                                           wire::nbt::NbtType::Compound, {wire::nbt::NbtTag::ofCompound(effect)}}));
+        arrow.heldItem = "arrow";
+        arrow.heldItemComponents.set("minecraft:potion_contents", wire::nbt::NbtTag::ofCompound(std::move(contents)));
+    }
     // parity: `EnchantmentHelper.getPiercingCount`, off the crossbow in its hand.
     if (mob.sourceNbt.has_value()) {
         const wire::nbt::NbtCompound* equipment = mob.sourceNbt->getCompound("equipment");

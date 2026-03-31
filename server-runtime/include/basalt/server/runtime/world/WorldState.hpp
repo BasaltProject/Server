@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/world/PrimedTntQueue.hpp>
 #include <basalt/server/runtime/world/SculkSensorTracker.hpp>
 #include <basalt/server/runtime/world/WorldMutex.hpp>
+#include <basalt/server/runtime/world/poi/PoiManager.hpp>
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/loot/Loot.hpp>
 #include <basalt/wire/common/Uuid.hpp>
@@ -69,6 +70,9 @@ public:
     };
 
     explicit WorldState(std::vector<server::world::Chunk> initialChunks = {}, LoadOrGenerate loadOrGenerate = {});
+
+    /// parity: `ServerLevel.getPoiManager`, kept in step with every block this world writes.
+    [[nodiscard]] poi::PoiManager& poi() const noexcept { return poi_; }
 
     /// Whether the dimension has a sky, which decides half of `getRawBrightness`.
     void setHasSkylight(bool hasSkylight) noexcept { hasSkylight_ = hasSkylight; }
@@ -460,6 +464,7 @@ private:
     std::vector<BlockEvent> blockEvents_;
     std::deque<TorchToggle> torchToggles_;
     SculkSensorTracker sculkSensors_;
+    mutable poi::PoiManager poi_;
     EntityRegistry entityRegistry_;
     DroppedItemPhysics itemPhysics_;
 };

@@ -76,11 +76,7 @@ private:
 
     static void hideRaidBar(const std::vector<player::PlayerSession*>& players, entity::Raid& raid);
 
-    /// Whether this is a village at all.
-    ///
-    /// parity: `ServerLevel.isVillage`, which counts the village points of interest around a spot.
-    /// There is no point of interest map here, so the beds are counted directly: a place people
-    /// sleep in is what a raid is aimed at either way.
+    /// parity: `ServerLevel.isVillage`, a section at most one away from a claimed village point.
     [[nodiscard]] static bool isVillage(world::LoadedWorld& world, double x, double y, double z);
 
     player::PlayerRegistry* players_;
