@@ -30,6 +30,9 @@ public:
 
     [[nodiscard]] static const structure::StructurePlacementGrid& grid();
 
+    /// Whether a treasure is buried in this chunk, which is what `/locate` and an explorer map ask.
+    [[nodiscard]] bool startsAt(std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) const;
+
 private:
     /// parity: the six-direction shell. A neighbour that is air or liquid gets the floor block when
     /// what is under it is also open (so the chest is not left over a hole), and the soft block

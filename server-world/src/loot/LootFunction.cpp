@@ -54,6 +54,15 @@ LootFunction LootFunction::smelt(bool useInputCount) {
     return built;
 }
 
+LootFunction LootFunction::explorationMap(ExplorationMapRequest request) {
+    LootFunction built;
+    built.kind_ = Kind::ExplorationMap;
+    auto parts = std::make_shared<Parts>();
+    parts->exploration = std::move(request);
+    built.parts_ = std::move(parts);
+    return built;
+}
+
 LootFunction LootFunction::discard() {
     LootFunction built;
     built.kind_ = Kind::Discard;
@@ -232,6 +241,12 @@ ItemStack LootFunction::run(ItemStack stack, random::RandomSource& random, std::
     case Kind::SetRandomDyes:
         return setComponent(std::move(stack), random, context);
     case Kind::CopyFromBlock:
+        return stack;
+    // parity: `ExplorationMapFunction.run`, which needs an origin and leaves an empty stack alone.
+    case Kind::ExplorationMap:
+        if (stack.count > 0 && context.origin.has_value() && context.explorationMap) {
+            context.explorationMap(stack, part.exploration);
+        }
         return stack;
     // parity: `IntLimit.clamp`: `Mth.clamp` with both ends, else whichever end there is.
     case Kind::LimitCount: {

@@ -14,6 +14,7 @@
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/FishingSystem.hpp>
 #include <basalt/server/runtime/LightningBoltSystem.hpp>
+#include <basalt/server/runtime/MapSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/MobTickSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
@@ -44,6 +45,7 @@
 #include <basalt/server/runtime/scoreboard/Teams.hpp>
 #include <basalt/server/runtime/timings/TimingsReport.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
+#include <basalt/server/runtime/world/maps/MapStorage.hpp>
 #include <basalt/wire/auth/SessionKeyPair.hpp>
 #include <basalt/wire/io/TcpSocket.hpp>
 
@@ -273,6 +275,8 @@ private:
     std::unique_ptr<NaturalSpawningSystem> spawning_;
     std::unique_ptr<ExperienceOrbSystem> orbs_;
     std::unique_ptr<FishingSystem> fishing_;
+    world::maps::MapStorage mapStorage_;
+    std::unique_ptr<MapSystem> maps_;
     std::unique_ptr<WitherSystem> withers_;
     std::unique_ptr<LightningBoltSystem> lightning_;
     std::unique_ptr<ShriekerSystem> shriekers_;

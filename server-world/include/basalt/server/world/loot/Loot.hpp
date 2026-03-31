@@ -53,6 +53,8 @@ public:
         SetOminousBottleAmplifier,
         SetRandomPotion,
         SetRandomDyes,
+        /// parity: `ExplorationMapFunction`, answered by the context.
+        ExplorationMap,
     };
 
     [[nodiscard]] static LootFunction enchantedCountIncrease(FloatProvider count,
@@ -89,6 +91,7 @@ public:
     /// `options` is a list of potion ids or a single `#tag`; empty is every potion, a gap here.
     [[nodiscard]] static LootFunction setRandomPotion(std::vector<std::string> options);
     [[nodiscard]] static LootFunction setRandomDyes(IntProvider count);
+    [[nodiscard]] static LootFunction explorationMap(ExplorationMapRequest request);
 
     [[nodiscard]] Kind kind() const noexcept { return kind_; }
 

@@ -1270,6 +1270,14 @@ void BasaltServer::startBedrockListener() {
                 }
             });
         };
+        context.mapInfo = [this](player::PlayerSession& player, const std::int64_t mapId) {
+            const wire::common::Uuid uuid = player.uuid();
+            worldRegistry_->scheduler().global().submit([this, uuid, mapId] {
+                if (const player::PlayerSession* session = playerRegistry_.get(uuid); session != nullptr) {
+                    maps_->sendWhole(*session, static_cast<std::int32_t>(mapId));
+                }
+            });
+        };
         context.signBook = [this](player::PlayerSession& player, const std::int32_t slot, const std::string& title) {
             const wire::common::Uuid uuid = player.uuid();
             worldRegistry_->scheduler().global().submit([this, uuid, slot, title] {
@@ -1356,6 +1364,9 @@ void BasaltServer::startBedrockListener() {
                     return;
                 }
                 if (fishing_->useRod(breakContext(), *session, *found->second, slot)) {
+                    return;
+                }
+                if (maps_->useEmptyMap(breakContext(), *session, *found->second, slot)) {
                     return;
                 }
                 if (player::throwItemFor(breakContext(), *session, *found->second, *item, slot)) {
@@ -1625,6 +1636,12 @@ void BasaltServer::startBedrockListener() {
                     // parity: `ServerPlayerGameMode.useItemOn` with something in hand: these are
                     // the item's own use, which happens sneaking or not, unlike the block's.
                     const player::BreakContext blocks = breakContext();
+                    // parity: `MapItem.useOn` marks a banner, and `EmptyMapItem.use` answers a click
+                    // on anything.
+                    if (maps_->useOnBanner(*session, *found->second, slot, hit.x, hit.y, hit.z).has_value() ||
+                        maps_->useEmptyMap(blocks, *session, *found->second, slot)) {
+                        return;
+                    }
                     // parity: `BucketItem.use` looks where the player is looking rather than at the
                     // block that was clicked, so this hands it the eye and not the hit.
                     // parity: `ThrowableProjectileItem.use`, which leaves the hand whatever is in

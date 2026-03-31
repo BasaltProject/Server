@@ -43,7 +43,17 @@ using wire::common::JsonValue;
     return found == kTargets.end() ? std::nullopt : std::optional{found->second};
 }
 
-/// parity: `LocationPredicate`, the biome and the block with its state; anything else never matches.
+/// parity: `MinMaxBounds.Doubles`, a number or a `{min, max}`.
+[[nodiscard]] DoubleBounds doubleBounds(const JsonValue* value) {
+    if (const std::optional<double> exact = asNumber(value); exact.has_value()) {
+        return DoubleBounds{.min = exact, .max = exact};
+    }
+    const JsonObject* object = asObject(value);
+    return object == nullptr ? DoubleBounds{}
+                             : DoubleBounds{.min = asNumber(object->find("min")), .max = asNumber(object->find("max"))};
+}
+
+/// parity: `LocationPredicate`, every field; a block predicate on the block entity is a gap.
 [[nodiscard]] LocationPredicate parseLocation(const JsonObject* predicate) {
     LocationPredicate location;
     if (predicate == nullptr) {
@@ -52,14 +62,42 @@ using wire::common::JsonValue;
     for (std::size_t index = 0; index < predicate->names().size(); ++index) {
         const std::string& name = predicate->names()[index];
         const JsonValue& value = predicate->values()[index];
-        const JsonObject* block = name == "block" ? value.get<JsonObject>() : nullptr;
+        const JsonObject* object = value.get<JsonObject>();
         if (name == "biomes") {
             location.biomes = idsOrTag(&value);
-        } else if (block != nullptr) {
+        } else if (name == "structures") {
+            location.structures = idsOrTag(&value);
+        } else if (name == "dimension") {
+            const auto parsed = wire::common::Identifier::parse(asString(&value).value_or(""));
+            location.unsupported = location.unsupported || !parsed.has_value();
+            if (parsed.has_value()) {
+                location.dimension = *parsed;
+            }
+        } else if (name == "position" && object != nullptr) {
+            location.position = std::array<DoubleBounds, 3>{
+                doubleBounds(object->find("x")), doubleBounds(object->find("y")), doubleBounds(object->find("z"))};
+        } else if (name == "smokey") {
+            location.smokey = asBool(&value);
+        } else if (name == "can_see_sky") {
+            location.canSeeSky = asBool(&value);
+        } else if (name == "light" && object != nullptr) {
+            location.hasLight = true;
+            const DoubleBounds bounds = doubleBounds(object->find("light"));
+            if (bounds.min.has_value()) {
+                location.lightMin = static_cast<std::int32_t>(*bounds.min);
+            }
+            if (bounds.max.has_value()) {
+                location.lightMax = static_cast<std::int32_t>(*bounds.max);
+            }
+        } else if (name == "fluid" && object != nullptr) {
+            location.hasFluid = true;
+            location.fluids = idsOrTag(object->find("fluids"));
+            location.fluidState = parseStateMatcher(asObject(object->find("state")));
+        } else if (name == "block" && object != nullptr) {
             location.hasBlock = true;
-            location.blocks = idsOrTag(block->find("blocks"));
-            location.state = parseStateMatcher(asObject(block->find("state")));
-            for (const std::string& key : block->names()) {
+            location.blocks = idsOrTag(object->find("blocks"));
+            location.state = parseStateMatcher(asObject(object->find("state")));
+            for (const std::string& key : object->names()) {
                 location.unsupported = location.unsupported || (key != "blocks" && key != "state");
             }
         } else {

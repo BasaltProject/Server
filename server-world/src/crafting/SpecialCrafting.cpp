@@ -90,7 +90,9 @@ constexpr std::string_view kFlightDuration = "minecraft:fireworks_flight_duratio
             }
         }
     }
-    return specialRecipes::withComponentsOf(recipe.result.item, keepResultCount ? recipe.result.count : 1, *centre);
+    const wire::common::Identifier& item =
+        recipe.result.item == wire::common::Identifier::vanilla("air") ? centre->item : recipe.result.item;
+    return specialRecipes::withComponentsOf(item, keepResultCount ? recipe.result.count : 1, *centre);
 }
 
 /// parity: `DecoratedPotRecipe`, four sherds in a diamond and nothing in the corners.
@@ -359,8 +361,19 @@ std::optional<loot::ItemStack> specialCrafting::assemble(const Recipe& recipe, c
         return centredInNine(recipe, input, true);
     case SpecialKind::DecoratedPot:
         return decoratedPot(recipe, input);
-    case SpecialKind::MapExtending:
-        return centredInNine(recipe, input, false);
+    case SpecialKind::MapExtending: {
+        // parity: `MapExtendingRecipe`, which only takes a map that has an id and leaves the zoom
+        // for when it is taken. That the map is not already at the widest is asked by the caller.
+        const loot::ItemStack* centre = input.width() == 3 && input.height() == 3 ? input.item(1, 1) : nullptr;
+        if (centre == nullptr || centre->components.find("minecraft:map_id") == nullptr) {
+            return std::nullopt;
+        }
+        std::optional<loot::ItemStack> map = centredInNine(recipe, input, false);
+        if (map.has_value()) {
+            map->components.putString("minecraft:map_post_processing", "scale");
+        }
+        return map;
+    }
     case SpecialKind::Dye:
     case SpecialKind::FireworkStarFade:
         return dye(recipe, input);

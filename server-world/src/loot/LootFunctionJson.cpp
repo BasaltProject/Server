@@ -12,12 +12,12 @@ namespace {
 using wire::common::JsonObject;
 using wire::common::JsonValue;
 
-/// The functions that only carry something over from the block entity or a structure search. What
+/// The functions that only carry something over from the block entity. What
 /// they carry is put on by the caller that knows the block, so the drop itself is right without
 /// them, none of them draws from the random, and refusing the whole table left it dropping nothing.
 [[nodiscard]] bool copiesOnly(std::string_view type) {
     return type == "minecraft:copy_components" || type == "minecraft:copy_custom_data" ||
-           type == "minecraft:copy_state" || type == "minecraft:copy_name" || type == "minecraft:exploration_map";
+           type == "minecraft:copy_state" || type == "minecraft:copy_name";
 }
 
 } // namespace
@@ -275,6 +275,29 @@ Parsed<LootFunction> Reader::typedCountFunction(const std::string& type, const J
         }
         return LootFunction::applyBonus(asString(object.find("enchantment")).value_or(""), kind, number,
                                         static_cast<float>(parameter("probability", 0.0)));
+    }
+    if (type == "minecraft:exploration_map") {
+        ExplorationMapRequest request;
+        if (const JsonValue* destination = object.find("destination"); destination != nullptr) {
+            if (const std::optional<std::string> one = asString(destination); one.has_value()) {
+                request.destination.push_back(*one);
+            } else if (const auto* list = destination->get<std::vector<JsonValue>>(); list != nullptr) {
+                for (const JsonValue& element : *list) {
+                    if (const std::optional<std::string> id = asString(&element); id.has_value()) {
+                        request.destination.push_back(*id);
+                    }
+                }
+            }
+        }
+        request.decoration = asString(object.find("decoration")).value_or(request.decoration);
+        request.zoom = static_cast<std::int8_t>(asNumber(object.find("zoom")).value_or(request.zoom));
+        request.searchRadius =
+            static_cast<std::int32_t>(asNumber(object.find("search_radius")).value_or(request.searchRadius));
+        if (const JsonValue* skip = object.find("skip_existing_chunks");
+            skip != nullptr && skip->get<bool>() != nullptr) {
+            request.skipExistingChunks = *skip->get<bool>();
+        }
+        return LootFunction::explorationMap(std::move(request));
     }
     if (copiesOnly(type)) {
         return LootFunction::copyFromBlock();

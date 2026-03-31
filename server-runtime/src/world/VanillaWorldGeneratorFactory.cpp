@@ -394,20 +394,21 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
     };
     answer.villages = built->village.get();
     answer.camps = built->camps.get();
-    // parity: `LocateCommand` searches 100 cells of each placement grid.
-    constexpr std::int32_t kLocateCells = 100;
     const auto onGrid = [](const structure::StructurePlacementGrid& grid, auto startsAt) {
-        return [&grid, startsAt](std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) {
-            return grid.locate(seed, chunkX, chunkZ, kLocateCells,
-                               [&](std::int32_t x, std::int32_t z) { return startsAt(seed, x, z); });
+        return [&grid, startsAt](std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ, std::int32_t cells,
+                                 const ClaimedStart& skip) {
+            return grid.locate(seed, chunkX, chunkZ, cells, [&](std::int32_t x, std::int32_t z) {
+                return startsAt(seed, x, z) && !(skip && skip(x, z));
+            });
         };
     };
     for (terrain::JigsawStructureGenerator* jigsaw : {built->pillagerOutposts.get(), built->trailRuins.get(),
                                                       built->ancientCities.get(), built->trialChambers.get()}) {
         answer.locators.push_back(
             StructureLocator{.id = Identifier::vanilla(jigsaw->name()),
-                             .locate = [jigsaw](std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ) {
-                                 return jigsaw->locate(seed, chunkX, chunkZ, kLocateCells);
+                             .locate = [jigsaw](std::int64_t seed, std::int32_t chunkX, std::int32_t chunkZ,
+                                                std::int32_t cells, const ClaimedStart& skip) {
+                                 return jigsaw->locate(seed, chunkX, chunkZ, cells, skip);
                              }});
     }
     const terrain::MineshaftStructureGenerator* mineshafts = built->mineshafts.get();
@@ -446,6 +447,29 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
                                           [mansions](std::int64_t seed, std::int32_t x, std::int32_t z) {
                                               return mansions->startsAt(seed, x, z);
                                           })});
+    const terrain::OceanMonumentStructureGenerator* monuments = built->oceanMonuments.get();
+    answer.locators.push_back(
+        StructureLocator{.id = Identifier::vanilla(std::string{terrain::OceanMonumentStructureGenerator::kName}),
+                         .locate = onGrid(terrain::OceanMonumentStructureGenerator::grid(),
+                                          [monuments](std::int64_t seed, std::int32_t x, std::int32_t z) {
+                                              return monuments->startsAt(seed, x, z);
+                                          })});
+    const terrain::BuriedTreasureStructureGenerator* treasures = built->buriedTreasures.get();
+    answer.locators.push_back(
+        StructureLocator{.id = Identifier::vanilla(std::string{terrain::BuriedTreasureStructureGenerator::kName}),
+                         .locate = onGrid(terrain::BuriedTreasureStructureGenerator::grid(),
+                                          [treasures](std::int64_t seed, std::int32_t x, std::int32_t z) {
+                                              return treasures->startsAt(seed, x, z);
+                                          })});
+    const terrain::OceanRuinStructureGenerator* ruins = built->oceanRuins.get();
+    for (const auto& [name, warm] : {std::pair{"ocean_ruin_cold", false}, std::pair{"ocean_ruin_warm", true}}) {
+        answer.locators.push_back(
+            StructureLocator{.id = Identifier::vanilla(name),
+                             .locate = onGrid(terrain::OceanRuinStructureGenerator::grid(),
+                                              [ruins, warm](std::int64_t seed, std::int32_t x, std::int32_t z) {
+                                                  return ruins->startsAt(seed, x, z, warm);
+                                              })});
+    }
     answer.strongholds = built->strongholds.get();
     answer.generate = [&world](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t gameTime,
                                const std::string& difficulty,

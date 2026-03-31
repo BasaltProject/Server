@@ -5,6 +5,7 @@
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 
+#include <array>
 #include <functional>
 #include <map>
 #include <mutex>
@@ -66,6 +67,13 @@ public:
     /// What the `score` providers and `entity_scores` read. Only rolled on the tick thread.
     void useScoreboard(const scoreboard::Scoreboard* scoreboard) { scoreboard_ = scoreboard; }
 
+    /// What an `exploration_map` rolled in a world does to its stack. Unset, the stack is left blank.
+    using ExplorationMaps = std::function<void(LoadedWorld& world, server::world::loot::ItemStack& stack,
+                                               const server::world::loot::ExplorationMapRequest& request,
+                                               const std::array<double, 3>& origin)>;
+
+    void useExplorationMaps(ExplorationMaps maps) { explorationMaps_ = std::move(maps); }
+
     /// Fills in what every roll asks outside the table: nested tables, enchantments and ordered tags.
     void prepare(server::world::loot::LootContext& context);
 
@@ -85,6 +93,7 @@ private:
     server::world::loot::LootReferences references_;
     const LootRegistries* registries_ = nullptr;
     const scoreboard::Scoreboard* scoreboard_ = nullptr;
+    ExplorationMaps explorationMaps_;
     // Several connection threads can break a block at once, so the cache has one owner and it is
     // this lock. Map nodes never move, so a table handed out stays valid while another thread reads.
     std::mutex mutex_;

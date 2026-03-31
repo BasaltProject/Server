@@ -46,6 +46,8 @@ public:
         std::function<std::map<std::string, world::LoadedWorld*>()> worlds;
         std::function<bool()> wantsUnloadEvents;
         std::function<void(const std::string& worldName, std::int32_t chunkX, std::int32_t chunkZ)> chunkUnloaded;
+        /// What belongs to the server rather than to one world, like its maps.
+        std::function<void()> saveShared;
     };
 
     struct Options {

@@ -1,5 +1,6 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/bedrock/BedrockBlockEntities.hpp>
+#include <basalt/server/runtime/bedrock/BedrockMaps.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayerInternals.hpp>
 #include <basalt/server/runtime/bedrock/BedrockRecords.hpp>
@@ -446,6 +447,12 @@ player::PlayerConnection BedrockPlayer::buildConnection(const BedrockListener::J
     };
 
     // The book again, after a trade has been taken out of it.
+    connection.sendMapData = [this](const wire::protocol::play::MapItemDataPacket& update) {
+        wire::io::ByteBuffer body;
+        wire::bedrock::writeMapItemData(body, bedrockMapOf(update, static_cast<std::uint8_t>(dimension_)), protocol_);
+        mailbox_->post(static_cast<std::uint16_t>(wire::bedrock::BedrockPacket::ClientboundMapItemData),
+                       body.toVector());
+    };
     connection.sendTrades = [this] { sendTrades(); };
 
     // The three rows of an open enchanting table, which that edition draws from its own packet.

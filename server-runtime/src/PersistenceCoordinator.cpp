@@ -47,6 +47,9 @@ void PersistenceCoordinator::persistEverything() const {
         commandStorage_->save();
         world->saveMetadata();
     }
+    if (hooks_.saveShared) {
+        hooks_.saveShared();
+    }
     persistPlayers();
 }
 

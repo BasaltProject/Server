@@ -97,6 +97,7 @@ class ContainerMenuController;
 class CombatSystem;
 class EndFightSystem;
 class FishingSystem;
+class MapSystem;
 class WitherSystem;
 class MobActionSystem;
 class ExplosionSystem;
@@ -254,6 +255,8 @@ public:
         EndFightSystem* endFight = nullptr;
         /// Casting and reeling in.
         FishingSystem* fishing = nullptr;
+        /// Making, drawing and marking maps.
+        MapSystem* maps = nullptr;
         /// What a wither skull set down may build.
         WitherSystem* withers = nullptr;
         /// What a mob does when something is used on it.

@@ -1,12 +1,22 @@
+#include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/scoreboard/Scoreboard.hpp>
+#include <basalt/server/runtime/world/FluidFlow.hpp>
+#include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/LootRegistries.hpp>
 #include <basalt/server/runtime/world/NaturalSpawner.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
+#include <basalt/server/runtime/world/WorldLight.hpp>
 #include <basalt/server/world/loot/LootTableJson.hpp>
+#include <basalt/server/world/structure/StructureQueries.hpp>
 
+#include <algorithm>
 #include <expected>
+#include <map>
+#include <span>
+#include <string>
 
 namespace basalt::server::runtime::world {
 namespace {
@@ -43,6 +53,69 @@ constexpr std::string_view kJsonSuffix = ".json";
     std::string standing = path;
     standing.erase(at == 0 ? 0 : at + 1, std::string_view{"wall_"}.size());
     return standing;
+}
+
+/// parity: `BlockState.getFluidState`: a source is `water` or `lava`, anything else flowing with its
+/// amount and whether it falls.
+void fluidOf(std::int32_t state, server::world::loot::PlaceFacts& place) {
+    const Submersion kind = fluids::of(state);
+    if (kind == Submersion::None) {
+        return;
+    }
+    const std::string name = kind == Submersion::Water ? "water" : "lava";
+    if (isSourceFluid(state)) {
+        place.fluid = Identifier::vanilla(name);
+        place.fluidProperties = {{"falling", "false"}};
+        return;
+    }
+    place.fluid = Identifier::vanilla("flowing_" + name);
+    const auto level = place.properties.find("level");
+    const std::int32_t blockLevel = level == place.properties.end() ? 0 : std::stoi(level->second);
+    const bool falling = blockLevel >= 8;
+    place.fluidProperties = {{"falling", falling ? "true" : "false"},
+                             {"level", std::to_string(falling ? 8 : 8 - blockLevel)}};
+}
+
+[[nodiscard]] bool litCampfire(std::int32_t state) {
+    const Identifier* block = server::registry::blockStateDefinitions::blockOf(state);
+    if (block == nullptr || (block->path() != "campfire" && block->path() != "soul_campfire")) {
+        return false;
+    }
+    const std::map<std::string, std::string> properties = server::registry::blockStateDefinitions::propertiesOf(state);
+    const auto lit = properties.find("lit");
+    return lit != properties.end() && lit->second == "true";
+}
+
+/// parity: `CampfireBlock.isSmokeyPos`: a lit campfire up to five below, the smoke stopped by any
+/// collision crossing the middle four pixels of the column.
+[[nodiscard]] bool smokeyAt(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    constexpr std::int32_t kReach = 5;
+    constexpr double kPostMin = 6.0 / 16.0;
+    constexpr double kPostMax = 10.0 / 16.0;
+    constexpr std::size_t kBoxStride = 6;
+    for (std::int32_t down = 1; down <= kReach; ++down) {
+        const std::int32_t state = world.blockState(x, y - down, z).value_or(0);
+        if (litCampfire(state)) {
+            return true;
+        }
+        const std::span<const std::int32_t> boxes = server::registry::blockShapes::collisionBoxes(state);
+        bool blocked = false;
+        for (std::size_t box = 0; box + kBoxStride <= boxes.size(); box += kBoxStride) {
+            const std::span<const std::int32_t> one = boxes.subspan(box, kBoxStride);
+            const auto unit = [&one](std::size_t index) {
+                return static_cast<double>(one[index]) / server::registry::blockShapes::kUnits;
+            };
+            if (unit(0) < kPostMax && unit(3) > kPostMin && unit(2) < kPostMax && unit(5) > kPostMin &&
+                unit(4) > unit(1)) {
+                blocked = true;
+                break;
+            }
+        }
+        if (blocked) {
+            return litCampfire(world.blockState(x, y - down - 1, z).value_or(0));
+        }
+    }
+    return false;
 }
 
 } // namespace
@@ -98,14 +171,45 @@ void RealLootTables::prepareAt(server::world::loot::LootContext& context, Loaded
                                double z) {
     prepare(context);
     context.origin = std::array<double, 3>{x, y, z};
+    if (explorationMaps_) {
+        context.explorationMap = [this, &world, x, y, z](server::world::loot::ItemStack& stack,
+                                                         const server::world::loot::ExplorationMapRequest& request) {
+            explorationMaps_(world, stack, request, {x, y, z});
+        };
+    }
     context.placeAt = [&world](std::int32_t bx, std::int32_t by, std::int32_t bz) {
-        server::world::loot::PlaceFacts place{.biome = naturalSpawner::biomeAt(world, bx, by, bz)};
+        server::world::loot::PlaceFacts place;
+        place.loaded = world.state().chunkIfLoaded(bx >> 4, bz >> 4) != nullptr;
+        if (const std::expected<Identifier, wire::common::IdentifierError> dimension =
+                Identifier::parse(config::dimensionRegistryKey(world.declaration().dimension));
+            dimension.has_value()) {
+            place.dimension = *dimension;
+        }
+        place.biome = naturalSpawner::biomeAt(world, bx, by, bz);
         if (const std::optional<std::int32_t> state = world.state().blockState(bx, by, bz); state.has_value()) {
             if (const Identifier* block = server::registry::blockStateDefinitions::blockOf(*state); block != nullptr) {
                 place.block = *block;
             }
             place.properties = server::registry::blockStateDefinitions::propertiesOf(*state);
+            fluidOf(*state, place);
         }
+        const bool sky = config::dimensionFacts(world.declaration().dimension).hasSkylight;
+        place.light = worldLight::rawBrightness(world.state(), bx, by, bz, sky, world.skyDarken());
+        place.canSeeSky = naturalSpawner::canSeeSky(world, bx, by, bz);
+        place.smokey = smokeyAt(world.state(), bx, by, bz);
+        place.inStructure = [&world, bx, by, bz](const std::vector<std::string>& wanted) {
+            const server::world::structure::StructureQueries structures{
+                [&world](std::int32_t chunkX, std::int32_t chunkZ) -> const server::world::structure::ChunkStructures* {
+                    const server::world::Chunk* chunk = world.state().chunkIfLoaded(chunkX, chunkZ);
+                    return chunk == nullptr ? nullptr : &chunk->structures();
+                }};
+            const server::world::structure::StructurePos at{bx, by, bz};
+            // A `#tag` of structures is a gap: none of the loot tables names one.
+            return std::ranges::any_of(wanted, [&structures, &at](const std::string& one) {
+                const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(one);
+                return id.has_value() && structures.startWithPieceAt(at, id->path()) != nullptr;
+            });
+        };
         return place;
     };
 }

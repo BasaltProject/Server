@@ -71,6 +71,16 @@ enum class EntityTarget : std::uint8_t {
     InteractingEntity
 };
 
+/// What an explorer map function asks the world for. parity: `ExplorationMapFunction`'s fields.
+struct ExplorationMapRequest {
+    /// Structure ids, or one `#tag`.
+    std::vector<std::string> destination;
+    std::string decoration = "minecraft:mansion";
+    std::int8_t zoom = 2;
+    std::int32_t searchRadius = 50;
+    bool skipExistingChunks = true;
+};
+
 /// What a roll knows about where it came from. parity: `LootContextParams`, the parts this server
 /// can answer; anything a caller leaves empty is a parameter the roll does not have.
 struct LootContext {
@@ -141,6 +151,9 @@ struct LootContext {
     /// parity: `WeatherCheck`, whether it rains and whether it thunders.
     std::optional<bool> raining;
     std::optional<bool> thundering;
+    /// parity: `ExplorationMapFunction.run`, which finds the structure and draws the map. Unset, the
+    /// stack is left as it is, which a `map_id` filter after it then throws away.
+    std::function<void(ItemStack& stack, const ExplorationMapRequest& request)> explorationMap;
 };
 
 /// The score holder behind one of the roll's entities: the context's own answer when it has one,

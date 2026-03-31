@@ -320,10 +320,12 @@ bool LootCondition::test(random::RandomSource& random, const LootContext& contex
         if (!context.origin.has_value() || !context.placeAt) {
             return false;
         }
-        const auto at = [this, &context](std::size_t axis) {
-            return static_cast<std::int32_t>(std::floor((*context.origin)[axis] + offset_[axis]));
-        };
-        return part.location->test(context.placeAt(at(0), at(1), at(2)), context.tags);
+        const std::array<double, 3> exact{(*context.origin)[0] + offset_[0], (*context.origin)[1] + offset_[1],
+                                          (*context.origin)[2] + offset_[2]};
+        const auto at = [&exact](std::size_t axis) { return static_cast<std::int32_t>(std::floor(exact[axis])); };
+        PlaceFacts place = context.placeAt(at(0), at(1), at(2));
+        place.exact = exact;
+        return part.location->test(place, context.tags);
     }
     // parity: `MatchTool` with no tool fails; with no predicate any tool passes.
     case Kind::MatchTool:

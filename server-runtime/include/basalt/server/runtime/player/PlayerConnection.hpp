@@ -9,6 +9,7 @@
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/common/Uuid.hpp>
 #include <basalt/wire/io/ByteBuffer.hpp>
+#include <basalt/wire/protocol/play/MapPackets.hpp>
 #include <basalt/wire/protocol/play/SpawnInfo.hpp>
 #include <basalt/wire/protocol/play/UiPackets.hpp>
 #include <basalt/wire/text/Component.hpp>
@@ -141,6 +142,9 @@ struct PlayerConnection {
     /// knows how to say it on the edition this connection speaks.
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId)> sendBlockChange;
 
+    /// A map's colours and markers in Java's shape. Unset on Java, which takes the packet itself; the
+    /// other edition draws maps its own way.
+    std::function<void(const wire::protocol::play::MapItemDataPacket& map)> sendMapData;
     /// Plays a sound where this player can hear it, named the way Java names it. A connection that
     /// speaks another edition translates the name itself.
     std::function<void(std::string_view sound, double x, double y, double z, float volume, float pitch)> playSound;

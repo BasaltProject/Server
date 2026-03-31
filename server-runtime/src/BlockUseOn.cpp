@@ -10,6 +10,7 @@
 #include <basalt/server/runtime/EndFightSystem.hpp>
 #include <basalt/server/runtime/FishingSystem.hpp>
 #include <basalt/server/runtime/ItemUseTimers.hpp>
+#include <basalt/server/runtime/MapSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/WitherSystem.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
@@ -308,6 +309,12 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
             ack();
             return;
         }
+        // parity: `CartographyTableBlock.useWithoutItem`.
+        if (path == "cartography_table") {
+            owner_->menus().openCartographyTable(*session, hit.pos);
+            ack();
+            return;
+        }
         // parity: `LoomBlock.useWithoutItem`, whose four slots belong to the screen.
         if (path == "loom") {
             owner_->menus().openLoomMenu(*session, hit.pos);
@@ -406,6 +413,16 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         if (clickedState.has_value() && world::signs::isSign(*clickedState) && editSign(hit.pos)) {
             ack();
             return;
+        }
+    }
+
+    // parity: `MapItem.useOn`, which marks a banner and fails on one it cannot mark.
+    if (MapSystem* maps = owner_->options().maps; maps != nullptr) {
+        if (world::LoadedWorld* here = owner_->currentWorld(); here != nullptr) {
+            if (maps->useOnBanner(*session, *here, heldSlot, hit.pos.x, hit.pos.y, hit.pos.z).has_value()) {
+                ack();
+                return;
+            }
         }
     }
 
@@ -599,6 +616,11 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
             owner_->options().fishing->useRod(breakContext(), *session, *world, PlayerInventory::kOffhandSlot)) {
             return;
         }
+        // parity: `EmptyMapItem.use` answers either hand.
+        if (owner_->options().maps != nullptr &&
+            owner_->options().maps->useEmptyMap(breakContext(), *session, *world, PlayerInventory::kOffhandSlot)) {
+            return;
+        }
         static_cast<void>(owner_->itemUseTimers().startBlocking(*session, *other, PlayerInventory::kOffhandSlot));
         return;
     }
@@ -616,6 +638,8 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
         owner_->itemUseTimers().startBlocking(*session, *item, heldSlot) ||
         (owner_->options().fishing != nullptr &&
          owner_->options().fishing->useRod(breakContext(), *session, *world, heldSlot)) ||
+        (owner_->options().maps != nullptr &&
+         owner_->options().maps->useEmptyMap(breakContext(), *session, *world, heldSlot)) ||
         !world::buckets::isBucket(*item)) {
         return;
     }

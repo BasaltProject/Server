@@ -80,10 +80,10 @@ public:
     /// would: the same weighted draw against the biome at the candidate's own centre column. A
     /// candidate that draws a different village is not a match, which is why this cannot be answered
     /// from the grid alone.
-    [[nodiscard]] std::optional<LocatedVillage> locate(std::int64_t seed, std::int32_t fromChunkX,
-                                                       std::int32_t fromChunkZ,
-                                                       const wire::common::Identifier* structure,
-                                                       std::int32_t maxCells = kDefaultSearchCells) const;
+    [[nodiscard]] std::optional<LocatedVillage>
+    locate(std::int64_t seed, std::int32_t fromChunkX, std::int32_t fromChunkZ,
+           const wire::common::Identifier* structure, std::int32_t maxCells = kDefaultSearchCells,
+           const std::function<bool(std::int32_t, std::int32_t)>& skip = {}) const;
 
     /// Assembles `structure` at a chunk that is not its candidate, which is what `/place structure`
     /// does: vanilla generates the structure where it was told, skipping the placement grid and the

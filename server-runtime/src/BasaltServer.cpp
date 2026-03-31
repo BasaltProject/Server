@@ -283,6 +283,11 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                       event.set(3, false);
                                   }));
     };
+    persistenceHooks.saveShared = [this] {
+        if (maps_ != nullptr) {
+            maps_->save();
+        }
+    };
     persistence_ = std::make_unique<PersistenceCoordinator>(
         std::move(persistenceHooks), playerRegistry_, *playerStore_, commandStorage_, metrics_,
         PersistenceCoordinator::Options{.spawnRadiusChunks = kSpawnRadiusChunks,
@@ -498,6 +503,21 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         playerRegistry_, ExperienceOrbSystem::Options{.nextSeed = [] { return scratchSeed(); }});
     fishing_ = std::make_unique<FishingSystem>(playerRegistry_, *orbs_,
                                                FishingSystem::Options{.nextSeed = [] { return scratchSeed(); }});
+    maps_ = std::make_unique<MapSystem>(
+        playerRegistry_, mapStorage_,
+        MapSystem::Options{.worldNamed = [this](std::string_view name) -> world::LoadedWorld* {
+                               const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+                               const auto found = worlds.find(std::string{name});
+                               return found == worlds.end() ? nullptr : found->second;
+                           },
+                           .itemTags = &vanillaData_.itemTags,
+                           .nextSeed = [] { return scratchSeed(); },
+                           .readJar = VanillaGameData::jarOf(options_.serverJar).readText});
+    vanillaData_.lootTables.useExplorationMaps([this](world::LoadedWorld& world, server::world::loot::ItemStack& stack,
+                                                      const server::world::loot::ExplorationMapRequest& request,
+                                                      const std::array<double, 3>& origin) {
+        static_cast<void>(maps_->explore(world, stack.components, request, origin));
+    });
     spawning_ = std::make_unique<NaturalSpawningSystem>(
         playerRegistry_, vanillaData_.biomeSpawns, chunkSimulation_, *spawnEquipment_, NaturalSpawningSystem::Hooks{},
         NaturalSpawningSystem::Options{.nextSeed = [] { return scratchSeed(); }});

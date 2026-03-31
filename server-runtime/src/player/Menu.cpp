@@ -96,6 +96,8 @@ Menu Menu::beacon(std::int32_t containerId) { return Menu{containerId, 0, 0, blo
 
 Menu Menu::loom(std::int32_t containerId) { return Menu{containerId, 0, 0, blockWindow(4)}; }
 
+Menu Menu::cartographyTable(std::int32_t containerId) { return Menu{containerId, 0, 0, blockWindow(3)}; }
+
 Menu Menu::merchant(std::int32_t containerId) {
     std::vector<std::optional<MenuSlot>> slots;
     slots.reserve(3 + kPlayerSlotsInWindow);

@@ -3,6 +3,7 @@
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
+#include <basalt/server/runtime/MapSystem.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
 #include <basalt/server/runtime/item/ItemComponents.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
@@ -73,6 +74,11 @@ std::int32_t ContainerMenuController::halfSize() const {
 }
 
 std::optional<storage::StoredItemStack> ContainerMenuController::readBlockSlot(std::int32_t index) const {
+    if (openCartography_) {
+        return index >= 0 && static_cast<std::size_t>(index) < cartographySlots_.size()
+                   ? cartographySlots_[static_cast<std::size_t>(index)]
+                   : std::nullopt;
+    }
     if (openBeacon_) {
         return index == Menu::kBeaconPayment ? beaconPayment_ : std::nullopt;
     }
@@ -136,6 +142,21 @@ std::optional<storage::StoredItemStack> ContainerMenuController::readBlockSlot(s
 }
 
 void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::optional<storage::StoredItemStack>& stack) {
+    if (openCartography_) {
+        if (index < 0 || static_cast<std::size_t>(index) >= cartographySlots_.size()) {
+            return;
+        }
+        if (index == Menu::kCartographyResult) {
+            if (!stack.has_value()) {
+                takeCartographyResult();
+            }
+            return;
+        }
+        cartographySlots_[static_cast<std::size_t>(index)] = stack;
+        // parity: `slotsChanged`, the result worked out again whenever an input moves.
+        recomputeCartographyResult();
+        return;
+    }
     if (openBeacon_) {
         if (index == Menu::kBeaconPayment) {
             beaconPayment_ = stack;
@@ -453,6 +474,9 @@ bool ContainerMenuController::canPlaceInto(const MenuSlot& slot) const {
     if (openGrindstone_ && block->index == Menu::kGrindstoneResult) {
         return false;
     }
+    if (openCartography_ && block->index == Menu::kCartographyResult) {
+        return false;
+    }
     if (openLoom_ && block->index == Menu::kLoomResult) {
         return false;
     }
@@ -461,7 +485,7 @@ bool ContainerMenuController::canPlaceInto(const MenuSlot& slot) const {
 
 bool ContainerMenuController::hasBlockSlots() const {
     return openBlock.has_value() || openEnderChest_ || openStonecutter_ || openSmithing_ || openAnvil_ ||
-           openGrindstone_ || openEnchantment_ || openBeacon_ || openLoom_;
+           openGrindstone_ || openEnchantment_ || openBeacon_ || openLoom_ || openCartography_;
 }
 
 bool ContainerMenuController::accepts(const MenuSlot& target, const storage::StoredItemStack& stack) const {
@@ -474,6 +498,14 @@ bool ContainerMenuController::accepts(const MenuSlot& target, const storage::Sto
         const std::optional<Identifier> payment = parsedOrNothing(stack.id);
         return block->index == Menu::kBeaconPayment && payment.has_value() && owner_->options().itemTags != nullptr &&
                world::realItemTags::contains(*owner_->options().itemTags, "minecraft:beacon_payment_items", *payment);
+    }
+    // parity: `CartographyTableMenu`'s two inputs: a map with an id, and paper, a map or a pane.
+    if (openCartography_) {
+        if (block->index == Menu::kCartographyMap) {
+            return stack.components.contains("minecraft:map_id");
+        }
+        return block->index == Menu::kCartographyAdditional &&
+               (stack.id == "minecraft:paper" || stack.id == "minecraft:map" || stack.id == "minecraft:glass_pane");
     }
     // parity: `LoomMenu`'s three inputs, each of which takes one kind of thing and nothing else.
     if (openLoom_) {
@@ -631,6 +663,16 @@ void ContainerMenuController::recomputeCraftingResult() {
     }
     const std::optional<server::world::loot::ItemStack> result = recipes->resultFor(input);
     craftingResult_ = result.has_value() ? std::optional{storedOf(*result)} : std::nullopt;
+    // parity: `MapExtendingRecipe.matches`, which also wants the map known and short of the widest.
+    if (craftingResult_.has_value() && craftingResult_->components.contains("minecraft:map_post_processing")) {
+        const std::optional<std::int32_t> mapId = MapSystem::mapIdOf(craftingResult_->components);
+        const std::optional<MapSystem::Summary> data = mapId.has_value() && owner_->options().maps != nullptr
+                                                           ? owner_->options().maps->summaryOf(*mapId)
+                                                           : std::nullopt;
+        if (!data.has_value() || data->scale >= 4) {
+            craftingResult_.reset();
+        }
+    }
     recipeUsed_ = craftingResult_.has_value() ? std::optional{match->id} : std::nullopt;
 }
 
@@ -699,6 +741,7 @@ void ContainerMenuController::takeCraftingResult(PlayerSession& session) {
         carriedItem_ = result;
     }
     awardRecipeCrafted();
+    settleCraftedMaps(session);
     // parity: `Recipe.getRemainingItems`: a cell whose item leaves something behind (a bucket, a
     // bottle) keeps it instead of emptying, and the book being copied stays where it was.
     const std::vector<std::optional<storage::StoredItemStack>> remaining = craftingRemainders();

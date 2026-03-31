@@ -196,6 +196,9 @@ public:
 
         virtual void signBook(std::int32_t slot, const std::string& title) = 0;
 
+        /// The client holds a map it was never sent and asks for the whole of it.
+        virtual void requestMap(std::int64_t mapId) = 0;
+
         /// The client swung its arm at nothing, which everybody else has to be told about.
         virtual void swing() = 0;
 

@@ -145,18 +145,42 @@ bool LocationPredicate::test(const PlaceFacts& place, const TagLookup& tags) con
     if (unsupported) {
         return false;
     }
-    if (!biomes.empty() &&
-        (!place.biome.has_value() || !matchesIdsOrTag(biomes, "worldgen/biome", *place.biome, tags))) {
+    if (position.has_value() && !((*position)[0].test(place.exact[0]) && (*position)[1].test(place.exact[1]) &&
+                                  (*position)[2].test(place.exact[2]))) {
         return false;
     }
-    if (!hasBlock) {
-        return true;
+    if (dimension.has_value() && place.dimension != dimension) {
+        return false;
+    }
+    if (!biomes.empty() &&
+        (!place.loaded || !place.biome.has_value() || !matchesIdsOrTag(biomes, "worldgen/biome", *place.biome, tags))) {
+        return false;
+    }
+    if (!structures.empty() && (!place.loaded || !place.inStructure || !place.inStructure(structures))) {
+        return false;
+    }
+    if (smokey.has_value() && (!place.loaded || *smokey != place.smokey)) {
+        return false;
+    }
+    if (hasLight && (!place.loaded || (lightMin.has_value() && place.light < *lightMin) ||
+                     (lightMax.has_value() && place.light > *lightMax))) {
+        return false;
     }
     // parity: `BlockPredicate`, the block and every named property with the value asked for.
-    if (!place.block.has_value() || !matchesIdsOrTag(blocks, "block", *place.block, tags)) {
+    if (hasBlock &&
+        (!place.loaded || !place.block.has_value() ||
+         (!blocks.empty() && !matchesIdsOrTag(blocks, "block", *place.block, tags)) || !state.test(place.properties))) {
         return false;
     }
-    return state.test(place.properties);
+    // parity: `FluidPredicate`, where an empty square is the empty fluid.
+    if (hasFluid) {
+        const wire::common::Identifier fluid = place.fluid.value_or(wire::common::Identifier::vanilla("empty"));
+        if (!place.loaded || (!fluids.empty() && !matchesIdsOrTag(fluids, "fluid", fluid, tags)) ||
+            !fluidState.test(place.fluidProperties)) {
+            return false;
+        }
+    }
+    return !canSeeSky.has_value() || *canSeeSky == place.canSeeSky;
 }
 
 } // namespace basalt::server::world::loot

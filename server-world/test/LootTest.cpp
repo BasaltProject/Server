@@ -6,6 +6,7 @@
 
 #include <doctest.h>
 
+#include <algorithm>
 #include <bit>
 #include <cstdint>
 #include <map>
@@ -747,4 +748,79 @@ TEST_CASE("a location check reads the square the offsets point at, and fails wit
     const std::vector<ItemStack> drops = grass->generate(random, 0.0F, std::nullopt, context);
     REQUIRE(drops.size() == 1);
     CHECK(drops.front().item.path() == "short_grass");
+}
+
+TEST_CASE("a location check reads position, dimension, structure, light, fluid, smoke and sky") {
+    using basalt::wire::common::Identifier;
+    const auto passes = [](std::string_view predicate, const PlaceFacts& facts) {
+        const std::expected<LootTable, LootTableParseError> table = lootTableJson::parse(
+            std::string{R"({"pools":[{"rolls":1,"condition":{"type":"minecraft:location_check","predicate":)"} +
+            std::string{predicate} + R"(},"entries":[{"type":"minecraft:item","name":"minecraft:stone"}]}]})");
+        REQUIRE(table.has_value());
+        LootContext context{.origin = std::array<double, 3>{0.5, 64.5, 0.5}};
+        context.placeAt = [&facts](std::int32_t, std::int32_t, std::int32_t) { return facts; };
+        rng::RandomSource random = rng::RandomSource::legacy(1);
+        return !table->generate(random, 0.0F, std::nullopt, context).empty();
+    };
+    PlaceFacts place{.dimension = Identifier::vanilla("the_nether"),
+                     .fluid = Identifier::vanilla("flowing_lava"),
+                     .fluidProperties = {{"falling", "false"}, {"level", "4"}},
+                     .light = 7,
+                     .smokey = true};
+    place.inStructure = [](const std::vector<std::string>& wanted) {
+        return std::ranges::find(wanted, "minecraft:fortress") != wanted.end();
+    };
+    CHECK(passes(R"({"position":{"y":{"min":64,"max":65}}})", place));
+    CHECK_FALSE(passes(R"({"position":{"x":3}})", place));
+    CHECK(passes(R"({"dimension":"minecraft:the_nether"})", place));
+    CHECK_FALSE(passes(R"({"dimension":"minecraft:overworld"})", place));
+    CHECK(passes(R"({"structures":"minecraft:fortress"})", place));
+    CHECK_FALSE(passes(R"({"structures":"minecraft:bastion_remnant"})", place));
+    CHECK(passes(R"({"light":{"light":{"min":5,"max":9}}})", place));
+    CHECK_FALSE(passes(R"({"light":{"light":8}})", place));
+    CHECK(passes(R"({"fluid":{"fluids":"minecraft:flowing_lava","state":{"level":"4"}}})", place));
+    CHECK_FALSE(passes(R"({"fluid":{"fluids":"minecraft:water"}})", place));
+    CHECK(passes(R"({"smokey":true,"can_see_sky":false})", place));
+    place.loaded = false;
+    CHECK_FALSE(passes(R"({"light":{"light":7}})", place));
+}
+
+TEST_CASE("an explorer map is drawn by whoever answers the context, and dropped when nobody does") {
+    // parity: 26.3's `chests/shipwreck_map` pool, a map filtered on having an id.
+    const std::expected<LootTable, LootTableParseError> table = lootTableJson::parse(R"({"pools":[{"rolls":1,
+        "entries":[{"type":"minecraft:item","name":"minecraft:buried_treasure_map","modifier":[
+            {"type":"minecraft:exploration_map","decoration":"minecraft:red_x",
+             "destination":"#minecraft:on_treasure_maps","skip_existing_chunks":false,"zoom":1},
+            {"type":"minecraft:filtered","item_filter":{"predicates":{"minecraft:map_id":{}}},
+             "on_fail":{"type":"minecraft:discard"}}]}]}]})");
+    REQUIRE(table.has_value());
+    const auto roll = [&table](const LootContext& context) {
+        std::vector<ItemStack> made;
+        basalt::server::random::RandomSource random = basalt::server::random::RandomSource::legacy(1);
+        table->generateRaw(
+            random, 0.0F, std::nullopt,
+            [&made](ItemStack stack) {
+                if (stack.count > 0) {
+                    made.push_back(std::move(stack));
+                }
+            },
+            context);
+        return made;
+    };
+    LootContext context;
+    context.origin = std::array<double, 3>{0.5, 64.0, 0.5};
+    CHECK(roll(context).empty());
+    ExplorationMapRequest seen;
+    context.explorationMap = [&seen](ItemStack& stack, const ExplorationMapRequest& request) {
+        seen = request;
+        stack.components.putInt("minecraft:map_id", 4);
+    };
+    const std::vector<ItemStack> made = roll(context);
+    REQUIRE(made.size() == 1);
+    CHECK(made[0].components.getInt("minecraft:map_id") == 4);
+    CHECK(seen.destination == std::vector<std::string>{"#minecraft:on_treasure_maps"});
+    CHECK(seen.decoration == "minecraft:red_x");
+    CHECK(seen.zoom == 1);
+    CHECK(seen.searchRadius == 50);
+    CHECK_FALSE(seen.skipExistingChunks);
 }

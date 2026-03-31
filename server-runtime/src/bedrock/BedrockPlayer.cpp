@@ -1,4 +1,5 @@
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/bedrock/BedrockMaps.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayerInternals.hpp>
 #include <basalt/server/runtime/bedrock/BedrockRecipes.hpp>
@@ -77,8 +78,10 @@ wire::bedrock::BedrockItemStack itemStackFor(const std::optional<storage::Stored
             block = static_cast<std::int32_t>(wire::bedrock::bedrockBlockId(*state, protocol));
         }
     }
-    return wire::bedrock::BedrockItemStack{
+    wire::bedrock::BedrockItemStack item{
         .runtimeId = named->palettePlace + 1, .count = stack->count, .data = named->data, .blockRuntimeId = block};
+    decorateMapStack(item, *stack);
+    return item;
 }
 
 BedrockPlayer::BedrockPlayer(const BedrockListener::Joining& joining, Context context)
@@ -279,7 +282,10 @@ wire::bedrock::BedrockItemStack BedrockPlayer::stackFor(const std::optional<stor
             block = static_cast<std::int32_t>(wire::bedrock::bedrockBlockId(*state, protocol_));
         }
     }
-    return {.runtimeId = named->palettePlace + 1, .count = stack->count, .data = named->data, .blockRuntimeId = block};
+    wire::bedrock::BedrockItemStack item{
+        .runtimeId = named->palettePlace + 1, .count = stack->count, .data = named->data, .blockRuntimeId = block};
+    decorateMapStack(item, *stack);
+    return item;
 }
 
 void BedrockPlayer::sendWindow(const std::uint32_t containerId,
@@ -563,6 +569,12 @@ void BedrockPlayer::signBook(const std::int32_t slot, const std::string& title) 
         return;
     }
     context_.signBook(*session_, slot, title);
+}
+
+void BedrockPlayer::requestMap(const std::int64_t mapId) {
+    if (session_ != nullptr && context_.mapInfo) {
+        context_.mapInfo(*session_, mapId);
+    }
 }
 
 void BedrockPlayer::showBorderColliders(const double minX, const double maxX, const double minZ, const double maxZ,
