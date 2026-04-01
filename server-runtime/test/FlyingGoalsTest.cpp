@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/ai/FlyingGoals.hpp>
+#include <basalt/server/runtime/entity/ai/PhantomGoals.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <doctest.h>
@@ -240,20 +241,23 @@ TEST_CASE("a guardian's beam takes eighty ticks and then lands") {
     CHECK_FALSE(fixture.actions.beam.has_value());
 }
 
-TEST_CASE("a phantom climbs above what it is after and dives through it") {
+TEST_CASE("a swooping phantom aims at the middle of its target and pulls up after the bite") {
     Fixture fixture;
     ServerEntity& phantom = fixture.add("phantom", 8.0, 8.0);
     ServerEntity& cow = fixture.add("cow", 8.0, 8.0);
-    phantom.y = 78.0;
+    phantom.y = 70.0;
     phantom.targetId = cow.entityId();
+    phantom.flight.swooping = true;
 
     ai::MobContext context = fixture.context(phantom);
-    ai::SwoopAttackGoal swoop;
-    REQUIRE(swoop.canUse(context));
+    ai::PhantomSweepGoal sweep;
+    REQUIRE(sweep.canUse(context));
+    sweep.tick(context);
+    CHECK(phantom.flight.moveTargetPoint[1] == doctest::Approx(64.0 + (cow.height() * 0.5)));
+    CHECK(phantom.flight.swooping);
 
-    // Fourteen blocks up is past the circling height, so it commits to the dive.
-    const double before = phantom.y;
-    swoop.tick(context);
-    CHECK(phantom.velocityY < 0.0);
-    CHECK(phantom.y <= before);
+    phantom.y = 64.5;
+    sweep.tick(context);
+    CHECK(fixture.actions.swings == 1);
+    CHECK_FALSE(phantom.flight.swooping);
 }

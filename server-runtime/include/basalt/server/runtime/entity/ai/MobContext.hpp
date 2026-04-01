@@ -31,6 +31,8 @@ struct PlayerView {
     double height = 0.0;
     /// parity: `TargetingConditions`, which skips a creative or spectating player outright.
     bool targetable = true;
+    /// parity: `Entity.isSpectator`, whom nothing sees at all.
+    bool spectator = false;
     std::optional<wire::common::Identifier> heldItem;
     bool sneaking = false;
     /// parity: `Player.isSwimming`, sprinting in water.
@@ -163,8 +165,16 @@ public:
     bool raidNearby = false;
     /// parity: `Attributes.MOVEMENT_SPEED` for this mob, with its modifiers.
     double speed = 0.0;
+    /// parity: `Level.getSkyDarken` and the dimension's sky and `ambientLight`, what the light of
+    /// a square elsewhere is read with.
+    std::int32_t skyDarken = 0;
+    bool hasSkylight = true;
+    float ambientLight = 0.0F;
 
     [[nodiscard]] const PlayerView* nearestPlayer(double range) const;
+    /// parity: `Level.getSeaLevel` and `getMinY`, which a phantom's anchor and a bat's aim read.
+    std::int32_t seaLevel = 63;
+    std::int32_t minY = -64;
 
     [[nodiscard]] double distanceSquaredTo(double x, double y, double z) const;
 

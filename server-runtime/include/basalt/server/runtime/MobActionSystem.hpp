@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/VillagerWorldSystem.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/MobConversions.hpp>
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
@@ -87,6 +88,8 @@ public:
         const world::realDamageTypeTags::TagMembers* damageTypeTags = nullptr;
         /// The block tags, which decide where a mob may teleport to.
         const world::realBlockTags::TagMembers* blockTags = nullptr;
+        /// The jar's trade sets, which a villager's offers are rolled from.
+        world::RealVillagerTrades* villagerTrades = nullptr;
     };
 
     /// Which worlds a mob might be in, since a goal only ever hands over the mob itself.
@@ -235,7 +238,15 @@ public:
 
     /// parity: `LivingEntity.aiStep`'s travel half, which runs for a mob this build has no goals
     /// for as much as for one it does.
-    void travelMob(world::LoadedWorld& world, entity::ServerEntity& mob, double speed);
+    void travelMob(world::LoadedWorld& world, entity::ServerEntity& mob, double speed,
+                   random::RandomSource* random = nullptr,
+                   const std::optional<std::array<double, 3>>& target = std::nullopt);
+
+    /// parity: `Vex.tick`, the summoned vex starving once its life is up.
+    void tickVexLife(const std::vector<player::PlayerSession*>& watchers, entity::ServerEntity& vex);
+
+    /// parity: `Blaze.customServerAiStep`, the lift towards a target above it.
+    static void blazeRises(entity::ServerEntity& blaze, std::optional<double> targetEye, random::RandomSource& random);
 
     /// One mob's turn to decide and then move.
     void tickMobAi(world::LoadedWorld& world, entity::ServerEntity& mob,
@@ -245,8 +256,8 @@ public:
     /// The TRIGGERED rider forest a thunder horse becomes when somebody walks up to it.
     void activateSkeletonTrap(world::LoadedWorld& world, entity::ServerEntity& horse, random::RandomSource& random);
 
-    void tickVillageGolem(world::LoadedWorld& world, entity::ServerEntity& villager,
-                          const std::vector<entity::ServerEntity*>& living, random::RandomSource& random);
+    /// What a villager's brain does to this world, bound to it for the calls that follow.
+    [[nodiscard]] entity::villager::VillagerWorld& villagersIn(world::LoadedWorld& world);
 
     /// parity: `Entity.die` over `LootTable`, the drops a mob leaves where it fell.
     void dropDeathLoot(world::LoadedWorld& world, const entity::ServerEntity& entity);
@@ -297,6 +308,11 @@ private:
 
     [[nodiscard]] std::int32_t cureProgress(world::LoadedWorld& world, const entity::ServerEntity& mob);
 
+    /// parity: `Villager.customServerAiStep`, the brain every tick instead of goals every other.
+    void tickVillager(world::LoadedWorld& world, entity::ServerEntity& villager,
+                      const std::vector<entity::ai::PlayerView>& views,
+                      const std::vector<entity::ServerEntity*>& living, random::RandomSource& random);
+
     player::PlayerRegistry* players_;
     BlockChangeBroadcaster* broadcaster_;
     ExplosionSystem* explosions_;
@@ -307,6 +323,7 @@ private:
     Worlds worlds_;
     Hooks hooks_;
     Options options_;
+    std::unique_ptr<VillagerWorldSystem> villagers_;
 };
 
 } // namespace basalt::server::runtime

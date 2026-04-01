@@ -33,6 +33,10 @@ namespace villagers {
 struct Offers;
 }
 
+namespace villager {
+struct VillagerState;
+}
+
 namespace wardenBrain {
 struct WardenState;
 }
@@ -119,6 +123,8 @@ public:
     std::int32_t villagerExperience = 0;
     /// parity: `AbstractVillager.offers`, rolled a level at a time and kept.
     std::shared_ptr<villagers::Offers> offers;
+    /// What a villager's brain remembers, or null for anything else.
+    std::shared_ptr<villager::VillagerState> villager;
 
     /// Ticks before it goes off, or `kNoFuse` for anything that is not primed. parity:
     /// `PrimedTnt.fuse`.
@@ -228,6 +234,28 @@ public:
     /// would cost every arrow and every item in the world one.
     std::optional<std::map<std::int32_t, std::int32_t>> anger;
 
+    /// What a flier's own move control and goals keep between ticks.
+    struct Flight {
+        /// parity: `GhastMoveControl.floatDuration`.
+        std::int32_t floatDuration = 0;
+        /// parity: `PhantomMoveControl.speed`, `Phantom.moveTargetPoint`, `anchorPoint` and the swoop
+        /// phase of `AttackPhase`.
+        float phantomSpeed = 0.1F;
+        std::array<double, 3> moveTargetPoint{};
+        std::optional<std::array<std::int32_t, 3>> anchorPoint;
+        bool swooping = false;
+        /// parity: `Vex.boundOrigin` and `limitedLifeTicks`, -1 for a vex that lives for ever.
+        std::optional<std::array<std::int32_t, 3>> boundOrigin;
+        std::int32_t limitedLifeTicks = -1;
+        /// parity: `Bat.targetPosition` and its resting flag.
+        std::optional<std::array<std::int32_t, 3>> batTarget;
+        bool resting = false;
+        /// parity: `Blaze.allowedHeightOffset` and `nextHeightOffsetChangeTick`.
+        float blazeHeightOffset = 0.5F;
+        std::int32_t blazeHeightOffsetTicks = 0;
+    };
+    Flight flight;
+
     /// parity: `MemoryModuleType.TOUCH_COOLDOWN`, the second a warden waits between shoves.
     std::int32_t touchCooldown = 0;
 
@@ -261,13 +289,8 @@ public:
 
     /// parity: a villager in its bed, which is a pose rather than anything the mob does.
     bool sleeping = false;
-
-    /// Villager brain memories involved in social iron-golem summoning.
-    std::int64_t lastSleptGameTime = std::numeric_limits<std::int64_t>::min();
-    std::int32_t golemDetectedTicks = 0;
-
-    /// Runtime-only cadence of the villager gossip path that asks five neighbours to agree.
-    std::int64_t lastGossipTime = std::numeric_limits<std::int64_t>::min();
+    /// parity: `LivingEntity.SLEEPING_POS_ID`, the head of the bed it lies in.
+    std::optional<std::array<std::int32_t, 3>> sleepingAt;
 
     /// What a thrown bottle leaves behind. parity: `ThrownSplashPotion`'s own contents.
     std::optional<std::string> potionEffect;

@@ -82,3 +82,34 @@ TEST_CASE("a dolphin holds four minutes and fills up in one breath") {
     static_cast<void>(breathing::tick(dolphin, kDry));
     CHECK(dolphin.airSupply == 4800);
 }
+
+TEST_CASE("the eye sits where the entity type puts it, a baby's where its own dimensions do") {
+    CHECK(breathing::eyeHeightOf(mobOf("zombie")) == doctest::Approx(1.74));
+    CHECK(breathing::eyeHeightOf(mobOf("pig")) == doctest::Approx(1.8 * 0.85).epsilon(1e-6));
+    ServerEntity calf = mobOf("cow");
+    calf.age = -24000;
+    CHECK(breathing::eyeHeightOf(calf) == doctest::Approx(0.69));
+    ServerEntity foal = mobOf("horse");
+    foal.age = -24000;
+    CHECK(breathing::eyeHeightOf(foal) == doctest::Approx(1.52 * 0.7).epsilon(1e-6));
+    ServerEntity slime = mobOf("slime");
+    slime.cubeSize = 4;
+    CHECK(breathing::eyeHeightOf(slime) == doctest::Approx(1.3));
+    ServerEntity sleeper = mobOf("villager");
+    sleeper.sleeping = true;
+    CHECK(breathing::eyeHeightOf(sleeper) == doctest::Approx(0.2));
+}
+
+TEST_CASE("drowning sends its particles, and water breathing keeps the air where it is") {
+    ServerEntity cow = mobOf("cow");
+    cow.airSupply = -19;
+    const std::vector<breathing::Hurt> owed = breathing::tick(cow, kUnderwater);
+    REQUIRE(owed.size() == 1);
+    CHECK(owed.front().drownParticles);
+    ServerEntity other = mobOf("cow");
+    other.effects.emplace(
+        Identifier::vanilla("water_breathing"),
+        basalt::server::runtime::world::ActiveEffect{.effect = Identifier::vanilla("water_breathing")});
+    static_cast<void>(breathing::tick(other, kUnderwater));
+    CHECK(other.airSupply == 300);
+}

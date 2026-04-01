@@ -1,13 +1,16 @@
 #include <basalt/server/registry/BlockShapes.hpp>
-#include <basalt/server/runtime/entity/FlyingMovement.hpp>
+#include <basalt/server/runtime/entity/FlyingPathFinder.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/FlyingGoals.hpp>
+#include <basalt/server/runtime/entity/ai/MobContext.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
+#include <basalt/server/runtime/world/WorldLight.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
 #include <cmath>
+#include <limits>
 #include <numbers>
 #include <optional>
 
@@ -18,7 +21,6 @@ using Block = std::array<std::int32_t, 3>;
 
 namespace mth = wire::common::mth;
 
-constexpr std::int32_t kInterval = 120;
 constexpr std::int32_t kAttempts = 10;
 constexpr std::int32_t kHorizontal = 8;
 constexpr std::int32_t kHoverVertical = 7;
@@ -26,7 +28,6 @@ constexpr std::int32_t kAirVertical = 4;
 constexpr std::int32_t kAirLift = -2;
 constexpr std::int32_t kHoverMax = 3;
 constexpr std::int32_t kHoverMin = 1;
-constexpr float kLookSpeed = 10.0F;
 
 /// parity: `BlockState.isSolid` as `GoalUtils.isSolid` asks it; a square past the world is treated
 /// as open, which only stops the climb.
@@ -110,13 +111,29 @@ constexpr float kLookSpeed = 10.0F;
     return at;
 }
 
-/// parity: `RandomPos.generateRandomPos`: ten rolls, all of them made, the first best one kept.
+/// parity: `Monster.getWalkTargetValue`, less the brighter the square:
+/// `-(getLightLevelDependentMagicValue(pos) - 0.5)`.
+[[nodiscard]] float walkTargetValue(MobContext& mob, const Block& at) {
+    const auto v = static_cast<float>(world::worldLight::rawBrightness(mob.world, at[0], at[1], at[2], mob.hasSkylight,
+                                                                       mob.skyDarken)) /
+                   15.0F;
+    const float curved = v / (4.0F - (3.0F * v));
+    return -((mob.ambientLight + ((1.0F - mob.ambientLight) * curved)) - 0.5F);
+}
+
+/// parity: `RandomPos.generateRandomPos`: ten rolls, all of them made, the first of the best kept.
 template <typename Supplier>
-[[nodiscard]] std::optional<Block> bestOf(Supplier supply) {
+[[nodiscard]] std::optional<Block> bestOf(MobContext& mob, Supplier supply) {
     std::optional<Block> best;
+    float bestWeight = -std::numeric_limits<float>::infinity();
     for (std::int32_t attempt = 0; attempt < kAttempts; ++attempt) {
         const std::optional<Block> candidate = supply();
-        if (candidate.has_value() && !best.has_value()) {
+        if (!candidate.has_value()) {
+            continue;
+        }
+        const float weight = walkTargetValue(mob, *candidate);
+        if (weight > bestWeight) {
+            bestWeight = weight;
             best = candidate;
         }
     }
@@ -125,10 +142,11 @@ template <typename Supplier>
 
 } // namespace
 
-HoverWanderGoal::HoverWanderGoal(double step) : step_(step) {}
+HoverWanderGoal::HoverWanderGoal(std::int32_t interval, bool whenIdle) : interval_(interval), whenIdle_(whenIdle) {}
 
 bool HoverWanderGoal::canUse(MobContext& mob) {
-    if (mob.random.nextInt(reducedTickDelay(kInterval)) != 0) {
+    if (whenIdle_ ? (!navigation::isDone(mob.mob) || mob.random.nextInt(interval_) != 0)
+                  : mob.random.nextInt(reducedTickDelay(interval_)) != 0) {
         return false;
     }
     // parity: `Entity.getViewVector(0)`, the way its body faces.
@@ -136,26 +154,38 @@ bool HoverWanderGoal::canUse(MobContext& mob) {
     const float pitch = mob.mob.pitch * (std::numbers::pi_v<float> / 180.0F);
     const auto xDir = static_cast<double>(mth::sin(yaw) * mth::cos(pitch));
     const auto zDir = static_cast<double>(mth::cos(yaw) * mth::cos(pitch));
-    std::optional<Block> target = bestOf([&] { return hoverCandidate(mob, xDir, zDir); });
+    std::optional<Block> target = bestOf(mob, [&] { return hoverCandidate(mob, xDir, zDir); });
     if (!target.has_value()) {
-        target = bestOf([&] { return airCandidate(mob, xDir, zDir); });
+        target = bestOf(mob, [&] { return airCandidate(mob, xDir, zDir); });
     }
     if (!target.has_value()) {
         return false;
     }
-    // parity: `Vec3.atBottomCenterOf`.
-    wanted_ = {(*target)[0] + 0.5, static_cast<double>((*target)[1]), (*target)[2] + 0.5};
-    arrived_ = false;
+    // parity: `FlyingPathNavigation.createPath`, from the square half a block up its feet, as far as
+    // the follow range reaches and sixteen nodes a block of it.
+    const double range = mob.mob.attributeWithModifiers("minecraft:follow_range");
+    const flyingPathFinder::Footprint size{.width = static_cast<std::int32_t>(std::floor(mob.mob.width() + 1.0)),
+                                           .height = static_cast<std::int32_t>(std::floor(mob.mob.height() + 1.0))};
+    const Block from{mth::floor(mob.mob.x), mth::floor(mob.mob.y + 0.5), mth::floor(mob.mob.z)};
+    const flyingPathFinder::Mob flier{.maluses = pathTypes::of(mob.mob.type()),
+                                      .at = Block{mth::floor(mob.mob.x), mth::floor(mob.mob.y), mth::floor(mob.mob.z)},
+                                      .minY = mob.minY};
+    std::vector<Block> path =
+        flyingPathFinder::find(mob.world, size, from, *target, static_cast<std::int32_t>(range * 16.0), range, flier);
+    if (path.empty()) {
+        return false;
+    }
+    // parity: `PathNavigation.moveTo(path, 1.0)`; the flying control then follows it node by node.
+    mob.mob.path = std::move(path);
+    mob.mob.pathIndex = 0;
+    mob.mob.walkTarget =
+        std::array<double, 3>{(*target)[0] + 0.5, static_cast<double>((*target)[1]), (*target)[2] + 0.5};
+    mob.mob.moveSpeed = 1.0;
     return true;
 }
 
-bool HoverWanderGoal::canContinueToUse(MobContext& /*mob*/) { return !arrived_; }
+bool HoverWanderGoal::canContinueToUse(MobContext& mob) { return !navigation::isDone(mob.mob); }
 
-void HoverWanderGoal::tick(MobContext& mob) {
-    if (!flyingMovement::approach(mob.mob, wanted_[0], wanted_[1], wanted_[2], step_)) {
-        arrived_ = true;
-    }
-    lookControl::lookAt(mob.mob, wanted_[0], wanted_[1], wanted_[2], kLookSpeed);
-}
+void HoverWanderGoal::stop(MobContext& mob) { navigation::stop(mob.mob); }
 
 } // namespace basalt::server::runtime::entity::ai

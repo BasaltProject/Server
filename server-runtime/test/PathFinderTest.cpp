@@ -2,6 +2,7 @@
 
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/entity/FlyingPathFinder.hpp>
 #include <basalt/server/runtime/entity/PathFinder.hpp>
 
 #include <doctest.h>
@@ -360,4 +361,28 @@ TEST_CASE("a step up looks no higher than the two blocks it needs") {
     }
 
     CHECK(pathFinder::find(loaded.state, 1, 64, 3, 5, 64, 3).has_value());
+}
+
+TEST_CASE("a flier's path goes over a wall it cannot pass and ends beside the target") {
+    Loaded loaded;
+    // A wall across the whole chunk, from y 64 up to 70, between x 3 and x 9.
+    for (std::int32_t z = 0; z < 16; ++z) {
+        for (std::int32_t y = 64; y <= 70; ++y) {
+            REQUIRE(loaded.state.setBlockState(6, y, z, stateOf("stone")));
+        }
+    }
+    const std::vector<flyingPathFinder::Node> path =
+        flyingPathFinder::find(loaded.state, {.width = 1, .height = 4}, {3, 66, 8}, {9, 66, 8}, 640, 40.0);
+    REQUIRE_FALSE(path.empty());
+    const flyingPathFinder::Node& last = path.back();
+    const std::int32_t off = std::abs(last[0] - 9) + std::abs(last[1] - 66) + std::abs(last[2] - 8);
+    CHECK(off <= 1);
+    // Four blocks tall, so it clears the top of the wall with its feet at 71.
+    bool over = false;
+    for (const flyingPathFinder::Node& node : path) {
+        const bool clear = node[0] != 6 || node[1] >= 71;
+        CHECK(clear);
+        over = over || node[0] == 6;
+    }
+    CHECK(over);
 }

@@ -80,6 +80,12 @@ public:
     bool explore(world::LoadedWorld& world, wire::nbt::NbtCompound& components,
                  const server::world::loot::ExplorationMapRequest& request, const std::array<double, 3>& origin);
 
+    /// parity: `ItemFrame.removeFramedMap`: the frame's marker goes the moment its map leaves it.
+    void frameLostMap(const wire::nbt::NbtCompound& components, const entity::ServerEntity& frame);
+
+    /// parity: `MapItemSavedData.isTrackedCountOverLimit(256)`, which stops a frame taking the map.
+    [[nodiscard]] bool tooManyMarkers(const wire::nbt::NbtCompound& components);
+
     /// The whole of a map, colours and markers, for a client that asks for one it was never sent.
     void sendWhole(const player::PlayerSession& player, std::int32_t mapId);
 

@@ -131,21 +131,23 @@ bool NaturalSpawningSystem::activateSkeletonTrap(world::LoadedWorld& world, Serv
     return true;
 }
 
-void NaturalSpawningSystem::tickVillageGolem(world::LoadedWorld& world, ServerEntity& villager,
-                                             const std::vector<ServerEntity*>& living, random::RandomSource& random) {
-    world::villageGolemSpawner::tick(
-        world, villager, living, random, [this, &world, &random](const std::array<std::int32_t, 3>& position) {
-            const world::SpawnRequest request{
-                .type = Identifier::vanilla("iron_golem"),
-                .x = position[0] + 0.5,
-                .y = static_cast<double>(position[1]),
-                .z = position[2] + 0.5,
-                .yaw = random.nextFloat() * kFullRotation,
-                .biome = world::naturalSpawner::biomeAt(world, position[0], position[1], position[2])};
-            world::MobSpawnGroupData group;
-            return materializeSpawnForest(world, request, group, position[0], position[1], position[2], random,
-                                          world::MobSpawnReason::MobSummoned, "mob_summoned") != nullptr;
-        });
+bool NaturalSpawningSystem::summonVillageGolem(world::LoadedWorld& world, const ServerEntity& villager,
+                                               random::RandomSource& random) {
+    const std::optional<std::array<std::int32_t, 3>> position =
+        world::villageGolemSpawner::findSpawnPosition(world, villager, random);
+    if (!position.has_value()) {
+        return false;
+    }
+    const world::SpawnRequest request{
+        .type = Identifier::vanilla("iron_golem"),
+        .x = (*position)[0] + 0.5,
+        .y = static_cast<double>((*position)[1]),
+        .z = (*position)[2] + 0.5,
+        .yaw = random.nextFloat() * kFullRotation,
+        .biome = world::naturalSpawner::biomeAt(world, (*position)[0], (*position)[1], (*position)[2])};
+    world::MobSpawnGroupData group;
+    return materializeSpawnForest(world, request, group, (*position)[0], (*position)[1], (*position)[2], random,
+                                  world::MobSpawnReason::MobSummoned, "mob_summoned") != nullptr;
 }
 
 void NaturalSpawningSystem::tickSpawning(world::LoadedWorld& world, const sched::Region& region) {

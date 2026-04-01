@@ -103,7 +103,8 @@ const DimensionFacts& dimensionFacts(WorldDimension dimension) noexcept {
                                             .coordinateScale = 8.0,
                                             .spawnsPortalPiglins = false,
                                             .skyLightLevel = 4.0F,
-                                            .hasDayTimeline = false};
+                                            .hasDayTimeline = false,
+                                            .ambientLight = 0.1F};
     static constexpr DimensionFacts kEnd{.configName = "end",
                                          .registryPath = "the_end",
                                          .registryIndex = 2,
@@ -114,7 +115,8 @@ const DimensionFacts& dimensionFacts(WorldDimension dimension) noexcept {
                                          .coordinateScale = 1.0,
                                          .spawnsPortalPiglins = false,
                                          .skyLightLevel = 15.0F,
-                                         .hasDayTimeline = false};
+                                         .hasDayTimeline = false,
+                                         .ambientLight = 0.25F};
     switch (dimension) {
     case WorldDimension::Nether:
         return kNether;

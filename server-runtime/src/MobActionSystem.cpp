@@ -82,6 +82,7 @@ constexpr double kFangParticleLift = 0.5;
 constexpr std::uint8_t kGhastChargingIndex = 16;
 constexpr std::uint8_t kBlazeChargedIndex = 16;
 constexpr std::int8_t kBlazeChargedFlag = 1;
+constexpr std::uint8_t kBatFlagsIndex = 16;
 constexpr std::uint8_t kGuardianBeamIndex = 17;
 
 /// parity: `Ghast.getExplosionPower`, and the speed a fireball is thrown at.
@@ -119,7 +120,14 @@ MobActionSystem::MobActionSystem(player::PlayerRegistry& players, BlockChangeBro
                                  Options options)
     : players_(&players), broadcaster_(&broadcaster), explosions_(&explosions), spawning_(&spawning), combat_(&combat),
       raids_(&raids), lootTables_(&lootTables), worlds_(std::move(worlds)), hooks_(std::move(hooks)),
-      options_(std::move(options)) {}
+      options_(std::move(options)),
+      villagers_(std::make_unique<VillagerWorldSystem>(players, broadcaster, spawning, raids, lootTables,
+                                                       options_.villagerTrades, options_.nextSeed)) {}
+
+entity::villager::VillagerWorld& MobActionSystem::villagersIn(world::LoadedWorld& world) {
+    villagers_->bind(world);
+    return *villagers_;
+}
 
 random::RandomSource MobActionSystem::freshRandom() const {
     return random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
@@ -277,7 +285,8 @@ void MobActionSystem::setCharging(ServerEntity& mob, bool charging) {
     if (world == nullptr) {
         return;
     }
-    const bool blaze = mob.type().path() == "blaze";
+    // parity: the blaze's and the vex's flag byte both carry it in their lowest bit.
+    const bool blaze = mob.type().path() == "blaze" || mob.type().path() == "vex";
     const SetEntityDataPacket::Entry entry =
         blaze ? SetEntityDataPacket::Entry{.index = kBlazeChargedIndex,
                                            .value = SetEntityDataPacket::ByteValue{.value = charging ? kBlazeChargedFlag
@@ -327,9 +336,6 @@ void MobActionSystem::setSleeping(ServerEntity& mob, bool sleeping) {
         return;
     }
     mob.sleeping = sleeping;
-    if (sleeping && mob.type().path() == "villager") {
-        mob.lastSleptGameTime = world->gameTime();
-    }
     sendEntityData(*world, mob.entityId(),
                    SetEntityDataPacket::Entry{.index = SetEntityDataPacket::kPoseIndex,
                                               .value = SetEntityDataPacket::PoseValue{
@@ -357,6 +363,14 @@ void MobActionSystem::poseChanged(ServerEntity& mob) {
                    SetEntityDataPacket::Entry{.index = static_cast<std::uint8_t>(entity::taming::kFlagsIndex),
                                               .value = SetEntityDataPacket::ByteValue{
                                                   .value = static_cast<std::int8_t>(entity::taming::flagsOf(mob))}});
+    // parity: `Bat.DATA_ID_FLAGS`, whose lowest bit is resting.
+    if (mob.type().path() == "bat") {
+        sendEntityData(*world, mob.entityId(),
+                       SetEntityDataPacket::Entry{.index = kBatFlagsIndex,
+                                                  .value = SetEntityDataPacket::ByteValue{
+                                                      .value = static_cast<std::int8_t>(mob.flight.resting ? 1 : 0)}});
+        return;
+    }
     if (mob.type().path() == "cat") {
         sendEntityData(*world, mob.entityId(),
                        SetEntityDataPacket::Entry{.index = kCatLyingIndex,
@@ -442,6 +456,14 @@ void MobActionSystem::summonVexes(ServerEntity& mob, std::int32_t count) {
     }
 }
 
+            // parity: `EvokerSummonSpellGoal`: bound where it rose, and twenty to a hundred and twenty
+            // seconds to live.
+            vex->ownerId = mob.entityId();
+            vex->flight.boundOrigin = std::array<std::int32_t, 3>{static_cast<std::int32_t>(std::floor(vex->x)),
+                                                                  static_cast<std::int32_t>(std::floor(vex->y)),
+                                                                  static_cast<std::int32_t>(std::floor(vex->z))};
+            const auto roll = options_.nextDouble ? static_cast<std::int32_t>(options_.nextDouble() * 90.0) : 0;
+            vex->flight.limitedLifeTicks = 20 * (30 + roll);
 void MobActionSystem::applyEffect(std::int32_t playerId, std::string_view effect, std::int32_t durationTicks,
                                   std::int32_t amplifier) {
     for (PlayerSession* player : players_->snapshot()) {

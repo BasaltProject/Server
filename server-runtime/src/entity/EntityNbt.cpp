@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/Villagers.hpp>
 #include <basalt/server/runtime/entity/WitherBoss.hpp>
+#include <basalt/server/runtime/entity/villager/VillagerNbt.hpp>
 
 #include <algorithm>
 #include <array>
@@ -27,8 +28,6 @@ using wire::nbt::NbtTag;
 using wire::nbt::NbtType;
 
 constexpr std::string_view kMaxHealthAttribute = "minecraft:max_health";
-constexpr std::string_view kLastSleptMemory = "minecraft:last_slept";
-constexpr std::string_view kGolemDetectedMemory = "minecraft:golem_detected_recently";
 
 constexpr std::array<std::string_view, 6> kPatrollingTypes{"pillager",   "vindicator", "evoker",
                                                            "illusioner", "witch",      "ravager"};
@@ -99,38 +98,6 @@ namespace {
     static const NbtCompound empty;
     const NbtCompound* found = tag.getCompound(key);
     return found == nullptr ? empty : *found;
-}
-
-void writeVillagerGolemMemories(NbtCompound& tag, const ServerEntity& entity) {
-    NbtCompound brain = compoundOf(tag, "Brain");
-    NbtCompound memories = compoundOf(brain, "memories");
-    if (entity.lastSleptGameTime != std::numeric_limits<std::int64_t>::min()) {
-        NbtCompound slept;
-        slept.putLong("value", entity.lastSleptGameTime);
-        memories.set(kLastSleptMemory, NbtTag::ofCompound(std::move(slept)));
-    }
-    if (entity.golemDetectedTicks > 0) {
-        NbtCompound detected;
-        detected.putBoolean("value", true);
-        detected.putLong("ttl", static_cast<std::int64_t>(entity.golemDetectedTicks));
-        memories.set(kGolemDetectedMemory, NbtTag::ofCompound(std::move(detected)));
-    } else {
-        memories.remove(kGolemDetectedMemory);
-    }
-    brain.set("memories", NbtTag::ofCompound(std::move(memories)));
-    tag.set("Brain", NbtTag::ofCompound(std::move(brain)));
-}
-
-void readVillagerGolemMemories(const NbtCompound& tag, ServerEntity& entity) {
-    const NbtCompound& memories = compoundOf(compoundOf(tag, "Brain"), "memories");
-    const NbtCompound& slept = compoundOf(memories, kLastSleptMemory);
-    if (slept.contains("value")) {
-        entity.lastSleptGameTime = static_cast<std::int64_t>(numericDouble(slept, "value"));
-    }
-    const NbtCompound& detected = compoundOf(memories, kGolemDetectedMemory);
-    if (numericBoolean(detected, "value")) {
-        entity.golemDetectedTicks = numericInt(detected, "ttl");
-    }
 }
 
 /// Reads Minecraft 26.2's `AttributeInstance.Packed.LIST_CODEC` representation.
@@ -450,7 +417,7 @@ NbtCompound encode(const ServerEntity& entity) {
         villagers::writeOffers(entity, tag);
     }
     if (path == "villager") {
-        writeVillagerGolemMemories(tag, entity);
+        villager::villagerNbt::write(entity, tag);
     }
     if (entity.owner.has_value()) {
         tag.putString("Owner", *entity.owner);
@@ -626,7 +593,7 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
         entity->villagerExperience = tag.getInt("Xp");
     }
     if (path == "villager") {
-        readVillagerGolemMemories(tag, *entity);
+        villager::villagerNbt::read(tag, *entity);
         villagers::readOffers(tag, *entity);
     }
     if (const std::string_view owner = tag.getString("Owner"); !owner.empty()) {

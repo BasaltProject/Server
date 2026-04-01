@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
+#include <basalt/server/runtime/entity/villager/VillagerBrain.hpp>
 #include <basalt/wire/common/Uuid.hpp>
 
 #include <doctest.h>
@@ -328,18 +329,19 @@ TEST_CASE("an entity's uuid goes out as the four ints vanilla reads") {
 
 TEST_CASE("a villager's own memories go out and come back") {
     ServerEntity villager = entityOf("villager");
-    villager.lastSleptGameTime = 12345;
-    villager.golemDetectedTicks = 600;
+    namespace brain = basalt::server::runtime::entity::villager::villagerBrain;
+    brain::stateOf(villager).memories.lastSlept.set(12345);
+    brain::stateOf(villager).memories.golemDetectedRecently.set(true, 600);
 
     const std::unique_ptr<ServerEntity> back = entityNbt::decode(entityNbt::encode(villager), 1, 1);
 
     REQUIRE(back != nullptr);
-    CHECK(back->lastSleptGameTime == 12345);
-    CHECK(back->golemDetectedTicks == 600);
+    CHECK(brain::stateOf(*back).memories.lastSlept.value == std::optional<std::int64_t>{12345});
+    CHECK(brain::stateOf(*back).memories.golemDetectedRecently.ttl == 600);
 
-    // With nothing detected the memory is taken back out rather than written as a zero.
+    // With nothing detected the memory is left out rather than written as a zero.
     ServerEntity quiet = entityOf("villager");
-    quiet.golemDetectedTicks = 0;
+    static_cast<void>(brain::stateOf(quiet));
     const NbtCompound tag = entityNbt::encode(quiet);
     REQUIRE(tag.getCompound("Brain") != nullptr);
     CHECK_FALSE(tag.getCompound("Brain")->getCompound("memories")->contains("minecraft:golem_detected_recently"));

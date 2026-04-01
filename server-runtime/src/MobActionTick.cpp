@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
+#include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/entity/Attributes.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/FlyingMovement.hpp>
@@ -24,12 +25,14 @@
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/Precipitation.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WorldLight.hpp>
 #include <basalt/wire/common/Mth.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
+#include <basalt/wire/protocol/play/EntityPackets.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -128,19 +131,26 @@ void MobActionSystem::tickBreath(world::LoadedWorld& world, const std::vector<Pl
                                                                         world.state(), wire::common::mth::floor(mob.x),
                                                                         eyeBlockY, wire::common::mth::floor(mob.z)));
     const bool inWater = isWater(stateAt(mob.x, mob.y, mob.z));
-    // parity: `isInRain`, where the sky is open above the feet. Biome precipitation is not asked.
-    const std::int32_t bx = wire::common::mth::floor(mob.x);
-    const std::int32_t bz = wire::common::mth::floor(mob.z);
-    const server::world::Chunk* column = world.state().chunkIfLoaded(bx >> 4, bz >> 4);
-    const bool inRain = world.weather().raining && column != nullptr &&
-                        column->heightAt(bx & 15, bz & 15, server::world::HeightmapType::MotionBlocking) <=
-                            wire::common::mth::floor(mob.y);
+    const bool inRain = world::precipitation::entityInRain(world, mob.x, mob.y, mob.z, mob.height());
     const entity::mobBreathing::Surroundings at{.eyeInWater = eyeInWater,
                                                 .eyeInBubbles =
                                                     eyeBlock != nullptr && eyeBlock->path() == "bubble_column",
                                                 .inWater = inWater,
-                                                .inRain = inRain};
+                                                .inRain = inRain,
+                                                .oxygenBonus = mob.attributeWithModifiers("oxygen_bonus"),
+                                                .random = &random};
     for (const entity::mobBreathing::Hurt& owed : entity::mobBreathing::tick(mob, at)) {
+        if (owed.drownParticles) {
+            // parity: `EntityEvent.DROWN_PARTICLES`, broadcast before the hit.
+            const wire::protocol::play::EntityEventPacket event{.entityId = mob.entityId(), .eventId = 67};
+            for (PlayerSession* player : watchers) {
+                if (player->connection().sendPlayPacket) {
+                    player->connection().sendPlayPacket(
+                        wire::protocol::play::EntityEventPacket::kId,
+                        [&event](wire::io::ByteBuffer& buffer) { event.write(buffer); });
+                }
+            }
+        }
         hurt(owed.amount, owed.cause);
     }
     // parity: `Dolphin.tick`: two minutes of moisture, and the flop on dry ground.
@@ -182,13 +192,22 @@ void MobActionSystem::tickBreath(world::LoadedWorld& world, const std::vector<Pl
 
 /// parity: `LivingEntity.aiStep`'s travel half, which is not the goals': gravity, the path it is
 /// already on, and where it is looking.
-void MobActionSystem::travelMob(world::LoadedWorld& world, ServerEntity& mob, double speed) {
-    // parity: `Mob.travel`'s flying branch: what flies is never walked along a path, and the goals
-    // move it themselves, so all that is left here is the drift.
+void MobActionSystem::travelMob(world::LoadedWorld& world, ServerEntity& mob, double speed,
+                                random::RandomSource* random, const std::optional<std::array<double, 3>>& target) {
+    // parity: every flier's own move control and travel; the ones on `FlyingPathNavigation` follow
+    // their path first.
     if (entity::flyers::flies(mob.type())) {
-        entity::flyingMovement::tick(world.state(), mob);
+        if (entity::flyingMovement::usesFlyingPath(mob.type())) {
+            entity::ai::navigation::tick(world.state(), mob);
+        }
+        random::RandomSource scratch = freshRandom();
+        entity::flyingMovement::tick(world.state(), mob, random != nullptr ? *random : scratch, target);
         entity::ai::lookControl::tick(mob);
         return;
+    }
+    // parity: `Blaze.aiStep`, which falls at six tenths of the speed.
+    if (mob.type().path() == "blaze" && !mob.onGround && mob.velocityY < 0.0) {
+        mob.velocityY *= 0.6;
     }
     entity::ai::navigation::tick(world.state(), mob);
     entity::ai::moveControl::tick(world.state(), mob, speed);
@@ -198,6 +217,10 @@ void MobActionSystem::travelMob(world::LoadedWorld& world, ServerEntity& mob, do
 void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
                                 const std::vector<entity::ai::PlayerView>& views,
                                 const std::vector<ServerEntity*>& living, random::RandomSource& random) {
+    if (mob.type().path() == "villager") {
+        tickVillager(world, mob, views, living, random);
+        return;
+    }
     if (mob.goals == nullptr) {
         mob.goals = entity::ai::mobGoals::forType(mob.type());
     }
@@ -206,7 +229,7 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
     // this build has no goals for hanging in the air: a copper golem put down on a chest never fell
     // the eighth of a block onto its lid.
     if (mob.goals == nullptr) {
-        travelMob(world, mob, mob.attributeWithModifiers(entity::attribute::kMovementSpeed));
+        travelMob(world, mob, mob.attributeWithModifiers(entity::attribute::kMovementSpeed), &random);
         return;
     }
     entity::ai::MobContext context{.world = world.state(),
@@ -222,7 +245,12 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
                                    .dayTime = world.clock().totalTicks(),
                                    .gameTime = world.gameTime(),
                                    .raidNearby = raids_->raidsIn(world).nearby(mob.x, mob.y, mob.z) != nullptr,
-                                   .speed = mob.attributeWithModifiers(entity::attribute::kMovementSpeed)};
+                                   .speed = mob.attributeWithModifiers(entity::attribute::kMovementSpeed),
+                                   .skyDarken = world.skyDarken(),
+                                   .hasSkylight = config::dimensionFacts(world.declaration().dimension).hasSkylight,
+                                   .ambientLight = config::dimensionFacts(world.declaration().dimension).ambientLight,
+                                   .seaLevel = config::dimensionFacts(world.declaration().dimension).seaLevel,
+                                   .minY = config::dimensionFacts(world.declaration().dimension).chunkHeight.minY()};
     // parity: `Mob.serverAiStep`, which decides on every other tick and staggers the mobs by their
     // own id so they do not all think on the same one.
     if ((mob.tickCount + mob.entityId()) % 2 != 0) {
@@ -230,17 +258,66 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
     } else {
         mob.goals->tick(context);
     }
-    travelMob(world, mob, context.speed);
+    // parity: the target a vex faces and a blaze rises to, as it stands after the goals.
+    std::optional<std::array<double, 3>> target;
+    double targetEye = 0.0;
+    if (mob.targetId.has_value()) {
+        if (const entity::ai::PlayerView* player = context.playerById(*mob.targetId); player != nullptr) {
+            target = std::array<double, 3>{player->x, player->y, player->z};
+            targetEye = player->y + static_cast<double>(1.62F);
+        } else if (const ServerEntity* other = context.entityById(*mob.targetId); other != nullptr && !other->removed) {
+            target = std::array<double, 3>{other->x, other->y, other->z};
+            targetEye = other->y + entity::mobBreathing::eyeHeightOf(*other);
+        }
+    }
+    if (mob.type().path() == "blaze") {
+        blazeRises(mob, target.has_value() ? std::optional<double>{targetEye} : std::nullopt, random);
+    }
+    travelMob(world, mob, context.speed, &random, target);
+}
+
+void MobActionSystem::tickVexLife(const std::vector<PlayerSession*>& watchers, ServerEntity& vex) {
+    // parity: `Vex.tick`: once its life runs out, a point of starving every second. The count is
+    // kept as `life_ticks` in what it saves.
+    if (vex.flight.limitedLifeTicks < 0 && vex.sourceNbt.has_value() && vex.sourceNbt->contains("life_ticks")) {
+        vex.flight.limitedLifeTicks = vex.sourceNbt->getInt("life_ticks");
+    }
+    if (vex.flight.limitedLifeTicks < 0) {
+        return;
+    }
+    const bool due = --vex.flight.limitedLifeTicks <= 0;
+    if (!vex.sourceNbt.has_value()) {
+        vex.sourceNbt.emplace();
+    }
+    vex.sourceNbt->putInt("life_ticks", due ? 20 : vex.flight.limitedLifeTicks);
+    if (!due) {
+        return;
+    }
+    vex.flight.limitedLifeTicks = 20;
+    const entity::entityCombat::Result result =
+        entity::entityCombat::hurt(vex, 1.0F, std::nullopt, std::nullopt, hooks_.combat, "starve");
+    if (result.landed) {
+        combat_->announceEntityHit(watchers, vex, world::damageTypes::kStarve, -1, result.died);
+    }
+}
+
+/// parity: `Blaze.customServerAiStep`: a new height to keep above its target every five seconds, and
+/// a lift whenever the target's eyes are higher than that over its own.
+void MobActionSystem::blazeRises(ServerEntity& blaze, std::optional<double> targetEye, random::RandomSource& random) {
+    ServerEntity::Flight& flight = blaze.flight;
+    if (--flight.blazeHeightOffsetTicks <= 0) {
+        flight.blazeHeightOffsetTicks = 100;
+        flight.blazeHeightOffset = static_cast<float>(random.triangle(0.5, 6.891));
+    }
+    if (targetEye.has_value() && *targetEye > blaze.y + entity::mobBreathing::eyeHeightOf(blaze) +
+                                                  static_cast<double>(flight.blazeHeightOffset)) {
+        blaze.velocityY += (static_cast<double>(0.3F) - blaze.velocityY) * static_cast<double>(0.3F);
+    }
 }
 
 void MobActionSystem::activateSkeletonTrap(world::LoadedWorld& world, ServerEntity& horse,
                                            random::RandomSource& random) {
     static_cast<void>(spawning_->activateSkeletonTrap(world, horse, random));
-}
-
-void MobActionSystem::tickVillageGolem(world::LoadedWorld& world, ServerEntity& villager,
-                                       const std::vector<ServerEntity*>& living, random::RandomSource& random) {
-    spawning_->tickVillageGolem(world, villager, living, random);
 }
 
 std::int32_t MobActionSystem::lightAt(world::LoadedWorld& world, const std::array<std::int32_t, 3>& position) {

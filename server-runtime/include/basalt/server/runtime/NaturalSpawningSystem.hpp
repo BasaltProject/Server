@@ -67,9 +67,9 @@ public:
     /// The TRIGGERED rider forest created when a living player comes within ten blocks.
     bool activateSkeletonTrap(world::LoadedWorld& world, entity::ServerEntity& horse, random::RandomSource& random);
 
-    /// Villager Brain agreement and MOB_SUMMONED iron-golem placement.
-    void tickVillageGolem(world::LoadedWorld& world, entity::ServerEntity& villager,
-                          const std::vector<entity::ServerEntity*>& living, random::RandomSource& random);
+    /// parity: `SpawnUtil.trySpawnMob` with `LEGACY_IRON_GOLEM`, the golem villagers agreed on.
+    bool summonVillageGolem(world::LoadedWorld& world, const entity::ServerEntity& villager,
+                            random::RandomSource& random);
 
     /// Fills the world around the players with the mobs their biomes offer.
     ///

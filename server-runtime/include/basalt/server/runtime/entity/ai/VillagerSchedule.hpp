@@ -10,9 +10,10 @@ namespace basalt::server::runtime::entity::ai {
 /// morning, gather at the bell at midday and go to bed at dusk.
 namespace villagerSchedule {
 
-enum class Activity : std::uint8_t { Idle, Work, Meet, Rest };
+enum class Activity : std::uint8_t { Idle, Work, Meet, Rest, Play };
 
-[[nodiscard]] Activity activityAt(std::int64_t dayTime);
+/// parity: the `villager_schedule` timeline's two tracks, the baby's and the adult's.
+[[nodiscard]] Activity activityAt(std::int64_t dayTime, bool baby = false);
 
 } // namespace villagerSchedule
 

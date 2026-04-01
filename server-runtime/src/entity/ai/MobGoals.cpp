@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/entity/ai/IllagerGoals.hpp>
 #include <basalt/server/runtime/entity/ai/LongDistancePatrolGoal.hpp>
 #include <basalt/server/runtime/entity/ai/MobGoals.hpp>
+#include <basalt/server/runtime/entity/ai/PhantomGoals.hpp>
 #include <basalt/server/runtime/entity/ai/SpecialGoals.hpp>
 #include <basalt/server/runtime/entity/ai/TameGoals.hpp>
 #include <basalt/server/runtime/entity/ai/TargetGoals.hpp>
@@ -52,14 +53,6 @@ constexpr std::int32_t kFangCooldown = 100;
 constexpr std::int32_t kBlindCast = 20;
 constexpr std::int32_t kBlindCooldown = 180;
 
-/// parity: how far each flier drifts and how hard it pushes itself along, which is not the same for
-/// any two of them: the vex has its own move control, the rest fly on the 0.02 air input.
-constexpr std::int32_t kBlazeRange = 8;
-constexpr double kBlazeStep = 0.012;
-constexpr std::int32_t kVexRange = 8;
-constexpr double kVexStep = 0.03;
-constexpr std::int32_t kBatRange = 7;
-constexpr double kBatStep = 0.008;
 /// parity: `WitherBoss.registerGoals`, a shot every two seconds from twenty blocks.
 constexpr std::int32_t kWitherShotInterval = 40;
 constexpr double kWitherRange = 20.0;
@@ -163,8 +156,8 @@ std::unique_ptr<GoalSelector> mobGoals::forType(const wire::common::Identifier& 
 namespace {
 
 bool buildAnimal(GoalSelector& selector, const wire::common::Identifier& type, std::string_view path) {
-    static const Names kSlow{"goat",   "horse", "donkey", "mule", "llama",   "camel", "sniffer", "armadillo",
-                             "turtle", "panda", "fox",    "bee",  "strider", "frog",  "axolotl"};
+    static const Names kSlow{"goat",      "horse",  "donkey", "mule", "llama",   "camel", "sniffer",
+                             "armadillo", "turtle", "panda",  "fox",  "strider", "frog",  "axolotl"};
     if (path == "cow" || path == "mooshroom") {
         farmAnimal(selector, type, 2.0, 1.25, 1.25);
         return true;
@@ -257,12 +250,13 @@ bool buildTamed(GoalSelector& selector, const wire::common::Identifier& type, st
         add<NearestAttackableEntityGoal>(selector, 1, Names{"rabbit", "chicken", "tadpole"});
         return true;
     }
+    // parity: `Parrot.registerGoals`, less the shoulder and following other mobs.
     if (path == "parrot") {
         add<FloatGoal>(selector, 0);
+        add<LookAtPlayerGoal>(selector, 1, kLookFar);
         add<SitWhenOrderedToGoal>(selector, 2);
-        add<FollowOwnerGoal>(selector, 2, 1.0);
-        add<RandomStrollGoal>(selector, 3, 1.0);
-        add<LookAtPlayerGoal>(selector, 3, kLookNear);
+        add<FollowOwnerGoal>(selector, 2, 1.0, 5.0, 1.0);
+        add<HoverWanderGoal>(selector, 2);
         return true;
     }
     if (path == "polar_bear") {
@@ -467,48 +461,70 @@ bool buildIllager(GoalSelector& selector, std::string_view path) {
 }
 
 bool buildFlier(GoalSelector& selector, std::string_view path) {
+    // parity: `Ghast.registerGoals`.
     if (path == "ghast") {
-        add<FlyingWanderGoal>(selector, 5);
+        add<GhastFloatGoal>(selector, 5);
+        add<GhastLookGoal>(selector, 7);
         add<FireballAttackGoal>(selector, 7);
         add<NearestAttackablePlayerGoal>(selector, 1);
         return true;
     }
+    // parity: `Blaze.registerGoals`, walking with its own slow fall.
     if (path == "blaze") {
         add<BlazeAttackGoal>(selector, 4);
-        add<FlyingWanderGoal>(selector, 5, kBlazeRange, kBlazeStep, false);
-        add<LookAtPlayerGoal>(selector, 7, kLookFar);
+        add<RandomStrollGoal>(selector, 7, 1.0);
+        add<LookAtPlayerGoal>(selector, 8, kLookFar);
         add<RandomLookAroundGoal>(selector, 8);
         add<HurtByTargetGoal>(selector, 1);
         add<NearestAttackablePlayerGoal>(selector, 2);
         return true;
     }
     if (path == "phantom") {
-        add<SwoopAttackGoal>(selector, 1);
-        add<FlyingWanderGoal>(selector, 2);
-        add<NearestAttackablePlayerGoal>(selector, 1);
+        add<PhantomStrategyGoal>(selector, 1);
+        add<PhantomSweepGoal>(selector, 2);
+        add<PhantomCircleGoal>(selector, 3);
+        add<PhantomTargetGoal>(selector, 1);
         return true;
     }
+    // parity: `Vex.registerGoals`, less copying its owner's target.
     if (path == "vex") {
-        add<ChargeAttackGoal>(selector, 4);
-        add<FlyingWanderGoal>(selector, 9, kVexRange, kVexStep, false);
+        add<FloatGoal>(selector, 0);
+        add<VexChargeGoal>(selector, 4);
+        add<VexRandomMoveGoal>(selector, 8);
+        add<LookAtPlayerGoal>(selector, 9, kLookMeet, 1.0F);
         add<HurtByTargetGoal>(selector, 1);
-        add<NearestAttackablePlayerGoal>(selector, 2);
+        add<NearestAttackablePlayerGoal>(selector, 3);
         return true;
     }
     // parity: `WitherBoss.registerGoals`.
     if (path == "wither") {
         add<WitherDoNothingGoal>(selector, 0);
         add<RangedAttackGoal>(selector, 2, 1.0, kWitherShotInterval, kWitherShotInterval, kWitherRange);
-        add<HoverWanderGoal>(selector, 5, kBatStep);
+        add<HoverWanderGoal>(selector, 5);
         add<LookAtPlayerGoal>(selector, 6, kLookFar);
         add<RandomLookAroundGoal>(selector, 7);
         add<HurtByTargetGoal>(selector, 1);
         add<WitherTargetGoal>(selector, 2);
         return true;
     }
-    if (path == "bat" || path == "allay") {
-        add<FlyingWanderGoal>(selector, 1, kBatRange, kBatStep, false);
+    // parity: `Bat.customServerAiStep`, which is all a bat does.
+    if (path == "bat") {
+        add<BatFlightGoal>(selector, 0);
+        return true;
+    }
+    // parity: the allay's idle `RandomStroll.fly`, the same hover and air roll.
+    if (path == "allay") {
+        add<HoverWanderGoal>(selector, 1);
         add<LookAtPlayerGoal>(selector, 2, kLookFar);
+        return true;
+    }
+    // parity: `Bee.registerGoals`, less the hive, the flowers, the crops and the anger.
+    if (path == "bee") {
+        add<BreedGoal>(selector, 2, 1.0);
+        add<TemptGoal>(selector, 3, 1.25, entity::breeding::foodFor(wire::common::Identifier::vanilla("bee")));
+        add<FollowParentGoal>(selector, 5, 1.25);
+        add<HoverWanderGoal>(selector, 8, 10, true);
+        add<FloatGoal>(selector, 9);
         return true;
     }
     return false;

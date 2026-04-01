@@ -43,6 +43,10 @@ enum class Touched : std::uint8_t { Nothing, Took, Rotated };
 /// The square a frame hangs in, which is where a comparator looks for it.
 [[nodiscard]] std::array<std::int32_t, 3> squareOf(const entity::ServerEntity& frame);
 
+/// parity: `ItemFrame.createBoundingBox`: a sixteenth thick against the wall, three quarters of a
+/// block across, and the whole block while it holds a map. Min then max corner.
+[[nodiscard]] std::array<double, 6> boundingBox(const entity::ServerEntity& frame);
+
 /// parity: `ItemFrame.interact`. The stack is what the player is holding, and only one of it goes in.
 [[nodiscard]] Touched interact(entity::ServerEntity& frame, const std::optional<server::world::loot::ItemStack>& held);
 

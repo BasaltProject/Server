@@ -690,7 +690,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                                                    .nextDouble = [] { return scratchDouble(); },
                                                                    .recipes = &vanillaData_.recipes,
                                                                    .damageTypeTags = &vanillaData_.damageTypeTags,
-                                                                   .blockTags = &vanillaData_.blockTags});
+                                                                   .blockTags = &vanillaData_.blockTags,
+                                                                   .villagerTrades = &vanillaData_.villagerTrades});
     shriekers_ = std::make_unique<ShriekerSystem>(playerRegistry_, *broadcaster_, *spawning_, *mobActions_,
                                                   ShriekerSystem::Options{.nextSeed = [] { return scratchSeed(); }});
     lightning_ = std::make_unique<LightningBoltSystem>(*broadcaster_, *mobActions_);

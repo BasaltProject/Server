@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/CombatHandler.hpp>
 #include <basalt/server/runtime/CombatSystem.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
+#include <basalt/server/runtime/MapSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
@@ -73,6 +74,9 @@ constexpr std::string_view kSoundAttackSweep = "entity.player.attack.sweep";
 constexpr float kAttackExhaustion = 0.1F;
 constexpr std::int32_t kPanicTicks = 40;
 constexpr float kHalfCircle = 180.0F;
+
+/// parity: `ItemEntity`'s default pickup delay of forty ticks.
+constexpr std::int32_t kDefaultPickupDelay = 40;
 
 std::optional<Identifier> parsedOrNothing(const std::string& id) {
     const std::expected<Identifier, wire::common::IdentifierError> parsed = Identifier::parse(id);
@@ -383,6 +387,12 @@ bool CombatHandler::useItemFrame(PlayerSession& session, ServerEntity& frame) {
         item.has_value() ? std::optional{server::world::loot::ItemStack{
                                .item = *item, .count = held->count, .components = held->components}}
                          : std::nullopt;
+    // parity: `ItemFrame.interact` refuses a map that already tracks more than 256 markers.
+    if (hand.has_value() && !world::itemFrames::shownIn(frame).has_value() && owner_->options().maps != nullptr &&
+        !(frame.sourceNbt.has_value() && frame.sourceNbt->getBoolean("Fixed")) &&
+        owner_->options().maps->tooManyMarkers(hand->components)) {
+        return true;
+    }
     const world::itemFrames::Touched touched = world::itemFrames::interact(frame, hand);
     if (touched == world::itemFrames::Touched::Nothing) {
         return false;
@@ -553,8 +563,14 @@ void CombatHandler::breakFrame(PlayerSession& session, ServerEntity& frame) {
     if (shown.has_value()) {
         static_cast<void>(frame.sourceNbt->remove("Item"));
         broadcastFrame(frame);
+        // parity: `dropItem` takes the map's marker off unless drops are off, where only a frame
+        // coming down on its own does.
+        if (world->gameRules().get(world::gameRules::kEntityDrops) && owner_->options().maps != nullptr) {
+            owner_->options().maps->frameLostMap(shown->components, frame);
+        }
         if (drops) {
-            owner_->blockInteraction().spawnDroppedItem(shown->item, shown->count, frame.x, frame.y, frame.z);
+            owner_->blockInteraction().spawnDroppedItem(shown->item, shown->count, frame.x, frame.y, frame.z, 0.0, 0.0,
+                                                        0.0, kDefaultPickupDelay, shown->components);
         }
     } else {
         frame.removed = true;

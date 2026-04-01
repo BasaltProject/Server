@@ -4,9 +4,8 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobLocalDifficulty.hpp>
 #include <basalt/server/runtime/world/NaturalSpawner.hpp>
+#include <basalt/server/runtime/world/Precipitation.hpp>
 #include <basalt/server/runtime/world/SkeletonHorseTrap.hpp>
-#include <basalt/server/world/terrain/BiomeClimateData.hpp>
-#include <basalt/server/world/terrain/BiomeTemperature.hpp>
 
 #include <cmath>
 #include <cstdint>
@@ -48,23 +47,6 @@ constexpr double kHorsePushSpread = 1.1485;
                : 0.0F;
 }
 
-[[nodiscard]] bool rainingAt(LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
-    if (!world.weather().raining || !naturalSpawner::canSeeSky(world, x, y, z)) {
-        return false;
-    }
-    const server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4);
-    if (chunk == nullptr || chunk->heightAt(x & 15, z & 15, server::world::HeightmapType::MotionBlocking) > y) {
-        return false;
-    }
-    const std::optional<Identifier> biome = naturalSpawner::biomeAt(world, x, y, z);
-    if (!biome.has_value()) {
-        return false;
-    }
-    const std::string id = biome->toString();
-    return server::world::terrain::biomeClimateFor(id).hasPrecipitation &&
-           !server::world::terrain::biomeTemperature::coldEnoughToSnow(id, x, y, z);
-}
-
 MobSpawnContext contextOf(const SpawnEquipmentFinalizer& equipment, random::RandomSource& levelRandom,
                           float specialMultiplier, const std::optional<Identifier>& biome, std::int64_t gameTime,
                           std::string_view difficulty,
@@ -102,7 +84,7 @@ MobSpawnNode& createSkeleton(MobSpawnForestBuilder& builder, double x, double y,
 
 bool shouldCreateFromThunder(LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                              random::RandomSource& random) {
-    if (!rainingAt(world, x, y, z) || !world.gameRules().get(gameRules::kSpawnMobs)) {
+    if (!precipitation::rainingAt(world, x, y, z) || !world.gameRules().get(gameRules::kSpawnMobs)) {
         return false;
     }
     const server::world::Chunk* chunk = world.state().chunkIfLoaded(x >> 4, z >> 4);
