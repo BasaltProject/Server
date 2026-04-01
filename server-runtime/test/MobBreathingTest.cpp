@@ -85,7 +85,7 @@ TEST_CASE("a dolphin holds four minutes and fills up in one breath") {
 
 TEST_CASE("the eye sits where the entity type puts it, a baby's where its own dimensions do") {
     CHECK(breathing::eyeHeightOf(mobOf("zombie")) == doctest::Approx(1.74));
-    CHECK(breathing::eyeHeightOf(mobOf("pig")) == doctest::Approx(1.8 * 0.85).epsilon(1e-6));
+    CHECK(breathing::eyeHeightOf(mobOf("pig")) == doctest::Approx(0.9 * 0.85).epsilon(1e-6));
     ServerEntity calf = mobOf("cow");
     calf.age = -24000;
     CHECK(breathing::eyeHeightOf(calf) == doctest::Approx(0.69));

@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/entity/MobConversions.hpp>
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/villager/Gossips.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
@@ -98,11 +99,35 @@ bool MobActionSystem::tickConversion(world::LoadedWorld& world, const std::vecto
     }
     // parity: `ZombieVillager.finishConversion` hands the villager back everything it was.
     const wire::nbt::NbtCompound zombieData = entity::entityNbt::encode(mob);
-    return convertMob(world, watchers, mob, *due, [&zombieData](wire::nbt::NbtCompound& tag) {
+    const std::span<const std::int32_t> starter =
+        mob.sourceNbt.has_value() ? mob.sourceNbt->getIntArray("ConversionPlayer") : std::span<const std::int32_t>{};
+    std::optional<std::string> curer;
+    if (starter.size() == 4) {
+        const auto half = [&starter](std::size_t at) {
+            return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(starter[at])) << 32U) |
+                   static_cast<std::uint32_t>(starter[at + 1]);
+        };
+        const wire::common::Uuid uuid{half(0), half(2)};
+        if (players_->get(uuid) != nullptr) {
+            curer = uuid.toString();
+        }
+    }
+    return convertMob(world, watchers, mob, *due, [&zombieData, &curer](wire::nbt::NbtCompound& tag) {
         for (const std::string_view key : {"VillagerData", "Offers", "Gossips", "Xp", "VillagerDataFinalized"}) {
             if (const wire::nbt::NbtTag* value = zombieData.find(key)) {
                 tag.set(key, *value);
             }
+        }
+        // parity: `ReputationEventType.ZOMBIE_VILLAGER_CURED`, for the curer if they are still here.
+        if (curer.has_value()) {
+            entity::villager::Gossips gossips;
+            if (const wire::nbt::NbtList* old = tag.getList("Gossips"); old != nullptr) {
+                gossips.decode(*old);
+            }
+            gossips.add(*curer, entity::villager::GossipType::kMajorPositive,
+                        entity::villager::Gossips::kPerEverlastingMemory);
+            gossips.add(*curer, entity::villager::GossipType::kMinorPositive, entity::villager::Gossips::kPerEvent);
+            tag.set("Gossips", wire::nbt::NbtTag::ofList(gossips.encode()));
         }
     });
 }
@@ -249,6 +274,8 @@ bool MobActionSystem::infectVillager(world::LoadedWorld& world, const ServerEnti
             tag.putBoolean("VillagerDataFinalized", true);
         });
     if (converted) {
+        // parity: `Villager.die` has already run by the time `Zombie.killedEntity` converts it.
+        villagerDied(world, villager, zombie.uuid().toString());
         // parity: `LivingEntity.die` skips the loot and the death once the killer answers false.
         villager.killed = false;
         villager.dying = false;
@@ -339,6 +366,7 @@ void MobActionSystem::thunderHit(world::LoadedWorld& world, const std::vector<Pl
             .into = wire::common::Identifier::vanilla("witch"), .keepEquipment = false, .keepCanPickUpLoot = false};
         if (convertMob(world, watchers, mob, conversion,
                        [](wire::nbt::NbtCompound& tag) { tag.putBoolean("PersistenceRequired", true); })) {
+            releaseVillagerPois(world, mob);
             return;
         }
     }

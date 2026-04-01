@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/entity/villager/Gossips.hpp>
 #include <basalt/server/runtime/entity/villager/VillagerMemories.hpp>
 #include <basalt/server/runtime/world/Trades.hpp>
@@ -178,6 +179,13 @@ public:
     /// What `mainHand` holds changed.
     virtual void mainHandChanged(ServerEntity& mob) = 0;
 
+    /// parity: `DATA_UNHAPPY_COUNTER`, which the client counts down by itself.
+    virtual void unhappyChanged(ServerEntity& mob, std::int32_t counter) = 0;
+
+    /// parity: `LivingEntity.addEffect`.
+    virtual void addEffect(ServerEntity& mob, std::string_view effect, std::int32_t duration,
+                           std::int32_t amplifier) = 0;
+
     /// parity: `SpawnUtil.trySpawnMob` for an iron golem next to this villager.
     virtual bool summonGolem(ServerEntity& mob) = 0;
 
@@ -250,6 +258,17 @@ void curedBy(ServerEntity& villager, const std::string& playerUuid);
 
 /// parity: `Villager.getPlayerReputation`.
 [[nodiscard]] std::int32_t reputationOf(ServerEntity& villager, const std::string& playerUuid);
+
+/// parity: `Villager.mobInteract` for the hand that trades: answers whether the trading screen opens.
+[[nodiscard]] bool startTrading(ServerEntity& villager, VillagerWorld& world, std::int32_t playerId,
+                                const std::string& playerUuid, bool mainHand);
+
+/// parity: `Villager.stopTrading`, from the menu closing or the offers running dry.
+void stopTrading(ServerEntity& villager);
+
+/// parity: `Villager.rewardTradeXp` for an offer worth `experience`. Answers the orb it drops.
+[[nodiscard]] std::int32_t rewardTradeXp(ServerEntity& villager, VillagerWorld& world, std::int32_t experience,
+                                         random::RandomSource& random);
 
 /// parity: `Villager.wantsToSpawnGolem`.
 [[nodiscard]] bool wantsGolem(ServerEntity& villager, std::int64_t gameTime);

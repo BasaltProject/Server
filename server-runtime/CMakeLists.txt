@@ -42,6 +42,7 @@ basalt_module(server-runtime-core
         src/entity/FlyingMovement.cpp
         src/entity/FlyingPathFinder.cpp
         src/entity/PathTypes.cpp
+        src/entity/Shulkers.cpp
         src/entity/LivingMovement.cpp
         src/entity/PathFinder.cpp
         src/entity/Minecarts.cpp
@@ -176,6 +177,9 @@ basalt_module(server-runtime-core
         src/MobActionWarden.cpp
         src/MobDeathLoot.cpp
         src/MobActionCopperGolem.cpp
+        src/MobActionShulker.cpp
+        src/MobActionGifts.cpp
+        src/MobActionDolphin.cpp
         src/ShriekerSystem.cpp
         src/LightningBoltSystem.cpp
         src/NaturalSpawningMaterialize.cpp
@@ -479,9 +483,10 @@ basalt_module(server-runtime-core
         src/entity/ai/Controls.cpp
         src/entity/ai/FlyingGoals.cpp
         src/entity/ai/HoverWanderGoal.cpp
+        src/entity/ai/PhantomGoals.cpp
+        src/entity/ai/ShulkerGoals.cpp
         src/entity/ai/GoalSelector.cpp
         src/entity/ai/Goals.cpp
-        src/entity/ai/PhantomGoals.cpp
         src/entity/ai/IllagerGoals.cpp
         src/entity/ai/LongDistancePatrolGoal.cpp
         src/entity/ai/MobContext.cpp
@@ -500,6 +505,7 @@ basalt_module(server-runtime-core
         src/entity/villager/VillagerBrain.cpp
         src/entity/villager/VillagerHelpers.cpp
         src/entity/villager/VillagerLife.cpp
+        src/entity/villager/VillagerTrading.cpp
         src/entity/villager/VillagerNbt.cpp
         src/entity/villager/VillagerSensors.cpp
         src/entity/villager/WorkBehaviors.cpp
@@ -507,6 +513,7 @@ basalt_module(server-runtime-core
         src/entity/ai/WanderingTraderGoals.cpp
         src/entity/ai/WitherGoals.cpp
         src/entity/ai/DolphinGoals.cpp
+        src/entity/ai/DolphinItemGoals.cpp
         src/entity/ai/CatGoals.cpp
         src/entity/ai/CopperGolemGoals.cpp
         src/world/VillageDataLoader.cpp
@@ -1958,6 +1965,12 @@ basalt_test(server-runtime-shelves-test
 basalt_test(server-runtime-shulkers-test
     SOURCES
         test/ShulkersTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-shulker-mob-test
+    SOURCES
+        test/ShulkerMobTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

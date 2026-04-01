@@ -92,6 +92,10 @@ public:
 
     /// What they are riding, by entity id. parity: `Entity.vehicle`.
     std::optional<std::int32_t> vehicleId;
+    /// Where the mobs last saw them, and whether they had moved sideways since.
+    /// parity: `Entity.lastKnownSpeed` as `hasMovedHorizontallyRecently` reads it.
+    std::array<double, 2> seenAt{};
+    bool movedHorizontally = false;
     /// The bobber this player has out, by entity id. parity: `Player.fishing`.
     std::optional<std::int32_t> fishingHook;
 

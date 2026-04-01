@@ -19,6 +19,7 @@
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/Villagers.hpp>
+#include <basalt/server/runtime/entity/villager/VillagerBrain.hpp>
 #include <basalt/server/runtime/item/ItemDamageEffects.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
@@ -1941,13 +1942,13 @@ void BasaltServer::startBedrockListener() {
                     // buyer, and the book is drawn again so the used offer stops being offered.
                     if (where != nullptr) {
                         entity::ServerEntity* merchant = where->state().entity(*applied.tradedWith);
-                        if (merchant != nullptr) {
-                            merchant->villagerExperience += applied.tradeExperience;
-                            // parity: `Villager.rewardTradeXp`, three to six points at the merchant.
+                        if (merchant != nullptr && mobActions_ != nullptr) {
+                            // parity: `Villager.rewardTradeXp`, promotion included.
                             random::RandomSource random =
                                 random::RandomSource::legacy(static_cast<std::int64_t>(scratchRandom()()));
-                            orbs_->spawn(*where, merchant->x, merchant->y + 0.5, merchant->z,
-                                         world::trades::kTradeOrbBase + random.nextInt(4));
+                            const std::int32_t orb = entity::villager::villagerBrain::rewardTradeXp(
+                                *merchant, mobActions_->villagersIn(*where), applied.tradeExperience, random);
+                            orbs_->spawn(*where, merchant->x, merchant->y + 0.5, merchant->z, orb);
                         }
                     }
                     if (session->connection().sendInventoryAll) {

@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/entity/MobCategory.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/Shulkers.hpp>
 #include <basalt/server/runtime/entity/WanderingTraderLifetime.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -181,10 +182,17 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
     }
     if (!entity.noAi) {
         actions_->tickMobAi(world, entity, views, living, random);
+        if (entity.type().path() == "dolphin") {
+            actions_->dolphinPicksUp(world, entity);
+        }
         ServerEntity* partner = entity::breeding::tick(entity, living);
         if (partner != nullptr) {
             actions_->breed(world, entity, *partner);
         }
+    }
+    // parity: `Shulker.tick`, after the living entity's own turn.
+    if (entity::shulkers::isShulker(entity.type())) {
+        actions_->tickShulker(world, watchers, living, entity, random);
     }
     const std::string_view path = entity.type().path();
     if (path == "wandering_trader" || path == "trader_llama") {

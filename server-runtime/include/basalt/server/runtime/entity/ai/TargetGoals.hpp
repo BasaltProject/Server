@@ -60,6 +60,11 @@ private:
 /// as long as they are in range.
 class HurtByTargetGoal final : public Goal {
 public:
+    using Types = std::set<std::string, std::less<>>;
+
+    /// parity: the types whose hits it ignores, and `setAlertOthers` with the types it leaves out.
+    explicit HurtByTargetGoal(Types ignoreDamageFrom = {}, bool alertOthers = false, Types ignoreAlert = {});
+
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Target}; }
 
     [[nodiscard]] bool canUse(MobContext& mob) override;
@@ -69,6 +74,11 @@ public:
     void start(MobContext& mob) override;
 
     void stop(MobContext& mob) override;
+
+private:
+    Types ignoreDamageFrom_;
+    bool alertOthers_;
+    Types ignoreAlert_;
 };
 
 /// parity: `MeleeAttackGoal`: walk the target down, repath every four to ten ticks, and swing once a

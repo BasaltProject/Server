@@ -60,13 +60,13 @@ TEST_CASE("an offer runs out after its uses and a restock moves demand by how wa
     CHECK(offer.demand == 0);
 }
 
-TEST_CASE("both cost slots are priced, and only what really pays counts as payment") {
+TEST_CASE("only the first cost slot is priced, and only what really pays counts as payment") {
     Offer offer{
         .costA = stack("emerald", 2), .costB = stack("book", 1), .result = stack("enchanted_book", 1), .demand = 20};
     const auto [first, second] = trades::currentCost(offer);
     CHECK(first.count == 4);
     REQUIRE(second.has_value());
-    CHECK(second->count == 2);
+    CHECK(second->count == 1);
 
     CHECK(trades::satisfies(stack("emerald", 4), first));
     CHECK_FALSE(trades::satisfies(stack("emerald", 3), first));

@@ -2,6 +2,7 @@
 
 #include <basalt/server/runtime/entity/Aabb.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/Villagers.hpp>
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
@@ -320,6 +321,7 @@ void died(ai::MobContext& mob, VillagerWorld& world, const std::optional<std::st
         }
     }
     releaseAllPois(mob, world);
+    stopTrading(ctx.self);
 }
 
 void tick(ai::MobContext& mob, VillagerWorld& world) {
@@ -347,6 +349,9 @@ void tick(ai::MobContext& mob, VillagerWorld& world) {
             raid.has_value() && raid->active && !raid->victory && !raid->loss) {
             ctx.world.entityEvent(ctx.self, 42);
         }
+    }
+    if (state.tradingPlayer.has_value() && (ctx.self.offers == nullptr || ctx.self.offers->list.empty())) {
+        stopTrading(ctx.self);
     }
     pickUpItems(ctx);
     // parity: `Villager.tick` after the living entity's own turn.

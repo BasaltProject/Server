@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/entity/ai/CatGoals.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
+#include <basalt/server/runtime/entity/ai/SpecialGoals.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
 #include <cmath>
@@ -68,6 +69,13 @@ void setLying(MobContext& mob, bool value) {
 }
 
 [[nodiscard]] bool tame(const MobContext& mob) { return mob.mob.owner.has_value(); }
+
+void setRelaxOne(MobContext& mob, bool value) {
+    if (mob.mob.relaxOne != value) {
+        mob.mob.relaxOne = value;
+        mob.actions.poseChanged(mob.mob);
+    }
+}
 
 } // namespace
 
@@ -214,6 +222,150 @@ bool CatSitOnBlockGoal::isValidTarget(MobContext& mob, std::int32_t x, std::int3
         return part == state->properties.end() || part->second != "head";
     }
     return true;
+}
+
+namespace {
+
+/// parity: `EnvironmentAttributes.CAT_WAKING_UP_GIFT_CHANCE` on the overworld day, a constant 0.7
+/// from tick 23667 to tick 362 and nothing the rest of the day, and nothing where there is no day.
+[[nodiscard]] float giftChance(const MobContext& mob) {
+    constexpr std::int64_t kDay = 24000;
+    constexpr std::int64_t kFrom = 23667;
+    constexpr std::int64_t kUntil = 362;
+    if (!mob.hasSkylight) {
+        return 0.0F;
+    }
+    const std::int64_t time = ((mob.dayTime % kDay) + kDay) % kDay;
+    return time >= kFrom || time < kUntil ? 0.7F : 0.0F;
+}
+
+[[nodiscard]] const PlayerView* ownerOf(const MobContext& mob) {
+    if (!mob.mob.owner.has_value()) {
+        return nullptr;
+    }
+    for (const PlayerView& player : mob.players) {
+        if (player.uuid == *mob.mob.owner) {
+            return &player;
+        }
+    }
+    return nullptr;
+}
+
+} // namespace
+
+bool CatRelaxOnOwnerGoal::canUse(MobContext& mob) {
+    if (!tame(mob) || mob.mob.sitting) {
+        return false;
+    }
+    const PlayerView* owner = ownerOf(mob);
+    if (owner == nullptr) {
+        return false;
+    }
+    owner_ = owner->entityId;
+    if (!owner->sleeping || mob.distanceSquaredTo(owner->x, owner->y, owner->z) > 100.0) {
+        return false;
+    }
+    const std::array<std::int32_t, 3> at{static_cast<std::int32_t>(std::floor(owner->x)),
+                                         static_cast<std::int32_t>(std::floor(owner->y)),
+                                         static_cast<std::int32_t>(std::floor(owner->z))};
+    const std::optional<registry::BlockState> state = stateAt(mob, at[0], at[1], at[2]);
+    if (!state.has_value() || !tagged(mob, "minecraft:cats_can_lie_on", *state)) {
+        return false;
+    }
+    // parity: the foot of the bed, one step back from where it faces, or the square itself.
+    goalPos_ = at;
+    if (const auto facing = state->properties.find("facing"); facing != state->properties.end()) {
+        const std::string_view face = facing->second;
+        (*goalPos_)[0] += face == "east" ? -1 : (face == "west" ? 1 : 0);
+        (*goalPos_)[2] += face == "south" ? -1 : (face == "north" ? 1 : 0);
+    }
+    return !spaceIsOccupied(mob);
+}
+
+bool CatRelaxOnOwnerGoal::spaceIsOccupied(MobContext& mob) const {
+    if (!goalPos_.has_value()) {
+        return false;
+    }
+    for (const ServerEntity* other : mob.entities) {
+        if (other == &mob.mob || other->removed || other->type().path() != "cat" ||
+            (!other->lying && !other->relaxOne)) {
+            continue;
+        }
+        const double half = other->width() / 2.0;
+        const bool touches = other->x + half > (*goalPos_)[0] - 2.0 && other->x - half < (*goalPos_)[0] + 3.0 &&
+                             other->y + other->height() > (*goalPos_)[1] - 2.0 && other->y < (*goalPos_)[1] + 3.0 &&
+                             other->z + half > (*goalPos_)[2] - 2.0 && other->z - half < (*goalPos_)[2] + 3.0;
+        if (touches) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool CatRelaxOnOwnerGoal::canContinueToUse(MobContext& mob) {
+    const PlayerView* owner = owner_.has_value() ? mob.playerById(*owner_) : nullptr;
+    return tame(mob) && !mob.mob.sitting && owner != nullptr && owner->sleeping && goalPos_.has_value() &&
+           !spaceIsOccupied(mob);
+}
+
+void CatRelaxOnOwnerGoal::start(MobContext& mob) {
+    if (goalPos_.has_value()) {
+        setSittingPose(mob, false);
+        static_cast<void>(navigation::moveTo(mob.world, mob.mob, (*goalPos_)[0], (*goalPos_)[1], (*goalPos_)[2],
+                                             static_cast<double>(1.1F)));
+    }
+}
+
+void CatRelaxOnOwnerGoal::stop(MobContext& mob) {
+    setLying(mob, false);
+    const PlayerView* owner = owner_.has_value() ? mob.playerById(*owner_) : nullptr;
+    if (owner != nullptr && owner->sleepTicks >= 100 && mob.random.nextFloat() < giftChance(mob)) {
+        // parity: `giveMorningGift`: a hop within five blocks, then the gift where it lands.
+        std::array<double, 3> from{std::floor(mob.mob.x), std::floor(mob.mob.y), std::floor(mob.mob.z)};
+        if (mob.mob.leashHolderId.has_value()) {
+            if (const ServerEntity* holder = mob.entityById(*mob.mob.leashHolderId); holder != nullptr) {
+                from = {std::floor(holder->x), std::floor(holder->y), std::floor(holder->z)};
+            }
+        }
+        const double x = from[0] + mob.random.nextInt(11) - 5;
+        const double y = from[1] + mob.random.nextInt(5) - 2;
+        const double z = from[2] + mob.random.nextInt(11) - 5;
+        if (const std::optional<double> landing = landingFor(mob, x, y, z, "minecraft:cat_does_not_teleport_to");
+            landing.has_value() && !mob.mob.vehicleId.has_value()) {
+            mob.mob.x = x;
+            mob.mob.y = *landing;
+            mob.mob.z = z;
+            mob.mob.velocityX = 0.0;
+            mob.mob.velocityY = 0.0;
+            mob.mob.velocityZ = 0.0;
+        }
+        mob.actions.dropGift(mob.mob, "gameplay/cat_morning_gift");
+    }
+    onBedTicks_ = 0;
+    setRelaxOne(mob, false);
+    navigation::stop(mob.mob);
+}
+
+void CatRelaxOnOwnerGoal::tick(MobContext& mob) {
+    const PlayerView* owner = owner_.has_value() ? mob.playerById(*owner_) : nullptr;
+    if (owner == nullptr || !goalPos_.has_value()) {
+        return;
+    }
+    setSittingPose(mob, false);
+    static_cast<void>(navigation::moveTo(mob.world, mob.mob, (*goalPos_)[0], (*goalPos_)[1], (*goalPos_)[2],
+                                         static_cast<double>(1.1F)));
+    if (mob.distanceSquaredTo(owner->x, owner->y, owner->z) < 2.5) {
+        ++onBedTicks_;
+        if (onBedTicks_ > adjustedTickDelay(16)) {
+            setLying(mob, true);
+            setRelaxOne(mob, false);
+        } else {
+            lookControl::lookAt(mob.mob, owner->x, owner->y + owner->height * 0.9, owner->z, 45.0F, 45.0F);
+            setRelaxOne(mob, true);
+        }
+    } else {
+        setLying(mob, false);
+    }
 }
 
 } // namespace basalt::server::runtime::entity::ai

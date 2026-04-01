@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
+#include <basalt/server/runtime/VillagerTradeController.hpp>
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/player/PlayerContainers.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
@@ -360,6 +361,7 @@ void ContainerMenuController::closeOpenMenu(PlayerSession& session) {
         return;
     }
     returnCraftingGrid(session);
+    owner_->trades().menuClosed();
     const std::optional<BlockPos> closing = openedAt_;
     std::optional<BlockPos> closingSecond;
     if (openBlockSecond.has_value()) {

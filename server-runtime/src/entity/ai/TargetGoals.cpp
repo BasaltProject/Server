@@ -114,7 +114,21 @@ void NearestAttackableEntityGoal::start(MobContext& mob) {
 
 void NearestAttackableEntityGoal::stop(MobContext& mob) { mob.mob.targetId.reset(); }
 
-bool HurtByTargetGoal::canUse(MobContext& mob) { return mob.mob.hurtBy.has_value() && !mob.mob.targetId.has_value(); }
+HurtByTargetGoal::HurtByTargetGoal(Types ignoreDamageFrom, bool alertOthers, Types ignoreAlert)
+    : ignoreDamageFrom_(std::move(ignoreDamageFrom)), alertOthers_(alertOthers), ignoreAlert_(std::move(ignoreAlert)) {}
+
+bool HurtByTargetGoal::canUse(MobContext& mob) {
+    if (!mob.mob.hurtBy.has_value() || mob.mob.targetId.has_value()) {
+        return false;
+    }
+    // parity: a hit from one of the ignored types is let pass, and forgotten.
+    if (const ServerEntity* by = mob.entityById(*mob.mob.hurtBy);
+        by != nullptr && ignoreDamageFrom_.contains(by->type().path())) {
+        mob.mob.hurtBy.reset();
+        return false;
+    }
+    return true;
+}
 
 bool HurtByTargetGoal::canContinueToUse(MobContext& mob) {
     if (!mob.mob.targetId.has_value()) {
@@ -130,6 +144,29 @@ bool HurtByTargetGoal::canContinueToUse(MobContext& mob) {
 void HurtByTargetGoal::start(MobContext& mob) {
     mob.mob.targetId = mob.mob.hurtBy;
     mob.mob.hurtBy.reset();
+    if (!alertOthers_ || !mob.mob.targetId.has_value()) {
+        return;
+    }
+    // parity: `alertOthers`, the same kind within the follow range across and ten up or down that
+    // has nothing to fight yet.
+    const double within = followRange(mob);
+    for (ServerEntity* other : mob.entities) {
+        if (other == &mob.mob || other->removed || other->dying || other->type() != mob.mob.type() ||
+            other->targetId.has_value() || ignoreAlert_.contains(other->type().path())) {
+            continue;
+        }
+        if (other->x + (other->width() / 2.0) < mob.mob.x - within ||
+            other->x - (other->width() / 2.0) > mob.mob.x + 1.0 + within ||
+            other->y + other->height() < mob.mob.y - 10.0 || other->y > mob.mob.y + 11.0 ||
+            other->z + (other->width() / 2.0) < mob.mob.z - within ||
+            other->z - (other->width() / 2.0) > mob.mob.z + 1.0 + within) {
+            continue;
+        }
+        if (mob.mob.owner.has_value() && other->owner != mob.mob.owner) {
+            continue;
+        }
+        other->targetId = mob.mob.targetId;
+    }
 }
 
 void HurtByTargetGoal::stop(MobContext& mob) { mob.mob.targetId.reset(); }

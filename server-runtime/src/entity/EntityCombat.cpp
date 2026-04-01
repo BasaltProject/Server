@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/Shulkers.hpp>
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
 #include <basalt/server/runtime/entity/WitherBoss.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
@@ -91,6 +92,11 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
             return {};
         }
     }
+    // parity: `Shulker.hurtServer`, whose closed shell turns an arrow away.
+    if (entity.shulker != nullptr && entity.shulker->peek == 0 && blamed.directType.has_value() &&
+        (blamed.directType->path() == "arrow" || blamed.directType->path() == "spectral_arrow")) {
+        return {};
+    }
     // Every hit a mob takes comes through here, so this is the one place that has to ask. A plugin
     // may stop it or change how much it is worth; what it cannot do is see a hit that was never
     // going to land, which is why this is below the checks above.
@@ -124,6 +130,9 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
     if (entity.copperGolem != nullptr) {
         entity.copperGolem->pose = copperGolems::Pose::Idle;
     }
+    if (entity.shulker != nullptr) {
+        entity.shulker->struckBy = blamed.directType.has_value() ? blamed.directType->path() : std::string{};
+    }
     entity.health -= static_cast<double>(reduced);
     bool died = entity.health <= 0.0;
     if (died) {
@@ -139,7 +148,9 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
     }
     // parity: the 0.4 every hit is worth, taken before the attacker's own extra knockback.
     // parity: `EnderDragon.knockback`, which a sitting dragon ignores.
-    const bool planted = entity.dragon != nullptr && enderDragon::isSitting(entity.dragon->phase);
+    // parity: a shulker's `setDeltaMovement` does nothing, so it takes no knockback either.
+    const bool planted =
+        (entity.dragon != nullptr && enderDragon::isSitting(entity.dragon->phase)) || entity.shulker != nullptr;
     if (!cooling && !planted) {
         knockback(entity, kDefaultKnockback, sourceX.value_or(entity.x) - entity.x,
                   sourceZ.value_or(entity.z) - entity.z);
@@ -159,6 +170,10 @@ std::string hurtSound(const wire::common::Identifier& type) { return "entity." +
 std::string deathSound(const wire::common::Identifier& type) { return "entity." + type.path() + ".death"; }
 
 std::string hurtSound(const ServerEntity& entity) {
+    // parity: `Shulker.getHurtSound`, muffled with the lid shut.
+    if (entity.shulker != nullptr && entity.shulker->peek == 0) {
+        return "entity.shulker.hurt_closed";
+    }
     return entity.copperGolem != nullptr ? std::string{copperGolems::hurtSound(entity.copperGolem->weather)}
                                          : hurtSound(entity.type());
 }

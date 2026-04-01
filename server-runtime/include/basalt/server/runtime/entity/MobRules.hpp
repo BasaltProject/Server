@@ -13,11 +13,8 @@
 namespace basalt::server::runtime::entity {
 
 /// Which entity types are alive, and what they are worth to the world around them.
-///
-/// parity: `MobCategory`, straight off each `EntityType`, plus what that category does not say: a
-/// category is where a type spawns, not whether it is alive. A villager and an iron golem are
-/// `misc` because nothing spawns them in a wave, and taking that as "not a mob" left both standing
-/// still with no AI at all. What settles it is `follow_range`, which only a `Mob` has.
+/// parity: `MobCategory` off each `EntityType`; a category says where a type spawns, not whether it is
+/// alive (a villager is `misc`). Alive means having `follow_range`, which only a `Mob` has.
 namespace mobs {
 
 /// parity: `Attributes.MOVEMENT_SPEED`'s own default for a walking animal.
@@ -32,10 +29,8 @@ inline constexpr double kDefaultWalkSpeed = 0.25;
 
 /// The mobs whose size decides what they are.
 ///
-/// parity: `AbstractCubeMob.setSize`: a cube's health is the square of its size, its speed is
-/// `0.2 + 0.1 * size` and its damage is the size itself, so a small slime is not a big one with a
-/// different model. Without this a slime read the registry's own default of 0.7 and crossed a field
-/// in seconds.
+/// parity: `AbstractCubeMob.setSize`: health is the square of the size, speed `0.2 + 0.1 * size` and
+/// damage the size itself, never the registry's default speed of 0.7.
 namespace cubeMobs {
 
 /// parity: the size `/summon` gives one, which is the smallest.
@@ -102,7 +97,8 @@ namespace taming {
 inline constexpr std::int32_t kTameOdds = 3;
 
 /// parity: `TamableAnimal`'s own byte, whose bits the client reads to draw a sitting pet.
-inline constexpr std::int32_t kFlagsIndex = 17;
+/// `AgeableMob`'s baby and 26.3's `AGE_LOCKED` come first.
+inline constexpr std::int32_t kFlagsIndex = 18;
 inline constexpr std::int32_t kFlagSitting = 0x01;
 inline constexpr std::int32_t kFlagTamed = 0x04;
 
@@ -157,10 +153,8 @@ inline constexpr float kFireDamage = 1.0F;
 
 /// When a mob is forgotten for being too far from anybody.
 ///
-/// parity: `Mob.checkDespawn`. Two rules, not one: past 128 blocks it goes at once, and between 32
-/// and 128 it goes on a one in eight hundred roll, but only after ten minutes of nobody near it.
-/// Inside 32 blocks that clock is reset, which is what keeps a farm from emptying while you stand
-/// in it.
+/// parity: `Mob.checkDespawn`. Past 128 blocks it goes at once; between 32 and 128 on a one in 800
+/// roll, only after ten minutes with nobody near. Inside 32 blocks that clock resets.
 namespace mobDespawn {
 
 /// parity: the `noActionTime > 600` before the random despawn is even considered.
@@ -214,11 +208,9 @@ void tick(ServerEntity& warden);
 } // namespace wardens
 
 /// What middle-clicking an entity puts in your hand.
-///
-/// parity: `Entity.getPickResult` and its overrides: a mob answers with its own spawn egg, the
-/// things that were placed from an item answer with that item, and everything else answers with
-/// nothing. It is a list rather than "the item with the same name" on purpose: an arrow, a snowball
-/// and a lit tnt all share a name with an item and none of them can be picked.
+/// parity: `Entity.getPickResult` and overrides: a mob gives its spawn egg, things placed from an
+/// item give that item, the rest nothing. An explicit list, since an arrow, a snowball and a lit tnt
+/// share an item's name and cannot be picked.
 namespace entityPickResults {
 
 [[nodiscard]] std::optional<wire::common::Identifier> itemFor(const wire::common::Identifier& type);

@@ -166,6 +166,7 @@ void ClientSession::startOutboundLoop() {
                         chunkStreamer_->sendBudget -= static_cast<float>(chunkStreamer_->flushReadyChunks(allowed));
                     }
                     lifecycle_->tickPlayer();
+                    trades_->tick();
                     entityTracker_->syncPlayers();
                     entityTracker_->syncNpcs();
                     uiState_->syncPosture();

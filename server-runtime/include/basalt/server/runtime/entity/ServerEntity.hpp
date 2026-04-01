@@ -45,6 +45,11 @@ namespace copperGolems {
 struct GolemState;
 }
 
+namespace shulkers {
+struct ShulkerState;
+struct BulletState;
+} // namespace shulkers
+
 namespace ai {
 class GoalSelector;
 }
@@ -190,6 +195,8 @@ public:
     /// cat's block goals.
     bool sittingPose = false;
     bool lying = false;
+    /// parity: `Cat.RELAX_STATE_ONE`, the cat settling beside its sleeping owner.
+    bool relaxOne = false;
     std::optional<std::int32_t> ownerHurtBy;
     std::optional<std::int32_t> ownerHurt;
 
@@ -228,12 +235,6 @@ public:
     /// Whether it is winding up a shot. parity: `Ghast.setCharging`/`Blaze.setCharged`.
     bool charging = false;
 
-    /// How angry a warden is at each entity it has noticed, by entity id.
-    ///
-    /// parity: `AngerManagement`, and absent for everything that is not a warden: a map per entity
-    /// would cost every arrow and every item in the world one.
-    std::optional<std::map<std::int32_t, std::int32_t>> anger;
-
     /// What a flier's own move control and goals keep between ticks.
     struct Flight {
         /// parity: `GhastMoveControl.floatDuration`.
@@ -255,6 +256,12 @@ public:
         std::int32_t blazeHeightOffsetTicks = 0;
     };
     Flight flight;
+
+    /// How angry a warden is at each entity it has noticed, by entity id.
+    ///
+    /// parity: `AngerManagement`, and absent for everything that is not a warden: a map per entity
+    /// would cost every arrow and every item in the world one.
+    std::optional<std::map<std::int32_t, std::int32_t>> anger;
 
     /// parity: `MemoryModuleType.TOUCH_COOLDOWN`, the second a warden waits between shoves.
     std::int32_t touchCooldown = 0;
@@ -391,6 +398,10 @@ public:
 
     /// What a copper golem keeps beyond this, or null for anything else.
     std::shared_ptr<copperGolems::GolemState> copperGolem;
+
+    /// What a shulker and a shulker bullet keep beyond this, or null for anything else.
+    std::shared_ptr<shulkers::ShulkerState> shulker;
+    std::shared_ptr<shulkers::BulletState> bullet;
 
     /// Attribute base values that were changed from their default. parity: `AttributeMap`, without
     /// modifiers.

@@ -88,6 +88,11 @@ void EnvironmentTickSystem::tickSleep(world::LoadedWorld& world) {
             continue;
         }
         players.push_back(player);
+        // parity: `Player.tick`: the counter stops at a hundred in bed, and once up it runs on to
+        // a hundred and ten before it clears, which is the window a cat's gift is read in.
+        if (!player->sleepingBed.has_value() && player->sleepTicks > 0 && ++player->sleepTicks >= 110) {
+            player->sleepTicks = 0;
+        }
         if (player->gamemode == Gamemode::Spectator) {
             continue;
         }
@@ -96,7 +101,7 @@ void EnvironmentTickSystem::tickSleep(world::LoadedWorld& world) {
             // parity: `ServerPlayer.tick` counts this while a player is in bed. Counted here rather
             // than in the Java session's own turn because a Bedrock player has no such turn, and a
             // sleeper nobody counts never sees morning.
-            player->sleepTicks++;
+            player->sleepTicks = std::min(player->sleepTicks + 1, 100);
             sleeping.push_back(player);
         }
     }

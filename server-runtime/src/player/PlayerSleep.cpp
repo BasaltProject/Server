@@ -160,7 +160,8 @@ void wakeUpFor(const BreakContext& context, PlayerSession& player, world::Loaded
     }
     const std::array<std::int32_t, 3> bed = *player.sleepingBed;
     player.sleepingBed.reset();
-    player.sleepTicks = 0;
+    // parity: `stopSleepInBed(false, ...)`, the way out of bed that is not forced, leaves it at 100.
+    player.sleepTicks = 100;
     if (world != nullptr) {
         freeBedAt(context, *world, bed[0], bed[1], bed[2]);
     }
