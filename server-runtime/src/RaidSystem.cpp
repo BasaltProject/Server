@@ -88,22 +88,22 @@ void RaidSystem::tickRaids(world::LoadedWorld& world) {
     entity::RaidManager& manager = world.raids();
     manager.tick++;
     const bool allowed = world.gameRules().get(world::gameRules::kRaids);
-    for (const std::int32_t id : manager.tickOrder()) {
-        Raid* raid = manager.get(id);
+    manager.forEachInTickOrder([&](std::int32_t /*id*/, Raid& raid) {
         if (!allowed) {
-            raid->stop();
-            removeAllBarPlayers(world, *raid);
+            raid.stop();
+            removeAllBarPlayers(world, raid);
         }
-        if (raid->isStopped()) {
-            removeAllBarPlayers(world, *raid);
+        if (raid.isStopped()) {
+            removeAllBarPlayers(world, raid);
+            releaseRaiders(world, raid);
             if (hooks_.raidFinished) {
-                hooks_.raidFinished(world, *raid, raid->endedAs == RaidStatus::Victory);
+                hooks_.raidFinished(world, raid, raid.endedAs == RaidStatus::Victory);
             }
-            manager.remove(id);
-            continue;
+            return true;
         }
-        tickRaid(world, *raid);
-    }
+        tickRaid(world, raid);
+        return false;
+    });
     if (manager.tick % kSaveInterval == 0) {
         manager.dirty = true;
     }
@@ -112,6 +112,9 @@ void RaidSystem::tickRaids(world::LoadedWorld& world) {
 void RaidSystem::tickRaid(world::LoadedWorld& world, Raid& raid) {
     if (raid.isStopped()) {
         return;
+    }
+    if (raid.active) {
+        applyRaiderHurts(world, raid);
     }
     if (raid.status == RaidStatus::Ongoing) {
         tickOngoing(world, raid);
@@ -218,9 +221,6 @@ void RaidSystem::tickOngoing(world::LoadedWorld& world, Raid& raid) {
             raid.status = RaidStatus::Victory;
             rewardHeroes(world, raid);
         }
-    }
-    if (raid.totalRaidersAlive() > 0) {
-        updateBossbar(world, raid);
     }
     world.raids().dirty = true;
 }

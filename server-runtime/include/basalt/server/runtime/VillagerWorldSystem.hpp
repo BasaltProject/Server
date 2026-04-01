@@ -38,10 +38,14 @@ public:
     using AddEffect = std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                                          entity::ServerEntity& mob, const world::ActiveEffect& effect)>;
 
+    /// A firework rocket put in the world, from the item it was made of.
+    using LaunchFirework = std::function<void(world::LoadedWorld& world, wire::nbt::NbtCompound item, double x,
+                                              double y, double z, std::int32_t ownerId)>;
+
     VillagerWorldSystem(player::PlayerRegistry& players, BlockChangeBroadcaster& broadcaster,
                         NaturalSpawningSystem& spawning, RaidSystem& raids, world::RealLootTables& lootTables,
                         world::RealVillagerTrades* trades, std::function<std::int64_t()> nextSeed,
-                        AddEffect addEffect = {});
+                        AddEffect addEffect = {}, LaunchFirework launchFirework = {});
 
     /// The world the calls that follow are about.
     void bind(world::LoadedWorld& world) { world_ = &world; }
@@ -101,6 +105,7 @@ private:
     world::RealVillagerTrades* trades_;
     std::function<std::int64_t()> nextSeed_;
     AddEffect addEffect_;
+    LaunchFirework launchFirework_;
     world::LoadedWorld* world_ = nullptr;
 };
 

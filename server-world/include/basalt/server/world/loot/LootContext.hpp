@@ -106,6 +106,9 @@ struct LootContext {
     /// parity: `LootContextParams.TOOL`, what broke the block, and its enchantments by id.
     std::optional<wire::common::Identifier> tool;
     std::map<std::string, std::int32_t, std::less<>> toolEnchantments;
+    /// The tool's whole component patch, when the caller has it: `match_tool` then reads every part
+    /// of its predicate rather than the item and enchantments alone.
+    std::optional<wire::nbt::NbtCompound> toolComponents;
     /// parity: `LAST_DAMAGE_PLAYER`, whether a player's hit is behind the death.
     bool killedByPlayer = false;
     /// parity: `THIS_ENTITY`, `ATTACKING_ENTITY` and `DIRECT_ATTACKING_ENTITY` as a predicate sees them.

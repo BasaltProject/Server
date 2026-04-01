@@ -1,7 +1,9 @@
-#include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
+#include <basalt/server/world/loot/LootCondition.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <expected>
 #include <functional>
 #include <map>
@@ -11,7 +13,7 @@ namespace basalt::server::runtime::world {
 namespace {
 
 namespace adv = server::world::advancement;
-namespace registry = server::registry;
+namespace loot = server::world::loot;
 
 using wire::common::Identifier;
 using wire::text::Component;
@@ -22,10 +24,36 @@ using wire::text::Component;
     return Component::text("[").append(title).append(Component::text("]")).color(colour);
 }
 
+/// Criteria written before a namespace was required name their trigger bare.
+[[nodiscard]] std::string triggerKey(std::string_view trigger) {
+    return trigger.find(':') == std::string_view::npos ? "minecraft:" + std::string{trigger} : std::string{trigger};
+}
+
+[[nodiscard]] bool allPass(const std::vector<loot::LootCondition>& conditions, random::RandomSource& random,
+                           const loot::LootContext& context) {
+    return std::ranges::all_of(
+        conditions, [&random, &context](const loot::LootCondition& one) { return one.test(random, context); });
+}
+
+[[nodiscard]] bool itemPasses(const loot::ItemPredicate& predicate, const TriggerItem& item,
+                              const loot::TagLookup& tags) {
+    return predicate.test(item.item, item.components, tags, item.count);
+}
+
 } // namespace
 
 AdvancementTriggers::AdvancementTriggers(const RealAdvancements& advancements, PlayerProgress& progress, Hooks hooks)
     : advancements_(&advancements), progress_(&progress), hooks_(std::move(hooks)) {
+    tags_ = hooks_.tags;
+    if (!tags_) {
+        tags_ = [this](std::string_view registry, const Identifier& id, std::string_view tag) {
+            const std::expected<Identifier, wire::common::IdentifierError> parsed = Identifier::parse(tag);
+            if (registry == "item") {
+                return parsed.has_value() && hooks_.itemTagMembers && hooks_.itemTagMembers(*parsed).contains(id);
+            }
+            return registry == "entity_type" && hooks_.entityTagged && hooks_.entityTagged(id, tag);
+        };
+    }
     for (const Identifier& id : advancements_->ids()) {
         const adv::Advancement* advancement = advancements_->find(id);
         if (advancement == nullptr) {
@@ -50,6 +78,8 @@ AdvancementTriggers::AdvancementTriggers(const RealAdvancements& advancements, P
             } else if (criterion.condition.kind == adv::ConditionKind::RecipeUnlocked &&
                        criterion.condition.recipe.has_value()) {
                 byRecipe_[*criterion.condition.recipe].push_back(CriterionRef{.advancement = id, .criterion = name});
+            } else if (criterion.condition.kind == adv::ConditionKind::Generic) {
+                byTrigger_[criterion.trigger.toString()].push_back(CriterionRef{.advancement = id, .criterion = name});
             } else if (criterion.condition.kind != adv::ConditionKind::Unsupported) {
                 byKind_[criterion.condition.kind].push_back(CriterionRef{.advancement = id, .criterion = name});
             }
@@ -127,19 +157,6 @@ void AdvancementTriggers::onRecipeUnlocked(std::string_view player, std::string_
     }
 }
 
-bool AdvancementTriggers::matchesType(const std::vector<std::string>& wanted, const Identifier& type) const {
-    if (wanted.empty()) {
-        return true;
-    }
-    return std::ranges::any_of(wanted, [this, &type](const std::string& name) {
-        if (name.starts_with('#')) {
-            return hooks_.entityTagged && hooks_.entityTagged(type, std::string_view{name}.substr(1));
-        }
-        const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(name);
-        return id.has_value() && *id == type;
-    });
-}
-
 void AdvancementTriggers::fire(std::string_view player, std::string_view uuid, adv::ConditionKind kind,
                                const std::function<bool(const adv::CriterionCondition&)>& accepts) {
     const auto found = byKind_.find(kind);
@@ -156,58 +173,10 @@ void AdvancementTriggers::fire(std::string_view player, std::string_view uuid, a
     }
 }
 
-void AdvancementTriggers::onKilledEntity(std::string_view player, std::string_view uuid, const Identifier& victim) {
-    fire(player, uuid, adv::ConditionKind::KilledEntity, [this, &victim](const adv::CriterionCondition& condition) {
-        return matchesType(condition.entityTypes, victim);
-    });
-}
-
-void AdvancementTriggers::onTamedAnimal(std::string_view player, std::string_view uuid, const Identifier& animal) {
-    fire(player, uuid, adv::ConditionKind::TamedAnimal, [this, &animal](const adv::CriterionCondition& condition) {
-        return matchesType(condition.entityTypes, animal);
-    });
-}
-
-void AdvancementTriggers::onSummonedEntity(std::string_view player, std::string_view uuid, const Identifier& summoned) {
-    fire(player, uuid, adv::ConditionKind::SummonedEntity, [this, &summoned](const adv::CriterionCondition& condition) {
-        return matchesType(condition.entityTypes, summoned);
-    });
-}
-
-void AdvancementTriggers::onBredAnimals(std::string_view player, std::string_view uuid, const Identifier& child,
-                                        const Identifier& parent, const Identifier& partner) {
-    fire(player, uuid, adv::ConditionKind::BredAnimals,
-         [this, &child, &parent, &partner](const adv::CriterionCondition& condition) {
-             // parity: the parents are tried both ways round before the criterion is refused.
-             const bool pair =
-                 (matchesType(condition.parentTypes, parent) && matchesType(condition.partnerTypes, partner)) ||
-                 (matchesType(condition.parentTypes, partner) && matchesType(condition.partnerTypes, parent));
-             return matchesType(condition.entityTypes, child) && pair;
-         });
-}
-
-void AdvancementTriggers::onEnteredBlock(std::string_view player, std::string_view uuid, const Identifier& block) {
-    fire(player, uuid, adv::ConditionKind::EnteredBlock, [&block](const adv::CriterionCondition& condition) {
-        return condition.block.has_value() && *condition.block == block;
-    });
-}
-
 void AdvancementTriggers::onRecipeCrafted(std::string_view player, std::string_view uuid, const Identifier& recipe) {
     fire(player, uuid, adv::ConditionKind::RecipeCrafted, [&recipe](const adv::CriterionCondition& condition) {
         return condition.recipe.has_value() && *condition.recipe == recipe;
     });
-}
-
-void AdvancementTriggers::onLocation(std::string_view player, std::string_view uuid,
-                                     const std::optional<Identifier>& biome,
-                                     const std::function<bool(const Identifier&)>& insideStructure) {
-    fire(player, uuid, adv::ConditionKind::AtLocation,
-         [&biome, &insideStructure](const adv::CriterionCondition& condition) {
-             if (condition.biome.has_value()) {
-                 return biome.has_value() && *biome == *condition.biome;
-             }
-             return condition.structure.has_value() && insideStructure && insideStructure(*condition.structure);
-         });
 }
 
 void AdvancementTriggers::onContainerLoot(std::string_view player, std::string_view uuid, const Identifier& table) {
@@ -224,90 +193,206 @@ void AdvancementTriggers::onChangedDimension(std::string_view player, std::strin
     });
 }
 
-void AdvancementTriggers::onConsumedItem(std::string_view player, std::string_view uuid, const Identifier& item) {
-    fire(player, uuid, adv::ConditionKind::ConsumedItem, [this, &item](const adv::CriterionCondition& condition) {
-        return condition.matchers.empty() || matches(condition.matchers.front(), item);
-    });
+bool AdvancementTriggers::listensTo(std::string_view trigger) const { return byTrigger_.contains(triggerKey(trigger)); }
+
+void AdvancementTriggers::fire(std::string_view trigger, std::string_view player, std::string_view uuid,
+                               const TriggerEvent& event) {
+    const auto found = byTrigger_.find(triggerKey(trigger));
+    if (found == byTrigger_.end()) {
+        return;
+    }
+    // Only what is still open is worth building the player's context for; most fire every tick.
+    std::vector<std::pair<const CriterionRef*, const adv::GenericCondition*>> open;
+    for (const CriterionRef& candidate : found->second) {
+        const adv::Advancement* advancement = advancements_->find(candidate.advancement);
+        const adv::AdvancementCriterion* criterion =
+            advancement == nullptr ? nullptr : advancement->criterion(candidate.criterion);
+        if (criterion == nullptr || criterion->condition.generic == nullptr ||
+            progress_->grantedCriteria(uuid, candidate.advancement).contains(candidate.criterion)) {
+            continue;
+        }
+        open.emplace_back(&candidate, criterion->condition.generic.get());
+    }
+    if (open.empty()) {
+        return;
+    }
+    std::optional<loot::LootContext> built = hooks_.playerContext ? hooks_.playerContext(uuid) : std::nullopt;
+    loot::LootContext context = built.has_value() ? *std::move(built) : loot::LootContext{};
+    if (!context.thisEntity.has_value()) {
+        context.thisEntity = loot::EntityFacts{.type = Identifier::vanilla("player"), .scoreName = std::string{player}};
+    }
+    context.tags = tags_;
+    context.hasEntity = true;
+    const bool consumesVictims = triggerKey(trigger) == "minecraft:killed_by_arrow";
+    for (const auto& [candidate, condition] : open) {
+        if (!accepts(*condition, event, context)) {
+            continue;
+        }
+        if (!consumesVictims || condition->victims.empty()) {
+            grant(player, uuid, *candidate);
+            continue;
+        }
+        // parity: `KilledByArrowTrigger`, where each predicate takes a victim of its own.
+        std::vector<const loot::EntityFacts*> left;
+        for (const loot::EntityFacts& victim : event.victims) {
+            left.push_back(&victim);
+        }
+        random::RandomSource random = random::RandomSource::legacy(seed_.fetch_add(1));
+        loot::LootContext victimContext = context;
+        const bool all = std::ranges::all_of(condition->victims, [&](const std::vector<loot::LootCondition>& one) {
+            for (auto at = left.begin(); at != left.end(); ++at) {
+                victimContext.thisEntity = **at;
+                if (allPass(one, random, victimContext)) {
+                    left.erase(at);
+                    return true;
+                }
+            }
+            return false;
+        });
+        if (all) {
+            grant(player, uuid, *candidate);
+        }
+    }
 }
 
-bool AdvancementTriggers::matchesBlock(const adv::BlockMatcher& matcher, const std::int32_t stateId) {
-    const Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
-    if (block == nullptr) {
+bool AdvancementTriggers::accepts(const adv::DamageSourceCheck& check, const TriggerDamage& damage,
+                                  const loot::LootContext& context) const {
+    for (const auto& [tag, expected] : check.tags) {
+        const std::string_view name = std::string_view{tag}.starts_with('#') ? std::string_view{tag}.substr(1) : tag;
+        const bool carries = hooks_.damageTagged && hooks_.damageTagged(damage.type, name);
+        if (carries != expected) {
+            return false;
+        }
+    }
+    const std::optional<std::array<double, 3>> origin =
+        context.thisEntity.has_value() ? context.thisEntity->position : std::nullopt;
+    if (check.direct != nullptr && !check.direct->test(damage.direct, tags_, origin)) {
         return false;
     }
-    if (!matcher.blocks.empty() && std::ranges::find(matcher.blocks, *block) == matcher.blocks.end()) {
+    if (check.source != nullptr && !check.source->test(damage.source, tags_, origin)) {
         return false;
     }
-    if (matcher.properties.empty()) {
-        return true;
+    return !check.isDirect.has_value() || *check.isDirect == damage.directHit;
+}
+
+bool AdvancementTriggers::accepts(const adv::GenericCondition& condition, const TriggerEvent& event,
+                                  loot::LootContext& context) const {
+    const loot::EntityFacts player = *context.thisEntity;
+    const std::optional<std::array<double, 3>> here = player.position;
+    random::RandomSource random = random::RandomSource::legacy(seed_.fetch_add(1));
+    const auto entityPasses = [&](const std::vector<loot::LootCondition>& conditions, const loot::EntityFacts& entity) {
+        context.thisEntity = entity;
+        if (!context.thisEntity->placeAt) {
+            context.thisEntity->placeAt = context.placeAt;
+        }
+        const bool passed = allPass(conditions, random, context);
+        context.thisEntity = player;
+        return passed;
+    };
+    for (const auto& [field, conditions] : condition.entities) {
+        if (field == "player") {
+            if (!allPass(conditions, random, context)) {
+                return false;
+            }
+            continue;
+        }
+        const auto entity = event.entities.find(field);
+        if (entity == event.entities.end() || !entityPasses(conditions, entity->second)) {
+            return false;
+        }
     }
-    const std::map<std::string, std::string> values = registry::blockStateDefinitions::propertiesOf(stateId);
-    return std::ranges::all_of(matcher.properties, [&values](const auto& wanted) {
-        const auto found = values.find(wanted.first);
-        return found != values.end() && found->second == wanted.second;
-    });
-}
-
-void AdvancementTriggers::onPlacedBlock(std::string_view player, std::string_view uuid, const std::int32_t stateId) {
-    fire(player, uuid, adv::ConditionKind::PlacedBlock, [stateId](const adv::CriterionCondition& condition) {
-        return condition.blockMatcher.has_value() && matchesBlock(*condition.blockMatcher, stateId);
-    });
-}
-
-void AdvancementTriggers::onItemUsedOnBlock(std::string_view player, std::string_view uuid, const std::int32_t stateId,
-                                            const Identifier& item) {
-    fire(player, uuid, adv::ConditionKind::ItemUsedOnBlock,
-         [this, stateId, &item](const adv::CriterionCondition& condition) {
-             return condition.blockMatcher.has_value() && matchesBlock(*condition.blockMatcher, stateId) &&
-                    (condition.matchers.empty() || matches(condition.matchers.front(), item));
-         });
-}
-
-void AdvancementTriggers::onSleptInBed(std::string_view player, std::string_view uuid) {
-    fire(player, uuid, adv::ConditionKind::SleptInBed, [](const adv::CriterionCondition&) { return true; });
-}
-
-void AdvancementTriggers::onVillagerTrade(std::string_view player, std::string_view uuid) {
-    fire(player, uuid, adv::ConditionKind::VillagerTrade, [](const adv::CriterionCondition&) { return true; });
-}
-
-void AdvancementTriggers::onCuredZombieVillager(std::string_view player, std::string_view uuid) {
-    fire(player, uuid, adv::ConditionKind::CuredZombieVillager, [](const adv::CriterionCondition&) { return true; });
-}
-
-void AdvancementTriggers::onEnchantedItem(std::string_view player, std::string_view uuid) {
-    fire(player, uuid, adv::ConditionKind::EnchantedItem, [](const adv::CriterionCondition&) { return true; });
-}
-
-void AdvancementTriggers::onConstructedBeacon(std::string_view player, std::string_view uuid,
-                                              const std::int32_t levels) {
-    fire(player, uuid, adv::ConditionKind::ConstructedBeacon, [levels](const adv::CriterionCondition& condition) {
-        return (!condition.minLevel.has_value() || levels >= *condition.minLevel) &&
-               (!condition.maxLevel.has_value() || levels <= *condition.maxLevel);
-    });
-}
-
-void AdvancementTriggers::onInteractedWithEntity(std::string_view player, std::string_view uuid,
-                                                 const Identifier& target, const bool targetIsBaby,
-                                                 const Identifier& item) {
-    fire(player, uuid, adv::ConditionKind::InteractedWithEntity,
-         [this, &target, targetIsBaby, &item](const adv::CriterionCondition& condition) {
-             return matchesType(condition.entityTypes, target) &&
-                    (!condition.baby.has_value() || *condition.baby == targetIsBaby) &&
-                    (condition.matchers.empty() || matches(condition.matchers.front(), item));
-         });
-}
-
-void AdvancementTriggers::onFishingHooked(std::string_view player, std::string_view uuid, const Identifier& item) {
-    fire(player, uuid, adv::ConditionKind::FishingHooked, [this, &item](const adv::CriterionCondition& condition) {
-        return condition.matchers.empty() || matches(condition.matchers.front(), item);
-    });
-}
-
-void AdvancementTriggers::onFilledBucket(std::string_view player, std::string_view uuid, const Identifier& bucket) {
-    fire(player, uuid, adv::ConditionKind::FilledBucket, [this, &bucket](const adv::CriterionCondition& condition) {
-        return condition.matchers.empty() || matches(condition.matchers.front(), bucket);
-    });
+    // parity: `ChanneledLightningTrigger`, each predicate met by any victim.
+    for (const std::vector<loot::LootCondition>& victim : condition.victims) {
+        if (!std::ranges::any_of(event.victims,
+                                 [&](const loot::EntityFacts& one) { return entityPasses(victim, one); })) {
+            return false;
+        }
+    }
+    for (const auto& [field, predicate] : condition.items) {
+        const auto item = event.items.find(field);
+        if (item == event.items.end() || !itemPasses(predicate, item->second, tags_)) {
+            return false;
+        }
+    }
+    for (const auto& [field, bounds] : condition.numbers) {
+        const auto number = event.numbers.find(field);
+        if (number == event.numbers.end() || !bounds.test(number->second)) {
+            return false;
+        }
+    }
+    for (const auto& [field, wanted] : condition.ids) {
+        const auto id = event.ids.find(field);
+        const std::string_view registry = field == "potion" ? "potion" : field == "recipes" ? "recipe" : "block";
+        if (id == event.ids.end() || !loot::matchesIdsOrTag(wanted, registry, id->second, tags_)) {
+            return false;
+        }
+    }
+    if (condition.state.has_value() && !condition.state->test(event.state)) {
+        return false;
+    }
+    if (condition.distance.has_value() && (!event.startPosition.has_value() || !here.has_value() ||
+                                           !condition.distance->test(*event.startPosition, *here))) {
+        return false;
+    }
+    if (condition.startPosition != nullptr) {
+        if (!event.startPosition.has_value() || !context.placeAt) {
+            return false;
+        }
+        const std::array<double, 3>& start = *event.startPosition;
+        loot::PlaceFacts place = context.placeAt(static_cast<std::int32_t>(std::floor(start[0])),
+                                                 static_cast<std::int32_t>(std::floor(start[1])),
+                                                 static_cast<std::int32_t>(std::floor(start[2])));
+        place.exact = start;
+        if (!condition.startPosition->test(place, tags_)) {
+            return false;
+        }
+    }
+    if (!condition.effects.empty() && !loot::EntityPredicate{.effects = condition.effects}.test(player, tags_, here)) {
+        return false;
+    }
+    if (condition.damage.has_value()) {
+        const adv::DamageCheck& check = *condition.damage;
+        if (!event.damage.has_value()) {
+            return false;
+        }
+        const TriggerDamage& damage = *event.damage;
+        if (!check.dealt.test(damage.dealt) || !check.taken.test(damage.taken) ||
+            (check.blocked.has_value() && *check.blocked != damage.blocked) ||
+            (check.source != nullptr && !check.source->test(damage.source, tags_, here)) ||
+            (check.type.has_value() && !accepts(*check.type, damage, context))) {
+            return false;
+        }
+    }
+    if (condition.killingBlow.has_value() &&
+        (!event.damage.has_value() || !accepts(*condition.killingBlow, *event.damage, context))) {
+        return false;
+    }
+    // parity: `RecipeCraftedTrigger`, each predicate taking an ingredient of its own.
+    if (!condition.ingredients.empty()) {
+        std::vector<const TriggerItem*> left;
+        for (const TriggerItem& ingredient : event.ingredients) {
+            left.push_back(&ingredient);
+        }
+        for (const loot::ItemPredicate& wanted : condition.ingredients) {
+            const auto match = std::ranges::find_if(
+                left, [this, &wanted](const TriggerItem* one) { return itemPasses(wanted, *one, tags_); });
+            if (match == left.end()) {
+                return false;
+            }
+            left.erase(match);
+        }
+    }
+    if (condition.location.has_value()) {
+        if (!event.location.has_value()) {
+            return false;
+        }
+        loot::LootContext location = *event.location;
+        location.tags = tags_;
+        if (!allPass(*condition.location, random, location)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 void AdvancementTriggers::grant(std::string_view player, std::string_view uuid, const CriterionRef& candidate) {

@@ -1,9 +1,11 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/AreaEffectClouds.hpp>
+#include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
+#include <basalt/server/runtime/entity/FireworkRockets.hpp>
 #include <basalt/server/runtime/entity/FishingHooks.hpp>
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
@@ -11,6 +13,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/Shulkers.hpp>
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
+#include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/Cushions.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
@@ -467,6 +470,28 @@ std::vector<GeneratedEquipment> generatedEntityEquipment(const NbtCompound& data
 
 std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadata* previous) const {
     Entries entries;
+    // parity: `FireworkRocketEntity`'s three fields, eight to ten.
+    if (fireworkItem.has_value() && (previous == nullptr || previous->fireworkItem != fireworkItem)) {
+        entries.push_back(Entry{.index = 8, .value = SetEntityDataPacket::ItemValue{.stack = *fireworkItem}});
+    }
+    if (fireworkAttached.has_value() && (previous == nullptr || previous->fireworkAttached != fireworkAttached) &&
+        (previous != nullptr || fireworkAttached->has_value())) {
+        entries.push_back(Entry{.index = 9, .value = SetEntityDataPacket::OptionalUnsignedIntValue{*fireworkAttached}});
+    }
+    if (fireworkShotAtAngle.has_value() &&
+        (previous == nullptr || previous->fireworkShotAtAngle != fireworkShotAtAngle) &&
+        (previous != nullptr || *fireworkShotAtAngle)) {
+        entries.push_back(Entry{.index = 10, .value = SetEntityDataPacket::BoolValue{.value = *fireworkShotAtAngle}});
+    }
+    if (beeFlags.has_value() && (previous == nullptr || previous->beeFlags != beeFlags) &&
+        (previous != nullptr || *beeFlags != 0)) {
+        entries.push_back(Entry{.index = bees::kFlagsDataIndex, .value = SetEntityDataPacket::ByteValue{*beeFlags}});
+    }
+    if (beeAngerEnd.has_value() && (previous == nullptr || previous->beeAngerEnd != beeAngerEnd) &&
+        (previous != nullptr || *beeAngerEnd != -1)) {
+        entries.push_back(
+            Entry{.index = bees::kAngerEndDataIndex, .value = SetEntityDataPacket::LongValue{*beeAngerEnd}});
+    }
     if ((previous == nullptr || previous->airSupply != airSupply) &&
         (previous != nullptr || airSupply != kDefaultAirSupply)) {
         entries.push_back(
@@ -650,6 +675,29 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     }
     if (entity.dragon != nullptr) {
         live.dragonPhase = static_cast<std::int32_t>(entity.dragon->phase);
+    }
+    if (entity.bee != nullptr) {
+        live.beeFlags = bees::flagsOf(*entity.bee);
+        live.beeAngerEnd = entity.bee->angerEndTime;
+    }
+    if (entity.firework != nullptr) {
+        const wire::nbt::NbtCompound& item = entity.firework->item;
+        const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
+            wire::common::Identifier::parse(std::string{item.getString("id")});
+        const server::registry::Item* type = id.has_value() ? server::registry::items::registry().byName(*id) : nullptr;
+        if (type != nullptr) {
+            const wire::nbt::NbtCompound* components = item.getCompound("components");
+            live.fireworkItem = wire::protocol::play::WireItemStack{
+                .itemId = type->protocolId,
+                .count = item.getInt("count", 1),
+                .components = components == nullptr
+                                  ? std::vector<wire::protocol::play::ItemComponent>{}
+                                  : item::itemComponentCodecs::toWire(*components, [](const wire::common::Identifier&) {
+                                        return std::optional<std::int32_t>{};
+                                    })};
+        }
+        live.fireworkAttached = entity.firework->attachedTo;
+        live.fireworkShotAtAngle = entity.firework->shotAtAngle;
     }
     if (areaEffectClouds::isCloud(entity.type())) {
         const areaEffectClouds::Cloud cloud = areaEffectClouds::read(entity);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/plugins/PluginWorldAccess.hpp>
+#include <basalt/server/runtime/chat/ChatMessage.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
@@ -67,6 +68,10 @@ struct PlayerConnection {
     /// Sends a system message to this player. Unset, nothing is sent, which is what a session with
     /// no connection behind it does.
     std::function<void(const wire::text::Component&)> sendSystemMessage;
+
+    /// A player's message, or a disguised one for a system sender, with the chat type it is drawn
+    /// with. Unset, it goes out as the decorated line through `sendSystemMessage`.
+    std::function<void(const chat::PlayerChatMessage& message, const chat::BoundChatType& chatType)> sendChatMessage;
 
     /// Writes one play packet to this player. Unset, nothing is sent.
     ///

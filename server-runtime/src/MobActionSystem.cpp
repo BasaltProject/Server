@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
+#include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
@@ -43,6 +44,7 @@ const Identifier& playerType() {
 constexpr std::int32_t kStrayArrowTicks = 600;
 constexpr std::int32_t kBoggedArrowTicks = 100;
 constexpr std::string_view kDeathMob = "mob";
+constexpr std::string_view kDeathSting = "sting";
 
 /// parity: `PanicGoal`, which runs for as long as the last hit is remembered.
 constexpr std::int32_t kPanicTicks = 40;
@@ -126,8 +128,13 @@ MobActionSystem::MobActionSystem(player::PlayerRegistry& players, BlockChangeBro
       villagers_(std::make_unique<VillagerWorldSystem>(
           players, broadcaster, spawning, raids, lootTables, options_.villagerTrades, options_.nextSeed,
           [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
-                 entity::ServerEntity& mob, const world::ActiveEffect& effect) {
-              static_cast<void>(addMobEffect(world, watchers, mob, effect));
+                 entity::ServerEntity& mob,
+                 const world::ActiveEffect& effect) { static_cast<void>(addMobEffect(world, watchers, mob, effect)); },
+          [this](world::LoadedWorld& world, wire::nbt::NbtCompound item, double x, double y, double z,
+                 std::int32_t ownerId) {
+              if (hooks_.launchFirework) {
+                  hooks_.launchFirework(world, std::move(item), x, y, z, ownerId);
+              }
           })) {}
 
 entity::villager::VillagerWorld& MobActionSystem::villagersIn(world::LoadedWorld& world) {
@@ -225,11 +232,22 @@ void MobActionSystem::hurtPlayer(ServerEntity& mob, std::int32_t playerId, float
     if (mob.type().path() == "ravager") {
         ravagerSwings(*world, mob);
     }
+    // parity: `Bee.doHurtTarget` stings, with the whole of its attack damage cut to an int.
+    const bool bee = entity::bees::isBee(mob.type());
+    const std::int32_t invulnerableBefore = player->invulnerableTicks;
+    const float healthBefore = player->health();
+    const float lastHurtBefore = player->lastHurt;
     // parity: `Player.hurtServer`, where the difficulty decides how much of it lands.
     player->connection().hurt(
-        player::combat::afterDifficulty(damage, world->difficulty()), kDeathMob, world::damageTypes::kMobAttack,
+        player::combat::afterDifficulty(bee ? static_cast<float>(static_cast<std::int32_t>(damage)) : damage,
+                                        world->difficulty()),
+        bee ? kDeathSting : kDeathMob, bee ? world::damageTypes::kSting : world::damageTypes::kMobAttack,
         entity::DamageSource{
             .entityId = mob.entityId(), .x = mob.x, .z = mob.z, .name = entity::entityCombat::displayName(mob)});
+    if (bee && (player->invulnerableTicks != invulnerableBefore || player->health() != healthBefore ||
+                player->lastHurt != lastHurtBefore)) {
+        beeStung(*world, mob, player, nullptr);
+    }
     // parity: `OwnerHurtByTargetGoal`: a pet goes for whatever hit the person it follows.
     for (ServerEntity* pet : world->state().entities()) {
         if (pet->owner.has_value() && *pet->owner == player->uuid().toString()) {
@@ -247,10 +265,15 @@ void MobActionSystem::hurtMob(ServerEntity& mob, ServerEntity& target, float dam
         ravagerSwings(*world, mob);
     }
     entity::entityCombat::blame(target, mob.entityId(), mob.entityId(), mob.type());
+    const bool bee = entity::bees::isBee(mob.type());
     const entity::entityCombat::Result result =
-        entity::entityCombat::hurt(target, damage, mob.x, mob.z, hooks_.combat, "mob_attack", mob.type().toString());
+        entity::entityCombat::hurt(target, bee ? static_cast<float>(static_cast<std::int32_t>(damage)) : damage, mob.x,
+                                   mob.z, hooks_.combat, bee ? "sting" : "mob_attack", mob.type().toString());
     if (!result.landed) {
         return;
+    }
+    if (bee) {
+        beeStung(*world, mob, nullptr, &target);
     }
     target.hurtBy = mob.entityId();
     // parity: a tame wolf's bite counts as its owner's.
@@ -261,7 +284,8 @@ void MobActionSystem::hurtMob(ServerEntity& mob, ServerEntity& target, float dam
     }
     target.panicTicks = kPanicTicks;
     const bool infected = result.died && infectVillager(*world, mob, target);
-    combat_->announceEntityHit(watchersOf(*world), target, world::damageTypes::kMobAttack, mob.entityId(),
+    combat_->announceEntityHit(watchersOf(*world), target,
+                               bee ? world::damageTypes::kSting : world::damageTypes::kMobAttack, mob.entityId(),
                                result.died && !infected);
     // parity: `LivingEntity.hurtServer` raises `ENTITY_DAMAGE` at whoever took the hit.
     world::vibrations::emit(world->state(), "entity_damage", target.x, target.y, target.z, world->gameTime(),

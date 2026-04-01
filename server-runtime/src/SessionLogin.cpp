@@ -60,13 +60,13 @@ std::string_view reasonName(mv::ProtocolVerdict::Refused::Reason reason) {
     return "too_old";
 }
 
-/// The eight registries in `RegistryDataLoader.SYNCHRONIZED_REGISTRIES` that nothing else here
+/// The seven registries in `RegistryDataLoader.SYNCHRONIZED_REGISTRIES` that nothing else here
 /// populates yet. Sent with zero entries so the client's registry access has an entry for each,
 /// which the tags scoped to them need to resolve at all.
-constexpr std::array<std::string_view, 8> kEmptySynchronizedRegistries{
-    "minecraft:chat_type",   "minecraft:trim_pattern",     "minecraft:sulfur_cube_archetype",
-    "minecraft:enchantment", "minecraft:test_environment", "minecraft:test_instance",
-    "minecraft:dialog",      "minecraft:timeline"};
+constexpr std::array<std::string_view, 7> kEmptySynchronizedRegistries{
+    "minecraft:trim_pattern",     "minecraft:sulfur_cube_archetype", "minecraft:enchantment",
+    "minecraft:test_environment", "minecraft:test_instance",         "minecraft:dialog",
+    "minecraft:timeline"};
 
 } // namespace
 
@@ -428,6 +428,7 @@ void ClientSession::handleConfiguration(std::int32_t packetId, wire::io::ByteBuf
             wire::protocol::configuration::ClientInformationPacket::read(body);
         if (information.has_value()) {
             pendingSkinParts_ = static_cast<std::int8_t>(information->skinParts);
+            pendingChatVisibility_ = information->chatFlags;
         }
     }
 }

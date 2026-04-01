@@ -339,6 +339,19 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                          return options_.blockTags != nullptr &&
                                 world::realBlockTags::contains(*options_.blockTags, "minecraft:convertible_to_mud",
                                                                block);
+                     },
+                 .launchFirework =
+                     [this, &world](double fx, double fy, double fz, double dirX, double dirY, double dirZ,
+                                    const server::world::loot::ItemStack& stack) {
+                         if (options_.launchFirework) {
+                             options_.launchFirework(world, fx, fy, fz, dirX, dirY, dirZ, stack);
+                         }
+                     },
+                 .releaseHive =
+                     [this, &world](std::int32_t hx, std::int32_t hy, std::int32_t hz, std::int32_t stateId) {
+                         if (options_.releaseHive) {
+                             options_.releaseHive(world, hx, hy, hz, stateId);
+                         }
                      }});
             if (!result.effects.empty()) {
                 broadcaster_->sendEffects(watchers, x, y, z, world.state().blockState(x, y, z).value_or(0),

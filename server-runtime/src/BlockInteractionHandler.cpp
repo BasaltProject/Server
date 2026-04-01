@@ -9,11 +9,13 @@
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/ItemUseTimers.hpp>
+#include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/PlayerDigSpeed.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -192,6 +194,13 @@ player::BreakContext BlockInteractionHandler::breakContext() {
     context.slotChanged = [this](const PlayerSession&, const std::int32_t slot) { owner_->sendInventorySlot(slot); };
     context.stopDigging = [this] { stopDigging(); };
     context.dismount = [this](player::PlayerSession& player) { owner_->dismount(player); };
+    context.hiveBroken = [this](world::LoadedWorld& world, const PlayerSession& player, const std::int32_t x,
+                                const std::int32_t y, const std::int32_t z, const std::int32_t stateId,
+                                const wire::nbt::NbtCompound& hive, const bool silkTouch) {
+        if (MobActionSystem* mobs = owner_->options().mobs; mobs != nullptr) {
+            mobs->hiveBroken(world, player, {x, y, z}, stateId, hive, silkTouch);
+        }
+    };
     context.awardExperience = owner_->options().awardExperience;
     return context;
 }
@@ -269,6 +278,7 @@ void BlockInteractionHandler::dropHeldItem(bool all) {
                      (-std::sin(yaw) * std::cos(pitch) * kThrowSpeed) + (std::cos(tossAngle) * tossSpread),
                      (-std::sin(pitch) * kThrowSpeed) + kThrowLift + tossLift(),
                      (std::cos(yaw) * std::cos(pitch) * kThrowSpeed) + (std::sin(tossAngle) * tossSpread));
+    player::statAwards::awardThrown(*session, held->id, dropCount);
 }
 
 void BlockInteractionHandler::handlePunch() {
@@ -418,6 +428,15 @@ void BlockInteractionHandler::handlePlayerAction(const play::ServerboundPlayerAc
                 broadcastEffects(action.pos,
                                  owner_->world().blockState(action.pos.x, action.pos.y, action.pos.z).value_or(0),
                                  struck);
+            }
+            // parity: `NoteBlock.attack` counts the strike even when the block above muffles it.
+            const std::optional<std::int32_t> struckState =
+                loaded->state().blockState(action.pos.x, action.pos.y, action.pos.z);
+            const Identifier* struckBlock =
+                struckState.has_value() ? reg::blockStateDefinitions::blockOf(*struckState) : nullptr;
+            if (PlayerSession* striker = owner_->playerSession();
+                striker != nullptr && struckBlock != nullptr && struckBlock->path() == "note_block") {
+                player::statAwards::award(*striker, "play_noteblock");
             }
             // parity: `RedStoneOreBlock.attack` runs the same `interact` a right click does, so an
             // ore lights whichever button was pressed on it.

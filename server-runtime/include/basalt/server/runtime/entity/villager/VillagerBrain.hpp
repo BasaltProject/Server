@@ -68,6 +68,18 @@ struct VillagerState {
 
     Memories memories;
 
+    /// parity: `GlobalPos.dimension` for home, job site, potential job site and meeting point.
+    /// `dimension` is the world it last ticked in; a position from another one is set aside, as
+    /// vanilla's behaviours ignore it, and comes back when the villager does.
+    struct ForeignPos {
+        std::string dimension;
+        BlockPos pos;
+    };
+
+    std::string dimension;
+    std::array<std::string, 4> positionDimensions;
+    std::array<std::optional<ForeignPos>, 4> foreignPositions;
+
     /// parity: `Brain.activeActivities`, one bit per `Activity`.
     std::uint16_t active = 0;
     Activity defaultActivity = Activity::kIdle;
@@ -99,6 +111,8 @@ struct VillagerState {
     /// parity: `Villager.lastTradedPlayer`.
     std::optional<std::int32_t> lastTradedPlayer;
     std::int32_t unhappyCounter = 0;
+    /// parity: `Mob.ambientSoundTime` as trading resets it: when it was last set back.
+    std::int64_t tradeSoundTime = -1000;
     /// parity: `DATA_VILLAGER_DATA_FINALIZED`.
     bool dataFinalized = false;
     /// Set whenever the profession changes, so the brain is rebuilt before its next turn.
@@ -261,7 +275,7 @@ void curedBy(ServerEntity& villager, const std::string& playerUuid);
 
 /// parity: `Villager.mobInteract` for the hand that trades: answers whether the trading screen opens.
 [[nodiscard]] bool startTrading(ServerEntity& villager, VillagerWorld& world, std::int32_t playerId,
-                                const std::string& playerUuid, bool mainHand);
+                                const std::string& playerUuid, bool mainHand, bool* talked = nullptr);
 
 /// parity: `Villager.stopTrading`, from the menu closing or the offers running dry.
 void stopTrading(ServerEntity& villager);
@@ -269,6 +283,12 @@ void stopTrading(ServerEntity& villager);
 /// parity: `Villager.rewardTradeXp` for an offer worth `experience`. Answers the orb it drops.
 [[nodiscard]] std::int32_t rewardTradeXp(ServerEntity& villager, VillagerWorld& world, std::int32_t experience,
                                          random::RandomSource& random);
+
+/// parity: `AbstractVillager.notifyTradeUpdated`: a yes or a no, at most once a second.
+void tradeUpdated(ServerEntity& villager, VillagerWorld& world, bool validTrade, std::int64_t gameTime);
+
+/// parity: `notifyTrade`'s `ambientSoundTime = -getAmbientSoundInterval()`.
+void noteTrade(ServerEntity& villager, std::int64_t gameTime);
 
 /// parity: `Villager.wantsToSpawnGolem`.
 [[nodiscard]] bool wantsGolem(ServerEntity& villager, std::int64_t gameTime);

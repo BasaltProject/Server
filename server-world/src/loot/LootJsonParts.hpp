@@ -28,6 +28,8 @@ using Parsed = std::expected<Value, LootTableParseError>;
 [[nodiscard]] std::vector<std::string> idsOrTag(const wire::common::JsonValue* value);
 /// The `type` of a typed object, with the default namespace filled in.
 [[nodiscard]] std::optional<std::string> typeOf(const wire::common::JsonObject& object);
+[[nodiscard]] DoubleBounds doubleBounds(const wire::common::JsonValue* value);
+[[nodiscard]] LocationPredicate parseLocation(const wire::common::JsonObject* predicate);
 [[nodiscard]] ItemPredicate parseItemPredicate(const wire::common::JsonObject& object);
 [[nodiscard]] EntityPredicate parseEntityPredicate(const wire::common::JsonObject& object);
 [[nodiscard]] LevelBasedValue parseLevelBased(const wire::common::JsonValue* value);

@@ -117,6 +117,9 @@ public:
 
     void openBrewingStand(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
 
+    /// parity: `MerchantMenu`, whose three trading slots belong to the villager's trade window.
+    void openMerchantMenu(player::PlayerSession& session);
+
     /// Whether the open window is a brewing stand's, which is read off the block it belongs to.
     [[nodiscard]] bool brewingStandOpen() const;
 
@@ -357,6 +360,8 @@ private:
     bool openCartography_ = false;
     std::array<std::optional<storage::StoredItemStack>, 3> cartographySlots_;
     std::int64_t cartographySoundTime_ = -1;
+
+    bool openMerchant_ = false;
 
     bool openGrindstone_ = false;
     std::array<std::optional<storage::StoredItemStack>, 3> grindstoneSlots_;

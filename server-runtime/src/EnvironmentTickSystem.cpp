@@ -21,7 +21,6 @@
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/SkeletonHorseTrap.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
-#include <basalt/server/world/structure/StructureQueries.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -174,25 +173,11 @@ void EnvironmentTickSystem::tickLocation(world::LoadedWorld& world) {
     if (options_.advancementTriggers == nullptr || world.gameTime() % kLocationIntervalTicks != 0) {
         return;
     }
-    const server::world::structure::StructureQueries structures{
-        [&world](std::int32_t chunkX, std::int32_t chunkZ) -> const server::world::structure::ChunkStructures* {
-            const server::world::Chunk* chunk = world.state().chunkIfLoaded(chunkX, chunkZ);
-            return chunk == nullptr ? nullptr : &chunk->structures();
-        }};
+    // parity: `PlayerTrigger` as `location`: the player's own predicate, where they stand.
     for (const PlayerSession* player : players_->snapshot()) {
-        if (player->worldName != world.name()) {
-            continue;
+        if (player->worldName == world.name()) {
+            options_.advancementTriggers->fire("location", player->name(), player->uuid().toString());
         }
-        const server::world::structure::StructurePos at{static_cast<std::int32_t>(std::floor(player->x)),
-                                                        static_cast<std::int32_t>(std::floor(player->y)),
-                                                        static_cast<std::int32_t>(std::floor(player->z))};
-        // parity: `LocationPredicate` reads the biome of the block the player stands on, and asks
-        // the structure manager for a piece rather than for the start's full bounds.
-        const std::optional<wire::common::Identifier> biome = world::naturalSpawner::biomeAt(world, at.x, at.y, at.z);
-        const auto insideStructure = [&structures, &at](const wire::common::Identifier& structure) {
-            return structures.startWithPieceAt(at, structure.path()) != nullptr;
-        };
-        options_.advancementTriggers->onLocation(player->name(), player->uuid().toString(), biome, insideStructure);
     }
 }
 
@@ -200,7 +185,7 @@ void EnvironmentTickSystem::tickLocation(world::LoadedWorld& world) {
 // rather than on a clock. Asking once a tick instead grants the same criteria a moment earlier at
 // worst: what a criterion reads is the block, and a player who stands in one was moved into it.
 void EnvironmentTickSystem::tickInsideBlocks(world::LoadedWorld& world) {
-    if (options_.advancementTriggers == nullptr) {
+    if (options_.advancementTriggers == nullptr || !options_.advancementTriggers->listensTo("enter_block")) {
         return;
     }
     const auto low = [](double value) { return static_cast<std::int32_t>(std::floor(value + kInsideMargin)); };
@@ -219,7 +204,10 @@ void EnvironmentTickSystem::tickInsideBlocks(world::LoadedWorld& world) {
                     }
                     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*state);
                     if (block != nullptr) {
-                        options_.advancementTriggers->onEnteredBlock(player->name(), player->uuid().toString(), *block);
+                        options_.advancementTriggers->fire(
+                            "enter_block", player->name(), player->uuid().toString(),
+                            world::TriggerEvent{.ids = {{"block", *block}},
+                                                .state = registry::blockStateDefinitions::propertiesOf(*state)});
                     }
                 }
             }

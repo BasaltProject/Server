@@ -44,7 +44,7 @@ using wire::protocol::configuration::RegistryEntry;
 /// A registry whose entries the client reads from its own copy of the vanilla pack.
 ///
 /// parity: `RegistrySynchronization.packRegistry` leaves out the data of an entry from a pack both
-/// ends know, and these three are only ever the vanilla ones. Sorted, as data pack loading is.
+/// ends know, and these four are only ever the vanilla ones. Sorted, as data pack loading is.
 [[nodiscard]] RegistryDataPacket known(std::string registryId, std::initializer_list<std::string_view> paths) {
     RegistryDataPacket packet{.registryId = std::move(registryId), .entries = {}};
     for (const std::string_view path : paths) {
@@ -66,6 +66,11 @@ std::vector<RegistryDataPacket> packets() {
         biomes.entries.push_back(entryOf(entry.path, vanillaBiomes::toNbt(entry)));
     }
     all.push_back(std::move(biomes));
+    // parity: right after the biomes, as `SYNCHRONIZED_REGISTRIES` lists it. Their order is what a
+    // chat packet's chat type number refers to.
+    all.push_back(
+        known("minecraft:chat_type", {"chat", "emote_command", "msg_command_incoming", "msg_command_outgoing",
+                                      "say_command", "team_msg_command_incoming", "team_msg_command_outgoing"}));
 
     all.push_back(variants("minecraft:banner_pattern", vanillaRegistryData::bannerPatterns(),
                            vanillaRegistryData::bannerPattern));
@@ -114,6 +119,7 @@ std::vector<RegistryDataPacket> packets() {
                          "flow",   "friend", "guster",  "heart", "heartbreak", "howl",  "miner",  "mourner",
                          "plenty", "prize",  "scrape",  "sheaf", "shelter",    "skull", "snort"}));
     all.push_back(known("minecraft:block_transformer", {"axe", "hoe", "shovel"}));
+
     all.push_back(known("minecraft:worldgen/block_state_provider",
                         {"cave_vines_body", "cave_vines_head", "flower_flower_forest", "flower_meadow", "flower_plain",
                          "mangrove_propagule", "podzol_beneath_tree", "soil_beneath_tree"}));

@@ -2,6 +2,7 @@
 
 #include <basalt/server/registry/ItemFood.hpp>
 #include <basalt/server/runtime/EntityVisibilityTracker.hpp>
+#include <basalt/server/runtime/chat/SecureChat.hpp>
 #include <basalt/server/runtime/config/UiConfigs.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/net/ProxyLogin.hpp>
@@ -98,6 +99,7 @@ class CombatSystem;
 class EndFightSystem;
 class FishingSystem;
 class MapSystem;
+class FireworkSystem;
 class WitherSystem;
 class MobActionSystem;
 class ExplosionSystem;
@@ -234,6 +236,10 @@ public:
         const wire::multiversion::SubstitutionLabels* substitutionLabels = nullptr;
         /// The server's own RSA pair, which only online mode uses.
         const wire::auth::SessionKeyPair* keyPair = nullptr;
+        /// Mojang's keys a chat session is checked against, and `enforceSecureProfile()` as vanilla
+        /// works it out: the setting, online mode and keys to check with.
+        const wire::auth::ServicesKeySet* servicesKeys = nullptr;
+        bool enforceSecureProfile = false;
         /// The bars `/bossbar` keeps, which a joining player is shown.
         const command::commands::BossBarRegistry* bossBars = nullptr;
         /// Which client versions may in. Defaults to this build's own and nothing else.
@@ -259,6 +265,8 @@ public:
         MapSystem* maps = nullptr;
         /// What a wither skull set down may build.
         WitherSystem* withers = nullptr;
+        /// The rockets in flight, which a player launches by hand or rides on.
+        FireworkSystem* fireworks = nullptr;
         /// What a mob does when something is used on it.
         MobActionSystem* mobs = nullptr;
         /// Experience left as orbs at a point.
@@ -519,9 +527,27 @@ private:
     /// Runs `work` on the owner of the world this player is in, or here when there is none yet.
     void onOwner(std::function<void()> work);
 
-    void broadcastChat(const std::string& message);
+    /// The chat packets, answering whether `packetId` was one. In `SessionChat.cpp`.
+    bool handleChatPacket(std::int32_t packetId, wire::io::ByteBuffer& body);
 
-    void runCommand(const std::string& command);
+    /// parity: `tryHandleChat`: illegal characters disconnect, a hidden chat refuses a message.
+    [[nodiscard]] bool tryHandleChat(const std::string& message, bool isCommand);
+
+    void broadcastChat(const chat::PlayerChatMessage& message);
+
+    void runCommand(const std::string& command, const chat::SignedArguments* signedArguments = nullptr);
+
+    void runSignedCommand(const wire::protocol::play::SignedChatCommandPacket& packet,
+                          const std::vector<chat::MessageSignature>& lastSeen);
+
+    /// parity: `sendPlayerChatMessage` and `sendDisguisedChatMessage`, as this client reads them.
+    void deliverChat(const chat::PlayerChatMessage& message, const chat::BoundChatType& chatType);
+
+    /// parity: `detectRateSpam`, which spares operators.
+    void detectSpam(chat::ChatThrottle& throttle);
+
+    /// A client older than this build, whose chat is translated rather than signed.
+    [[nodiscard]] bool translatedClient() const;
 
     void sendSuggestions(const wire::protocol::play::CommandSuggestionRequestPacket& request);
 
@@ -621,6 +647,11 @@ private:
     std::vector<std::uint8_t> challenge_;
     std::optional<wire::auth::SessionProfile> pendingProfile_;
     std::int8_t pendingSkinParts_ = static_cast<std::int8_t>(0x7F);
+    std::int32_t pendingChatVisibility_ = 0;
+    /// This connection's secure chat, from the moment there is a player to sign for.
+    std::unique_ptr<chat::SecureChat> secureChat_;
+    chat::ChatThrottle chatSpam_;
+    chat::ChatThrottle commandSpam_;
     std::optional<wire::auth::forwarding::ForwardingResult> forwardedHandshake_;
     /// Sent from the tick thread, accepted on the network one.
     std::mutex teleportMutex_;

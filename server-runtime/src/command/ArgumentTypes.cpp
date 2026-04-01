@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/CommandEnvironment.hpp>
 #include <basalt/server/runtime/command/EntitySelector.hpp>
+#include <basalt/server/runtime/command/MessageArguments.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/text/ComponentJson.hpp>
@@ -224,19 +225,27 @@ private:
     std::int32_t min_;
 };
 
-/// Everything left on the line. `minecraft:message` reads the same text; what makes it a distinct
-/// type is that vanilla resolves `@selector` mentions and signs it, neither of which exists yet
-/// (documented gap, same as signed chat).
+/// Everything left on the line. `minecraft:message` reads the same text, but checks its length and
+/// selectors and is signed by the client.
 class RestOfLineArgument final : public ArgumentType {
 public:
     explicit RestOfLineArgument(bool asMessage) : asMessage_(asMessage) {}
 
-    [[nodiscard]] Parsed<ArgumentValue> parse(StringReader& reader, const CommandSource&,
-                                              const CommandEnvironment&) const override {
+    [[nodiscard]] Parsed<ArgumentValue> parse(StringReader& reader, const CommandSource& source,
+                                              const CommandEnvironment& environment) const override {
+        if (asMessage_) {
+            Parsed<std::string> message = messageArguments::parse(reader, source, environment);
+            if (!message.has_value()) {
+                return std::unexpected{message.error()};
+            }
+            return ArgumentValue::of(std::move(*message));
+        }
         std::string text = reader.remaining();
         reader.setCursor(static_cast<std::int32_t>(reader.string().size()));
         return ArgumentValue::of(std::move(text));
     }
+
+    [[nodiscard]] bool signable() const override { return asMessage_; }
 
     [[nodiscard]] ArgumentParser wire() const override {
         if (asMessage_) {

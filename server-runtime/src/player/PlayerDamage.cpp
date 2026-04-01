@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/DamageProtection.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -33,6 +34,9 @@
 
 namespace basalt::server::runtime::player {
 namespace {
+
+/// parity: the `3.4028235E37F` every damage statistic stays under.
+constexpr float kLargestCountedDamage = 3.4028235E37F;
 
 /// parity: `setLastHurtByPlayer(player, 100)`.
 constexpr std::int32_t kPlayerHitMemoryTicks = 100;
@@ -168,6 +172,8 @@ attackerAnswers(const PlayerSession& session, std::int32_t attackerId, const Dam
         return {};
     }
     const float blocked = damage;
+    // parity: `BlocksAttacks.hurtBlockingItem`, every blocked hit before any wear.
+    statAwards::used(session, shield->id);
     // parity: `ItemDamageFunction`, nothing under three and the floor of one plus the hit above it.
     if (blocked >= kShieldWearThreshold && session.gamemode != wire::protocol::play::Gamemode::Creative) {
         random::RandomSource random = random::RandomSource::legacy(static_cast<std::int64_t>(std::random_device{}()));
@@ -185,6 +191,10 @@ attackerAnswers(const PlayerSession& session, std::int32_t attackerId, const Dam
         }
         if (!worn.has_value()) {
             playAround(session, "item.shield.break", 0.8F, context);
+            statAwards::itemBroken(session, shield->id,
+                                   slot == PlayerInventory::kOffhandSlot ? statAwards::kBreakOffHand
+                                                                         : statAwards::kBreakMainHand,
+                                   context.registry);
         }
     }
     Blocked answer{.amount = blocked, .pushed = false};
@@ -293,7 +303,8 @@ void shove(const PlayerSession& session, const entity::shieldBlows::Push& push) 
 } // namespace
 
 float damageAfterProtection(const PlayerSession& session, const float amount,
-                            const std::optional<Identifier>& damageType, const DamageContext& context) {
+                            const std::optional<Identifier>& damageType, const DamageContext& context,
+                            float* resisted) {
     const world::realDamageTypeTags::TagMembers* tags = context.damageTypeTags;
     if (tags == nullptr || !damageType.has_value()) {
         return amount;
@@ -330,7 +341,11 @@ float damageAfterProtection(const PlayerSession& session, const float amount,
     const auto resistance = session.effects.find(world::mobEffects::resistance());
     if (resistance != session.effects.end() &&
         !world::realDamageTypeTags::isIn(*tags, world::realDamageTypeTags::kBypassesResistance, *damageType)) {
+        const float before = damage;
         damage = player::combat::afterResistance(damage, resistance->second.amplifier);
+        if (resisted != nullptr) {
+            *resisted = before - damage;
+        }
     }
     if (damage <= 0.0F ||
         world::realDamageTypeTags::isIn(*tags, world::realDamageTypeTags::kBypassesEnchantments, *damageType)) {
@@ -400,7 +415,15 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
         session->lastHurt = dealt;
         session->invulnerableTicks = kHurtCooldownTicks;
     }
-    const float afterArmour = damageAfterProtection(*session, incoming, damageType, context);
+    float resisted = 0.0F;
+    const float afterArmour = damageAfterProtection(*session, incoming, damageType, context, &resisted);
+    // parity: `getDamageAfterMagicAbsorb` and `hurtServer`, both in tenths of a heart.
+    if (resisted > 0.0F && resisted < kLargestCountedDamage) {
+        statAwards::award(*session, "damage_resisted", std::lround(resisted * 10.0F));
+    }
+    if (blocked.amount > 0.0F && blocked.amount < kLargestCountedDamage) {
+        statAwards::award(*session, "damage_blocked_by_shield", std::lround(blocked.amount * 10.0F));
+    }
     if (!cooling) {
         // parity: `BlocksAttacks.onBlocked` plays the block instead of the damage event.
         if (blocked.amount > 0.0F) {
@@ -421,6 +444,9 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
     }
     // parity: `LivingEntity.hurt` takes it out of absorption first, and only the rest off health.
     const float absorbed = std::min(session->absorption, afterArmour);
+    if (absorbed > 0.0F && absorbed < kLargestCountedDamage) {
+        statAwards::award(*session, "damage_absorbed", std::lround(absorbed * 10.0F));
+    }
     if (absorbed > 0.0F) {
         session->absorption -= absorbed;
         if (session->connection().syncAbsorption) {
@@ -431,14 +457,24 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
     if (damage <= 0.0F) {
         return;
     }
-    // parity: `resolvePlayerResponsibleForDamage`, a player's hit remembered for a hundred ticks.
+    // parity: `resolvePlayerResponsibleForDamage`, a player's hit remembered for a hundred ticks,
+    // and `setLastHurtByMob` for anything else that hit them.
     if (source.has_value() && context.registry != nullptr) {
+        const std::int32_t responsible = source->ownerId.value_or(source->entityId);
+        bool byPlayer = false;
         for (const PlayerSession* other : context.registry->snapshot()) {
-            if (other->entityId() == source->ownerId.value_or(source->entityId)) {
+            if (other->entityId() == responsible) {
                 session->lastHurtByPlayerId = other->entityId();
                 session->lastHurtByPlayerTime.store(kPlayerHitMemoryTicks);
+                byPlayer = true;
                 break;
             }
+        }
+        world::LoadedWorld* world = context.world ? context.world() : nullptr;
+        const entity::ServerEntity* mob = byPlayer || world == nullptr ? nullptr : world->state().entity(responsible);
+        if (mob != nullptr) {
+            session->lastHurtByMobType = mob->type();
+            session->lastHurtByMobTime.store(kPlayerHitMemoryTicks);
         }
     }
     session->stats.addDamageTaken(damage);

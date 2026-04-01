@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/command/CommandSource.hpp>
 #include <basalt/server/runtime/command/commands/BossBarCommand.hpp>
 #include <basalt/server/runtime/player/PlayerBooks.hpp>
+#include <basalt/server/runtime/player/PlayerGliding.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
@@ -98,7 +99,8 @@ play::PlayerInfoEntry entryFor(const PlayerSession& player) {
                                  .name = player.name(),
                                  .listed = true,
                                  .gamemode = player.gamemode,
-                                 .properties = player.profileProperties};
+                                 .properties = player.profileProperties,
+                                 .chatSession = player.chatSession()};
 }
 
 /// The protocol ids of every item the ingredients name, each once.
@@ -180,40 +182,7 @@ void ClientSession::sendStonecutterRecipes() {
     sendCompressed(play::UpdateRecipesPacket::kId, [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
 }
 
-void ClientSession::broadcastChat(const std::string& message) {
-    PlayerSession* session = playerSession_.get();
-    if (session == nullptr) {
-        return;
-    }
-    std::string spoken = message;
-    if (options_.plugins.chatAllowed && !options_.plugins.chatAllowed(*session, spoken)) {
-        return;
-    }
-    // The console line is `<Name> message`, which is what vanilla logs: its own chat type decorates
-    // the message the same way before it reaches the log.
-    const wire::text::Component text =
-        wire::text::Component::text("<" + session->name() + "> " + spoken).color(wire::text::kWhite);
-    logger_.info([this, &text] { return wire::text::resolvePlainText(text, consoleLang()); });
-    if (options_.playerRegistry == nullptr) {
-        return;
-    }
-    // Through the connection's own way of saying something rather than through a Java packet: a
-    // Bedrock player is in this registry too, and that edition writes its chat differently. For a
-    // Java player the two are the same call.
-    for (const PlayerSession* player : options_.playerRegistry->snapshot()) {
-        if (player->connection().sendSystemMessage) {
-            player->connection().sendSystemMessage(text);
-            continue;
-        }
-        if (player->connection().sendPlayPacket) {
-            player->connection().sendPlayPacket(play::SystemChatPacket::kId, [&text](wire::io::ByteBuffer& buffer) {
-                play::SystemChatPacket{.content = text, .isActionBar = false}.write(buffer);
-            });
-        }
-    }
-}
-
-void ClientSession::runCommand(const std::string& command) {
+void ClientSession::runCommand(const std::string& command, const chat::SignedArguments* signedArguments) {
     PlayerSession* session = playerSession_.get();
     command::CommandDispatcher* dispatcher = options_.commands;
     if (session == nullptr || dispatcher == nullptr) {
@@ -227,7 +196,7 @@ void ClientSession::runCommand(const std::string& command) {
     // an operator watching the console should see what players are running, and console output is
     // not part of protocol parity.
     logger_.info([session, &line] { return session->name() + " issued server command: /" + line; });
-    command::PlayerCommandSource source{*session, dispatcher->environment().groups()};
+    command::PlayerCommandSource source{*session, dispatcher->environment().groups(), signedArguments};
     dispatcher->execute(source, line);
 }
 
@@ -256,6 +225,9 @@ player::PlayerConnection ClientSession::playerConnection() {
         return enchantments == nullptr ? std::nullopt : enchantments->protocolIdOf(name);
     };
     connection.sendSystemMessage = [this](const wire::text::Component& message) { sendPluginText(message, false); };
+    connection.sendChatMessage = [this](const chat::PlayerChatMessage& message, const chat::BoundChatType& chatType) {
+        deliverChat(message, chatType);
+    };
     connection.sendPlayPacket = [this](std::int32_t id, const std::function<void(wire::io::ByteBuffer&)>& write) {
         sendPlayPacket(id, write);
     };
@@ -535,8 +507,11 @@ void ClientSession::enterPlay() {
             .name = property.name, .value = property.value, .signature = property.signature});
     }
     session->skinParts = pendingSkinParts_;
+    session->chatVisibility.store(static_cast<PlayerSession::ChatVisibility>(std::clamp(pendingChatVisibility_, 0, 2)));
     playerSession_ = std::move(session);
     PlayerSession& player = *playerSession_;
+    secureChat_ = std::make_unique<chat::SecureChat>(
+        player.uuid(), options_.enforceSecureProfile && !translatedClient(), options_.servicesKeys);
 
     std::vector<std::string> worldNames;
     worldNames.reserve(options_.worlds.size());
@@ -559,7 +534,7 @@ void ClientSession::enterPlay() {
                               // was restored above.
                               .spawnInfo = spawnInfo(player.gamemode),
                               .onlineMode = online,
-                              .enforcesSecureChat = false}
+                              .enforcesSecureChat = options_.enforceSecureProfile && !translatedClient()}
             .write(buffer);
     });
 
@@ -733,27 +708,7 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         }
         return;
     }
-    if (packetId == play::ChatMessagePacket::kId) {
-        const std::optional<play::ChatMessagePacket> chat = play::ChatMessagePacket::read(body);
-        if (chat.has_value()) {
-            broadcastChat(chat->message);
-        }
-        return;
-    }
-    if (packetId == play::ChatCommandPacket::kId) {
-        const std::optional<play::ChatCommandPacket> command = play::ChatCommandPacket::read(body);
-        if (command.has_value()) {
-            runCommand(command->command);
-        }
-        return;
-    }
-    // A command carrying signed arguments. Nothing verifies the signatures yet, so it runs exactly
-    // like its unsigned form.
-    if (packetId == play::SignedChatCommandPacket::kId) {
-        const std::optional<play::SignedChatCommandPacket> command = play::SignedChatCommandPacket::read(body);
-        if (command.has_value()) {
-            runCommand(command->command);
-        }
+    if (handleChatPacket(packetId, body)) {
         return;
     }
     if (packetId == play::CommandSuggestionRequestPacket::kId) {
@@ -798,6 +753,8 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
                 options_.plugins.sprintChanged(*session, true);
             }
             session->sprinting = true;
+        } else if (command->action == play::PlayerCommandPacket::Action::StartFallFlying && session != nullptr) {
+            player::gliding::startFallFlying(*session);
         } else if (command->action == play::PlayerCommandPacket::Action::StopSprinting && session != nullptr) {
             if (options_.plugins.sprintChanged) {
                 options_.plugins.sprintChanged(*session, false);
@@ -972,6 +929,11 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         }
         const auto skinParts = static_cast<std::int8_t>(information->skinParts);
         pendingSkinParts_ = skinParts;
+        pendingChatVisibility_ = information->chatFlags;
+        if (session != nullptr) {
+            session->chatVisibility.store(
+                static_cast<PlayerSession::ChatVisibility>(std::clamp(information->chatFlags, 0, 2)));
+        }
         if (session != nullptr && session->skinParts != skinParts) {
             session->skinParts = skinParts;
             const play::SetEntityDataPacket metadata =

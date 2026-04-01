@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerBlockToggle.hpp>
 #include <basalt/server/runtime/player/PlayerFaces.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/DaylightDetectors.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -55,7 +56,7 @@ std::int32_t frameDirectionData(const std::string_view facing) {
 } // namespace
 
 bool tuneNoteBlockFor(const BreakContext& context, world::LoadedWorld& world, const std::int32_t x,
-                      const std::int32_t y, const std::int32_t z) {
+                      const std::int32_t y, const std::int32_t z, PlayerSession* player) {
     // parity: `NoteBlock.useWithoutItem`, which moves the note on one and plays it.
     const std::optional<world::BlockChange> change = world::noteBlocks::tune(world.state(), x, y, z);
     if (!change.has_value()) {
@@ -68,11 +69,15 @@ bool tuneNoteBlockFor(const BreakContext& context, world::LoadedWorld& world, co
     if (context.blocks != nullptr) {
         context.blocks->sendEffects(playersIn(context, world.name()), x, y, z, change->stateId, change->effects);
     }
+    if (player != nullptr) {
+        statAwards::award(*player, "tune_noteblock");
+    }
     return true;
 }
 
 bool ringBellFor(const BreakContext& context, world::LoadedWorld& world, const std::int32_t x, const std::int32_t y,
-                 const std::int32_t z, const wire::protocol::play::Direction face, const float clickY) {
+                 const std::int32_t z, const wire::protocol::play::Direction face, const float clickY,
+                 PlayerSession* player) {
     const std::optional<std::int32_t> stateId = world.state().blockState(x, y, z);
     if (!stateId.has_value() || face == wire::protocol::play::Direction::Up ||
         face == wire::protocol::play::Direction::Down || clickY > kBellHitTop) {
@@ -99,6 +104,9 @@ bool ringBellFor(const BreakContext& context, world::LoadedWorld& world, const s
     context.blocks->sendEffects(playersIn(context, world.name()), x, y, z, *stateId, effects);
     // parity: `BellBlockEntity.triggerEvent` over `updateEntities`, every villager in earshot.
     VillagerWorldSystem::alertVillagers(world, x, y, z);
+    if (player != nullptr) {
+        statAwards::award(*player, "bell_ring");
+    }
     return true;
 }
 

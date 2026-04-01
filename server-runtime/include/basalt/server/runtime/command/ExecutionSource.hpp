@@ -58,6 +58,9 @@ public:
 
     [[nodiscard]] const ExecutionSource* asExecution() const override { return this; }
 
+    /// parity: a modified `CommandSourceStack` keeps the signing context it came from.
+    [[nodiscard]] const chat::SignedArguments* signedArguments() const override { return base_->signedArguments(); }
+
     [[nodiscard]] world::LoadedWorld* world() const noexcept { return world_; }
 
     [[nodiscard]] std::pair<float, float> rotation() const override { return rotation_; }

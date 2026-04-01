@@ -7,9 +7,11 @@
 #include <doctest.h>
 
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -828,4 +830,64 @@ TEST_CASE("an explorer map is drawn by whoever answers the context, and dropped 
     CHECK(seen.zoom == 1);
     CHECK(seen.searchRadius == 50);
     CHECK_FALSE(seen.skipExistingChunks);
+}
+
+TEST_CASE("an entity predicate reads equipment, flags, distance, footing and what rides it") {
+    using basalt::wire::common::Identifier;
+    const auto conditionOf = [](std::string_view text) {
+        const std::expected<basalt::wire::common::JsonValue, basalt::wire::common::JsonError> json =
+            basalt::wire::common::parseJson(text);
+        REQUIRE(json.has_value());
+        const std::expected<LootCondition, LootTableParseError> condition = lootTableJson::parseCondition(*json);
+        REQUIRE(condition.has_value());
+        return *condition;
+    };
+    rng::RandomSource random = rng::RandomSource::legacy(1);
+    // A raid captain's banner, by its exact component, as `voluntary_exile` asks for it.
+    const LootCondition captain = conditionOf(R"({"type":"minecraft:entity_properties","entity":"this",
+        "predicate":{"minecraft:equipment":{"head":{"items":"minecraft:white_banner",
+        "components":{"minecraft:banner_patterns":[{"color":"cyan","pattern":"minecraft:rhombus"}]}}}}})");
+    basalt::wire::nbt::NbtCompound layer;
+    layer.putString("color", "cyan");
+    layer.putString("pattern", "minecraft:rhombus");
+    basalt::wire::nbt::NbtCompound banner;
+    banner.set("minecraft:banner_patterns",
+               basalt::wire::nbt::NbtTag::ofList(basalt::wire::nbt::NbtList{
+                   basalt::wire::nbt::NbtType::Compound, {basalt::wire::nbt::NbtTag::ofCompound(layer)}}));
+    EntityFacts pillager{.type = Identifier::vanilla("pillager")};
+    pillager.equipment.emplace("head", EquippedItem{.item = Identifier::vanilla("white_banner"), .components = banner});
+    CHECK(captain.test(random, LootContext{.thisEntity = pillager}));
+    pillager.equipment.at("head").components = {};
+    CHECK_FALSE(captain.test(random, LootContext{.thisEntity = pillager}));
+
+    // parity: `DistancePredicate` measures from the origin, horizontally here.
+    const LootCondition far = conditionOf(R"({"type":"minecraft:entity_properties","entity":"this",
+        "predicate":{"minecraft:distance":{"horizontal":{"min":50.0}},"minecraft:flags":{"is_on_ground":true}}})");
+    EntityFacts skeleton{.type = Identifier::vanilla("skeleton"), .position = std::array<double, 3>{30.0, 64.0, 40.0}};
+    skeleton.flags.emplace("is_on_ground", true);
+    LootContext context{.thisEntity = skeleton};
+    context.origin = std::array<double, 3>{0.0, 64.0, 0.0};
+    CHECK(far.test(random, context));
+    context.origin = std::array<double, 3>{10.0, 64.0, 10.0};
+    CHECK_FALSE(far.test(random, context));
+
+    // parity: `SteppingOnPredicate` reads the square under the feet, and only on the ground.
+    const LootCondition powder = conditionOf(R"({"type":"minecraft:entity_properties","entity":"this",
+        "predicate":{"minecraft:stepping_on":{"block":{"blocks":"minecraft:powder_snow"}}}})");
+    EntityFacts walker{.type = Identifier::vanilla("player"), .position = std::array<double, 3>{0.5, 70.0, 0.5}};
+    walker.placeAt = [](std::int32_t, std::int32_t y, std::int32_t) {
+        return PlaceFacts{.block = Identifier::vanilla(y == 69 ? "powder_snow" : "air")};
+    };
+    CHECK_FALSE(powder.test(random, LootContext{.thisEntity = walker}));
+    walker.flags.emplace("is_on_ground", true);
+    CHECK(powder.test(random, LootContext{.thisEntity = walker}));
+
+    const LootCondition goatBoat = conditionOf(R"({"type":"minecraft:entity_properties","entity":"this",
+        "predicate":{"minecraft:vehicle":{"minecraft:entity_type":"minecraft:oak_boat",
+        "minecraft:passenger":{"minecraft:entity_type":"minecraft:goat"}}}})");
+    auto boat = std::make_shared<EntityFacts>(EntityFacts{.type = Identifier::vanilla("oak_boat")});
+    boat->passengers.push_back(std::make_shared<const EntityFacts>(EntityFacts{.type = Identifier::vanilla("goat")}));
+    EntityFacts rider{.type = Identifier::vanilla("player")};
+    rider.vehicleFacts = boat;
+    CHECK(goatBoat.test(random, LootContext{.thisEntity = rider}));
 }

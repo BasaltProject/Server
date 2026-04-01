@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/runtime/world/Beehives.hpp>
 #include <basalt/server/runtime/world/Explosions.hpp>
 #include <basalt/server/runtime/world/Rails.hpp>
 
@@ -193,10 +194,20 @@ std::vector<Broken> explode(WorldState& world, std::int32_t minY, std::int32_t m
         if (!stateId.has_value() || *stateId == registry::blocks::air().stateId) {
             continue;
         }
+        std::optional<wire::nbt::NbtCompound> hive;
+        if (const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*stateId);
+            block != nullptr && beehives::isHive(block->path())) {
+            const server::world::Chunk* chunk = world.chunkIfLoaded(bx >> 4, bz >> 4);
+            const server::world::ChunkBlockEntity* entity =
+                chunk == nullptr ? nullptr : chunk->blockEntityAt(bx & 15, by, bz & 15);
+            if (entity != nullptr) {
+                hive = entity->data();
+            }
+        }
         if (!world.setBlockState(bx, by, bz, registry::blocks::air().stateId)) {
             continue;
         }
-        broken.push_back(Broken{.x = bx, .y = by, .z = bz, .stateId = *stateId});
+        broken.push_back(Broken{.x = bx, .y = by, .z = bz, .stateId = *stateId, .hive = std::move(hive)});
     }
     return broken;
 }

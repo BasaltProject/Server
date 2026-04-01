@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
 #include <basalt/server/runtime/world/SummonAwards.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 
 namespace basalt::server::runtime::world::summonAwards {
 
@@ -26,7 +27,8 @@ void award(AdvancementTriggers* triggers, const std::vector<player::PlayerSessio
         const entity::Aabb theirs = entity::Aabb::of(player->x, player->y, player->z, blockPlacement::kPlayerWidth,
                                                      blockPlacement::kPlayerHeight);
         if (around.intersects(theirs)) {
-            triggers->onSummonedEntity(player->name(), player->uuid().toString(), summoned.type());
+            triggers->fire("summoned_entity", player->name(), player->uuid().toString(),
+                           TriggerEvent{.entities = {{"entity", triggerFacts::ofEntity(summoned)}}});
         }
     }
 }

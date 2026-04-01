@@ -4,10 +4,12 @@
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
+#include <basalt/server/runtime/VillagerTradeController.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerPick.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 
@@ -137,6 +139,7 @@ void ContainerMenuController::handleContainerClick(const ServerboundContainerCli
             const storage::StoredItemStack carried = *carriedItem_;
             const std::int32_t thrown = button == kRightButton ? 1 : carried.count;
             dropStack(*session, withCount(carried, thrown));
+            player::statAwards::awardThrown(*session, carried.id, thrown);
             const std::int32_t left = carried.count - thrown;
             carriedItem_ = left <= 0 ? std::nullopt : std::optional{withCount(carried, left)};
             sendInventory();
@@ -186,6 +189,7 @@ void ContainerMenuController::handleContainerClick(const ServerboundContainerCli
             takeCraftingResult(*session);
             if (carriedItem_.has_value()) {
                 dropStack(*session, *carriedItem_);
+                player::statAwards::awardThrown(*session, carriedItem_->id, carriedItem_->count);
             }
             carriedItem_ = previouslyCarried;
             break;
@@ -198,6 +202,7 @@ void ContainerMenuController::handleContainerClick(const ServerboundContainerCli
         // Button 0 is `Q`, button 1 is ctrl+`Q`: one item or the whole stack.
         const std::int32_t thrown = button == 0 ? 1 : stack->count;
         dropStack(*session, withCount(*stack, thrown));
+        player::statAwards::awardThrown(*session, stack->id, thrown);
         const std::int32_t left = stack->count - thrown;
         writeSlot(*session, *slot, left <= 0 ? std::nullopt : std::optional{withCount(*stack, left)});
         break;
@@ -450,6 +455,13 @@ void ContainerMenuController::quickMove(PlayerSession& session, const MenuSlot& 
         return;
     }
 
+    // parity: `MerchantMenu.quickMoveStack`: the result trades again and again, and the inventory
+    // only ever moves within itself, never into the payment slots.
+    const auto* merchantSlot = std::get_if<player::menuSlot::Block>(&slot);
+    if (openMerchant_ && merchantSlot != nullptr && merchantSlot->index == VillagerTradeController::kResult) {
+        owner_->trades().quickMoveResult(session);
+        return;
+    }
     const std::optional<storage::StoredItemStack> stack = readSlot(session, slot);
     if (!stack.has_value()) {
         return;
@@ -463,7 +475,7 @@ void ContainerMenuController::quickMove(PlayerSession& session, const MenuSlot& 
         return;
     }
     std::vector<MenuSlot> targets;
-    if (fromInventory != nullptr && hasBlockSlots()) {
+    if (fromInventory != nullptr && hasBlockSlots() && !openMerchant_) {
         for (std::int32_t index = 0; index < openBlockSize; index++) {
             targets.emplace_back(player::menuSlot::Block{index});
         }

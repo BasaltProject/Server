@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 
 #include <array>
 #include <expected>
@@ -17,55 +18,13 @@
 namespace basalt::server::runtime {
 namespace {
 
-/// The damage type behind the name `entityCombat::hurt` was given, where the two differ.
-[[nodiscard]] wire::common::Identifier damageTypeOf(std::string_view cause) {
-    if (cause == "attack" || cause == "sweep") {
-        return wire::common::Identifier::vanilla("player_attack");
-    }
-    if (cause == "projectile") {
-        return wire::common::Identifier::vanilla("arrow");
-    }
-    return wire::common::Identifier::vanilla(std::string{cause});
-}
-
 using ::basalt::server::world::loot::EntityFacts;
 using entity::ServerEntity;
 using player::PlayerSession;
 using wire::common::Identifier;
 
-/// parity: `DyeColor`, in the order a sheep's `Color` byte counts them.
-constexpr std::array<std::string_view, 16> kDyeColors{"white", "orange", "magenta",    "light_blue", "yellow", "lime",
-                                                      "pink",  "gray",   "light_gray", "cyan",       "purple", "blue",
-                                                      "brown", "green",  "red",        "black"};
-
 [[nodiscard]] EntityFacts factsOf(const world::LoadedWorld& world, const ServerEntity& entity) {
-    EntityFacts facts{.type = entity.type(),
-                      .onFire = entity.fireTicks > 0,
-                      .baby = entity.age < 0,
-                      .cubeSize = entity.cubeSize,
-                      .captain = entity.patrolLeader,
-                      .scoreName = entity.uuid().toString()};
-    const std::string_view path = entity.type().path();
-    if (entity.sourceNbt.has_value()) {
-        const wire::nbt::NbtCompound& data = *entity.sourceNbt;
-        if (path == "sheep") {
-            facts.components.emplace("minecraft:sheep/color",
-                                     std::string{kDyeColors[static_cast<std::size_t>(data.getByte("Color") & 0x0F)]});
-            facts.sheared = data.getBoolean("Sheared");
-        } else if (path == "mooshroom") {
-            facts.components.emplace("minecraft:mooshroom/variant",
-                                     data.getString("Type").empty() ? "red" : std::string{data.getString("Type")});
-        }
-        facts.baby = facts.baby || data.getBoolean("IsBaby");
-    } else if (path == "sheep") {
-        facts.components.emplace("minecraft:sheep/color", "white");
-    }
-    if (entity.vehicleId.has_value()) {
-        if (const ServerEntity* vehicle = world.state().entity(*entity.vehicleId); vehicle != nullptr) {
-            facts.vehicle = vehicle->type();
-        }
-    }
-    return facts;
+    return world::triggerFacts::ofEntity(world, entity);
 }
 
 void addHeld(EntityFacts& facts, const std::optional<storage::StoredItemStack>& held) {
@@ -102,7 +61,7 @@ void addHeld(EntityFacts& facts, const std::optional<storage::StoredItemStack>& 
     tables->prepareAt(context, world, dead.x, dead.y, dead.z);
     // parity: `damage_source_properties` reads the source of the killing blow, by its damage type.
     if (!dead.lastDamageCause.empty() && options_.damageTypeTags != nullptr) {
-        const Identifier type = damageTypeOf(dead.lastDamageCause);
+        const Identifier type = world::triggerFacts::damageTypeOf(dead.lastDamageCause);
         context.damageType = type;
         context.damageTagged = [tags = options_.damageTypeTags, type](std::string_view tag) {
             const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(tag);

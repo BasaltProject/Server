@@ -44,6 +44,10 @@ struct Hooks {
     std::function<void(const ServerEntity& entity, const std::optional<std::string>& attackerName)> died;
 };
 
+/// A clock that ticks once per hit on a raider and once per raid bar refresh, so the raid can tell
+/// which came last.
+[[nodiscard]] std::int64_t nextRaidBarStamp();
+
 /// Hurts `entity` for `amount`, pushed away from the source, answering what happened.
 ///
 /// parity: `LivingEntity.hurtServer`. The cooldown is the part worth naming: inside it only a bigger

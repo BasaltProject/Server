@@ -1,6 +1,8 @@
 #include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
+#include <basalt/server/runtime/entity/FireworkRockets.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -372,6 +374,12 @@ NbtCompound encode(const ServerEntity& entity) {
     if (path == "wither_skull") {
         tag.putBoolean("dangerous", entity.dangerousSkull);
     }
+    if (path == "firework_rocket") {
+        fireworkRockets::write(entity, tag);
+    }
+    if (path == "bee") {
+        bees::write(entity, tag);
+    }
     if (patrols(path)) {
         if (entity.patrolTarget.has_value()) {
             tag.putIntArray("patrol_target", {entity.patrolTarget->begin(), entity.patrolTarget->end()});
@@ -383,7 +391,7 @@ NbtCompound encode(const ServerEntity& entity) {
         // parity: `Raider.addAdditionalSaveData`; the raid id only while that raid is still saved.
         tag.putInt("Wave", entity.raidWave);
         tag.putBoolean("CanJoinRaid", entity.canJoinRaid);
-        if (entity.raidId.has_value()) {
+        if (entity.raidId.has_value() && !entity.raidStale) {
             tag.putInt("RaidId", *entity.raidId);
         } else {
             tag.remove("RaidId");
@@ -564,6 +572,9 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
         entity->wither->random = random::RandomSource::legacy(entity->entityId());
     }
     entity->dangerousSkull = path == "wither_skull" && numericBoolean(tag, "dangerous");
+    if (path == "firework_rocket") {
+        fireworkRockets::read(tag, *entity);
+    }
     entity->breedCooldown = std::max(entity->age, 0);
     if (patrols(path)) {
         if (const std::span<const std::int32_t> target = tag.getIntArray("patrol_target"); target.size() >= 3) {

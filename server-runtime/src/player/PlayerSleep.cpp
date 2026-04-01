@@ -133,7 +133,7 @@ std::optional<world::BedProblem> sleepInBedFor(const SleepContext& context, Play
     // spawn point: a straw bed counts the night and grants nothing.
     player.stats.increment(storage::stats::custom(straw ? "sleep_in_straw_bed" : "sleep_in_bed"));
     if (setsSpawn && context.blocks.triggers != nullptr) {
-        context.blocks.triggers->onSleptInBed(player.name(), player.uuid().toString());
+        context.blocks.triggers->fire("slept_in_bed", player.name(), player.uuid().toString());
     }
     showSleeping(context.blocks, player, world, head);
     return std::nullopt;

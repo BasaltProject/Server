@@ -83,8 +83,17 @@ inline const wire::common::Identifier kPlayerAttack = wire::common::Identifier::
 /// parity: `DamageTypes.MOB_ATTACK`, what a mob that walked up to you deals.
 inline const wire::common::Identifier kMobAttack = wire::common::Identifier::vanilla("mob_attack");
 
+/// parity: `DamageTypes.STING`, a bee's.
+inline const wire::common::Identifier kSting = wire::common::Identifier::vanilla("sting");
+
+/// parity: `DamageTypes.GENERIC`, what a bee that has lost its sting dies of.
+inline const wire::common::Identifier kGeneric = wire::common::Identifier::vanilla("generic");
+
 /// parity: `DamageTypes.ENDER_PEARL`, the five points a pearl costs whoever threw it.
 inline const wire::common::Identifier kEnderPearl = wire::common::Identifier::vanilla("ender_pearl");
+
+/// parity: `DamageTypes.FIREWORKS`, a rocket's stars, blamed on whoever set it off.
+inline const wire::common::Identifier kFireworks = wire::common::Identifier::vanilla("fireworks");
 
 /// parity: `DamageTypes.ARROW`, which blames whoever shot it.
 inline const wire::common::Identifier kArrow = wire::common::Identifier::vanilla("arrow");

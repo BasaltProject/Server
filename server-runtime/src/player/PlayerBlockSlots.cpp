@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/player/PlayerFaces.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/ChiseledBookshelves.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
@@ -254,6 +255,8 @@ bool useJukeboxFor(const BreakContext& context, PlayerSession& player, world::Lo
     }
     spendOne(context, player, heldSlot, *held);
     notifyAround(context, world, x, y, z, std::nullopt);
+    // parity: `JukeboxPlayable.tryInsertIntoJukebox`.
+    statAwards::award(player, "play_record");
     return true;
 }
 

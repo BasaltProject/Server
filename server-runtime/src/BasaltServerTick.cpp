@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/entity/DeathDrops.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
+#include <basalt/server/runtime/entity/FireworkRockets.hpp>
 #include <basalt/server/runtime/entity/Minecarts.hpp>
 #include <basalt/server/runtime/entity/MobCombat.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
@@ -33,7 +34,9 @@
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
+#include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
 #include <algorithm>
@@ -313,31 +316,74 @@ void BasaltServer::tickPrimedTnt(world::LoadedWorld& world) {
     }
 }
 
+world::TriggerDamage BasaltServer::killingBlowOf(const world::LoadedWorld& world, const entity::ServerEntity& dead) {
+    world::TriggerDamage blow{.type = world::triggerFacts::damageTypeOf(dead.lastDamageCause)};
+    const auto factsOf = [this, &world](std::int32_t id) -> std::optional<server::world::loot::EntityFacts> {
+        for (const player::PlayerSession* player : playerRegistry_.snapshot()) {
+            if (player->entityId() == id) {
+                return world::triggerFacts::ofPlayer(*player);
+            }
+        }
+        const entity::ServerEntity* mob = world.state().entity(id);
+        return mob == nullptr ? std::nullopt : std::optional{world::triggerFacts::ofEntity(world, *mob)};
+    };
+    const entity::ServerEntity::Blame& blame = dead.lastBlame;
+    if (blame.causingId.has_value()) {
+        blow.source = factsOf(*blame.causingId);
+    }
+    if (blame.directId.has_value()) {
+        blow.direct = factsOf(*blame.directId);
+    }
+    if (!blow.direct.has_value() && blame.directType.has_value()) {
+        blow.direct = server::world::loot::EntityFacts{.type = *blame.directType};
+    }
+    blow.directHit = blame.causingId.has_value() && blame.causingId == blame.directId;
+    return blow;
+}
+
 void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& region) {
     for (entity::ServerEntity* dead : world.state().entities()) {
         if (!dead->killed || !region.ownsPosition(dead->x, dead->z)) {
             continue;
         }
         dead->killed = false;
-        // parity: `Villager.die`, whose murderer is the player that hit it last.
-        if (dead->type() == entity::villagers::type()) {
-            mobActions_->villagerDied(world, *dead,
-                                      dead->lastHurtByPlayer.has_value() && dead->lastHurtByPlayerTime > 0
-                                          ? std::optional<std::string>{dead->lastHurtByPlayer->toString()}
-                                          : std::nullopt);
+        // parity: `source.getEntity()` of the blow that killed it, a player or a mob.
+        std::optional<wire::common::Uuid> murderer;
+        bool murdererIsPlayer = false;
+        if (const std::optional<std::int32_t> causing = dead->lastBlame.causingId; causing.has_value()) {
+            if (const entity::ServerEntity* mob = world.state().entity(*causing); mob != nullptr) {
+                murderer = mob->uuid();
+            }
+            for (const player::PlayerSession* player : playerRegistry_.snapshot()) {
+                if (player->entityId() == *causing) {
+                    murderer = player->uuid();
+                    murdererIsPlayer = true;
+                }
+            }
         }
-        // parity: `Raider.die`, a player behind the last hit becoming a hero of the village.
+        // parity: `Villager.die` tells its witnesses who did it.
+        if (dead->type() == entity::villagers::type()) {
+            mobActions_->villagerDied(
+                world, *dead, murderer.has_value() ? std::optional<std::string>{murderer->toString()} : std::nullopt);
+        }
+        // parity: `Player.killedEntity`, the statistic of whoever landed the killing blow.
+        if (murdererIsPlayer) {
+            if (player::PlayerSession* killer = playerRegistry_.get(*murderer); killer != nullptr) {
+                killer->stats.increment(storage::stats::killed(dead->type().toString()));
+            }
+        }
+        // parity: `Raider.die`, a player killer becoming a hero of the village.
         if (RaidSystem::isRaider(*dead)) {
-            raids_->raiderDied(world, *dead,
-                               dead->lastHurtByPlayer.has_value() && dead->lastHurtByPlayerTime > 0
-                                   ? dead->lastHurtByPlayer
-                                   : std::nullopt);
+            raids_->raiderDied(world, *dead, murdererIsPlayer ? murderer : std::nullopt);
         }
         // parity: `killer.awardKillScore`, the kill credit going to the player who hit it last.
         if (dead->lastHurtByPlayer.has_value() && dead->lastHurtByPlayerTime > 0) {
             const std::lock_guard<std::mutex> guard(pendingKillsLock_);
-            pendingKills_.push_back(PendingKill{
-                .killer = *dead->lastHurtByPlayer, .victim = dead->uuid().toString(), .victimType = dead->type()});
+            pendingKills_.push_back(PendingKill{.killer = *dead->lastHurtByPlayer,
+                                                .victim = dead->uuid().toString(),
+                                                .victimType = dead->type(),
+                                                .victimFacts = world::triggerFacts::ofEntity(world, *dead),
+                                                .killingBlow = killingBlowOf(world, *dead)});
         }
         // parity: `Entity.die` drops the entity's own loot table where it stood.
         const bool mobDrops = world.gameRules().get(world::gameRules::kMobDrops);
@@ -666,6 +712,10 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                                                                       {}});
                 }
             }
+            continue;
+        }
+        if (entity::fireworkRockets::isRocket(*entity)) {
+            fireworks_->tick(world, watchers, living, *entity);
             continue;
         }
         if (entity::shulkers::isBullet(entity->type())) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/random/RandomSource.hpp>
+#include <basalt/server/runtime/entity/ai/DoorInteraction.hpp>
 #include <basalt/server/world/loot/Loot.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/common/Uuid.hpp>
@@ -72,6 +73,8 @@ struct GolemState {
     /// A golem just built from a pattern, whose weathering the chest under it gives on its first turn.
     bool fromPattern = false;
     std::optional<Position> openedChest;
+    /// parity: `InteractWithDoor` in the golem's core activity.
+    ai::doorInteraction::State doors;
     /// The bolt that last scraped it, by entity id. parity: `lastLightningBoltUUID`.
     std::optional<std::int32_t> lastLightning;
     /// parity: the `TRANSPORT_ITEMS_COOLDOWN_TICKS` memory; zero is absent.

@@ -64,6 +64,13 @@ struct RuntimeEntityMetadata {
     std::optional<std::int32_t> shulkerFace;
     std::optional<std::int32_t> shulkerPeek;
     std::optional<std::int32_t> shulkerColor;
+    /// parity: `FireworkRocketEntity`'s item, who it is stuck to and whether it was shot at an angle.
+    std::optional<wire::protocol::play::WireItemStack> fireworkItem;
+    std::optional<std::optional<std::int32_t>> fireworkAttached;
+    std::optional<bool> fireworkShotAtAngle;
+    /// parity: `Bee.DATA_FLAGS_ID` and `DATA_ANGER_END_TIME`.
+    std::optional<std::int8_t> beeFlags;
+    std::optional<std::int64_t> beeAngerEnd;
 
     /// Initial non-default fields, or every field whose live value changed since `previous`.
     [[nodiscard]] std::vector<wire::protocol::play::SetEntityDataPacket::Entry>

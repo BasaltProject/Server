@@ -33,6 +33,10 @@ namespace villagers {
 struct Offers;
 }
 
+namespace fireworkRockets {
+struct RocketState;
+}
+
 namespace villager {
 struct VillagerState;
 }
@@ -43,6 +47,10 @@ struct WardenState;
 
 namespace copperGolems {
 struct GolemState;
+}
+
+namespace bees {
+struct BeeState;
 }
 
 namespace shulkers {
@@ -130,6 +138,8 @@ public:
     std::shared_ptr<villagers::Offers> offers;
     /// What a villager's brain remembers, or null for anything else.
     std::shared_ptr<villager::VillagerState> villager;
+    /// parity: `FireworkRocketEntity`'s own fields; absent for everything that is not a rocket.
+    std::shared_ptr<fireworkRockets::RocketState> firework;
 
     /// Ticks before it goes off, or `kNoFuse` for anything that is not primed. parity:
     /// `PrimedTnt.fuse`.
@@ -276,6 +286,13 @@ public:
     bool canJoinRaid = false;
     std::int32_t ticksOutsideRaid = 0;
     bool celebrating = false;
+    /// The raid it names was stopped and dropped: it stays this raider's until it is saved, as
+    /// vanilla keeps the dead reference until the chunk reloads.
+    bool raidStale = false;
+    /// parity: `Raider.hurtServer` refreshes the raid bar before the hit lands: the health it saw
+    /// and when, in the order hits came.
+    double raidHealthAtHurt = 0.0;
+    std::int64_t raidHurtStamp = 0;
 
     /// parity: `PatrollingMonster`'s persisted route and role.
     std::optional<std::array<std::int32_t, 3>> patrolTarget;
@@ -378,6 +395,23 @@ public:
     /// Which node of it comes next. parity: `Path.nextNodeIndex`.
     std::int32_t pathIndex = 0;
 
+    /// parity: `PathNavigation`'s stuck detection: its own tick count, the last hundred-tick check
+    /// and the timeout on the node it is heading for.
+    struct NavigationWatch {
+        std::int32_t tick = 0;
+        std::int32_t lastStuckCheck = 0;
+        std::array<double, 3> lastStuckCheckPos{};
+        std::array<std::int32_t, 3> timeoutNode{};
+        std::int64_t timeoutTimer = 0;
+        double timeoutLimit = 0.0;
+        std::int64_t lastTimeoutCheck = 0;
+        bool stuck = false;
+    };
+
+    NavigationWatch navigationWatch;
+    /// parity: `LivingEntity.speed`, what the move control last walked it at.
+    float aiSpeed = 0.0F;
+
     /// Ticks with nobody near it. parity: `Mob.noActionTime`, which is what the random despawn
     /// waits on, and what standing beside a mob resets.
     std::int32_t idleTicks = 0;
@@ -406,6 +440,8 @@ public:
 
     /// What a copper golem keeps beyond this, or null for anything else.
     std::shared_ptr<copperGolems::GolemState> copperGolem;
+    /// parity: `Bee`'s own fields. Absent for everything that is not one.
+    std::shared_ptr<bees::BeeState> bee;
 
     /// What a shulker and a shulker bullet keep beyond this, or null for anything else.
     std::shared_ptr<shulkers::ShulkerState> shulker;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/chat/ChatMessage.hpp>
 #include <basalt/server/runtime/config/GroupsConfig.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
@@ -90,6 +91,10 @@ public:
     /// selector that matches nobody here is no error yet. parity: brigadier resolves a selector
     /// when the command runs, once per source, not when it parses.
     [[nodiscard]] virtual bool defersSelectors() const { return false; }
+
+    /// parity: `CommandSourceStack.getSigningContext`: the message arguments a player signed for
+    /// this line, or null when nothing was signed.
+    [[nodiscard]] virtual const chat::SignedArguments* signedArguments() const { return nullptr; }
 };
 
 /// The console. Permission `kOwners`, like vanilla's own `MinecraftServer` source: whoever can type
@@ -130,7 +135,8 @@ private:
 /// vanilla's does.
 class PlayerCommandSource final : public CommandSource {
 public:
-    PlayerCommandSource(player::PlayerSession& player, const config::GroupsConfig& groups);
+    PlayerCommandSource(player::PlayerSession& player, const config::GroupsConfig& groups,
+                        const chat::SignedArguments* signedArguments = nullptr);
 
     [[nodiscard]] std::string name() const override;
 
@@ -149,9 +155,12 @@ public:
 
     [[nodiscard]] bool hasPermission(std::optional<std::string_view> node) const override;
 
+    [[nodiscard]] const chat::SignedArguments* signedArguments() const override { return signedArguments_; }
+
 private:
     player::PlayerSession* player_;
     const config::GroupsConfig* groups_;
+    const chat::SignedArguments* signedArguments_;
 };
 
 /// A command block running its own command. parity: `BaseCommandBlock.createCommandSourceStack`,

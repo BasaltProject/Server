@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <limits>
 #include <map>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <string>
@@ -64,6 +65,9 @@ public:
     float yaw = 0.0F;
     float pitch = 0.0F;
     bool onGround = false;
+    /// parity: `Entity.FLAG_FALL_FLYING` and `LivingEntity.fallFlyTicks`, gliding on an elytra.
+    bool fallFlying = false;
+    std::int32_t fallFlyTicks = 0;
 
     /// Which permission group they belong to, loaded from `players.db` at join. Unset means the
     /// group currently marked as the default, which is resolved when a permission is checked rather
@@ -116,6 +120,14 @@ public:
     /// sleeves, trouser legs). The client owns this and reports it; the server only relays it to
     /// everyone else, or nobody would see the outer layer of anyone's skin.
     std::int8_t skinParts = kAllSkinParts;
+
+    /// parity: `ChatVisiblity`, from the client's settings: full, system messages only, or hidden.
+    enum class ChatVisibility : std::uint8_t { Full, System, Hidden };
+    std::atomic<ChatVisibility> chatVisibility{ChatVisibility::Full};
+
+    /// The chat session other clients check this player's messages with, once it is verified.
+    [[nodiscard]] std::optional<wire::protocol::play::RemoteChatSessionData> chatSession() const;
+    void setChatSession(std::optional<wire::protocol::play::RemoteChatSessionData> session);
 
     [[nodiscard]] float health() const noexcept { return health_; }
 
@@ -220,6 +232,9 @@ public:
 
     /// What this player may not use yet, and the turn of the world each one frees up on.
     ///
+    /// parity: `LivingEntity.lastHurtByMob`, the kind of mob that hurt them last, kept for as long.
+    std::optional<wire::common::Identifier> lastHurtByMobType;
+    std::atomic<std::int32_t> lastHurtByMobTime{0};
     /// parity: `ItemCooldowns`, which belongs to the player and not to the connection: both doors
     /// throw the same pearl, so both wait the same.
     std::map<std::string, std::int64_t, std::less<>> itemCooldowns;
@@ -251,7 +266,11 @@ public:
 
     [[nodiscard]] bool instabuild() const noexcept;
 
+    /// parity: `ServerPlayer.sendSystemMessage`, which a hidden chat drops.
     void sendSystemMessage(const wire::text::Component& message) const;
+
+    /// parity: `ServerPlayer.sendChatMessage`, which only a full chat shows.
+    void sendChatMessage(const chat::PlayerChatMessage& message, const chat::BoundChatType& chatType) const;
 
     /// Back to a freshly spawned player: full health, full food, no experience kept.
     void resetForRespawn();
@@ -263,6 +282,8 @@ private:
     PlayerConnection connection_;
     float health_ = kMaxHealth;
     float maxHealth_ = kMaxHealth;
+    mutable std::mutex chatSessionMutex_;
+    std::optional<wire::protocol::play::RemoteChatSessionData> chatSession_;
 };
 
 } // namespace basalt::server::runtime::player

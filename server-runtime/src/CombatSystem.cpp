@@ -298,6 +298,18 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         });
     if (change.has_value()) {
         broadcaster_.announceRedstone(world, watchers, *change);
+        // parity: `TargetBlock.onProjectileHit`, for a projectile a player owns.
+        const Identifier* struck = server::registry::blockStateDefinitions::blockOf(change->stateId);
+        if (struck != nullptr && struck->path() == "target" && entity.ownerId.has_value() && options_.targetHit) {
+            for (PlayerSession* shooter : watchers) {
+                if (shooter->entityId() == *entity.ownerId) {
+                    const std::string power =
+                        server::registry::blockStateDefinitions::propertiesOf(change->stateId)["power"];
+                    options_.targetHit(world, *shooter, entity, power.empty() ? 0 : std::stoi(power));
+                    break;
+                }
+            }
+        }
     }
     if (!kind.sticks) {
         entity.removed = true;

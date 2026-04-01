@@ -55,12 +55,15 @@ basalt_module(server-runtime-core
         src/entity/Villagers.cpp
         src/entity/Raids.cpp
         src/entity/RaiderEquipment.cpp
+        src/entity/FireworkRockets.cpp
+        src/entity/IntHashOrder.cpp
         src/entity/WanderingTraderLifetime.cpp
         src/entity/ServerEntity.cpp
         src/entity/ShieldBlows.cpp
         src/config/WorldsConfig.cpp
         src/command/StringReader.cpp
         src/command/ArgumentTypes.cpp
+        src/command/MessageArguments.cpp
         src/command/commands/AccessCommands.cpp
         src/command/commands/AttributeCommand.cpp
         src/command/commands/BasicCommands.cpp
@@ -146,6 +149,11 @@ basalt_module(server-runtime-core
         src/CommandWiring.cpp
         src/SessionLogin.cpp
         src/SessionPlay.cpp
+        src/SessionChat.cpp
+        src/chat/ChatBroadcast.cpp
+        src/chat/ChatMessage.cpp
+        src/chat/LastSeenValidator.cpp
+        src/chat/SecureChat.cpp
         src/SessionDelegates.cpp
         src/ChunkStreamer.cpp
         src/CombatArrows.cpp
@@ -167,6 +175,7 @@ basalt_module(server-runtime-core
         src/ItemUseTimers.cpp
         src/PlayerLifecycle.cpp
         src/VillagerTradeController.cpp
+        src/MerchantSlots.cpp
         src/UiStateSync.cpp
         src/RedstoneTickSystem.cpp
         src/BlockEventTick.cpp
@@ -177,6 +186,7 @@ basalt_module(server-runtime-core
         src/MobActionRavager.cpp
         src/MobActionWarden.cpp
         src/MobDeathLoot.cpp
+        src/MobActionBees.cpp
         src/MobActionCopperGolem.cpp
         src/MobActionShulker.cpp
         src/MobActionGifts.cpp
@@ -187,6 +197,7 @@ basalt_module(server-runtime-core
         src/NaturalSpawningMaterialize.cpp
         src/NaturalSpawningSystem.cpp
         src/RaidSystem.cpp
+        src/FireworkSystem.cpp
         src/RaidMembers.cpp
         src/RaidWaves.cpp
         src/MobActionVillager.cpp
@@ -237,6 +248,7 @@ basalt_module(server-runtime-core
         src/player/PlayerPersistence.cpp
         src/player/PlayerBlockUpdates.cpp
         src/player/PlayerDeath.cpp
+        src/player/PlayerBeehives.cpp
         src/player/PlayerBlockBreak.cpp
         src/player/PlayerBlockItemUse.cpp
         src/player/PlayerBlockSlots.cpp
@@ -254,6 +266,9 @@ basalt_module(server-runtime-core
         src/player/PlayerSpawnItems.cpp
         src/player/PlayerSweep.cpp
         src/player/PlayerThrown.cpp
+        src/player/PlayerGliding.cpp
+        src/player/PlayerFireworks.cpp
+        src/player/PlayerCrossbow.cpp
         src/player/PlayerVitals.cpp
         src/player/PlayerBlockPlace.cpp
         src/player/PlayerContainers.cpp
@@ -266,6 +281,9 @@ basalt_module(server-runtime-core
         src/player/Combat.cpp
         src/player/ExperienceData.cpp
         src/player/PlayerStats.cpp
+        src/player/StatAwards.cpp
+        src/player/PlayerCakesAndPots.cpp
+        src/player/PlayerCauldrons.cpp
         src/net/ProxyLogin.cpp
         src/net/SessionOutbox.cpp
         src/registry/VanillaBiomes.cpp
@@ -371,8 +389,10 @@ basalt_module(server-runtime-core
         src/world/Lightning.cpp
         src/world/Explosions.cpp
         src/world/AdvancementTriggers.cpp
+        src/world/TriggerFacts.cpp
         src/world/Anvils.cpp
         src/world/Beacons.cpp
+        src/world/Beehives.cpp
         src/world/Books.cpp
         src/world/AnvilEnchantments.cpp
         src/world/EnchantmentBooks.cpp
@@ -480,6 +500,7 @@ basalt_module(server-runtime-core
         src/entity/MobConversions.cpp
         src/entity/MobStatusEffects.cpp
         src/entity/WardenBrain.cpp
+        src/entity/Bees.cpp
         src/entity/CopperGolem.cpp
         src/entity/EntityCombat.cpp
         src/entity/MobBrain.cpp
@@ -500,7 +521,6 @@ basalt_module(server-runtime-core
         src/entity/ai/SpecialGoals.cpp
         src/entity/ai/TameGoals.cpp
         src/entity/ai/TargetGoals.cpp
-        src/entity/ai/VillagerGoals.cpp
         src/entity/ai/RandomPos.cpp
         src/entity/villager/BrainTables.cpp
         src/entity/villager/CoreBehaviors.cpp
@@ -522,6 +542,9 @@ basalt_module(server-runtime-core
         src/entity/ai/DolphinItemGoals.cpp
         src/entity/ai/CatGoals.cpp
         src/entity/ai/CopperGolemGoals.cpp
+        src/entity/ai/BeeGoals.cpp
+        src/entity/ai/BeeNavigation.cpp
+        src/entity/ai/DoorInteraction.cpp
         src/world/VillageDataLoader.cpp
         src/world/VillageGolemSpawner.cpp
         src/world/VillageProximity.cpp
@@ -881,12 +904,6 @@ basalt_test(server-runtime-tame-goals-test
     DEPENDS basalt::server-runtime-core
 )
 
-basalt_test(server-runtime-villager-goals-test
-    SOURCES
-        test/VillagerGoalsTest.cpp
-    DEPENDS basalt::server-runtime-core
-)
-
 basalt_test(server-runtime-target-goals-test
     SOURCES
         test/TargetGoalsTest.cpp
@@ -1027,6 +1044,24 @@ basalt_test(server-runtime-poi-manager-test
 
 target_compile_definitions(server-runtime-poi-manager-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
+
+basalt_test(server-runtime-bees-test
+    SOURCES
+        test/BeesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-door-interaction-test
+    SOURCES
+        test/DoorInteractionTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-firework-rockets-test
+    SOURCES
+        test/FireworkRocketsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
 
 basalt_test(server-runtime-raids-test
     SOURCES
@@ -1197,6 +1232,12 @@ basalt_test(server-runtime-scoreboard-command-test
 
 target_compile_definitions(server-runtime-scoreboard-command-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-secure-chat-test
+    SOURCES
+        test/SecureChatTest.cpp
+    DEPENDS basalt::server-runtime-core
 )
 
 basalt_test(server-runtime-session-commands-test

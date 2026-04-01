@@ -355,5 +355,11 @@ TEST_CASE("a statistic criterion is resolved the way the jar reads it") {
           std::optional<std::string>{"minecraft.mined:minecraft.stone"});
     CHECK_FALSE(Objective::canonical("nonsense").has_value());
     CHECK_FALSE(Objective::canonical("minecraft.nothing:minecraft.stone").has_value());
+    // The value has to be in the statistic type's own registry.
+    CHECK_FALSE(Objective::canonical("minecraft.mined:minecraft.diamond").has_value());
+    CHECK_FALSE(Objective::canonical("custom:nonsense").has_value());
+    CHECK(Objective::canonical("killed:zombie") == std::optional<std::string>{"minecraft.killed:minecraft.zombie"});
+    CHECK(Objective::canonical("crafted:minecraft.diamond") ==
+          std::optional<std::string>{"minecraft.crafted:minecraft.diamond"});
     CHECK(Objective::criterionOfStat("minecraft:custom/minecraft:jump") == "minecraft.custom:minecraft.jump");
 }

@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/player/PlayerThrown.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
 #include <basalt/wire/protocol/play/SimplePackets.hpp>
@@ -33,6 +34,7 @@ using wire::protocol::play::SetEntityDataPacket;
 using wire::protocol::play::SoundSource;
 
 constexpr std::string_view kBow = "bow";
+constexpr std::string_view kCrossbow = "crossbow";
 constexpr std::string_view kEnderPearl = "ender_pearl";
 
 /// parity: `LivingEntity`'s own using-item bit.
@@ -118,13 +120,35 @@ void ItemUseTimers::tickEating(PlayerSession& session) {
     }
     // parity: `Consumable.onConsume` ends in `CONSUME_ITEM.trigger` with the stack that was eaten.
     world::AdvancementTriggers* triggers = owner_->options().advancementTriggers;
-    const std::optional<Identifier> item = eaten.has_value() ? parsedOrNothing(eaten->id) : std::nullopt;
+    const std::optional<world::TriggerItem> item = world::triggerFacts::itemOf(eaten);
     if (triggers != nullptr && item.has_value()) {
-        triggers->onConsumedItem(session.name(), session.uuid().toString(), *item);
+        triggers->fire("consume_item", session.name(), session.uuid().toString(),
+                       world::TriggerEvent{.items = {{"item", *item}}});
     }
 }
 
 bool ItemUseTimers::startDrawing(PlayerSession& session, const Identifier& item, std::int32_t slot) {
+    // parity: `CrossbowItem.use`: a loaded crossbow fires at once, an empty one starts charging if
+    // there is anything to load it with.
+    if (item.path() == kCrossbow) {
+        const std::optional<storage::StoredItemStack>& held = session.inventory.at(slot);
+        world::LoadedWorld* world = owner_->currentWorld();
+        if (held.has_value() && player::crossbow::isCharged(*held)) {
+            if (world != nullptr) {
+                player::crossbow::shoot(owner_->blockInteraction().breakContext(), owner_->options().fireworks, session,
+                                        *world, slot);
+            }
+            return true;
+        }
+        if (!player::crossbow::ammoSlot(session).has_value() && session.gamemode != Gamemode::Creative) {
+            return true;
+        }
+        crossbowCharging_ = {};
+        drawingSlot_ = slot;
+        drawingTicks_ = 0;
+        setUsingItem(true, item);
+        return true;
+    }
     if (item.path() != kBow) {
         return false;
     }
@@ -151,10 +175,17 @@ void ItemUseTimers::tickDrawing(PlayerSession& session) {
     }
     const std::optional<storage::StoredItemStack>& held = session.inventory.at(drawingSlot_);
     const std::optional<Identifier> id = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
-    if (!id.has_value() || id->path() != kBow ||
+    if (!id.has_value() || (id->path() != kBow && id->path() != kCrossbow) ||
         drawingSlot_ != PlayerInventory::kHotbarStart + session.inventory.heldSlot()) {
         stopDrawing();
         return;
+    }
+    // parity: `CrossbowItem.onUseTick`, handed the ticks held before this one.
+    if (id->path() == kCrossbow) {
+        if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
+            player::crossbow::tickCharging(owner_->blockInteraction().breakContext(), session, *world, drawingSlot_,
+                                           drawingTicks_, crossbowCharging_);
+        }
     }
     drawingTicks_++;
 }
@@ -169,8 +200,11 @@ void ItemUseTimers::releaseBow() {
     }
     const std::int32_t slot = drawingSlot_;
     const std::int32_t drawn = drawingTicks_;
+    const std::optional<storage::StoredItemStack>& drawnItem = session->inventory.at(slot);
+    // parity: `CrossbowItem.releaseUsing` only ends the use; the load happened while charging.
+    const bool crossbow = drawnItem.has_value() && player::crossbow::isCrossbow(*drawnItem);
     stopDrawing();
-    if (world != nullptr) {
+    if (world != nullptr && !crossbow) {
         player::shootBowFor(owner_->blockInteraction().breakContext(), *session, *world, slot, drawn,
                             hooks_.shootAllowed);
     }

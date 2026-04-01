@@ -134,6 +134,70 @@ namespace {
 
 } // namespace
 
+/// parity: `MinMaxBounds.Doubles`, a number or a `{min, max}`.
+DoubleBounds doubleBounds(const JsonValue* value) {
+    if (const std::optional<double> exact = asNumber(value); exact.has_value()) {
+        return DoubleBounds{.min = exact, .max = exact};
+    }
+    const JsonObject* object = asObject(value);
+    return object == nullptr ? DoubleBounds{}
+                             : DoubleBounds{.min = asNumber(object->find("min")), .max = asNumber(object->find("max"))};
+}
+
+/// parity: `LocationPredicate`, every field; a block predicate on the block entity is a gap.
+LocationPredicate parseLocation(const JsonObject* predicate) {
+    LocationPredicate location;
+    if (predicate == nullptr) {
+        return location;
+    }
+    for (std::size_t index = 0; index < predicate->names().size(); ++index) {
+        const std::string& name = predicate->names()[index];
+        const JsonValue& value = predicate->values()[index];
+        const JsonObject* object = value.get<JsonObject>();
+        if (name == "biomes") {
+            location.biomes = idsOrTag(&value);
+        } else if (name == "structures") {
+            location.structures = idsOrTag(&value);
+        } else if (name == "dimension") {
+            const auto parsed = wire::common::Identifier::parse(asString(&value).value_or(""));
+            location.unsupported = location.unsupported || !parsed.has_value();
+            if (parsed.has_value()) {
+                location.dimension = *parsed;
+            }
+        } else if (name == "position" && object != nullptr) {
+            location.position = std::array<DoubleBounds, 3>{
+                doubleBounds(object->find("x")), doubleBounds(object->find("y")), doubleBounds(object->find("z"))};
+        } else if (name == "smokey") {
+            location.smokey = asBool(&value);
+        } else if (name == "can_see_sky") {
+            location.canSeeSky = asBool(&value);
+        } else if (name == "light" && object != nullptr) {
+            location.hasLight = true;
+            const DoubleBounds bounds = doubleBounds(object->find("light"));
+            if (bounds.min.has_value()) {
+                location.lightMin = static_cast<std::int32_t>(*bounds.min);
+            }
+            if (bounds.max.has_value()) {
+                location.lightMax = static_cast<std::int32_t>(*bounds.max);
+            }
+        } else if (name == "fluid" && object != nullptr) {
+            location.hasFluid = true;
+            location.fluids = idsOrTag(object->find("fluids"));
+            location.fluidState = parseStateMatcher(asObject(object->find("state")));
+        } else if (name == "block" && object != nullptr) {
+            location.hasBlock = true;
+            location.blocks = idsOrTag(object->find("blocks"));
+            location.state = parseStateMatcher(asObject(object->find("state")));
+            for (const std::string& key : object->names()) {
+                location.unsupported = location.unsupported || (key != "blocks" && key != "state");
+            }
+        } else {
+            location.unsupported = true;
+        }
+    }
+    return location;
+}
+
 /// parity: `ItemPredicate`, reading `items`, the two enchantment sub-predicates and presence.
 ItemPredicate parseItemPredicate(const JsonObject& object) {
     ItemPredicate predicate;
@@ -142,6 +206,23 @@ ItemPredicate parseItemPredicate(const JsonObject& object) {
         const JsonValue& value = object.values()[index];
         if (name == "items") {
             predicate.items = idsOrTag(&value);
+            continue;
+        }
+        if (name == "count") {
+            predicate.count = doubleBounds(&value);
+            continue;
+        }
+        // parity: `DataComponentExactPredicate`, each component held with exactly that value.
+        if (const JsonObject* exact = name == "components" ? value.get<JsonObject>() : nullptr; exact != nullptr) {
+            for (std::size_t at = 0; at < exact->names().size(); ++at) {
+                std::expected<wire::nbt::NbtTag, wire::nbt::JsonToNbtError> tag =
+                    wire::nbt::jsonToNbt(exact->values()[at]);
+                if (!tag.has_value()) {
+                    predicate.unsupported = true;
+                    continue;
+                }
+                predicate.exact.emplace_back(exact->names()[at], *std::move(tag));
+            }
             continue;
         }
         const JsonObject* predicates = name == "predicates" ? value.get<JsonObject>() : nullptr;
@@ -202,13 +283,53 @@ EntityPredicate parseEntityPredicate(const JsonObject& object) {
         } else if (name == "minecraft:flags" && inner != nullptr) {
             for (std::size_t at = 0; at < inner->names().size(); ++at) {
                 const std::optional<bool> flag = asBool(&inner->values()[at]);
-                if (inner->names()[at] == "is_on_fire") {
+                const std::string& key = inner->names()[at];
+                if (key == "is_on_fire") {
                     predicate.onFire = flag;
-                } else if (inner->names()[at] == "is_baby") {
+                } else if (key == "is_baby") {
                     predicate.baby = flag;
+                } else if (flag.has_value()) {
+                    predicate.flags.emplace(key, *flag);
                 } else {
                     predicate.unsupported = true;
                 }
+            }
+        } else if (name == "minecraft:location" && inner != nullptr) {
+            predicate.location = std::make_shared<const LocationPredicate>(parseLocation(inner));
+        } else if (name == "minecraft:stepping_on" && inner != nullptr) {
+            predicate.steppingOn = std::make_shared<const LocationPredicate>(parseLocation(inner));
+        } else if (name == "minecraft:distance" && inner != nullptr) {
+            predicate.distance = DistancePredicate{.x = doubleBounds(inner->find("x")),
+                                                   .y = doubleBounds(inner->find("y")),
+                                                   .z = doubleBounds(inner->find("z")),
+                                                   .horizontal = doubleBounds(inner->find("horizontal")),
+                                                   .absolute = doubleBounds(inner->find("absolute"))};
+        } else if (name == "minecraft:passenger" && inner != nullptr) {
+            predicate.passenger = std::make_shared<EntityPredicate>(parseEntityPredicate(*inner));
+        } else if (name == "minecraft:type_specific/lightning" && inner != nullptr) {
+            predicate.blocksSetOnFire = doubleBounds(inner->find("blocks_set_on_fire"));
+            predicate.unsupported = predicate.unsupported || inner->find("entity_struck") != nullptr;
+        } else if (name == "minecraft:type_specific/player" && inner != nullptr) {
+            // parity: `PlayerPredicate`, of which only `looking_at` is read; the rest never match.
+            for (std::size_t at = 0; at < inner->names().size(); ++at) {
+                const JsonObject* looked = inner->values()[at].get<JsonObject>();
+                if (inner->names()[at] == "looking_at" && looked != nullptr) {
+                    predicate.lookingAt = std::make_shared<EntityPredicate>(parseEntityPredicate(*looked));
+                } else {
+                    predicate.unsupported = true;
+                }
+            }
+        } else if (name == "minecraft:effects" && inner != nullptr) {
+            for (std::size_t at = 0; at < inner->names().size(); ++at) {
+                const JsonObject* wanted = inner->values()[at].get<JsonObject>();
+                EffectRequirement requirement{.effect = inner->names()[at]};
+                if (wanted != nullptr) {
+                    requirement.amplifier = doubleBounds(wanted->find("amplifier"));
+                    requirement.duration = doubleBounds(wanted->find("duration"));
+                    requirement.ambient = asBool(wanted->find("ambient"));
+                    requirement.visible = asBool(wanted->find("visible"));
+                }
+                predicate.effects.push_back(std::move(requirement));
             }
         } else if (name == "minecraft:components" && inner != nullptr) {
             for (std::size_t at = 0; at < inner->names().size(); ++at) {
@@ -238,11 +359,15 @@ EntityPredicate parseEntityPredicate(const JsonObject& object) {
         } else if (name == "minecraft:vehicle" && inner != nullptr) {
             predicate.vehicle = std::make_shared<EntityPredicate>(parseEntityPredicate(*inner));
         } else if (name == "minecraft:equipment" && inner != nullptr) {
-            const JsonObject* mainhand = asObject(inner->find("mainhand"));
-            if (mainhand != nullptr && inner->size() == 1) {
-                predicate.mainhand = parseItemPredicate(*mainhand);
-            } else {
-                predicate.unsupported = true;
+            for (std::size_t at = 0; at < inner->names().size(); ++at) {
+                const JsonObject* slot = inner->values()[at].get<JsonObject>();
+                if (slot == nullptr) {
+                    predicate.unsupported = true;
+                } else if (inner->names()[at] == "mainhand") {
+                    predicate.mainhand = parseItemPredicate(*slot);
+                } else {
+                    predicate.equipment.emplace(inner->names()[at], parseItemPredicate(*slot));
+                }
             }
         } else {
             predicate.unsupported = true;

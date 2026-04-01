@@ -2,9 +2,13 @@
 
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
+#include <basalt/server/world/loot/LootContext.hpp>
+#include <basalt/server/world/loot/LootPredicates.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/text/Component.hpp>
 
+#include <array>
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -16,14 +20,47 @@
 
 namespace basalt::server::runtime::world {
 
+/// One stack a trigger is told about.
+struct TriggerItem {
+    wire::common::Identifier item;
+    std::int32_t count = 1;
+    wire::nbt::NbtCompound components;
+};
+
+/// A blow a trigger is told about. parity: `DamageSource` and the amounts `hurtServer` works out.
+struct TriggerDamage {
+    float dealt = 0.0F;
+    float taken = 0.0F;
+    bool blocked = false;
+    wire::common::Identifier type = wire::common::Identifier::vanilla("generic");
+    std::optional<server::world::loot::EntityFacts> direct;
+    std::optional<server::world::loot::EntityFacts> source;
+    /// parity: `DamageSource.isDirect`, whoever caused it also landed it.
+    bool directHit = false;
+};
+
+/// What one firing of a trigger knows, by the field names its criteria read. parity: the arguments
+/// each `SimpleCriterionTrigger.trigger` passes on. The player's own facts come from the hooks.
+struct TriggerEvent {
+    std::map<std::string, server::world::loot::EntityFacts, std::less<>> entities;
+    std::vector<server::world::loot::EntityFacts> victims;
+    std::map<std::string, TriggerItem, std::less<>> items;
+    std::map<std::string, double, std::less<>> numbers;
+    std::map<std::string, wire::common::Identifier, std::less<>> ids;
+    std::map<std::string, std::string> state;
+    /// Where a fall, a flight or a ride began, for `start_position` and `distance`.
+    std::optional<std::array<double, 3>> startPosition;
+    std::optional<TriggerDamage> damage;
+    std::vector<TriggerItem> ingredients;
+    /// The block and tool a `location` predicate runs against.
+    std::optional<server::world::loot::LootContext> location;
+};
+
 /// What a player just did, and which criteria that satisfies.
 ///
-/// parity: `CriteriaTriggers` plus `PlayerAdvancements.award`, indexed once at startup so a
-/// picked-up item costs a map lookup rather than a walk over three thousand criteria.
-///
-/// The limit is which triggers exist, not which conditions: `inventory_changed` and
-/// `recipe_unlocked` are what this build can observe, and the rest arrive with the systems that
-/// produce their events.
+/// parity: `CriteriaTriggers` plus `PlayerAdvancements.award`. Criteria are indexed once at startup,
+/// by item and recipe for the two that fire all the time and by trigger for the rest, whose
+/// conditions are read field by field against what the event says.
 class AdvancementTriggers {
 public:
     /// Which items a tag holds, for the matchers written as `#minecraft:planks`.
@@ -47,9 +84,19 @@ public:
         Announce announce;
         AwardExperience awardExperience;
         AwardRecipe awardRecipe;
+        /// Any registry's tags, which the predicates ask about by registry name.
+        server::world::loot::TagLookup tags;
+        /// Whether a damage type carries a tag, for `DamageSourcePredicate.tags`.
+        std::function<bool(const wire::common::Identifier& damageType, std::string_view tag)> damageTagged;
+        /// What a player's own predicates run in: their facts as `this` and their position as the
+        /// origin. parity: `EntityPredicate.createContext(player, player)`.
+        std::function<std::optional<server::world::loot::LootContext>(std::string_view uuid)> playerContext;
     };
 
     AdvancementTriggers(const RealAdvancements& advancements, PlayerProgress& progress, Hooks hooks = {});
+
+    /// Fires any trigger read field by field, by its id. parity: `SimpleCriterionTrigger.trigger`.
+    void fire(std::string_view trigger, std::string_view player, std::string_view uuid, const TriggerEvent& event = {});
 
     /// parity: `InventoryChangeTrigger`, which vanilla fires on any inventory change rather than on
     /// the item that changed, so an advancement whose matcher was already satisfied still completes
@@ -58,75 +105,20 @@ public:
                             const std::vector<std::optional<storage::StoredItemStack>>& inventory);
 
     /// parity: `RecipeUnlockedTrigger`, fired when a recipe enters the book rather than when it is
-    /// used.
+    /// crafted.
     void onRecipeUnlocked(std::string_view player, std::string_view uuid, const wire::common::Identifier& recipe);
 
-    /// parity: `KilledTrigger` as `player_killed_entity`: what the player killed.
-    void onKilledEntity(std::string_view player, std::string_view uuid, const wire::common::Identifier& victim);
-
-    /// parity: `TameAnimalTrigger`.
-    void onTamedAnimal(std::string_view player, std::string_view uuid, const wire::common::Identifier& animal);
-
-    /// parity: `SummonedEntityTrigger`, the golem or boss a player just built.
-    void onSummonedEntity(std::string_view player, std::string_view uuid, const wire::common::Identifier& summoned);
-
-    /// parity: `BredAnimalsTrigger`, whose two parents match either way round.
-    void onBredAnimals(std::string_view player, std::string_view uuid, const wire::common::Identifier& child,
-                       const wire::common::Identifier& parent, const wire::common::Identifier& partner);
-
-    /// parity: `EnterBlockTrigger`, fired once per tick for every block the player stands in.
-    void onEnteredBlock(std::string_view player, std::string_view uuid, const wire::common::Identifier& block);
-
-    /// parity: `RecipeCraftedTrigger`, fired when the result of a recipe is taken out of its slot.
     void onRecipeCrafted(std::string_view player, std::string_view uuid, const wire::common::Identifier& recipe);
 
-    /// parity: `PlayerTrigger` as `location`, which the jar fires once a second: the biome the
-    /// player stands in, and the structure whose piece is under them. Either may be absent.
-    void onLocation(std::string_view player, std::string_view uuid,
-                    const std::optional<wire::common::Identifier>& biome,
-                    const std::function<bool(const wire::common::Identifier&)>& insideStructure);
-
-    /// parity: `LootTableTrigger`, a container whose loot this player rolled.
     void onContainerLoot(std::string_view player, std::string_view uuid, const wire::common::Identifier& table);
 
-    /// parity: `ChangeDimensionTrigger`.
     void onChangedDimension(std::string_view player, std::string_view uuid, const wire::common::Identifier& from,
                             const wire::common::Identifier& to);
 
-    /// parity: `ConsumeItemTrigger`, an item eaten or drunk.
-    void onConsumedItem(std::string_view player, std::string_view uuid, const wire::common::Identifier& item);
-
-    /// parity: `ItemUsedOnLocationTrigger` as `placed_block`, read off the block that is now there
-    /// rather than off the item that put it there.
-    void onPlacedBlock(std::string_view player, std::string_view uuid, std::int32_t stateId);
-
-    /// parity: the same trigger as `item_used_on_block`, fired when using the item did something.
-    void onItemUsedOnBlock(std::string_view player, std::string_view uuid, std::int32_t stateId,
-                           const wire::common::Identifier& item);
-
-    /// parity: `PlayerTrigger` as `slept_in_bed`, `TradeTrigger` and `EnchantedItemTrigger`:
-    /// three whose criteria ask nothing beyond the act itself.
-    void onSleptInBed(std::string_view player, std::string_view uuid);
-    void onVillagerTrade(std::string_view player, std::string_view uuid);
-    void onEnchantedItem(std::string_view player, std::string_view uuid);
-    void onCuredZombieVillager(std::string_view player, std::string_view uuid);
-
-    /// parity: `ConstructBeaconTrigger`, told to everyone near a beacon that just lit.
-    void onConstructedBeacon(std::string_view player, std::string_view uuid, std::int32_t levels);
-
-    /// parity: `PlayerInteractTrigger`, fired only when the interaction did something and the item
-    /// is what did it.
-    void onInteractedWithEntity(std::string_view player, std::string_view uuid, const wire::common::Identifier& target,
-                                bool targetIsBaby, const wire::common::Identifier& item);
-
-    /// parity: `FishingRodHookedTrigger`, one call per item the rod brought up.
-    void onFishingHooked(std::string_view player, std::string_view uuid, const wire::common::Identifier& item);
-
-    /// parity: `FilledBucketTrigger`, the bucket that came back full.
-    void onFilledBucket(std::string_view player, std::string_view uuid, const wire::common::Identifier& bucket);
+    /// Whether a criterion of this trigger could ever fire, so a caller can skip building facts.
+    [[nodiscard]] bool listensTo(std::string_view trigger) const;
 
 private:
-    /// One criterion of one advancement, as the trigger index refers to it.
     struct CriterionRef {
         wire::common::Identifier advancement;
         std::string criterion;
@@ -140,26 +132,24 @@ private:
     [[nodiscard]] bool matches(const server::world::advancement::ItemMatcher& matcher,
                                const wire::common::Identifier& item) const;
 
-    /// Whether a block state is one a criterion names, properties included.
-    [[nodiscard]] static bool matchesBlock(const server::world::advancement::BlockMatcher& matcher,
-                                           std::int32_t stateId);
+    [[nodiscard]] bool accepts(const server::world::advancement::GenericCondition& condition, const TriggerEvent& event,
+                               server::world::loot::LootContext& context) const;
+
+    [[nodiscard]] bool accepts(const server::world::advancement::DamageSourceCheck& check, const TriggerDamage& damage,
+                               const server::world::loot::LootContext& context) const;
+
+    void fire(std::string_view player, std::string_view uuid, server::world::advancement::ConditionKind kind,
+              const std::function<bool(const server::world::advancement::CriterionCondition&)>& accepts);
 
     const RealAdvancements* advancements_;
     PlayerProgress* progress_;
     Hooks hooks_;
-    /// Every `inventory_changed` criterion, indexed by an item that can satisfy its first matcher.
+    server::world::loot::TagLookup tags_;
     std::map<wire::common::Identifier, std::vector<CriterionRef>> byItem_;
-    /// Every `recipe_unlocked` criterion, by the recipe it waits for.
     std::map<wire::common::Identifier, std::vector<CriterionRef>> byRecipe_;
-    /// The criteria of every other trigger, by kind: a handful each, so a walk is enough.
     std::map<server::world::advancement::ConditionKind, std::vector<CriterionRef>> byKind_;
-
-    /// Walks one kind, granting every criterion whose condition `accepts` answers for.
-    void fire(std::string_view player, std::string_view uuid, server::world::advancement::ConditionKind kind,
-              const std::function<bool(const server::world::advancement::CriterionCondition&)>& accepts);
-
-    /// parity: an entity predicate that names types, ids or one `#tag`; empty means any.
-    [[nodiscard]] bool matchesType(const std::vector<std::string>& wanted, const wire::common::Identifier& type) const;
+    std::map<std::string, std::vector<CriterionRef>, std::less<>> byTrigger_;
+    mutable std::atomic<std::int64_t> seed_{0};
 };
 
 } // namespace basalt::server::runtime::world

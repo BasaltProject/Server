@@ -115,10 +115,13 @@ private:
                         bool fromTotalHealth);
     void setLeader(world::LoadedWorld& world, entity::Raid& raid, std::int32_t wave, entity::ServerEntity& raider);
     void rewardHeroes(world::LoadedWorld& world, entity::Raid& raid);
+    static void releaseRaiders(world::LoadedWorld& world, entity::Raid& raid);
     static void moveCenterToVillageSection(world::LoadedWorld& world, entity::Raid& raid);
 
     /// parity: `Raid.updateBossbar`.
     void updateBossbar(world::LoadedWorld& world, entity::Raid& raid);
+    /// The refresh the last hit on one of its raiders asked for, with that raider's health before it.
+    void applyRaiderHurts(world::LoadedWorld& world, entity::Raid& raid);
     /// parity: `Raid.updatePlayers`.
     void updatePlayers(world::LoadedWorld& world, entity::Raid& raid);
     void setBarName(world::LoadedWorld& world, entity::Raid& raid, wire::text::Component name);

@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/player/PlayerBlockPlace.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/BlockEntityDefaults.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
@@ -24,6 +25,7 @@
 #include <basalt/server/runtime/world/RedstoneWire.hpp>
 #include <basalt/server/runtime/world/Shulkers.hpp>
 #include <basalt/server/runtime/world/Signs.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Tripwires.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
 
@@ -311,12 +313,15 @@ bool placeBlockFor(PlayerSession& player, world::LoadedWorld& world, const Block
     }
     // parity: `BlockItem.place` grants off the state that ended up in the world, not off the one the
     // item asked for: a dried ghast put in water is waterlogged by the time this is read.
-    if (context.blocks.triggers != nullptr) {
-        const std::optional<std::int32_t> standing = world.state().blockState(placeAt.x, placeAt.y, placeAt.z);
-        if (standing.has_value()) {
-            context.blocks.triggers->onPlacedBlock(player.name(), player.uuid().toString(), *standing);
-        }
+    if (context.blocks.triggers != nullptr && context.blocks.lootTables != nullptr &&
+        context.blocks.triggers->listensTo("placed_block")) {
+        context.blocks.triggers->fire(
+            "placed_block", player.name(), player.uuid().toString(),
+            world::TriggerEvent{.location = world::triggerFacts::atBlock(*context.blocks.lootTables, world, player,
+                                                                         placeAt.x, placeAt.y, placeAt.z, held)});
     }
+    // parity: `ItemStack.useOn`, a block item that went down counts as used.
+    statAwards::used(player, held.id);
     // parity: `GameEvent.BLOCK_PLACE`, thirteen: a block going down is louder than one coming up.
     heardBySculk(context.blocks, world, "block_place", placeAt.x, placeAt.y, placeAt.z, {.entity = player.uuid()});
     // parity: `SignBlockEntity.applyImplicitComponents`, then `SignBlock.setPlacedBy`, which only

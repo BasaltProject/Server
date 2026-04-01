@@ -28,6 +28,11 @@ void PlayerStats::increment(std::string_view key, std::int64_t amount) {
     found->second += amount;
 }
 
+void PlayerStats::noteOnly(std::string_view key, std::int64_t amount) {
+    const std::lock_guard<std::mutex> guard{lock_};
+    noteChange(key, amount, false);
+}
+
 void PlayerStats::noteChange(std::string_view key, std::int64_t delta, bool reset) {
     auto found = changes_.find(key);
     if (found == changes_.end()) {

@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
+#include <basalt/server/runtime/entity/ai/BeeGoals.hpp>
 #include <basalt/server/runtime/entity/ai/CatGoals.hpp>
 #include <basalt/server/runtime/entity/ai/CopperGolemGoals.hpp>
 #include <basalt/server/runtime/entity/ai/DolphinGoals.hpp>
@@ -16,7 +17,6 @@
 #include <basalt/server/runtime/entity/ai/SpecialGoals.hpp>
 #include <basalt/server/runtime/entity/ai/TameGoals.hpp>
 #include <basalt/server/runtime/entity/ai/TargetGoals.hpp>
-#include <basalt/server/runtime/entity/ai/VillagerGoals.hpp>
 #include <basalt/server/runtime/entity/ai/WanderingTraderGoals.hpp>
 #include <basalt/server/runtime/entity/ai/WardenGoals.hpp>
 #include <basalt/server/runtime/entity/ai/WitherGoals.hpp>
@@ -61,9 +61,6 @@ constexpr std::int32_t kBlindCooldown = 180;
 constexpr std::int32_t kWitherShotInterval = 40;
 constexpr double kWitherRange = 20.0;
 
-/// parity: the villager's own 0.5 speed modifier.
-constexpr double kVillagerSpeed = 0.5;
-
 /// parity: `Monster` and the golem's `DefendVillageTargetGoal`: what an iron golem goes after.
 const Names& hostile() {
     static const Names kTypes{"zombie",       "husk",       "drowned",         "zombie_villager", "skeleton",
@@ -85,13 +82,6 @@ const Names& wolfBegItems() {
     static const Names kItems{"bone",   "beef",   "porkchop",    "chicken",
                               "mutton", "rabbit", "cooked_beef", "cooked_porkchop"};
     return kItems;
-}
-
-/// parity: what a villager runs from.
-const Names& villagerThreats() {
-    static const Names kTypes{"zombie", "husk",     "drowned",    "zombie_villager", "zoglin", "vindicator",
-                              "evoker", "pillager", "illusioner", "ravager",         "vex",    "witch"};
-    return kTypes;
 }
 
 template <typename GoalType, typename... Args>
@@ -543,33 +533,14 @@ bool buildFlier(GoalSelector& selector, std::string_view path) {
         add<LookAtPlayerGoal>(selector, 2, kLookFar);
         return true;
     }
-    // parity: `Bee.registerGoals`, less the hive, the flowers, the crops and the anger.
     if (path == "bee") {
-        add<BreedGoal>(selector, 2, 1.0);
-        add<TemptGoal>(selector, 3, 1.25, entity::breeding::foodFor(wire::common::Identifier::vanilla("bee")));
-        add<FollowParentGoal>(selector, 5, 1.25);
-        add<HoverWanderGoal>(selector, 8, 10, true);
-        add<FloatGoal>(selector, 9);
+        beeGoals::registerGoals(selector);
         return true;
     }
     return false;
 }
 
 bool buildVillage(GoalSelector& selector, std::string_view path) {
-    if (path == "villager") {
-        // parity: a villager runs on a brain rather than on goals, so this is that brain's schedule
-        // read by goals: the job site by day, the bell in the afternoon, the bed at night, and a run
-        // from anything that raids the village.
-        add<FloatGoal>(selector, 0);
-        add<AvoidEntityGoal>(selector, 1, villagerThreats(), 8.0, 0.5, 0.7);
-        add<SleepInBedGoal>(selector, 2, kVillagerSpeed);
-        add<WorkAtSiteGoal>(selector, 3, kVillagerSpeed);
-        add<MeetAtBellGoal>(selector, 4, kVillagerSpeed);
-        add<RandomStrollGoal>(selector, 5, 0.6);
-        add<LookAtPlayerGoal>(selector, 6, kLookNear);
-        add<RandomLookAroundGoal>(selector, 7);
-        return true;
-    }
     if (path == "wandering_trader") {
         add<FloatGoal>(selector, 0);
         add<AvoidEntityGoal>(selector, 1, Names{"zombie"}, 8.0, 0.5, 0.5);

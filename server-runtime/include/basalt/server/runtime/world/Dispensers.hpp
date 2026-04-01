@@ -66,6 +66,14 @@ struct Hooks {
     /// parity: `BlockTags.CONVERTABLE_TO_MUD`, which a dispensed water bottle asks. The tag is the
     /// datapack's, so the caller answers it.
     std::function<bool(const wire::common::Identifier& block)> convertsToMud;
+    /// parity: `FireworkRocketItem.createDispenseConfig`'s rocket, shot at an angle from just outside
+    /// the face along the way it faces. Unset, a rocket is thrown like any other item.
+    std::function<void(double x, double y, double z, double dirX, double dirY, double dirZ,
+                       const server::world::loot::ItemStack& stack)>
+        launchFirework;
+    /// parity: `BeehiveBlock.releaseBeesAndResetHoneyLevel(..., BEE_RELEASED)` after a dispenser
+    /// took the honey; `stateId` is the hive as it was.
+    std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId)> releaseHive;
 };
 
 /// What a turn did: whether anything went out, and what the clients should hear about it.

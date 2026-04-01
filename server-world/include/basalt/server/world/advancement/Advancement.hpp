@@ -1,9 +1,13 @@
 #pragma once
 
+#include <basalt/server/world/loot/LootCondition.hpp>
+#include <basalt/server/world/loot/LootPredicates.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/text/Component.hpp>
 
 #include <cstdint>
+#include <map>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string>
@@ -19,63 +23,61 @@ struct ItemMatcher {
     std::optional<wire::common::Identifier> tag;
 };
 
-/// A block as a criterion names it: which blocks count, and the state values that must match.
-///
-/// parity: `BlockPredicate` cut down to what the criteria in the jar actually ask for, which is a
-/// set of blocks or one tag, plus a handful of property values.
-struct BlockMatcher {
-    std::vector<wire::common::Identifier> blocks;
-    std::optional<wire::common::Identifier> tag;
-    std::vector<std::pair<std::string, std::string>> properties;
-};
-
-/// parity: `CriterionTriggerInstance`. Deliberately incomplete: a trigger with no case here is
-/// `Unsupported` and never fires, which is the honest answer while the gameplay event behind it does
-/// not exist. The two that do exist cover 3299 of vanilla's 3500-odd criteria.
+/// parity: `CriterionTriggerInstance`. A few triggers keep a shape of their own and the rest are read
+/// field by field; a criterion that asks for something unread is `Unsupported` and never fires.
 enum class ConditionKind : std::uint8_t {
     InventoryItems,
     RecipeUnlocked,
-    /// parity: `KilledTrigger` as `player_killed_entity`.
-    KilledEntity,
-    /// parity: `TameAnimalTrigger`.
-    TamedAnimal,
-    /// parity: `SummonedEntityTrigger`.
-    SummonedEntity,
     /// parity: `LootTableTrigger` as `player_generates_container_loot`.
     ContainerLoot,
     /// parity: `ChangeDimensionTrigger`.
     ChangedDimension,
-    /// parity: `ConsumeItemTrigger`.
-    ConsumedItem,
-    /// parity: `FilledBucketTrigger`.
-    FilledBucket,
-    /// parity: `BredAnimalsTrigger`, which names the newborn or the two parents.
-    BredAnimals,
-    /// parity: `EnterBlockTrigger`, the block a player is standing in.
-    EnteredBlock,
-    /// parity: `PlayerTrigger` as `location`: where the player is standing, every second.
-    AtLocation,
     /// parity: `RecipeCraftedTrigger`, the recipe behind a result the player took.
     RecipeCrafted,
-    /// parity: `FishingRodHookedTrigger`, what came out of the water.
-    FishingHooked,
-    /// parity: `PlayerInteractTrigger` as `player_interacted_with_entity`.
-    InteractedWithEntity,
-    /// parity: `ItemUsedOnLocationTrigger` as `placed_block`: the block that is now there.
-    PlacedBlock,
-    /// parity: `ItemUsedOnLocationTrigger` as `item_used_on_block`: what was used on what.
-    ItemUsedOnBlock,
-    /// parity: `PlayerTrigger` as `slept_in_bed`.
-    SleptInBed,
-    /// parity: `TradeTrigger`, a villager's offer taken.
-    VillagerTrade,
-    /// parity: `EnchantedItemTrigger`.
-    EnchantedItem,
-    /// parity: `ConstructBeaconTrigger`, the tiers under a beacon that just lit.
-    ConstructedBeacon,
-    /// parity: `CuredZombieVillagerTrigger`, with neither of its two entity predicates.
-    CuredZombieVillager,
+    /// Read field by field as 26.3 writes it: see `GenericCondition`.
+    Generic,
     Unsupported,
+};
+
+/// parity: `DamageSourcePredicate`: tags the damage type carries or lacks, and who dealt it.
+struct DamageSourceCheck {
+    std::vector<std::pair<std::string, bool>> tags;
+    std::shared_ptr<const loot::EntityPredicate> direct;
+    std::shared_ptr<const loot::EntityPredicate> source;
+    std::optional<bool> isDirect;
+};
+
+/// parity: `DamagePredicate`: how much, whether a shield took it, and the source.
+struct DamageCheck {
+    loot::DoubleBounds dealt;
+    loot::DoubleBounds taken;
+    std::shared_ptr<const loot::EntityPredicate> source;
+    std::optional<bool> blocked;
+    std::optional<DamageSourceCheck> type;
+};
+
+/// A criterion's conditions by field, as 26.3 serializes every trigger instance: context predicates
+/// on the entities involved, item predicates, bounds and the few shapes of their own.
+struct GenericCondition {
+    /// `player`, `entity`, `source`, `projectile` and the rest: each a list of loot conditions run
+    /// with that entity as `this` and the player's position as the origin.
+    std::map<std::string, std::vector<loot::LootCondition>, std::less<>> entities;
+    /// parity: `KilledByArrowTrigger` and `ChanneledLightningTrigger`, each predicate its own victim.
+    std::vector<std::vector<loot::LootCondition>> victims;
+    std::map<std::string, loot::ItemPredicate, std::less<>> items;
+    std::map<std::string, loot::DoubleBounds, std::less<>> numbers;
+    /// Ids or one `#tag`, by field: `recipes`, `potion`, `block`.
+    std::map<std::string, std::vector<std::string>, std::less<>> ids;
+    std::optional<loot::StateMatcher> state;
+    std::optional<loot::DistancePredicate> distance;
+    std::shared_ptr<const loot::LocationPredicate> startPosition;
+    std::vector<loot::EffectRequirement> effects;
+    std::optional<DamageCheck> damage;
+    std::optional<DamageSourceCheck> killingBlow;
+    /// parity: `RecipeCraftedTrigger.ingredients`, each predicate a different ingredient.
+    std::vector<loot::ItemPredicate> ingredients;
+    /// The `location` predicate of the block triggers, run with the block as the loot context.
+    std::optional<std::vector<loot::LootCondition>> location;
 };
 
 /// What a criterion is waiting for. One tagged struct rather than a hierarchy: without RTTI the kind
@@ -86,30 +88,12 @@ struct CriterionCondition {
     std::vector<ItemMatcher> matchers;
     /// `minecraft:recipe_unlocked` and `minecraft:recipe_crafted`: the recipe learnt or used.
     std::optional<wire::common::Identifier> recipe;
-    /// The entity types a kill, a taming, a summon or a newborn asks for, ids or a single `#tag`.
-    /// Empty is any.
-    std::vector<std::string> entityTypes;
-    /// Whether the entity has to be a baby or a grown one. parity: the `minecraft:flags` predicate,
-    /// of which only `is_baby` is read.
-    std::optional<bool> baby;
-    /// `minecraft:bred_animals`: the two parents, which the trigger matches either way round.
-    std::vector<std::string> parentTypes;
-    std::vector<std::string> partnerTypes;
     /// `minecraft:player_generates_container_loot`: the table that was rolled.
     std::optional<wire::common::Identifier> lootTable;
-    /// `minecraft:construct_beacon`: how many tiers the beacon stands on, either end optional.
-    std::optional<std::int32_t> minLevel;
-    std::optional<std::int32_t> maxLevel;
-    /// `minecraft:placed_block` and `minecraft:item_used_on_block`: the block it happened on.
-    std::optional<BlockMatcher> blockMatcher;
-    /// `minecraft:enter_block`: the block the player has to be standing in.
-    std::optional<wire::common::Identifier> block;
-    /// `minecraft:location`: the biome or the structure the player has to be standing in.
-    std::optional<wire::common::Identifier> biome;
-    std::optional<wire::common::Identifier> structure;
     /// `minecraft:changed_dimension`: where the player came from and went to, either optional.
     std::optional<wire::common::Identifier> fromDimension;
     std::optional<wire::common::Identifier> toDimension;
+    std::shared_ptr<const GenericCondition> generic;
 };
 
 /// One named criterion: which trigger grants it, and under what condition.

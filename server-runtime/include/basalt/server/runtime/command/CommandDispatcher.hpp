@@ -202,6 +202,11 @@ public:
     /// three entities succeeds three times. A comparator on a command block reads the count.
     std::int32_t execute(const CommandSource& source, const std::string& input, std::int32_t& successes) const;
 
+    /// parity: `SignableCommand.of`: the message arguments of a line, by node name, with the text a
+    /// client signs for each. Empty for a line that does not parse.
+    [[nodiscard]] std::vector<std::pair<std::string, std::string>> signableArguments(const CommandSource& source,
+                                                                                     const std::string& input) const;
+
     /// What a line could be completed with, the line ending where the client's cursor is.
     [[nodiscard]] SuggestionResult suggest(const CommandSource& source, const std::string& input) const;
 
@@ -255,7 +260,8 @@ private:
     void collect(StringReader& reader, const CommandNode& node, const CommandSource& source, const Arguments& arguments,
                  std::vector<std::pair<std::int32_t, wire::protocol::play::CommandSuggestion>>& out) const;
 
-    void reportSyntaxError(const CommandSource& source, const CommandSyntaxError& error) const;
+    void reportSyntaxError(const CommandSource& source, const CommandSyntaxError& error,
+                           const std::string& input) const;
 
     const CommandEnvironment* environment_;
     CommandNode root_;

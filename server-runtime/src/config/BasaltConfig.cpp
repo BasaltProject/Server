@@ -148,6 +148,11 @@ std::string mergeLegacyProperties(std::string_view templateText,
             replaceOnce("online-mode = true", "online-mode = " + std::string{*online});
         }
     }
+    if (const auto enforce = imported("enforce-secure-profile"); enforce.has_value()) {
+        if (*enforce == "true" || *enforce == "false") {
+            replaceOnce("enforce-secure-profile = true", "enforce-secure-profile = " + std::string{*enforce});
+        }
+    }
     // The view distance is not imported here because it no longer lives in this file: it is a
     // per-world setting and belongs to `worlds.toml`, which is where importing it goes when it
     // does.
@@ -175,6 +180,7 @@ std::expected<BasaltConfig, std::string> BasaltConfig::fromToml(const TomlTable&
     if (server != nullptr) {
         config.maxPlayers = static_cast<std::int32_t>(server->integer("max-players").value_or(defaults.maxPlayers));
         config.onlineMode = server->boolean("online-mode").value_or(defaults.onlineMode);
+        config.enforceSecureProfile = server->boolean("enforce-secure-profile").value_or(defaults.enforceSecureProfile);
         config.gamemode = std::string{server->string("gamemode").value_or(defaults.gamemode)};
         config.whitelist = server->boolean("whitelist").value_or(defaults.whitelist);
     }

@@ -193,6 +193,35 @@ public:
     /// parity: `Raider.setCelebrating`.
     virtual void setCelebrating(ServerEntity& /*raider*/, bool /*celebrating*/) {}
 
+    /// A hive as a bee sees it. parity: `getBeehiveBlockEntity`, `isFull` and `isFireNearby`.
+    struct HiveView {
+        bool loaded = false;
+        bool hive = false;
+        bool full = false;
+        bool fireNearby = false;
+    };
+
+    [[nodiscard]] virtual HiveView hiveAt(const ServerEntity& /*bee*/, const std::array<std::int32_t, 3>& /*pos*/) {
+        return {};
+    }
+
+    /// parity: `BeehiveBlockEntity.addOccupant`, which takes the bee out of the world.
+    virtual void enterHive(ServerEntity& /*bee*/, const std::array<std::int32_t, 3>& /*hive*/) {}
+
+    /// parity: `PoiManager.getInRange(#bee_home, pos, radius, ANY)`, in the manager's own order.
+    [[nodiscard]] virtual std::vector<std::array<std::int32_t, 3>> beeHomesNear(const ServerEntity& /*bee*/,
+                                                                                std::int32_t /*radius*/) {
+        return {};
+    }
+
+    /// parity: `EnvironmentAttributes.BEES_STAY_IN_HIVE` at the bee, and `Level.isRaining`.
+    [[nodiscard]] virtual bool beesStayInHive(const ServerEntity& /*bee*/) { return false; }
+
+    [[nodiscard]] virtual bool raining(const ServerEntity& /*bee*/) { return false; }
+
+    /// parity: `BeeGrowCropGoal.tick` on one square below the bee. Answers whether it grew.
+    virtual bool growBeeCrop(ServerEntity& /*bee*/, const std::array<std::int32_t, 3>& /*pos*/) { return false; }
+
     /// Whether a block is in a block tag, which 26.3 decides teleports and jumps with. Without the
     /// server's tags nothing is in any, which a goal reads as the tag-free rule.
     [[nodiscard]] virtual std::optional<bool> blockTagged(std::string_view /*tag*/,
@@ -220,9 +249,6 @@ public:
     std::int64_t dayTime = 0;
     /// parity: `Level.getGameTime`, used by absolute AI cooldown deadlines.
     std::int64_t gameTime = 0;
-    /// parity: `Raid`, which is what puts a village in its hide activity.
-    bool raidNearby = false;
-
     /// parity: `Raider.getCurrentRaid`, as a raider's goals read it.
     struct RaiderRaid {
         /// parity: `Raid.isActive`, false for a raid that was stopped under it.

@@ -1,5 +1,7 @@
 #include <basalt/server/runtime/BuildInfo.hpp>
+#include <basalt/server/runtime/chat/ChatBroadcast.hpp>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
+#include <basalt/server/runtime/command/MessageArguments.hpp>
 #include <basalt/server/runtime/command/commands/BasicCommands.hpp>
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
 
@@ -70,10 +72,11 @@ SayCommand::SayCommand() : Command("say", permissionLevel::kGamemasters) {}
 void SayCommand::build(const CommandNodeBuilder& root) const {
     root.argument("message", messageArgument(), [](const CommandNodeBuilder& message) {
         message.executes([](const CommandContext& context) {
-            const std::string* text = context.get<std::string>("message");
-            context.environment().broadcast(Component::translatable(
-                "chat.type.announcement",
-                {context.source().displayName(), Component::text(text == nullptr ? std::string{} : *text)}));
+            const CommandEnvironment& environment = context.environment();
+            chat::broadcastChatMessage(
+                environment.players().snapshot(), messageArguments::resolveChatMessage(context, "message"),
+                messageArguments::bind(chat::chatType::kSayCommand, context.source(), environment),
+                environment.logger(), environment.lang());
             return Parsed<std::int32_t>{1};
         });
     });
@@ -84,10 +87,11 @@ EmoteCommand::EmoteCommand() : Command("me") {}
 void EmoteCommand::build(const CommandNodeBuilder& root) const {
     root.argument("action", messageArgument(), [](const CommandNodeBuilder& action) {
         action.executes([](const CommandContext& context) {
-            const std::string* text = context.get<std::string>("action");
-            context.environment().broadcast(
-                Component::translatable("chat.type.emote", {context.source().displayName(),
-                                                            Component::text(text == nullptr ? std::string{} : *text)}));
+            const CommandEnvironment& environment = context.environment();
+            chat::broadcastChatMessage(
+                environment.players().snapshot(), messageArguments::resolveChatMessage(context, "action"),
+                messageArguments::bind(chat::chatType::kEmoteCommand, context.source(), environment),
+                environment.logger(), environment.lang());
             return Parsed<std::int32_t>{1};
         });
     });
@@ -136,8 +140,10 @@ void KickCommand::build(const CommandNodeBuilder& root) const {
         });
         targets.argument("reason", messageArgument(), [kick](const CommandNodeBuilder& reason) {
             reason.executes([kick](const CommandContext& context) {
+                // parity: `MessageArgument.getMessage`, selectors and all.
                 const std::string* text = context.get<std::string>("reason");
-                return kick(context, Component::text(text == nullptr ? std::string{} : *text));
+                return kick(context, messageArguments::resolveComponent(text == nullptr ? std::string{} : *text,
+                                                                        context.source(), context.environment()));
             });
         });
     });

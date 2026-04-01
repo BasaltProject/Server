@@ -216,40 +216,29 @@ TEST_CASE("a criterion reads its conditions as the one predicate 26.3 writes") {
     };
     const CriterionCondition killed =
         conditionOf("minecraft:player_killed_entity", R"({"entity":{"type":"minecraft:entity_properties",
-            "entity":"this","predicate":{"minecraft:entity_type":"minecraft:breeze"}}})");
-    CHECK(killed.kind == ConditionKind::KilledEntity);
-    CHECK(killed.entityTypes == std::vector<std::string>{"minecraft:breeze"});
-
-    const CriterionCondition bred =
-        conditionOf("minecraft:bred_animals", R"({"parent":{"type":"entity_properties","entity":"this",
-            "predicate":{"minecraft:entity_type":"minecraft:frog"}},"partner":{"type":"minecraft:all_of","terms":[
-            {"type":"minecraft:entity_properties","entity":"this",
-             "predicate":{"minecraft:entity_type":"minecraft:frog"}}]}})");
-    CHECK(bred.kind == ConditionKind::BredAnimals);
-    CHECK(bred.parentTypes == std::vector<std::string>{"minecraft:frog"});
-    CHECK(bred.partnerTypes == std::vector<std::string>{"minecraft:frog"});
-
-    const CriterionCondition placed = conditionOf(
-        "minecraft:placed_block", R"({"location":{"type":"minecraft:match_block","blocks":"minecraft:creaking_heart",
-            "state":{"creaking_heart_state":"awake"}}})");
-    REQUIRE(placed.blockMatcher.has_value());
-    CHECK(placed.blockMatcher->blocks.front().path() == "creaking_heart");
-    CHECK(placed.blockMatcher->properties.front().second == "awake");
+            "entity":"this","predicate":{"minecraft:entity_type":"minecraft:breeze"}},
+            "killing_blow":{"tags":[{"id":"minecraft:is_projectile","expected":true}]}})");
+    REQUIRE(killed.kind == ConditionKind::Generic);
+    CHECK(killed.generic->entities.at("entity").size() == 1);
+    REQUIRE(killed.generic->killingBlow.has_value());
+    CHECK(killed.generic->killingBlow->tags.front().first == "minecraft:is_projectile");
 
     const CriterionCondition used =
         conditionOf("minecraft:item_used_on_block", R"({"location":{"type":"minecraft:all_of","terms":[
-            {"type":"minecraft:location_check","predicate":{"block":{"blocks":["minecraft:oak_log"]}}},
+            {"type":"minecraft:location_check","offsetY":1,"predicate":{"block":{"blocks":"#minecraft:logs"}}},
             {"type":"minecraft:match_tool","predicate":{"items":"#minecraft:axes"}}]}})");
-    CHECK(used.kind == ConditionKind::ItemUsedOnBlock);
-    REQUIRE(used.blockMatcher.has_value());
-    CHECK(used.blockMatcher->blocks.front().path() == "oak_log");
-    REQUIRE(used.matchers.size() == 1);
-    CHECK(used.matchers.front().tag->path() == "axes");
+    REQUIRE(used.kind == ConditionKind::Generic);
+    CHECK(used.generic->location.has_value());
 
-    // A named predicate, a tag of blocks and a neighbour check are questions this build leaves alone.
-    CHECK(conditionOf("minecraft:player_killed_entity", R"({"entity":"minecraft:some/predicate"})").kind ==
+    const CriterionCondition fell =
+        conditionOf("minecraft:fall_from_height",
+                    R"({"distance":{"y":{"min":379}},"start_position":{"position":{"y":{"max":-59}}}})");
+    REQUIRE(fell.kind == ConditionKind::Generic);
+    CHECK(fell.generic->distance->y.min == 379.0);
+    CHECK(fell.generic->startPosition != nullptr);
+
+    // An unknown field, and `impossible`, are never granted.
+    CHECK(conditionOf("minecraft:player_killed_entity", R"({"sound":"minecraft:x"})").kind ==
           ConditionKind::Unsupported);
-    CHECK(conditionOf("minecraft:placed_block",
-                      R"({"location":{"type":"minecraft:match_block","blocks":"#minecraft:logs"}})")
-              .kind == ConditionKind::Unsupported);
+    CHECK(conditionOf("minecraft:impossible", "{}").kind == ConditionKind::Unsupported);
 }

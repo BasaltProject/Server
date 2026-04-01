@@ -3,8 +3,10 @@
 #include <basalt/server/runtime/bedrock/BedrockPlayer.hpp>
 #include <basalt/server/runtime/bedrock/BedrockPlayerInternals.hpp>
 #include <basalt/server/runtime/bedrock/BedrockRecipes.hpp>
+#include <basalt/server/runtime/chat/ChatBroadcast.hpp>
 #include <basalt/server/runtime/placeholder/PlaceholderSlots.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/Dialogs.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
@@ -220,6 +222,8 @@ BedrockPlayer::~BedrockPlayer() {
         static_cast<void>(session_->inventory.add(*windows_->cursor));
         windows_->cursor.reset();
     }
+    // parity: `PlayerList.remove` awards it before the player is saved.
+    player::statAwards::award(*session_, "leave_game");
     // Written before they leave the registry, so what is saved is a player who still exists.
     if (context_.save && session_->connection().storedSnapshot) {
         if (const std::optional<storage::StoredPlayer> row = session_->connection().storedSnapshot(); row.has_value()) {
@@ -797,10 +801,15 @@ void BedrockPlayer::say(std::string message) {
     if (session_ == nullptr) {
         return;
     }
-    // The same shape the Java side logs and sends, so a line reads the same wherever it is read.
-    const Component text = Component::text("<" + session_->name() + "> " + std::move(message));
-    context_.logger.info([this, &text] { return wire::text::resolvePlainText(text, context_.lang); });
-    announce(text);
+    // parity: a player with no chat session, whose line is unsigned chat like any other.
+    if (context_.registry == nullptr) {
+        return;
+    }
+    chat::broadcastChatMessage(
+        context_.registry->snapshot(),
+        chat::PlayerChatMessage::unsignedFrom(session_->uuid(), std::move(message), chat::nowMillis()),
+        chat::BoundChatType{.type = chat::chatType::kChat, .name = chat::displayName(*session_, nullptr)},
+        context_.logger, context_.lang);
 }
 
 void BedrockPlayer::move(const double x, const double y, const double z, const float yaw, const float pitch) {

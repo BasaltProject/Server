@@ -18,6 +18,7 @@
 #include <basalt/server/runtime/player/PlayerSigns.hpp>
 #include <basalt/server/runtime/player/PlayerSleep.hpp>
 #include <basalt/server/runtime/player/PlayerSpawnItems.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
@@ -94,8 +95,8 @@ void BlockInteractionHandler::broadcastSound(const BlockPos& pos, const std::str
 
 bool BlockInteractionHandler::ringBell(const play::BlockHitResult& hit) {
     world::LoadedWorld* world = owner_->currentWorld();
-    return world != nullptr &&
-           player::ringBellFor(breakContext(), *world, hit.pos.x, hit.pos.y, hit.pos.z, hit.direction, hit.clickY);
+    return world != nullptr && player::ringBellFor(breakContext(), *world, hit.pos.x, hit.pos.y, hit.pos.z,
+                                                   hit.direction, hit.clickY, owner_->playerSession());
 }
 
 void BlockInteractionHandler::openNewSign(const BlockPos& pos, std::int32_t stateId) {
@@ -238,6 +239,8 @@ void BlockInteractionHandler::openLectern(PlayerSession& session, const BlockPos
     menus.openMenu = player::Menu::playerInventory();
     menus.openBlock = pos;
     menus.openLecternAt = pos;
+    // parity: `LecternBlock.openScreen`.
+    player::statAwards::award(session, "interact_with_lectern");
     const std::int32_t containerId = menus.nextContainerId;
     owner_->sendCompressed(play::OpenScreenPacket::kId, [containerId](wire::io::ByteBuffer& buffer) {
         play::OpenScreenPacket{.containerId = containerId,

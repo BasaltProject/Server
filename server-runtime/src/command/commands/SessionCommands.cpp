@@ -1,4 +1,6 @@
+#include <basalt/server/runtime/chat/ChatBroadcast.hpp>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
+#include <basalt/server/runtime/command/MessageArguments.hpp>
 #include <basalt/server/runtime/command/commands/SessionCommands.hpp>
 #include <basalt/wire/protocol/play/BorderPackets.hpp>
 #include <basalt/wire/text/TextColor.hpp>
@@ -79,29 +81,41 @@ TeamMsgCommand::TeamMsgCommand(scoreboard::Teams& teams)
 void TeamMsgCommand::build(const CommandNodeBuilder& root) const {
     root.argument("message", messageArgument(), [this](const CommandNodeBuilder& message) {
         message.executes([this](const CommandContext& context) -> Parsed<std::int32_t> {
-            const Parsed<player::PlayerSession*> player = context.requirePlayer();
-            if (!player.has_value()) {
-                return std::unexpected{player.error()};
+            const Parsed<player::PlayerSession*> entity = context.requireEntity();
+            if (!entity.has_value()) {
+                return std::unexpected{entity.error()};
             }
-            const scoreboard::Team* team = teams_->teamOf((*player)->name());
+            const scoreboard::Team* team = teams_->teamOf((*entity)->name());
             if (team == nullptr) {
                 return std::unexpected{
                     CommandSyntaxError{.component = Component::translatable("commands.teammsg.failed.noteam")}};
             }
-            const auto* text = context.get<std::string>("message");
-            const Component body = Component::text(text == nullptr ? std::string{} : *text);
-            const Component line = Component::translatable(
-                "chat.type.team.text", {team->displayName, Component::text((*player)->name()), body});
+            std::vector<player::PlayerSession*> receivers;
             for (player::PlayerSession* member : context.environment().players().snapshot()) {
-                if (std::ranges::find(team->members, member->name()) != team->members.end()) {
-                    member->sendSystemMessage(line);
+                if (member == *entity || team->hasMember(member->name())) {
+                    receivers.push_back(member);
                 }
             }
-            context.environment().logger().info([&] {
-                return "[Team " + team->name + "] <" + (*player)->name() + "> " +
-                       (text == nullptr ? std::string{} : *text);
-            });
-            return static_cast<std::int32_t>(team->members.size());
+            if (receivers.empty()) {
+                return 0;
+            }
+            // parity: `TeamMsgCommand.SUGGEST_STYLE` over the team's formatted name.
+            const Component teamName =
+                chat::formattedTeamName(*team)
+                    .hoverEvent(wire::text::HoverEvent::showText(Component::translatable("chat.type.team.hover")))
+                    .clickEvent(wire::text::ClickEvent::suggestCommand("/teammsg "));
+            const CommandEnvironment& environment = context.environment();
+            const chat::PlayerChatMessage sent = messageArguments::resolveChatMessage(context, "message");
+            const chat::BoundChatType incoming =
+                messageArguments::bind(chat::chatType::kTeamMsgCommandIncoming, context.source(), environment)
+                    .withTarget(teamName);
+            const chat::BoundChatType outgoing =
+                messageArguments::bind(chat::chatType::kTeamMsgCommandOutgoing, context.source(), environment)
+                    .withTarget(teamName);
+            for (const player::PlayerSession* receiver : receivers) {
+                receiver->sendChatMessage(sent, receiver == *entity ? outgoing : incoming);
+            }
+            return static_cast<std::int32_t>(receivers.size());
         });
     });
 }

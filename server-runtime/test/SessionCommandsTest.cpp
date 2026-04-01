@@ -162,8 +162,10 @@ TEST_CASE("teammsg reaches the sender's own team and nobody else") {
         fixture.source, basalt::server::runtime::command::ExecutionSource::Changes{.player = &steve}};
     CHECK(fixture.dispatcher.execute(asSteve, "teammsg regroup") == 2);
 
-    CHECK(flatten(fixture.clients[0]->messages.at(0)).find("chat.type.team.text") != std::string::npos);
-    CHECK(fixture.clients[1]->messages.size() == 1);
+    // parity: the sender reads it as sent, the rest of the team as received.
+    CHECK(flatten(fixture.clients[0]->messages.at(0)).find("chat.type.team.sent") != std::string::npos);
+    REQUIRE(fixture.clients[1]->messages.size() == 1);
+    CHECK(flatten(fixture.clients[1]->messages.at(0)).find("chat.type.team.text") != std::string::npos);
     CHECK(fixture.clients[2]->messages.empty());
 }
 

@@ -1,5 +1,6 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/entity/Attributes.hpp>
+#include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
@@ -10,6 +11,7 @@
 #include <basalt/server/runtime/player/Combat.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <utility>
 
@@ -52,12 +54,26 @@ void blame(ServerEntity& target, std::optional<std::int32_t> causingId, std::int
     target.nextBlame = ServerEntity::Blame{.causingId = causingId, .directId = directId, .directType = directType};
 }
 
+std::int64_t nextRaidBarStamp() {
+    static std::atomic<std::int64_t> clock{0};
+    return ++clock;
+}
+
 Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, std::optional<double> sourceZ,
             const Hooks& hooks, std::string_view cause, const std::optional<std::string>& attackerName,
             const bool byPlayer) {
     const ServerEntity::Blame blamed = std::exchange(entity.nextBlame, {});
+    // parity: `Raider.hurtServer` calls `updateBossbar` before anything else.
+    if (entity.raidId.has_value()) {
+        entity.raidHealthAtHurt = entity.health;
+        entity.raidHurtStamp = nextRaidBarStamp();
+    }
     if (entity.removed || entity.health <= 0.0) {
         return {};
+    }
+    // parity: `Bee.hurtServer` stops pollinating before the hit is even weighed.
+    if (entity.bee != nullptr) {
+        entity.bee->pollinating = false;
     }
     // parity: `EnderDragon.hurtServer` is a hit on the body, and only a player or an explosion
     // (`always_hurts_ender_dragons`) takes health off. Anything else still counts as having hit.

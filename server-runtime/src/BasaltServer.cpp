@@ -10,11 +10,13 @@
 #include <basalt/server/runtime/placeholder/PlayerPlaceholders.hpp>
 #include <basalt/server/runtime/placeholder/ServerPlaceholders.hpp>
 #include <basalt/server/runtime/player/PlayerContainers.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/plugins/PluginsCommand.hpp>
 #include <basalt/server/runtime/world/EndPodium.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/RecipeBook.hpp>
 #include <basalt/server/runtime/world/SummonAwards.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/wire/auth/MojangSessionService.hpp>
 #include <basalt/wire/multiversion/java/JavaTranslators.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
@@ -134,6 +136,40 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                 world::recipeBook::add(*player, vanillaData_.recipes, {recipe});
             }
         }
+    };
+    triggerHooks.tags = [this](std::string_view registry, const wire::common::Identifier& id, std::string_view tag) {
+        const wire::common::Identifier named = wire::common::Identifier::parse(tag).value_or(id);
+        if (registry == "item") {
+            return world::realItemTags::membersOf(vanillaData_.itemTags, named.toString()).contains(id);
+        }
+        if (registry == "entity_type") {
+            return world::realEntityTypeTags::membersOf(vanillaData_.entityTags, named).contains(id);
+        }
+        if (registry == "block") {
+            return world::realBlockTags::membersOf(vanillaData_.blockTags, named.toString()).contains(id);
+        }
+        if (registry == "enchantment") {
+            return std::ranges::contains(vanillaData_.lootRegistries.tagMembers(registry, named), id);
+        }
+        return false;
+    };
+    triggerHooks.damageTagged = [this](const wire::common::Identifier& type, std::string_view tag) {
+        const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
+            wire::common::Identifier::parse(tag);
+        return id.has_value() && world::realDamageTypeTags::isIn(vanillaData_.damageTypeTags, *id, type);
+    };
+    triggerHooks.playerContext = [this](std::string_view uuid) -> std::optional<server::world::loot::LootContext> {
+        const std::optional<wire::common::Uuid> id = wire::common::Uuid::parse(uuid);
+        player::PlayerSession* player = id.has_value() ? playerRegistry_.get(*id) : nullptr;
+        if (player == nullptr || worldRegistry_ == nullptr) {
+            return std::nullopt;
+        }
+        const std::map<std::string, world::LoadedWorld*> worlds = worldRegistry_->worlds();
+        const auto found = worlds.find(player->worldName);
+        if (found == worlds.end()) {
+            return std::nullopt;
+        }
+        return world::triggerFacts::ofPlayerAt(vanillaData_.lootTables, *found->second, *player);
     };
     advancementTriggers_ = std::make_unique<world::AdvancementTriggers>(vanillaData_.advancements, *playerProgress_,
                                                                         std::move(triggerHooks));
@@ -491,12 +527,19 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                         .blockTags = &vanillaData_.blockTags});
     explosions_ = std::make_unique<ExplosionSystem>(
         playerRegistry_, vanillaData_.lootTables,
-        ExplosionSystem::Hooks{.struck =
-                                   [this](world::LoadedWorld& world,
-                                          const std::vector<player::PlayerSession*>& watchers, double x, double y,
-                                          double z, float power, std::int32_t sourceEntityId) {
-                                       combat_->hurtByExplosion(world, watchers, x, y, z, power, sourceEntityId);
-                                   }},
+        ExplosionSystem::Hooks{
+            .struck =
+                [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, double x,
+                       double y, double z, float power, std::int32_t sourceEntityId) {
+                    combat_->hurtByExplosion(world, watchers, x, y, z, power, sourceEntityId);
+                },
+            .hiveBlown =
+                [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
+                       const wire::nbt::NbtCompound& hive, std::int32_t sourceEntityId) {
+                    if (mobActions_ != nullptr) {
+                        mobActions_->hiveBlown(world, {x, y, z}, stateId, hive, sourceEntityId);
+                    }
+                }},
         ExplosionSystem::Options{.nextSeed = [] { return scratchSeed(); },
                                  .nextDouble = [] { return scratchDouble(); }});
     orbs_ = std::make_unique<ExperienceOrbSystem>(
@@ -548,11 +591,23 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                        player::PlayerSession* player) { withers_->skullLanded(world, watchers, skull, mob, player); },
             .awardExperience = [this](world::LoadedWorld& world, double x, double y, double z,
                                       std::int32_t amount) { orbs_->award(world, x, y, z, amount); },
+            .targetHit =
+                [this](world::LoadedWorld& world, player::PlayerSession& shooter,
+                       const entity::ServerEntity& projectile, std::int32_t signal) {
+                    player::statAwards::award(shooter, "target_hit");
+                    advancementTriggers_->fire(
+                        "target_hit", shooter.name(), shooter.uuid().toString(),
+                        world::TriggerEvent{
+                            .entities = {{"projectile", world::triggerFacts::ofEntity(world, projectile)}},
+                            .numbers = {{"signal_strength", signal}}});
+                },
             .crystalDestroyed =
                 [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                        const entity::ServerEntity& crystal, std::optional<std::int32_t> byPlayer) {
                     endFight_->crystalDestroyed(world, watchers, crystal, byPlayer);
                 }});
+    fireworks_ = std::make_unique<FireworkSystem>(playerRegistry_, *combat_,
+                                                  FireworkSystem::Options{.nextSeed = [] { return scratchSeed(); }});
     clouds_ = std::make_unique<AreaEffectCloudSystem>(
         playerRegistry_, *combat_, AreaEffectCloudSystem::Options{.entityTags = &vanillaData_.entityTags});
     endFight_ = std::make_unique<EndFightSystem>(
@@ -603,6 +658,19 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                         withers_->placed(world, x, y, z);
                     }
                 },
+            .launchFirework =
+                [this](world::LoadedWorld& world, double x, double y, double z, double dirX, double dirY, double dirZ,
+                       const server::world::loot::ItemStack& stack) {
+                    // parity: `FireworkRocketItem.asProjectile` takes one of the stack.
+                    wire::nbt::NbtCompound item;
+                    item.putString("id", stack.item.toString());
+                    item.putInt("count", 1);
+                    if (stack.components.size() > 0) {
+                        item.set("components", wire::nbt::NbtTag::ofCompound(stack.components));
+                    }
+                    static_cast<void>(
+                        fireworks_->shoot(world, std::move(item), x, y, z, dirX, dirY, dirZ, 0.5F, 1.0F, std::nullopt));
+                },
             .spawnHatchling =
                 [this](world::LoadedWorld& world, const world::scheduledBlocks::Hatchling& hatched) {
                     if (spawning_ == nullptr) {
@@ -619,13 +687,36 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                         });
                 },
             .advancementTriggers = advancementTriggers_.get(),
+            .releaseHive =
+                [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                       std::int32_t stateId) {
+                    if (mobActions_ != nullptr) {
+                        mobActions_->emptyHive(world, {x, y, z}, stateId, nullptr,
+                                               world::beehives::Release::BeeReleased);
+                    }
+                },
+            .tickBeehive =
+                [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                       std::vector<world::BlockChange>& pending) {
+                    return mobActions_ != nullptr && mobActions_->tickBeehive(world, x, y, z, pending);
+                },
             .shriekerHeard =
                 [this](world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival) {
                     if (shriekers_ != nullptr) {
                         shriekers_->heard(world, arrival);
                     }
                 }});
-    raids_ = std::make_unique<RaidSystem>(playerRegistry_, *broadcaster_, *spawning_, RaidSystem::Hooks{},
+    // parity: `Raid.absorbRaidOmen` and `Raid.tick`'s victory, each a statistic and a trigger.
+    RaidSystem::Hooks raidHooks;
+    raidHooks.raidTriggered = [this](player::PlayerSession& player) {
+        player::statAwards::award(player, "raid_trigger");
+        advancementTriggers_->fire("voluntary_exile", player.name(), player.uuid().toString());
+    };
+    raidHooks.raidWon = [this](player::PlayerSession& player) {
+        player::statAwards::award(player, "raid_win");
+        advancementTriggers_->fire("hero_of_the_village", player.name(), player.uuid().toString());
+    };
+    raids_ = std::make_unique<RaidSystem>(playerRegistry_, *broadcaster_, *spawning_, std::move(raidHooks),
                                           RaidSystem::Options{.nextSeed = [] { return scratchSeed(); }}, logger_);
     statusEffects_ = std::make_unique<StatusEffectSystem>(
         playerRegistry_, [this](world::LoadedWorld& world, player::PlayerSession& player,
@@ -683,11 +774,20 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     mobHooks.curedZombieVillager = [this](const wire::common::Uuid& uuid) {
         player::PlayerSession* session = playerRegistry_.get(uuid);
         if (session != nullptr && advancementTriggers_ != nullptr) {
-            advancementTriggers_->onCuredZombieVillager(session->name(), uuid.toString());
+            // parity: `CuredZombieVillagerTrigger`, the zombie that was and the villager that is.
+            advancementTriggers_->fire(
+                "cured_zombie_villager", session->name(), uuid.toString(),
+                world::TriggerEvent{
+                    .entities = {{"zombie", {.type = wire::common::Identifier::vanilla("zombie_villager")}},
+                                 {"villager", {.type = wire::common::Identifier::vanilla("villager")}}}});
         }
     };
     mobHooks.witherShoots = [this](world::LoadedWorld& world, entity::ServerEntity& wither) {
         withers_->shootAtTarget(world, wither);
+    };
+    mobHooks.launchFirework = [this](world::LoadedWorld& world, wire::nbt::NbtCompound item, double x, double y,
+                                     double z, std::int32_t ownerId) {
+        static_cast<void>(fireworks_->launch(world, std::move(item), x, y, z, ownerId));
     };
     mobHooks.spawnOrb = [this](world::LoadedWorld& world, double x, double y, double z, std::int32_t value) {
         orbs_->spawn(world, x, y, z, value);
@@ -701,7 +801,14 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         }
         session->stats.increment(storage::stats::animalsBred());
         if (advancementTriggers_ != nullptr) {
-            advancementTriggers_->onBredAnimals(session->name(), std::string{cause}, child, parent, partner);
+            // parity: `BredAnimalsTrigger`, which tries the parents both ways round.
+            const server::world::loot::EntityFacts newborn{.type = child, .baby = true};
+            for (const auto& [one, other] : {std::pair{parent, partner}, std::pair{partner, parent}}) {
+                advancementTriggers_->fire(
+                    "bred_animals", session->name(), std::string{cause},
+                    world::TriggerEvent{
+                        .entities = {{"child", newborn}, {"parent", {.type = one}}, {"partner", {.type = other}}}});
+            }
         }
     };
     mobActions_ =

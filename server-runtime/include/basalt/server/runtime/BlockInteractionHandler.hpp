@@ -131,8 +131,9 @@ public:
     void handleUseItemOn(const wire::protocol::play::ServerboundUseItemOnPacket& useItemOn);
 
     /// parity: `ITEM_USED_ON_BLOCK`, raised by the items whose use changes the block clicked.
-    void awardItemUsedOn(const player::PlayerSession& session, const std::optional<std::int32_t>& clickedState,
-                         const wire::common::Identifier& item) const;
+    void awardItemUsedOn(const player::PlayerSession& session, const wire::protocol::play::BlockPos& pos,
+                         const std::optional<std::int32_t>& clickedState,
+                         const std::optional<storage::StoredItemStack>& tool) const;
 
     void handleUseItem(const wire::protocol::play::ServerboundUseItemPacket& useItem);
 

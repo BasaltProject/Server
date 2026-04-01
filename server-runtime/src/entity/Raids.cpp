@@ -40,12 +40,6 @@ constexpr std::array<std::string_view, 4> kStatusNames{"ongoing", "victory", "lo
     return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(high)) << 32U) | static_cast<std::uint32_t>(low);
 }
 
-/// parity: `HashCommon.mix`, where an int key lands in fastutil's table.
-[[nodiscard]] std::uint32_t mix(std::int32_t key) {
-    const std::uint32_t hash = static_cast<std::uint32_t>(key) * 0x9E3779B9U;
-    return hash ^ (hash >> 16U);
-}
-
 [[nodiscard]] std::string pathFor(std::string_view worldRoot) { return std::string{worldRoot} + "/raids.nbt"; }
 
 } // namespace
@@ -243,25 +237,26 @@ Raid* RaidManager::nearby(const RaidPos& pos, std::int32_t maxDistanceSquared) {
 std::int32_t RaidManager::add(std::unique_ptr<Raid> raid) {
     const std::int32_t id = ++nextId_;
     raids_.insert_or_assign(id, std::move(raid));
+    order_.insert(id);
     dirty = true;
     return id;
 }
 
 void RaidManager::remove(std::int32_t id) {
     raids_.erase(id);
+    order_.remove(id);
     dirty = true;
 }
 
-std::vector<std::int32_t> RaidManager::tickOrder() const {
-    // parity: fastutil walks its table from the last slot down; a small map never grows past 32.
-    std::vector<std::int32_t> ids;
-    for (const auto& [id, raid] : raids_) {
-        ids.push_back(id);
-    }
-    constexpr std::uint32_t kMask = 31;
-    std::ranges::stable_sort(
-        ids, [](std::int32_t left, std::int32_t right) { return (mix(left) & kMask) > (mix(right) & kMask); });
-    return ids;
+void RaidManager::forEachInTickOrder(const std::function<bool(std::int32_t id, Raid& raid)>& visit) {
+    order_.iterate([&](std::int32_t id) {
+        if (!visit(id, *raids_.at(id))) {
+            return false;
+        }
+        raids_.erase(id);
+        dirty = true;
+        return true;
+    });
 }
 
 void RaidManager::encode(NbtCompound& tag) const {
@@ -279,6 +274,7 @@ void RaidManager::encode(NbtCompound& tag) const {
 
 void RaidManager::decode(const NbtCompound& tag) {
     raids_.clear();
+    order_ = IntHashOrder{};
     nextId_ = tag.getInt("next_id", 1);
     tick = tag.getInt("tick");
     if (const NbtList* raids = tag.getList("raids"); raids != nullptr) {
@@ -289,6 +285,7 @@ void RaidManager::decode(const NbtCompound& tag) {
             }
             if (std::unique_ptr<Raid> raid = Raid::decode(*compound, ++seeds_); raid != nullptr) {
                 raids_.insert_or_assign(compound->getInt("id"), std::move(raid));
+                order_.insert(compound->getInt("id"));
             }
         }
     }

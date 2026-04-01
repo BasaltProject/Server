@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <map>
+#include <mutex>
 
 namespace basalt::server::storage {
 
@@ -38,11 +40,28 @@ std::string stats::mined(std::string_view block) { return std::string{kMined} + 
 
 std::string stats::used(std::string_view item) { return std::string{kUsed} + "/" + std::string{item}; }
 
+std::string stats::crafted(std::string_view item) { return std::string{kCrafted} + "/" + std::string{item}; }
+
+std::string stats::broken(std::string_view item) { return std::string{kBroken} + "/" + std::string{item}; }
+
+std::string stats::pickedUp(std::string_view item) { return std::string{kPickedUp} + "/" + std::string{item}; }
+
+std::string stats::dropped(std::string_view item) { return std::string{kDropped} + "/" + std::string{item}; }
+
+std::string stats::killed(std::string_view entityType) { return std::string{kKilled} + "/" + std::string{entityType}; }
+
+std::string stats::killedBy(std::string_view entityType) {
+    return std::string{kKilledBy} + "/" + std::string{entityType};
+}
+
 namespace {
 
 const std::string& named(std::string_view name) {
     // One string per counter, built once: these are compared and looked up, never rebuilt per tick.
+    // Asked from every connection's thread; a node's string never moves once it is in.
+    static std::mutex guard;
     static std::map<std::string, std::string, std::less<>> built;
+    const std::scoped_lock lock{guard};
     const auto found = built.find(name);
     if (found != built.end()) {
         return found->second;

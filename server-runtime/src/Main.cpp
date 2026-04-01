@@ -15,6 +15,7 @@
 #include <basalt/wire/auth/HttpsClient.hpp>
 #include <basalt/wire/auth/MojangSessionService.hpp>
 #include <basalt/wire/auth/SessionKeyPair.hpp>
+#include <basalt/wire/auth/SignatureValidator.hpp>
 #include <basalt/wire/common/logging/LogOutput.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 #include <basalt/wire/common/logging/Panic.hpp>
@@ -84,6 +85,7 @@ struct Instance {
     std::unique_ptr<world::VanillaWorldGeneratorFactory> generators;
     std::optional<wire::auth::SessionKeyPair> keyPair;
     std::unique_ptr<wire::auth::MojangSessionService> sessions;
+    std::unique_ptr<wire::auth::ServicesKeySet> servicesKeys;
     std::unique_ptr<BasaltServer> server;
 };
 
@@ -178,6 +180,14 @@ template <typename T>
         instance->sessions = std::make_unique<wire::auth::MojangSessionService>();
         options.keyPair = instance->keyPair.has_value() ? &*instance->keyPair : nullptr;
         options.sessionService = instance->sessions.get();
+        // parity: authlib fetches Mojang's public keys once at start; without them no chat
+        // session can be checked and secure chat is not enforced.
+        instance->servicesKeys = std::make_unique<wire::auth::ServicesKeySet>(wire::auth::ServicesKeySet::fetch());
+        if (!instance->servicesKeys->canValidateProfileKeys()) {
+            wire::common::Logger{"Auth"}.warn(
+                [] { return std::string{"Could not fetch Mojang's public keys: chat sessions will be ignored."}; });
+        }
+        options.servicesKeys = instance->servicesKeys.get();
     }
     // Console-only: clients translate for themselves, a log file cannot. Unpacked from the same
     // server.jar as everything else, so this costs no extra download.

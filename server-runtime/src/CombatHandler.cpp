@@ -13,6 +13,7 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/Cushions.hpp>
 #include <basalt/server/runtime/world/DamageProtection.hpp>
 #include <basalt/server/runtime/world/FallLanding.hpp>
@@ -113,11 +114,15 @@ void CombatHandler::trackFall(PlayerSession& session, double y, bool onGround,
         session.flying || session.gamemode == Gamemode::Creative || session.gamemode == Gamemode::Spectator ||
         (feetState.has_value() && (world::fluids::of(*feetState) != world::Submersion::None || climbing));
     if (cancelled) {
-        fallDistance = 0.0;
+        resetFall(session);
         return;
     }
     if (!onGround && y < session.y) {
         fallDistance += session.y - y;
+    }
+    // parity: `trackStartFallingPosition`, where the player is once any fall is counted.
+    if (fallDistance > 0.0 && !fallStart.has_value()) {
+        fallStart = std::array<double, 3>{session.x, y, session.z};
     }
     if (onGround && !session.onGround) {
         // parity: `Entity.checkFallDamage` raises `HIT_GROUND` at the landing whenever anything was
@@ -132,11 +137,21 @@ void CombatHandler::trackFall(PlayerSession& session, double y, bool onGround,
             }
         }
         applyFallDamage(session, y);
-        fallDistance = 0.0;
+        resetFall(session);
     }
     if (onGround) {
-        fallDistance = 0.0;
+        resetFall(session);
     }
+}
+
+void CombatHandler::resetFall(const PlayerSession& session) {
+    world::AdvancementTriggers* triggers = owner_->options().advancementTriggers;
+    if (session.health() > 0.0F && fallStart.has_value() && triggers != nullptr) {
+        triggers->fire("fall_from_height", session.name(), session.uuid().toString(),
+                       world::TriggerEvent{.startPosition = fallStart});
+    }
+    fallStart.reset();
+    fallDistance = 0.0;
 }
 
 void CombatHandler::bounceOn(PlayerSession& session, world::LoadedWorld& world, double landingY) {

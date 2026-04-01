@@ -32,6 +32,8 @@
 #include <basalt/server/runtime/player/PlayerBlockToggle.hpp>
 #include <basalt/server/runtime/player/PlayerBooks.hpp>
 #include <basalt/server/runtime/player/PlayerBuckets.hpp>
+#include <basalt/server/runtime/player/PlayerCakesAndPots.hpp>
+#include <basalt/server/runtime/player/PlayerCauldrons.hpp>
 #include <basalt/server/runtime/player/PlayerContainers.hpp>
 #include <basalt/server/runtime/player/PlayerCooldowns.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
@@ -47,6 +49,7 @@
 #include <basalt/server/runtime/player/PlayerSpawnItems.hpp>
 #include <basalt/server/runtime/player/PlayerSweep.hpp>
 #include <basalt/server/runtime/player/PlayerThrown.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/AnvilEnchantments.hpp>
 #include <basalt/server/runtime/world/Beacons.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
@@ -66,6 +69,7 @@
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/Shelves.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WeaponDamage.hpp>
 #include <basalt/wire/bedrock/BedrockEntityIdentifiers.hpp>
@@ -883,6 +887,10 @@ void BasaltServer::startBedrockListener() {
                 entity::entityCombat::rememberPlayer(*target, session->uuid());
                 // parity: `Player.attack` wears the weapon by one point per hit, and unbreaking
                 // gets its say before the wear lands rather than repairing it afterwards.
+                // parity: `ItemStack.hurtEnemy`, which counts a `weapon` as used.
+                if (held.has_value() && item::itemWear::costPerAttack(*held) > 0) {
+                    player::statAwards::used(*session, held->id);
+                }
                 if (session->gamemode != wire::protocol::play::Gamemode::Creative && held.has_value() &&
                     item::itemWear::isDamageable(*held)) {
                     item::ItemDamageEffects effects{
@@ -896,6 +904,10 @@ void BasaltServer::startBedrockListener() {
                     if (worn != held) {
                         session->inventory.set(player::PlayerInventory::kHotbarStart + session->inventory.heldSlot(),
                                                worn);
+                        if (!worn.has_value()) {
+                            player::statAwards::itemBroken(*session, held->id, player::statAwards::kBreakMainHand,
+                                                           &playerRegistry_);
+                        }
                         if (session->connection().sendInventoryAll) {
                             session->connection().sendInventoryAll();
                         }
@@ -1004,7 +1016,7 @@ void BasaltServer::startBedrockListener() {
                     return;
                 }
                 // parity: `Animal.mobInteract`: love for a grown one, a faster childhood for a calf.
-                const bool baby = target->age < 0;
+                const std::optional<world::TriggerItem> used = world::triggerFacts::itemOf(held);
                 if (entity::breeding::canFallInLove(*target)) {
                     entity::breeding::feed(*target, session->uuid().toString());
                 } else if (entity::breeding::canAgeUp(*target)) {
@@ -1013,8 +1025,11 @@ void BasaltServer::startBedrockListener() {
                     return;
                 }
                 if (advancementTriggers_ != nullptr) {
-                    advancementTriggers_->onInteractedWithEntity(session->name(), session->uuid().toString(),
-                                                                 target->type(), baby, *item);
+                    advancementTriggers_->fire(
+                        "player_interacted_with_entity", session->name(), session->uuid().toString(),
+                        world::TriggerEvent{
+                            .entities = {{"entity", world::triggerFacts::ofEntity(*found->second, *target)}},
+                            .items = {{"item", used.value_or(world::TriggerItem{.item = *item})}}});
                 }
                 if (session->gamemode == wire::protocol::play::Gamemode::Creative) {
                     return;
@@ -1615,11 +1630,20 @@ void BasaltServer::startBedrockListener() {
                                                                     hit.z, *clickedState));
                             return;
                         }
-                        if (player::ringBellFor(blocks, *found->second, hit.x, hit.y, hit.z, hit.direction,
-                                                hit.clickY) ||
-                            player::tuneNoteBlockFor(blocks, *found->second, hit.x, hit.y, hit.z) ||
+                        if (player::ringBellFor(blocks, *found->second, hit.x, hit.y, hit.z, hit.direction, hit.clickY,
+                                                session) ||
+                            player::tuneNoteBlockFor(blocks, *found->second, hit.x, hit.y, hit.z, session) ||
                             player::toggleBlockFor(blocks, *found->second, hit.x, hit.y, hit.z, session->yaw) ||
                             player::cycleBlockFor(blocks, *found->second, hit.x, hit.y, hit.z)) {
+                            return;
+                        }
+                        const std::int32_t usedSlot = player::PlayerInventory::kHotbarStart + hotbarSlot;
+                        if (player::useCauldronFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, usedSlot,
+                                                   session->inventory.at(usedSlot)) ||
+                            player::useCakeFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, usedSlot,
+                                               session->inventory.at(usedSlot), hit.clickY) ||
+                            player::useFlowerPotFor(blocks, *session, *found->second, hit.x, hit.y, hit.z, usedSlot,
+                                                    session->inventory.at(usedSlot))) {
                             return;
                         }
                     }

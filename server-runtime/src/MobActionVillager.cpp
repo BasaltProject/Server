@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
+#include <basalt/server/runtime/config/WorldsConfig.hpp>
 #include <basalt/server/runtime/entity/Attributes.hpp>
 #include <basalt/server/runtime/entity/MobCombat.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -22,9 +23,9 @@ void MobActionSystem::tickVillager(world::LoadedWorld& world, entity::ServerEnti
                                    .night = world::beds::isNight(world.clock().totalTicks()),
                                    .dayTime = world.clock().totalTicks(),
                                    .gameTime = world.gameTime(),
-                                   .raidNearby =
-                                       RaidSystem::raidAt(world, villager.x, villager.y, villager.z) != nullptr,
                                    .speed = villager.attributeWithModifiers(entity::attribute::kMovementSpeed)};
+    entity::villager::villagerBrain::stateOf(villager).dimension =
+        config::dimensionRegistryKey(world.declaration().dimension);
     entity::villager::villagerBrain::tick(context, villagersIn(world));
     travelMob(world, villager, context.speed);
 }

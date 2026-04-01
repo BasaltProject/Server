@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/BlockPlacement.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
@@ -164,6 +165,7 @@ bool eatHeldItem(const BreakContext& context, PlayerSession& player, world::Load
     static constexpr std::array<std::string_view, 4> kDrunk{"milk_bucket", "potion", "honey_bottle", "ominous_bottle"};
     const bool drunk = std::ranges::find(kDrunk, id->path()) != kDrunk.end();
     world::vibrations::emit(world.state(), drunk ? "drink" : "eat", player.x, player.y, player.z, world.gameTime());
+    statAwards::used(player, eaten.id);
 
     player.food.eat(food->nutrition, food->saturation);
     // parity: `OminousBottleAmplifier.onConsume`, Bad Omen for 100 minutes at the bottle's level.

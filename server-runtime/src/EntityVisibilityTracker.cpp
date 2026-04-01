@@ -342,7 +342,8 @@ void EntityVisibilityTracker::syncPlayers() {
                                                        .name = other->name(),
                                                        .listed = true,
                                                        .gamemode = other->gamemode,
-                                                       .properties = other->profileProperties}})
+                                                       .properties = other->profileProperties,
+                                                       .chatSession = other->chatSession()}})
                 .write(buffer);
         });
         owner_->sendPlayPacket(SpawnEntityPacket::kId, [&](wire::io::ByteBuffer& buffer) {

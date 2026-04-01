@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/PlayerLifecycle.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
+#include <basalt/server/runtime/player/PlayerGliding.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/sched/Owner.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
@@ -166,7 +167,13 @@ void ClientSession::startOutboundLoop() {
                         chunkStreamer_->sendBudget -= static_cast<float>(chunkStreamer_->flushReadyChunks(allowed));
                     }
                     lifecycle_->tickPlayer();
+                    chatSpam_.tick();
+                    commandSpam_.tick();
                     trades_->tick();
+                    if (player::PlayerSession* glider = playerSession();
+                        glider != nullptr && currentWorld() != nullptr) {
+                        player::gliding::tick(blockInteraction_->breakContext(), *glider, *currentWorld());
+                    }
                     entityTracker_->syncPlayers();
                     entityTracker_->syncNpcs();
                     uiState_->syncPosture();

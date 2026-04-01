@@ -58,6 +58,10 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     };
     options.onlineMode = options_.sessionService;
     options.keyPair = options_.keyPair;
+    options.servicesKeys = options_.servicesKeys;
+    // parity: `DedicatedServer.enforceSecureProfile`, the setting only with online mode and keys.
+    options.enforceSecureProfile = config_->enforceSecureProfile && options_.sessionService != nullptr &&
+                                   options_.servicesKeys != nullptr && options_.servicesKeys->canValidateProfileKeys();
     options.forwarding = config_->forwarding;
     options.playerRegistry = &playerRegistry_;
     options.worlds = namedWorlds();
@@ -102,6 +106,7 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     options.fishing = fishing_.get();
     options.maps = maps_.get();
     options.withers = withers_.get();
+    options.fireworks = fireworks_.get();
     options.mobs = mobActions_.get();
     options.awardExperience = [this](world::LoadedWorld& world, double x, double y, double z, std::int32_t amount) {
         orbs_->award(world, x, y, z, amount);

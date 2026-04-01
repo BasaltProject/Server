@@ -208,7 +208,7 @@ TEST_CASE("the nether biomes carry their sounds, music and particles in that ord
 TEST_CASE("the configuration packets go out in the order a client resolves ids in") {
     const std::vector<basalt::wire::protocol::configuration::RegistryDataPacket> packets =
         vanillaConfigurationRegistries::packets();
-    REQUIRE(packets.size() == 24);
+    REQUIRE(packets.size() == 25);
 
     std::vector<std::string> order;
     std::int32_t entries = 0;
@@ -224,7 +224,7 @@ TEST_CASE("the configuration packets go out in the order a client resolves ids i
         joined += id;
     }
     CHECK(joined == "minecraft:world_clock,minecraft:dimension_type,minecraft:worldgen/biome,"
-                    "minecraft:banner_pattern,minecraft:wolf_variant,minecraft:wolf_sound_variant,"
+                    "minecraft:chat_type,minecraft:banner_pattern,minecraft:wolf_variant,minecraft:wolf_sound_variant,"
                     "minecraft:pig_variant,minecraft:pig_sound_variant,minecraft:frog_variant,"
                     "minecraft:cat_variant,minecraft:cat_sound_variant,minecraft:cow_sound_variant,"
                     "minecraft:cow_variant,minecraft:chicken_sound_variant,minecraft:chicken_variant,"
@@ -233,14 +233,14 @@ TEST_CASE("the configuration packets go out in the order a client resolves ids i
                     "minecraft:decorated_pot_pattern,minecraft:block_transformer,"
                     "minecraft:worldgen/block_state_provider");
     // 2 clocks, 4 dimensions, 67 biomes, 43 banners, 51 across the animal variants, 51 paintings,
-    // 11 trims, 51 damage types, 22 songs, 8 instruments, 23 pot patterns, 3 transformers and 8
-    // state providers.
-    CHECK(entries == 343);
+    // 11 trims, 51 damage types, 22 songs, 8 instruments, 23 pot patterns, 3 transformers, 8
+    // state providers and 7 chat types.
+    CHECK(entries == 350);
 
     // Every key is namespaced. An entry with no value means "the client already knows this one",
-    // which only the three registries 26.3 sends from the shared vanilla pack are.
-    const std::set<std::string> known{"minecraft:decorated_pot_pattern", "minecraft:block_transformer",
-                                      "minecraft:worldgen/block_state_provider"};
+    // which only the four registries 26.3 sends from the shared vanilla pack are.
+    const std::set<std::string> known{"minecraft:chat_type", "minecraft:decorated_pot_pattern",
+                                      "minecraft:block_transformer", "minecraft:worldgen/block_state_provider"};
     for (const auto& packet : packets) {
         CAPTURE(packet.registryId);
         CHECK_FALSE(packet.entries.empty());
@@ -263,7 +263,7 @@ TEST_CASE("the configuration packets go out in the order a client resolves ids i
 
     // Every painting the jar ships, each with its own size and its own two translation keys. A
     // client told about one of them draws every other as that one.
-    const auto& paintings = packets[16];
+    const auto& paintings = packets[17];
     REQUIRE(paintings.entries.size() == 51);
     CHECK(paintings.entries.front().key == "minecraft:alban");
     CHECK(paintings.entries.back().key == "minecraft:wither");
@@ -277,7 +277,7 @@ TEST_CASE("the configuration packets go out in the order a client resolves ids i
 
     // Every entry's value is its own, not the first one's repeated: the wolf variants are the
     // clearest case, because each names its own asset.
-    const auto& wolves = packets[4];
+    const auto& wolves = packets[5];
     REQUIRE(wolves.entries.size() == 9);
     CHECK(wolves.entries[0].key == "minecraft:pale");
     CHECK(wolves.entries[4].key == "minecraft:ashen");
@@ -289,7 +289,7 @@ TEST_CASE("the configuration packets go out in the order a client resolves ids i
     CHECK(biomes.entries.front().value->get<nbt::NbtCompound>()->find("effects") != nullptr);
 
     // A trim material's colour reaches its description rather than being dropped on the way.
-    const auto& quartz = packets[17].entries.front();
+    const auto& quartz = packets[18].entries.front();
     CHECK(quartz.key == "minecraft:quartz");
     CHECK(quartz.value->get<nbt::NbtCompound>()->find("description") != nullptr);
 }
