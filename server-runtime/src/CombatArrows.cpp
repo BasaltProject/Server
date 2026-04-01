@@ -8,10 +8,12 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/PotionEffects.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <set>
 #include <string_view>
 
 namespace basalt::server::runtime {
@@ -106,6 +108,44 @@ void CombatSystem::deflectArrow(ServerEntity& arrow) {
     }
 }
 
+void CombatSystem::arrowTriggers(const world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                                 ServerEntity& arrow, const ServerEntity& mob, float damage, bool died) {
+    world::AdvancementTriggers* triggers = options_.advancementTriggers;
+    const auto shooter = std::ranges::find_if(watchers, [&arrow](const PlayerSession* player) {
+        return arrow.ownerId.has_value() && player->entityId() == *arrow.ownerId;
+    });
+    if (triggers == nullptr || shooter == watchers.end()) {
+        return;
+    }
+    world::triggerFacts::playerHurtEntity(*triggers, world, **shooter, mob, damage, world::damageTypes::kArrow,
+                                          world::triggerFacts::ofEntity(world, arrow));
+    // parity: `AbstractArrow.onHitEntity`: a piercing arrow names all it killed on every hit, any
+    // other only the one it just killed.
+    std::vector<wire::common::Identifier> killed;
+    if (arrow.pierceLevel > 0) {
+        if (died) {
+            arrow.piercedAndKilled.push_back(mob.type());
+        }
+        killed = arrow.piercedAndKilled;
+    } else if (died) {
+        killed.push_back(mob.type());
+    } else {
+        return;
+    }
+    world::TriggerEvent event;
+    std::set<wire::common::Identifier> kinds;
+    for (const wire::common::Identifier& type : killed) {
+        event.victims.push_back(server::world::loot::EntityFacts{.type = type});
+        kinds.insert(type);
+    }
+    event.numbers.emplace("unique_entity_types", static_cast<double>(kinds.size()));
+    if (arrow.firedFromWeapon.has_value()) {
+        event.items.emplace("fired_from_weapon", world::TriggerItem{.item = *arrow.firedFromWeapon,
+                                                                    .components = arrow.firedFromWeaponComponents});
+    }
+    triggers->fire("killed_by_arrow", (*shooter)->name(), (*shooter)->uuid().toString(), event);
+}
+
 CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
                                                     const std::vector<PlayerSession*>& watchers,
                                                     const std::vector<ServerEntity*>& living, ServerEntity& arrow,
@@ -174,6 +214,7 @@ CombatSystem::ArrowHit CombatSystem::hitEntityAlong(world::LoadedWorld& world,
         }
         mob.panicTicks = kPanicTicks;
         announceEntityHit(watchers, mob, world::damageTypes::kArrow, arrow.entityId(), result.died);
+        arrowTriggers(world, watchers, arrow, mob, static_cast<float>(damage), result.died);
         if (!result.died) {
             arrowEffects(world, watchers, living, arrow, &mob, nullptr);
         }

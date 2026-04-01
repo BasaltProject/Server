@@ -341,6 +341,11 @@ public:
     /// parity: `AbstractArrow.pierceLevel`, and the ids it has already gone through.
     std::int8_t pierceLevel = 0;
     std::vector<std::int32_t> piercedIds;
+    /// parity: `AbstractArrow.firedFromWeapon` and `piercedAndKilledEntities`, what the shooter's
+    /// `killed_by_arrow` reads.
+    std::optional<wire::common::Identifier> firedFromWeapon;
+    wire::nbt::NbtCompound firedFromWeaponComponents;
+    std::vector<wire::common::Identifier> piercedAndKilled;
 
     /// parity: `Ravager.attackTick`, `stunnedTick` and `roarTick`; any of them holds it still.
     std::int32_t ravagerAttackTicks = 0;

@@ -215,4 +215,32 @@ loot::LootContext atBlock(RealLootTables& tables, LoadedWorld& world, const play
     return context;
 }
 
+std::optional<loot::EntityFacts> ofId(const LoadedWorld& world, const std::vector<player::PlayerSession*>& players,
+                                      std::int32_t id) {
+    for (const player::PlayerSession* player : players) {
+        if (player != nullptr && player->entityId() == id) {
+            return ofPlayer(*player);
+        }
+    }
+    const entity::ServerEntity* mob = world.state().entity(id);
+    return mob == nullptr ? std::nullopt : std::optional{ofEntity(world, *mob)};
+}
+
+void playerHurtEntity(AdvancementTriggers& triggers, const LoadedWorld& world, const player::PlayerSession& player,
+                      const entity::ServerEntity& victim, float dealt, const Identifier& damageType,
+                      const std::optional<loot::EntityFacts>& direct) {
+    if (!triggers.listensTo("player_hurt_entity")) {
+        return;
+    }
+    const loot::EntityFacts attacker = ofPlayer(player);
+    triggers.fire("player_hurt_entity", player.name(), player.uuid().toString(),
+                  TriggerEvent{.entities = {{"entity", ofEntity(world, victim)}},
+                               .damage = TriggerDamage{.dealt = dealt,
+                                                       .taken = dealt,
+                                                       .type = damageType,
+                                                       .direct = direct.has_value() ? direct : attacker,
+                                                       .source = attacker,
+                                                       .directHit = !direct.has_value()}});
+}
+
 } // namespace basalt::server::runtime::world::triggerFacts

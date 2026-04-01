@@ -14,6 +14,7 @@ struct DamageSource;
 } // namespace basalt::server::runtime::entity
 
 namespace basalt::server::runtime::world {
+class AdvancementTriggers;
 class LoadedWorld;
 class RealEnchantments;
 } // namespace basalt::server::runtime::world
@@ -43,6 +44,8 @@ struct DamageContext {
     std::function<void(PlayerSession& player, std::int32_t cooldownTicks)> disableBlocking;
     /// What dying needs, for the hit that takes the last half heart.
     DeathContext death;
+    /// Where `entity_hurt_player` and `entity_killed_player` go.
+    world::AdvancementTriggers* triggers = nullptr;
 };
 
 /// Whether a raised shield faces a hit coming from there, which is what turns an arrow back.

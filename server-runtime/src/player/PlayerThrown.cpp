@@ -166,6 +166,8 @@ void shootBowFor(const BreakContext& context, PlayerSession& player, world::Load
         infinite ? entity::ServerEntity::ArrowPickup::CreativeOnly : entity::ServerEntity::ArrowPickup::Allowed;
     arrow.heldItem = std::string{parsedOrNothing(ammo.id).value_or(Identifier::vanilla("arrow")).path()};
     arrow.heldItemComponents = ammo.components;
+    arrow.firedFromWeapon = parsedOrNothing(held->id);
+    arrow.firedFromWeaponComponents = held->components;
 
     const double roll = context.nextDouble ? context.nextDouble() : 0.5;
     const auto soundPitch = static_cast<float>((1.0 / ((roll * 0.4) + 1.2)) + (static_cast<double>(power) * 0.5));

@@ -8,6 +8,8 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/player/StatAwards.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 #include <basalt/server/runtime/world/RealItemTags.hpp>
@@ -387,6 +389,8 @@ void shoot(const BreakContext& context, FireworkSystem* fireworks, PlayerSession
                     wire::common::Identifier::parse(projectile.id);
                 arrow.heldItem = std::string{id.has_value() ? id->path() : "arrow"};
                 arrow.heldItemComponents = projectile.components;
+                arrow.firedFromWeapon = wire::common::Identifier::vanilla("crossbow");
+                arrow.firedFromWeaponComponents = weapon->components;
             }
         }
         playNear(context, player, world, "item.crossbow.shoot", 1.0F, shotPitch(random, index));
@@ -394,6 +398,18 @@ void shoot(const BreakContext& context, FireworkSystem* fireworks, PlayerSession
             break;
         }
     }
+    // parity: `CrossbowItem.performShooting` ends in `SHOT_CROSSBOW` and the used statistic.
+    if (context.triggers != nullptr) {
+        const std::expected<wire::common::Identifier, wire::common::IdentifierError> id =
+            wire::common::Identifier::parse(weapon->id);
+        if (id.has_value()) {
+            context.triggers->fire(
+                "shot_crossbow", player.name(), player.uuid().toString(),
+                world::TriggerEvent{
+                    .items = {{"item", world::TriggerItem{.item = *id, .components = weapon->components}}}});
+        }
+    }
+    statAwards::used(player, weapon->id);
 }
 
 } // namespace basalt::server::runtime::player::crossbow

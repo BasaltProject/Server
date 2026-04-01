@@ -601,6 +601,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                             .entities = {{"projectile", world::triggerFacts::ofEntity(world, projectile)}},
                             .numbers = {{"signal_strength", signal}}});
                 },
+            .advancementTriggers = advancementTriggers_.get(),
             .crystalDestroyed =
                 [this](world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                        const entity::ServerEntity& crystal, std::optional<std::int32_t> byPlayer) {

@@ -18,8 +18,9 @@ class PlayerSession;
 }
 
 namespace basalt::server::runtime::world {
+class AdvancementTriggers;
 class LoadedWorld;
-}
+} // namespace basalt::server::runtime::world
 
 namespace basalt::server::runtime {
 
@@ -60,6 +61,8 @@ public:
         std::function<void(world::LoadedWorld& world, player::PlayerSession& shooter,
                            const entity::ServerEntity& projectile, std::int32_t signal)>
             targetHit;
+        /// Where a player's arrow's `player_hurt_entity` and `killed_by_arrow` go.
+        world::AdvancementTriggers* advancementTriggers = nullptr;
         /// A crystal went, by that player if one was behind it.
         std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            const entity::ServerEntity& crystal, std::optional<std::int32_t> byPlayer)>
@@ -159,6 +162,10 @@ private:
     ArrowHit hitEntityAlong(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                             const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& arrow, double fromX,
                             double fromY, double fromZ);
+
+    /// parity: what `AbstractArrow.onHitEntity` tells its shooting player's advancements.
+    void arrowTriggers(const world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                       entity::ServerEntity& arrow, const entity::ServerEntity& mob, float damage, bool died);
 
     /// The gust a wind charge leaves where it landed.
     void gustWhereItLanded(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, double x,
