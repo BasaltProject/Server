@@ -168,6 +168,27 @@ ServerEntity* NaturalSpawningSystem::materializeEventMob(world::LoadedWorld& wor
     return materializeForest(world, forest);
 }
 
+ServerEntity* NaturalSpawningSystem::spawnEventRaider(world::LoadedWorld& world, const Identifier& type, double x,
+                                                      double y, double z, random::RandomSource& random,
+                                                      const std::function<void(ServerEntity&)>& initialize) {
+    const auto blockX = static_cast<std::int32_t>(std::floor(x));
+    const auto blockY = static_cast<std::int32_t>(std::floor(y));
+    const auto blockZ = static_cast<std::int32_t>(std::floor(z));
+    const world::MobSpawnContext context{.random = &random,
+                                         .specialMultiplier = specialMultiplierAt(world, blockX, blockZ),
+                                         .difficulty = world.difficulty(),
+                                         .equipment = equipment_,
+                                         .biome = world::naturalSpawner::biomeAt(world, blockX, blockY, blockZ),
+                                         .gameTime = world.gameTime(),
+                                         .reason = world::MobSpawnReason::Event,
+                                         .entityRandomFactory = [this] { return freshRandom(); }};
+    wire::nbt::NbtCompound data;
+    world::MobSpawnGroupData group;
+    const world::MobSpawnForest forest = world::writeGeneratedForest(data, type, 0, context, group, blockX, blockY,
+                                                                     blockZ, x, y, z, 0.0F, spawnEnvironment(world));
+    return materializeForest(world, forest, "event", true, initialize);
+}
+
 ServerEntity* NaturalSpawningSystem::materializeForest(world::LoadedWorld& world, const world::MobSpawnForest& forest,
                                                        std::string_view eventReason, bool checkMain,
                                                        const std::function<void(ServerEntity&)>& initialize) {
@@ -176,7 +197,8 @@ ServerEntity* NaturalSpawningSystem::materializeForest(world::LoadedWorld& world
     // whatever rides it, so the rider has a vehicle id to point at.
     const auto materialize = [&](auto&& self, const server::world::ChunkGeneratedEntity& descriptor,
                                  ServerEntity* vehicle) -> void {
-        const bool isMain = &descriptor == &forest.main;
+        // The forest keeps its own copy of the main mob, so it is found by value, not by address.
+        const bool isMain = main == nullptr && descriptor == forest.main;
         if ((!isMain || checkMain) &&
             !spawnAllowed(world, descriptor.type, descriptor.x, descriptor.y, descriptor.z, eventReason)) {
             return;

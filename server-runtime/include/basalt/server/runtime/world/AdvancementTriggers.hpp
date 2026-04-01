@@ -109,6 +109,7 @@ public:
     void onSleptInBed(std::string_view player, std::string_view uuid);
     void onVillagerTrade(std::string_view player, std::string_view uuid);
     void onEnchantedItem(std::string_view player, std::string_view uuid);
+    void onCuredZombieVillager(std::string_view player, std::string_view uuid);
 
     /// parity: `ConstructBeaconTrigger`, told to everyone near a beacon that just lit.
     void onConstructedBeacon(std::string_view player, std::string_view uuid, std::int32_t levels);

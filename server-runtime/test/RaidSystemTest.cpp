@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
+#include <basalt/server/runtime/entity/RaiderEquipment.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
@@ -146,24 +147,34 @@ struct RaidFixture {
 
 } // namespace
 
+namespace {
+
+/// A claimed bell at 8, 64, 8: the sections around it are a village.
+void buildVillage(LoadedWorld& world) {
+    REQUIRE(world.state().setBlockState(8, 64, 8, blocks::named("bell")->stateId));
+    REQUIRE(world.state().poi().acquire(basalt::server::runtime::world::poi::BlockPos{8, 64, 8}));
+}
+
+void standAt(PlayerSession& player, double x, double y, double z) {
+    player.x = x;
+    player.y = y;
+    player.z = z;
+}
+
+} // namespace
+
 TEST_CASE("a bad omen carried into a village turns into a raid omen") {
     RaidFixture fixture{scratch("raid-omen")};
     LoadedWorld& world = *fixture.spawn.base.world;
-    // parity: a bell somebody has claimed is what makes the sections around it a village.
-    REQUIRE(world.state().setBlockState(8, 64, 8, blocks::named("bell")->stateId));
-    REQUIRE(world.state().poi().acquire(basalt::server::runtime::world::poi::BlockPos{8, 64, 8}));
-    fixture.spawn.base.player->x = 8.0;
-    fixture.spawn.base.player->y = 64.0;
-    fixture.spawn.base.player->z = 8.0;
+    buildVillage(world);
+    standAt(*fixture.spawn.base.player, 8.0, 64.0, 8.0);
 
-    std::vector<std::pair<std::string, std::int32_t>> started;
     basalt::server::runtime::world::ActiveEffect omen{
         .effect = basalt::server::runtime::world::mobEffects::badOmen(), .amplifier = 0, .remainingTicks = 100};
     fixture.raids.tickOmens(world, *fixture.spawn.base.player, omen);
 
     REQUIRE(fixture.spawn.base.effects.size() == 1);
     CHECK(fixture.spawn.base.effects.front().first == "raid_omen");
-    // Where they were standing is where the raid will start.
     REQUIRE(fixture.spawn.base.player->raidOmenPosition.has_value());
     CHECK((*fixture.spawn.base.player->raidOmenPosition)[0] == 8);
 }
@@ -177,53 +188,100 @@ TEST_CASE("a bad omen away from any village does nothing at all") {
     CHECK_FALSE(fixture.spawn.base.player->raidOmenPosition.has_value());
 }
 
-TEST_CASE("a raid omen running out starts the raid where it was picked up") {
+TEST_CASE("a raid omen running out starts the raid at the middle of the village's claimed points") {
     RaidFixture fixture{scratch("raid-start")};
     LoadedWorld& world = *fixture.spawn.base.world;
-    fixture.spawn.base.player->raidOmenPosition = std::array<std::int32_t, 3>{8, 64, 8};
+    buildVillage(world);
+    fixture.spawn.base.player->raidOmenPosition = std::array<std::int32_t, 3>{20, 64, 20};
     basalt::server::runtime::world::ActiveEffect ending{
         .effect = basalt::server::runtime::world::mobEffects::raidOmen(), .amplifier = 1, .remainingTicks = 1};
 
     fixture.raids.tickOmens(world, *fixture.spawn.base.player, ending);
-    REQUIRE(fixture.raids.raidsIn(world).all().size() == 1);
-    const Raid& raid = *fixture.raids.raidsIn(world).all().front();
-    CHECK(raid.centerX() == 8);
-    // parity: the omen's own amplifier is what the raid's level starts at.
-    CHECK(raid.omenLevel == 2);
+    REQUIRE(world.raids().size() == 1);
+    const Raid* raid = RaidSystem::raidAt(world, 8.0, 64.0, 8.0);
+    REQUIRE(raid != nullptr);
+    CHECK(raid->center == basalt::server::runtime::entity::RaidPos{8, 64, 8});
+    // parity: the omen's amplifier plus one.
+    CHECK(raid->raidOmenLevel == 2);
     CHECK_FALSE(fixture.spawn.base.player->raidOmenPosition.has_value());
 }
 
-TEST_CASE("a raid with no waves left is won and its heroes rewarded") {
+TEST_CASE("a raid whose last wave is gone waits two seconds, then rewards its heroes") {
     RaidFixture fixture{scratch("raid-victory")};
     LoadedWorld& world = *fixture.spawn.base.world;
-    Raid* raid = fixture.raids.raidsIn(world).createOrExtend(8, 64, 8, 0, "easy");
-    REQUIRE(raid != nullptr);
-    raid->groupsSpawned = raid->totalGroups();
-    fixture.spawn.base.player->x = 8.0;
-    fixture.spawn.base.player->y = 64.0;
-    fixture.spawn.base.player->z = 8.0;
+    buildVillage(world);
+    standAt(*fixture.spawn.base.player, 8.0, 64.0, 8.0);
+    const std::int32_t id =
+        world.raids().add(std::make_unique<Raid>(basalt::server::runtime::entity::RaidPos{8, 64, 8}, 3, 1));
+    Raid& raid = *world.raids().get(id);
+    raid.started = true;
+    raid.raidOmenLevel = 1;
+    raid.groupsSpawned = 3;
+    raid.heroes.push_back(fixture.spawn.base.player->uuid());
 
-    fixture.raids.tickRaids(world);
-    CHECK(raid->status == basalt::server::runtime::entity::RaidStatus::Victory);
+    for (std::int32_t tick = 0; tick <= Raid::kPostRaidTicks; ++tick) {
+        fixture.raids.tickRaids(world);
+    }
+    CHECK(raid.status == basalt::server::runtime::entity::RaidStatus::Victory);
     REQUIRE(fixture.spawn.base.effects.size() == 1);
     CHECK(fixture.spawn.base.effects.front().first == "hero_of_the_village");
-
-    // It stays around for its celebration and is only then forgotten.
-    CHECK(fixture.raids.raidsIn(world).all().size() == 1);
     CHECK(fixture.finished.empty());
 }
 
-TEST_CASE("a raid that runs out of time stops without a victory") {
-    RaidFixture fixture{scratch("raid-timeout")};
+TEST_CASE("a raid whose village is gone after its first wave is lost, and before it just stops") {
+    RaidFixture fixture{scratch("raid-loss")};
     LoadedWorld& world = *fixture.spawn.base.world;
-    Raid* raid = fixture.raids.raidsIn(world).createOrExtend(8, 64, 8, 0, "easy");
-    REQUIRE(raid != nullptr);
-    raid->ticksActive = Raid::kTimeoutTicks - 1;
+    const std::int32_t lost =
+        world.raids().add(std::make_unique<Raid>(basalt::server::runtime::entity::RaidPos{8, 64, 8}, 3, 1));
+    world.raids().get(lost)->groupsSpawned = 1;
+    const std::int32_t stopped =
+        world.raids().add(std::make_unique<Raid>(basalt::server::runtime::entity::RaidPos{8, 64, 200}, 3, 2));
+    world.state().getOrGenerateChunk(0, 12);
 
     fixture.raids.tickRaids(world);
-    // Nothing is celebrating, so it is gone the same tick, which is why nothing here reads `raid`
-    // again: the manager owns it and has already dropped it.
-    CHECK(fixture.raids.raidsIn(world).all().empty());
+    CHECK(world.raids().get(lost)->status == basalt::server::runtime::entity::RaidStatus::Loss);
+    CHECK(world.raids().get(stopped)->isStopped());
+    fixture.raids.tickRaids(world);
+    CHECK(world.raids().get(stopped) == nullptr);
     REQUIRE(fixture.finished.size() == 1);
     CHECK_FALSE(fixture.finished.front());
+}
+
+TEST_CASE("a wave spawns round the village with a bannered captain, and each raider knows its raid") {
+    RaidFixture fixture{scratch("raid-wave")};
+    LoadedWorld& world = *fixture.spawn.base.world;
+    for (std::int32_t chunkX = -2; chunkX <= 2; ++chunkX) {
+        for (std::int32_t chunkZ = -2; chunkZ <= 2; ++chunkZ) {
+            world.state().getOrGenerateChunk(chunkX, chunkZ);
+        }
+    }
+    const std::int32_t surface =
+        world.state().chunkIfLoaded(0, 0)->heightAt(8, 8, basalt::server::world::HeightmapType::WorldSurface);
+    REQUIRE(world.state().setBlockState(8, surface, 8, blocks::named("bell")->stateId));
+    REQUIRE(world.state().poi().acquire(basalt::server::runtime::world::poi::BlockPos{8, surface, 8}));
+    standAt(*fixture.spawn.base.player, 8.0, surface, 8.0);
+    const std::int32_t id =
+        world.raids().add(std::make_unique<Raid>(basalt::server::runtime::entity::RaidPos{8, surface, 8}, 3, 9));
+    Raid& raid = *world.raids().get(id);
+    raid.raidOmenLevel = 1;
+    raid.cooldownTicks = 0;
+
+    fixture.raids.tickRaids(world);
+    REQUIRE(raid.started);
+    CHECK(raid.groupsSpawned == 1);
+    // parity: the first wave is four pillagers, plus what the bonus roll adds.
+    CHECK(raid.totalRaidersAlive() >= 4);
+    REQUIRE(raid.leaders.contains(1));
+    const ServerEntity* captain = world.state().entity(raid.leaders.at(1));
+    REQUIRE(captain != nullptr);
+    CHECK(captain->patrolLeader);
+    CHECK(basalt::server::runtime::entity::raiderEquipment::wearsOminousBanner(*captain));
+    for (const std::int32_t raiderId : raid.groups.at(1)) {
+        const ServerEntity* raider = world.state().entity(raiderId);
+        REQUIRE(raider != nullptr);
+        CHECK(raider->raidId == std::optional<std::int32_t>{id});
+        CHECK(raider->raidWave == 1);
+        CHECK(raider->canJoinRaid);
+    }
+    CHECK(raid.totalHealth > 0.0F);
 }

@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <array>
+#include <span>
 #include <string>
 
 namespace basalt::server::runtime::entity::mobStatusEffects {
@@ -88,6 +89,56 @@ void removeModifiers(ServerEntity& mob, const Identifier& effect) {
     return !one.infinite() && (one.remainingTicks < other.remainingTicks || other.infinite());
 }
 
+/// parity: `MobEffectInstance.update` on the hidden dose at `index` of the chain.
+void updateHidden(std::vector<world::ActiveEffect>& chain, std::size_t index, const world::ActiveEffect& takeOver) {
+    if (index >= chain.size()) {
+        chain.push_back(takeOver);
+        return;
+    }
+    const world::ActiveEffect before = chain[index];
+    if (takeOver.amplifier > before.amplifier) {
+        if (shorterThan(takeOver, before)) {
+            chain.insert(chain.begin() + static_cast<std::ptrdiff_t>(index) + 1, before);
+        }
+        chain[index].amplifier = takeOver.amplifier;
+        chain[index].remainingTicks = takeOver.remainingTicks;
+        chain[index].ambient = takeOver.ambient;
+    } else if (shorterThan(before, takeOver)) {
+        if (takeOver.amplifier != before.amplifier) {
+            updateHidden(chain, index + 1, takeOver);
+            return;
+        }
+        chain[index].remainingTicks = takeOver.remainingTicks;
+        chain[index].ambient = takeOver.ambient;
+    } else if (!takeOver.ambient && before.ambient) {
+        chain[index].ambient = false;
+    }
+    chain[index].visible = takeOver.visible;
+    chain[index].showIcon = takeOver.showIcon;
+}
+
+void encodeDetails(NbtCompound& entry, const world::ActiveEffect& active, std::span<const world::ActiveEffect> hidden) {
+    entry.putByte("amplifier", static_cast<std::int8_t>(active.amplifier));
+    entry.putInt("duration", active.remainingTicks);
+    entry.putBoolean("ambient", active.ambient);
+    entry.putBoolean("show_particles", active.visible);
+    entry.putBoolean("show_icon", active.showIcon);
+    if (!hidden.empty()) {
+        NbtCompound next;
+        encodeDetails(next, hidden.front(), hidden.subspan(1));
+        entry.set("hidden_effect", NbtTag::ofCompound(std::move(next)));
+    }
+}
+
+[[nodiscard]] world::ActiveEffect decodeDetails(const Identifier& id, const NbtCompound& entry) {
+    return world::ActiveEffect{.effect = id,
+                               .amplifier = entry.getByte("amplifier"),
+                               .remainingTicks = entry.getInt("duration", 1),
+                               .ambient = entry.getBoolean("ambient"),
+                               .visible = entry.getBoolean("show_particles", true),
+                               .showIcon = entry.getBoolean("show_icon", true)};
+}
+
 } // namespace
 
 bool canBeAffected(const ServerEntity& mob, const Identifier& effect) {
@@ -140,14 +191,26 @@ bool add(ServerEntity& mob, const world::ActiveEffect& effect) {
         return true;
     }
     world::ActiveEffect& current = found->second;
+    std::vector<world::ActiveEffect>& hidden = mob.hiddenEffects[effect.effect];
     bool changed = false;
     if (effect.amplifier > current.amplifier) {
+        // parity: the weaker dose outlasting the stronger one is kept aside, to come back later.
+        if (shorterThan(effect, current)) {
+            hidden.insert(hidden.begin(), current);
+        }
         current.amplifier = effect.amplifier;
         current.remainingTicks = effect.remainingTicks;
         changed = true;
-    } else if (shorterThan(current, effect) && effect.amplifier == current.amplifier) {
-        current.remainingTicks = effect.remainingTicks;
-        changed = true;
+    } else if (shorterThan(current, effect)) {
+        if (effect.amplifier == current.amplifier) {
+            current.remainingTicks = effect.remainingTicks;
+            changed = true;
+        } else {
+            updateHidden(hidden, 0, effect);
+        }
+    }
+    if (hidden.empty()) {
+        mob.hiddenEffects.erase(effect.effect);
     }
     if (changed) {
         applyModifiers(mob, current.effect, current.amplifier);
@@ -168,6 +231,7 @@ bool has(const ServerEntity& mob, const Identifier& effect) { return mob.effects
 
 bool remove(ServerEntity& mob, const Identifier& effect) {
     removeModifiers(mob, effect);
+    mob.hiddenEffects.erase(effect);
     return mob.effects.erase(effect) > 0;
 }
 
@@ -176,6 +240,7 @@ void clear(ServerEntity& mob) {
         removeModifiers(mob, id);
     }
     mob.effects.clear();
+    mob.hiddenEffects.clear();
 }
 
 std::vector<TickEffect> tick(ServerEntity& mob, std::vector<Identifier>& expired) {
@@ -199,6 +264,23 @@ std::vector<TickEffect> tick(ServerEntity& mob, std::vector<Identifier>& expired
         }
         if (!active.infinite()) {
             active.remainingTicks--;
+        }
+        // parity: `tickDownDuration` counts the hidden doses down with it, and one takes over when
+        // the stronger runs out.
+        if (const auto chain = mob.hiddenEffects.find(active.effect); chain != mob.hiddenEffects.end()) {
+            for (world::ActiveEffect& hidden : chain->second) {
+                if (!hidden.infinite() && hidden.remainingTicks > 0) {
+                    hidden.remainingTicks--;
+                }
+            }
+            if (active.remainingTicks == 0 && !chain->second.empty()) {
+                active = chain->second.front();
+                chain->second.erase(chain->second.begin());
+                if (chain->second.empty()) {
+                    mob.hiddenEffects.erase(chain);
+                }
+                applyModifiers(mob, active.effect, active.amplifier);
+            }
         }
         if (!active.infinite() && active.remainingTicks <= 0) {
             expired.push_back(active.effect);
@@ -237,11 +319,10 @@ NbtTag encode(const ServerEntity& mob) {
     for (const auto& [id, active] : mob.effects) {
         NbtCompound entry;
         entry.putString("id", id.toString());
-        entry.putByte("amplifier", static_cast<std::int8_t>(active.amplifier));
-        entry.putInt("duration", active.remainingTicks);
-        entry.putBoolean("ambient", active.ambient);
-        entry.putBoolean("show_particles", active.visible);
-        entry.putBoolean("show_icon", active.showIcon);
+        const auto chain = mob.hiddenEffects.find(id);
+        encodeDetails(entry, active,
+                      chain == mob.hiddenEffects.end() ? std::span<const world::ActiveEffect>{}
+                                                       : std::span<const world::ActiveEffect>{chain->second});
         static_cast<void>(list.push(NbtTag::ofCompound(std::move(entry))));
     }
     return NbtTag::ofList(std::move(list));
@@ -263,12 +344,15 @@ void decode(ServerEntity& mob, const NbtCompound& tag) {
             continue;
         }
         applyModifiers(mob, *id, entry->getByte("amplifier"));
-        mob.effects.insert_or_assign(*id, world::ActiveEffect{.effect = *id,
-                                                              .amplifier = entry->getByte("amplifier"),
-                                                              .remainingTicks = entry->getInt("duration", 1),
-                                                              .ambient = entry->getBoolean("ambient"),
-                                                              .visible = entry->getBoolean("show_particles", true),
-                                                              .showIcon = entry->getBoolean("show_icon", true)});
+        mob.effects.insert_or_assign(*id, decodeDetails(*id, *entry));
+        std::vector<world::ActiveEffect> chain;
+        for (const NbtCompound* hidden = entry->getCompound("hidden_effect"); hidden != nullptr;
+             hidden = hidden->getCompound("hidden_effect")) {
+            chain.push_back(decodeDetails(*id, *hidden));
+        }
+        if (!chain.empty()) {
+            mob.hiddenEffects.insert_or_assign(*id, std::move(chain));
+        }
     }
 }
 

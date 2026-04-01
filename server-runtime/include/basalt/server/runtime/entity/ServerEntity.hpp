@@ -212,6 +212,9 @@ public:
     std::int32_t conversionCountdown = -1;
     /// Status effects it carries, by effect. parity: `LivingEntity.activeEffects`.
     std::map<wire::common::Identifier, world::ActiveEffect> effects;
+    /// parity: `MobEffectInstance.hiddenEffect`, the weaker doses a stronger one covers, the next to
+    /// come back first.
+    std::map<wire::common::Identifier, std::vector<world::ActiveEffect>> hiddenEffects;
     /// parity: `Creeper.DATA_IS_POWERED`, saved as `powered`.
     bool powered = false;
     /// The bolt that last touched it, so a mooshroom turns once per bolt. parity: `lastLightningBoltUUID`.
@@ -266,8 +269,13 @@ public:
     /// parity: `MemoryModuleType.TOUCH_COOLDOWN`, the second a warden waits between shoves.
     std::int32_t touchCooldown = 0;
 
-    /// parity: `Raider.getCurrentRaid`, kept here as the village this raider is walking to.
-    std::optional<std::array<std::int32_t, 3>> raidCenter;
+    /// parity: `Raider`'s membership: `getCurrentRaid` by its id in the world's raids, `Wave`,
+    /// `CanJoinRaid`, `ticksOutsideRaid` and `IS_CELEBRATING`.
+    std::optional<std::int32_t> raidId;
+    std::int32_t raidWave = 0;
+    bool canJoinRaid = false;
+    std::int32_t ticksOutsideRaid = 0;
+    bool celebrating = false;
 
     /// parity: `PatrollingMonster`'s persisted route and role.
     std::optional<std::array<std::int32_t, 3>> patrolTarget;

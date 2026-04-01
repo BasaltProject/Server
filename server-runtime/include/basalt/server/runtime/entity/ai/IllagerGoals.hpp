@@ -84,30 +84,4 @@ private:
     std::int32_t nextCast_ = 0;
 };
 
-/// parity: `PathfindToRaidGoal`: a raider with a raid to be at walks to the village and only stops
-/// when it is inside it or has somebody to hit.
-class PathfindToRaidGoal final : public Goal {
-public:
-    explicit PathfindToRaidGoal(double speed);
-
-    [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Move}; }
-
-    [[nodiscard]] bool requiresUpdateEveryTick() const override { return true; }
-
-    [[nodiscard]] bool canUse(MobContext& mob) override;
-
-    [[nodiscard]] bool canContinueToUse(MobContext& mob) override;
-
-    void start(MobContext& mob) override;
-
-    void stop(MobContext& mob) override;
-
-    void tick(MobContext& mob) override;
-
-private:
-    void moveToCentre(MobContext& mob) const;
-
-    double speed_;
-};
-
 } // namespace basalt::server::runtime::entity::ai

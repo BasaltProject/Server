@@ -122,6 +122,10 @@ public:
     /// parity: `Roar.start`, the warden's roar at somebody it is about to fight.
     virtual void wardenRoar(ServerEntity& /*warden*/, std::int32_t /*targetId*/) {}
 
+    /// parity: `Warden.increaseAngerAt`, with the listening sound it makes when `sound` is set.
+    virtual void wardenAngered(ServerEntity& /*warden*/, std::int32_t /*suspectId*/, std::int32_t /*amount*/,
+                               bool /*sound*/) {}
+
     /// parity: `Container.startOpen` and `stopOpen` from a copper golem: the lid and its sound.
     virtual void golemOpensChest(ServerEntity& /*golem*/, std::int32_t /*x*/, std::int32_t /*y*/, std::int32_t /*z*/,
                                  bool /*open*/) {}
@@ -180,6 +184,15 @@ public:
     /// parity: `ShulkerAttackGoal`'s `new ShulkerBullet(level, shulker, target, axis)` and its sound.
     virtual void shootShulkerBullet(ServerEntity& /*shulker*/, std::int32_t /*targetId*/) {}
 
+    /// parity: `PathfindToRaidGoal.recruitNearby`, the idle raiders around this one joining its raid.
+    virtual void recruitRaiders(ServerEntity& /*raider*/) {}
+
+    /// parity: `Raider.pickUpItem` for an ominous banner, which makes the raider its wave's captain.
+    virtual void takeRaidBanner(ServerEntity& /*raider*/, std::int32_t /*itemId*/) {}
+
+    /// parity: `Raider.setCelebrating`.
+    virtual void setCelebrating(ServerEntity& /*raider*/, bool /*celebrating*/) {}
+
     /// Whether a block is in a block tag, which 26.3 decides teleports and jumps with. Without the
     /// server's tags nothing is in any, which a goal reads as the tag-free rule.
     [[nodiscard]] virtual std::optional<bool> blockTagged(std::string_view /*tag*/,
@@ -209,6 +222,19 @@ public:
     std::int64_t gameTime = 0;
     /// parity: `Raid`, which is what puts a village in its hide activity.
     bool raidNearby = false;
+
+    /// parity: `Raider.getCurrentRaid`, as a raider's goals read it.
+    struct RaiderRaid {
+        /// parity: `Raid.isActive`, false for a raid that was stopped under it.
+        bool active = false;
+        bool over = false;
+        bool loss = false;
+        std::array<std::int32_t, 3> center{};
+        /// parity: `getLeader(wave)`, alive.
+        bool leaderAlive = false;
+    };
+
+    std::optional<RaiderRaid> raid;
     /// parity: `Attributes.MOVEMENT_SPEED` for this mob, with its modifiers.
     double speed = 0.0;
     /// parity: `Level.getSkyDarken` and the dimension's sky and `ambientLight`, what the light of

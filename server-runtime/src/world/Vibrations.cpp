@@ -501,6 +501,12 @@ void offer(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::i
 }
 } // namespace
 
+bool occludedBetween(WorldState& world, double fromX, double fromY, double fromZ, double toX, double toY,
+                     double toZ) {
+    return occluded(world, fromX, fromY, fromZ, static_cast<std::int32_t>(std::floor(toX)),
+                    static_cast<std::int32_t>(std::floor(toY)), static_cast<std::int32_t>(std::floor(toZ)));
+}
+
 std::int32_t frequencyOf(std::string_view event) {
     // parity: the table's own tail, `for (int i = 1; i <= 15; i++) map.put(getResonanceEventByFrequency(i), i)`.
     // A resonance event is worth the number in its name, which is what carries the frequency across
@@ -522,6 +528,13 @@ std::int32_t frequencyOf(std::string_view event) {
 
 void emit(WorldState& world, std::string_view event, double x, double y, double z, std::int64_t gameTime,
           const Source& source) {
+    world.recordGameEvent(GameEventRecord{.event = std::string{event},
+                                          .x = x,
+                                          .y = y,
+                                          .z = z,
+                                          .gameTime = gameTime,
+                                          .entity = source.entity,
+                                          .projectileOwner = source.projectileOwner});
     const auto blockX = static_cast<std::int32_t>(std::floor(x));
     const auto blockY = static_cast<std::int32_t>(std::floor(y));
     const auto blockZ = static_cast<std::int32_t>(std::floor(z));

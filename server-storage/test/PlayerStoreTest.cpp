@@ -144,6 +144,7 @@ TEST_CASE("the player database answers what the frozen kotlin answers") {
         whiron.inventory = std::move(inventory);
         whiron.tags = {"builder", "alpha"};
         whiron.postEffects = {"minecraft:shaders/post/invert", "minecraft:shaders/post/blur"};
+        whiron.wardenSpawnTracker = {40, 3, 120};
         whiron.stats = StoredStats{}.with(stats::deaths(), 4).with(stats::jump(), 900);
         players.save(whiron);
         players.save(player("22222222-0000-0000-0000-000000000000", "Ana", "nether", StoredGamemode::Survival,
@@ -163,6 +164,7 @@ TEST_CASE("the player database answers what the frozen kotlin answers") {
         CHECK(describe(players.load("nobody")) == "-");
         // In the order they were added, and nothing for someone who has none.
         CHECK(players.load("11111111-2222-3333-4444-555555555555")->postEffects == whiron.postEffects);
+        CHECK(players.load("11111111-2222-3333-4444-555555555555")->wardenSpawnTracker == whiron.wardenSpawnTracker);
         CHECK(players.load("33333333-0000-0000-0000-000000000000")->postEffects.empty());
         // The one player who is not in survival, so the mode really comes off the row.
         CHECK(describe(players.load("33333333-0000-0000-0000-000000000000")) ==

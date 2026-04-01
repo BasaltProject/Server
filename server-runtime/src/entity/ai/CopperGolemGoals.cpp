@@ -101,10 +101,23 @@ void writeSlots(MobContext& ctx, const std::vector<Position>& halves, const Slot
     }
 }
 
-/// parity: `ChestBlock.isChestBlockedAt`, by the block above. A cat sitting there is not modelled.
-[[nodiscard]] bool blocked(world::WorldState& world, const Position& at) {
+/// parity: `ChestBlock.isChestBlockedAt`: a block that conducts on top, or a cat sitting there.
+[[nodiscard]] bool blocked(world::WorldState& world, const std::vector<ServerEntity*>& entities, const Position& at) {
     const std::optional<std::int32_t> above = world.blockState(at[0], at[1] + 1, at[2]);
-    return above.has_value() && reg::blockSupport::conductsRedstone(*above);
+    if (above.has_value() && reg::blockSupport::conductsRedstone(*above)) {
+        return true;
+    }
+    for (const ServerEntity* cat : entities) {
+        if (cat->removed || cat->type().path() != "cat" || !(cat->sitting || cat->sittingPose)) {
+            continue;
+        }
+        const double half = cat->width() / 2.0;
+        if (cat->x + half > at[0] && cat->x - half < at[0] + 1.0 && cat->y + cat->height() > at[1] + 1.0 &&
+            cat->y < at[1] + 2.0 && cat->z + half > at[2] && cat->z - half < at[2] + 1.0) {
+            return true;
+        }
+    }
+    return false;
 }
 
 [[nodiscard]] bool locked(world::WorldState& world, const Position& at) {
@@ -271,7 +284,7 @@ private:
         }
         const Position at = *state_.target;
         const std::optional<std::string> path = chestPath(ctx_.world, at);
-        if (!path.has_value() || !wanted(ctx_.mob, *path) || blocked(ctx_.world, at)) {
+        if (!path.has_value() || !wanted(ctx_.mob, *path) || blocked(ctx_.world, ctx_.entities, at)) {
             return false;
         }
         if (state_.travel != Travel::Travelling || hasValidTravellingPath(at)) {
@@ -626,5 +639,44 @@ void CopperGolemIdleGoal::tick(MobContext& mob) {
 }
 
 void CopperGolemIdleGoal::stop(MobContext& mob) { golems::stateOf(mob.mob, mob.random).waitTicks = 0; }
+
+bool LookAtPlayerSometimesGoal::canUse(MobContext& mob) {
+    constexpr double kRangeSquared = 36.0;
+    const PlayerView* nearest = nullptr;
+    double best = kRangeSquared;
+    for (const PlayerView& player : mob.players) {
+        const double distance = mob.distanceSquaredTo(player.x, player.y, player.z);
+        if (!player.spectator && distance <= best) {
+            best = distance;
+            nearest = &player;
+        }
+    }
+    if (nearest == nullptr) {
+        return false;
+    }
+    // parity: `SetEntityLookTargetSometimes.Ticker`, a new wait of forty to eighty after each look.
+    if (ticksUntilNextStart_ == 0) {
+        ticksUntilNextStart_ = 40 + mob.random.nextInt(41) - 1;
+        return false;
+    }
+    if (--ticksUntilNextStart_ != 0) {
+        return false;
+    }
+    player_ = nearest->entityId;
+    return true;
+}
+
+bool LookAtPlayerSometimesGoal::canContinueToUse(MobContext& mob) {
+    return lookTicks_ > 0 && player_.has_value() && mob.playerById(*player_) != nullptr;
+}
+
+void LookAtPlayerSometimesGoal::start(MobContext& mob) { lookTicks_ = 45 + mob.random.nextInt(46); }
+
+void LookAtPlayerSometimesGoal::tick(MobContext& mob) {
+    --lookTicks_;
+    if (const PlayerView* player = player_.has_value() ? mob.playerById(*player_) : nullptr; player != nullptr) {
+        lookControl::lookAt(mob.mob, player->x, player->y + static_cast<double>(1.62F), player->z, 45.0F, 90.0F);
+    }
+}
 
 } // namespace basalt::server::runtime::entity::ai

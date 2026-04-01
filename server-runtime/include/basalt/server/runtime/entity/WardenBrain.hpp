@@ -1,9 +1,12 @@
 #pragma once
 
+#include <basalt/wire/common/Uuid.hpp>
 #include <basalt/wire/protocol/play/BlockPos.hpp>
 
+#include <array>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -37,6 +40,29 @@ inline constexpr std::int32_t kDarknessDisplayLimit = 200;
 /// parity: the synched `CLIENT_ANGER_LEVEL`, right after `Monster`'s fields.
 inline constexpr std::uint8_t kAngerDataIndex = 16;
 
+/// parity: `WardenAi.SNIFFING_DURATION`, the sniff cooldown and `DISTURBANCE_LOCATION_EXPIRY_TIME`.
+inline constexpr std::int32_t kSniffTicks = 84;
+inline constexpr std::int32_t kSniffCooldownMin = 100;
+inline constexpr std::int32_t kSniffCooldownMax = 200;
+inline constexpr std::int32_t kDisturbanceTicks = 100;
+/// parity: the warden's `VibrationUser`: sixteen blocks, forty ticks deaf after each one heard, and a
+/// hundred of remembering a projectile.
+inline constexpr std::int32_t kListenerRadius = 16;
+inline constexpr std::int32_t kVibrationCooldown = 40;
+inline constexpr std::int32_t kRecentProjectileTicks = 100;
+
+/// A vibration on its way to the warden. parity: `VibrationInfo` and the tick it was heard in.
+struct Heard {
+    std::string event;
+    float distance = 0.0F;
+    double x = 0.0;
+    double y = 0.0;
+    double z = 0.0;
+    std::optional<wire::common::Uuid> entity;
+    std::optional<wire::common::Uuid> projectileOwner;
+    std::int64_t tick = 0;
+};
+
 struct WardenState {
     std::int32_t emergeTicks = 0;
     std::int32_t digTicks = 0;
@@ -47,6 +73,21 @@ struct WardenState {
     /// Ticks into a sonic boom, zero when there is none.
     std::int32_t sonicTicks = 0;
     std::int32_t sonicCooldown = 0;
+    /// parity: `VibrationSystem.Data`: the selector's candidate, the one travelling and its delay.
+    std::optional<Heard> candidate;
+    std::optional<Heard> travelling;
+    std::int32_t travelTicks = 0;
+    /// The last game event it has considered, as a tick and a count within it.
+    std::int64_t heardTime = -1;
+    std::size_t heardCount = 0;
+    /// parity: `VIBRATION_COOLDOWN`, `RECENT_PROJECTILE`, `SNIFF_COOLDOWN`, `IS_SNIFFING` and
+    /// `DISTURBANCE_LOCATION`, each as ticks left.
+    std::int32_t vibrationCooldown = 0;
+    std::int32_t recentProjectile = 0;
+    std::int32_t sniffCooldown = 0;
+    std::int32_t sniffTicks = 0;
+    std::optional<std::array<std::int32_t, 3>> disturbance;
+    std::int32_t disturbanceTicks = 0;
 };
 
 /// One thing the brain wants done this tick.
@@ -86,6 +127,14 @@ struct View {
 
 /// parity: `WardenAi.setDigCooldown`, which only ever refreshes a cooldown still running.
 void refreshDigCooldown(ServerEntity& warden);
+
+/// parity: `WardenAi.setDisturbanceLocation`: only for a calm warden with nobody to fight, which
+/// then looks there, goes there, and does not sniff for five seconds.
+void setDisturbance(ServerEntity& warden, const std::array<std::int32_t, 3>& at);
+
+/// parity: `VibrationSelector.addCandidate`: a noise from an earlier tick stays, the nearer wins,
+/// and a tie goes to the higher frequency.
+void offer(WardenState& state, Heard heard);
 
 /// parity: `Warden.doHurtTarget`, whose swing pushes the next sonic boom back.
 [[nodiscard]] std::vector<Action> meleeHit(ServerEntity& warden);

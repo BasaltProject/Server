@@ -39,6 +39,15 @@ constexpr std::int32_t kOffhand = -106;
 /// slots 100 to 103 and the offhand at -106. Those are folded into the flat layout used here,
 /// because a slot number that is negative or above the inventory size is vanilla's own encoding
 /// trick, not a real position.
+/// parity: `WardenSpawnTracker.CODEC`, three counts that default to zero.
+[[nodiscard]] std::array<std::int32_t, 3> wardenTrackerOf(const NbtCompound* tracker) {
+    if (tracker == nullptr) {
+        return {};
+    }
+    return {tracker->getInt("ticks_since_last_warning"), tracker->getInt("warning_level"),
+            tracker->getInt("cooldown_ticks")};
+}
+
 /// parity: 26.3 `ServerPlayer.readAdditionalSaveData`'s `post_effects`, a list of identifiers.
 [[nodiscard]] std::vector<std::string> postEffectsOf(const NbtList* list) {
     std::vector<std::string> effects;
@@ -139,6 +148,7 @@ std::expected<StoredPlayer, StorageFormatError> read(std::string_view uuid, std:
         .stats = {},
         .tags = {},
         .postEffects = postEffectsOf(listOf(*root, "post_effects")),
+        .wardenSpawnTracker = wardenTrackerOf(root->getCompound("warden_spawn_tracker")),
     };
 }
 

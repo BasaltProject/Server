@@ -2,6 +2,8 @@
 #include <basalt/server/storage/StorageNbt.hpp>
 
 #include <cstdint>
+#include <cstdlib>
+#include <string>
 #include <utility>
 
 namespace basalt::server::storage {
@@ -11,7 +13,7 @@ namespace {
 constexpr std::string_view kColumns =
     "uuid, name, last_seen, first_seen, play_time_ticks, world, x, y, z, yaw, pitch, health, food, "
     "saturation, exhaustion, xp_level, xp_progress, xp_total, gamemode, group_name, last_ip, "
-    "inventory, ender_chest, stats, tags, post_effects";
+    "inventory, ender_chest, stats, tags, post_effects, warden_spawn_tracker";
 
 /// A tag cannot contain a comma: vanilla's own tag argument is a single word.
 [[nodiscard]] std::set<std::string, std::less<>> splitTags(const std::optional<std::string>& stored) {
@@ -125,6 +127,10 @@ constexpr std::string_view kColumns =
     }
     player.tags = splitTags(row.textOrNull(24));
     player.postEffects = splitList(row.textOrNull(25));
+    const std::vector<std::string> tracker = splitList(row.textOrNull(26));
+    for (std::size_t index = 0; index < tracker.size() && index < player.wardenSpawnTracker.size(); ++index) {
+        player.wardenSpawnTracker[index] = std::atoi(tracker[index].c_str());
+    }
     return player;
 }
 
@@ -174,9 +180,9 @@ void PlayerRepository::save(const StoredPlayer& player) {
 INSERT INTO player(
     uuid, name, last_seen, first_seen, play_time_ticks, world, x, y, z, yaw, pitch,
     health, food, saturation, exhaustion, xp_level, xp_progress, xp_total, gamemode,
-    group_name, inventory, ender_chest, stats, tags, post_effects
+    group_name, inventory, ender_chest, stats, tags, post_effects, warden_spawn_tracker
 )
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(uuid) DO UPDATE SET
     name = excluded.name,
     last_seen = excluded.last_seen,
@@ -197,7 +203,8 @@ ON CONFLICT(uuid) DO UPDATE SET
     ender_chest = excluded.ender_chest,
     stats = excluded.stats,
     tags = excluded.tags,
-    post_effects = excluded.post_effects)");
+    post_effects = excluded.post_effects,
+    warden_spawn_tracker = excluded.warden_spawn_tracker)");
     const std::vector<std::uint8_t> inventory = inventoryNbt::encode(player.inventory);
     const std::vector<std::uint8_t> enderChest = inventoryNbt::encode(player.enderChest);
     const std::vector<std::uint8_t> stats = statsNbt::encode(player.stats);
@@ -226,6 +233,9 @@ ON CONFLICT(uuid) DO UPDATE SET
     statement.bindBlobOrNull(23, stats);
     statement.bind(24, joinTags(player.tags));
     statement.bind(25, joinList(player.postEffects));
+    statement.bind(26,
+                   joinList({std::to_string(player.wardenSpawnTracker[0]), std::to_string(player.wardenSpawnTracker[1]),
+                             std::to_string(player.wardenSpawnTracker[2])}));
     statement.execute();
 }
 

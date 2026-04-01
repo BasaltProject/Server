@@ -271,6 +271,10 @@ void AdvancementTriggers::onVillagerTrade(std::string_view player, std::string_v
     fire(player, uuid, adv::ConditionKind::VillagerTrade, [](const adv::CriterionCondition&) { return true; });
 }
 
+void AdvancementTriggers::onCuredZombieVillager(std::string_view player, std::string_view uuid) {
+    fire(player, uuid, adv::ConditionKind::CuredZombieVillager, [](const adv::CriterionCondition&) { return true; });
+}
+
 void AdvancementTriggers::onEnchantedItem(std::string_view player, std::string_view uuid) {
     fire(player, uuid, adv::ConditionKind::EnchantedItem, [](const adv::CriterionCondition&) { return true; });
 }

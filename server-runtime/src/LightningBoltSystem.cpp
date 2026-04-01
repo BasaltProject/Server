@@ -4,11 +4,15 @@
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/DroppedItem.hpp>
+#include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/common/Mth.hpp>
+
+#include <cmath>
 
 namespace basalt::server::runtime {
 namespace {
@@ -24,6 +28,29 @@ constexpr double kHeight = 6.0;
 constexpr float kLightningDamage = 5.0F;
 /// parity: `spawnFire(4)` on the strike.
 constexpr std::int32_t kStrikeFires = 4;
+/// parity: `GameRules.FIRE_SPREAD_RADIUS_AROUND_PLAYER`.
+constexpr world::GameRule kFireSpreadRadius = world::GameRule::integer("fire_spread_radius_around_player", 128, -1);
+
+/// parity: `ServerLevel.canSpreadFireAround`: the rule off, or somebody not spectating near enough.
+[[nodiscard]] bool canSpreadFireAround(const world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                                       std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::int32_t radius = world.gameRules().number(kFireSpreadRadius);
+    if (radius == -1) {
+        return true;
+    }
+    for (const PlayerSession* player : watchers) {
+        if (player->gamemode == wire::protocol::play::Gamemode::Spectator) {
+            continue;
+        }
+        const double dx = player->x - x;
+        const double dy = player->y - y;
+        const double dz = player->z - z;
+        if (std::sqrt((dx * dx) + (dy * dy) + (dz * dz)) < static_cast<double>(radius)) {
+            return true;
+        }
+    }
+    return false;
+}
 
 } // namespace
 
@@ -46,7 +73,8 @@ void LightningBoltSystem::tick(world::LoadedWorld& world, const std::vector<Play
         // whole number hits the block under its feet and not the air it is in.
         world::lightning::strike(world.state(), mth::floor(bolt.x), mth::floor(bolt.y - 1.0e-6), mth::floor(bolt.z),
                                  false, random, changes);
-        if (fierce) {
+        if (fierce &&
+            canSpreadFireAround(world, watchers, mth::floor(bolt.x), mth::floor(bolt.y), mth::floor(bolt.z))) {
             world::lightning::spawnFire(world.state(), mth::floor(bolt.x), mth::floor(bolt.y), mth::floor(bolt.z),
                                         kStrikeFires, random, changes);
         }
@@ -60,8 +88,10 @@ void LightningBoltSystem::tick(world::LoadedWorld& world, const std::vector<Play
         } else if (bolt.boltLife < -random.nextInt(10)) {
             bolt.boltFlashes--;
             bolt.boltLife = 1;
-            world::lightning::spawnFire(world.state(), mth::floor(bolt.x), mth::floor(bolt.y), mth::floor(bolt.z), 0,
-                                        random, changes);
+            if (canSpreadFireAround(world, watchers, mth::floor(bolt.x), mth::floor(bolt.y), mth::floor(bolt.z))) {
+                world::lightning::spawnFire(world.state(), mth::floor(bolt.x), mth::floor(bolt.y), mth::floor(bolt.z),
+                                            0, random, changes);
+            }
         }
     }
     for (const world::BlockChange& change : changes) {
@@ -85,6 +115,15 @@ void LightningBoltSystem::hitAround(world::LoadedWorld& world, const std::vector
             continue;
         }
         mobs_->thunderHit(world, watchers, *entity, bolt.entityId());
+    }
+    // parity: `Entity.thunderHit` on an item: five points against its five health, and gone.
+    for (const world::DroppedItem& item : world.state().nearbyItems(bolt.x, bolt.y, bolt.z, 2.0 * (kReach + kHeight))) {
+        if (!touches(item.x, item.y, item.z, 0.125, 0.25)) {
+            continue;
+        }
+        static_cast<void>(world.state().hurtItem(item.entityId, static_cast<std::int32_t>(kLightningDamage)));
+        world::vibrations::emit(world.state(), "entity_damage", item.x, item.y, item.z, world.gameTime(),
+                                {.entity = item.uuid});
     }
     for (PlayerSession* player : watchers) {
         if (player->dead || !touches(player->x, player->y, player->z, 0.3, 1.8)) {

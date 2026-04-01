@@ -190,7 +190,7 @@ double eyeHeightOf(const ServerEntity& mob) {
         const std::int32_t size = mob.sourceNbt.has_value() ? entityNbt::numericInt(*mob.sourceNbt, "size") : 0;
         eye *= 1.0F + (0.15F * static_cast<float>(size));
     }
-    return static_cast<double>(eye * static_cast<float>(mob.attributeWithModifiers("scale")));
+    return static_cast<double>(eye * static_cast<float>(mob.attributeWithModifiers("minecraft:scale")));
 }
 
 std::vector<Hurt> tick(ServerEntity& mob, const Surroundings& at) {

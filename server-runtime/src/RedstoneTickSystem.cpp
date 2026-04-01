@@ -391,10 +391,8 @@ void RedstoneTickSystem::tickFootsteps(world::LoadedWorld& world) {
                 changes.push_back(*lit);
             }
         }
-        // parity: the warden's own `VibrationUser`, which hears a step sixteen blocks away and gets
-        // angrier at whoever took it. Sneaking makes no vibration, so it hears nothing.
+        // parity: sneaking makes no vibration, so nothing hears the step or feels it.
         if (!player->sneaking) {
-            hearFootstep(world, *player);
             // parity: `Block.stepOn` for the blocks outside redstone, the sculk shrieker among them,
             // on `Entity.getOnPos`, a fifth of a block under the feet.
             if (options_.steppedOn) {
@@ -421,21 +419,6 @@ void RedstoneTickSystem::tickFootsteps(world::LoadedWorld& world) {
     }
     for (const world::BlockChange& change : changes) {
         broadcaster_->announceRedstone(world, watchers, change);
-    }
-}
-
-void RedstoneTickSystem::hearFootstep(world::LoadedWorld& world, const PlayerSession& player) {
-    for (entity::ServerEntity* entity : world.state().entities()) {
-        if (entity->removed || !entity::wardens::isWarden(entity->type())) {
-            continue;
-        }
-        const double dx = entity->x - player.x;
-        const double dy = entity->y - player.y;
-        const double dz = entity->z - player.z;
-        if ((dx * dx) + (dy * dy) + (dz * dz) > entity::wardens::kHearingRange * entity::wardens::kHearingRange) {
-            continue;
-        }
-        entity::wardens::anger(*entity, player.entityId(), entity::wardens::kHeard);
     }
 }
 

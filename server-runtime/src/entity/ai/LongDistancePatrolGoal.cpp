@@ -66,7 +66,7 @@ std::vector<ServerEntity*> LongDistancePatrolGoal::companions(MobContext& mob) {
         Aabb::of(mob.mob.x, mob.mob.y, mob.mob.z, mob.mob.width(), mob.mob.height()).inflate(kCompanionRange);
     std::vector<ServerEntity*> found;
     for (ServerEntity* candidate : mob.entities) {
-        if (candidate == &mob.mob || candidate->removed || candidate->raidCenter.has_value() ||
+        if (candidate == &mob.mob || candidate->removed || candidate->raidId.has_value() ||
             !raiderTypes().contains(candidate->type().path())) {
             continue;
         }

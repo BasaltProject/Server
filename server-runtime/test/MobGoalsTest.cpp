@@ -175,10 +175,10 @@ TEST_CASE("a raider carries the patrol goal every other raider carries") {
     REQUIRE(pillager != nullptr);
     REQUIRE(witch != nullptr);
     REQUIRE(zombie != nullptr);
-    // A zombie is not a raider, so it never gets one.
+    // A zombie is not a raider, so it never gets one; a raider also carries `Raider`'s own four.
     CHECK(zombie->size() == 7);
-    CHECK(pillager->size() == 10);
-    CHECK(witch->size() == 9);
+    CHECK(pillager->size() == 13);
+    CHECK(witch->size() == 12);
 }
 
 TEST_CASE("a wolf told to sit holds still under its own goal selector") {

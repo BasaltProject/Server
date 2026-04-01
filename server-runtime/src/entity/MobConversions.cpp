@@ -99,7 +99,8 @@ std::optional<Conversion> tick(ServerEntity& mob, const Around& around) {
                                   .keepEquipment = false,
                                   .keepCanPickUpLoot = false,
                                   .levelEvent = kCuredEvent,
-                                  .nausea = true};
+                                  .nausea = true,
+                                  .finalize = Conversion::Finalize::CuredVillager};
             }
         }
         return std::nullopt;
@@ -127,7 +128,10 @@ std::optional<Conversion> tick(ServerEntity& mob, const Around& around) {
             return Conversion{.into = Identifier::vanilla("frog"),
                               .keepEquipment = false,
                               .keepCanPickUpLoot = false,
-                              .persistent = true};
+                              .persistent = true,
+                              .sound = "entity.tadpole.grow_up",
+                              .soundVolume = 0.15F,
+                              .finalize = Conversion::Finalize::Frog};
         }
         return std::nullopt;
     }
@@ -136,9 +140,15 @@ std::optional<Conversion> tick(ServerEntity& mob, const Around& around) {
         mob.conversionClock = converting ? mob.conversionClock + 1 : 0;
         if (mob.conversionClock > kZombifyTicks) {
             const bool hoglin = path == "hoglin";
+            // parity: `Piglin` and `PiglinBrute.playConvertedSound`, silent in peace, and the hoglin's
+            // `makeSound`, which is not.
             return Conversion{.into = Identifier::vanilla(hoglin ? "zoglin" : "zombified_piglin"),
                               .keepCanPickUpLoot = !hoglin,
-                              .nausea = true};
+                              .nausea = true,
+                              .sound = hoglin                   ? "entity.hoglin.converted_to_zombified"
+                                       : path == "piglin_brute" ? "entity.piglin_brute.converted_to_zombified"
+                                                                : "entity.piglin.converted_to_zombified",
+                              .quietInPeace = !hoglin};
         }
     }
     return std::nullopt;

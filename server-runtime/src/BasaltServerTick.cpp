@@ -326,6 +326,13 @@ void BasaltServer::tickDeaths(world::LoadedWorld& world, const sched::Region& re
                                           ? std::optional<std::string>{dead->lastHurtByPlayer->toString()}
                                           : std::nullopt);
         }
+        // parity: `Raider.die`, a player behind the last hit becoming a hero of the village.
+        if (RaidSystem::isRaider(*dead)) {
+            raids_->raiderDied(world, *dead,
+                               dead->lastHurtByPlayer.has_value() && dead->lastHurtByPlayerTime > 0
+                                   ? dead->lastHurtByPlayer
+                                   : std::nullopt);
+        }
         // parity: `killer.awardKillScore`, the kill credit going to the player who hit it last.
         if (dead->lastHurtByPlayer.has_value() && dead->lastHurtByPlayerTime > 0) {
             const std::lock_guard<std::mutex> guard(pendingKillsLock_);

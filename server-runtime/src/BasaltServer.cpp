@@ -664,6 +664,28 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         context.nextSeed = [] { return static_cast<std::int64_t>(scratchRandom()()); };
         player::announceOpeners(context, world, x, y, z, block->path(), openers);
     };
+    mobHooks.teamCarried = [this](const std::string& from, const std::string& to) {
+        scoreboard::Team* team = teams_.teamOf(from);
+        if (team == nullptr) {
+            return;
+        }
+        static_cast<void>(teams_.join(*team, to));
+        static_cast<void>(team->removeMember(from));
+        for (player::PlayerSession* player : playerRegistry_.snapshot()) {
+            if (player->connection().sendPlayerTeam) {
+                player->connection().sendPlayerTeam(team->name, wire::protocol::play::SetPlayerTeamPacket::kMethodJoin,
+                                                    std::nullopt, {to});
+                player->connection().sendPlayerTeam(team->name, wire::protocol::play::SetPlayerTeamPacket::kMethodLeave,
+                                                    std::nullopt, {from});
+            }
+        }
+    };
+    mobHooks.curedZombieVillager = [this](const wire::common::Uuid& uuid) {
+        player::PlayerSession* session = playerRegistry_.get(uuid);
+        if (session != nullptr && advancementTriggers_ != nullptr) {
+            advancementTriggers_->onCuredZombieVillager(session->name(), uuid.toString());
+        }
+    };
     mobHooks.witherShoots = [this](world::LoadedWorld& world, entity::ServerEntity& wither) {
         withers_->shootAtTarget(world, wither);
     };

@@ -19,7 +19,9 @@ constexpr double kShotRangeSquared = 400.0;
 /// parity: the four blocks the search box keeps along the attach axis.
 constexpr double kShallow = 4.0;
 
-[[nodiscard]] double followRange(const MobContext& mob) { return mob.mob.attributeWithModifiers("follow_range"); }
+[[nodiscard]] double followRange(const MobContext& mob) {
+    return mob.mob.attributeWithModifiers("minecraft:follow_range");
+}
 
 } // namespace
 

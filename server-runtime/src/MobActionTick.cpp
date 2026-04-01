@@ -137,7 +137,7 @@ void MobActionSystem::tickBreath(world::LoadedWorld& world, const std::vector<Pl
                                                     eyeBlock != nullptr && eyeBlock->path() == "bubble_column",
                                                 .inWater = inWater,
                                                 .inRain = inRain,
-                                                .oxygenBonus = mob.attributeWithModifiers("oxygen_bonus"),
+                                                .oxygenBonus = mob.attributeWithModifiers("minecraft:oxygen_bonus"),
                                                 .random = &random};
     for (const entity::mobBreathing::Hurt& owed : entity::mobBreathing::tick(mob, at)) {
         if (owed.drownParticles) {
@@ -228,6 +228,11 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
     // every living thing runs whether or not anything is driving it. Leaving early here left a mob
     // this build has no goals for hanging in the air: a copper golem put down on a chest never fell
     // the eighth of a block onto its lid.
+    // parity: `Raider.aiStep`, which looks for a raid to join before `Mob.aiStep` runs the goals.
+    const bool raider = RaidSystem::isRaider(mob);
+    if (raider) {
+        raids_->tickRaider(world, mob);
+    }
     if (mob.goals == nullptr) {
         travelMob(world, mob, mob.attributeWithModifiers(entity::attribute::kMovementSpeed), &random);
         return;
@@ -244,7 +249,8 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
                                    .night = world::beds::isNight(world.clock().totalTicks()),
                                    .dayTime = world.clock().totalTicks(),
                                    .gameTime = world.gameTime(),
-                                   .raidNearby = raids_->raidsIn(world).nearby(mob.x, mob.y, mob.z) != nullptr,
+                                   .raidNearby = RaidSystem::raidAt(world, mob.x, mob.y, mob.z) != nullptr,
+                                   .raid = raider ? raids_->raidOf(world, mob) : std::nullopt,
                                    .speed = mob.attributeWithModifiers(entity::attribute::kMovementSpeed),
                                    .skyDarken = world.skyDarken(),
                                    .hasSkylight = config::dimensionFacts(world.declaration().dimension).hasSkylight,

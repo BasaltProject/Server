@@ -2,6 +2,7 @@
 
 #include <basalt/wire/nbt/NbtTag.hpp>
 
+#include <array>
 #include <cstdint>
 #include <map>
 #include <optional>
@@ -137,6 +138,8 @@ struct StoredPlayer {
     std::set<std::string, std::less<>> tags;
     /// parity: 26.3 `ServerPlayer.postEffects`, in the order `/posteffect` added them.
     std::vector<std::string> postEffects;
+    /// parity: `Player.wardenSpawnTracker`: ticks since the last warning, the level and the cooldown.
+    std::array<std::int32_t, 3> wardenSpawnTracker{};
 };
 
 } // namespace basalt::server::storage

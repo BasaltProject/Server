@@ -93,7 +93,8 @@ void flyingControl(world::WorldState& world, ServerEntity& mob, float maxTurn, b
         if ((dx * dx) + (dy * dy) + (dz * dz) >= kArrived) {
             const auto yaw = static_cast<float>(std::atan2(dz, dx) * kDegrees) - 90.0F;
             mob.yaw = rotlerp(mob.yaw, yaw, 90.0F);
-            const double attribute = mob.attributeWithModifiers(mob.onGround ? "movement_speed" : "flying_speed");
+            const double attribute =
+                mob.attributeWithModifiers(mob.onGround ? "minecraft:movement_speed" : "minecraft:flying_speed");
             speed = static_cast<double>(static_cast<float>(mob.moveSpeed * attribute));
             input.forward = speed;
             const double flat = std::sqrt((dx * dx) + (dz * dz));
@@ -118,7 +119,7 @@ void ghastControl(world::WorldState& world, ServerEntity& mob, random::RandomSou
         const double dz = mob.wantedZ - mob.z;
         if (flyingMovement::ghastCanReach(world, mob, dx, dy, dz)) {
             const double length = std::sqrt((dx * dx) + (dy * dy) + (dz * dz));
-            const double push = mob.attributeWithModifiers("flying_speed") * 5.0 / 3.0;
+            const double push = mob.attributeWithModifiers("minecraft:flying_speed") * 5.0 / 3.0;
             if (length >= 1.0E-5) {
                 mob.velocityX += dx / length * push;
                 mob.velocityY += dy / length * push;

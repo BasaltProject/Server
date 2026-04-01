@@ -220,17 +220,8 @@ void ShriekerSystem::shriek(world::LoadedWorld& world, const PlayerSession& play
     world.state().scheduleBlockTick(x, y, z, wire::common::Identifier::vanilla("sculk_shrieker"),
                                     shriekers::kShriekTicks);
     // parity: `GameEvent.SHRIEK`, which no sensor weighs but a warden in earshot hears as the player.
-    for (entity::ServerEntity* candidate : world.state().entities()) {
-        if (candidate->removed || !entity::wardens::isWarden(candidate->type())) {
-            continue;
-        }
-        const double dx = candidate->x - (x + 0.5);
-        const double dy = candidate->y - (y + 0.5);
-        const double dz = candidate->z - (z + 0.5);
-        if ((dx * dx) + (dy * dy) + (dz * dz) <= entity::wardens::kHearingRange * entity::wardens::kHearingRange) {
-            static_cast<void>(entity::wardens::anger(*candidate, player.entityId(), entity::wardens::kHeard));
-        }
-    }
+    world::vibrations::emit(world.state(), "shriek", x + 0.5, y + 0.5, z + 0.5, world.gameTime(),
+                            {.entity = player.uuid()});
 }
 
 void ShriekerSystem::scheduledTick(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,

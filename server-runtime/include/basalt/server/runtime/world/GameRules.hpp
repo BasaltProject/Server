@@ -50,6 +50,8 @@ inline constexpr GameRule kMaxCommandSequenceLength = GameRule::integer("max_com
 /// parity: `isCommandBlockEnabled`, which is what stops a command block running its command. The
 /// cycle around it carries on either way: only the command is skipped.
 inline constexpr GameRule kCommandBlocksWork = GameRule::boolean("command_blocks_work", true);
+/// parity: `GameRules.RAIDS`, which stops every raid the moment it is off.
+inline constexpr GameRule kRaids = GameRule::boolean("raids", true);
 inline constexpr GameRule kMaxCommandForks = GameRule::integer("max_command_forks", 65536, 0);
 inline constexpr GameRule kSendCommandFeedback = GameRule::boolean("send_command_feedback", true);
 inline constexpr GameRule kLogAdminCommands = GameRule::boolean("log_admin_commands", true);

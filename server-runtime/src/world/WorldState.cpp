@@ -238,6 +238,18 @@ void WorldState::queueBlockEvent(BlockEvent event) {
     blockEvents_.push_back(std::move(event));
 }
 
+void WorldState::recordGameEvent(GameEventRecord record) {
+    const WorldWriteLock lock{mutex_};
+    std::erase_if(gameEvents_,
+                  [&record](const GameEventRecord& kept) { return kept.gameTime < record.gameTime - 1; });
+    gameEvents_.push_back(std::move(record));
+}
+
+std::vector<GameEventRecord> WorldState::recentGameEvents() const {
+    const WorldReadLock lock{mutex_};
+    return gameEvents_;
+}
+
 std::optional<BlockEvent> WorldState::takeFirstBlockEvent() {
     const WorldWriteLock lock{mutex_};
     if (blockEvents_.empty()) {

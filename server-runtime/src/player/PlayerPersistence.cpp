@@ -44,7 +44,10 @@ storage::StoredPlayer toStored(const PlayerSession& session, std::string_view wo
                                  .enderChest = std::move(enderChest),
                                  .stats = session.stats.snapshot(playTimeTicks),
                                  .tags = session.tags,
-                                 .postEffects = session.postEffects};
+                                 .postEffects = session.postEffects,
+                                 .wardenSpawnTracker = {session.wardenTracker.ticksSinceLastWarning,
+                                                        session.wardenTracker.warningLevel,
+                                                        session.wardenTracker.cooldownTicks}};
 }
 
 void restore(PlayerSession& session, const storage::StoredPlayer& stored) {
@@ -66,6 +69,9 @@ void restore(PlayerSession& session, const storage::StoredPlayer& stored) {
     }
     session.tags = stored.tags;
     session.postEffects = stored.postEffects;
+    session.wardenTracker = world::wardenSpawnTracker::Tracker{.ticksSinceLastWarning = stored.wardenSpawnTracker[0],
+                                                               .warningLevel = stored.wardenSpawnTracker[1],
+                                                               .cooldownTicks = stored.wardenSpawnTracker[2]};
 }
 
 } // namespace basalt::server::runtime::player::playerPersistence

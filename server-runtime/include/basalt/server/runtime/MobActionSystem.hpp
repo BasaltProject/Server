@@ -74,6 +74,10 @@ public:
         std::function<void(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                            std::int32_t openers)>
             openersChanged;
+        /// A converted mob takes the old one's scoreboard team, by uuid string.
+        std::function<void(const std::string& from, const std::string& to)> teamCarried;
+        /// parity: `CriteriaTriggers.CURED_ZOMBIE_VILLAGER`, for whoever gave the apple.
+        std::function<void(const wire::common::Uuid& player)> curedZombieVillager;
     };
 
     /// The rolls a mob's turn needs, none of which is part of the level's own stream.
@@ -144,6 +148,12 @@ public:
 
     void wardenRoar(entity::ServerEntity& warden, std::int32_t targetId) override;
 
+    void wardenAngered(entity::ServerEntity& warden, std::int32_t suspectId, std::int32_t amount, bool sound) override;
+
+    /// parity: the warden's `VibrationSystem`: what it hears, the travel, and `onReceiveVibration`.
+    void wardenHears(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                     entity::ServerEntity& warden);
+
     void golemOpensChest(entity::ServerEntity& golem, std::int32_t x, std::int32_t y, std::int32_t z,
                          bool open) override;
 
@@ -172,6 +182,12 @@ public:
     void shulkerPeek(entity::ServerEntity& shulker, std::int32_t amount) override;
 
     void shootShulkerBullet(entity::ServerEntity& shulker, std::int32_t targetId) override;
+
+    void recruitRaiders(entity::ServerEntity& raider) override;
+
+    void takeRaidBanner(entity::ServerEntity& raider, std::int32_t itemId) override;
+
+    void setCelebrating(entity::ServerEntity& raider, bool celebrating) override;
 
     /// parity: `Shulker.tick`: the reaction to a hit, a new face or a jump when it lost its hold,
     /// and the lid easing towards its peek.
@@ -359,6 +375,17 @@ private:
                                                                               const entity::ServerEntity& dead) const;
 
     [[nodiscard]] std::int32_t cureProgress(world::LoadedWorld& world, const entity::ServerEntity& mob);
+
+    /// parity: `ConversionType.SINGLE`'s riders, seat, leash and team, carried to the new mob.
+    void carryOver(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                   entity::ServerEntity& from, entity::ServerEntity& to);
+
+    /// parity: the `finalizeSpawn(CONVERSION)` a frog, a cured villager or an infected one gets.
+    void finalizeConverted(world::LoadedWorld& world, const entity::ServerEntity& from, entity::ServerEntity& to,
+                           const entity::mobConversions::Conversion& conversion);
+
+    /// parity: the rest of `ZombieVillager.finishConversion`: the kept gear dropped and the trigger.
+    void villagerCured(world::LoadedWorld& world, const entity::ServerEntity& zombie, entity::ServerEntity& villager);
 
     /// parity: `Villager.customServerAiStep`, the brain every tick instead of goals every other.
     void tickVillager(world::LoadedWorld& world, entity::ServerEntity& villager,

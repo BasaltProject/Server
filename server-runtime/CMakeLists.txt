@@ -54,6 +54,7 @@ basalt_module(server-runtime-core
         src/entity/GeneratedEntityPresentation.cpp
         src/entity/Villagers.cpp
         src/entity/Raids.cpp
+        src/entity/RaiderEquipment.cpp
         src/entity/WanderingTraderLifetime.cpp
         src/entity/ServerEntity.cpp
         src/entity/ShieldBlows.cpp
@@ -180,11 +181,14 @@ basalt_module(server-runtime-core
         src/MobActionShulker.cpp
         src/MobActionGifts.cpp
         src/MobActionDolphin.cpp
+        src/MobActionWardenHearing.cpp
         src/ShriekerSystem.cpp
         src/LightningBoltSystem.cpp
         src/NaturalSpawningMaterialize.cpp
         src/NaturalSpawningSystem.cpp
         src/RaidSystem.cpp
+        src/RaidMembers.cpp
+        src/RaidWaves.cpp
         src/MobActionVillager.cpp
         src/VillagerWorldSystem.cpp
         src/EntityVisibilityExtras.cpp
@@ -485,9 +489,11 @@ basalt_module(server-runtime-core
         src/entity/ai/HoverWanderGoal.cpp
         src/entity/ai/PhantomGoals.cpp
         src/entity/ai/ShulkerGoals.cpp
+        src/entity/ai/WardenGoals.cpp
         src/entity/ai/GoalSelector.cpp
         src/entity/ai/Goals.cpp
         src/entity/ai/IllagerGoals.cpp
+        src/entity/ai/RaiderGoals.cpp
         src/entity/ai/LongDistancePatrolGoal.cpp
         src/entity/ai/MobContext.cpp
         src/entity/ai/MobGoals.cpp
@@ -1027,6 +1033,9 @@ basalt_test(server-runtime-raids-test
         test/RaidsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
+
+target_compile_definitions(server-runtime-raids-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
 
 basalt_test(server-runtime-redstone-tick-system-test
     SOURCES
