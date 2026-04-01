@@ -1,5 +1,6 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/runtime/entity/Allays.hpp>
 #include <basalt/server/runtime/entity/AreaEffectClouds.hpp>
 #include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
@@ -483,6 +484,16 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
         (previous != nullptr || *fireworkShotAtAngle)) {
         entries.push_back(Entry{.index = 10, .value = SetEntityDataPacket::BoolValue{.value = *fireworkShotAtAngle}});
     }
+    if (allayDancing.has_value() && (previous == nullptr || previous->allayDancing != allayDancing) &&
+        (previous != nullptr || *allayDancing)) {
+        entries.push_back(
+            Entry{.index = allays::kDancingDataIndex, .value = SetEntityDataPacket::BoolValue{.value = *allayDancing}});
+    }
+    if (allayCanDuplicate.has_value() && (previous == nullptr || previous->allayCanDuplicate != allayCanDuplicate) &&
+        (previous != nullptr || !*allayCanDuplicate)) {
+        entries.push_back(Entry{.index = allays::kCanDuplicateDataIndex,
+                                .value = SetEntityDataPacket::BoolValue{.value = *allayCanDuplicate}});
+    }
     if (beeFlags.has_value() && (previous == nullptr || previous->beeFlags != beeFlags) &&
         (previous != nullptr || *beeFlags != 0)) {
         entries.push_back(Entry{.index = bees::kFlagsDataIndex, .value = SetEntityDataPacket::ByteValue{*beeFlags}});
@@ -675,6 +686,10 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     }
     if (entity.dragon != nullptr) {
         live.dragonPhase = static_cast<std::int32_t>(entity.dragon->phase);
+    }
+    if (entity.allay != nullptr) {
+        live.allayDancing = entity.allay->dancing;
+        live.allayCanDuplicate = entity.allay->duplicationCooldown == 0;
     }
     if (entity.bee != nullptr) {
         live.beeFlags = bees::flagsOf(*entity.bee);

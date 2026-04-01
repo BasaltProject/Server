@@ -171,7 +171,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 if (!song.has_value()) {
                     continue;
                 }
-                if (jukeboxes::tick(world, x, y, z, hooks.songLength ? hooks.songLength(*song) : 0)) {
+                if (jukeboxes::tick(world, x, y, z, hooks.songLength ? hooks.songLength(*song) : 0, gameTime)) {
                     chunk->markDirty();
                     // parity: `JukeboxBlockEntity.onSongChanged` ends in `updateNeighborsAt`, which
                     // is what takes the signal off whatever the jukebox was feeding.

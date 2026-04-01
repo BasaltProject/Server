@@ -70,6 +70,9 @@ std::optional<Counted> movementStat(double dx, double dy, double dz, const Facts
         }
         return counted(facts.crouching ? storage::stats::crouchOneCm() : storage::stats::walkOneCm(), horizontal);
     }
+    if (facts.fallFlying) {
+        return counted(storage::stats::custom("aviate_one_cm"), centimetresOf(dx, dy, dz));
+    }
     // parity: the last branch is everything else in the air, and a step under a quarter of a block
     // counts for nothing: it is what keeps a player standing on a slab from flying on the spot.
     const std::int32_t horizontal = horizontalOf(dx, dz);

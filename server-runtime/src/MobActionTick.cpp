@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
 #include <basalt/server/runtime/RaidSystem.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
+#include <basalt/server/runtime/entity/Allays.hpp>
 #include <basalt/server/runtime/entity/Attributes.hpp>
 #include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
@@ -235,7 +236,8 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
     if (raider) {
         raids_->tickRaider(world, mob);
     }
-    if (mob.goals == nullptr) {
+    const bool allay = entity::allays::isAllay(mob.type());
+    if (mob.goals == nullptr && !allay) {
         travelMob(world, mob, mob.attributeWithModifiers(entity::attribute::kMovementSpeed), &random);
         return;
     }
@@ -258,6 +260,12 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
                                    .ambientLight = config::dimensionFacts(world.declaration().dimension).ambientLight,
                                    .seaLevel = config::dimensionFacts(world.declaration().dimension).seaLevel,
                                    .minY = config::dimensionFacts(world.declaration().dimension).chunkHeight.minY()};
+    // parity: `Allay.customServerAiStep`, the brain every tick instead of goals.
+    if (allay) {
+        tickAllay(world, context);
+        travelMob(world, mob, context.speed, &random);
+        return;
+    }
     // parity: `Mob.serverAiStep`, which decides on every other tick and staggers the mobs by their
     // own id so they do not all think on the same one.
     if ((mob.tickCount + mob.entityId()) % 2 != 0) {
@@ -395,6 +403,9 @@ void MobActionSystem::trailSnow(world::LoadedWorld& world, const ServerEntity& g
 }
 
 void MobActionSystem::dropDeathLoot(world::LoadedWorld& world, const ServerEntity& entity) {
+    if (entity::allays::isAllay(entity.type())) {
+        dropAllayInventory(world, entity);
+    }
     const server::world::loot::LootTable* table = lootTables_->forEntity(entity.type());
     if (table == nullptr) {
         return;

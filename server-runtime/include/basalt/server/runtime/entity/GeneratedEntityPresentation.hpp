@@ -71,6 +71,9 @@ struct RuntimeEntityMetadata {
     /// parity: `Bee.DATA_FLAGS_ID` and `DATA_ANGER_END_TIME`.
     std::optional<std::int8_t> beeFlags;
     std::optional<std::int64_t> beeAngerEnd;
+    /// parity: `Allay.DATA_DANCING` and `DATA_CAN_DUPLICATE`.
+    std::optional<bool> allayDancing;
+    std::optional<bool> allayCanDuplicate;
 
     /// Initial non-default fields, or every field whose live value changed since `previous`.
     [[nodiscard]] std::vector<wire::protocol::play::SetEntityDataPacket::Entry>

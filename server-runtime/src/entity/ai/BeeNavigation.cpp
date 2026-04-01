@@ -152,9 +152,11 @@ constexpr double kQuarterTurn = static_cast<double>(std::numbers::pi_v<float> / 
     return water(mob.world, at) || hasMalus(mob, at) ? std::nullopt : std::optional{at};
 }
 
-/// parity: `RandomPos.generateRandomPos` weighed by `Bee.getWalkTargetValue`, ten for air.
+/// parity: `RandomPos.generateRandomPos` weighed by `Bee.getWalkTargetValue`, ten for air, or by
+/// `PathfinderMob`'s zero for everybody else.
 template <typename Supplier>
 [[nodiscard]] std::optional<Block> bestOf(MobContext& mob, Supplier supply) {
+    const bool bee = bees::isBee(mob.mob.type());
     std::optional<Block> best;
     double bestWeight = -std::numeric_limits<double>::infinity();
     for (std::int32_t attempt = 0; attempt < kAttempts; ++attempt) {
@@ -162,7 +164,7 @@ template <typename Supplier>
         if (!candidate.has_value()) {
             continue;
         }
-        const double weight = air(mob.world, *candidate) ? 10.0 : 0.0;
+        const double weight = bee && air(mob.world, *candidate) ? 10.0 : 0.0;
         if (weight > bestWeight) {
             bestWeight = weight;
             best = candidate;
@@ -181,8 +183,8 @@ Route plan(MobContext& mob, const Block& target, std::int32_t accuracy, float vi
     // parity: `getMaxPathLength`, the follow range or the bee's required forty-eight.
     const double range =
         std::max(mob.mob.attributeWithModifiers("minecraft:follow_range"), static_cast<double>(bees::kPathLength));
-    const auto maxNodes = static_cast<std::int32_t>(static_cast<float>(mth::floor(static_cast<float>(range) * 16.0F)) *
-                                                    visitedMultiplier);
+    const auto maxNodes = static_cast<std::int32_t>(
+        static_cast<float>(mth::floor(static_cast<double>(static_cast<float>(range) * 16.0F))) * visitedMultiplier);
     const flyingPathFinder::Footprint size{.width = static_cast<std::int32_t>(std::floor(mob.mob.width() + 1.0)),
                                            .height = static_cast<std::int32_t>(std::floor(mob.mob.height() + 1.0))};
     const Block from{mth::floor(mob.mob.x), mth::floor(mob.mob.y + 0.5), mth::floor(mob.mob.z)};
@@ -252,6 +254,21 @@ std::optional<std::array<double, 3>> wanderSpot(MobContext& mob, const std::opti
     if (!spot.has_value()) {
         spot = bestOf(mob, [&] { return airCandidate(mob, 8, 4, -2, xDir, zDir, kQuarterTurn); });
     }
+    if (!spot.has_value()) {
+        return std::nullopt;
+    }
+    return std::array<double, 3>{(*spot)[0] + 0.5, static_cast<double>((*spot)[1]), (*spot)[2] + 0.5};
+}
+
+std::optional<std::array<double, 3>> airAndWaterSpot(MobContext& mob, std::int32_t horizontal, std::int32_t vertical,
+                                                     std::int32_t lift) {
+    // parity: `getViewVector(0)`, within a quarter turn of it.
+    const float yaw = -mob.mob.yaw * (std::numbers::pi_v<float> / 180.0F);
+    const float pitch = mob.mob.pitch * (std::numbers::pi_v<float> / 180.0F);
+    const auto xDir = static_cast<double>(mth::sin(yaw) * mth::cos(pitch));
+    const auto zDir = static_cast<double>(mth::cos(yaw) * mth::cos(pitch));
+    const std::optional<Block> spot =
+        bestOf(mob, [&] { return airCandidate(mob, horizontal, vertical, lift, xDir, zDir, kQuarterTurn); });
     if (!spot.has_value()) {
         return std::nullopt;
     }

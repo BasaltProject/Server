@@ -53,6 +53,10 @@ namespace bees {
 struct BeeState;
 }
 
+namespace allays {
+struct AllayState;
+}
+
 namespace shulkers {
 struct ShulkerState;
 struct BulletState;
@@ -232,6 +236,9 @@ public:
     /// parity: `LightningBolt.life` and `flashes`, for a bolt.
     std::int32_t boltLife = 2;
     std::int32_t boltFlashes = -1;
+    /// parity: `LightningBolt.blocksSetOnFire` and `hitEntities`, what `lightning_strike` reads.
+    std::int32_t boltFiresSet = 0;
+    std::vector<std::int32_t> boltHitIds;
     /// parity: `IsImmuneToZombification`.
     bool immuneToZombification = false;
     /// parity: `LivingEntity.zza` and `yya` as a smooth swimmer last left them.
@@ -447,6 +454,8 @@ public:
     std::shared_ptr<copperGolems::GolemState> copperGolem;
     /// parity: `Bee`'s own fields. Absent for everything that is not one.
     std::shared_ptr<bees::BeeState> bee;
+    /// parity: `Allay`'s own fields and brain. Absent for everything that is not one.
+    std::shared_ptr<allays::AllayState> allay;
 
     /// What a shulker and a shulker bullet keep beyond this, or null for anything else.
     std::shared_ptr<shulkers::ShulkerState> shulker;

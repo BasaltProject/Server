@@ -16,8 +16,9 @@ class PlayerSession;
 }
 
 namespace basalt::server::runtime::world {
+class AdvancementTriggers;
 class LoadedWorld;
-}
+} // namespace basalt::server::runtime::world
 
 namespace basalt::server::runtime {
 
@@ -30,7 +31,8 @@ class MobActionSystem;
 /// parity: `LightningBolt.tick`.
 class LightningBoltSystem {
 public:
-    LightningBoltSystem(BlockChangeBroadcaster& broadcaster, MobActionSystem& mobs);
+    LightningBoltSystem(BlockChangeBroadcaster& broadcaster, MobActionSystem& mobs,
+                        world::AdvancementTriggers* triggers = nullptr);
 
     void tick(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
               const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& bolt,
@@ -38,10 +40,15 @@ public:
 
 private:
     void hitAround(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
-                   const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& bolt);
+                   const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& bolt);
+
+    /// parity: the `LIGHTNING_STRIKE` trigger a bolt fires as it goes, for every player near it.
+    void announceStrike(const world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                        const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& bolt) const;
 
     BlockChangeBroadcaster* broadcaster_;
     MobActionSystem* mobs_;
+    world::AdvancementTriggers* triggers_;
 };
 
 } // namespace basalt::server::runtime

@@ -70,7 +70,8 @@ void countMovement(player::PlayerSession& session, double dx, double dy, double 
         .climbing = feet.has_value() && player::playerMovement::isClimbable(*feet),
         .onGround = onGround,
         .sprinting = session.sprinting,
-        .crouching = session.sneaking};
+        .crouching = session.sneaking,
+        .fallFlying = session.fallFlying};
     const std::optional<player::playerMovement::Counted> counted =
         player::playerMovement::movementStat(dx, dy, dz, facts);
     if (counted.has_value()) {

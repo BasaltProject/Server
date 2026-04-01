@@ -27,6 +27,8 @@ struct Facts {
     bool onGround = false;
     bool sprinting = false;
     bool crouching = false;
+    /// parity: `isFallFlying`, gliding on an elytra.
+    bool fallFlying = false;
 };
 
 /// A counter and how much to add to it.

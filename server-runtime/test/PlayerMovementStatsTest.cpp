@@ -52,6 +52,12 @@ TEST_CASE("climbing counts what was gained, and the air counts nothing under a q
     CHECK_FALSE(movementStat(0.25, 0.0, 0.0, Facts{}).has_value());
     CHECK(movementStat(0.26, 0.0, 0.0, Facts{})->key == stats::flyOneCm());
 
+    // parity: gliding comes before it, and counts the fall too, with no threshold.
+    const std::optional<Counted> glided = movementStat(0.0, -0.03, 0.04, Facts{.fallFlying = true});
+    REQUIRE(glided.has_value());
+    CHECK(glided->key == stats::custom("aviate_one_cm"));
+    CHECK(glided->centimetres == 5);
+
     // A passenger and a player standing still both count nowhere.
     CHECK_FALSE(movementStat(1.0, 0.0, 0.0, Facts{.riding = true, .onGround = true}).has_value());
     CHECK_FALSE(movementStat(0.0, 0.0, 0.0, Facts{.onGround = true}).has_value());

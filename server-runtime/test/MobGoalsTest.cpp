@@ -154,7 +154,6 @@ TEST_CASE("every mob this build gives an AI to comes back with goals") {
                                          "cod",
                                          "slime",
                                          "trader_llama",
-                                         "allay",
                                          "endermite",
                                          "vindicator"};
     for (const std::string& type : types) {

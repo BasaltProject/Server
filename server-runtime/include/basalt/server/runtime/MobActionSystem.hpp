@@ -28,11 +28,16 @@ class PlayerSession;
 
 namespace basalt::server::runtime::world {
 class LoadedWorld;
+class AdvancementTriggers;
 class RealLootTables;
 } // namespace basalt::server::runtime::world
 
 namespace basalt::server::runtime::world {
 class RealRecipes;
+}
+
+namespace basalt::server::runtime::entity::allays {
+struct AllayState;
 }
 
 namespace basalt::server::runtime {
@@ -100,6 +105,8 @@ public:
         const world::realBlockTags::TagMembers* blockTags = nullptr;
         /// The jar's trade sets, which a villager's offers are rolled from.
         world::RealVillagerTrades* villagerTrades = nullptr;
+        /// Where the triggers a mob's doing earns a player go: a hive broken, an allay's delivery.
+        world::AdvancementTriggers* advancementTriggers = nullptr;
     };
 
     /// Which worlds a mob might be in, since a goal only ever hands over the mob itself.
@@ -322,6 +329,19 @@ public:
     /// parity: `Animal.spawnChildFromBreeding`: the calf appears where its parent stands.
     void breed(world::LoadedWorld& world, entity::ServerEntity& animal, entity::ServerEntity& partner);
 
+    /// parity: `Allay.customServerAiStep` over `AllayAi`, with the rest of `Allay.aiStep`.
+    void tickAllay(world::LoadedWorld& world, entity::ai::MobContext& context);
+
+    /// What using an item on an allay did with it. parity: `Allay.mobInteract`.
+    enum class AllayUse : std::uint8_t { Pass, Done, ConsumeOne };
+
+    [[nodiscard]] AllayUse useOnAllay(world::LoadedWorld& world, player::PlayerSession& player,
+                                      entity::ServerEntity& allay,
+                                      const std::optional<server::world::loot::ItemStack>& held, bool mainHand);
+
+    /// parity: `Allay.dropEquipment`'s inventory, spilled where it died.
+    void dropAllayInventory(world::LoadedWorld& world, const entity::ServerEntity& allay);
+
     /// The bee's own turn beyond its goals. parity: `Bee.customServerAiStep` and the rest of `Bee.aiStep`.
     void tickBee(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                  entity::ServerEntity& bee, random::RandomSource& random);
@@ -433,6 +453,16 @@ private:
 
     /// parity: the rest of `ZombieVillager.finishConversion`: the kept gear dropped and the trigger.
     void villagerCured(world::LoadedWorld& world, const entity::ServerEntity& zombie, entity::ServerEntity& villager);
+
+    /// parity: the allay's vibration user and `JukeboxListener`.
+    void allayHears(world::LoadedWorld& world, entity::ServerEntity& allay, entity::allays::AllayState& state);
+
+    /// parity: `AllayAi.throwItem`.
+    void allayThrows(world::LoadedWorld& world, entity::ServerEntity& allay, entity::allays::AllayState& state,
+                     const std::array<double, 3>& target);
+
+    /// parity: `Mob.aiStep`'s pickup over `InventoryCarrier.pickUpItem`.
+    void allayPicksUp(world::LoadedWorld& world, entity::ServerEntity& allay, entity::allays::AllayState& state);
 
     /// parity: `NeutralMob.updatePersistentAnger(level, false)`.
     void updateBeeAnger(world::LoadedWorld& world, entity::ServerEntity& bee, random::RandomSource& random);

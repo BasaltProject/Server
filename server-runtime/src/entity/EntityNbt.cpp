@@ -1,4 +1,5 @@
 #include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/runtime/entity/Allays.hpp>
 #include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
@@ -379,6 +380,9 @@ NbtCompound encode(const ServerEntity& entity) {
     }
     if (path == "bee") {
         bees::write(entity, tag);
+    }
+    if (path == "allay") {
+        allays::write(entity, tag);
     }
     if (patrols(path)) {
         if (entity.patrolTarget.has_value()) {

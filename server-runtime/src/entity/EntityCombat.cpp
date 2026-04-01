@@ -1,4 +1,5 @@
 #include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/runtime/entity/Allays.hpp>
 #include <basalt/server/runtime/entity/Attributes.hpp>
 #include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
@@ -69,6 +70,11 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
         entity.raidHurtStamp = nextRaidBarStamp();
     }
     if (entity.removed || entity.health <= 0.0) {
+        return {};
+    }
+    // parity: `Allay.hurtServer`, which the player it likes cannot hurt.
+    if (entity.allay != nullptr && entity.allay->likedPlayerEntity.has_value() &&
+        blamed.causingId == entity.allay->likedPlayerEntity) {
         return {};
     }
     // parity: `Bee.hurtServer` stops pollinating before the hit is even weighed.

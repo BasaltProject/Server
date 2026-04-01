@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 
 #include <charconv>
 #include <cmath>
@@ -130,8 +131,8 @@ std::optional<BlockChange> insert(WorldState& world, std::int32_t x, std::int32_
     return change;
 }
 
-std::optional<std::pair<BlockChange, wire::common::Identifier>> eject(WorldState& world, std::int32_t x, std::int32_t y,
-                                                                      std::int32_t z) {
+std::optional<std::pair<BlockChange, wire::common::Identifier>>
+eject(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, const std::optional<std::int64_t> gameTime) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value()) {
         return std::nullopt;
@@ -160,6 +161,10 @@ std::optional<std::pair<BlockChange, wire::common::Identifier>> eject(WorldState
     BlockChange change{.x = x, .y = y, .z = z, .stateId = *quiet};
     if (wasPlaying) {
         change.effects.emplace_back(blockEffect::Effect{.type = blockEffect::Effect::kStopJukeboxSong});
+        // parity: `JukeboxSongPlayer.stop`, which an allay dancing to it hears.
+        if (gameTime.has_value()) {
+            vibrations::emit(world, "jukebox_stop_play", x + 0.5, y + 0.5, z + 0.5, *gameTime);
+        }
     }
     return std::pair{change, *disc};
 }
@@ -176,7 +181,7 @@ std::optional<std::string> songAt(WorldState& world, std::int32_t x, std::int32_
 bool isPlaying(const wire::nbt::NbtCompound& data) { return data.find(kTicksKey) != nullptr; }
 
 bool tick(WorldState& world, const std::int32_t x, const std::int32_t y, const std::int32_t z,
-          const std::int64_t lengthTicks) {
+          const std::int64_t lengthTicks, const std::optional<std::int64_t> gameTime) {
     server::world::ChunkBlockEntity* entity = entityAt(world, x, y, z, false);
     if (entity == nullptr || !isPlaying(entity->data())) {
         return false;
@@ -186,7 +191,14 @@ bool tick(WorldState& world, const std::int32_t x, const std::int32_t y, const s
     // last turn is spent on the check and not on the counter.
     if (elapsed >= lengthTicks + kEndPadding) {
         entity->data().remove(kTicksKey);
+        if (gameTime.has_value()) {
+            vibrations::emit(world, "jukebox_stop_play", x + 0.5, y + 0.5, z + 0.5, *gameTime);
+        }
         return true;
+    }
+    // parity: `shouldEmitJukeboxPlayingEvent`, once a second from the start.
+    if (gameTime.has_value() && elapsed % 20 == 0) {
+        vibrations::emit(world, "jukebox_play", x + 0.5, y + 0.5, z + 0.5, *gameTime);
     }
     entity->data().putLong(kTicksKey, elapsed + 1);
     return false;

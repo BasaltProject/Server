@@ -228,7 +228,7 @@ bool useJukeboxFor(const BreakContext& context, PlayerSession& player, world::Lo
                    const std::optional<storage::StoredItemStack>& held) {
     // parity: `JukeboxBlock.useWithoutItem` pops what is playing before it looks at the hand at all.
     if (const std::optional<std::pair<world::BlockChange, wire::common::Identifier>> ejected =
-            world::jukeboxes::eject(world.state(), x, y, z);
+            world::jukeboxes::eject(world.state(), x, y, z, world.gameTime());
         ejected.has_value()) {
         const world::BlockChange& change = ejected->first;
         announceBlock(context, world.name(), change.x, change.y, change.z, change.stateId);
