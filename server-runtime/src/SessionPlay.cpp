@@ -549,6 +549,7 @@ void ClientSession::enterPlay() {
 
     // Without these a real client's "loading terrain" screen never dismisses: it has no centre to
     // count chunks around and no radius to know when it has enough.
+    chunkStreamer_->setRequestedViewDistance(pendingViewDistance_);
     const server::world::ChunkTracker::Delta initialChunks =
         chunkStreamer_->initialJoin(player.x, player.z, chunkRadius);
 
@@ -930,6 +931,10 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         const auto skinParts = static_cast<std::int8_t>(information->skinParts);
         pendingSkinParts_ = skinParts;
         pendingChatVisibility_ = information->chatFlags;
+        pendingViewDistance_ = information->viewDistance;
+        if (chunkStreamer_ != nullptr) {
+            chunkStreamer_->setRequestedViewDistance(information->viewDistance);
+        }
         if (session != nullptr) {
             session->chatVisibility.store(
                 static_cast<PlayerSession::ChatVisibility>(std::clamp(information->chatFlags, 0, 2)));

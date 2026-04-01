@@ -364,6 +364,30 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
             return;
         }
     }
+    // parity: `PiglinAi.mobInteract`: a gold ingot to admire and barter.
+    if (MobActionSystem* mobs = owner_->options().mobs; mobs != nullptr && entity->type().path() == "piglin") {
+        const bool mainHand = interact.hand == wire::protocol::play::InteractPacket::kMainHand;
+        const std::int32_t slot =
+            mainHand ? PlayerInventory::kHotbarStart + session->inventory.heldSlot() : PlayerInventory::kOffhandSlot;
+        const std::optional<storage::StoredItemStack> inHand = session->inventory.at(slot);
+        std::optional<server::world::loot::ItemStack> held;
+        if (inHand.has_value() && inHand->count > 0) {
+            if (const std::optional<Identifier> id = parsedOrNothing(inHand->id); id.has_value()) {
+                held = server::world::loot::ItemStack{
+                    .item = *id, .count = inHand->count, .components = inHand->components};
+            }
+        }
+        if (mobs->useOnPiglin(*world, *session, *entity, held)) {
+            // parity: `consumeAndReturn`, which a creative hand keeps.
+            if (session->gamemode != Gamemode::Creative && inHand.has_value()) {
+                storage::StoredItemStack left = *inHand;
+                left.count -= 1;
+                session->inventory.set(slot, left.count <= 0 ? std::nullopt : std::optional{left});
+                owner_->sendInventorySlot(slot);
+            }
+            return;
+        }
+    }
     // parity: `CopperGolem.mobInteract`: the carried item back, shears, wax and a scrape.
     if (MobActionSystem* mobs = owner_->options().mobs;
         mobs != nullptr && entity::copperGolems::isCopperGolem(entity->type())) {

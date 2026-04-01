@@ -74,6 +74,12 @@ struct RuntimeEntityMetadata {
     /// parity: `Allay.DATA_DANCING` and `DATA_CAN_DUPLICATE`.
     std::optional<bool> allayDancing;
     std::optional<bool> allayCanDuplicate;
+    /// parity: `Piglin`'s baby, crossbow and dance flags, one after `AbstractPiglin`'s own.
+    std::optional<bool> piglinBaby;
+    std::optional<bool> piglinCharging;
+    std::optional<bool> piglinDancing;
+    /// parity: `Axolotl.DATA_PLAYING_DEAD`.
+    std::optional<bool> axolotlPlayingDead;
 
     /// Initial non-default fields, or every field whose live value changed since `previous`.
     [[nodiscard]] std::vector<wire::protocol::play::SetEntityDataPacket::Entry>

@@ -265,6 +265,11 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         if (!path.empty() && world::containers::isPlain(path)) {
             owner_->menus().openChest(*session, hit.pos, path);
             awardOpened();
+            // parity: `ChestBlock`, `BarrelBlock` and `ShulkerBoxBlock`, which anger the piglins that see it.
+            if (path != "hopper" && path != "dispenser" && path != "dropper" && owner_->options().mobs != nullptr &&
+                owner_->currentWorld() != nullptr) {
+                owner_->options().mobs->angerNearbyPiglins(*owner_->currentWorld(), *session, true);
+            }
             ack();
             return;
         }
@@ -383,6 +388,9 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         if (path == "ender_chest") {
             owner_->menus().openEnderChest(*session, hit.pos);
             awardOpened();
+            if (owner_->options().mobs != nullptr && owner_->currentWorld() != nullptr) {
+                owner_->options().mobs->angerNearbyPiglins(*owner_->currentWorld(), *session, true);
+            }
             ack();
             return;
         }

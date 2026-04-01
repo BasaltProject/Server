@@ -62,6 +62,11 @@ constexpr double kSpeedLerp = 0.1;
 
 } // namespace
 
+std::optional<Push> hoglinThrow(const ServerEntity& body, double targetX, double targetZ, double resistance,
+                                random::RandomSource& random) {
+    return throwTarget(body, targetX, targetZ, resistance, random);
+}
+
 Push strongKnockback(const ServerEntity& ravager, double targetX, double targetZ) {
     const double xd = targetX - ravager.x;
     const double zd = targetZ - ravager.z;

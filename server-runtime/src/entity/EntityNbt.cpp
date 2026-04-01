@@ -6,6 +6,8 @@
 #include <basalt/server/runtime/entity/FireworkRockets.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
+#include <basalt/server/runtime/entity/NeutralAnger.hpp>
+#include <basalt/server/runtime/entity/Piglins.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/Villagers.hpp>
 #include <basalt/server/runtime/entity/WitherBoss.hpp>
@@ -384,6 +386,10 @@ NbtCompound encode(const ServerEntity& entity) {
     if (path == "allay") {
         allays::write(entity, tag);
     }
+    if (piglins::isPiglin(entity.type())) {
+        piglins::write(entity, tag);
+    }
+    neutralAnger::write(entity, tag);
     if (patrols(path)) {
         if (entity.patrolTarget.has_value()) {
             tag.putIntArray("patrol_target", {entity.patrolTarget->begin(), entity.patrolTarget->end()});

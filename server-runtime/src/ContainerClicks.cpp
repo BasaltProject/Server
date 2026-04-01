@@ -10,8 +10,10 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerPick.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
+#include <basalt/server/runtime/world/BlockPickData.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
+#include <basalt/server/world/Chunk.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -607,7 +609,21 @@ void ContainerMenuController::handlePickItemFromBlock(const wire::protocol::play
         !hooks_.pickAllowed(*session, packet.pos.x, packet.pos.y, packet.pos.z, item->id.toString())) {
         return;
     }
-    pickItem(*session, item->id.toString());
+    // parity: `handlePickItemFromBlock`: the block entity's data only for a creative player who asked.
+    const bool includeData = session->gamemode == Gamemode::Creative && packet.includeData;
+    const server::world::ChunkBlockEntity* entity = nullptr;
+    if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
+        if (const server::world::Chunk* chunk = world->state().chunkIfLoaded(packet.pos.x >> 4, packet.pos.z >> 4);
+            chunk != nullptr) {
+            entity = chunk->blockEntityAt(packet.pos.x & 15, packet.pos.y, packet.pos.z & 15);
+        }
+    }
+    storage::StoredItemStack picked{.id = item->id.toString(), .count = 1, .components = {}};
+    world::blockPickData::addCloneComponents(*stateId, entity, includeData, picked.components);
+    if (includeData && entity != nullptr) {
+        world::blockPickData::addBlockData(*entity, picked.components);
+    }
+    pickItem(*session, picked);
 }
 
 void ContainerMenuController::handlePickItemFromEntity(const wire::protocol::play::PickItemFromEntityPacket& packet) {
@@ -626,17 +642,18 @@ void ContainerMenuController::handlePickItemFromEntity(const wire::protocol::pla
     if (!item.has_value()) {
         return;
     }
-    pickItem(*session, item->toString());
+    pickItem(*session, storage::StoredItemStack{.id = item->toString(), .count = 1, .components = {}});
 }
 
-void ContainerMenuController::pickItem(PlayerSession& session, const std::string& id) {
-    if (!player::pickItemFor(session, id)) {
-        return;
-    }
+void ContainerMenuController::pickItem(PlayerSession& session, const storage::StoredItemStack& picked) {
+    const bool changed = player::pickItemFor(session, picked);
+    // parity: `tryPickItem` names the selected slot whether or not anything was found.
     if (session.connection().setHeldSlot) {
         session.connection().setHeldSlot(session.inventory.heldSlot());
     }
-    sendInventoryAll();
+    if (changed) {
+        sendInventoryAll();
+    }
 }
 
 } // namespace basalt::server::runtime

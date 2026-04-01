@@ -375,7 +375,7 @@ TEST_CASE("loot give rolls the named table into an inventory") {
     jar.files["data/minecraft/loot_table/gameplay/fishing.json"] =
         R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:cod"}]}]})";
     basalt::server::runtime::world::RealLootTables tables{jar.handle()};
-    fixture.dispatcher.registerCommand(std::make_shared<commands::LootCommand>(tables, [] { return std::int64_t{7}; }));
+    fixture.dispatcher.registerCommand(std::make_shared<commands::LootCommand>(tables));
 
     CHECK(fixture.dispatcher.execute(fixture.source, "loot give Steve loot minecraft:gameplay/fishing") == 1);
     CHECK(steve.inventory.at(basalt::server::runtime::player::PlayerInventory::kHotbarStart)->id == "minecraft:cod");
@@ -393,7 +393,7 @@ TEST_CASE("loot spawn drops the roll on the ground where it was told") {
     jar.files["data/minecraft/loot_table/chests/simple_dungeon.json"] =
         R"({"pools":[{"rolls":2,"entries":[{"type":"minecraft:item","name":"minecraft:bone"}]}]})";
     basalt::server::runtime::world::RealLootTables tables{jar.handle()};
-    fixture.dispatcher.registerCommand(std::make_shared<commands::LootCommand>(tables, [] { return std::int64_t{7}; }));
+    fixture.dispatcher.registerCommand(std::make_shared<commands::LootCommand>(tables));
 
     CHECK(fixture.dispatcher.execute(fixture.source, "loot spawn 8 64 8 loot minecraft:chests/simple_dungeon") == 2);
     CHECK(fixture.world->state().items().size() == 2);
@@ -418,7 +418,7 @@ TEST_CASE("loot insert fills a container's free slots without dropping what it h
     jar.files["data/minecraft/loot_table/chests/simple_dungeon.json"] =
         R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:bone"}]}]})";
     basalt::server::runtime::world::RealLootTables tables{jar.handle()};
-    fixture.dispatcher.registerCommand(std::make_shared<commands::LootCommand>(tables, [] { return std::int64_t{7}; }));
+    fixture.dispatcher.registerCommand(std::make_shared<commands::LootCommand>(tables));
 
     CHECK(fixture.dispatcher.execute(fixture.source, "loot insert 8 64 8 loot minecraft:chests/simple_dungeon") == 1);
     const basalt::server::world::ChunkBlockEntity* chest = state.chunkIfLoaded(0, 0)->blockEntityAt(8, 64, 8);

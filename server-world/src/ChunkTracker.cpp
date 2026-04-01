@@ -2,9 +2,20 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <stdexcept>
 
 namespace basalt::server::world {
+
+bool ChunkTracker::isWithinDistance(std::int32_t centerX, std::int32_t centerZ, std::int32_t viewDistance,
+                                    std::int32_t chunkX, std::int32_t chunkZ, bool includeNeighbors) {
+    const std::int64_t buffer = includeNeighbors ? 2 : 1;
+    const std::int64_t deltaX =
+        std::max<std::int64_t>(0, std::abs(static_cast<std::int64_t>(chunkX) - centerX) - buffer);
+    const std::int64_t deltaZ =
+        std::max<std::int64_t>(0, std::abs(static_cast<std::int64_t>(chunkZ) - centerZ) - buffer);
+    return (deltaX * deltaX) + (deltaZ * deltaZ) < static_cast<std::int64_t>(viewDistance) * viewDistance;
+}
 
 ChunkTracker::Delta ChunkTracker::update(const std::int32_t centerX, const std::int32_t centerZ,
                                          const std::int32_t radius) {
@@ -12,10 +23,13 @@ ChunkTracker::Delta ChunkTracker::update(const std::int32_t centerX, const std::
         throw std::invalid_argument{"radius must be non-negative"};
     }
 
+    // parity: `Positioned.forEach`, the square one past the view distance filtered by `contains`.
     std::set<ChunkPos> desired;
-    for (std::int32_t x = centerX - radius; x <= centerX + radius; ++x) {
-        for (std::int32_t z = centerZ - radius; z <= centerZ + radius; ++z) {
-            desired.insert(ChunkPos{.x = x, .z = z});
+    for (std::int32_t x = centerX - radius - 1; x <= centerX + radius + 1; ++x) {
+        for (std::int32_t z = centerZ - radius - 1; z <= centerZ + radius + 1; ++z) {
+            if (isWithinDistance(centerX, centerZ, radius, x, z, true)) {
+                desired.insert(ChunkPos{.x = x, .z = z});
+            }
         }
     }
 

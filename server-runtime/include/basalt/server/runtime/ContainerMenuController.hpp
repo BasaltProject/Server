@@ -282,7 +282,7 @@ private:
 
     void dropStack(player::PlayerSession& session, const storage::StoredItemStack& stack);
 
-    void pickItem(player::PlayerSession& session, const std::string& id);
+    void pickItem(player::PlayerSession& session, const storage::StoredItemStack& picked);
 
     void announceOpeners(const wire::protocol::play::BlockPos& pos, const std::string& block, std::int32_t openers);
 

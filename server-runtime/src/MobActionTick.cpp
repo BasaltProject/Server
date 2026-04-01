@@ -15,6 +15,7 @@
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobCombat.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
+#include <basalt/server/runtime/entity/Piglins.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/GoalSelector.hpp>
@@ -237,7 +238,10 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
         raids_->tickRaider(world, mob);
     }
     const bool allay = entity::allays::isAllay(mob.type());
-    if (mob.goals == nullptr && !allay) {
+    const bool piglin = entity::piglins::isPiglin(mob.type());
+    const bool hoglin = mob.type().path() == "hoglin";
+    const bool axolotl = mob.type().path() == "axolotl";
+    if (mob.goals == nullptr && !allay && !piglin && !hoglin && !axolotl) {
         travelMob(world, mob, mob.attributeWithModifiers(entity::attribute::kMovementSpeed), &random);
         return;
     }
@@ -263,6 +267,22 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
     // parity: `Allay.customServerAiStep`, the brain every tick instead of goals.
     if (allay) {
         tickAllay(world, context);
+        travelMob(world, mob, context.speed, &random);
+        return;
+    }
+    // parity: `Piglin.customServerAiStep` and the brute's, a brain every tick.
+    if (axolotl) {
+        tickAxolotl(world, context);
+        travelMob(world, mob, context.speed, &random);
+        return;
+    }
+    if (hoglin) {
+        tickHoglin(world, context);
+        travelMob(world, mob, context.speed, &random);
+        return;
+    }
+    if (piglin) {
+        tickPiglin(world, context);
         travelMob(world, mob, context.speed, &random);
         return;
     }
@@ -405,6 +425,9 @@ void MobActionSystem::trailSnow(world::LoadedWorld& world, const ServerEntity& g
 void MobActionSystem::dropDeathLoot(world::LoadedWorld& world, const ServerEntity& entity) {
     if (entity::allays::isAllay(entity.type())) {
         dropAllayInventory(world, entity);
+    }
+    if (entity::piglins::isPiglin(entity.type())) {
+        dropPiglinInventory(world, entity);
     }
     const server::world::loot::LootTable* table = lootTables_->forEntity(entity.type());
     if (table == nullptr) {

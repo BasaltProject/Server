@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/Allays.hpp>
 #include <basalt/server/runtime/entity/AreaEffectClouds.hpp>
+#include <basalt/server/runtime/entity/Axolotls.hpp>
 #include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
@@ -11,6 +12,7 @@
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
+#include <basalt/server/runtime/entity/Piglins.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/Shulkers.hpp>
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
@@ -273,8 +275,10 @@ std::vector<Entry> generatedEntityMetadata(std::string_view type, const NbtCompo
         }
     }
     if (ageableMobs::hasBabyMetadata(type) && (entityNbt::numericInt(data, "Age") < 0 || data.getBoolean("IsBaby"))) {
-        entries.push_back(
-            Entry{.index = ageableMobs::kBabyDataIndex, .value = SetEntityDataPacket::BoolValue{.value = true}});
+        // parity: the piglin's baby flag sits after `AbstractPiglin`'s zombification one.
+        entries.push_back(Entry{.index = static_cast<std::uint8_t>(type == "piglin" ? piglins::kBabyDataIndex
+                                                                                    : ageableMobs::kBabyDataIndex),
+                                .value = SetEntityDataPacket::BoolValue{.value = true}});
     }
     if (cubeMobs::isCube(type) && data.getInt("Size") != 0) {
         entries.push_back(Entry{.index = kCubeSizeDataIndex,
@@ -484,6 +488,17 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
         (previous != nullptr || *fireworkShotAtAngle)) {
         entries.push_back(Entry{.index = 10, .value = SetEntityDataPacket::BoolValue{.value = *fireworkShotAtAngle}});
     }
+    const auto flag = [&entries, previous](const std::optional<bool>& now,
+                                           const std::optional<bool> RuntimeEntityMetadata::* field,
+                                           std::uint8_t index) {
+        if (now.has_value() && (previous == nullptr || previous->*field != now) && (previous != nullptr || *now)) {
+            entries.push_back(Entry{.index = index, .value = SetEntityDataPacket::BoolValue{.value = *now}});
+        }
+    };
+    flag(piglinBaby, &RuntimeEntityMetadata::piglinBaby, piglins::kBabyDataIndex);
+    flag(piglinCharging, &RuntimeEntityMetadata::piglinCharging, piglins::kChargingDataIndex);
+    flag(piglinDancing, &RuntimeEntityMetadata::piglinDancing, piglins::kDancingDataIndex);
+    flag(axolotlPlayingDead, &RuntimeEntityMetadata::axolotlPlayingDead, axolotls::kPlayingDeadDataIndex);
     if (allayDancing.has_value() && (previous == nullptr || previous->allayDancing != allayDancing) &&
         (previous != nullptr || *allayDancing)) {
         entries.push_back(
@@ -686,6 +701,17 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     }
     if (entity.dragon != nullptr) {
         live.dragonPhase = static_cast<std::int32_t>(entity.dragon->phase);
+    }
+    if (entity.axolotl != nullptr) {
+        live.axolotlPlayingDead = axolotls::playingDead(entity);
+    }
+    if (entity.type().path() == "piglin") {
+        live.baby.reset();
+        live.piglinBaby = entity.age < 0;
+        if (entity.piglin != nullptr) {
+            live.piglinCharging = entity.piglin->chargingCrossbow;
+            live.piglinDancing = entity.piglin->dancing;
+        }
     }
     if (entity.allay != nullptr) {
         live.allayDancing = entity.allay->dancing;

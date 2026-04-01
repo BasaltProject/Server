@@ -57,6 +57,22 @@ namespace allays {
 struct AllayState;
 }
 
+namespace piglins {
+struct PiglinState;
+}
+
+namespace neutralAnger {
+struct Anger;
+}
+
+namespace hoglins {
+struct HoglinState;
+}
+
+namespace axolotls {
+struct AxolotlState;
+}
+
 namespace shulkers {
 struct ShulkerState;
 struct BulletState;
@@ -456,6 +472,17 @@ public:
     std::shared_ptr<bees::BeeState> bee;
     /// parity: `Allay`'s own fields and brain. Absent for everything that is not one.
     std::shared_ptr<allays::AllayState> allay;
+    /// parity: `Piglin` and `PiglinBrute`'s own fields and brain.
+    std::shared_ptr<piglins::PiglinState> piglin;
+    /// parity: `NeutralMob`'s anger, for the neutral mobs that keep it here.
+    std::shared_ptr<neutralAnger::Anger> neutral;
+    /// parity: `Hoglin`'s brain.
+    std::shared_ptr<hoglins::HoglinState> hoglin;
+    /// parity: `Axolotl`'s brain.
+    std::shared_ptr<axolotls::AxolotlState> axolotl;
+    /// Whether its move control swims this turn. parity: `AxolotlMoveControl`, which is
+    /// `SmoothSwimmingMoveControl` only in water.
+    bool smoothSwimming = false;
 
     /// What a shulker and a shulker bullet keep beyond this, or null for anything else.
     std::shared_ptr<shulkers::ShulkerState> shulker;

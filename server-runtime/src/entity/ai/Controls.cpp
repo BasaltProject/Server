@@ -464,7 +464,7 @@ void tickSwimming(ServerEntity& mob) {
 
 } // namespace lookControl
 
-bool swimsSmoothly(const ServerEntity& mob) { return mob.type().path() == "dolphin"; }
+bool swimsSmoothly(const ServerEntity& mob) { return mob.type().path() == "dolphin" || mob.smoothSwimming; }
 
 bool inWater(world::WorldState& world, const ServerEntity& mob) {
     const std::optional<std::int32_t> state = world.blockState(blockOf(mob.x), blockOf(mob.y), blockOf(mob.z));

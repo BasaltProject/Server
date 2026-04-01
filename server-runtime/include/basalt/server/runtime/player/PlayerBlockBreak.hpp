@@ -77,6 +77,8 @@ struct BreakContext {
     std::function<void(world::LoadedWorld& world, const PlayerSession& player, std::int32_t x, std::int32_t y,
                        std::int32_t z, std::int32_t stateId, const wire::nbt::NbtCompound& hive, bool silkTouch)>
         hiveBroken;
+    /// parity: `Block.playerWillDestroy`'s `guarded_by_piglins` check, before the block goes.
+    std::function<void(world::LoadedWorld& world, const PlayerSession& player, std::int32_t stateId)> guardedBroken;
     /// Takes the player off whatever they ride. parity: `Entity.stopRiding`.
     std::function<void(PlayerSession& player)> dismount;
 };

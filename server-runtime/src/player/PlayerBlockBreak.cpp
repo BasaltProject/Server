@@ -342,6 +342,9 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
             carried = world::shulkers::contentsOf(entity->data());
         }
     }
+    if (broken.has_value() && context.guardedBroken) {
+        context.guardedBroken(world, *session, *broken);
+    }
     // parity: `BeehiveBlock.playerDestroy` is handed the block entity as it was before the break.
     std::optional<wire::nbt::NbtCompound> hive;
     if (brokenBlock != nullptr && world::beehives::isHive(brokenBlock->path())) {

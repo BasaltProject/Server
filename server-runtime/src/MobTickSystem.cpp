@@ -195,6 +195,9 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
     if (entity::bees::isBee(entity.type())) {
         actions_->tickBee(world, watchers, entity, random);
     }
+    if (entity.type().path() == "zombified_piglin") {
+        actions_->tickZombifiedPiglin(world, entity, random);
+    }
     // parity: `Shulker.tick`, after the living entity's own turn.
     if (entity::shulkers::isShulker(entity.type())) {
         actions_->tickShulker(world, watchers, living, entity, random);

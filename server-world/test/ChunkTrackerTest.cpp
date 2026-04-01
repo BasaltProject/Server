@@ -24,52 +24,29 @@ namespace {
 
 } // namespace
 
-TEST_CASE("the view delta matches the frozen kotlin") {
+TEST_CASE("the view is vanilla's cylinder, one ring of neighbours past the distance") {
+    // parity: `ChunkTrackingView.isWithinDistance` with the neighbours: every axis less two,
+    // squared, strictly under the distance squared. At two that is the whole seven by seven.
     ChunkTracker tracker;
-    {
-        const ChunkTracker::Delta delta = tracker.update(0, 0, 2);
-        CHECK(render(delta.toLoad) ==
-              "-2,-2;-2,-1;-2,0;-2,1;-2,2;-1,-2;-1,-1;-1,0;-1,1;-1,2;0,-2;0,-1;0,0;0,1;0,2;1,-2;1,-1;1,0;1,1;1,2;"
-              "2,-2;2,-1;2,0;2,1;2,2");
-        CHECK(render(delta.toUnload) == "");
-        CHECK(tracker.loaded().size() == 25);
-    }
-    {
-        const ChunkTracker::Delta delta = tracker.update(1, 0, 2);
-        CHECK(render(delta.toLoad) == "3,-2;3,-1;3,0;3,1;3,2");
-        CHECK(render(delta.toUnload) == "-2,-2;-2,-1;-2,0;-2,1;-2,2");
-        CHECK(tracker.loaded().size() == 25);
-    }
-    {
-        const ChunkTracker::Delta delta = tracker.update(1, 0, 3);
-        CHECK(render(delta.toLoad) ==
-              "-2,-3;-2,-2;-2,-1;-2,0;-2,1;-2,2;-2,3;-1,-3;-1,3;0,-3;0,3;1,-3;1,3;2,-3;2,3;3,-3;3,3;4,-3;4,-2;4,-1;"
-              "4,0;4,1;4,2;4,3");
-        CHECK(render(delta.toUnload) == "");
-        CHECK(tracker.loaded().size() == 49);
-    }
-    {
-        const ChunkTracker::Delta delta = tracker.update(-4, 7, 1);
-        CHECK(render(delta.toLoad) == "-5,6;-5,7;-5,8;-4,6;-4,7;-4,8;-3,6;-3,7;-3,8");
-        CHECK(render(delta.toUnload) ==
-              "-2,-3;-2,-2;-2,-1;-2,0;-2,1;-2,2;-2,3;-1,-3;-1,-2;-1,-1;-1,0;-1,1;-1,2;-1,3;0,-3;0,-2;0,-1;0,0;0,1;"
-              "0,2;0,3;1,-3;1,-2;1,-1;1,0;1,1;1,2;1,3;2,-3;2,-2;2,-1;2,0;2,1;2,2;2,3;3,-3;3,-2;3,-1;3,0;3,1;3,2;"
-              "3,3;4,-3;4,-2;4,-1;4,0;4,1;4,2;4,3");
-        CHECK(tracker.loaded().size() == 9);
-    }
-    {
-        const ChunkTracker::Delta delta = tracker.update(-4, 7, 0);
-        CHECK(render(delta.toLoad) == "");
-        CHECK(render(delta.toUnload) == "-5,6;-5,7;-5,8;-4,6;-4,8;-3,6;-3,7;-3,8");
-        CHECK(tracker.loaded().size() == 1);
-    }
+    CHECK(tracker.update(0, 0, 2).toLoad.size() == 49);
     tracker.reset();
-    {
-        const ChunkTracker::Delta delta = tracker.update(-4, 7, 0);
-        CHECK(render(delta.toLoad) == "-4,7");
-        CHECK(render(delta.toUnload) == "");
-        CHECK(tracker.loaded().size() == 1);
-    }
+    const ChunkTracker::Delta ten = tracker.update(0, 0, 10);
+    CHECK(ten.toLoad.size() == 473);
+    CHECK(ChunkTracker::isWithinDistance(0, 0, 10, 11, 0, true));
+    CHECK_FALSE(ChunkTracker::isWithinDistance(0, 0, 10, 12, 0, true));
+    CHECK(ChunkTracker::isWithinDistance(0, 0, 10, 11, 6, true));
+    CHECK_FALSE(ChunkTracker::isWithinDistance(0, 0, 10, 11, 7, true));
+    CHECK_FALSE(ChunkTracker::isWithinDistance(0, 0, 10, 11, 11, true));
+    // Without the neighbours the client's own view is one ring smaller.
+    CHECK(ChunkTracker::isWithinDistance(0, 0, 10, 10, 0, false));
+    CHECK_FALSE(ChunkTracker::isWithinDistance(0, 0, 10, 11, 0, false));
+
+    // A step east brings in as many columns as it drops, and no square corners.
+    const ChunkTracker::Delta moved = tracker.update(1, 0, 10);
+    CHECK(moved.toLoad.size() == 23);
+    CHECK(moved.toUnload.size() == 23);
+    CHECK(render(moved.toLoad).find("12,11") == std::string::npos);
+    CHECK(tracker.loaded().size() == 473);
 }
 
 TEST_CASE("a negative radius is refused") {

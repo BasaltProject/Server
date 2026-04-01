@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/entity/ai/IllagerGoals.hpp>
 #include <basalt/server/runtime/entity/ai/LongDistancePatrolGoal.hpp>
 #include <basalt/server/runtime/entity/ai/MobGoals.hpp>
+#include <basalt/server/runtime/entity/ai/NeutralGoals.hpp>
 #include <basalt/server/runtime/entity/ai/PhantomGoals.hpp>
 #include <basalt/server/runtime/entity/ai/RaiderGoals.hpp>
 #include <basalt/server/runtime/entity/ai/ShulkerGoals.hpp>
@@ -155,7 +156,7 @@ std::unique_ptr<GoalSelector> mobGoals::forType(const wire::common::Identifier& 
 namespace {
 
 bool buildAnimal(GoalSelector& selector, const wire::common::Identifier& type, std::string_view path) {
-    static const Names kSlow{"horse", "donkey", "mule", "llama", "turtle", "panda", "fox", "strider", "axolotl"};
+    static const Names kSlow{"horse", "donkey", "mule", "llama", "turtle", "panda", "fox", "strider"};
     // parity: the brains' own speeds, `GoatAi`, `FrogAi`, `ArmadilloAi` and `SnifferAi`: two to flee and
     // a quarter more to follow food or a parent; the camel's four, two and a half, and two to idle.
     static const Names kBrained{"goat", "frog", "armadillo", "sniffer"};
@@ -313,10 +314,12 @@ bool buildUndead(GoalSelector& selector, std::string_view path) {
         return true;
     }
     if (path == "zombified_piglin") {
-        // parity: it only ever goes for whoever hit it or its neighbours.
+        // parity: `ZombifiedPiglin.addBehaviourGoals`: whoever hit it, its neighbours told, and any
+        // player it is still angry at.
         add<MeleeAttackGoal>(selector, 2, 1.0);
         monsterTail(selector);
-        add<HurtByTargetGoal>(selector, 1);
+        add<HurtByTargetGoal>(selector, 1, HurtByTargetGoal::Types{}, true);
+        add<AngryAtPlayerGoal>(selector, 2);
         return true;
     }
     if (path == "warden") {
@@ -331,7 +334,7 @@ bool buildUndead(GoalSelector& selector, std::string_view path) {
         add<AngerTargetGoal>(selector, 1);
         return true;
     }
-    static const Names kBrutes{"wither_skeleton", "piglin_brute", "hoglin", "zoglin", "vindicator", "ravager"};
+    static const Names kBrutes{"wither_skeleton", "zoglin", "vindicator", "ravager"};
     if (kBrutes.contains(path)) {
         if (patrollingTypes().contains(path)) {
             addRaiderGoals(selector);
