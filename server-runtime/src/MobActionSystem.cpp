@@ -182,12 +182,11 @@ void MobActionSystem::sendEntityData(const world::LoadedWorld& world, std::int32
 }
 
 void MobActionSystem::playSound(const world::LoadedWorld& world, const ServerEntity& mob, std::string_view sound,
-                                float volume, float pitch) {
+                                float volume, float pitch, SoundSource source) {
     broadcaster_->sendEffects(
         watchersOf(world), static_cast<std::int32_t>(std::floor(mob.x)), static_cast<std::int32_t>(std::floor(mob.y)),
         static_cast<std::int32_t>(std::floor(mob.z)), server::registry::blocks::air().stateId,
-        {world::blockEffect::Sound{
-            .name = std::string{sound}, .source = SoundSource::Hostile, .volume = volume, .pitch = pitch}});
+        {world::blockEffect::Sound{.name = std::string{sound}, .source = source, .volume = volume, .pitch = pitch}});
 }
 
 void MobActionSystem::swing(ServerEntity& mob) {

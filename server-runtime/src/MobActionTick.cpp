@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/FlyingMovement.hpp>
+#include <basalt/server/runtime/entity/Frogs.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobCombat.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
@@ -218,6 +219,39 @@ void MobActionSystem::travelMob(world::LoadedWorld& world, ServerEntity& mob, do
     entity::ai::lookControl::tick(mob);
 }
 
+namespace {
+
+using BrainTick = void (MobActionSystem::*)(world::LoadedWorld&, entity::ai::MobContext&);
+
+/// The mobs whose AI is a brain this build runs itself, and its turn.
+[[nodiscard]] BrainTick brainOf(const wire::common::Identifier& type) {
+    const std::string_view path = type.path();
+    if (entity::allays::isAllay(type)) {
+        return &MobActionSystem::tickAllay;
+    }
+    if (entity::piglins::isPiglin(type)) {
+        return &MobActionSystem::tickPiglin;
+    }
+    if (path == "hoglin") {
+        return &MobActionSystem::tickHoglin;
+    }
+    if (path == "axolotl") {
+        return &MobActionSystem::tickAxolotl;
+    }
+    if (path == "goat") {
+        return &MobActionSystem::tickGoat;
+    }
+    if (path == "frog") {
+        return &MobActionSystem::tickFrog;
+    }
+    if (path == "tadpole") {
+        return &MobActionSystem::tickTadpole;
+    }
+    return nullptr;
+}
+
+} // namespace
+
 void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
                                 const std::vector<entity::ai::PlayerView>& views,
                                 const std::vector<ServerEntity*>& living, random::RandomSource& random) {
@@ -237,11 +271,8 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
     if (raider) {
         raids_->tickRaider(world, mob);
     }
-    const bool allay = entity::allays::isAllay(mob.type());
-    const bool piglin = entity::piglins::isPiglin(mob.type());
-    const bool hoglin = mob.type().path() == "hoglin";
-    const bool axolotl = mob.type().path() == "axolotl";
-    if (mob.goals == nullptr && !allay && !piglin && !hoglin && !axolotl) {
+    const BrainTick brain = brainOf(mob.type());
+    if (mob.goals == nullptr && brain == nullptr) {
         travelMob(world, mob, mob.attributeWithModifiers(entity::attribute::kMovementSpeed), &random);
         return;
     }
@@ -265,24 +296,11 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
                                    .seaLevel = config::dimensionFacts(world.declaration().dimension).seaLevel,
                                    .minY = config::dimensionFacts(world.declaration().dimension).chunkHeight.minY()};
     // parity: `Allay.customServerAiStep`, the brain every tick instead of goals.
-    if (allay) {
-        tickAllay(world, context);
-        travelMob(world, mob, context.speed, &random);
-        return;
-    }
-    // parity: `Piglin.customServerAiStep` and the brute's, a brain every tick.
-    if (axolotl) {
-        tickAxolotl(world, context);
-        travelMob(world, mob, context.speed, &random);
-        return;
-    }
-    if (hoglin) {
-        tickHoglin(world, context);
-        travelMob(world, mob, context.speed, &random);
-        return;
-    }
-    if (piglin) {
-        tickPiglin(world, context);
+    // parity: the brain-driven mobs' `customServerAiStep`, the brain every tick instead of goals.
+    // parity: the tadpole is an `AbstractFish` that keeps the fish goals and runs its brain after them.
+    const bool goalsToo = mob.goals != nullptr && mob.type().path() == "tadpole";
+    if (brain != nullptr && !goalsToo) {
+        (this->*brain)(world, context);
         travelMob(world, mob, context.speed, &random);
         return;
     }
@@ -292,6 +310,9 @@ void MobActionSystem::tickMobAi(world::LoadedWorld& world, ServerEntity& mob,
         mob.goals->tickRunning(context, false);
     } else {
         mob.goals->tick(context);
+    }
+    if (goalsToo) {
+        (this->*brain)(world, context);
     }
     // parity: the target a vex faces and a blaze rises to, as it stands after the goals.
     std::optional<std::array<double, 3>> target;
@@ -459,11 +480,17 @@ void MobActionSystem::breed(world::LoadedWorld& world, ServerEntity& animal, Ser
     if (entry == nullptr || (hooks_.breedAllowed && !hooks_.breedAllowed(world, animal, partner))) {
         return;
     }
-    auto baby = std::make_unique<ServerEntity>(players_->allocateEntityId(), wire::common::Uuid::random(),
-                                               animal.type(), entry->protocolId, animal.x, animal.y, animal.z);
-    baby->age = entity::breeding::kBabyAge;
-    const wire::common::Identifier childType = baby->type();
-    world.state().spawnEntity(std::move(baby));
+    // parity: `Frog.spawnChildFromBreeding`: no child, a frog carrying spawn to lay by the water.
+    const bool frog = animal.type().path() == "frog";
+    const wire::common::Identifier childType = animal.type();
+    if (frog) {
+        entity::frogs::stateOf(animal).pregnant = true;
+    } else {
+        auto baby = std::make_unique<ServerEntity>(players_->allocateEntityId(), wire::common::Uuid::random(),
+                                                   animal.type(), entry->protocolId, animal.x, animal.y, animal.z);
+        baby->age = entity::breeding::kBabyAge;
+        world.state().spawnEntity(std::move(baby));
+    }
     // parity: `finalizeSpawnChildFromBreeding` credits whoever fed either parent, the first one first.
     const std::optional<std::string>& cause = animal.loveCause.has_value() ? animal.loveCause : partner.loveCause;
     if (cause.has_value() && hooks_.bredAnimals) {

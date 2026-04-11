@@ -32,6 +32,8 @@ struct JarReader {
 using TagMembers = std::map<wire::common::Identifier, std::set<wire::common::Identifier>>;
 
 inline const wire::common::Identifier kBypassesArmour = wire::common::Identifier::vanilla("bypasses_armor");
+inline const wire::common::Identifier kBypassesInvulnerability =
+    wire::common::Identifier::vanilla("bypasses_invulnerability");
 inline const wire::common::Identifier kBypassesEffects = wire::common::Identifier::vanilla("bypasses_effects");
 inline const wire::common::Identifier kBypassesResistance = wire::common::Identifier::vanilla("bypasses_resistance");
 inline const wire::common::Identifier kBypassesEnchantments =

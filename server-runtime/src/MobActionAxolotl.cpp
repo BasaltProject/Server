@@ -7,7 +7,6 @@
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/Goals.hpp>
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
-#include <basalt/server/runtime/entity/ai/RandomPos.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
@@ -193,16 +192,8 @@ void MobActionSystem::tickAxolotl(world::LoadedWorld& world, entity::ai::MobCont
         if (!state.motion.walk.has_value()) {
             for (const std::size_t choice : kit::shuffled(context.random, {2, 2, 3, 5, 5})) {
                 if (choice == 0 && inWater) {
-                    for (std::int32_t tries = 0; tries <= 10; ++tries) {
-                        const std::optional<kit::Vec> spot =
-                            entity::ai::randomPos::defaultPos(context.world, axolotl, context.random, 10, 7);
-                        if (!spot.has_value()) {
-                            break;
-                        }
-                        if (isWaterAt(context.world, (*spot)[0], (*spot)[1], (*spot)[2])) {
-                            kit::walkTo(state.motion, *spot, 0.5F, 0);
-                            break;
-                        }
+                    if (const std::optional<kit::Vec> spot = kit::swimSpot(context); spot.has_value()) {
+                        kit::walkTo(state.motion, *spot, 0.5F, 0);
                     }
                     break;
                 }

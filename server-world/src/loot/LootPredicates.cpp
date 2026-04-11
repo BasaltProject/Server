@@ -120,7 +120,8 @@ bool DistancePredicate::test(const std::array<double, 3>& from, const std::array
     const auto dx = static_cast<float>(from[0] - to[0]);
     const auto dy = static_cast<float>(from[1] - to[1]);
     const auto dz = static_cast<float>(from[2] - to[2]);
-    return x.test(std::abs(dx)) && y.test(std::abs(dy)) && z.test(std::abs(dz)) &&
+    return x.test(static_cast<double>(std::abs(dx))) && y.test(static_cast<double>(std::abs(dy))) &&
+           z.test(static_cast<double>(std::abs(dz))) &&
            horizontal.testSquared(static_cast<double>(dx * dx + dz * dz)) &&
            absolute.testSquared(static_cast<double>(dx * dx + dy * dy + dz * dz));
 }
@@ -200,7 +201,10 @@ bool EntityPredicate::test(const std::optional<EntityFacts>& entity, const TagLo
         return false;
     }
     if (lookingAt != nullptr) {
-        if (entity->lookingAt == nullptr || !lookingAt->test(*entity->lookingAt, tags, origin)) {
+        const std::shared_ptr<const EntityFacts> seen =
+            entity->lookingAt != nullptr ? entity->lookingAt
+                                         : (entity->findLookingAt ? entity->findLookingAt() : nullptr);
+        if (seen == nullptr || !lookingAt->test(*seen, tags, origin)) {
             return false;
         }
     }

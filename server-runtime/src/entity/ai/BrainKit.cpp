@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/entity/ai/Goals.hpp>
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
 #include <basalt/server/runtime/entity/ai/RandomPos.hpp>
+#include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/wire/common/Mth.hpp>
 
@@ -113,8 +114,53 @@ std::optional<Vec> strollSpot(MobContext& mob, std::int32_t horizontal, std::int
     return randomPos::landPos(mob.world, mob.mob, mob.random, horizontal, vertical);
 }
 
+std::optional<Vec> swimSpot(MobContext& mob) {
+    const auto fluidAt = [&mob](const Vec& at, bool water) {
+        const std::optional<std::int32_t> state =
+            mob.world.blockState(mth::floor(at[0]), mth::floor(at[1]), mth::floor(at[2]));
+        const world::Submersion fluid = state.has_value() ? world::fluids::of(*state) : world::Submersion::None;
+        return water ? fluid == world::Submersion::Water : fluid != world::Submersion::None;
+    };
+    // parity: `BehaviorUtils.getRandomSwimmablePos`: ten more tries for a spot in water.
+    const auto swimmable = [&](std::int32_t horizontal, std::int32_t vertical) {
+        std::optional<Vec> at = randomPos::defaultPos(mob.world, mob.mob, mob.random, horizontal, vertical);
+        for (std::int32_t count = 0; at.has_value() && !fluidAt(*at, true) && count++ < 10;) {
+            at = randomPos::defaultPos(mob.world, mob.mob, mob.random, horizontal, vertical);
+        }
+        return at;
+    };
+    static constexpr std::array<std::array<std::int32_t, 2>, 6> kTiers{
+        {{1, 1}, {3, 3}, {5, 5}, {6, 5}, {7, 7}, {10, 7}}};
+    std::optional<Vec> fallback;
+    std::optional<Vec> target;
+    for (const auto& [horizontal, vertical] : kTiers) {
+        if (!fallback.has_value()) {
+            target = swimmable(horizontal, vertical);
+        } else {
+            // parity: past the first find, the same way out, only further.
+            const Vec to{(*fallback)[0] - mob.mob.x, (*fallback)[1] - mob.mob.y, (*fallback)[2] - mob.mob.z};
+            const double length = std::sqrt((to[0] * to[0]) + (to[1] * to[1]) + (to[2] * to[2]));
+            const Vec unit =
+                length < static_cast<double>(1.0E-5F) ? Vec{} : Vec{to[0] / length, to[1] / length, to[2] / length};
+            target = Vec{mob.mob.x + (unit[0] * horizontal), mob.mob.y + (unit[1] * vertical),
+                         mob.mob.z + (unit[2] * horizontal)};
+        }
+        if (!target.has_value() || !fluidAt(*target, false)) {
+            return fallback;
+        }
+        fallback = target;
+    }
+    return target;
+}
+
 std::optional<Block> nearestBlock(const MobContext& mob, std::int32_t rangeXZ, std::int32_t rangeY,
                                   const std::function<bool(std::int32_t stateId)>& matches) {
+    return nearestBlockWhere(mob, rangeXZ, rangeY,
+                             [&matches](const Block& /*at*/, std::int32_t stateId) { return matches(stateId); });
+}
+
+std::optional<Block> nearestBlockWhere(const MobContext& mob, std::int32_t rangeXZ, std::int32_t rangeY,
+                                       const std::function<bool(const Block& at, std::int32_t stateId)>& matches) {
     const Block own{mth::floor(mob.mob.x), mth::floor(mob.mob.y), mth::floor(mob.mob.z)};
     const std::int32_t maxDepth = rangeXZ + rangeY + rangeXZ;
     for (std::int32_t depth = 0; depth <= maxDepth; ++depth) {
@@ -133,7 +179,7 @@ std::optional<Block> nearestBlock(const MobContext& mob, std::int32_t rangeXZ, s
                     }
                     const Block at{own[0] + dx, own[1] + dy, own[2] + (sign * dz)};
                     const std::optional<std::int32_t> state = mob.world.blockState(at[0], at[1], at[2]);
-                    if (state.has_value() && matches(*state)) {
+                    if (state.has_value() && matches(at, *state)) {
                         return at;
                     }
                 }

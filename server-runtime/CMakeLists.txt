@@ -189,6 +189,8 @@ basalt_module(server-runtime-core
         src/MobActionAllay.cpp
         src/MobActionAxolotl.cpp
         src/MobActionBees.cpp
+        src/MobActionFrog.cpp
+        src/MobActionGoat.cpp
         src/MobActionHoglin.cpp
         src/MobActionNeutral.cpp
         src/MobActionPiglin.cpp
@@ -335,7 +337,6 @@ basalt_module(server-runtime-core
         src/world/ArrowButtons.cpp
         src/world/Hoppers.cpp
         src/world/EndPortals.cpp
-        src/world/EnchantmentAttributes.cpp
         src/world/BlockExperience.cpp
         src/world/BlockPatterns.cpp
         src/world/WitherPatterns.cpp
@@ -398,6 +399,7 @@ basalt_module(server-runtime-core
         src/world/TriggerFacts.cpp
         src/world/BlockPickData.cpp
         src/player/PlayerTotem.cpp
+        src/player/PlayerAttributes.cpp
         src/world/Anvils.cpp
         src/world/Beacons.cpp
         src/world/Beehives.cpp
@@ -557,6 +559,7 @@ basalt_module(server-runtime-core
         src/entity/ai/BeeGoals.cpp
         src/entity/ai/BeeNavigation.cpp
         src/entity/ai/BrainKit.cpp
+        src/entity/ai/LongJump.cpp
         src/entity/ai/NeutralGoals.cpp
         src/entity/ai/DoorInteraction.cpp
         src/world/VillageDataLoader.cpp
@@ -1460,6 +1463,12 @@ basalt_test(server-runtime-player-arrow-pickup-test
     DEPENDS basalt::server-runtime-core
 )
 
+basalt_test(server-runtime-player-totem-test
+    SOURCES
+        test/PlayerTotemTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-block-pick-data-test
     SOURCES
         test/BlockPickDataTest.cpp
@@ -1490,9 +1499,9 @@ basalt_test(server-runtime-hoppers-test
     DEPENDS basalt::server-runtime-core
 )
 
-basalt_test(server-runtime-enchantment-attributes-test
+basalt_test(server-runtime-player-attributes-test
     SOURCES
-        test/EnchantmentAttributesTest.cpp
+        test/PlayerAttributesTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

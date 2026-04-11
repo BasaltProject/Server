@@ -16,12 +16,9 @@ namespace basalt::server::runtime {
 
 class ClientSession;
 
-/// Eating, drawing a bow and the cooldown clock: what a player is doing with the item in their
-/// hand, and for how much longer.
-///
-/// A back-reference to the owning session rather than narrow callbacks: this state was already
-/// tightly coupled to the session, and every method here still needs a handful of its
-/// collaborators (the world, the plugin hooks, the outbound packets).
+/// Eating, drawing a bow and the cooldown clock: what a player is doing with the item in hand, and
+/// for how much longer. Holds a back-reference to the session because every method needs several of
+/// its collaborators (world, plugin hooks, outbound packets).
 class ItemUseTimers {
 public:
     /// What a plugin gets a say in. Unset means nobody objects.
@@ -71,6 +68,14 @@ public:
     /// parity: `EnderpearlItem.use`.
     bool throwEnderPearl(player::PlayerSession& session, const wire::common::Identifier& item, std::int32_t slot);
 
+    /// parity: `SpyglassItem.use`: raised at once, a minute at most, the sound on each end.
+    bool startSpyglass(player::PlayerSession& session, const wire::common::Identifier& item, std::int32_t slot);
+    void stopSpyglass();
+    void tickSpyglass(player::PlayerSession& session);
+
+    /// parity: `ServerPlayer.updateUsingItem`, `USING_ITEM` every turn something is held in use.
+    void tickUsingTrigger(player::PlayerSession& session);
+
     /// Whether this item is still greyed out. parity: `ItemCooldowns.isOnCooldown`.
     [[nodiscard]] bool onCooldown(const wire::common::Identifier& item);
 
@@ -98,11 +103,16 @@ private:
     /// A game event at the player's own position, which is where every one of these is raised.
     void emitAt(std::string_view event);
 
+    void playAroundExceptSelf(const player::PlayerSession& session, std::string_view sound);
+
     /// Which slot is being eaten from, and how many ticks of the mouthful are left.
     bool usingItem_ = false;
     /// What the using-item bit is set for, so the end of the use can name it.
     std::optional<wire::common::Identifier> usedItem_;
     std::int32_t eatingSlot_ = -1;
+    /// The spyglass held up, and the turns left of its minute.
+    std::int32_t spyglassSlot_ = -1;
+    std::int32_t spyglassTicks_ = 0;
     std::int32_t eatingTicks_ = 0;
     /// What cannot be used again yet, by item path and the tick it frees up on.
     /// The bow being drawn, and for how long.

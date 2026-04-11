@@ -97,6 +97,8 @@ struct EntityFacts {
     std::vector<std::shared_ptr<const EntityFacts>> passengers;
     /// parity: `PlayerPredicate.looking_at`, what the player's view first meets within a hundred.
     std::shared_ptr<const EntityFacts> lookingAt;
+    /// The same worked out only when a predicate asks, since it walks every entity in a hundred.
+    std::function<std::shared_ptr<const EntityFacts>()> findLookingAt;
     /// parity: `LightningBolt.getBlocksSetOnFire`, for a bolt.
     std::optional<std::int32_t> blocksSetOnFire;
     std::map<std::string, EffectFacts, std::less<>> effects;

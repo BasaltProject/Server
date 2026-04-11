@@ -2,9 +2,11 @@
 
 #include <basalt/server/registry/ItemFood.hpp>
 #include <basalt/wire/common/Identifier.hpp>
+#include <basalt/wire/protocol/play/EntityPackets.hpp>
 
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <vector>
 
 namespace basalt::server::runtime::player {
@@ -57,7 +59,12 @@ public:
 
     void sendEffectRemoved(const wire::common::Identifier& effect);
 
+    /// parity: `LivingEntity.detectEquipmentUpdates` and the dirty attributes `ServerEntity.sendDirtyEntityData`
+    /// sends: every attribute whose base or modifiers changed since last time, each whole.
     void syncHeldAttributes();
+
+    /// For a respawn, whose new client-side player knows no modifiers.
+    void forgetSentAttributes() { sentAttributes_.clear(); }
 
     /// Redraws whatever is due. Failures are swallowed: decoration must never drop a connection.
     void tickUi();
@@ -92,6 +99,8 @@ private:
 
     ClientSession* owner_;
     Hooks hooks_;
+    /// What the client was last told of each attribute, by its protocol id.
+    std::map<std::int32_t, wire::protocol::play::UpdateAttributesPacket::AttributeSnapshot> sentAttributes_;
 };
 
 } // namespace basalt::server::runtime

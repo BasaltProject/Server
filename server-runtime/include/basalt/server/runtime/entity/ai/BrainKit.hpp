@@ -90,10 +90,18 @@ void lookAtTarget(MobContext& mob, Look& look);
 /// parity: `LandRandomPos.getPos(mob, horizontal, vertical)`, `RandomStroll.stroll`'s spot.
 [[nodiscard]] std::optional<Vec> strollSpot(MobContext& mob, std::int32_t horizontal = 10, std::int32_t vertical = 7);
 
+/// parity: `RandomStroll.getTargetSwimPos`: water further out tier by tier, the last good one kept.
+[[nodiscard]] std::optional<Vec> swimSpot(MobContext& mob);
+
 /// parity: `findBlocksInBoxByManhattanDistance(pos, rangeXZ, rangeY)`: the first square, nearest
 /// shells first, whose state `matches`.
 [[nodiscard]] std::optional<Block> nearestBlock(const MobContext& mob, std::int32_t rangeXZ, std::int32_t rangeY,
                                                 const std::function<bool(std::int32_t stateId)>& matches);
+
+/// `nearestBlock` with the square's position given too.
+[[nodiscard]] std::optional<Block>
+nearestBlockWhere(const MobContext& mob, std::int32_t rangeXZ, std::int32_t rangeY,
+                  const std::function<bool(const Block& at, std::int32_t stateId)>& matches);
 
 /// parity: `ShufflingList.shuffle`: each weight drawn as `-nextFloat()^(1/weight)`, smallest first.
 [[nodiscard]] std::vector<std::size_t> shuffled(random::RandomSource& random, const std::vector<std::int32_t>& weights);

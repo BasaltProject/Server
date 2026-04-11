@@ -100,9 +100,12 @@ void PlayerLifecycle::tickPlayer() {
     rideTick(*session);
     owner_->tryPickupNearbyItems();
     checkEquipment(*session);
+    owner_->uiState().syncHeldAttributes();
+    owner_->itemUseTimers().tickUsingTrigger(*session);
     owner_->itemUseTimers().tickEating(*session);
     owner_->itemUseTimers().tickDrawing(*session);
     owner_->itemUseTimers().tickBlocking(*session);
+    owner_->itemUseTimers().tickSpyglass(*session);
     owner_->blockInteraction().tickDigging(*session);
 }
 
@@ -136,9 +139,9 @@ void PlayerLifecycle::tickTriggers(PlayerSession& session) {
     }
     triggers->fire("tick", name, uuid);
     if (levitationStart_.has_value()) {
-        triggers->fire("levitation", name, uuid,
-                       world::TriggerEvent{.numbers = {{"duration", levitationTicks_}},
-                                           .startPosition = levitationStart_});
+        triggers->fire(
+            "levitation", name, uuid,
+            world::TriggerEvent{.numbers = {{"duration", levitationTicks_}}, .startPosition = levitationStart_});
         ++levitationTicks_;
     }
 }
@@ -216,6 +219,8 @@ void PlayerLifecycle::respawn() {
         wire::protocol::play::RespawnPacket{.spawnInfo = owner_->spawnInfo(session->gamemode), .dataToKeep = 0}.write(
             buffer);
     });
+    // The client's new player starts from bare attributes, so everything goes out again.
+    owner_->uiState().forgetSentAttributes();
     owner_->sendPlayerPosition(session->x, session->y, session->z, session->yaw, session->pitch);
     // parity: `PlayerList.sendLevelInfo` again, which is what a respawn goes through too.
     if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {

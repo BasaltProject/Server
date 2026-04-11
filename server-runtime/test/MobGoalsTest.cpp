@@ -123,7 +123,6 @@ TEST_CASE("every mob this build gives an AI to comes back with goals") {
                                          "chicken",
                                          "sheep",
                                          "rabbit",
-                                         "goat",
                                          "wolf",
                                          "cat",
                                          "parrot",

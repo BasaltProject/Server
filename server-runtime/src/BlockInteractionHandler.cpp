@@ -417,6 +417,7 @@ void BlockInteractionHandler::handlePlayerAction(const play::ServerboundPlayerAc
         owner_->itemUseTimers().stopEating();
         owner_->itemUseTimers().releaseBow();
         owner_->itemUseTimers().stopBlocking();
+        owner_->itemUseTimers().stopSpyglass();
         break;
     case Action::SwapItemWithOffhand:
         owner_->swapWithOffhand();

@@ -27,6 +27,7 @@
 #include <basalt/server/runtime/world/Pistons.hpp>
 #include <basalt/server/runtime/world/PressurePlates.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Tripwires.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/common/Mth.hpp>
@@ -410,7 +411,8 @@ void RedstoneTickSystem::tickFootsteps(world::LoadedWorld& world) {
         const auto stepX = static_cast<std::int32_t>(std::floor(player->x));
         const auto stepZ = static_cast<std::int32_t>(std::floor(player->z));
         const std::int32_t stepY = world::pressurePlates::blockUnder(player->y);
-        const world::vibrations::Source source{.entity = player->uuid()};
+        const world::vibrations::Source source =
+            world::triggerFacts::vibrationSourceOf(*player, options_.advancementTriggers);
         if (world::vibrations::stoodOn(world.state(), stepX, stepY, stepZ, player->x, player->y, player->z,
                                        world.gameTime(), source)) {
             continue;

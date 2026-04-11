@@ -1,12 +1,20 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/entity/BlockRay.hpp>
+#include <basalt/server/runtime/entity/MobBreathing.hpp>
+#include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
+#include <basalt/wire/common/Mth.hpp>
 
 #include <array>
+#include <cmath>
+#include <limits>
+#include <numbers>
 #include <string_view>
 #include <utility>
 
@@ -14,12 +22,25 @@ namespace basalt::server::runtime::world::triggerFacts {
 namespace {
 
 namespace loot = server::world::loot;
+namespace mth = wire::common::mth;
 using wire::common::Identifier;
 
 /// parity: `DyeColor`, in the order a sheep's `Color` byte counts them.
 constexpr std::array<std::string_view, 16> kDyeColors{"white", "orange", "magenta",    "light_blue", "yellow", "lime",
                                                       "pink",  "gray",   "light_gray", "cyan",       "purple", "blue",
                                                       "brown", "green",  "red",        "black"};
+
+/// parity: `LOOKING_AT_RANGE` and `hasLineOfSight`'s reach.
+constexpr double kLookRange = 100.0;
+constexpr double kSightRange = 128.0;
+constexpr float kRadians = static_cast<float>(std::numbers::pi / 180.0);
+
+/// parity: the player's standing and crouching boxes and eyes.
+constexpr double kPlayerWidth = 0.6;
+constexpr double kStandingHeight = 1.8;
+constexpr double kSneakingHeight = 1.5;
+constexpr double kStandingEye = 1.62;
+constexpr double kSneakingEye = 1.27;
 
 /// The worn pieces in the inventory's own order, head first.
 constexpr std::array<std::string_view, 4> kArmourSlots{"head", "chest", "legs", "feet"};
@@ -163,11 +184,13 @@ loot::EntityFacts ofPlayer(const player::PlayerSession& player) {
     return facts;
 }
 
-loot::LootContext ofPlayerAt(RealLootTables& tables, LoadedWorld& world, const player::PlayerSession& player) {
+loot::LootContext ofPlayerAt(RealLootTables& tables, LoadedWorld& world, const player::PlayerSession& player,
+                             const player::PlayerRegistry* players) {
     loot::LootContext context{.hasEntity = true};
     tables.prepareAt(context, world, player.x, player.y, player.z);
     loot::EntityFacts facts = ofPlayer(player);
     facts.placeAt = context.placeAt;
+    facts.findLookingAt = [&world, &player, players] { return lookingAtOf(world, player, players); };
     if (player.vehicleId.has_value()) {
         if (const entity::ServerEntity* vehicle = world.state().entity(*player.vehicleId); vehicle != nullptr) {
             facts.vehicle = vehicle->type();
@@ -215,6 +238,16 @@ loot::LootContext atBlock(RealLootTables& tables, LoadedWorld& world, const play
     return context;
 }
 
+vibrations::Source vibrationSourceOf(const player::PlayerSession& player, AdvancementTriggers* triggers) {
+    vibrations::Source source{.entity = player.uuid(), .steppingCarefully = player.sneaking};
+    if (triggers != nullptr && player.sneaking) {
+        source.avoided = [triggers, name = std::string{player.name()}, uuid = player.uuid().toString()] {
+            triggers->fire("avoid_vibration", name, uuid);
+        };
+    }
+    return source;
+}
+
 std::optional<loot::EntityFacts> ofId(const LoadedWorld& world, const std::vector<player::PlayerSession*>& players,
                                       std::int32_t id) {
     for (const player::PlayerSession* player : players) {
@@ -241,6 +274,66 @@ void playerHurtEntity(AdvancementTriggers& triggers, const LoadedWorld& world, c
                                                        .direct = direct.has_value() ? direct : attacker,
                                                        .source = attacker,
                                                        .directHit = !direct.has_value()}});
+}
+
+std::shared_ptr<const loot::EntityFacts> lookingAtOf(LoadedWorld& world, const player::PlayerSession& player,
+                                                     const player::PlayerRegistry* players) {
+    const double eyeY = player.y + (player.sneaking ? kSneakingEye : kStandingEye);
+    // parity: `Entity.calculateViewVector`, through the sine table.
+    const float pitch = player.pitch * kRadians;
+    const float yaw = -player.yaw * kRadians;
+    const auto cosYaw = static_cast<double>(mth::cos(yaw));
+    const auto sinYaw = static_cast<double>(mth::sin(yaw));
+    const auto cosPitch = static_cast<double>(mth::cos(pitch));
+    const auto sinPitch = static_cast<double>(mth::sin(pitch));
+    const std::array<double, 3> from{player.x, eyeY, player.z};
+    const std::array<double, 3> to{from[0] + (sinYaw * cosPitch * kLookRange), from[1] - (sinPitch * kLookRange),
+                                   from[2] + (cosYaw * cosPitch * kLookRange)};
+    double nearest = std::numeric_limits<double>::max();
+    std::optional<loot::EntityFacts> found;
+    std::array<double, 3> foundEye{};
+    const auto consider = [&](double x, double y, double z, double width, double height, double eye,
+                              const auto& facts) {
+        const std::optional<double> at =
+            entity::projectiles::clipBox(from[0], from[1], from[2], to[0], to[1], to[2], x - (width / 2.0), y,
+                                         z - (width / 2.0), x + (width / 2.0), y + height, z + (width / 2.0));
+        if (at.has_value() && *at < nearest) {
+            nearest = *at;
+            found = facts();
+            foundEye = {x, y + eye, z};
+        }
+    };
+    for (const entity::ServerEntity* other : world.state().entities()) {
+        if (other->removed) {
+            continue;
+        }
+        consider(other->x, other->y, other->z, other->width(), other->height(),
+                 entity::mobBreathing::eyeHeightOf(*other), [&world, other] { return ofEntity(world, *other); });
+    }
+    if (players != nullptr) {
+        for (const player::PlayerSession* other : players->snapshot()) {
+            // parity: the pick leaves out the player looking and anyone in spectator.
+            if (other == &player || other->worldName != player.worldName ||
+                other->gamemode == wire::protocol::play::Gamemode::Spectator) {
+                continue;
+            }
+            consider(other->x, other->y, other->z, kPlayerWidth, other->sneaking ? kSneakingHeight : kStandingHeight,
+                     other->sneaking ? kSneakingEye : kStandingEye, [other] { return ofPlayer(*other); });
+        }
+    }
+    if (!found.has_value()) {
+        return nullptr;
+    }
+    // parity: `LivingEntity.hasLineOfSight`, eye to eye through what collides, and never past 128.
+    const double dx = foundEye[0] - from[0];
+    const double dy = foundEye[1] - from[1];
+    const double dz = foundEye[2] - from[2];
+    if (std::sqrt((dx * dx) + (dy * dy) + (dz * dz)) > kSightRange ||
+        entity::blockRay::cast(world.state(), from[0], from[1], from[2], foundEye[0], foundEye[1], foundEye[2])
+            .has_value()) {
+        return nullptr;
+    }
+    return std::make_shared<const loot::EntityFacts>(*std::move(found));
 }
 
 } // namespace basalt::server::runtime::world::triggerFacts

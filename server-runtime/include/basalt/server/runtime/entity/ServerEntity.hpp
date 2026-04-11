@@ -73,6 +73,15 @@ namespace axolotls {
 struct AxolotlState;
 }
 
+namespace goats {
+struct GoatState;
+}
+
+namespace frogs {
+struct FrogState;
+struct TadpoleState;
+} // namespace frogs
+
 namespace shulkers {
 struct ShulkerState;
 struct BulletState;
@@ -291,6 +300,7 @@ public:
         float blazeHeightOffset = 0.5F;
         std::int32_t blazeHeightOffsetTicks = 0;
     };
+
     Flight flight;
 
     /// How angry a warden is at each entity it has noticed, by entity id.
@@ -480,6 +490,13 @@ public:
     std::shared_ptr<hoglins::HoglinState> hoglin;
     /// parity: `Axolotl`'s brain.
     std::shared_ptr<axolotls::AxolotlState> axolotl;
+    /// parity: `Goat`'s brain.
+    std::shared_ptr<goats::GoatState> goat;
+    /// parity: `Frog`'s and `Tadpole`'s brains.
+    std::shared_ptr<frogs::FrogState> frog;
+    std::shared_ptr<frogs::TadpoleState> tadpole;
+    /// parity: `LivingEntity.discardFriction`, which a long jump turns on until it lands.
+    bool discardFriction = false;
     /// Whether its move control swims this turn. parity: `AxolotlMoveControl`, which is
     /// `SmoothSwimmingMoveControl` only in water.
     bool smoothSwimming = false;

@@ -1,11 +1,13 @@
 #pragma once
 
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/server/world/loot/LootContext.hpp>
 #include <basalt/server/world/loot/LootPredicates.hpp>
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string_view>
 #include <vector>
@@ -15,8 +17,9 @@ class ServerEntity;
 }
 
 namespace basalt::server::runtime::player {
+class PlayerRegistry;
 class PlayerSession;
-}
+} // namespace basalt::server::runtime::player
 
 namespace basalt::server::runtime::world {
 
@@ -42,7 +45,13 @@ namespace triggerFacts {
 
 /// A player's predicates' context: their facts as `this`, prepared at where they stand.
 [[nodiscard]] server::world::loot::LootContext ofPlayerAt(RealLootTables& tables, LoadedWorld& world,
-                                                          const player::PlayerSession& player);
+                                                          const player::PlayerSession& player,
+                                                          const player::PlayerRegistry* players = nullptr);
+
+/// parity: `PlayerPredicate.looking_at`'s pick: the nearest entity the view meets within a hundred
+/// blocks, and only if nothing solid stands between the two pairs of eyes.
+[[nodiscard]] std::shared_ptr<const server::world::loot::EntityFacts>
+lookingAtOf(LoadedWorld& world, const player::PlayerSession& player, const player::PlayerRegistry* players);
 
 /// parity: `ItemUsedOnLocationTrigger`'s context: the player, the block, the tool and the square's
 /// centre. `stateId` stands in for the block when it has changed since the use it answers.
@@ -51,6 +60,10 @@ namespace triggerFacts {
                                                        std::int32_t y, std::int32_t z,
                                                        const std::optional<storage::StoredItemStack>& tool,
                                                        std::optional<std::int32_t> stateId = std::nullopt);
+
+/// A noise a player makes: who, whether they crouch, and the `avoid_vibration` a sensor that let it
+/// pass fires for them.
+[[nodiscard]] vibrations::Source vibrationSourceOf(const player::PlayerSession& player, AdvancementTriggers* triggers);
 
 /// A player's facts, or an entity's, by entity id in `world`.
 [[nodiscard]] std::optional<server::world::loot::EntityFacts>
