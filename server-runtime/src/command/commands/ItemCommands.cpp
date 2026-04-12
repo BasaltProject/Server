@@ -1,3 +1,4 @@
+#include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/command/ArgumentTypes.hpp>
 #include <basalt/server/runtime/command/WorldArguments.hpp>
@@ -24,9 +25,6 @@ namespace {
 namespace reg = server::registry;
 
 using wire::text::Component;
-
-/// Vanilla's own cap on `/give`, which exists so a typo cannot ask for two billion items.
-constexpr std::int32_t kMaxCount = 6400;
 
 constexpr auto kRadians = static_cast<float>(std::numbers::pi / 180.0);
 
@@ -98,18 +96,28 @@ void GiveCommand::build(const CommandNodeBuilder& root) const {
                 ", which no client can draw yet: it is stored and saved, but the tooltip will not show it."));
         }
 
+        // parity: `GiveCommand.giveItem`: a hundred stacks at most, handed over one stack at a time.
+        const std::int32_t maxStack = reg::itemStacking::maxStackSize(item->id, parsed->components);
+        if (count > maxStack * 100) {
+            return std::unexpected{CommandSyntaxError{
+                .component = Component::translatable(
+                    "commands.give.failed.toomanyitems",
+                    {Component::text(std::to_string(maxStack * 100)), Component::text(item->id.toString())})}};
+        }
         const std::vector<player::PlayerSession*>& targets = targetsOf(context);
         for (player::PlayerSession* target : targets) {
-            const std::int32_t leftOver = target->inventory.add(
-                storage::StoredItemStack{.id = item->id.toString(), .count = count, .components = parsed->components});
-            // parity: `GiveCommand.giveItem` drops what did not fit at the feet, a stack at a time.
-            for (std::int32_t left = leftOver; left > 0; left -= player::PlayerInventory::kMaxStack) {
-                dropAtFeet(context, *target,
-                           storage::StoredItemStack{.id = item->id.toString(),
-                                                    .count = std::min(left, player::PlayerInventory::kMaxStack),
-                                                    .components = parsed->components});
-            }
-            if (leftOver == 0) {
+            for (std::int32_t remaining = count; remaining > 0;) {
+                const std::int32_t size = std::min(maxStack, remaining);
+                remaining -= size;
+                const storage::StoredItemStack stack{
+                    .id = item->id.toString(), .count = size, .components = parsed->components};
+                const std::int32_t leftOver = target->inventory.add(stack);
+                if (leftOver > 0) {
+                    dropAtFeet(
+                        context, *target,
+                        storage::StoredItemStack{.id = stack.id, .count = leftOver, .components = parsed->components});
+                    continue;
+                }
                 random::RandomSource random =
                     random::RandomSource::legacy(static_cast<std::int64_t>(std::random_device{}()));
                 const float pitch = (((random.nextFloat() - random.nextFloat()) * 0.7F) + 1.0F) * 2.0F;
@@ -139,7 +147,7 @@ void GiveCommand::build(const CommandNodeBuilder& root) const {
     root.argument("targets", playersArgument(false), [give](const CommandNodeBuilder& targets) {
         targets.argument("item", itemArgument(), [give](const CommandNodeBuilder& item) {
             item.executes([give](const CommandContext& context) { return give(context, 1); });
-            item.argument("count", integerArgument(1, kMaxCount), [give](const CommandNodeBuilder& count) {
+            item.argument("count", integerArgument(1), [give](const CommandNodeBuilder& count) {
                 count.executes([give](const CommandContext& context) {
                     const auto* asked = context.get<std::int32_t>("count");
                     return give(context, asked == nullptr ? 1 : *asked);

@@ -885,7 +885,7 @@ struct Target {
         }
         std::optional<ItemStack>& there = slots[static_cast<std::size_t>(slot)];
         if (there.has_value() && (there->item != stack.item || there->components != stack.components ||
-                                  there->count >= containers::maxStackFor(into.path, stack.item))) {
+                                  there->count >= containers::maxStackFor(into.path, stack))) {
             continue;
         }
         if (!containers::acceptsThroughFace(into.path, slot, stack.item, !there.has_value())) {

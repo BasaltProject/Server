@@ -11,14 +11,9 @@
 
 namespace basalt::server::runtime::world {
 
-/// The decorated pot, which holds one stack and nothing else.
-///
-/// parity: `DecoratedPotBlock` over `DecoratedPotBlockEntity`. It is a container with one slot and no
-/// screen: items go in one at a time by hand, a hopper fills and empties it, and a comparator reads
-/// how full that single stack is. Clicking it with an empty hand only makes it wobble.
-///
-/// Everything here takes the block entity's own tag rather than a world: the caller has already
-/// looked the pot up to know it is one.
+/// The decorated pot: one slot, no screen; filled by hand one item at a time or by a hopper.
+/// parity: `DecoratedPotBlock` over `DecoratedPotBlockEntity`. Everything here takes the block
+/// entity's own tag, not a world.
 namespace decoratedPots {
 
 /// parity: `ContainerSingleItem`, which is exactly one slot.
@@ -37,7 +32,8 @@ inline constexpr std::string_view kSherds = "minecraft:sherds";
 /// parity: `DecoratedPotBlock.useItemOn`: one item goes in, and only if the pot is empty or already
 /// holds that same item with room left. Answers the effects, or nothing when it did not fit.
 [[nodiscard]] std::optional<std::vector<BlockEffect>> insert(wire::nbt::NbtCompound& data,
-                                                             const wire::common::Identifier& item);
+                                                             const wire::common::Identifier& item,
+                                                             const wire::nbt::NbtCompound& components = {});
 
 /// parity: `DecoratedPotBlock.useWithoutItem`, which is a wobble and a thud and nothing else.
 [[nodiscard]] std::vector<BlockEffect> rebuff();

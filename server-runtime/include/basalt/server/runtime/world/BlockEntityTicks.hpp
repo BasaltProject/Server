@@ -53,6 +53,8 @@ struct Hooks {
     /// parity: `ChiseledBookShelfBlockEntity.acceptsItemType`, which asks the `bookshelf_books`
     /// item tag: the tags are the datapack's, and this file has no business loading one.
     std::function<bool(const wire::common::Identifier& item)> isBookshelfBook;
+    /// parity: the `does_not_block_hoppers` block tag, the datapack's like the one above.
+    std::function<bool(const wire::common::Identifier& block)> doesNotBlockHoppers;
     /// parity: `JukeboxSong.lengthInTicks`, which is data in the operator's own jar.
     std::function<std::int64_t(const std::string& song)> songLength;
     /// parity: the `beacon_base_blocks` block tag, which is the datapack's and not this file's.

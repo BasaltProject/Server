@@ -71,13 +71,27 @@ constexpr std::array<Entry, 45> kPotions{{
 /// parity: `MobEffectInstance.withScaledDuration`; an infinite one stays infinite.
 [[nodiscard]] ActiveEffect scaled(ActiveEffect effect, float scale) {
     if (effect.remainingTicks >= 0) {
-        effect.remainingTicks =
-            std::max(wire::common::mth::floor(static_cast<float>(effect.remainingTicks) * scale), 1);
+        effect.remainingTicks = std::max(
+            wire::common::mth::floor(static_cast<double>(static_cast<float>(effect.remainingTicks) * scale)), 1);
     }
     return effect;
 }
 
 } // namespace
+
+std::vector<Identifier> ids() {
+    // parity: the three that carry nothing come first, then every potion in `kPotions`, which is
+    // in registration order with turtle master's two effects side by side.
+    std::vector<Identifier> all{Identifier::vanilla("water"), Identifier::vanilla("mundane"),
+                                Identifier::vanilla("thick"), Identifier::vanilla("awkward")};
+    for (const Entry& entry : kPotions) {
+        const Identifier id = Identifier::vanilla(std::string{entry.potion});
+        if (all.back() != id) {
+            all.push_back(id);
+        }
+    }
+    return all;
+}
 
 std::vector<ActiveEffect> ofPotion(std::string_view potion) {
     std::vector<ActiveEffect> effects;

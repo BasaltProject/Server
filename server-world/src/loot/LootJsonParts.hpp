@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/world/loot/Loot.hpp>
+#include <basalt/server/world/loot/LootContext.hpp>
 #include <basalt/server/world/loot/LootTableJson.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 
@@ -38,6 +39,7 @@ using Parsed = std::expected<Value, LootTableParseError>;
 /// `set_components`, `set_name`, `set_potion`, with the type already read.
 [[nodiscard]] Parsed<LootFunction> parseComponentSetter(std::string_view type,
                                                         const wire::common::JsonObject& function);
+[[nodiscard]] std::optional<EntityTarget> entityTargetOf(const wire::common::JsonValue* value);
 
 /// Reads one piece of loot data, resolving the registry entries it names through `references`.
 class Reader {
@@ -60,6 +62,13 @@ public:
     [[nodiscard]] Parsed<LootEntry> entry(const wire::common::JsonObject& object);
     [[nodiscard]] Parsed<LootPool> pool(const wire::common::JsonObject& object);
     [[nodiscard]] Parsed<LootTable> table(const wire::common::JsonObject& object);
+    /// The component editing functions, or nothing for a type that is not one of them.
+    [[nodiscard]] std::optional<Parsed<LootFunction>> componentFunction(const std::string& type,
+                                                                        const wire::common::JsonObject& object);
+    /// A `slot_source` holder: a named entry, a typed source, or an inline group.
+    [[nodiscard]] Parsed<SlotSource> slotSource(const wire::common::JsonValue& value);
+    /// The ids a tag of a registry names, nested tags flattened, in order and without repeats.
+    [[nodiscard]] Parsed<std::vector<std::string>> tagValues(std::string_view registry, const std::string& id);
 
 private:
     LootReferences* references_;

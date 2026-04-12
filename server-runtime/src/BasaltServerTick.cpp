@@ -30,6 +30,7 @@
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/DroppedItemNbt.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
+#include <basalt/server/runtime/world/EnderEyes.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
@@ -225,13 +226,9 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
                 step("Warden warning tick", [this, &world] { shriekers_->tickTrackers(world); });
             }
             step("Inhabited-time tick", [this, &world, &region] { redstone_->tickInhabitedTime(world, region); });
-            // parity: `ServerLevel.tick` runs the booked block turns first, the fluids after them and
-            // the random ticks last, inside the chunk source. Doing the water first let it break a
-            // repeater whose own turn was due that very tick, and the pulse the jar gives was lost.
-            // parity: the jar books an absolute `triggerTick`, so a turn cannot shorten what it
-            // books itself. This is that, said with a countdown: everything counts down once, here,
-            // before a single turn runs. Inside a pass instead, the fluids lost a tick of whatever
-            // the block turns had just booked, measured in `vibranota`.
+            // parity: `ServerLevel.tick` runs booked block turns first, then fluids, then random ticks.
+            // The jar books an absolute `triggerTick`; the countdown equivalent is to count everything
+            // down once, here, before any turn runs, so a turn cannot shorten what it books itself.
             step("Open turn", [this, &world, &region] { redstone_->openTurn(world, region); });
             step("Scheduled block tick", [this, &world, &region] { redstone_->tickScheduledBlocks(world, region); });
             step("Fluid tick", [this, &world, &region] { redstone_->tickFluids(world, region); });
@@ -343,13 +340,15 @@ world::TriggerDamage BasaltServer::killingBlowOf(const world::LoadedWorld& world
 }
 
 void BasaltServer::tickBoat(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
-                            const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& boat) {
+                            const std::vector<entity::ServerEntity*>& /*living*/, entity::ServerEntity& boat) {
     player::PlayerSession* driver = nullptr;
     for (player::PlayerSession* player : watchers) {
         if (!boat.passengerIds.empty() && player->entityId() == boat.passengerIds.front()) {
             driver = player;
         }
     }
+    // parity: `AbstractBoat.tick` starts with `super.tick()`, whose `baseTick` lets the current in.
+    pushes_->pushByFluid(world, boat);
     const entity::boats::TickResult result = entity::boats::tick(world.state(), boat, driver != nullptr);
     // parity: `applyEffectsFromBlocks` and `tickBubbleColumn`, then the pushes at the end of the turn.
     vehicles_->tickBoatBubbles(world, boat, driver != nullptr);
@@ -517,6 +516,8 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
     // parity: `LivingEntity.pushEntities` on each player's own turn, which comes before the level's.
     for (player::PlayerSession* player : watchers) {
         if (region.ownsPosition(player->x, player->z)) {
+            // parity: `baseTick`'s currents come before `aiStep`'s pushes.
+            pushes_->pushByFluid(world, *player);
             pushes_->pushByPlayer(world, *player);
         }
     }
@@ -664,29 +665,30 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
             const bool disguised =
                 headItem.has_value() &&
                 world::realItemTags::contains(vanillaData_.itemTags, "minecraft:gaze_disguise_equipment", *headItem);
-            views.push_back(entity::ai::PlayerView{.entityId = player->entityId(),
-                                                   .uuid = player->uuid().toString(),
-                                                   .x = player->x,
-                                                   .y = player->y,
-                                                   .z = player->z,
-                                                   .width = playerWidth,
-                                                   .height = playerHeight,
-                                                   .targetable = isTargetable(*player),
-                                                   .spectator = isSpectator(*player),
-                                                   .heldItem = std::move(heldItem),
-                                                   .sneaking = player->sneaking,
-                                                   .sprinting = player->sprinting,
-                                                   .swimming = player->swimming,
-                                                   .yaw = player->yaw,
-                                                   .pitch = player->pitch,
-                                                   .vehicleId = player->vehicleId,
-                                                   .movedHorizontally = player->movedHorizontally,
-                                                   .facing = wire::common::mth::floor((player->yaw / 90.0F) + 0.5) & 3,
-                                                   .sleeping = player->sleepingBed.has_value(),
-                                                   .sleepTicks = player->sleepTicks,
-                                                   .gazeDisguised = disguised,
-                                                   .flying = player->flying,
-                                                   .inWater = feetInWater(world, *player)});
+            views.push_back(entity::ai::PlayerView{
+                .entityId = player->entityId(),
+                .uuid = player->uuid().toString(),
+                .x = player->x,
+                .y = player->y,
+                .z = player->z,
+                .width = playerWidth,
+                .height = playerHeight,
+                .targetable = isTargetable(*player),
+                .spectator = isSpectator(*player),
+                .heldItem = std::move(heldItem),
+                .sneaking = player->sneaking,
+                .sprinting = player->sprinting,
+                .swimming = player->swimming,
+                .yaw = player->yaw,
+                .pitch = player->pitch,
+                .vehicleId = player->vehicleId,
+                .movedHorizontally = player->movedHorizontally,
+                .facing = wire::common::mth::floor(static_cast<double>(player->yaw / 90.0F) + 0.5) & 3,
+                .sleeping = player->sleepingBed.has_value(),
+                .sleepTicks = player->sleepTicks,
+                .gazeDisguised = disguised,
+                .flying = player->flying,
+                .inWater = feetInWater(world, *player)});
         }
     }
 
@@ -802,6 +804,10 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                                                                       {}});
                 }
             }
+            continue;
+        }
+        if (world::enderEyes::isEye(*entity)) {
+            world::enderEyes::tick(world, watchers, playerRegistry_, *entity, scratchSeed());
             continue;
         }
         if (entity::fireworkRockets::isRocket(*entity)) {

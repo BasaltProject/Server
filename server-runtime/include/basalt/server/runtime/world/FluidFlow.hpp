@@ -65,6 +65,12 @@ struct Context {
 /// The same, from the two states already in hand.
 [[nodiscard]] float heightOf(std::int32_t stateId, std::int32_t aboveStateId);
 
+/// parity: `FluidState.getOwnHeight`, the amount over nine whatever is above, and nothing for no fluid.
+[[nodiscard]] float ownHeightOf(std::int32_t stateId);
+
+/// parity: `FlowingFluid.FALLING`, a flow fed from above.
+[[nodiscard]] bool fallingFluid(std::int32_t stateId);
+
 /// Like `kindOf`, but only for a square that **is** the liquid: a waterlogged stair holds water and
 /// answers `kindOf`, and it is not a `LiquidBlock`, so the hooks that hang off that class skip it.
 [[nodiscard]] std::optional<FluidKind> liquidBlockKindOf(std::int32_t stateId);

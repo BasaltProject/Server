@@ -59,7 +59,10 @@ PlayerUi::PlayerUi(std::function<config::UiConfigs()> configs,
 
 void PlayerUi::tick(std::int64_t tick, const PlaceholderContext& context) {
     const config::UiConfigs configs = configs_();
-    if (due(tick, configs.tabList.enabled, configs.tabList.updateIntervalTicks)) {
+    // A world change redraws even the panels drawn only once.
+    const bool redraw = std::exchange(redrawPending_, false);
+    if (due(tick, configs.tabList.enabled, configs.tabList.updateIntervalTicks) ||
+        (redraw && configs.tabList.enabled)) {
         updateTabList(context);
     }
     // A plugin holding the sidebar turns it on even where the operator's file left it off:
@@ -67,13 +70,13 @@ void PlayerUi::tick(std::int64_t tick, const PlaceholderContext& context) {
     const bool boardOn = configs.scoreboard.enabled || (plugin_.holdsSidebar && plugin_.holdsSidebar());
     const std::int32_t boardEvery =
         configs.scoreboard.enabled ? configs.scoreboard.updateIntervalTicks : kPluginSidebarInterval;
-    if (due(tick, boardOn, boardEvery)) {
+    if (due(tick, boardOn, boardEvery) || (redraw && boardOn)) {
         updateScoreboard(context);
     }
     const bool barOn = configs.bossBar.enabled || (plugin_.holdsBossBar && plugin_.holdsBossBar());
     const std::int32_t barEvery =
         configs.bossBar.enabled ? configs.bossBar.updateIntervalTicks : kPluginSidebarInterval;
-    if (due(tick, barOn, barEvery)) {
+    if (due(tick, barOn, barEvery) || (redraw && barOn)) {
         updateBossBar(context);
     }
 }
@@ -101,6 +104,12 @@ void PlayerUi::clearScoreboard() {
 void PlayerUi::clear() {
     clearScoreboard();
     clearBossBar();
+}
+
+void PlayerUi::worldChanged() {
+    clear();
+    lastTabList_.reset();
+    redrawPending_ = true;
 }
 
 void PlayerUi::updateTabList(const PlaceholderContext& context) {

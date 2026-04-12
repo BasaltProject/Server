@@ -14,6 +14,7 @@
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
 #include <basalt/server/runtime/entity/NeutralAnger.hpp>
 #include <basalt/server/runtime/entity/Piglins.hpp>
+#include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/Sniffers.hpp>
 #include <basalt/server/runtime/entity/Villagers.hpp>
@@ -484,6 +485,12 @@ NbtCompound encode(const ServerEntity& entity) {
     }
     if (entity.owner.has_value()) {
         tag.putString("Owner", *entity.owner);
+    } else if (entity.ownerUuid.has_value()) {
+        // parity: `Projectile.addAdditionalSaveData`'s `Owner` and `LeftOwner`.
+        tag.set("Owner", uuidTag(*entity.ownerUuid));
+    }
+    if (entity.leftOwner) {
+        tag.putBoolean("LeftOwner", true);
     }
     if (entity.customName.has_value()) {
         tag.putString("CustomName", *entity.customName);
@@ -680,6 +687,10 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
     }
     if (const std::string_view owner = tag.getString("Owner"); !owner.empty()) {
         entity->owner = std::string{owner};
+    }
+    if (projectiles::kindOf(*type) != nullptr) {
+        entity->ownerUuid = uuidIn(tag, "Owner");
+        entity->leftOwner = tag.getBoolean("LeftOwner");
     }
     entity->sitting = numericBoolean(tag, "Sitting");
     if (const std::string_view customName = tag.getString("CustomName"); !customName.empty()) {

@@ -1,3 +1,4 @@
+#include "LootComponentEdit.hpp"
 #include "LootJsonParts.hpp"
 
 #include <basalt/server/world/loot/LootTableJson.hpp>
@@ -208,6 +209,19 @@ Parsed<LootEntry> Reader::entry(const JsonObject& object) {
                 built.tables.push_back(NestedTable{.id = *id});
             }
         }
+        return built;
+    }
+    // parity: `SlotLoot`, the stacks a slot source reads.
+    if (*type == "minecraft:slots") {
+        const JsonValue* source = object.find("slot_source");
+        if (source == nullptr) {
+            return std::unexpected(missing("slots slot_source"));
+        }
+        Parsed<SlotSource> parsed = slotSource(*source);
+        if (!parsed.has_value()) {
+            return std::unexpected(parsed.error());
+        }
+        built.slotSource = std::make_shared<const SlotSource>(std::move(*parsed));
         return built;
     }
     return std::unexpected(LootTableParseError{"Unsupported loot pool entry type: " + *type});

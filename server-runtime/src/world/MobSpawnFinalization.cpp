@@ -154,7 +154,8 @@ CommonSpawnState stateFor(const Identifier& type, std::int32_t groupIndex, const
     state.ranMobFinalizer = true;
 
     if (!entity::cubeMobs::isCube(type)) {
-        mobVariantSpawnFinalizer::afterCommon(type.path(), group, random, state.typeData);
+        mobVariantSpawnFinalizer::afterCommon(type.path(), group, context, blockX, blockY, blockZ, random,
+                                              state.typeData);
         state.cubeSize = entity::cubeMobs::kDefaultSize;
         return state;
     }

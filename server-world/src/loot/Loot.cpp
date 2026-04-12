@@ -1,3 +1,4 @@
+#include "LootComponentEdit.hpp"
 #include "LootParts.hpp"
 
 #include <basalt/server/registry/Items.hpp>
@@ -66,7 +67,8 @@ void rollRaw(const LootTable& table, Roll& roll, const LootPool::Output& output)
 /// parity: `LootPoolEntryContainer.expand`: the entry's own condition first, then the leaf's one
 /// choice (or one per item or table when it expands) or the composite's children, `alternatives`
 /// stopping at the first that expands, `sequence` at the first that does not, `group` never.
-bool expand(const LootEntry& entry, Roll& roll, std::vector<const LootEntry*>& chain, std::vector<Choice>& choices) {
+template <typename Found>
+bool expand(const LootEntry& entry, Roll& roll, std::vector<const LootEntry*>& chain, const Found& found) {
     if (!entry.canRun(roll.random, roll.context)) {
         return false;
     }
@@ -79,27 +81,27 @@ bool expand(const LootEntry& entry, Roll& roll, std::vector<const LootEntry*>& c
     case LootEntry::Composite::None:
         if (entry.expand && (entry.tag.has_value() || !entry.tagItems.empty())) {
             for (const Identifier& item : itemsOf(entry, roll.context)) {
-                choices.push_back(Choice{.leaf = &entry, .item = item, .chain = chain});
+                found(Choice{.leaf = &entry, .item = item, .chain = chain});
             }
         } else if (entry.expand && (!entry.tables.empty() || entry.tableTag.has_value())) {
             for (const LootTable* table : tablesOf(entry, roll.context)) {
-                choices.push_back(Choice{.leaf = &entry, .table = table, .chain = chain});
+                found(Choice{.leaf = &entry, .table = table, .chain = chain});
             }
         } else {
-            choices.push_back(Choice{.leaf = &entry, .chain = chain});
+            found(Choice{.leaf = &entry, .chain = chain});
         }
         break;
     case LootEntry::Composite::Alternatives:
         expanded = std::ranges::any_of(entry.children,
-                                       [&](const LootEntry& child) { return expand(child, roll, chain, choices); });
+                                       [&](const LootEntry& child) { return expand(child, roll, chain, found); });
         break;
     case LootEntry::Composite::Sequence:
         expanded = std::ranges::all_of(entry.children,
-                                       [&](const LootEntry& child) { return expand(child, roll, chain, choices); });
+                                       [&](const LootEntry& child) { return expand(child, roll, chain, found); });
         break;
     case LootEntry::Composite::Group:
         for (const LootEntry& child : entry.children) {
-            static_cast<void>(expand(child, roll, chain, choices));
+            static_cast<void>(expand(child, roll, chain, found));
         }
         break;
     }
@@ -141,6 +143,15 @@ void createStacks(const Choice& choice, Roll& roll, const LootPool::Output& outp
         }
         return;
     }
+    // parity: `SlotLoot`, every non-empty stack the source reads.
+    if (leaf.slotSource != nullptr) {
+        for (ItemStack& stack : leaf.slotSource->provide(roll.context)) {
+            if (stack.count > 0) {
+                emit(std::move(stack));
+            }
+        }
+        return;
+    }
     // parity: `TagEntry` unexpanded, every item of the set at once.
     if (leaf.tag.has_value() || !leaf.tagItems.empty()) {
         for (const Identifier& item : itemsOf(leaf, roll.context)) {
@@ -157,8 +168,9 @@ void createStacks(const Choice& choice, Roll& roll, const LootPool::Output& outp
 void addRandomItem(const LootPool& pool, Roll& roll, const LootPool::Output& output) {
     std::vector<Choice> expanded;
     std::vector<const LootEntry*> chain;
+    const auto keep = [&expanded](Choice choice) { expanded.push_back(std::move(choice)); };
     for (const LootEntry& entry : pool.entries) {
-        static_cast<void>(expand(entry, roll, chain, expanded));
+        static_cast<void>(expand(entry, roll, chain, keep));
     }
     std::vector<Choice> valid;
     std::int32_t totalWeight = 0;
@@ -238,6 +250,33 @@ void withRadius(const LootContext& context, std::optional<float> explosionRadius
 }
 
 } // namespace
+
+void rollContainerEntries(const std::vector<LootEntry>& entries, random::RandomSource& random,
+                          const LootContext& context, const LootPool::Output& output) {
+    std::vector<const LootTable*> visited;
+    Roll roll{.random = random, .context = context, .luck = context.luck, .visited = visited};
+    // parity: `LootTable.createStackSplitter`, a stack past its size handed on in full stacks.
+    const LootPool::Output split = [&output](ItemStack stack) {
+        const std::int32_t most = std::max(server::registry::itemStacking::maxStackSize(stack.item), 1);
+        if (stack.count < most) {
+            output(std::move(stack));
+            return;
+        }
+        std::int32_t left = stack.count;
+        while (left > 0) {
+            ItemStack part = stack;
+            part.count = std::min(most, left);
+            left -= part.count;
+            output(std::move(part));
+        }
+    };
+    std::vector<const LootEntry*> chain;
+    // parity: each choice makes its stacks the moment it is found, before the next condition rolls.
+    const auto make = [&roll, &split](const Choice& choice) { createStacks(choice, roll, split); };
+    for (const LootEntry& entry : entries) {
+        static_cast<void>(expand(entry, roll, chain, make));
+    }
+}
 
 std::int32_t LootEntry::weightFor(float luck) const {
     return std::max(wire::common::mth::floor(

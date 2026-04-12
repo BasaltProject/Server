@@ -129,6 +129,11 @@ std::optional<OpenWindow> windowFor(world::LoadedWorld& world, const std::int32_
         return OpenWindow{
             .type = wire::bedrock::BedrockContainerType::Loom, .x = x, .y = y, .z = z, .size = 0, .block = path};
     }
+    // parity: `CartographyTableBlock.useWithoutItem`. Its three slots belong to the screen too.
+    if (path == "cartography_table") {
+        return OpenWindow{
+            .type = wire::bedrock::BedrockContainerType::Cartography, .x = x, .y = y, .z = z, .size = 0, .block = path};
+    }
     // parity: `BeaconBlockEntity` is a `MenuProvider`: its one slot belongs to the screen too.
     if (path == "beacon") {
         return OpenWindow{

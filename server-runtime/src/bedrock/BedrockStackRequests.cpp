@@ -133,6 +133,11 @@ struct Place {
         return {.kind = Place::Kind::Grid, .slot = 1};
     case BedrockContainerSlot::LoomMaterial:
         return {.kind = Place::Kind::Grid, .slot = 2};
+    case BedrockContainerSlot::CartographyInput:
+        // A cartography table's two inputs are the screen's, so they live where a grid's first cells do.
+        return {.kind = Place::Kind::Grid, .slot = 0};
+    case BedrockContainerSlot::CartographyAdditional:
+        return {.kind = Place::Kind::Grid, .slot = 1};
     case BedrockContainerSlot::BeaconPayment:
         // A beacon's one slot is the screen's, so it lives where a grid's first cell does.
         return {.kind = Place::Kind::Grid, .slot = 0};
@@ -155,6 +160,7 @@ struct Place {
     case BedrockContainerSlot::GrindstoneResult:
     case BedrockContainerSlot::SmithingResult:
     case BedrockContainerSlot::LoomResult:
+    case BedrockContainerSlot::CartographyResult:
         // What a craft just made, which is nowhere until the line that takes it says where.
         return {.kind = Place::Kind::Created};
     default:
@@ -191,6 +197,9 @@ struct Reach {
     std::optional<std::int32_t> grindstoneWorth;
     /// What the open enchanting table charged, once the request has taken one of its rows.
     std::optional<std::int32_t> enchantCost;
+    /// How many of each were in the open cartography table when it made something: its own
+    /// consume lines have to take exactly one of each.
+    std::optional<std::array<std::int32_t, 2>> cartographyBefore;
 };
 
 [[nodiscard]] std::optional<storage::StoredItemStack> stackAt(const Reach& reach, const Place& place) {
@@ -319,7 +328,7 @@ private:
     }
     const std::optional<storage::StoredItemStack> target = stackAt(reach, to);
     if (target.has_value()) {
-        if (!sameKind(*target, *source) || target->count + count > PlayerInventory::kMaxStack) {
+        if (!sameKind(*target, *source) || target->count + count > PlayerInventory::maxStackIn(*target)) {
             return false;
         }
         if (!writeStack(reach, to, withCount(*target, target->count + count))) {
@@ -481,6 +490,46 @@ private:
     return true;
 }
 
+[[nodiscard]] bool cartographyOpen(const BedrockWindows& windows) {
+    return windows.open.has_value() && windows.open->type == wire::bedrock::BedrockContainerType::Cartography;
+}
+
+/// A cartography table names one of its four fixed recipes, but what it makes is worked out from what
+/// is in it. Its consume lines take the inputs, as a table's do.
+[[nodiscard]] bool craftCartography(Reach& reach, const StackRequestContext& context) {
+    if (!context.cartographyResult) {
+        return false;
+    }
+    const std::optional<storage::StoredItemStack> map = stackAt(reach, {.kind = Place::Kind::Grid, .slot = 0});
+    const std::optional<storage::StoredItemStack> additional = stackAt(reach, {.kind = Place::Kind::Grid, .slot = 1});
+    if (!map.has_value() || !additional.has_value()) {
+        return false;
+    }
+    const std::optional<storage::StoredItemStack> made = context.cartographyResult(*map, *additional);
+    if (!made.has_value()) {
+        return false;
+    }
+    reach.created = *made;
+    reach.cartographyBefore = std::array<std::int32_t, 2>{map->count, additional->count};
+    return true;
+}
+
+/// parity: `CartographyTableMenu`'s result slot `onTake`: one of each input, however the client
+/// counted them.
+[[nodiscard]] bool cartographyPaid(const Reach& reach) {
+    if (!reach.cartographyBefore.has_value()) {
+        return true;
+    }
+    for (std::int32_t slot = 0; slot < 2; ++slot) {
+        const std::optional<storage::StoredItemStack> left = stackAt(reach, {.kind = Place::Kind::Grid, .slot = slot});
+        const std::int32_t now = left.has_value() ? left->count : 0;
+        if (now != (*reach.cartographyBefore)[static_cast<std::size_t>(slot)] - 1) {
+            return false;
+        }
+    }
+    return true;
+}
+
 } // namespace
 
 StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWindows& windows, world::LoadedWorld* world,
@@ -542,6 +591,12 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
             touched.add(action.source);
             break;
         case BedrockStackActionType::Craft: {
+            if (cartographyOpen(windows)) {
+                if (!craftCartography(reach, context)) {
+                    return {};
+                }
+                break;
+            }
             // An enchanting table names one of its three rows by the number it was given, which is
             // the only thing that number means: what the row puts on was decided when it was rolled.
             if (windows.enchanting.has_value() && windows.open.has_value() &&
@@ -591,6 +646,14 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
             break;
         }
         case BedrockStackActionType::CraftOptional: {
+            // The same line a cartography table sends, whose name box this edition has and Java
+            // does not: the name goes unused.
+            if (cartographyOpen(windows)) {
+                if (!craftCartography(reach, context)) {
+                    return {};
+                }
+                break;
+            }
             // An anvil, which names no recipe: what it makes is worked out from what is in it, and
             // the name is whatever was typed into the box.
             if (!windows.open.has_value() || windows.open->type != wire::bedrock::BedrockContainerType::Anvil ||
@@ -722,6 +785,9 @@ StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWind
     // request, so a half of it left over means the whole of it is refused.
     if ((reach.trade.has_value() || reach.anvilCost.has_value() || reach.grindstoneWorth.has_value()) &&
         reach.created.has_value()) {
+        return {};
+    }
+    if (!cartographyPaid(reach)) {
         return {};
     }
     const std::vector<BedrockResponseContainer> containers = touched.answer(reach);

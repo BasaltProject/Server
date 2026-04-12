@@ -44,6 +44,7 @@
 #include <basalt/server/runtime/world/Cushions.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
 #include <basalt/server/runtime/world/EndPortals.hpp>
+#include <basalt/server/runtime/world/EnderEyes.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
@@ -757,6 +758,10 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
             owner_->options().maps->useEmptyMap(breakContext(), *session, *world, PlayerInventory::kOffhandSlot)) {
             return;
         }
+        // parity: `EnderEyeItem.use` answers either hand.
+        if (world::enderEyes::throwFor(breakContext(), *session, *world, PlayerInventory::kOffhandSlot)) {
+            return;
+        }
         // parity: `Item.use` charges a `kinetic_weapon` from either hand.
         if (owner_->combat().startCharge(*session, PlayerInventory::kOffhandSlot)) {
             return;
@@ -783,6 +788,7 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
     if (owner_->itemUseTimers().onCooldown(*item) || owner_->itemUseTimers().startEating(*session, *item, heldSlot) ||
         owner_->itemUseTimers().startDrawing(*session, *item, heldSlot) ||
         owner_->itemUseTimers().throwEnderPearl(*session, *item, heldSlot) ||
+        world::enderEyes::throwFor(breakContext(), *session, *world, heldSlot) ||
         (owner_->options().fireworks != nullptr &&
          player::useRocketFor(breakContext(), *owner_->options().fireworks, *session, *world, heldSlot)) ||
         owner_->itemUseTimers().startBlocking(*session, *item, heldSlot) ||

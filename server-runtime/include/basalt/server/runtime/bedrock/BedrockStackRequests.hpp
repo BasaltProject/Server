@@ -77,6 +77,10 @@ struct StackRequestContext {
         const storage::StoredItemStack& banner, const storage::StoredItemStack& dye,
         const storage::StoredItemStack* patternItem, const std::string& pattern)>
         loomResult;
+    /// What a cartography table makes of a map and what goes with it, or nothing.
+    std::function<std::optional<storage::StoredItemStack>(const storage::StoredItemStack& map,
+                                                          const storage::StoredItemStack& additional)>
+        cartographyResult;
 };
 
 [[nodiscard]] StackRequestAnswer applyStackRequest(player::PlayerSession& session, BedrockWindows& windows,

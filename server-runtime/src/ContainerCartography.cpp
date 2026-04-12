@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/MapSystem.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/maps/Cartography.hpp>
 
 #include <algorithm>
 #include <cstdint>
@@ -19,13 +20,6 @@ using wire::protocol::play::SoundSource;
 
 /// parity: `MenuType.CARTOGRAPHY_TABLE`'s registry id.
 constexpr std::int32_t kCartographyMenu = 23;
-constexpr std::string_view kPostProcessing = "minecraft:map_post_processing";
-
-[[nodiscard]] storage::StoredItemStack oneOf(const storage::StoredItemStack& stack, std::int32_t count) {
-    storage::StoredItemStack copy = stack;
-    copy.count = count;
-    return copy;
-}
 
 } // namespace
 
@@ -65,29 +59,12 @@ void ContainerMenuController::recomputeCartographyResult() {
         result.reset();
         return;
     }
-    const std::optional<std::int32_t> id = MapSystem::mapIdOf(map->components);
-    const std::optional<MapSystem::Summary> data = id.has_value() ? maps->summaryOf(*id) : std::nullopt;
-    if (!data.has_value()) {
+    // parity: `setupResultSlot` leaves the slot alone for a map without data.
+    if (const std::optional<std::int32_t> id = MapSystem::mapIdOf(map->components);
+        !id.has_value() || !maps->summaryOf(*id).has_value()) {
         return;
     }
-    const std::expected<wire::common::Identifier, wire::common::IdentifierError> mapItem =
-        wire::common::Identifier::parse(map->id);
-    const bool extendable =
-        mapItem.has_value() && owner_->options().itemTags != nullptr &&
-        world::realItemTags::contains(*owner_->options().itemTags, "minecraft:extendable_maps", *mapItem);
-    if (additional->id == "minecraft:paper" && extendable && !data->locked && data->scale < 4) {
-        storage::StoredItemStack made = oneOf(*map, 1);
-        made.components.putString(kPostProcessing, "scale");
-        result = std::move(made);
-    } else if (additional->id == "minecraft:glass_pane" && !data->locked) {
-        storage::StoredItemStack made = oneOf(*map, 1);
-        made.components.putString(kPostProcessing, "lock");
-        result = std::move(made);
-    } else if (additional->id == "minecraft:map") {
-        result = oneOf(*map, 2);
-    } else {
-        result.reset();
-    }
+    result = world::maps::cartographyResult(*map, *additional, *maps, owner_->options().itemTags);
 }
 
 void ContainerMenuController::takeCartographyResult() {
@@ -117,19 +94,8 @@ void ContainerMenuController::takeCartographyResult() {
 void ContainerMenuController::settleCraftedMaps(PlayerSession& session) {
     MapSystem* maps = owner_->options().maps;
     world::LoadedWorld* world = owner_->currentWorld();
-    if (maps == nullptr || world == nullptr) {
-        return;
-    }
-    if (carriedItem_.has_value() && carriedItem_->components.contains(kPostProcessing)) {
-        maps->postProcessCrafted(carriedItem_->components, *world);
-    }
-    for (std::int32_t slot = 0; slot < storage::StoredInventory::kPlayerSlots; ++slot) {
-        const std::optional<storage::StoredItemStack>& stack = session.inventory.at(slot);
-        if (stack.has_value() && stack->components.contains(kPostProcessing)) {
-            storage::StoredItemStack settled = *stack;
-            maps->postProcessCrafted(settled.components, *world);
-            session.inventory.set(slot, std::move(settled));
-        }
+    if (maps != nullptr && world != nullptr) {
+        static_cast<void>(world::maps::settleCraftedMaps(session, &carriedItem_, *maps, *world));
     }
 }
 

@@ -53,6 +53,10 @@ namespace fireworkRockets {
 struct RocketState;
 }
 
+namespace enderEyes {
+struct EyeState;
+}
+
 namespace villager {
 struct VillagerState;
 }
@@ -205,6 +209,8 @@ public:
     std::shared_ptr<villager::VillagerState> villager;
     /// parity: `FireworkRocketEntity`'s own fields; absent for everything that is not a rocket.
     std::shared_ptr<fireworkRockets::RocketState> firework;
+    /// parity: `EyeOfEnder`'s unsaved target, life and fate; absent for anything else.
+    std::shared_ptr<enderEyes::EyeState> enderEye;
 
     /// Ticks before it goes off, or `kNoFuse` for anything that is not primed. parity:
     /// `PrimedTnt.fuse`.
@@ -241,6 +247,10 @@ public:
 
     /// Who shot it, by entity id. parity: `Projectile.owner`, which is who a kill is blamed on.
     std::optional<std::int32_t> ownerId;
+    /// The same by uuid, which is what a save keeps and a load finds the shooter by again.
+    std::optional<wire::common::Uuid> ownerUuid;
+    /// parity: `Projectile.leftOwner`: clear of the shooter's party, whom it may hit from then on.
+    bool leftOwner = false;
     /// parity: `Projectile.lastDeflectedBy`, which it passes through untouched.
     std::optional<std::int32_t> lastDeflectedBy;
     /// parity: `AbstractArrow.isCritArrow`, set by a fully drawn bow and worth extra damage.
@@ -676,11 +686,8 @@ public:
     std::map<std::string, std::map<std::string, AttributeModifier, std::less<>>, std::less<>> attributeModifiers;
 
     /// The base value of one attribute: what a command set, else what this kind of entity is born
-    /// with, else the attribute's own default.
-    ///
-    /// parity: `AttributeMap`, which is built from `DefaultAttributes.getSupplier(type)`: a cow
-    /// walks at 0.2 and a zombie at 0.23 because their own suppliers say so, not because of any
-    /// global.
+    /// with, else the attribute's own default. parity: `AttributeMap` built from
+    /// `DefaultAttributes.getSupplier(type)`, so per-type values (cow 0.2, zombie 0.23 speed).
     [[nodiscard]] double attribute(std::string_view id) const;
 
     /// The value with modifiers applied.

@@ -192,6 +192,9 @@ basalt_module(server-world
     src/loot/LootItemFunctions.cpp
     src/loot/LootJsonParts.cpp
     src/loot/LootFill.cpp
+    src/loot/LootComponentFunctions.cpp
+    src/loot/LootComponentJson.cpp
+    src/loot/LootContainerFunctions.cpp
     src/terrain/BiomeTemperature.cpp
     src/terrain/DesertPyramidPiece.cpp
     src/terrain/DesertPyramidStructureGenerator.cpp

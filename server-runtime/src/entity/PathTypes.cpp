@@ -68,6 +68,7 @@ using namespace std::string_view_literals;
                                        "respawn_anchor"sv,
                                        "sea_pickle"sv,
                                        "pointed_dripstone"sv,
+                                       "sulfur_spike"sv,
                                        "end_rod"sv,
                                        "shelf_mushroom"sv,
                                        "stonecutter"sv,

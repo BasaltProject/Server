@@ -8,7 +8,6 @@
 #include <basalt/server/runtime/world/RecipeBook.hpp>
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/wire/io/FileIO.hpp>
-#include <basalt/wire/multiversion/ProtocolVersions.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
 
@@ -268,8 +267,8 @@ void BasaltServer::awardAdvancementLoot(std::string_view uuid, const std::vector
 
 void BasaltServer::sendAdvancementPacket(const player::PlayerSession& player, std::int32_t id,
                                          const std::function<void(wire::io::ByteBuffer&)>& write) const {
-    if (player.connection().protocolVersion == wire::multiversion::protocolVersions::kNative &&
-        player.connection().sendPlayPacket) {
+    // Older clients get it through their chain, which lays it out their way or drops it before 1.12.
+    if (player.connection().sendPlayPacket) {
         player.connection().sendPlayPacket(id, write);
     }
 }

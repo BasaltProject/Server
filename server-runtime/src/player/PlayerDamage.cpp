@@ -14,10 +14,12 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/player/PlayerTotem.hpp>
+#include <basalt/server/runtime/player/PlayerVersusPlayer.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/DamageProtection.hpp>
+#include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
@@ -449,8 +451,22 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
                 const std::optional<Identifier>& damageType, const std::optional<entity::DamageSource>& source,
                 const DamageContext& context) {
     PlayerSession* session = &player;
+    session->lastHurtLanded = false;
     if (session->dead || session->invulnerable()) {
         return;
+    }
+    // parity: `ServerPlayer.hurtServer` asks `canHarmPlayer` of whoever is behind the hit, the
+    // shooter of a projectile included: the pvp rule, then the teams' friendly fire.
+    if (source.has_value() && context.registry != nullptr) {
+        const std::int32_t responsible = source->ownerId.value_or(source->entityId);
+        const world::LoadedWorld* world = context.world ? context.world() : nullptr;
+        for (const PlayerSession* attacker : context.registry->snapshot()) {
+            if (attacker->entityId() == responsible &&
+                !pvp::canHarm(*session, *attacker, world == nullptr || world->gameRules().get(world::gameRules::kPvp),
+                              context.teams)) {
+                return;
+            }
+        }
     }
     // parity: `Player.hurtServer` throws off whatever sits on the shoulders.
     session->shoulderDropPending = true;
@@ -483,6 +499,8 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
         session->lastHurt = dealt;
         session->invulnerableTicks = kHurtCooldownTicks;
     }
+    // parity: `hurtServer` answers `!blocked || damage > 0`.
+    session->lastHurtLanded = blocked.amount <= 0.0F || incoming > 0.0F;
     // parity: `AbstractArrow.onHitEntity` leaves a non-piercing arrow in whoever it really hurt.
     if (damageType == world::damageTypes::kArrow && source.has_value() && !source->piercing &&
         (blocked.amount <= 0.0F || incoming > 0.0F)) {
@@ -527,10 +545,25 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
         std::function<void()> run;
 
         ~ScopeExit() { run(); }
-    } const hurtTrigger{[&context, session, &hit] {
-        if (context.triggers != nullptr) {
-            context.triggers->fire("entity_hurt_player", session->name(), session->uuid().toString(),
-                                   world::TriggerEvent{.damage = hit});
+    } const hurtTrigger{[&context, session, &hit, &source] {
+        if (context.triggers == nullptr) {
+            return;
+        }
+        context.triggers->fire("entity_hurt_player", session->name(), session->uuid().toString(),
+                               world::TriggerEvent{.damage = hit});
+        // parity: `PLAYER_HURT_ENTITY` for the player behind the hit, a player being an entity too.
+        if (!source.has_value() || context.registry == nullptr || !context.triggers->listensTo("player_hurt_entity")) {
+            return;
+        }
+        const std::int32_t responsible = source->ownerId.value_or(source->entityId);
+        for (const PlayerSession* attacker : context.registry->snapshot()) {
+            if (attacker->entityId() == responsible) {
+                context.triggers->fire(
+                    "player_hurt_entity", attacker->name(), attacker->uuid().toString(),
+                    world::TriggerEvent{.entities = {{"entity", world::triggerFacts::ofPlayer(*session)}},
+                                        .damage = hit});
+                return;
+            }
         }
     }};
 

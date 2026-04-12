@@ -216,11 +216,10 @@ Parsed<LootFunction> Reader::typedCountFunction(const std::string& type, const J
     if (type == "minecraft:set_instrument") {
         return LootFunction::setInstrument(idsOrTag(object.find("options")));
     }
+    // parity: without `options`, any potion of the registry.
     if (type == "minecraft:set_random_potion") {
-        if (object.find("options") == nullptr) {
-            return std::unexpected(LootTableParseError{"Unsupported set_random_potion without options"});
-        }
-        return LootFunction::setRandomPotion(idsOrTag(object.find("options")));
+        const JsonValue* options = object.find("options");
+        return LootFunction::setRandomPotion(idsOrTag(options), options == nullptr);
     }
     if (type == "minecraft:explosion_decay") {
         return LootFunction::explosionDecay();
@@ -301,6 +300,9 @@ Parsed<LootFunction> Reader::typedCountFunction(const std::string& type, const J
     }
     if (copiesOnly(type)) {
         return LootFunction::copyFromBlock();
+    }
+    if (std::optional<Parsed<LootFunction>> edit = componentFunction(type, object); edit.has_value()) {
+        return std::move(*edit);
     }
     return std::unexpected(LootTableParseError{"Unsupported loot function type: " + type});
 }

@@ -48,7 +48,6 @@
 #include <basalt/server/runtime/player/PlayerSleep.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/player/PlayerSpawnItems.hpp>
-#include <basalt/server/runtime/player/PlayerSweep.hpp>
 #include <basalt/server/runtime/player/PlayerThrown.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/AnvilEnchantments.hpp>
@@ -63,6 +62,7 @@
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/Enchanting.hpp>
 #include <basalt/server/runtime/world/EnchantmentBooks.hpp>
+#include <basalt/server/runtime/world/EnderEyes.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/Grindstones.hpp>
 #include <basalt/server/runtime/world/Lecterns.hpp>
@@ -73,6 +73,7 @@
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WeaponDamage.hpp>
+#include <basalt/server/runtime/world/maps/Cartography.hpp>
 #include <basalt/wire/bedrock/BedrockEntityIdentifiers.hpp>
 #include <basalt/wire/io/Platform.hpp>
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
@@ -433,6 +434,7 @@ player::DamageContext BasaltServer::damageContext() {
     context.triggers = advancementTriggers_.get();
     context.damageTypeTags = &vanillaData_.damageTypeTags;
     context.enchantments = &vanillaData_.enchantments;
+    context.teams = &teams_;
     context.slotChanged = [](const player::PlayerSession& player, std::int32_t) {
         if (player.connection().sendInventoryAll) {
             player.connection().sendInventoryAll();
@@ -807,6 +809,15 @@ void BasaltServer::startBedrockListener() {
                 }
                 world::LoadedWorld& world = *found->second;
                 entity::ServerEntity* target = world.state().entity(entityId);
+                if (target == nullptr) {
+                    for (player::PlayerSession* other : playerRegistry_.snapshot()) {
+                        if (other->entityId() == entityId && other != session &&
+                            other->worldName == session->worldName) {
+                            bedrockAttackPlayer(*session, *other, world, falling);
+                            return;
+                        }
+                    }
+                }
                 if (target == nullptr || target->removed || !registry::entityAttributes::isLiving(target->type())) {
                     return;
                 }
@@ -848,7 +859,9 @@ void BasaltServer::startBedrockListener() {
                     }};
                 const float enchanted = world::weaponDamage::of(held, base, definitionOf, &victim);
                 const player::combat::Swing swing =
-                    player::combat::swingOf(strength, base, enchanted, falling, session->onGround, session->sprinting);
+                    player::combat::swingOf(strength, base, enchanted,
+                                            player::pvp::criticalPossible(*session, world, falling), session->onGround,
+                                            session->sprinting);
                 if (swing.damage <= 0.0F) {
                     return;
                 }
@@ -871,26 +884,23 @@ void BasaltServer::startBedrockListener() {
                 // nor a sprinting one. The sweep itself is the same code the other door runs.
                 if (swing.fullStrength && !swing.critical && !swing.knockbackAttack && session->onGround &&
                     weapon.has_value() && weapon->path().ends_with("_sword")) {
-                    const std::vector<player::SweepHit> caught =
-                        player::sweepAround(*session, world, *target, strength);
-                    for (player::PlayerSession* watcher : playerRegistry_.snapshot()) {
-                        if (watcher->worldName != session->worldName || !watcher->connection().playSound) {
-                            continue;
-                        }
-                        watcher->connection().playSound("entity.player.attack.sweep", session->x, session->y,
-                                                        session->z, 1.0F, 1.0F);
-                        // Everything the sweep caught sounds for itself, the same as what was aimed
-                        // at: a silent sweep looks like it missed.
-                        for (const player::SweepHit& hit : caught) {
-                            const entity::ServerEntity* struck = world.state().entity(hit.entityId);
-                            if (struck == nullptr) {
-                                continue;
+                    const player::BreakContext blocks = breakContext();
+                    player::pvp::Context melee = meleeContext(blocks);
+                    const std::string worldName = session->worldName;
+                    // Everything the sweep caught sounds for itself: a silent sweep looks like a miss.
+                    melee.sweptMob = [this, worldName](entity::ServerEntity& struck, bool died) {
+                        for (player::PlayerSession* watcher : playerRegistry_.snapshot()) {
+                            if (watcher->worldName == worldName && watcher->connection().playSound) {
+                                watcher->connection().playSound(died ? entity::entityCombat::deathSound(struck)
+                                                                     : entity::entityCombat::hurtSound(struck),
+                                                                struck.x, struck.y, struck.z, 1.0F, 1.0F);
                             }
-                            watcher->connection().playSound(hit.died ? entity::entityCombat::deathSound(*struck)
-                                                                     : entity::entityCombat::hurtSound(*struck),
-                                                            struck->x, struck->y, struck->z, 1.0F, 1.0F);
                         }
-                    }
+                    };
+                    player::pvp::sweep(*session, world, melee, target->entityId(),
+                                       entity::Aabb::of(target->x, target->y, target->z, target->width(),
+                                                        target->height()),
+                                       base * player::combat::chargeScale(strength), strength, held);
                 }
                 // parity: `HurtByTargetGoal` and `PanicGoal` both read the last thing that hurt it.
                 target->hurtBy = session->entityId();
@@ -1395,6 +1405,9 @@ void BasaltServer::startBedrockListener() {
                 if (maps_->useEmptyMap(breakContext(), *session, *found->second, slot)) {
                     return;
                 }
+                if (world::enderEyes::throwFor(breakContext(), *session, *found->second, slot)) {
+                    return;
+                }
                 if (player::throwItemFor(breakContext(), *session, *found->second, *item, slot)) {
                     player::startCooldownFor(*session, *item, found->second->gameTime());
                 }
@@ -1681,7 +1694,8 @@ void BasaltServer::startBedrockListener() {
                     // block that was clicked, so this hands it the eye and not the hit.
                     // parity: `ThrowableProjectileItem.use`, which leaves the hand whatever is in
                     // front of it. This door hears it as a click on whatever the arc started at.
-                    if (player::throwItemFor(blocks, *session, *found->second, *item, slot)) {
+                    if (world::enderEyes::throwFor(blocks, *session, *found->second, slot) ||
+                        player::throwItemFor(blocks, *session, *found->second, *item, slot)) {
                         return;
                     }
 
@@ -1966,9 +1980,21 @@ void BasaltServer::startBedrockListener() {
                                 return std::nullopt;
                             }
                             return world::looms::weave(banner, named, *colour);
+                        },
+                        .cartographyResult = [this](const storage::StoredItemStack& map,
+                                                    const storage::StoredItemStack& additional) {
+                            return maps_ == nullptr ? std::nullopt
+                                                    : world::maps::cartographyResult(map, additional, *maps_,
+                                                                                     &vanillaData_.itemTags);
                         }});
                 answer(applied.accepted, applied.containers);
                 if (!applied.accepted && session->connection().sendInventoryAll) {
+                    session->connection().sendInventoryAll();
+                }
+                // parity: `MapItem.onCraftedPostProcess`, once the copy a cartography table made is taken.
+                if (applied.accepted && maps_ != nullptr && where != nullptr &&
+                    world::maps::settleCraftedMaps(*session, &windows->cursor, *maps_, *where) &&
+                    session->connection().sendInventoryAll) {
                     session->connection().sendInventoryAll();
                 }
                 if (applied.tradedWith.has_value()) {

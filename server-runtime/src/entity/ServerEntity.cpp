@@ -2,12 +2,14 @@
 #include <basalt/server/runtime/entity/Camels.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobCategory.hpp>
+#include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/Sniffers.hpp>
 
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <string_view>
 #include <utility>
 
 namespace basalt::server::runtime::entity {
@@ -171,6 +173,84 @@ constexpr float kSnifferDiggingDrop = 0.4F;
 
 [[nodiscard]] bool babyCamel(const ServerEntity& entity) { return entity.camel != nullptr && entity.age < 0; }
 
+/// A baby's own box: `width` and `height` fixed, or the type's scaled when `scale` is set.
+struct BabyBox {
+    std::string_view type;
+    float width = 0.0F;
+    float height = 0.0F;
+    float scale = 0.0F;
+};
+
+/// parity: every `BABY_DIMENSIONS` a `getDefaultDimensions` returns for a baby.
+constexpr std::array<BabyBox, 36> kBabyBoxes{{
+    {"villager", 0.49F, 0.98F},
+    {"zombie_villager", 0.49F, 0.98F},
+    {"zombie", 0.49F, 0.98F},
+    {"husk", 0.49F, 0.98F},
+    {"drowned", 0.49F, 0.98F},
+    {"piglin", 0.49F, 0.98F},
+    {"zombified_piglin", 0.49F, 0.98F},
+    {"strider", 0.45F, 0.85F},
+    {"hoglin", 0.75F, 0.85F},
+    {"zoglin", 0.75F, 0.85F},
+    {"polar_bear", 0.7F, 0.7F},
+    {"squid", 0.5F, 0.5F},
+    {"glow_squid", 0.5F, 0.5F},
+    {"axolotl", 0.375F, 0.21F},
+    {"pig", 0.45F, 0.45F},
+    {"cow", 0.45F, 0.7F},
+    {"mooshroom", 0.45F, 0.7F},
+    {"goat", 0.45F, 0.65F},
+    {"rabbit", 0.24F, 0.4F},
+    {"cat", 0.3F, 0.35F},
+    {"ocelot", 0.3F, 0.35F},
+    {"wolf", 0.3F, 0.425F},
+    {"sheep", 0.45F, 0.65F},
+    {"chicken", 0.3F, 0.4F},
+    {"horse", 0.0F, 0.0F, 0.7F},
+    {"skeleton_horse", 0.0F, 0.0F, 0.7F},
+    {"zombie_horse", 0.0F, 0.0F, 0.7F},
+    {"donkey", 0.0F, 0.0F, 0.5F},
+    {"mule", 0.0F, 0.0F, 0.5F},
+    {"llama", 0.0F, 0.0F, 0.5F},
+    {"trader_llama", 0.0F, 0.0F, 0.5F},
+    {"dolphin", 0.0F, 0.0F, 0.65F},
+    {"armadillo", 0.0F, 0.0F, 0.6F},
+    {"panda", 0.0F, 0.0F, 0.5F},
+    {"fox", 0.0F, 0.0F, 0.6F},
+    {"turtle", 0.0F, 0.0F, 0.3F},
+}};
+
+/// parity: `LivingEntity.getAgeScale` where no box of its own is given, and `HappyGhast`'s, and
+/// `Nautilus`'s `BABY_DIMENSIONS`, which is the same half.
+[[nodiscard]] float ageScaleOf(std::string_view type) { return type == "happy_ghast" ? 0.2375F : 0.5F; }
+
+[[nodiscard]] bool baby(const ServerEntity& entity) {
+    return entity.age < 0 && ageableMobs::hasBabyMetadata(entity.type().path());
+}
+
+/// parity: `getDefaultDimensions` for a baby, or for a slime or magma cube scaled by its size.
+[[nodiscard]] std::pair<float, float> defaultBox(const ServerEntity& entity, const wire::common::Identifier& type) {
+    const auto width = static_cast<float>(registry::entityTypeShapes::widthOf(type));
+    const auto height = static_cast<float>(registry::entityTypeShapes::heightOf(type));
+    const std::string_view path = type.path();
+    if (path == "slime" || path == "magma_cube") {
+        const auto size = static_cast<float>(entity.cubeSize);
+        return {width * size, height * size};
+    }
+    if (!baby(entity)) {
+        return {width, height};
+    }
+    for (const BabyBox& box : kBabyBoxes) {
+        if (box.type == path) {
+            return box.scale > 0.0F ? std::pair{width * box.scale, height * box.scale}
+                                    : std::pair{box.width, box.height};
+        }
+    }
+    const float scale = ageScaleOf(path);
+    return {width * scale, height * scale};
+}
+
 } // namespace
 
 double ServerEntity::width() const {
@@ -182,7 +262,7 @@ double ServerEntity::width() const {
     if (sniffer != nullptr && sniffer->pose == sniffers::Pose::Digging && age < 0) {
         return static_cast<double>(static_cast<float>(registry::entityTypeShapes::widthOf(type_)) * 0.5F);
     }
-    return registry::entityTypeShapes::widthOf(type_);
+    return static_cast<double>(defaultBox(*this, type_).first);
 }
 
 double ServerEntity::height() const {
@@ -198,7 +278,7 @@ double ServerEntity::height() const {
         const float digging = static_cast<float>(registry::entityTypeShapes::heightOf(type_)) - kSnifferDiggingDrop;
         return static_cast<double>(age < 0 ? digging * 0.5F : digging);
     }
-    return registry::entityTypeShapes::heightOf(type_);
+    return static_cast<double>(defaultBox(*this, type_).second);
 }
 
 bool ServerEntity::hasTag(std::string_view tag) const { return std::ranges::find(tags, tag) != tags.end(); }

@@ -17,9 +17,9 @@
 #include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/terrain/BiomeZoomer.hpp>
-#include <basalt/server/world/terrain/ProtoChunks.hpp>
 #include <basalt/server/world/terrain/NoiseRouterData.hpp>
 #include <basalt/server/world/terrain/OverworldBiomeSource.hpp>
+#include <basalt/server/world/terrain/ProtoChunks.hpp>
 #include <basalt/server/world/terrain/StrongholdStructureGenerator.hpp>
 #include <basalt/server/world/terrain/VillageStructureGenerator.hpp>
 #include <basalt/server/world/terrain/surface/SurfaceRuleEnvironment.hpp>
@@ -30,6 +30,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <string>
@@ -39,9 +40,6 @@
 namespace basalt::server::runtime::world {
 
 /// What a caller hands over besides the world's own declaration.
-///
-/// A struct because there are a dozen of them and all but a few have a sensible default: a test
-/// builds a world with two fields set, and the server fills the rest.
 struct LoadedWorldOptions {
     /// Where this world's generation and saving are recorded. Off unless `/timings` is on.
     wire::common::Timings* timings = nullptr;
@@ -101,35 +99,33 @@ public:
     /// The named random streams this world keeps, which is what a loot table rolls on.
     [[nodiscard]] RandomSequences& randomSequences() noexcept { return randomSequences_; }
 
+    /// The level's own stream, held for as long as the lease lives so a region at a time draws.
+    struct RandomLease {
+        std::unique_lock<std::mutex> lock;
+        random::RandomSource& random;
+    };
+
+    /// parity: `Level.random`, one stream for the whole level seeded apart from the world seed, as
+    /// `RandomSource.create` is.
+    [[nodiscard]] RandomLease leaseRandom() { return RandomLease{std::unique_lock{randomMutex_}, random_}; }
+
     /// parity: `ServerLevel.getRaids`, saved beside the regions.
     [[nodiscard]] entity::RaidManager& raids() noexcept { return raids_; }
 
     /// The region this world is ticked in. One per world while the world is in one piece.
     [[nodiscard]] sched::Region& region() const noexcept { return *region_; }
 
-    /// Who owns this world's state: its chunks, its blocks and everything living in them.
-    ///
-    /// The tick thread claims it on its first turn, and from then on anybody else reaches it with
-    /// `Owner::submit` rather than by touching it. One world, one region, one owner today; one
-    /// owner per region once the world is split, with the same rule.
+    /// Who owns this world's state: its chunks, its blocks and everything living in them. The tick
+    /// thread claims it on its first turn; anybody else goes through `Owner::submit`.
     [[nodiscard]] sched::Owner& owner() const noexcept { return region_->owner(); }
 
-    /// Who owns the block at these coordinates.
-    ///
-    /// One world is one region today, so it is always `owner`. The signature is the point: code
-    /// that asks this instead of assuming keeps working when a world is several regions, and the
-    /// answer must not be kept from one turn to the next, because a region can merge into another
-    /// between two of them.
+    /// Who owns the block at these coordinates: always `owner` while a world is one region. Not to be
+    /// kept across turns, since regions can merge between them.
     [[nodiscard]] sched::Owner& ownerOf(std::int32_t x, std::int32_t z) const;
 
-    /// What the client calls this world: a `ResourceKey<Level>`, not a dimension type.
-    ///
-    /// The distinction is what makes travelling between worlds work at all. The dimension type is
-    /// selected separately by the declaration, while the level key identifies this concrete world
-    /// and tells the client when to rebuild its chunk cache.
-    ///
-    /// The default world and its own Nether and End keep `minecraft:overworld`, `the_nether` and
-    /// `the_end`, so a single-world setup looks like vanilla to clients and datapacks alike.
+    /// What the client calls this world: a `ResourceKey<Level>`, not a dimension type. It is what tells
+    /// the client to rebuild its chunk cache on travel. The default world and its Nether and End keep
+    /// `minecraft:overworld`, `the_nether` and `the_end`, so a single-world setup looks like vanilla.
     [[nodiscard]] const std::string& levelKey() const noexcept { return levelKey_; }
 
     /// This world's own directory, which is where `level.nbt` lives.
@@ -154,13 +150,9 @@ public:
 
     void setSpawn(std::int32_t x, std::int32_t y, std::int32_t z, float yaw = 0.0F);
 
-    /// This world's clock, weather and game rules: everything a `/time`, `/weather` or `/gamerule`
-    /// changes and a restart has to remember.
-    ///
-    /// Vanilla keeps one clock per *dimension type* on the server rather than one per level, and
-    /// weather and rules per level. Basalt keeps all three per world, which is the same thing on a
-    /// vanilla-shaped single-world server and the only sensible answer once an operator declares
-    /// two overworlds, something vanilla cannot do at all.
+    /// This world's clock, weather and game rules: what `/time`, `/weather` and `/gamerule` change.
+    /// Vanilla keeps the clock per dimension type; here all three are per world, which is the same on
+    /// a single-world server and still works with two overworlds.
     [[nodiscard]] WorldClock& clock() noexcept { return clock_; }
 
     [[nodiscard]] const WorldClock& clock() const noexcept { return clock_; }
@@ -171,9 +163,8 @@ public:
 
     /// How much the sky is dimmed right now, as it stood when this turn began.
     ///
-    /// parity: `Level.getSkyDarken`, a field `updateSkyBrightness` writes once a turn before the
-    /// clock moves. Everything that reads the sky, a detector and the spawning rules, reads this and
-    /// not a fresh sum, so they all agree within a turn.
+    /// parity: `Level.getSkyDarken`, written once a turn by `updateSkyBrightness` before the clock
+    /// moves, so detectors and spawning rules agree within a turn.
     [[nodiscard]] std::int32_t skyDarken() const noexcept { return skyDarken_; }
 
     /// parity: `Level.updateSkyBrightness`.
@@ -250,12 +241,8 @@ public:
     /// Rewrites `level.nbt` with the state as it stands now.
     void saveMetadata();
 
-    /// Picks the spawn block, generating only the chunks that search reads.
-    ///
-    /// A void world skips the search: its spawn is whatever the metadata says, because there is no
-    /// terrain to stand on other than the platform placed under exactly that point. A world whose
-    /// spawn was moved by `/setworldspawn` skips it too: the point of moving it is that it is no
-    /// longer wherever the terrain happens to be.
+    /// Picks the spawn block, generating only the chunks that search reads. Skipped for a void world
+    /// (its platform sits under the saved point) and for a spawn moved by `/setworldspawn`.
     void warmSpawnArea();
 
     void save(const std::vector<server::world::Chunk*>& chunks);
@@ -264,8 +251,7 @@ public:
 
     /// Drops chunks no player in *this* world can reach, after saving whatever changed in them.
     ///
-    /// `playerPositions` is only the players who are in this world: keeping a chunk resident
-    /// because somebody is standing at the same coordinates in a different world would be nonsense.
+    /// `playerPositions` holds only the players in this world.
     std::size_t unloadUnreachable(const std::vector<std::pair<std::int32_t, std::int32_t>>& playerPositions,
                                   std::int32_t spawnRadiusChunks, std::int32_t retainMarginChunks);
 
@@ -288,11 +274,16 @@ private:
 
     void stashEntities(const std::vector<server::world::Chunk*>& chunks);
 
+    /// parity: `RandomSupport.generateUniqueSeed`, what `RandomSource.create` starts from.
+    [[nodiscard]] static random::RandomSource uniqueRandom();
+
     config::WorldDeclaration declaration_;
     config::WorldSettings settings_;
     WorldMetadata metadata_;
     std::unique_ptr<DragonFight> dragonFight_;
     RandomSequences randomSequences_{metadata_.seed};
+    std::mutex randomMutex_;
+    random::RandomSource random_ = uniqueRandom();
     entity::RaidManager raids_;
     wire::common::Logger logger_;
     wire::common::Timings ownTimings_;

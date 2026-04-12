@@ -1,3 +1,4 @@
+#include <basalt/server/registry/Items.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/DecoratedPots.hpp>
 
@@ -14,9 +15,6 @@ constexpr std::size_t kSides = 4;
 constexpr std::int32_t kWobblePositive = 0;
 constexpr std::int32_t kWobbleNegative = 1;
 
-/// parity: `Item.getMaxStackSize`, which this build does not read yet.
-constexpr std::int32_t kMaxStack = 64;
-
 } // namespace
 
 const wire::common::Identifier& block() {
@@ -30,17 +28,23 @@ std::optional<server::world::loot::ItemStack> contents(const wire::nbt::NbtCompo
     return blockInventory::readFor(block().path(), data, kSize)[0];
 }
 
-std::optional<std::vector<BlockEffect>> insert(wire::nbt::NbtCompound& data, const wire::common::Identifier& item) {
+std::optional<std::vector<BlockEffect>> insert(wire::nbt::NbtCompound& data, const wire::common::Identifier& item,
+                                               const wire::nbt::NbtCompound& components) {
     blockInventory::Slots slots = blockInventory::readFor(block().path(), data, kSize);
-    const std::optional<server::world::loot::ItemStack>& held = slots[0];
-    if (held.has_value() && (held->item != item || held->count >= kMaxStack)) {
+    std::optional<server::world::loot::ItemStack>& held = slots[0];
+    if (held.has_value() && (held->item != item || held->components != components ||
+                             held->count >= registry::itemStacking::maxStackSize(held->item, held->components))) {
         return std::nullopt;
     }
-    slots[0] = held.has_value() ? server::world::loot::ItemStack{.item = held->item, .count = held->count + 1}
-                                : server::world::loot::ItemStack{.item = item, .count = 1};
+    if (held.has_value()) {
+        held->count += 1;
+    } else {
+        held = server::world::loot::ItemStack{.item = item, .count = 1, .components = components};
+    }
     blockInventory::writeFor(block().path(), data, slots);
     // parity: the pitch rises with how full it is, which is what makes filling one audible.
-    const float bend = static_cast<float>(slots[0]->count) / static_cast<float>(kMaxStack);
+    const float bend = static_cast<float>(held->count) /
+                       static_cast<float>(registry::itemStacking::maxStackSize(held->item, held->components));
     return std::vector<BlockEffect>{blockEffect::Event{.b0 = 1, .b1 = kWobblePositive},
                                     blockEffect::Sound{.name = "block.decorated_pot.insert",
                                                        .source = wire::protocol::play::SoundSource::Blocks,

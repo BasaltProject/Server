@@ -395,6 +395,7 @@ bool PlayerLifecycle::switchWorld(world::LoadedWorld& target, double x, double y
     owner_->uiState().sendAbilities();
     owner_->uiState().syncHealth();
     owner_->uiState().syncExperience();
+    owner_->playerUi().worldChanged();
 
     owner_->chunkStreamer().resetForWorldSwitch(x, z, target.settings().viewDistance);
     dimensionTriggers(*session, *previous, target, left);

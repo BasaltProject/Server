@@ -1,6 +1,7 @@
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/VanillaEntries.hpp>
 #include <basalt/server/registry/VanillaTables.hpp>
+#include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <algorithm>
 #include <array>
@@ -122,6 +123,25 @@ const ItemStackingEntry* of(const Identifier& item) {
 std::int32_t maxStackSize(const Identifier& item) {
     const ItemStackingEntry* entry = of(item);
     return entry == nullptr ? kDefaultStackSize : entry->maxStackSize;
+}
+
+std::int32_t maxStackSize(const Identifier& item, const wire::nbt::NbtCompound& components) {
+    if (const wire::nbt::NbtTag* own = components.find("minecraft:max_stack_size"); own != nullptr) {
+        if (const std::int32_t* value = own->get<std::int32_t>(); value != nullptr) {
+            return *value;
+        }
+    }
+    return maxStackSize(item);
+}
+
+std::int32_t maxStackSize(std::string_view item, const wire::nbt::NbtCompound& components) {
+    constexpr std::string_view kVanilla = "minecraft:";
+    if (item.starts_with(kVanilla)) {
+        item.remove_prefix(kVanilla.size());
+    } else if (item.find(':') != std::string_view::npos) {
+        return maxStackSize(Identifier::parse(item).value_or(vanilla("air")), components);
+    }
+    return maxStackSize(vanilla(item), components);
 }
 
 std::int32_t cooldownTicks(const Identifier& item) {

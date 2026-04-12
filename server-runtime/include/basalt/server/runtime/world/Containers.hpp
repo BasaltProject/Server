@@ -15,9 +15,7 @@ namespace basalt::server::runtime::world {
 /// What a container holds, seen from outside: how full it is, which is all a comparator wants.
 ///
 /// parity: `BlockState.getAnalogOutputSignal` over `AbstractContainerMenu.getRedstoneSignalFromContainer`.
-/// Twenty-seven blocks implement it in 26.2; the ones whose contents this build keeps are here, and
-/// the rest answer nothing rather than a wrong zero, so a comparator behind them reads the block
-/// instead of being told the box is empty.
+/// A block whose contents are not kept answers nothing rather than a wrong zero.
 namespace containers {
 
 /// parity: `ChestBlockEntity`, three rows. A paired chest reads as one of 54; see `doubleChests`.
@@ -54,7 +52,10 @@ struct Readers {
 ///
 /// parity: `Container.getMaxStackSize(stack)`: three block entities cut it to one, and two of them
 /// are within a hopper's reach: a chiseled bookshelf and a jukebox.
-[[nodiscard]] std::int32_t maxStackFor(std::string_view path, const wire::common::Identifier& item);
+[[nodiscard]] std::int32_t maxStackFor(std::string_view path, const server::world::loot::ItemStack& stack);
+
+/// parity: `Container.DEFAULT_MAX_STACK_SIZE`, what a slot holds before the stack's own limit.
+inline constexpr std::int32_t kSlotLimit = 99;
 
 /// The slots a container opens to whoever asks from `from`. parity:
 /// `WorldlyContainer.getSlotsForFace`: a furnace and a brewing stand each open different slots per

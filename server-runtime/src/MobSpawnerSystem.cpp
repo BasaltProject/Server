@@ -36,11 +36,12 @@ bool MobSpawnerSystem::tick(world::LoadedWorld& world, wire::nbt::NbtCompound& d
         !world.gameRules().get(world::gameRules::kSpawnerBlocksWork)) {
         return false;
     }
-    random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
+    // parity: `BaseSpawner.serverTick` draws from `level.getRandom()`, the level's own stream.
+    world::LoadedWorld::RandomLease lease = world.leaseRandom();
     Turn turn{.world = world,
               .state = state,
               .pos = pos,
-              .random = random,
+              .random = lease.random,
               .broadcastEvent = broadcastEvent,
               .spawnDataChanged = spawnDataChanged};
     if (state.spawnDelay == -1) {

@@ -569,6 +569,12 @@ float heightOf(std::int32_t stateId, std::int32_t aboveStateId) {
     return static_cast<float>(amountOf(stateId)) / 9.0F;
 }
 
+float ownHeightOf(std::int32_t stateId) {
+    return kindOf(stateId).has_value() ? static_cast<float>(amountOf(stateId)) / 9.0F : 0.0F;
+}
+
+bool fallingFluid(std::int32_t stateId) { return isFalling(stateId); }
+
 float heightAt(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     return heightOf(world.blockState(x, y, z).value_or(0), world.blockState(x, y + 1, z).value_or(0));
 }

@@ -149,7 +149,7 @@ void ContainerMenuController::quickMoveMount(PlayerSession& session, const MenuS
         std::vector<MenuSlot> targets = players(PlayerInventory::kHotbarStart, PlayerInventory::kMainSlots, true);
         const std::vector<MenuSlot> storageRows = players(0, PlayerInventory::kHotbarStart, true);
         targets.insert(targets.end(), storageRows.begin(), storageRows.end());
-        if (!moveInto(targets, PlayerInventory::kMaxStack)) {
+        if (!moveInto(targets, PlayerInventory::maxStackIn(stack))) {
             return;
         }
     } else if (mountAccepts(1, stack) && !readSlot(session, player::menuSlot::Block{1}).has_value()) {
@@ -161,14 +161,14 @@ void ContainerMenuController::quickMoveMount(PlayerSession& session, const MenuS
         for (std::int32_t index = 0; index < chest; ++index) {
             chestSlots.emplace_back(player::menuSlot::Block{horses::kEquipmentSlots + index});
         }
-        if (chest == 0 || !moveInto(chestSlots, PlayerInventory::kMaxStack)) {
+        if (chest == 0 || !moveInto(chestSlots, PlayerInventory::maxStackIn(stack))) {
             // parity: nothing on the mount takes it, so it crosses between storage and hotbar.
             if (fromInventory->index >= PlayerInventory::kHotbarStart) {
                 static_cast<void>(
-                    moveInto(players(0, PlayerInventory::kHotbarStart, false), PlayerInventory::kMaxStack));
+                    moveInto(players(0, PlayerInventory::kHotbarStart, false), PlayerInventory::maxStackIn(stack)));
             } else {
                 static_cast<void>(moveInto(players(PlayerInventory::kHotbarStart, PlayerInventory::kMainSlots, false),
-                                           PlayerInventory::kMaxStack));
+                                           PlayerInventory::maxStackIn(stack)));
             }
         }
     }

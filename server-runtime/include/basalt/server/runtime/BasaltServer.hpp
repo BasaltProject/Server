@@ -46,6 +46,7 @@
 #include <basalt/server/runtime/function/FunctionLibrary.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
+#include <basalt/server/runtime/player/PlayerVersusPlayer.hpp>
 #include <basalt/server/runtime/plugins/ServerObjectModel.hpp>
 #include <basalt/server/runtime/plugins/ServerPluginServices.hpp>
 #include <basalt/server/runtime/scoreboard/Scoreboard.hpp>
@@ -238,6 +239,13 @@ private:
 
     /// What breaking a block needs, whichever door the breaker came in by.
     [[nodiscard]] player::BreakContext breakContext();
+
+    /// What a melee blow needs, over `blocks` for the wear it causes, whichever door it came by.
+    [[nodiscard]] player::pvp::Context meleeContext(const player::BreakContext& blocks);
+
+    /// A Bedrock player's blow on another player. parity: `Player.attack` on a `ServerPlayer`.
+    void bedrockAttackPlayer(player::PlayerSession& session, player::PlayerSession& victim, world::LoadedWorld& world,
+                             bool falling);
 
     /// The recipe book as the other door reads it, built the first time it is asked for: the list
     /// is the same for everyone and costs a walk of every recipe to build.

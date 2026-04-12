@@ -1,4 +1,6 @@
+#include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/Registries.hpp>
+#include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 
 #include <algorithm>
@@ -17,7 +19,7 @@ constexpr std::int32_t kMenuArmourStart = 5;
 constexpr std::int32_t kMenuStorageStart = 9;
 constexpr std::int32_t kMenuOffhand = 45;
 
-/// Hotbar first, then the rest of the main inventory: where a picked-up item goes.
+/// parity: vanilla's own slot order 0 to 35, which is the hotbar and then the storage rows from the top.
 [[nodiscard]] const std::array<std::int32_t, PlayerInventory::kMainSlots>& fillOrder() {
     static const std::array<std::int32_t, PlayerInventory::kMainSlots> order = [] {
         std::array<std::int32_t, PlayerInventory::kMainSlots> built{};
@@ -25,10 +27,7 @@ constexpr std::int32_t kMenuOffhand = 45;
         for (std::int32_t slot = PlayerInventory::kHotbarStart; slot < PlayerInventory::kMainSlots; slot++) {
             built[at++] = slot;
         }
-        for (std::int32_t slot = PlayerInventory::kHotbarSize; slot < PlayerInventory::kHotbarStart; slot++) {
-            built[at++] = slot;
-        }
-        for (std::int32_t slot = 0; slot < PlayerInventory::kHotbarSize; slot++) {
+        for (std::int32_t slot = 0; slot < PlayerInventory::kHotbarStart; slot++) {
             built[at++] = slot;
         }
         return built;
@@ -114,39 +113,72 @@ const std::optional<storage::StoredItemStack>& PlayerInventory::heldItem() const
 }
 
 std::int32_t PlayerInventory::add(const storage::StoredItemStack& stack) {
+    if (stack.count <= 0) {
+        return 0;
+    }
+    // parity: `Inventory.add`: a worn stack only ever takes a free slot, whole.
+    if (item::itemWear::isDamageable(stack) && item::itemWear::damage(stack) > 0) {
+        for (const std::int32_t slot : fillOrder()) {
+            if (!slots_[static_cast<std::size_t>(slot)].has_value()) {
+                slots_[static_cast<std::size_t>(slot)] = stack;
+                changed_ = true;
+                return 0;
+            }
+        }
+        return stack.count;
+    }
     std::int32_t remaining = stack.count;
-    for (const std::int32_t slot : fillOrder()) {
-        if (remaining <= 0) {
+    while (remaining > 0) {
+        std::optional<std::int32_t> slot = slotWithRoomFor(stack);
+        if (!slot.has_value()) {
+            for (const std::int32_t free : fillOrder()) {
+                if (!slots_[static_cast<std::size_t>(free)].has_value()) {
+                    slot = free;
+                    break;
+                }
+            }
+        }
+        if (!slot.has_value()) {
             break;
         }
-        std::optional<storage::StoredItemStack>& existing = slots_[static_cast<std::size_t>(slot)];
-        if (!existing.has_value() || !sameStack(*existing, stack)) {
-            continue;
+        std::optional<storage::StoredItemStack>& target = slots_[static_cast<std::size_t>(*slot)];
+        if (!target.has_value()) {
+            target = storage::StoredItemStack{.id = stack.id, .count = 0, .components = stack.components};
         }
-        const std::int32_t room = kMaxStack - existing->count;
-        if (room <= 0) {
-            continue;
-        }
-        const std::int32_t moved = std::min(room, remaining);
-        existing->count += moved;
-        remaining -= moved;
-    }
-    for (const std::int32_t slot : fillOrder()) {
-        if (remaining <= 0) {
+        const std::int32_t moved = std::min(remaining, maxStackIn(*target) - target->count);
+        if (moved <= 0) {
             break;
         }
-        std::optional<storage::StoredItemStack>& empty = slots_[static_cast<std::size_t>(slot)];
-        if (empty.has_value()) {
-            continue;
-        }
-        const std::int32_t moved = std::min(kMaxStack, remaining);
-        empty = storage::StoredItemStack{.id = stack.id, .count = moved, .components = stack.components};
+        target->count += moved;
         remaining -= moved;
-    }
-    if (remaining != stack.count) {
         changed_ = true;
     }
     return remaining;
+}
+
+std::optional<std::int32_t> PlayerInventory::slotWithRoomFor(const storage::StoredItemStack& stack) const {
+    // parity: `Inventory.getSlotWithRemainingSpace`: the held slot, the off hand, then the main slots.
+    const auto hasRoom = [&](std::int32_t slot) {
+        const std::optional<storage::StoredItemStack>& existing = slots_[static_cast<std::size_t>(slot)];
+        return existing.has_value() && sameStack(*existing, stack) && maxStackIn(*existing) > 1 &&
+               existing->count < maxStackIn(*existing);
+    };
+    if (hasRoom(kHotbarStart + heldSlot_)) {
+        return kHotbarStart + heldSlot_;
+    }
+    if (hasRoom(kOffhandSlot)) {
+        return kOffhandSlot;
+    }
+    for (const std::int32_t slot : fillOrder()) {
+        if (hasRoom(slot)) {
+            return slot;
+        }
+    }
+    return std::nullopt;
+}
+
+std::int32_t PlayerInventory::maxStackIn(const storage::StoredItemStack& stack) {
+    return std::min(kSlotLimit, registry::itemStacking::maxStackSize(stack.id, stack.components));
 }
 
 std::int32_t PlayerInventory::countOf(std::string_view id) const {

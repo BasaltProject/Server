@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/MobSpawnFinalization.hpp>
+#include <basalt/server/runtime/world/SpawnPlaces.hpp>
 
 #include <cmath>
 #include <cstdint>
@@ -47,7 +48,9 @@ ServerEntity* NaturalSpawningSystem::materializeSpawnForest(world::LoadedWorld& 
                                          .biome = request.biome,
                                          .gameTime = world.gameTime(),
                                          .reason = reason,
-                                         .entityRandomFactory = [this] { return freshRandom(); }};
+                                         .entityRandomFactory = [this] { return freshRandom(); },
+                                         .moonBrightness = world::spawnPlaces::moonBrightness(world),
+                                         .structureAt = world::spawnPlaces::structureAt(world)};
     wire::nbt::NbtCompound data;
     const world::MobSpawnForest forest =
         world::writeGeneratedForest(data, request.type, request.groupIndex, context, group, blockX, blockY, blockZ,
@@ -104,7 +107,9 @@ ServerEntity* NaturalSpawningSystem::materializeVillageSiegeZombie(world::Loaded
                                          .biome = world::naturalSpawner::biomeAt(world, 0, 0, 0),
                                          .gameTime = world.gameTime(),
                                          .reason = world::MobSpawnReason::Event,
-                                         .entityRandomFactory = [this] { return freshRandom(); }};
+                                         .entityRandomFactory = [this] { return freshRandom(); },
+                                         .moonBrightness = world::spawnPlaces::moonBrightness(world),
+                                         .structureAt = world::spawnPlaces::structureAt(world)};
     wire::nbt::NbtCompound data;
     world::MobSpawnGroupData group;
     const world::MobSpawnForest forest = world::writeGeneratedForest(data, zombie, 0, context, group, 0, 0, 0, 0.0, 0.0,
@@ -160,7 +165,9 @@ ServerEntity* NaturalSpawningSystem::materializeEventMob(world::LoadedWorld& wor
                                          .biome = world::naturalSpawner::biomeAt(world, blockX, blockY, blockZ),
                                          .gameTime = world.gameTime(),
                                          .reason = world::MobSpawnReason::Event,
-                                         .entityRandomFactory = [this] { return freshRandom(); }};
+                                         .entityRandomFactory = [this] { return freshRandom(); },
+                                         .moonBrightness = world::spawnPlaces::moonBrightness(world),
+                                         .structureAt = world::spawnPlaces::structureAt(world)};
     wire::nbt::NbtCompound data;
     world::MobSpawnGroupData group;
     const world::MobSpawnForest forest = world::writeGeneratedForest(data, type, 0, context, group, blockX, blockY,
@@ -181,7 +188,9 @@ ServerEntity* NaturalSpawningSystem::spawnEventRaider(world::LoadedWorld& world,
                                          .biome = world::naturalSpawner::biomeAt(world, blockX, blockY, blockZ),
                                          .gameTime = world.gameTime(),
                                          .reason = world::MobSpawnReason::Event,
-                                         .entityRandomFactory = [this] { return freshRandom(); }};
+                                         .entityRandomFactory = [this] { return freshRandom(); },
+                                         .moonBrightness = world::spawnPlaces::moonBrightness(world),
+                                         .structureAt = world::spawnPlaces::structureAt(world)};
     wire::nbt::NbtCompound data;
     world::MobSpawnGroupData group;
     const world::MobSpawnForest forest = world::writeGeneratedForest(data, type, 0, context, group, blockX, blockY,
@@ -202,7 +211,9 @@ world::MobSpawnForest NaturalSpawningSystem::finalizeForSpawner(world::LoadedWor
                                          .biome = world::naturalSpawner::biomeAt(world, blockX, blockY, blockZ),
                                          .gameTime = world.gameTime(),
                                          .reason = world::MobSpawnReason::Spawner,
-                                         .entityRandomFactory = [this] { return freshRandom(); }};
+                                         .entityRandomFactory = [this] { return freshRandom(); },
+                                         .moonBrightness = world::spawnPlaces::moonBrightness(world),
+                                         .structureAt = world::spawnPlaces::structureAt(world)};
     wire::nbt::NbtCompound data;
     world::MobSpawnGroupData group;
     return world::writeGeneratedForest(data, type, 0, context, group, blockX, blockY, blockZ, x, y, z, yaw,
@@ -235,7 +246,8 @@ ServerEntity* NaturalSpawningSystem::materializeForest(world::LoadedWorld& world
         ServerEntity* resolvedVehicle = vehicle;
         if (resolvedVehicle == nullptr) {
             for (const world::MobExternalVehicleLink& link : forest.externalVehicleLinks) {
-                if (&link.passenger == &descriptor) {
+                // A link holds its own copy of the passenger, so it is matched by value too.
+                if (link.passenger == descriptor) {
                     resolvedVehicle = world.state().entity(link.vehicleId);
                     break;
                 }

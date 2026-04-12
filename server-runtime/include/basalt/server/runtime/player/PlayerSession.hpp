@@ -32,11 +32,7 @@
 namespace basalt::server::runtime::player {
 
 /// Server-side state for one logged-in player: identity, live position, and the survival state the
-/// client draws in its HUD.
-///
-/// Health, hunger and experience live here rather than on the connection because they outlive any
-/// single packet exchange and are what a respawn resets; the connection is only how they reach the
-/// client, and `players.db` is where it survives a rejoin.
+/// client draws in its HUD (what a respawn resets and `players.db` keeps across a rejoin).
 class PlayerSession {
 public:
     static constexpr float kMaxHealth = 20.0F;
@@ -203,6 +199,9 @@ public:
 
     /// parity: `LivingEntity.invulnerableTime`, the half second after a hit when most others miss.
     std::int32_t invulnerableTicks = 0;
+
+    /// What the last `hurtServer` answered: whether that hit counted, shield and cooldown included.
+    bool lastHurtLanded = false;
 
     /// parity: `LivingEntity.lastHurt`: inside that window only a bigger hit lands, and only the
     /// rest of it.

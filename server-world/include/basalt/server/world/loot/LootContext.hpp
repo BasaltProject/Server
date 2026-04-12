@@ -17,10 +17,8 @@ namespace basalt::server::world::loot {
 
 /// A stack of an item: what a loot table produces and what a crafting grid holds.
 ///
-/// `components` is what the item carries beyond its own defaults, in the same form the rest of the
-/// server stores it. Most of what comes out of a loot table has none; a crafting recipe that dyes,
-/// repairs, copies a book or decorates a shield is defined entirely by what it does to them, so the
-/// grid has to carry them or those recipes cannot exist at all.
+/// `components` is what the item carries beyond its own defaults, in the server's usual form;
+/// recipes that dye, repair, copy a book or decorate a shield work entirely on them.
 struct ItemStack {
     wire::common::Identifier item;
     std::int32_t count = 0;
@@ -157,6 +155,12 @@ struct LootContext {
     /// parity: `ExplorationMapFunction.run`, which finds the structure and draws the map. Unset, the
     /// stack is left as it is, which a `map_id` filter after it then throws away.
     std::function<void(ItemStack& stack, const ExplorationMapRequest& request)> explorationMap;
+    /// parity: `SlotProvider.getSlotsFromRange`: the stacks in a slot range (`container.*`) of one of
+    /// the roll's entities, its block entity (`block_entity`) or its container (`container`). Unset,
+    /// or a source the roll lacks, is no slots, as vanilla answers a missing parameter.
+    std::function<std::vector<ItemStack>(std::string_view source, std::string_view slots)> slotsOf;
+    /// Every entry of a registry in id order, for `set_random_potion` with no options.
+    std::function<std::vector<wire::common::Identifier>(std::string_view registry)> registryEntries;
 };
 
 /// The score holder behind one of the roll's entities: the context's own answer when it has one,

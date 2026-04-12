@@ -102,6 +102,8 @@ struct EntityFacts {
     /// parity: `LightningBolt.getBlocksSetOnFire`, for a bolt.
     std::optional<std::int32_t> blocksSetOnFire;
     std::map<std::string, EffectFacts, std::less<>> effects;
+    /// A player's game profile as `minecraft:profile` stores it resolved, for `fill_player_head`.
+    std::optional<wire::nbt::NbtCompound> profile;
 };
 
 /// Whether an id is in a tag of a registry: `item`, `entity_type` or `enchantment`.

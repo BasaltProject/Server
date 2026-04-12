@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/LootRegistries.hpp>
 #include <basalt/server/runtime/world/NaturalSpawner.hpp>
+#include <basalt/server/runtime/world/PotionEffects.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 #include <basalt/server/runtime/world/WorldLight.hpp>
 #include <basalt/server/world/loot/LootTableJson.hpp>
@@ -139,9 +140,7 @@ void RealLootTables::reload(Jar jar) {
     references_.replace(referencesOf(jar_.readText));
 }
 
-const LootTable* RealLootTables::byId(const Identifier& id) {
-    return read(id, fileOf(id), "rolls nothing");
-}
+const LootTable* RealLootTables::byId(const Identifier& id) { return read(id, fileOf(id), "rolls nothing"); }
 
 const LootTable* RealLootTables::forEntity(const Identifier& type) {
     // parity: `EntityType.getDefaultLootTable`, the type's own namespace under `entities/`.
@@ -163,6 +162,11 @@ void RealLootTables::prepare(server::world::loot::LootContext& context) {
     if (scoreboard_ != nullptr && !context.score) {
         context.score = [scoreboard = scoreboard_](std::string_view holder, std::string_view objective) {
             return scoreboard->score(holder, objective);
+        };
+    }
+    if (!context.registryEntries) {
+        context.registryEntries = [](std::string_view registry) {
+            return registry == "potion" ? potionEffects::ids() : std::vector<Identifier>{};
         };
     }
     if (registries_ == nullptr) {

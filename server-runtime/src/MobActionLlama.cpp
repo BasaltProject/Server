@@ -56,6 +56,7 @@ void MobActionSystem::llamaSpit(ServerEntity& llama, double targetX, double targ
         entity::projectiles::spawn(world->state(), *kind, players_->allocateEntityId(), entry->protocolId, x, y, z, dx,
                                    dy + lift, dz, kSpitPower, kSpitUncertainty, random);
     spit.ownerId = llama.entityId();
+    spit.ownerUuid = llama.uuid();
     // parity: `Projectile.getAddEntityPacket`, which names the owner in the spawn packet's data.
     spit.objectData = llama.entityId();
     if (!entity::horses::silent(llama)) {

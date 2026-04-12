@@ -1,5 +1,6 @@
 #include <basalt/server/runtime/datapack/DataFiles.hpp>
 #include <basalt/server/runtime/datapack/PackRepository.hpp>
+#include <basalt/server/runtime/datapack/RegistrySchemas.hpp>
 #include <basalt/server/runtime/datapack/RegistryValidation.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 
@@ -95,6 +96,12 @@ std::vector<ElementError> invalidElements(const ResourceStack& resources, const 
                     ElementError{.registry = "minecraft:" + std::string{registry},
                                  .element = id.toString(),
                                  .message = "Not a JSON object: " + id.toString() + " from pack " + *pack});
+            } else if (const std::optional<std::string> schema =
+                           schemaError(registry, *json->get<wire::common::JsonObject>());
+                       schema.has_value()) {
+                errors.push_back(ElementError{.registry = "minecraft:" + std::string{registry},
+                                              .element = id.toString(),
+                                              .message = *schema + " in " + id.toString() + " from pack " + *pack});
             }
         }
     }

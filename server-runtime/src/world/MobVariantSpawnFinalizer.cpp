@@ -117,8 +117,9 @@ void writeBrainMemories(NbtCompound& data, const std::vector<std::pair<std::stri
 }
 
 /// The packs' variant for this spawn, left unset when none matched as vanilla's `ifPresent`.
-void writePackVariant(std::string_view registry, const MobSpawnContext& context, NbtCompound& data) {
-    const VariantSpawnFacts facts{.biome = context.biome};
+void writePackVariant(std::string_view registry, const MobSpawnContext& context, std::int32_t blockX,
+                      std::int32_t blockY, std::int32_t blockZ, NbtCompound& data) {
+    const VariantSpawnFacts facts = spawnFactsOf(context, blockX, blockY, blockZ);
     if (const auto index = variantSpawnConditions::pick(registry, facts, *context.random); index.has_value()) {
         data.set("variant", NbtTag::ofString(variantSpawnConditions::entries(registry)[*index].toString()));
     }
@@ -131,8 +132,9 @@ void writePackSoundVariant(std::string_view registry, random::RandomSource& rand
 }
 
 /// parity: `Wolf.finalizeSpawn` falls back to `WolfVariants.DEFAULT` when nothing matched.
-[[nodiscard]] std::int32_t pickPackWolfVariant(const MobSpawnContext& context) {
-    const VariantSpawnFacts facts{.biome = context.biome};
+[[nodiscard]] std::int32_t pickPackWolfVariant(const MobSpawnContext& context, std::int32_t blockX, std::int32_t blockY,
+                                               std::int32_t blockZ) {
+    const VariantSpawnFacts facts = spawnFactsOf(context, blockX, blockY, blockZ);
     if (const auto index = variantSpawnConditions::pick("wolf_variant", facts, *context.random); index.has_value()) {
         return static_cast<std::int32_t>(*index);
     }
@@ -246,7 +248,7 @@ bool beforeCommon(std::string_view type, const MobSpawnContext& context, MobSpaw
         // parity: `Camel.finalizeSpawn` starts every natural camel in the fully standing pose.
         data.putLong("LastPoseTick", std::max<std::int64_t>(0, context.gameTime - kCamelFullStandTicks));
     } else if ((type == "chicken" || type == "cow" || type == "pig") && variantSpawnConditions::installed()) {
-        writePackVariant(std::string{type} + "_variant", context, data);
+        writePackVariant(std::string{type} + "_variant", context, blockX, blockY, blockZ, data);
         writePackSoundVariant(std::string{type} + "_sound_variant", random, data);
     } else if (type == "chicken" || type == "cow" || type == "pig") {
         data.set("variant",
@@ -268,7 +270,7 @@ bool beforeCommon(std::string_view type, const MobSpawnContext& context, MobSpaw
         writeFoxEquipment(random, data);
     } else if (type == "frog") {
         if (variantSpawnConditions::installed()) {
-            writePackVariant("frog_variant", context, data);
+            writePackVariant("frog_variant", context, blockX, blockY, blockZ, data);
         } else {
             data.set("variant", NbtTag::ofString(registryKey(
                                     selectTemperatureVariant(biome, random, mobSpawnVariantData::warmFrogBiomes(),
@@ -330,7 +332,8 @@ bool beforeCommon(std::string_view type, const MobSpawnContext& context, MobSpaw
         // parity: `Turtle.finalizeSpawn` anchors navigation and egg laying to its birth block.
         data.putIntArray("home_pos", {blockX, blockY, blockZ});
     } else if (type == "wolf" && variantSpawnConditions::installed()) {
-        const std::int32_t variant = sharedVariant(group, [&context] { return pickPackWolfVariant(context); });
+        const std::int32_t variant = sharedVariant(
+            group, [&context, blockX, blockY, blockZ] { return pickPackWolfVariant(context, blockX, blockY, blockZ); });
         const std::vector<Identifier>& wolves = variantSpawnConditions::entries("wolf_variant");
         if (static_cast<std::size_t>(variant) < wolves.size()) {
             data.set("variant", NbtTag::ofString(wolves[static_cast<std::size_t>(variant)].toString()));
@@ -347,7 +350,7 @@ bool beforeCommon(std::string_view type, const MobSpawnContext& context, MobSpaw
                      sounds[static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(sounds.size())))])));
     } else if (type == "zombie_nautilus") {
         if (variantSpawnConditions::installed()) {
-            writePackVariant("zombie_nautilus_variant", context, data);
+            writePackVariant("zombie_nautilus_variant", context, blockX, blockY, blockZ, data);
         } else {
             // parity: `PriorityProvider` still consumes `nextInt(1)` after choosing the highest match.
             static_cast<void>(random.nextInt(1));
@@ -359,9 +362,10 @@ bool beforeCommon(std::string_view type, const MobSpawnContext& context, MobSpaw
     return concreteBaby;
 }
 
-void afterCommon(std::string_view type, MobSpawnGroupData& group, random::RandomSource& random, NbtCompound& data) {
+void afterCommon(std::string_view type, MobSpawnGroupData& group, const MobSpawnContext& context, std::int32_t blockX,
+                 std::int32_t blockY, std::int32_t blockZ, random::RandomSource& random, NbtCompound& data) {
     if (type == "cat") {
-        catSpawnFinalizer::afterCommon(group.catSpawnContext, random, data);
+        catSpawnFinalizer::afterCommon(group.catSpawnContext, context, blockX, blockY, blockZ, random, data);
         return;
     }
     if (type != "tropical_fish") {

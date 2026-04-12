@@ -67,6 +67,12 @@ public:
     /// parity: `LivingEntity.pushEntities` for a player.
     void pushByPlayer(world::LoadedWorld& world, player::PlayerSession& player);
 
+    /// parity: `Entity.baseTick`'s `updateFluidInteraction`: the water and lava it stands in carry it.
+    void pushByFluid(world::LoadedWorld& world, entity::ServerEntity& entity);
+
+    /// The same on the motion the server keeps for a player.
+    void pushByFluid(world::LoadedWorld& world, player::PlayerSession& player);
+
     /// parity: `target.push(pusher)`, dispatched on what the target is.
     void push(world::LoadedWorld& world, const Body& target, const Body& pusher);
 

@@ -205,6 +205,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 }
                 const hoppers::Around around{
                     .isBookshelfBook = hooks.isBookshelfBook,
+                    .doesNotBlockHoppers = hooks.doesNotBlockHoppers,
                     .recipeFor = hooks.recipeFor,
                     .changes = &changes,
                     .gameTime = gameTime,

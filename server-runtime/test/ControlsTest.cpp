@@ -105,3 +105,26 @@ TEST_CASE("standing in water is what the block at the mob's feet says") {
     REQUIRE(world.setBlockState(8, 70, 8, basalt::server::registry::blocks::named("stone")->stateId));
     CHECK_FALSE(ai::isPassable(world, 8, 70, 8));
 }
+
+TEST_CASE("a mob crossing flat ground keeps its feet on it") {
+    WorldState world;
+    world.getOrGenerateChunk(0, 0);
+    world.getOrGenerateChunk(1, 0);
+    const std::int32_t stone = basalt::server::registry::blocks::named("stone")->stateId;
+    for (std::int32_t x = 0; x < 32; ++x) {
+        for (std::int32_t z = 0; z < 16; ++z) {
+            REQUIRE(world.setBlockState(x, 64, z, stone));
+        }
+    }
+    const std::unique_ptr<ServerEntity> mob = zombieAt(8.5, 65.0, 8.5);
+    mob->onGround = true;
+    std::int32_t airborne = 0;
+    for (std::int32_t tick = 0; tick < 40; ++tick) {
+        ai::moveControl::setWanted(*mob, 20.0, 65.0, 8.5, 1.0);
+        ai::moveControl::tick(world, *mob, 0.25);
+        airborne += mob->onGround ? 0 : 1;
+    }
+    // parity: `Mth.equal`'s slack; comparing exactly calls a rounding error a wall and hops it.
+    CHECK(airborne <= 1);
+    CHECK(mob->x > 12.0);
+}

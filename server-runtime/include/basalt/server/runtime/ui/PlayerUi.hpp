@@ -23,16 +23,10 @@ struct SurfaceContent {
     std::vector<std::string> lines;
 };
 
-/// The tab list, scoreboard and boss bar of one player.
-///
-/// Lives on that player's own connection thread, driven from the same loop that already ticks
-/// hunger, because everything here writes to a socket and the shared tick thread must never do
-/// that: one client that stops reading would otherwise park saving, chunk unloading and every other
-/// player.
-///
-/// Every piece is redrawn on its own interval and **sent only when the text it renders to changes**.
-/// That is not a micro-optimisation: at twenty refreshes a second a scoreboard is a dozen packets
-/// per player per tick, and almost every one of them would say exactly what the last one said.
+/// The tab list, scoreboard and boss bar of one player. Runs on the player's connection thread: it
+/// writes to a socket, and a client that stops reading must never stall the shared tick thread.
+/// Each piece redraws on its own interval and is **sent only when its rendered text changes**;
+/// otherwise a scoreboard is a dozen redundant packets per player per tick.
 class PlayerUi {
 public:
     using Send = std::function<void(std::int32_t packetId, const std::function<void(wire::io::ByteBuffer&)>& write)>;
@@ -69,6 +63,9 @@ public:
 
     /// Takes down anything this player was shown. Called when they leave or change worlds.
     void clear();
+
+    /// Takes everything down and draws it again on the next tick, for the world the player is now in.
+    void worldChanged();
 
     /// Where the drawing goes. Set once, before the first tick.
     void drawInto(Surfaces surfaces) { surfaces_ = std::move(surfaces); }
@@ -111,6 +108,7 @@ private:
     config::OnceReporter reporter_;
 
     std::optional<std::pair<std::string, std::string>> lastTabList_;
+    bool redrawPending_ = false;
     std::optional<std::string> lastScoreboardTitle_;
     std::vector<std::string> lastScoreboardLines_;
     bool scoreboardShown_ = false;

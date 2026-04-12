@@ -217,14 +217,13 @@ TEST_CASE("the loot tables roll what the official server rolls") {
 
     // A type this build does not implement is named rather than silently producing wrong loot.
     SUBCASE("unknownEntry") {
-        CHECK(refusal(R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:slots","slot_source":"x"}]}]})") ==
-              "Unsupported_loot_pool_entry_type:_minecraft:slots");
+        CHECK(refusal(R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:nope"}]}]})") ==
+              "Unsupported_loot_pool_entry_type:_minecraft:nope");
     }
 
     SUBCASE("unknownFunction") {
         CHECK(refusal(R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:stone",
-               "modifier":{"type":"minecraft:set_lore","lore":[]}}]}]})") ==
-              "Unsupported_loot_function_type:_minecraft:set_lore");
+               "modifier":{"type":"minecraft:nope"}}]}]})") == "Unsupported_loot_function_type:_minecraft:nope");
     }
 
     SUBCASE("unknownProvider") {
@@ -890,4 +889,73 @@ TEST_CASE("an entity predicate reads equipment, flags, distance, footing and wha
     EntityFacts rider{.type = Identifier::vanilla("player")};
     rider.vehicleFacts = boat;
     CHECK(goatBoat.test(random, LootContext{.thisEntity = rider}));
+}
+
+TEST_CASE("the component functions edit lists, books, attributes and containers as vanilla does") {
+    using basalt::wire::common::Identifier;
+    LootReferences references{[](std::string_view registry, const Identifier& id) -> std::optional<std::string> {
+        const std::string key = std::string{registry} + "/" + id.path();
+        if (key == "tags/predicate/never") {
+            return R"({"values":["minecraft:no"]})";
+        }
+        if (key == "predicate/no") {
+            return R"({"type":"minecraft:random_chance","chance":0})";
+        }
+        return std::nullopt;
+    }};
+    const std::expected<LootTable, LootTableParseError> table = lootTableJson::parse(
+        R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:iron_sword",
+            "modifier":[
+             {"type":"minecraft:set_lore","lore":["a","b"],"mode":"append"},
+             {"type":"minecraft:set_lore","lore":["z"],"mode":"insert","offset":1},
+             {"type":"minecraft:set_custom_data","tag":"{x:{y:1b}}"},
+             {"type":"minecraft:set_custom_data","tag":{"x":{"z":2}}},
+             {"type":"minecraft:toggle_tooltips","toggles":{"enchantments":false}},
+             {"type":"minecraft:set_attributes","replace":false,"modifiers":[{"id":"minecraft:extra",
+              "attribute":"minecraft:attack_damage","operation":"add_value","amount":3,"slot":["mainhand","offhand"]}]}]}]},
+           {"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:chest","modifier":
+            {"type":"minecraft:set_contents","component":"minecraft:container","entries":[
+             {"type":"minecraft:item","name":"minecraft:stone","modifier":{"type":"minecraft:set_count","count":70}},
+             {"type":"minecraft:item","name":"minecraft:dirt","condition":{"type":"minecraft:all_of","terms":"#minecraft:never"}}]}}]}]})",
+        &references);
+    REQUIRE(table.has_value());
+    rng::RandomSource random = rng::RandomSource::legacy(5);
+    const std::vector<ItemStack> items = table->generate(random, 0.0F, std::nullopt, {});
+    REQUIRE(items.size() == 2);
+    const ItemStack& sword = items[0];
+    const auto* lore = sword.components.getList("minecraft:lore");
+    REQUIRE(lore != nullptr);
+    REQUIRE(lore->size() == 3);
+    CHECK(*(*lore)[1].get<std::string>() == "z");
+    const auto* data = sword.components.getCompound("minecraft:custom_data")->getCompound("x");
+    CHECK(data->getByte("y") == 1);
+    CHECK(data->getInt("z") == 2);
+    CHECK(sword.components.getCompound("minecraft:tooltip_display")->getList("hidden_components")->size() == 1);
+    // parity: `update` starts from the sword's own two hand modifiers and adds the third.
+    const auto* modifiers = sword.components.getList("minecraft:attribute_modifiers");
+    REQUIRE(modifiers != nullptr);
+    CHECK(modifiers->size() == 3);
+    // parity: the stack splitter cuts seventy stone into a full stack and six, and the tagged
+    // predicate never lets the dirt in.
+    const auto* contents = items[1].components.getList("minecraft:container");
+    REQUIRE(contents != nullptr);
+    REQUIRE(contents->size() == 2);
+    CHECK((*contents)[1].get<basalt::wire::nbt::NbtCompound>()->getCompound("item")->getInt("count") == 6);
+
+    const std::expected<LootTable, LootTableParseError> slots = lootTableJson::parse(
+        R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:slots","slot_source":{"type":"minecraft:limit_slots",
+            "limit":1,"slot_source":{"type":"minecraft:slot_range","source":"this","slots":"armor.*"}}}]}]})");
+    REQUIRE(slots.has_value());
+    LootContext context;
+    context.slotsOf = [](std::string_view source, std::string_view range) {
+        CHECK(source == "this");
+        CHECK(range == "armor.*");
+        return std::vector<ItemStack>{ItemStack{.item = Identifier::vanilla("iron_helmet"), .count = 1},
+                                      ItemStack{.item = Identifier::vanilla("iron_boots"), .count = 1}};
+    };
+    const std::vector<ItemStack> worn = slots->generate(random, 0.0F, std::nullopt, context);
+    REQUIRE(worn.size() == 1);
+    CHECK(worn[0].item.path() == "iron_helmet");
+    CHECK(refusal(R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:slots","slot_source":
+        {"type":"minecraft:slot_range","slots":"armor.tail"}}]}]})") == "Invalid_slot_range:_armor.tail");
 }

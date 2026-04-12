@@ -169,7 +169,7 @@ void ContainerMenuController::handleContainerClick(const ServerboundContainerCli
         // parity: `AbstractContainerMenu.doClick`'s swap asks the slot's `mayPlace` and its size.
         if (const std::optional<storage::StoredItemStack> incoming = readSlot(*session, hotbar);
             incoming.has_value() && brewingStandOpen() &&
-            (!accepts(*slot, *incoming) || incoming->count > slotCapacity(*slot))) {
+            (!accepts(*slot, *incoming) || incoming->count > slotCapacity(*slot, *incoming))) {
             sendInventory();
             return;
         }
@@ -238,7 +238,7 @@ void ContainerMenuController::handleContainerClick(const ServerboundContainerCli
             sendInventory();
             return;
         }
-        carriedItem_ = withCount(*stack, PlayerInventory::kMaxStack);
+        carriedItem_ = withCount(*stack, PlayerInventory::maxStackIn(*stack));
         break;
     }
     case ServerboundContainerClickPacket::Mode::PickupAll:
@@ -253,8 +253,9 @@ void ContainerMenuController::collectMatching(PlayerSession& session, bool rever
         return;
     }
     const storage::StoredItemStack carried = *carriedItem_;
+    const std::int32_t most = PlayerInventory::maxStackIn(carried);
     std::int32_t total = carried.count;
-    if (total >= PlayerInventory::kMaxStack) {
+    if (total >= most) {
         return;
     }
 
@@ -276,17 +277,17 @@ void ContainerMenuController::collectMatching(PlayerSession& session, bool rever
     // needed.
     for (std::int32_t pass = 0; pass < 2; pass++) {
         for (const MenuSlot& slot : slots) {
-            if (total >= PlayerInventory::kMaxStack) {
+            if (total >= most) {
                 break;
             }
             const std::optional<storage::StoredItemStack> existing = readSlot(session, slot);
             if (!existing.has_value() || !sameItem(*existing, carried)) {
                 continue;
             }
-            if (pass == 0 && existing->count >= PlayerInventory::kMaxStack) {
+            if (pass == 0 && existing->count >= PlayerInventory::maxStackIn(*existing)) {
                 continue;
             }
-            const std::int32_t taken = std::min(PlayerInventory::kMaxStack - total, existing->count);
+            const std::int32_t taken = std::min(most - total, existing->count);
             total += taken;
             const std::int32_t left = existing->count - taken;
             writeSlot(session, slot, left <= 0 ? std::nullopt : std::optional{withCount(*existing, left)});
@@ -354,7 +355,7 @@ void ContainerMenuController::distributeQuickCraft(PlayerSession& session) {
         return;
     }
 
-    std::int32_t perSlot = PlayerInventory::kMaxStack;
+    std::int32_t perSlot = PlayerInventory::maxStackIn(carried);
     if (quickCraftType_ == kQuickCraftTypeLeft) {
         perSlot = carried.count / static_cast<std::int32_t>(targets.size());
     } else if (quickCraftType_ == kQuickCraftTypeRight) {
@@ -371,7 +372,7 @@ void ContainerMenuController::distributeQuickCraft(PlayerSession& session) {
         }
         const std::optional<storage::StoredItemStack> existing = readSlot(session, slot);
         const std::int32_t already = existing.has_value() ? existing->count : 0;
-        const std::int32_t give = std::min({perSlot, PlayerInventory::kMaxStack - already, remaining});
+        const std::int32_t give = std::min({perSlot, slotCapacity(slot, carried) - already, remaining});
         if (give <= 0) {
             continue;
         }
@@ -408,7 +409,7 @@ void ContainerMenuController::pickupClick(PlayerSession& session, const MenuSlot
     }
     const storage::StoredItemStack carried = *carriedItem_;
     // parity: `Slot.mayPlace` and `getMaxStackSize`, which only the brewing stand's slots narrow here.
-    const std::int32_t capacity = slotCapacity(slot);
+    const std::int32_t capacity = slotCapacity(slot, carried);
     if ((brewingStandOpen() || mountOpen()) && !accepts(slot, carried)) {
         return;
     }
@@ -515,7 +516,7 @@ void ContainerMenuController::quickMove(PlayerSession& session, const MenuSlot& 
         if (!existing.has_value() || !sameItem(*existing, *stack)) {
             continue;
         }
-        const std::int32_t room = PlayerInventory::kMaxStack - existing->count;
+        const std::int32_t room = slotCapacity(target, *existing) - existing->count;
         if (room <= 0) {
             continue;
         }
@@ -530,8 +531,10 @@ void ContainerMenuController::quickMove(PlayerSession& session, const MenuSlot& 
         if (!accepts(target, *stack) || readSlot(session, target).has_value()) {
             continue;
         }
-        writeSlot(session, target, withCount(*stack, remaining));
-        remaining = 0;
+        const std::int32_t placed = std::min(remaining, slotCapacity(target, *stack));
+        writeSlot(session, target, withCount(*stack, placed));
+        remaining -= placed;
+        break;
     }
     writeSlot(session, slot, remaining <= 0 ? std::nullopt : std::optional{withCount(*stack, remaining)});
 }
@@ -585,6 +588,11 @@ void ContainerMenuController::handleSetCreativeModeSlot(
                         return &enchantments->entries()[static_cast<std::size_t>(protocolId)].first;
                     })};
         }
+    }
+    // parity: `handleSetCreativeModeSlot`'s `validData`: an overfull stack is ignored outright.
+    if (stack.has_value() &&
+        stack->count > server::registry::itemStacking::maxStackSize(stack->id, stack->components)) {
+        return;
     }
     session->inventory.set(*slot, stack);
     sendInventorySlot(*slot);

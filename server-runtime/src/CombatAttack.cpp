@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/VehicleSystem.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
+#include <basalt/server/runtime/command/CommandDispatcher.hpp>
 #include <basalt/server/runtime/entity/Allays.hpp>
 #include <basalt/server/runtime/entity/Armadillos.hpp>
 #include <basalt/server/runtime/entity/Boats.hpp>
@@ -33,7 +34,7 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
-#include <basalt/server/runtime/player/PlayerSweep.hpp>
+#include <basalt/server/runtime/player/PlayerVersusPlayer.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
@@ -77,20 +78,16 @@ using wire::protocol::play::SoundSource;
 
 constexpr double kSprintKnockback = 0.5;
 constexpr double kSweepSpeedLimit = 0.003;
-constexpr double kSweepParticleHeight = 1.0;
 constexpr std::string_view kSwordSuffix = "_sword";
-constexpr std::string_view kParticleSweep = "sweep_attack";
 
 constexpr std::string_view kSoundAttackKnockback = "entity.player.attack.knockback";
 constexpr std::string_view kSoundAttackNoDamage = "entity.player.attack.nodamage";
 constexpr std::string_view kSoundAttackCrit = "entity.player.attack.crit";
 constexpr std::string_view kSoundAttackStrong = "entity.player.attack.strong";
 constexpr std::string_view kSoundAttackWeak = "entity.player.attack.weak";
-constexpr std::string_view kSoundAttackSweep = "entity.player.attack.sweep";
 
 constexpr float kAttackExhaustion = 0.1F;
 constexpr std::int32_t kPanicTicks = 40;
-constexpr float kHalfCircle = 180.0F;
 
 /// parity: `ItemEntity`'s default pickup delay of forty ticks.
 constexpr std::int32_t kDefaultPickupDelay = 40;
@@ -121,6 +118,22 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
                 target = candidate;
                 break;
             }
+        }
+    }
+    // parity: `Player.attack` on a `ServerPlayer`, who is no entity of the world's.
+    if (target == nullptr) {
+        for (PlayerSession* other : owner_->playersInSameWorld()) {
+            if (other->entityId() != attack.entityId || other == session) {
+                continue;
+            }
+            const Identifier playerType = Identifier::vanilla("player");
+            if (player::combat::withinAttackReach(session->x, session->y, session->z, other->x, other->y, other->z,
+                                                  server::registry::entityTypeShapes::widthOf(playerType),
+                                                  server::registry::entityTypeShapes::heightOf(playerType)) &&
+                (!hooks_.attackAllowed || hooks_.attackAllowed(*session, other->entityId()))) {
+                attackPlayer(*session, *other, *world);
+            }
+            return;
         }
     }
     if (target == nullptr || target->removed) {
@@ -216,8 +229,9 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
                    world::realEntityTypeTags::membersOf(*entityTags, tag).contains(target->type());
         }};
     const float enchanted = world::weaponDamage::of(heldStack, base, definitionOf, &victim);
-    const player::combat::Swing swing =
-        player::combat::swingOf(strength, base, enchanted, fallDistance > 0.0, session->onGround, session->sprinting);
+    const player::combat::Swing swing = player::combat::swingOf(
+        strength, base, enchanted, player::pvp::criticalPossible(*session, *world, fallDistance > 0.0),
+        session->onGround, session->sprinting);
     const float damage = swing.damage;
     const bool fullStrength = swing.fullStrength;
     const bool critical = swing.critical;
@@ -257,7 +271,7 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
                        owner_->lastStepSquared < kSweepSpeedLimit * kSweepSpeedLimit && weapon.has_value() &&
                        weapon->path().ends_with(kSwordSuffix);
     if (sweep) {
-        sweepAround(*session, *target, *world, strength);
+        sweepAround(*session, *target, *world, strength, base * player::combat::chargeScale(strength), heldStack);
     }
     broadcastDamageEvent(*target, world::damageTypes::kPlayerAttack, session->entityId());
     broadcastMotion(*target);
@@ -303,23 +317,62 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
 }
 
 void CombatHandler::sweepAround(PlayerSession& session, const ServerEntity& target, world::LoadedWorld& world,
-                                float strength) {
-    owner_->broadcastSound(kSoundAttackSweep, session.x, session.y, session.z, SoundSource::Players);
-    for (const player::SweepHit& hit : player::sweepAround(session, world, target, strength)) {
-        ServerEntity* caught = world.state().entity(hit.entityId);
-        if (caught == nullptr) {
-            continue;
-        }
-        broadcastDamageEvent(*caught, world::damageTypes::kPlayerAttack, session.entityId());
-        broadcastMotion(*caught);
-        if (hit.died) {
-            killEntity(*caught);
-        }
+                                float strength, float baseDamage,
+                                const std::optional<storage::StoredItemStack>& weapon) {
+    const player::BreakContext blocks = owner_->blockInteraction().breakContext();
+    player::pvp::sweep(session, world, meleeContext(blocks), target.entityId(),
+                       entity::Aabb::of(target.x, target.y, target.z, target.width(), target.height()), baseDamage,
+                       strength, weapon);
+}
+
+player::pvp::Context CombatHandler::meleeContext(const player::BreakContext& blocks) {
+    const ClientSession::Options& options = owner_->options();
+    return player::pvp::Context{.registry = options.playerRegistry,
+                                .enchantments = options.enchantments,
+                                .entityTags = options.entityTypeTags,
+                                .teams = options.commands == nullptr ? nullptr
+                                                                     : options.commands->environment().options().teams,
+                                .blocks = &blocks,
+                                .sweptMob =
+                                    [this](ServerEntity& mob, bool died) {
+                                        const PlayerSession* session = owner_->playerSession();
+                                        broadcastDamageEvent(mob, world::damageTypes::kPlayerAttack,
+                                                             session == nullptr ? -1 : session->entityId());
+                                        broadcastMotion(mob);
+                                        if (died) {
+                                            killEntity(mob);
+                                        }
+                                    },
+                                .nextSeed = [] { return static_cast<std::int64_t>(std::random_device{}()); }};
+}
+
+void CombatHandler::attackPlayer(PlayerSession& session, PlayerSession& victim, world::LoadedWorld& world) {
+    if (victim.dead || victim.gamemode == Gamemode::Spectator) {
+        return;
     }
-    // parity: the sweep's own particle, a block ahead of where the player is looking.
-    const float yaw = session.yaw * std::numbers::pi_v<float> / kHalfCircle;
-    broadcastParticle(kParticleSweep, session.x - static_cast<double>(std::sin(yaw)), session.y + kSweepParticleHeight,
-                      session.z + static_cast<double>(std::cos(yaw)), 0);
+    // parity: `Player.getWeaponItem` is the riptide's trident while it spins.
+    const std::optional<storage::StoredItemStack> weapon =
+        spinning_ && session.autoSpinItem.has_value() ? session.autoSpinItem : session.inventory.heldItem();
+    world::RealEnchantments* enchantments = owner_->options().enchantments;
+    const player::playerAttributes::DefinitionOf definitionOf = [enchantments](const Identifier& id) {
+        return enchantments == nullptr ? nullptr : enchantments->definitionOf(id);
+    };
+    const float strength = player::combat::attackStrengthScale(
+        session.ticksSinceSwing, player::playerAttributes::valueOf(session, "minecraft:attack_speed", definitionOf));
+    session.ticksSinceSwing = 0;
+    const auto base =
+        spinning_
+            ? session.autoSpinDamage
+            : static_cast<float>(player::playerAttributes::valueOf(session, "minecraft:attack_damage", definitionOf));
+    const player::BreakContext blocks = owner_->blockInteraction().breakContext();
+    static_cast<void>(player::pvp::attack(
+        session, victim, world, meleeContext(blocks),
+        player::pvp::Swing{.strength = strength,
+                           .base = base,
+                           .falling = player::pvp::criticalPossible(session, world, fallDistance > 0.0),
+                           .weapon = weapon,
+                           .weaponSlot = PlayerInventory::kHotbarStart + session.inventory.heldSlot(),
+                           .slowEnoughToSweep = owner_->lastStepSquared < kSweepSpeedLimit * kSweepSpeedLimit}));
 }
 
 void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& interact) {
