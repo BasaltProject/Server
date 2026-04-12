@@ -10,18 +10,11 @@
 
 #include <cmath>
 #include <cstdint>
-#include <numbers>
 
 namespace basalt::server::runtime::entity::ai {
 namespace {
 
 constexpr double kClimbSpeed = 0.2;
-constexpr std::int32_t kAggroDelay = 5;
-constexpr double kStareRange = 64.0;
-constexpr double kCone = 0.025;
-constexpr double kEyeShare = 0.85;
-constexpr double kPlayerEye = 1.62;
-constexpr double kDegrees = 180.0;
 
 /// parity: sixty-four blocks across, thirty-two up or down.
 constexpr double kRange = 64.0;
@@ -87,71 +80,6 @@ void ClimbWallsGoal::tick(MobContext& mob) {
     mob.mob.onGround = false;
 }
 
-/// parity: `isLookingAtMe(player, 0.025, true, false, eyeY)`.
-bool StareTriggerGoal::staredAtBy(const MobContext& mob, const PlayerView& player) {
-    if (mob.distanceSquaredTo(player.x, player.y, player.z) > kStareRange * kStareRange) {
-        return false;
-    }
-    const double eyeY = mob.mob.y + (mob.mob.height() * kEyeShare);
-    double dx = mob.mob.x - player.x;
-    double dy = eyeY - (player.y + kPlayerEye);
-    double dz = mob.mob.z - player.z;
-    const double distance = std::sqrt((dx * dx) + (dy * dy) + (dz * dz));
-    if (distance < 1.0e-4) {
-        return false;
-    }
-    dx /= distance;
-    dy /= distance;
-    dz /= distance;
-    const double pitch = static_cast<double>(player.pitch) * std::numbers::pi / kDegrees;
-    const double yaw = static_cast<double>(player.yaw) * std::numbers::pi / kDegrees;
-    const double lookX = -std::sin(yaw) * std::cos(pitch);
-    const double lookY = -std::sin(pitch);
-    const double lookZ = std::cos(yaw) * std::cos(pitch);
-    const double dot = (lookX * dx) + (lookY * dy) + (lookZ * dz);
-    return dot > 1.0 - (kCone / distance);
-}
-
-bool StareTriggerGoal::canUse(MobContext& mob) {
-    pending_.reset();
-    if (mob.mob.targetId.has_value()) {
-        return false;
-    }
-    double bestDistance = 0.0;
-    for (const PlayerView& player : mob.players) {
-        if (!player.targetable || !staredAtBy(mob, player)) {
-            continue;
-        }
-        const double distance = mob.distanceSquaredTo(player.x, player.y, player.z);
-        if (pending_.has_value() && distance >= bestDistance) {
-            continue;
-        }
-        bestDistance = distance;
-        pending_ = player.entityId;
-    }
-    return pending_.has_value();
-}
-
-void StareTriggerGoal::start(MobContext& /*mob*/) {
-    // parity: five ticks of being stared at before it comes for you.
-    aggroTime_ = adjustedTickDelay(kAggroDelay);
-}
-
-bool StareTriggerGoal::canContinueToUse(MobContext& mob) {
-    const PlayerView* player = pending_.has_value() ? mob.playerById(*pending_) : nullptr;
-    if (player == nullptr || !staredAtBy(mob, *player)) {
-        return false;
-    }
-    if (aggroTime_ > 0) {
-        aggroTime_--;
-        return true;
-    }
-    mob.mob.targetId = player->entityId;
-    return false;
-}
-
-void StareTriggerGoal::stop(MobContext& /*mob*/) { pending_.reset(); }
-
 void TeleportAwayGoal::tick(MobContext& mob) {
     const world::WorldState& world = mob.world;
     const auto blockX = static_cast<std::int32_t>(std::floor(mob.mob.x));
@@ -174,18 +102,24 @@ void TeleportAwayGoal::tick(MobContext& mob) {
     }
 }
 
-void TeleportAwayGoal::teleportRandomly(MobContext& mob) {
+void TeleportAwayGoal::teleportRandomly(MobContext& mob) { static_cast<void>(teleportEndermanRandomly(mob)); }
+
+bool teleportEndermanRandomly(MobContext& mob) {
     const double x = mob.mob.x + ((mob.random.nextDouble() - 0.5) * kRange);
     const double y =
         mob.mob.y + (static_cast<double>(mob.random.nextInt(static_cast<std::int32_t>(kRange))) - (kRange / 2));
     const double z = mob.mob.z + ((mob.random.nextDouble() - 0.5) * kRange);
+    return teleportEnderman(mob, x, y, z);
+}
+
+bool teleportEnderman(MobContext& mob, double x, double y, double z) {
     // parity: 26.3 `Enderman.teleport` over `randomTeleport(..., ENDERMAN_DOES_NOT_TELEPORT_TO)`.
     if (mob.mob.vehicleId.has_value()) {
-        return;
+        return false;
     }
     const std::optional<double> landing = landingFor(mob, x, y, z, "minecraft:enderman_does_not_teleport_to");
     if (!landing.has_value()) {
-        return;
+        return false;
     }
     mob.mob.x = x;
     mob.mob.y = *landing;
@@ -195,6 +129,7 @@ void TeleportAwayGoal::teleportRandomly(MobContext& mob) {
     mob.mob.velocityZ = 0.0;
     navigation::stop(mob.mob);
     mob.actions.teleported(mob.mob);
+    return true;
 }
 
 std::optional<double> landingFor(MobContext& mob, double x, double y, double z, std::string_view avoided) {

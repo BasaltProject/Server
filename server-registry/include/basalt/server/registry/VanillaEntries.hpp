@@ -16,6 +16,24 @@ struct BlockMovementEntry {
     float bounciness;
 };
 
+/// A block's `SoundType`: its volume and pitch and the sound of breaking, stepping on, placing,
+/// hitting and falling onto it.
+struct BlockSoundTypeEntry {
+    float volume;
+    float pitch;
+    std::string_view breakSound;
+    std::string_view stepSound;
+    std::string_view placeSound;
+    std::string_view hitSound;
+    std::string_view fallSound;
+};
+
+/// Which of those a block has, by its index in `blockSoundTypesTable`.
+struct BlockSoundEntry {
+    std::string_view block;
+    std::int32_t soundType;
+};
+
 /// What one kind of mob starts with: its health, how fast it walks, how far it notices you.
 struct EntityAttributeEntry {
     std::string_view entity;
@@ -56,44 +74,40 @@ struct ToolRule {
     std::optional<float> speed;
 };
 
-/// The blocks that move an entity differently from every other block: ice is slippery, soul
-/// sand is slow, honey kills a jump and a bed bounces. Anything absent is the default 0.6
-/// friction, with no change to speed or jump and no bounce at all.
+/// The blocks that move an entity differently: ice is slippery, soul sand is slow, honey kills a
+/// jump and a bed bounces. Anything absent is the default 0.6 friction with no bounce.
 ///
-/// Not reported by the data generator, so it comes from a harness run against the real
-/// classes (see `basalt.datagen`).
+/// Not in the data generator's reports; dumped by a harness (see `basalt.datagen`).
 [[nodiscard]] std::span<const BlockMovementEntry> blockMovementTable();
 
-/// Every living entity type's own attribute base values, from the real registry: what each mob
-/// starts with before anything modifies it.
+/// Every distinct `SoundType`, stone's first, and the blocks that do not sound like stone.
 ///
-/// Vanilla builds these in each class's `createAttributes`, which is code and not data, so they
-/// come from a harness run against the real registry (see `basalt.datagen`).
+/// Code and not data in the jar, so it comes from a harness run against the real classes, off each
+/// block's default state: the decorated pot is the one block whose sound changes with its state.
+[[nodiscard]] std::span<const BlockSoundTypeEntry> blockSoundTypesTable();
+
+[[nodiscard]] std::span<const BlockSoundEntry> blockSoundsTable();
+
+/// Every living entity type's attribute base values, before anything modifies them.
+///
+/// Built in code by each class's `createAttributes`, so dumped by a harness (see `basalt.datagen`).
 [[nodiscard]] std::span<const EntityAttributeEntry> entityAttributesTable();
 
-/// Every damageable item, from the real server jar's own item component reports: how much
-/// wear it survives (`minecraft:max_damage`), what breaking one block costs it
-/// (`minecraft:tool`'s `damage_per_block`) and what one attack costs it
-/// (`minecraft:weapon`'s `item_damage_per_attack`).
+/// Every damageable item: `minecraft:max_damage`, `minecraft:tool`'s `damage_per_block` and
+/// `minecraft:weapon`'s `item_damage_per_attack`, from the jar's item component reports.
 ///
-/// An item missing from here has no durability at all, which is not the same as having a
-/// large one: it never wears and never breaks.
+/// An item missing from here has no durability at all: it never wears and never breaks.
 [[nodiscard]] std::span<const ItemDurabilityEntry> itemDurabilityTable();
 
-/// Every entity type's box, the category it spawns under, how far a client tracks it and how
-/// often it is told about it.
+/// Every entity type's box, spawn category, client tracking range and update interval.
 ///
-/// Not reported by the data generator: vanilla builds all of it in `EntityType.Builder`, so it
-/// comes from a harness run against the real registry (see `basalt.datagen`).
+/// Built in code by `EntityType.Builder`, so dumped by a harness (see `basalt.datagen`).
 [[nodiscard]] std::span<const EntityTypeShape> entityTypeShapesTable();
 
-/// Every tool item's mining rules, from the real server jar's own item component reports
-/// (`minecraft:tool`). Each rule is a block tag, whether the tool is correct for that tag's
-/// drops, and how fast it mines it.
+/// Every tool item's `minecraft:tool` rules, from the jar's item component reports.
 ///
-/// Order matters and is preserved: vanilla applies the first rule whose tag contains the
-/// block, and every tool lists its `incorrect_for_<tier>_tool` exclusion before the general
-/// `mineable/<kind>` rule so the exclusion wins.
+/// Order is preserved: vanilla applies the first rule whose tag contains the block, so each tool's
+/// `incorrect_for_<tier>_tool` exclusion wins over the general `mineable/<kind>` rule after it.
 [[nodiscard]] std::span<const ToolRule> itemToolsTable();
 
 } // namespace basalt::server::registry

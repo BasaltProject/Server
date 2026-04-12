@@ -24,6 +24,7 @@
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Waxing.hpp>
 #include <basalt/server/world/Chunk.hpp>
 
@@ -161,6 +162,7 @@ void wearOne(const BreakContext& context, PlayerSession& player, const std::int3
     if (worn == held) {
         return;
     }
+    world::triggerFacts::durabilityChanged(context.triggers, player, held, worn);
     player.inventory.set(heldSlot, worn);
     if (!worn.has_value()) {
         statAwards::itemBroken(player, held.id,
@@ -293,7 +295,7 @@ bool useAxeFor(const BreakContext& context, PlayerSession& player, world::Loaded
 bool transformBlockFor(const BreakContext& context, PlayerSession& player, world::LoadedWorld& world,
                        world::RealBlockTransformers& transformers, const wire::common::Identifier& transformer,
                        const std::int32_t x, const std::int32_t y, const std::int32_t z,
-                       const wire::protocol::play::Direction face, const std::int32_t heldSlot,
+                       const wire::protocol::play::Direction face, const std::int32_t /*heldSlot*/,
                        const storage::StoredItemStack& held) {
     // parity: `playerHasBlockingItemUseIntent`: a shield in the other hand wins unless sneaking.
     const std::optional<storage::StoredItemStack>& offhand = player.inventory.at(PlayerInventory::kOffhandSlot);

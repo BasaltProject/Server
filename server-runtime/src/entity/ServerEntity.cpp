@@ -1,7 +1,9 @@
 #include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/runtime/entity/Camels.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobCategory.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/Sniffers.hpp>
 
 #include <algorithm>
 #include <array>
@@ -156,9 +158,48 @@ double ServerEntity::attributeWithModifiers(std::string_view id) const {
     return value;
 }
 
-double ServerEntity::width() const { return registry::entityTypeShapes::widthOf(type_); }
+namespace {
 
-double ServerEntity::height() const { return registry::entityTypeShapes::heightOf(type_); }
+/// parity: `Camel`'s own baby boxes, `BABY_STANDING_DIMENSIONS` and `BABY_SITTING_DIMENSIONS`.
+constexpr float kBabyCamelWidth = 0.95F;
+constexpr float kBabyCamelHeight = 1.4F;
+constexpr float kBabyCamelSittingHeight = 0.425F;
+/// parity: `ADULT_SITTING_DIMENSIONS`, the type's height less this.
+constexpr float kCamelSittingDrop = 1.43F;
+/// parity: `Sniffer.DIGGING_DIMENSIONS`, the type's height less this, scaled by the age.
+constexpr float kSnifferDiggingDrop = 0.4F;
+
+[[nodiscard]] bool babyCamel(const ServerEntity& entity) { return entity.camel != nullptr && entity.age < 0; }
+
+} // namespace
+
+double ServerEntity::width() const {
+    // parity: `Camel.getDefaultDimensions` and `Sniffer.getDefaultDimensions`, the two whose box
+    // follows what they are doing.
+    if (babyCamel(*this)) {
+        return static_cast<double>(kBabyCamelWidth);
+    }
+    if (sniffer != nullptr && sniffer->pose == sniffers::Pose::Digging && age < 0) {
+        return static_cast<double>(static_cast<float>(registry::entityTypeShapes::widthOf(type_)) * 0.5F);
+    }
+    return registry::entityTypeShapes::widthOf(type_);
+}
+
+double ServerEntity::height() const {
+    if (camel != nullptr && camel->lastPoseTick < 0) {
+        return babyCamel(*this) ? static_cast<double>(kBabyCamelSittingHeight)
+                                : static_cast<double>(static_cast<float>(registry::entityTypeShapes::heightOf(type_)) -
+                                                      kCamelSittingDrop);
+    }
+    if (babyCamel(*this)) {
+        return static_cast<double>(kBabyCamelHeight);
+    }
+    if (sniffer != nullptr && sniffer->pose == sniffers::Pose::Digging) {
+        const float digging = static_cast<float>(registry::entityTypeShapes::heightOf(type_)) - kSnifferDiggingDrop;
+        return static_cast<double>(age < 0 ? digging * 0.5F : digging);
+    }
+    return registry::entityTypeShapes::heightOf(type_);
+}
 
 bool ServerEntity::hasTag(std::string_view tag) const { return std::ranges::find(tags, tag) != tags.end(); }
 

@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 #include <basalt/server/runtime/world/RealItemTags.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 
 namespace basalt::server::runtime::player::gliding {
@@ -78,6 +79,7 @@ void tick(const BreakContext& context, PlayerSession& player, world::LoadedWorld
                 return effects.process(stack, cost, source);
             });
         if (worn != wings) {
+            world::triggerFacts::durabilityChanged(context.triggers, player, *wings, worn);
             player.inventory.set(kChestSlot, worn);
             if (context.slotChanged) {
                 context.slotChanged(player, kChestSlot);

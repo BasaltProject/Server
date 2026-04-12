@@ -49,7 +49,9 @@ CREATE TABLE IF NOT EXISTS player (
     -- The screen shaders /posteffect put on them, comma-separated, in the order they were added.
     post_effects TEXT,
     -- How close they are to a warden: ticks since the last warning, the level and the cooldown.
-    warden_spawn_tracker TEXT
+    warden_spawn_tracker TEXT,
+    -- The rest of what the player's entity keeps, as an NBT compound under vanilla's own keys.
+    entity_data BLOB
 );
 
 -- Name lookup is how an operator refers to a player; the others are what the admin queries scan.

@@ -5,14 +5,16 @@
 #include <basalt/server/runtime/entity/ai/CopperGolemGoals.hpp>
 #include <basalt/server/runtime/entity/ai/DolphinGoals.hpp>
 #include <basalt/server/runtime/entity/ai/DolphinItemGoals.hpp>
+#include <basalt/server/runtime/entity/ai/EndermanGoals.hpp>
 #include <basalt/server/runtime/entity/ai/FlyingGoals.hpp>
 #include <basalt/server/runtime/entity/ai/GoalSelector.hpp>
-#include <basalt/server/runtime/entity/ai/HorseGoals.hpp>
 #include <basalt/server/runtime/entity/ai/Goals.hpp>
+#include <basalt/server/runtime/entity/ai/HorseGoals.hpp>
 #include <basalt/server/runtime/entity/ai/IllagerGoals.hpp>
 #include <basalt/server/runtime/entity/ai/LongDistancePatrolGoal.hpp>
 #include <basalt/server/runtime/entity/ai/MobGoals.hpp>
 #include <basalt/server/runtime/entity/ai/NeutralGoals.hpp>
+#include <basalt/server/runtime/entity/ai/ParrotGoals.hpp>
 #include <basalt/server/runtime/entity/ai/PhantomGoals.hpp>
 #include <basalt/server/runtime/entity/ai/RaiderGoals.hpp>
 #include <basalt/server/runtime/entity/ai/ShulkerGoals.hpp>
@@ -258,9 +260,11 @@ bool buildTamed(GoalSelector& selector, const wire::common::Identifier& type, st
         add<RandomLookAroundGoal>(selector, 10);
         add<OwnerHurtByTargetGoal>(selector, 1);
         add<OwnerHurtTargetGoal>(selector, 2);
-        add<HurtByTargetGoal>(selector, 3);
+        add<HurtByTargetGoal>(selector, 3, HurtByTargetGoal::Types{}, true);
+        add<AngryAtPlayerGoal>(selector, 4);
         // parity: a wild wolf hunts sheep and rabbits; a tamed one only what its owner does.
-        add<NearestAttackableEntityGoal>(selector, 4, Names{"sheep", "rabbit", "skeleton"});
+        add<NearestAttackableEntityGoal>(selector, 5, Names{"sheep", "rabbit", "skeleton"});
+        add<ResetUniversalAngerTargetGoal>(selector, 8, true);
         return true;
     }
     if (path == "cat") {
@@ -291,13 +295,14 @@ bool buildTamed(GoalSelector& selector, const wire::common::Identifier& type, st
         add<NearestAttackableEntityGoal>(selector, 1, Names{"rabbit", "chicken", "tadpole"});
         return true;
     }
-    // parity: `Parrot.registerGoals`, less the shoulder and following other mobs.
+    // parity: `Parrot.registerGoals`, less following other mobs.
     if (path == "parrot") {
         add<FloatGoal>(selector, 0);
         add<LookAtPlayerGoal>(selector, 1, kLookFar);
         add<SitWhenOrderedToGoal>(selector, 2);
         add<FollowOwnerGoal>(selector, 2, 1.0, 5.0, 1.0);
         add<HoverWanderGoal>(selector, 2);
+        add<LandOnOwnersShoulderGoal>(selector, 3);
         return true;
     }
     if (path == "polar_bear") {
@@ -307,6 +312,8 @@ bool buildTamed(GoalSelector& selector, const wire::common::Identifier& type, st
         add<LookAtPlayerGoal>(selector, 5, kLookNear);
         add<RandomLookAroundGoal>(selector, 6);
         add<HurtByTargetGoal>(selector, 1);
+        add<AngryAtPlayerGoal>(selector, 3);
+        add<ResetUniversalAngerTargetGoal>(selector, 5, false);
         return true;
     }
     // parity: `CopperGolemAi`: panic, the chest round, and a short stroll or a wait between rounds.
@@ -323,6 +330,11 @@ bool buildTamed(GoalSelector& selector, const wire::common::Identifier& type, st
         add<LookAtPlayerGoal>(selector, 7, kLookNear);
         add<RandomLookAroundGoal>(selector, 8);
         add<HurtByTargetGoal>(selector, 2);
+        // parity: `IronGolem` alone is a `NeutralMob`.
+        if (path == "iron_golem") {
+            add<AngryAtPlayerGoal>(selector, 3);
+            add<ResetUniversalAngerTargetGoal>(selector, 4, false);
+        }
         // parity: `DefendVillageTargetGoal` and the golem's own list of what counts as a monster,
         // which is everything hostile that walks.
         add<NearestAttackableEntityGoal>(selector, 3, hostile());
@@ -350,6 +362,7 @@ bool buildUndead(GoalSelector& selector, std::string_view path) {
         monsterTail(selector);
         add<HurtByTargetGoal>(selector, 1, HurtByTargetGoal::Types{}, true);
         add<AngryAtPlayerGoal>(selector, 2);
+        add<ResetUniversalAngerTargetGoal>(selector, 3, true);
         return true;
     }
     if (path == "warden") {
@@ -419,11 +432,14 @@ bool buildMonster(GoalSelector& selector, std::string_view path) {
     if (path == "enderman") {
         // parity: minus carrying blocks about, which is its own pair of goals.
         add<FloatGoal>(selector, 0);
+        add<EndermanFreezeWhenLookedAtGoal>(selector, 1);
         add<TeleportAwayGoal>(selector, 1);
         add<MeleeAttackGoal>(selector, 2, 1.0);
         monsterTail(selector);
-        add<StareTriggerGoal>(selector, 1);
+        add<EndermanLookForPlayerGoal>(selector, 1);
         add<HurtByTargetGoal>(selector, 2);
+        add<NearestAttackableEntityGoal>(selector, 3, Names{"endermite"});
+        add<ResetUniversalAngerTargetGoal>(selector, 4, false);
         return true;
     }
     if (path == "creeper") {

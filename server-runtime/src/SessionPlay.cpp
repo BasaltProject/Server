@@ -391,13 +391,6 @@ player::PlayerConnection ClientSession::playerConnection() {
             dismount(*rider);
         }
     };
-    connection.showSleeping = [this](const std::int32_t entityId,
-                                     const std::optional<std::array<std::int32_t, 3>> bed) {
-        const play::SetEntityDataPacket packet = play::SetEntityDataPacket::sleeping(
-            entityId, bed.has_value() ? std::optional{play::BlockPos{(*bed)[0], (*bed)[1], (*bed)[2]}} : std::nullopt);
-        sendPlayPacket(play::SetEntityDataPacket::kId,
-                       [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
-    };
     connection.wakeUp = [this] { wakeUp(); };
     connection.sendTime = [this](const world::LoadedWorld& world) { uiState_->sendTime(world); };
     connection.sendActionBar = [this](const wire::text::Component& message) { sendPluginText(message, true); };
@@ -414,7 +407,6 @@ player::PlayerConnection ClientSession::playerConnection() {
         const play::TitleTextPacket over{.text = title};
         sendCompressed(play::kSetTitleTextId, [&over](wire::io::ByteBuffer& buffer) { over.write(buffer); });
     };
-    connection.syncSubmersion = [this] { syncSubmersion(); };
     connection.sendCommandTree = [this] { sendCommandTree(); };
     connection.syncExperience = [this] { syncExperience(); };
     connection.killPlayer = [this](std::string_view deathMessageId) { killPlayer(deathMessageId); };
@@ -513,6 +505,7 @@ void ClientSession::enterPlay() {
             .name = property.name, .value = property.value, .signature = property.signature});
     }
     session->skinParts = pendingSkinParts_;
+    session->mainArm = pendingMainHand_;
     session->chatVisibility.store(static_cast<PlayerSession::ChatVisibility>(std::clamp(pendingChatVisibility_, 0, 2)));
     playerSession_ = std::move(session);
     PlayerSession& player = *playerSession_;
@@ -619,11 +612,6 @@ void ClientSession::enterPlay() {
     sendCompressed(play::PlayerInfoUpdatePacket::kId, [&entries](wire::io::ByteBuffer& buffer) {
         play::PlayerInfoUpdatePacket::initializing(entries).write(buffer);
     });
-
-    // Their own entity, not just everyone else's: a client reads its *own* skin layers from the
-    // synced metadata, so without this the player sees themselves with no hat, jacket or sleeves.
-    const play::SetEntityDataPacket skin = play::SetEntityDataPacket::skinParts(entityId, player.skinParts);
-    sendCompressed(play::SetEntityDataPacket::kId, [&skin](wire::io::ByteBuffer& buffer) { skin.write(buffer); });
 
     // The HUD draws no hearts and no experience bar until it has been told what to draw.
     uiState_->syncHealth();
@@ -961,6 +949,7 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         }
         const auto skinParts = static_cast<std::int8_t>(information->skinParts);
         pendingSkinParts_ = skinParts;
+        pendingMainHand_ = information->mainHand;
         pendingChatVisibility_ = information->chatFlags;
         pendingViewDistance_ = information->viewDistance;
         if (chunkStreamer_ != nullptr) {
@@ -970,20 +959,10 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
             session->chatVisibility.store(
                 static_cast<PlayerSession::ChatVisibility>(std::clamp(information->chatFlags, 0, 2)));
         }
-        if (session != nullptr && session->skinParts != skinParts) {
+        // parity: `ServerPlayer.updateOptions` sets both, and the tracker sends what changed.
+        if (session != nullptr) {
             session->skinParts = skinParts;
-            const play::SetEntityDataPacket metadata =
-                play::SetEntityDataPacket::skinParts(session->entityId(), skinParts);
-            sendPlayPacket(play::SetEntityDataPacket::kId,
-                           [&metadata](wire::io::ByteBuffer& buffer) { metadata.write(buffer); });
-            for (const PlayerSession* other : playersInSameWorld()) {
-                if (other->uuid() == session->uuid() || !other->connection().sendPlayPacket) {
-                    continue;
-                }
-                other->connection().sendPlayPacket(
-                    play::SetEntityDataPacket::kId,
-                    [&metadata](wire::io::ByteBuffer& buffer) { metadata.write(buffer); });
-            }
+            session->mainArm = information->mainHand;
         }
         return;
     }

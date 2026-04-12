@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
+#include <basalt/server/runtime/world/RealEntityTypeTags.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/common/Uuid.hpp>
 
@@ -41,6 +42,8 @@ public:
         std::function<std::int64_t()> nextSeed;
         /// What the `blocks_wind_charge_explosions` tag holds, the only thing that shortens a gust.
         const world::realBlockTags::TagMembers* blockTags = nullptr;
+        /// What `deflects_projectiles` holds: the breeze.
+        const world::realEntityTypeTags::TagMembers* entityTags = nullptr;
         /// Where a dragon fireball burst, for the cloud it leaves.
         std::function<void(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                            const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& fireball)>
@@ -190,6 +193,10 @@ private:
 
     /// Where a thrown pearl puts whoever threw it.
     void landEnderPearl(const std::vector<player::PlayerSession*>& watchers, entity::ServerEntity& pearl);
+    /// parity: `Projectile.hitTargetOrDeflectSelf` against a breeze. Answers whether it was turned.
+    bool deflected(const std::vector<player::PlayerSession*>& watchers,
+                   const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& projectile, double fromX,
+                   double fromY, double fromZ);
 
     BlockChangeBroadcaster& broadcaster_;
     ExplosionSystem& explosions_;

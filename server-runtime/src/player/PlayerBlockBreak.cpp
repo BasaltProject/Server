@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/item/ItemDamageEffects.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
@@ -310,6 +311,7 @@ void wearHeldItem(const BreakContext& context, PlayerSession& player, const std:
     if (context.itemDamageAllowed && !context.itemDamageAllowed(*session, held->id, cost, !worn.has_value())) {
         return;
     }
+    world::triggerFacts::durabilityChanged(context.triggers, *session, *held, worn);
     session->inventory.set(heldSlot, worn);
     if (!worn.has_value()) {
         statAwards::itemBroken(*session, held->id, statAwards::kBreakMainHand, context.registry);

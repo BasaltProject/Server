@@ -15,6 +15,7 @@
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Composters.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/Dispensers.hpp>
@@ -80,6 +81,35 @@ void RedstoneTickSystem::releaseHatchlings(world::LoadedWorld& world,
         }
     }
     hatched.clear();
+}
+
+void RedstoneTickSystem::crafterCrafted(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                                        const server::world::crafting::CraftingInput& input,
+                                        const world::blockInventory::Slots& grid) {
+    world::AdvancementTriggers* triggers = options_.advancementTriggers;
+    if (triggers == nullptr || recipes_ == nullptr || !triggers->listensTo("crafter_recipe_crafted")) {
+        return;
+    }
+    const std::optional<world::RealRecipes::Match> match = recipes_->recipeMatching(input);
+    if (!match.has_value()) {
+        return;
+    }
+    std::vector<world::TriggerItem> ingredients;
+    for (const std::optional<server::world::loot::ItemStack>& slot : grid) {
+        ingredients.push_back(slot.has_value() ? world::TriggerItem{.item = slot->item,
+                                                                    .count = slot->count,
+                                                                    .components = slot->components}
+                                               : world::TriggerItem{.item = wire::common::Identifier::vanilla("air"),
+                                                                    .count = 0});
+    }
+    constexpr double kHalfBox = 8.5;
+    for (PlayerSession* player : watchersOf(world)) {
+        if (std::abs(player->x - (x + 0.5)) < kHalfBox && std::abs(player->y - (y + 0.5)) < kHalfBox &&
+            std::abs(player->z - (z + 0.5)) < kHalfBox) {
+            triggers->fire("crafter_recipe_crafted", player->name(), player->uuid().toString(),
+                           world::TriggerEvent{.ids = {{"recipe_id", match->id}}, .ingredients = ingredients});
+        }
+    }
 }
 
 void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sched::Region& region) {
@@ -370,7 +400,12 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                 world.state(), x, y, z,
                 {.resultFor =
                      [this](const server::world::crafting::CraftingInput& input) { return recipes_->resultFor(input); },
-                 .allocateEntityId = [this] { return players_->allocateEntityId(); }});
+                 .allocateEntityId = [this] { return players_->allocateEntityId(); },
+                 .crafted =
+                     [this, &world, x, y, z](const server::world::crafting::CraftingInput& input,
+                                            const world::blockInventory::Slots& grid) {
+                         crafterCrafted(world, x, y, z, input, grid);
+                     }});
             crafted.has_value()) {
             scheduled.push_back(*crafted);
         }

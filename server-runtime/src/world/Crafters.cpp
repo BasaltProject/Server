@@ -186,6 +186,9 @@ std::optional<BlockChange> craft(WorldState& world, std::int32_t x, std::int32_t
                            .effects = {blockEffect::Effect{.type = blockEffect::Effect::kCrafterFail, .data = 0}}};
     }
     deliver(world, x, y, z, *stateId, *result, hooks);
+    if (hooks.crafted) {
+        hooks.crafted(server::world::crafting::CraftingInput::of(kGrid, kGrid, slots), slots);
+    }
     for (std::optional<server::world::loot::ItemStack>& slot : slots) {
         if (!slot.has_value()) {
             continue;

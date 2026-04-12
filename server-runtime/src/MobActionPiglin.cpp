@@ -1,5 +1,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
+#include <basalt/server/runtime/entity/BlockRay.hpp>
+#include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobEquipment.hpp>
 #include <basalt/server/runtime/entity/Piglins.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -71,6 +73,7 @@ void MobActionSystem::tickPiglin(world::LoadedWorld& world, entity::ai::MobConte
     if (state.angryAt.until < -1) {
         state.angryAt.until = now + (-2 - state.angryAt.until);
     }
+    settle(state.universalAnger, now);
     if (!state.memoriesSeeded) {
         state.memoriesSeeded = true;
         // parity: `PiglinAi.initMemories` and `PiglinBruteAi.initMemories`, from `finalizeSpawn`.
@@ -297,23 +300,36 @@ void MobActionSystem::piglinCore(world::LoadedWorld& world, entity::ai::MobConte
                 }
             }
         }
-        // parity: `StartCelebratingIfTargetDead(300, wantsToDance)`.
+        // parity: `StartCelebratingIfTargetDead(300, wantsToDance)`, which holds on to a dead player
+        // unless `forgive_dead_players`.
         if (piglin.targetId.has_value() && !state.celebrateLocation.has(now)) {
             const ServerEntity* target = context.entityById(*piglin.targetId);
-            const bool dead = target != nullptr && (target->dying || target->removed || target->health <= 0.0);
+            const PlayerSession* deadPlayer = nullptr;
+            for (PlayerSession* player : watchersOf(world)) {
+                if (player->entityId() == *piglin.targetId && player->dead) {
+                    deadPlayer = player;
+                }
+            }
+            const bool dead = deadPlayer != nullptr ||
+                              (target != nullptr && (target->dying || target->removed || target->health <= 0.0));
             if (dead) {
                 random::RandomSource dance = random::RandomSource::legacy(now);
-                if (target->type().path() == "hoglin" && dance.nextFloat() < 0.1F) {
+                if (target != nullptr && target->type().path() == "hoglin" && dance.nextFloat() < 0.1F) {
                     state.dancing = true;
                 }
-                state.celebrateLocation.setFor({mth::floor(target->x), mth::floor(target->y), mth::floor(target->z)},
-                                               now, piglins::kCelebrationTime);
-                piglin.targetId.reset();
-                state.angryAt.erase();
+                const double x = deadPlayer != nullptr ? deadPlayer->x : target->x;
+                const double y = deadPlayer != nullptr ? deadPlayer->y : target->y;
+                const double z = deadPlayer != nullptr ? deadPlayer->z : target->z;
+                state.celebrateLocation.setFor({mth::floor(x), mth::floor(y), mth::floor(z)}, now,
+                                               piglins::kCelebrationTime);
+                if (deadPlayer == nullptr || world.gameRules().get(world::gameRules::kForgiveDeadPlayers)) {
+                    piglin.targetId.reset();
+                    state.angryAt.erase();
+                }
             }
         }
     }
-    // parity: `StopBeingAngryIfTargetDead`.
+    // parity: `StopBeingAngryIfTargetDead`, a dead player only with `forgive_dead_players`.
     if (state.angryAt.has(now)) {
         for (const ServerEntity* other : context.entities) {
             if (other->uuid() == *state.angryAt.value && (other->dying || other->health <= 0.0)) {
@@ -322,6 +338,57 @@ void MobActionSystem::piglinCore(world::LoadedWorld& world, entity::ai::MobConte
             }
         }
     }
+    if (state.angryAt.has(now) && world.gameRules().get(world::gameRules::kForgiveDeadPlayers)) {
+        for (const PlayerSession* player : watchersOf(world)) {
+            if (player->uuid() == *state.angryAt.value && player->dead) {
+                state.angryAt.erase();
+                break;
+            }
+        }
+    }
+}
+
+void MobActionSystem::piglinRetaliate(world::LoadedWorld& world, ServerEntity& piglin, PiglinState& state,
+                                      std::int32_t attackerId, bool byPlayer) {
+    if (!byPlayer || !world.gameRules().get(world::gameRules::kUniversalAnger)) {
+        piglinSetAngerTarget(world, piglin, state, attackerId);
+        piglinBroadcastAnger(world, piglin, state, attackerId);
+        return;
+    }
+    // parity: `setAngerTargetToNearestTargetablePlayerIfFound` and `broadcastUniversalAnger`, each
+    // adult it sees turning on the nearest player it can see itself.
+    piglinSetAngerTarget(world, piglin, state, tSense.attackablePlayer.value_or(attackerId));
+    for (ServerEntity* adult : tSense.adultPiglins) {
+        if (const std::optional<std::int32_t> player = piglinNearestPlayer(world, *adult); player.has_value()) {
+            piglinSetAngerTarget(world, *adult, piglins::stateOf(*adult), *player);
+        }
+    }
+}
+
+std::optional<std::int32_t> MobActionSystem::piglinNearestPlayer(world::LoadedWorld& world,
+                                                                 const ServerEntity& piglin) {
+    const double range = piglin.attributeWithModifiers("minecraft:follow_range");
+    const double eyeY = piglin.y + entity::mobBreathing::eyeHeightOf(piglin);
+    std::optional<std::int32_t> nearest;
+    double best = range * range;
+    for (PlayerSession* player : watchersOf(world)) {
+        if (player->dead || player->gamemode == wire::protocol::play::Gamemode::Creative ||
+            player->gamemode == wire::protocol::play::Gamemode::Spectator) {
+            continue;
+        }
+        const double dx = player->x - piglin.x;
+        const double dy = player->y - piglin.y;
+        const double dz = player->z - piglin.z;
+        const double distance = (dx * dx) + (dy * dy) + (dz * dz);
+        if (distance >= best ||
+            entity::blockRay::cast(world.state(), piglin.x, eyeY, piglin.z, player->x, player->y + 1.62, player->z)
+                .has_value()) {
+            continue;
+        }
+        best = distance;
+        nearest = player->entityId();
+    }
+    return nearest;
 }
 
 std::optional<std::int32_t> MobActionSystem::piglinAttackTarget(world::LoadedWorld& world,
@@ -351,6 +418,10 @@ std::optional<std::int32_t> MobActionSystem::piglinAttackTarget(world::LoadedWor
     static_cast<void>(world);
     if (state.brute) {
         return sense.attackablePlayer.has_value() ? sense.attackablePlayer : sense.nemesis;
+    }
+    // parity: `UNIVERSAL_ANGER` turns it on the nearest player it can see.
+    if (state.universalAnger.has(now) && sense.attackablePlayer.has_value()) {
+        return sense.attackablePlayer;
     }
     if (sense.nemesis.has_value()) {
         return sense.nemesis;

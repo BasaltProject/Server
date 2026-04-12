@@ -12,7 +12,9 @@
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/common/Uuid.hpp>
+#include <basalt/wire/nbt/NbtTag.hpp>
 #include <basalt/wire/protocol/login/LoginPackets.hpp>
+#include <basalt/wire/protocol/play/BlockPos.hpp>
 #include <basalt/wire/protocol/play/SpawnInfo.hpp>
 #include <basalt/wire/text/Component.hpp>
 
@@ -93,6 +95,23 @@ public:
     /// `blocks_attacks`, which only blocks once its delay has passed.
     std::optional<std::int32_t> blockingSlot;
     std::int32_t blockingTicks = 0;
+    /// parity: `LivingEntity.getUsedItemHand`, whether what is in use is in the off hand.
+    bool usingOffhand = false;
+
+    /// parity: `Entity.FLAG_SWIMMING` as `updateSwimming` sets it, and `Player.updatePlayerPose`.
+    bool swimming = false;
+    wire::protocol::play::Pose pose = wire::protocol::play::Pose::Standing;
+    /// parity: `Avatar.DATA_PLAYER_MAIN_HAND` from the client's settings: 0 left, 1 right.
+    std::int32_t mainArm = 1;
+    /// parity: `LivingEntity`'s stuck arrows and stingers and the timers that shed them.
+    std::int32_t arrowCount = 0;
+    std::int32_t removeArrowTime = 0;
+    std::int32_t stingerCount = 0;
+    std::int32_t removeStingerTime = 0;
+    /// parity: `ServerPlayer.shoulderEntityLeft`/`Right`, a parrot sitting there as its saved tag.
+    std::optional<wire::nbt::NbtCompound> shoulderLeft;
+    std::optional<wire::nbt::NbtCompound> shoulderRight;
+    std::int64_t timeEntitySatOnShoulder = 0;
 
     /// What they are riding, by entity id. parity: `Entity.vehicle`.
     std::optional<std::int32_t> vehicleId;
@@ -235,6 +254,10 @@ public:
     /// parity: `LivingEntity.lastHurtByMob`, the kind of mob that hurt them last, kept for as long.
     std::optional<wire::common::Identifier> lastHurtByMobType;
     std::atomic<std::int32_t> lastHurtByMobTime{0};
+    /// parity: `ServerPlayer.currentExplosionImpactPos` and `currentExplosionCause`, where the last
+    /// blast caught them and what set it off, until their next fall starts.
+    std::optional<std::array<double, 3>> explosionImpact;
+    std::optional<std::int32_t> explosionCause;
     /// parity: `ItemCooldowns`, which belongs to the player and not to the connection: both doors
     /// throw the same pearl, so both wait the same.
     std::map<std::string, std::int64_t, std::less<>> itemCooldowns;

@@ -138,6 +138,12 @@ public:
                          const std::optional<std::int32_t>& clickedState,
                          const std::optional<storage::StoredItemStack>& tool) const;
 
+    /// parity: `DEFAULT_BLOCK_USE` for a block's own use, or `ANY_BLOCK_USE` for any use that took
+    /// the click, with what was held.
+    void awardBlockUse(const player::PlayerSession& session, const wire::protocol::play::BlockPos& pos,
+                       const std::optional<std::int32_t>& clickedState,
+                       const std::optional<storage::StoredItemStack>& tool, bool withoutItem) const;
+
     void handleUseItem(const wire::protocol::play::ServerboundUseItemPacket& useItem);
 
     /// parity: `handlePunch`, an arm swung at the air or a block.

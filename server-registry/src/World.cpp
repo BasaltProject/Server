@@ -102,6 +102,23 @@ float bouncinessOf(std::int32_t stateId) {
 
 } // namespace blockMovement
 
+namespace blockSounds {
+
+const BlockSoundTypeEntry& of(std::int32_t stateId) {
+    static const std::unordered_map<Identifier, std::int32_t> table = [] {
+        std::unordered_map<Identifier, std::int32_t> built;
+        for (const BlockSoundEntry& entry : blockSoundsTable()) {
+            built.emplace(vanilla(entry.block), entry.soundType);
+        }
+        return built;
+    }();
+    const Identifier* block = blockStateDefinitions::blockOf(stateId);
+    const auto found = block == nullptr ? table.end() : table.find(*block);
+    return blockSoundTypesTable()[found == table.end() ? 0 : static_cast<std::size_t>(found->second)];
+}
+
+} // namespace blockSounds
+
 namespace noteBlockInstruments {
 namespace {
 

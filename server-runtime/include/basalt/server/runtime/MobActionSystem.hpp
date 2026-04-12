@@ -22,6 +22,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -262,6 +263,23 @@ public:
     void takeRaidBanner(entity::ServerEntity& raider, std::int32_t itemId) override;
 
     void setCelebrating(entity::ServerEntity& raider, bool celebrating) override;
+
+    bool sitOnShoulder(entity::ServerEntity& parrot, std::int32_t playerId) override;
+
+    /// parity: `Entity.move`'s tail for a mob: the fall counted and landed, the footsteps, the swimming.
+    void emitMovement(world::LoadedWorld& world, entity::ServerEntity& mob);
+
+    /// parity: the same for every player, whose footsteps and strokes everybody else hears.
+    void emitPlayerMovement(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers);
+
+    /// parity: `Camel.tickRidden`, the rider's forward key standing it up.
+    void camelRidden(world::LoadedWorld& world, entity::ServerEntity& camel, const player::PlayerSession& rider);
+
+    /// parity: `Parrot.aiStep`'s one in four hundred imitation of a mob nearby.
+    void tickParrot(world::LoadedWorld& world, entity::ServerEntity& parrot);
+
+    /// parity: `ServerPlayer.handleShoulderEntities` and `removeEntitiesOnShoulder` for every player.
+    void tickShoulders(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers);
 
     /// parity: `Shulker.tick`: the reaction to a hit, a new face or a jump when it lost its hold,
     /// and the lid easing towards its peek.
@@ -513,6 +531,13 @@ public:
     /// parity: `ZombifiedPiglin.customServerAiStep`: the anger, its growl, its speed and the others called in.
     void tickZombifiedPiglin(world::LoadedWorld& world, entity::ServerEntity& mob, random::RandomSource& random);
 
+    /// parity: `updatePersistentAnger(level, true)` in the `aiStep` of the wolf, the iron golem, the
+    /// polar bear and the enderman, and the enderman's `setTarget` speed.
+    void tickNeutralMob(world::LoadedWorld& world, entity::ServerEntity& mob, random::RandomSource& random);
+
+    /// parity: `ServerPlayer.tellNeutralMobsThatIDied` for every player who died since the last turn.
+    void forgiveDeadPlayers(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers);
+
     /// The bee's own turn beyond its goals. parity: `Bee.customServerAiStep` and the rest of `Bee.aiStep`.
     void tickBee(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                  entity::ServerEntity& bee, random::RandomSource& random);
@@ -574,9 +599,8 @@ private:
     void creakingHeartHurt(world::LoadedWorld& world, const std::array<std::int32_t, 3>& at);
 
     /// parity: `spreadResin`.
-    std::optional<std::array<std::int32_t, 3>> spreadResin(world::LoadedWorld& world,
-                                                           const std::array<std::int32_t, 3>& from,
-                                                           random::RandomSource& random);
+    std::optional<std::array<std::int32_t, 3>>
+    spreadResin(world::LoadedWorld& world, const std::array<std::int32_t, 3>& from, random::RandomSource& random);
 
     /// parity: `removeProtector`, torn down or, with a breaker, killed by them.
     void removeCreakingProtector(world::LoadedWorld& world, const std::array<std::int32_t, 3>& at,
@@ -696,6 +720,12 @@ private:
                               entity::piglins::PiglinState& state, std::int32_t targetId);
     void piglinBroadcastAnger(world::LoadedWorld& world, entity::ServerEntity& piglin,
                               entity::piglins::PiglinState& state, std::int32_t targetId);
+    /// parity: `PiglinAi.maybeRetaliate`'s anger, universal or at the attacker, told to the others.
+    void piglinRetaliate(world::LoadedWorld& world, entity::ServerEntity& piglin, entity::piglins::PiglinState& state,
+                         std::int32_t attackerId, bool byPlayer);
+    /// parity: `getNearestVisibleTargetablePlayer`, off the piglin's own player sensor.
+    [[nodiscard]] std::optional<std::int32_t> piglinNearestPlayer(world::LoadedWorld& world,
+                                                                  const entity::ServerEntity& piglin);
     [[nodiscard]] std::optional<std::int32_t> piglinAttackTarget(world::LoadedWorld& world,
                                                                  const entity::ai::MobContext& context,
                                                                  entity::piglins::PiglinState& state);
@@ -755,6 +785,22 @@ private:
     std::map<std::pair<std::string, std::array<std::int32_t, 3>>, bool> hivesByFire_;
     /// Each creaking heart's unsaved counters, by world and square.
     std::map<std::pair<std::string, std::array<std::int32_t, 3>>, entity::creakings::HeartState> creakingHearts_;
+    /// parity: `Parrot.imitateNearbyMobs` from a box at `x, y, z`. Answers whether it made a sound.
+    bool imitateNearbyMobs(world::LoadedWorld& world, double x, double y, double z, double width, double height,
+                           wire::protocol::play::SoundSource source, random::RandomSource& random);
+    /// parity: `LivingEntity.checkFallDamage` on landing: the dust, `fallOn` and `causeFallDamage`.
+    void landMob(world::LoadedWorld& world, entity::ServerEntity& mob);
+    /// parity: `walkingStepSound` on the square at `at`.
+    void stepSound(world::LoadedWorld& world, entity::ServerEntity& mob, const std::array<std::int32_t, 3>& at,
+                   std::int32_t stateId);
+    /// parity: `Entity.playSound`, heard by everyone in the world, never from a silenced mob.
+    void movementSound(world::LoadedWorld& world, const entity::ServerEntity& mob, std::string_view sound, float volume,
+                       float pitch);
+    /// parity: `ServerPlayer.respawnEntityOnShoulder`.
+    void respawnShoulder(world::LoadedWorld& world, player::PlayerSession& player, const wire::nbt::NbtCompound& tag);
+
+    /// The players whose death the neutral mobs have already been told of.
+    std::set<std::int32_t> mourned_;
 };
 
 } // namespace basalt::server::runtime

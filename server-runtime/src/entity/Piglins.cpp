@@ -20,6 +20,7 @@ using wire::nbt::NbtType;
 
 constexpr std::string_view kAngryAt = "minecraft:angry_at";
 constexpr std::string_view kHuntedRecently = "minecraft:hunted_recently";
+constexpr std::string_view kUniversalAnger = "minecraft:universal_anger";
 constexpr std::string_view kHome = "minecraft:home";
 
 [[nodiscard]] NbtTag uuidTag(const wire::common::Uuid& uuid) {
@@ -105,6 +106,10 @@ PiglinState& stateOf(ServerEntity& piglin) {
             state.angryAt.until = angry->contains("ttl") ? -2 - angry->getLong("ttl") : -1;
         }
     }
+    if (const NbtCompound* universal = memories->getCompound(kUniversalAnger); universal != nullptr) {
+        state.universalAnger.value = universal->getBoolean("value");
+        state.universalAnger.until = universal->contains("ttl") ? -2 - universal->getLong("ttl") : -1;
+    }
     if (const NbtCompound* hunted = memories->getCompound(kHuntedRecently); hunted != nullptr) {
         state.huntedRecently.value = true;
         state.huntedRecently.until = hunted->contains("ttl") ? -2 - hunted->getLong("ttl") : -1;
@@ -142,6 +147,10 @@ void write(const ServerEntity& piglin, NbtCompound& tag) {
     NbtCompound memories;
     if (state.angryAt.has(gameTime)) {
         putTimed(memories, kAngryAt, uuidTag(*state.angryAt.value), state.angryAt.until, gameTime);
+    }
+    if (state.universalAnger.has(gameTime)) {
+        putTimed(memories, kUniversalAnger, NbtTag::ofBoolean(*state.universalAnger.value), state.universalAnger.until,
+                 gameTime);
     }
     if (state.huntedRecently.has(gameTime)) {
         putTimed(memories, kHuntedRecently, NbtTag::ofBoolean(true), state.huntedRecently.until, gameTime);

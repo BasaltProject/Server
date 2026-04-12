@@ -12,7 +12,9 @@
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
 #include <basalt/server/runtime/entity/WitherBoss.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
+#include <basalt/server/runtime/player/PlayerImpulse.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
@@ -29,6 +31,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <set>
 #include <utility>
 
 namespace basalt::server::runtime {
@@ -111,6 +114,9 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
         emitVibration(world, "projectile_shoot", entity.x, entity.y, entity.z, entity.uuid());
     }
     const std::string_view path = kind.type.path();
+    if (deflected(watchers, living, entity, fromX, fromY, fromZ)) {
+        return;
+    }
 
     // parity: `AbstractWindCharge.onHitBlock`, whose gust goes off a quarter of a block back along
     // the face it came in through, and `onHitEntity`, which lets it off where it stands.
@@ -394,6 +400,46 @@ void CombatSystem::splashPotion(world::LoadedWorld& world, const std::vector<Pla
                                                         .pitch = 1.0F}});
 }
 
+bool CombatSystem::deflected(const std::vector<PlayerSession*>& watchers, const std::vector<ServerEntity*>& living,
+                             ServerEntity& projectile, double fromX, double fromY, double fromZ) {
+    // parity: `Breeze.deflection`, which lets a wind charge through.
+    const std::string_view path = projectile.type().path();
+    if (path == "wind_charge" || path == "breeze_wind_charge" || options_.entityTags == nullptr) {
+        return false;
+    }
+    const std::set<Identifier>& deflectors =
+        world::realEntityTypeTags::membersOf(*options_.entityTags, Identifier::vanilla("deflects_projectiles"));
+    if (deflectors.empty() || std::ranges::none_of(living, [&deflectors](const ServerEntity* mob) {
+            return deflectors.contains(mob->type());
+        })) {
+        return false;
+    }
+    const std::optional<Target> target = targetAlong(watchers, living, projectile, fromX, fromY, fromZ);
+    if (!target.has_value() || target->mob == nullptr || !deflectors.contains(target->mob->type())) {
+        return false;
+    }
+    // parity: `hitTargetOrDeflectSelf`: the deflector keeps it from landing, and turns it back only
+    // the first time in a row.
+    const ServerEntity& breeze = *target->mob;
+    if (projectile.lastDeflectedBy == breeze.entityId()) {
+        return true;
+    }
+    projectile.lastDeflectedBy = breeze.entityId();
+    const std::int64_t seed = options_.nextSeed ? options_.nextSeed() : 0;
+    for (const PlayerSession* watcher : watchers) {
+        player::playSoundFor(*watcher, "minecraft:entity.breeze.deflect", wire::protocol::play::SoundSource::Hostile,
+                             breeze.x, breeze.y, breeze.z, 1.0F, 1.0F, seed);
+    }
+    // parity: `ProjectileDeflection.REVERSE` at full power: back at half the speed, turned a little
+    // over half a turn either way.
+    constexpr double kReverse = -0.5;
+    projectile.velocityX *= kReverse;
+    projectile.velocityY *= kReverse;
+    projectile.velocityZ *= kReverse;
+    projectile.yaw += 170.0F + (static_cast<float>(options_.nextInt ? options_.nextInt(1000) : 0) / 1000.0F * 20.0F);
+    return true;
+}
+
 void CombatSystem::landEnderPearl(const std::vector<PlayerSession*>& watchers, ServerEntity& pearl) {
     pearl.removed = true;
     if (!pearl.ownerId.has_value()) {
@@ -419,6 +465,8 @@ void CombatSystem::landEnderPearl(const std::vector<PlayerSession*>& watchers, S
     if (owner->connection().teleportTo) {
         owner->connection().teleportTo(pearl.x, pearl.y, pearl.z, owner->yaw, owner->pitch);
     }
+    // parity: `ThrownEnderpearl.onHit` lets go of the thrower's impulse.
+    player::impulse::reset(*owner);
     if (owner->connection().hurt) {
         owner->connection().hurt(kEnderPearlDamage, kDeathFall, world::damageTypes::kEnderPearl, std::nullopt);
     }

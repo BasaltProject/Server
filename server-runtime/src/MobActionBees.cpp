@@ -229,6 +229,8 @@ void MobActionSystem::beeStung(world::LoadedWorld& world, ServerEntity& bee, Pla
     // parity: `Bee.doHurtTarget` leaves its stinger in whatever it stung.
     if (mob != nullptr) {
         ++mob->stingerCount;
+    } else if (player != nullptr) {
+        ++player->stingerCount;
     }
     state.hasStung = true;
     entity::bees::stopBeingAngry(bee, state);

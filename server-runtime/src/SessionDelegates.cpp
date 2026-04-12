@@ -176,8 +176,6 @@ void ClientSession::addEffect(const Identifier& effect, std::int32_t durationTic
     uiState_->addEffect(effect, durationTicks, amplifier);
 }
 
-void ClientSession::syncSubmersion() { uiState_->syncSubmersion(); }
-
 void ClientSession::syncHealth() { uiState_->syncHealth(); }
 
 void ClientSession::syncHeldAttributes() { uiState_->syncHeldAttributes(); }

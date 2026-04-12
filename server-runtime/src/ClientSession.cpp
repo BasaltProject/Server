@@ -176,7 +176,6 @@ void ClientSession::startOutboundLoop() {
                     }
                     entityTracker_->syncPlayers();
                     entityTracker_->syncNpcs();
-                    uiState_->syncPosture();
                     entityTracker_->syncItemEntities();
                     entityTracker_->syncSummonedEntities();
                     entityTracker_->syncGeneratedEntities();

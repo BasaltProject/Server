@@ -117,7 +117,11 @@ struct BulletState;
 
 namespace ai {
 class GoalSelector;
-}
+
+namespace brainKit {
+struct SensorScan;
+} // namespace brainKit
+} // namespace ai
 
 /// parity: `LivingEntity.tickDeath`, which removes the body once `deathTime` reaches twenty.
 inline constexpr std::int32_t kDeathTicks = 20;
@@ -233,11 +237,16 @@ public:
 
     /// Who shot it, by entity id. parity: `Projectile.owner`, which is who a kill is blamed on.
     std::optional<std::int32_t> ownerId;
+    /// parity: `Projectile.lastDeflectedBy`, which it passes through untouched.
+    std::optional<std::int32_t> lastDeflectedBy;
     /// parity: `AbstractArrow.isCritArrow`, set by a fully drawn bow and worth extra damage.
     bool critical = false;
 
     /// Who hit it last, waiting for `HurtByTargetGoal` to turn that into a target.
     std::optional<std::int32_t> hurtBy;
+    /// parity: `LivingEntity.lastHurtByMob` and its timestamp, which only `stopBeingAngry` clears.
+    std::optional<std::int32_t> lastHurtByMob;
+    std::int32_t lastHurtByMobTimestamp = 0;
     /// The player whose hit still counts as theirs, and for how many more ticks.
     /// parity: `LivingEntity.lastHurtByPlayer` and `lastHurtByPlayerMemoryTime`.
     std::optional<wire::common::Uuid> lastHurtByPlayer;
@@ -441,6 +450,20 @@ public:
     /// parity: `LivingEntity.DATA_STINGER_COUNT_ID` and `removeStingerTime`, the bee stings it wears.
     std::int32_t stingerCount = 0;
     std::int32_t removeStingerTime = 0;
+    /// parity: what its brain's `NearestLivingEntitySensor` and `PlayerSensor` saw on their last scan.
+    std::shared_ptr<ai::brainKit::SensorScan> sensorScan;
+    /// Where its movement was last heard from, and `Entity.moveDist`, `flyDist`, `nextStep` and
+    /// `fallDistance`, with `walkingStepSound`'s amethyst chime clock.
+    std::optional<std::array<double, 3>> emittedFrom;
+    float moveDist = 0.0F;
+    float flyDist = 0.0F;
+    float nextStep = 1.0F;
+    double fallDistance = 0.0;
+    std::int32_t lastCrystalSoundTick = 0;
+    float crystalSoundIntensity = 0.0F;
+    /// parity: `LivingEntity.DATA_ARROW_COUNT_ID` and `removeArrowTime`, the arrows stuck in it.
+    std::int32_t arrowCount = 0;
+    std::int32_t removeArrowTime = 0;
 
     /// What the goals decided it is doing. parity: `Mob.goalSelector`, one set of goals per mob.
     std::shared_ptr<ai::GoalSelector> goals;

@@ -79,6 +79,12 @@ void PlayerSession::resetForRespawn() {
     airSupply = world::fluids::kMaxAir;
     fireTicks = 0;
     effects.clear();
+    swimming = false;
+    pose = wire::protocol::play::Pose::Standing;
+    arrowCount = 0;
+    removeArrowTime = 0;
+    stingerCount = 0;
+    removeStingerTime = 0;
 }
 
 } // namespace basalt::server::runtime::player

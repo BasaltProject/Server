@@ -51,6 +51,11 @@ struct PlayerView {
     /// parity: `Player.isSleeping` and `getSleepTimer`, which a cat on the bed reads.
     bool sleeping = false;
     std::int32_t sleepTicks = 0;
+    /// parity: `LivingEntity.PLAYER_NOT_WEARING_DISGUISE_ITEM`, inverted: a carved pumpkin on the head.
+    bool gazeDisguised = false;
+    /// parity: `Abilities.flying` and `Entity.isInWater`, which keep a parrot off the shoulder.
+    bool flying = false;
+    bool inWater = false;
 };
 
 /// What a goal can make the world do beyond moving its own mob.
@@ -145,6 +150,9 @@ public:
 
     /// A pet's sitting or lying pose changed, so everyone watching has to see it.
     virtual void poseChanged(ServerEntity& /*mob*/) {}
+
+    /// parity: `ShoulderRidingEntity.setEntityOnShoulder`. Answers whether it sat down.
+    virtual bool sitOnShoulder(ServerEntity& /*parrot*/, std::int32_t /*playerId*/) { return false; }
 
     /// parity: `Container.setChanged`: the chunk is saved and a comparator reads it again.
     virtual void containerChanged(ServerEntity& /*mob*/, std::int32_t /*x*/, std::int32_t /*y*/, std::int32_t /*z*/) {}
@@ -259,6 +267,9 @@ public:
     std::int64_t dayTime = 0;
     /// parity: `Level.getGameTime`, used by absolute AI cooldown deadlines.
     std::int64_t gameTime = 0;
+    /// parity: `GameRules.UNIVERSAL_ANGER`, which the target goals of neutral mobs read.
+    bool universalAnger = false;
+
     /// parity: `Raider.getCurrentRaid`, as a raider's goals read it.
     struct RaiderRaid {
         /// parity: `Raid.isActive`, false for a raid that was stopped under it.

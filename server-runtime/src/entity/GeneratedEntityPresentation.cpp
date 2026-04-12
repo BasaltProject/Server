@@ -19,6 +19,7 @@
 #include <basalt/server/runtime/entity/Horses.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
+#include <basalt/server/runtime/entity/NeutralAnger.hpp>
 #include <basalt/server/runtime/entity/Piglins.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/Shulkers.hpp>
@@ -43,6 +44,12 @@ namespace {
 constexpr std::uint8_t kEffectParticlesDataIndex = 10;
 constexpr std::uint8_t kEffectAmbienceDataIndex = 11;
 /// parity: `LivingEntity.DATA_STINGER_COUNT_ID`, after the arrows stuck in it.
+constexpr std::uint8_t kArrowCountDataIndex = 12;
+/// parity: `Wolf`'s anger after the tamable's two and its own interest and collar.
+constexpr std::uint8_t kWolfAngerEndDataIndex = 22;
+/// parity: `Enderman`'s creepy and stared-at flags after its carried block at 16.
+constexpr std::uint8_t kEndermanCreepyDataIndex = 17;
+constexpr std::uint8_t kEndermanStaredAtDataIndex = 18;
 constexpr std::uint8_t kStingerCountDataIndex = 13;
 
 /// parity: `ExperienceOrb.DATA_VALUE`.
@@ -493,6 +500,11 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
         (previous != nullptr || fireworkAttached->has_value())) {
         entries.push_back(Entry{.index = 9, .value = SetEntityDataPacket::OptionalUnsignedIntValue{*fireworkAttached}});
     }
+    if (arrows.has_value() && (previous == nullptr || previous->arrows != arrows) &&
+        (previous != nullptr || *arrows != 0)) {
+        entries.push_back(
+            Entry{.index = kArrowCountDataIndex, .value = SetEntityDataPacket::IntValue{.value = *arrows}});
+    }
     if (stingers.has_value() && (previous == nullptr || previous->stingers != stingers) &&
         (previous != nullptr || *stingers != 0)) {
         entries.push_back(
@@ -571,6 +583,20 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
         (previous != nullptr || *beeAngerEnd != -1)) {
         entries.push_back(
             Entry{.index = bees::kAngerEndDataIndex, .value = SetEntityDataPacket::LongValue{*beeAngerEnd}});
+    }
+    if (wolfAngerEnd.has_value() && (previous == nullptr || previous->wolfAngerEnd != wolfAngerEnd) &&
+        (previous != nullptr || *wolfAngerEnd != -1)) {
+        entries.push_back(Entry{.index = kWolfAngerEndDataIndex, .value = SetEntityDataPacket::LongValue{*wolfAngerEnd}});
+    }
+    if (endermanCreepy.has_value() && (previous == nullptr || previous->endermanCreepy != endermanCreepy) &&
+        (previous != nullptr || *endermanCreepy)) {
+        entries.push_back(
+            Entry{.index = kEndermanCreepyDataIndex, .value = SetEntityDataPacket::BoolValue{*endermanCreepy}});
+    }
+    if (endermanStaredAt.has_value() && (previous == nullptr || previous->endermanStaredAt != endermanStaredAt) &&
+        (previous != nullptr || *endermanStaredAt)) {
+        entries.push_back(
+            Entry{.index = kEndermanStaredAtDataIndex, .value = SetEntityDataPacket::BoolValue{*endermanStaredAt}});
     }
     if ((previous == nullptr || previous->airSupply != airSupply) &&
         (previous != nullptr || airSupply != kDefaultAirSupply)) {
@@ -758,6 +784,7 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
         }
         live.effectParticles = std::move(particles);
         live.stingers = entity.stingerCount;
+        live.arrows = entity.arrowCount;
         // parity: `areAllEffectsAmbient` over no effects at all answers false on a fresh entity.
         live.effectsAmbient = !entity.effects.empty() && swirl.allAmbient;
     }
@@ -843,6 +870,14 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
     if (entity.bee != nullptr) {
         live.beeFlags = bees::flagsOf(*entity.bee);
         live.beeAngerEnd = entity.bee->angerEndTime;
+    }
+    if (entity.type().path() == "wolf") {
+        live.wolfAngerEnd = entity.neutral != nullptr ? entity.neutral->endTime : -1;
+    }
+    if (entity.type().path() == "enderman") {
+        // parity: `setTarget` raises `DATA_CREEPY` with a target and lowers both without one.
+        live.endermanCreepy = entity.targetId.has_value();
+        live.endermanStaredAt = entity.neutral != nullptr && entity.neutral->staredAt;
     }
     if (entity.firework != nullptr) {
         const wire::nbt::NbtCompound& item = entity.firework->item;

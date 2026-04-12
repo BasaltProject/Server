@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
+#include <basalt/server/runtime/player/PlayerEntityData.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 #include <basalt/wire/common/Uuid.hpp>
 #include <basalt/wire/protocol/play/EntityData.hpp>
@@ -79,6 +80,9 @@ private:
 
     void syncEquipmentOf(const player::PlayerSession& other);
 
+    /// parity: `ServerEntity.sendDirtyEntityData` for one player, this client's own included.
+    void syncPlayerData(const player::PlayerSession& player);
+
     void sendDisplayText(std::int32_t entityId, const std::string& text);
 
     /// parity: the team that hides a name tag, which an NPC joins before it is drawn.
@@ -105,6 +109,8 @@ private:
     std::map<std::int32_t, std::vector<std::int32_t>> lastPassengers_;
     std::map<std::int32_t, std::int32_t> lastLeashHolders_;
     std::set<std::int32_t> trackedPlayers_;
+    /// What each player's synched data was last sent as, this client's own included.
+    std::map<std::int32_t, player::PlayerEntityData> lastPlayerData_;
     std::map<std::int32_t, std::vector<std::optional<storage::StoredItemStack>>> trackedEquipment_;
     std::set<std::int32_t> trackedGeneratedEntities_;
 };

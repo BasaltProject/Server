@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/Jukeboxes.hpp>
 #include <basalt/server/runtime/world/RandomTicks.hpp>
@@ -7,6 +8,7 @@
 #include <basalt/server/runtime/world/RealItemTags.hpp>
 #include <basalt/server/runtime/world/ScheduledBlocks.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
+#include <basalt/server/world/crafting/Crafting.hpp>
 #include <basalt/server/world/loot/Loot.hpp>
 
 #include <cstdint>
@@ -169,6 +171,11 @@ public:
 private:
     /// Puts what a hatching block left behind in the world, and empties the list.
     void releaseHatchlings(world::LoadedWorld& world, std::vector<world::scheduledBlocks::Hatchling>& hatched);
+
+    /// parity: `CrafterBlock.dispenseFrom`'s `CRAFTER_RECIPE_CRAFTED`, for every player in the
+    /// seventeen-block box around it.
+    void crafterCrafted(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                        const server::world::crafting::CraftingInput& input, const world::blockInventory::Slots& grid);
 
     [[nodiscard]] std::vector<player::PlayerSession*> watchersOf(const world::LoadedWorld& world) const;
 

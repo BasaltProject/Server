@@ -115,8 +115,20 @@ struct Seen {
     std::string_view type;
 };
 
-/// parity: `NearestLivingEntitySensor` and `PlayerSensor`, within `range`, nearest first.
-[[nodiscard]] std::vector<Seen> nearby(const MobContext& mob, double range);
+/// parity: the sensors' last scan, every twenty ticks from a random start, and the sight test of each
+/// thing seen, asked once a tick.
+struct SensorScan {
+    std::int64_t nextScan = 0;
+    bool started = false;
+    std::vector<std::pair<std::int32_t, bool>> seen;
+    std::int64_t sightTime = -1;
+    std::vector<std::pair<std::int32_t, bool>> sight;
+};
+
+/// parity: `NearestLivingEntitySensor` and `PlayerSensor`: what the last scan of the follow range
+/// saw, in the scan's order, within `range` of where it is now. `visibleOnly` is the
+/// `NEAREST_VISIBLE_*` memories, which keep what `Sensor.isEntityTargetable` lets through.
+[[nodiscard]] std::vector<Seen> nearby(const MobContext& mob, double range, bool visibleOnly = true);
 
 /// parity: `Mob.isWithinMeleeAttackRange`.
 [[nodiscard]] bool withinMeleeRange(const MobContext& mob, const TargetView& target);

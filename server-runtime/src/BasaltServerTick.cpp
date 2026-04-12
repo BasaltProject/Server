@@ -5,9 +5,9 @@
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/FishingSystem.hpp>
 #include <basalt/server/runtime/LightningBoltSystem.hpp>
-#include <basalt/server/runtime/entity/Creakings.hpp>
 #include <basalt/server/runtime/entity/AreaEffectClouds.hpp>
 #include <basalt/server/runtime/entity/Boats.hpp>
+#include <basalt/server/runtime/entity/Creakings.hpp>
 #include <basalt/server/runtime/entity/DeathDrops.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
@@ -37,6 +37,7 @@
 #include <basalt/server/runtime/world/ItemFrames.hpp>
 #include <basalt/server/runtime/world/Lightning.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
+#include <basalt/server/runtime/world/RealItemTags.hpp>
 #include <basalt/server/runtime/world/RedstoneComponents.hpp>
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
@@ -84,8 +85,8 @@ constexpr double kFullTurn = 6.283185307179586;
     return player.gamemode == wire::protocol::play::Gamemode::Spectator;
 }
 
-/// parity: `Player.updateSwimming`, near enough: sprinting with its feet in water.
-[[nodiscard]] bool inWater(world::LoadedWorld& world, const player::PlayerSession& player) {
+/// parity: `Entity.isInWater`, near enough: water where the feet are.
+[[nodiscard]] bool feetInWater(world::LoadedWorld& world, const player::PlayerSession& player) {
     const std::optional<std::int32_t> state = world.state().blockState(
         wire::common::mth::floor(player.x), wire::common::mth::floor(player.y), wire::common::mth::floor(player.z));
     return state.has_value() && entity::swimPath::holdsWater(*state);
@@ -629,6 +630,12 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                     heldItem = *parsed;
                 }
             }
+            const std::optional<storage::StoredItemStack>& head =
+                player->inventory.at(player::PlayerInventory::kArmourStart);
+            const auto headItem = wire::common::Identifier::parse(head.has_value() ? head->id : std::string{});
+            const bool disguised =
+                headItem.has_value() &&
+                world::realItemTags::contains(vanillaData_.itemTags, "minecraft:gaze_disguise_equipment", *headItem);
             views.push_back(entity::ai::PlayerView{.entityId = player->entityId(),
                                                    .uuid = player->uuid().toString(),
                                                    .x = player->x,
@@ -641,19 +648,27 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                                                    .heldItem = std::move(heldItem),
                                                    .sneaking = player->sneaking,
                                                    .sprinting = player->sprinting,
-                                                   .swimming = player->sprinting && inWater(world, *player),
+                                                   .swimming = player->swimming,
                                                    .yaw = player->yaw,
                                                    .pitch = player->pitch,
                                                    .vehicleId = player->vehicleId,
                                                    .movedHorizontally = player->movedHorizontally,
                                                    .facing = wire::common::mth::floor((player->yaw / 90.0F) + 0.5) & 3,
                                                    .sleeping = player->sleepingBed.has_value(),
-                                                   .sleepTicks = player->sleepTicks});
+                                                   .sleepTicks = player->sleepTicks,
+                                                   .gazeDisguised = disguised,
+                                                   .flying = player->flying,
+                                                   .inWater = feetInWater(world, *player)});
         }
     }
 
     if (region.isPrimary()) {
         orbs_->tickPlayers(watchers);
+        if (mobActions_ != nullptr) {
+            mobActions_->forgiveDeadPlayers(world, watchers);
+            mobActions_->tickShoulders(world, watchers);
+            mobActions_->emitPlayerMovement(world, watchers);
+        }
     }
     // parity: `ServerLevel.tick` runs the dragon fight before any entity takes its turn.
     if (world.dragonFight() != nullptr && region.ownsPosition(0.0, 0.0)) {

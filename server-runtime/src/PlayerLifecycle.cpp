@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/PlayerLifecycle.hpp>
 #include <basalt/server/runtime/UiStateSync.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/player/PlayerImpulse.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
@@ -293,10 +294,14 @@ void PlayerLifecycle::setGamemode(Gamemode mode) {
         return;
     }
     session->gamemode = mode;
+    // parity: `ServerPlayerGameMode.changeGameModeForPlayer` lets go of any impulse.
+    player::impulse::reset(*session);
     if (!session->mayFly()) {
         session->flying = false;
     }
     if (mode == Gamemode::Spectator) {
+        // parity: `ServerPlayer.setGameMode` to spectator puts the shoulder parrots back.
+        session->shoulderDropPending = true;
         session->flying = true;
     }
     owner_->sendCompressed(wire::protocol::play::GameEventPacket::kId, [mode](wire::io::ByteBuffer& buffer) {

@@ -428,6 +428,7 @@ void ClientSession::handleConfiguration(std::int32_t packetId, wire::io::ByteBuf
             wire::protocol::configuration::ClientInformationPacket::read(body);
         if (information.has_value()) {
             pendingSkinParts_ = static_cast<std::int8_t>(information->skinParts);
+            pendingMainHand_ = information->mainHand;
             pendingChatVisibility_ = information->chatFlags;
             pendingViewDistance_ = information->viewDistance;
         }

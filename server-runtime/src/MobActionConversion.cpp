@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/villager/Gossips.hpp>
+#include <basalt/server/runtime/entity/villager/VillagerBrain.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
@@ -28,6 +29,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <functional>
 #include <limits>
 
@@ -524,6 +526,22 @@ void MobActionSystem::finalizeConverted(world::LoadedWorld& world, const ServerE
     }
     static_cast<void>(from);
     data.putBoolean("CanBreakDoors", random.nextFloat() < special * 0.1F);
+    // parity: `Zombie.finalizeSpawn`'s Halloween head, rolled only on the day, and never dropped.
+    const wire::nbt::NbtCompound* worn = data.getCompound("equipment");
+    const std::chrono::year_month_day today{std::chrono::floor<std::chrono::days>(std::chrono::system_clock::now())};
+    if ((worn == nullptr || worn->getCompound("head") == nullptr) && today.month() == std::chrono::October &&
+        today.day() == std::chrono::day{31} && random.nextFloat() < 0.25F) {
+        wire::nbt::NbtCompound head;
+        head.putString("id", random.nextFloat() < 0.1F ? "minecraft:jack_o_lantern" : "minecraft:carved_pumpkin");
+        head.putInt("count", 1);
+        wire::nbt::NbtCompound equipment = worn == nullptr ? wire::nbt::NbtCompound{} : *worn;
+        equipment.set("head", wire::nbt::NbtTag::ofCompound(std::move(head)));
+        data.set("equipment", wire::nbt::NbtTag::ofCompound(std::move(equipment)));
+        const wire::nbt::NbtCompound* chances = data.getCompound("drop_chances");
+        wire::nbt::NbtCompound dropChances = chances == nullptr ? wire::nbt::NbtCompound{} : *chances;
+        dropChances.set("head", wire::nbt::NbtTag::ofFloat(0.0F));
+        data.set("drop_chances", wire::nbt::NbtTag::ofCompound(std::move(dropChances)));
+    }
     to.attributeValues["minecraft:spawn_reinforcements"] = random.nextDouble() * static_cast<double>(0.1F);
     modifier("minecraft:knockback_resistance", "minecraft:random_spawn_bonus",
              random.nextDouble() * static_cast<double>(0.05F), entity::AttributeOperation::AddValue);
@@ -542,20 +560,36 @@ void MobActionSystem::finalizeConverted(world::LoadedWorld& world, const ServerE
 }
 
 void MobActionSystem::villagerCured(world::LoadedWorld& world, const ServerEntity& zombie, ServerEntity& villager) {
-    // parity: `dropPreservedEquipment`: what the zombie picked up up falls out, as the cured
-    // villager wears nothing.
+    // parity: `dropPreservedEquipment` in `EquipmentSlot.VALUES` order: what the zombie picked up
+    // falls out, as the cured villager wears nothing, but what the curse of binding holds goes into
+    // the villager's own inventory at the slot's index.
     const wire::nbt::NbtCompound saved = entity::entityNbt::encode(zombie);
     const wire::nbt::NbtCompound* equipment = saved.getCompound("equipment");
     const wire::nbt::NbtCompound* chances = saved.getCompound("drop_chances");
+    static constexpr std::array<std::pair<std::string_view, std::size_t>, 8> kSlots{{{"mainhand", 0},
+                                                                                     {"offhand", 1},
+                                                                                     {"feet", 0},
+                                                                                     {"legs", 1},
+                                                                                     {"chest", 2},
+                                                                                     {"head", 3},
+                                                                                     {"body", 0},
+                                                                                     {"saddle", 0}}};
     if (equipment != nullptr) {
-        for (const std::string& slot : equipment->names()) {
+        for (const auto& [slot, index] : kSlots) {
             const wire::nbt::NbtCompound* stack = equipment->getCompound(slot);
-            // parity: `DropChances.isPreserved`, a chance over one, which is what picking up gives.
-            if (stack == nullptr || chances == nullptr || chances->getFloat(slot, 0.0F) <= 1.0F) {
+            const std::optional<server::world::loot::ItemStack> item =
+                stack == nullptr ? std::nullopt : world::blockInventory::readStack(*stack);
+            if (!item.has_value()) {
                 continue;
             }
-            const std::optional<server::world::loot::ItemStack> item = world::blockInventory::readStack(*stack);
-            if (!item.has_value()) {
+            // parity: `PREVENT_ARMOR_CHANGE`, which of vanilla's enchantments only binding carries.
+            const wire::nbt::NbtCompound* enchantments = item->components.getCompound("minecraft:enchantments");
+            if (enchantments != nullptr && enchantments->contains("minecraft:binding_curse")) {
+                entity::villager::villagerBrain::stateOf(villager).inventory[index] = *item;
+                continue;
+            }
+            // parity: `DropChances.isPreserved`, a chance over one, which is what picking up gives.
+            if (chances == nullptr || chances->getFloat(slot, 0.0F) <= 1.0F) {
                 continue;
             }
             world.state().spawnItem(world::DroppedItem{.entityId = players_->allocateEntityId(),
@@ -578,7 +612,6 @@ void MobActionSystem::villagerCured(world::LoadedWorld& world, const ServerEntit
         };
         hooks_.curedZombieVillager(wire::common::Uuid{half(0), half(2)});
     }
-    static_cast<void>(villager);
 }
 
 } // namespace basalt::server::runtime

@@ -26,6 +26,24 @@ constexpr double kDegrees = 180.0 / std::numbers::pi;
 /// The way there: through the water for a swimmer, over the ground for everything else.
 [[nodiscard]] std::optional<std::vector<std::array<std::int32_t, 3>>>
 pathFor(world::WorldState& world, const ServerEntity& mob, double x, double y, double z) {
+    // parity: `AmphibiousPathNavigation` for the frog and the axolotl: one search over water and land,
+    // to the target's square half a block up and within a block of it.
+    if (const std::string_view path = mob.type().path(); path == "frog" || path == "axolotl") {
+        const double range = mob.attributeWithModifiers("minecraft:follow_range");
+        const std::array<std::int32_t, 3> start =
+            pathFinder::amphibiousStartOf(world, mob.x, mob.y, mob.z, mob.width(), mob.onGround, inWater(world, mob));
+        const std::array<std::array<std::int32_t, 3>, 1> targets{{{blockOf(x), blockOf(y + 0.5), blockOf(z)}}};
+        const std::optional<pathFinder::Route> route =
+            pathFinder::findRoute(world, start[0], start[1], start[2], targets,
+                                  pathFinder::RouteOptions{.accuracy = 1,
+                                                           .maxPathLength = static_cast<float>(range),
+                                                           .maxVisited = static_cast<std::int32_t>(range * 16.0),
+                                                           .amphibious = true});
+        if (!route.has_value()) {
+            return std::nullopt;
+        }
+        return route->nodes;
+    }
     if (swimsSmoothly(mob)) {
         // parity: `SwimNodeEvaluator.getStart`, the floor of the box's corner half a block up.
         const double half = mob.width() / 2.0;
@@ -37,13 +55,12 @@ pathFor(world::WorldState& world, const ServerEntity& mob, double x, double y, d
         const double range = mob.attributeWithModifiers("minecraft:follow_range");
         const flyingPathFinder::Footprint size{.width = static_cast<std::int32_t>(std::floor(mob.width() + 1.0)),
                                                .height = static_cast<std::int32_t>(std::floor(mob.height() + 1.0))};
-        const flyingPathFinder::Mob flier{.maluses = pathTypes::of(mob.type()),
-                                          .at = std::array<std::int32_t, 3>{blockOf(mob.x), blockOf(mob.y),
-                                                                            blockOf(mob.z)}};
-        std::vector<std::array<std::int32_t, 3>> path =
-            flyingPathFinder::find(world, size, {blockOf(mob.x), blockOf(mob.y + 0.5), blockOf(mob.z)},
-                                   {blockOf(x), blockOf(y), blockOf(z)}, static_cast<std::int32_t>(range * 16.0),
-                                   range, flier);
+        const flyingPathFinder::Mob flier{
+            .maluses = pathTypes::of(mob.type()),
+            .at = std::array<std::int32_t, 3>{blockOf(mob.x), blockOf(mob.y), blockOf(mob.z)}};
+        std::vector<std::array<std::int32_t, 3>> path = flyingPathFinder::find(
+            world, size, {blockOf(mob.x), blockOf(mob.y + 0.5), blockOf(mob.z)}, {blockOf(x), blockOf(y), blockOf(z)},
+            static_cast<std::int32_t>(range * 16.0), range, flier);
         return path;
     }
     // parity: `CopperGolem`'s navigation, forty-eight blocks long and through doors.

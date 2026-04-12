@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/GoalSelector.hpp>
 #include <basalt/server/runtime/entity/ai/Goals.hpp>
+#include <basalt/server/runtime/entity/ai/NeutralGoals.hpp>
 #include <basalt/server/runtime/entity/ai/TargetGoals.hpp>
 #include <basalt/server/runtime/world/Beehives.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
@@ -246,7 +247,8 @@ public:
             if (mob.random.nextInt(kPositionChangeChance) == 0) {
                 const float offsetX = offset(mob);
                 const float offsetZ = offset(mob);
-                hover_ = std::array<double, 3>{flower[0] + offsetX, flower[1], flower[2] + offsetZ};
+                hover_ = std::array<double, 3>{flower[0] + static_cast<double>(offsetX), flower[1],
+                                               flower[2] + static_cast<double>(offsetZ)};
                 navigation::stop(mob.mob);
             } else {
                 setWanted = false;
@@ -605,20 +607,7 @@ public:
         if (!canTarget(mob) || mob.random.nextInt(reducedTickDelay(10)) != 0) {
             return false;
         }
-        const BeeState& bee = beeOf(mob);
-        const double range = mob.mob.attributeWithModifiers("minecraft:follow_range");
-        const PlayerView* best = nullptr;
-        double bestDistance = range * range;
-        for (const PlayerView& player : mob.players) {
-            if (!player.targetable || !bee.angryAt.has_value() || player.uuid != bee.angryAt->toString()) {
-                continue;
-            }
-            const double distance = mob.distanceSquaredTo(player.x, player.y, player.z);
-            if (distance <= bestDistance) {
-                bestDistance = distance;
-                best = &player;
-            }
-        }
+        const PlayerView* best = nearestAngeringPlayer(mob);
         if (best == nullptr) {
             return false;
         }
@@ -674,6 +663,7 @@ void registerGoals(GoalSelector& selector) {
     add<FloatGoal>(selector, 9);
     add<HurtByOtherGoal>(selector, 1);
     add<BecomeAngryTargetGoal>(selector, 2);
+    add<ResetUniversalAngerTargetGoal>(selector, 3, true);
 }
 
 } // namespace basalt::server::runtime::entity::ai::beeGoals

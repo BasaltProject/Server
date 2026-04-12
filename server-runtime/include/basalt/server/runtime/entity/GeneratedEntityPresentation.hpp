@@ -77,6 +77,7 @@ struct RuntimeEntityMetadata {
     std::optional<std::optional<std::int32_t>> fireworkAttached;
     /// parity: `LivingEntity.DATA_STINGER_COUNT_ID`.
     std::optional<std::int32_t> stingers;
+    std::optional<std::int32_t> arrows;
     /// parity: `Armadillo.ARMADILLO_STATE`.
     std::optional<std::int32_t> armadilloState;
     /// parity: `Sniffer.DATA_STATE` and `DATA_DROP_SEED_AT_TICK`.
@@ -90,6 +91,10 @@ struct RuntimeEntityMetadata {
     /// parity: `Bee.DATA_FLAGS_ID` and `DATA_ANGER_END_TIME`.
     std::optional<std::int8_t> beeFlags;
     std::optional<std::int64_t> beeAngerEnd;
+    /// parity: `Wolf.DATA_ANGER_END_TIME`, and `Enderman.DATA_CREEPY` and `DATA_STARED_AT`.
+    std::optional<std::int64_t> wolfAngerEnd;
+    std::optional<bool> endermanCreepy;
+    std::optional<bool> endermanStaredAt;
     /// parity: `Allay.DATA_DANCING` and `DATA_CAN_DUPLICATE`.
     std::optional<bool> allayDancing;
     std::optional<bool> allayCanDuplicate;

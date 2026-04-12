@@ -2,6 +2,7 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/entity/PathFinder.hpp>
+#include <basalt/server/runtime/world/Fluids.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -21,6 +22,9 @@ constexpr double kHeuristicWeight = 1.5;
 /// parity: `WalkNodeEvaluator.getPathTypeStatic`'s malus for water and for what burns.
 constexpr double kWaterMalus = 8.0;
 constexpr double kDangerMalus = 16.0;
+/// parity: `AmphibiousNodeEvaluator.prepare`'s own malus for dry land and for the water at a shore.
+constexpr double kAmphibiousWalkableMalus = 6.0;
+constexpr double kAmphibiousWaterBorderMalus = 4.0;
 
 constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::North, registry::BlockFace::South,
                                                          registry::BlockFace::West, registry::BlockFace::East};
@@ -40,6 +44,13 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
                           bool doors = false) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     return stateId.has_value() && (registry::blockShapes::isEmptyShape(*stateId) || (doors && isMobDoor(*stateId)));
+}
+
+/// parity: `PathType.WATER`, water a mob can be in.
+[[nodiscard]] bool isWater(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+    return stateId.has_value() && world::fluids::of(*stateId) == world::Submersion::Water &&
+           registry::blockShapes::isEmptyShape(*stateId);
 }
 
 [[nodiscard]] bool standable(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, bool doors) {
@@ -80,10 +91,28 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
     return 0.0;
 }
 
+/// parity: `AmphibiousNodeEvaluator.getPathType` with its `prepare` malus: water free, water beside
+/// a blocked square four, anything walkable six.
+[[nodiscard]] double amphibiousMalus(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    if (isWater(world, x, y, z)) {
+        constexpr std::array<std::array<std::int32_t, 3>, 6> kAround{
+            {{0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}, {-1, 0, 0}, {1, 0, 0}}};
+        for (const std::array<std::int32_t, 3>& offset : kAround) {
+            if (!isOpen(world, x + offset[0], y + offset[1], z + offset[2])) {
+                return kAmphibiousWaterBorderMalus;
+            }
+        }
+        return 0.0;
+    }
+    const double danger = malus(world, x, y, z);
+    return danger > 0.0 ? danger : kAmphibiousWalkableMalus;
+}
+
 /// Where a step in this direction lands: the same height, one up, or up to three down.
 [[nodiscard]] std::optional<Position> step(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                           bool doors = false) {
-    if (standable(world, x, y, z, doors)) {
+                                           bool doors = false, bool amphibious = false) {
+    // parity: `findAcceptedNode` hands an amphibious mob the water node as it is, floor or not.
+    if (standable(world, x, y, z, doors) || (amphibious && isWater(world, x, y, z))) {
         return Position{x, y, z};
     }
     if (standable(world, x, y + 1, z, doors) && isOpen(world, x, y + 2, z, doors)) {
@@ -100,11 +129,11 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
 /// parity: `WalkNodeEvaluator.getNeighbors`: the four sides and the four corners, up one or down
 /// three.
 [[nodiscard]] std::vector<Position> neighbours(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
-                                               bool doors = false) {
+                                               bool doors = false, bool amphibious = false) {
     std::vector<Position> found;
     for (const registry::BlockFace face : kHorizontal) {
         const std::optional<Position> landed =
-            step(world, x + registry::stepX(face), y, z + registry::stepZ(face), doors);
+            step(world, x + registry::stepX(face), y, z + registry::stepZ(face), doors, amphibious);
         if (landed.has_value()) {
             found.push_back(*landed);
         }
@@ -116,10 +145,19 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
             if (!isOpen(world, x + dx, y, z, doors) || !isOpen(world, x, y, z + dz, doors)) {
                 continue;
             }
-            const std::optional<Position> landed = step(world, x + dx, y, z + dz, doors);
+            const std::optional<Position> landed = step(world, x + dx, y, z + dz, doors, amphibious);
             if (landed.has_value()) {
                 found.push_back(*landed);
             }
+        }
+    }
+    // parity: `AmphibiousNodeEvaluator.getNeighbors`: straight up and down as well, into water only.
+    if (amphibious) {
+        if (isWater(world, x, y + 1, z)) {
+            found.push_back(Position{x, y + 1, z});
+        }
+        if (isWater(world, x, y - 1, z)) {
+            found.push_back(Position{x, y - 1, z});
         }
     }
     return found;
@@ -149,6 +187,16 @@ constexpr std::array<registry::BlockFace, 4> kHorizontal{registry::BlockFace::No
 
 bool canStandAt(world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     return standable(world, x, y, z, false);
+}
+
+std::array<std::int32_t, 3> amphibiousStartOf(world::WorldState& world, double x, double y, double z, double width,
+                                              bool onGround, bool inWater) {
+    if (!inWater) {
+        return startOf(world, x, y, z, onGround);
+    }
+    const double half = width / 2.0;
+    return {static_cast<std::int32_t>(std::floor(x - half)), static_cast<std::int32_t>(std::floor(y + 0.5)),
+            static_cast<std::int32_t>(std::floor(z - half))};
 }
 
 bool isMobDoor(std::int32_t stateId) {
@@ -253,12 +301,15 @@ std::optional<Route> findRoute(world::WorldState& world, std::int32_t fromX, std
         }
         const float g = node.g;
         const float walked = node.walked;
-        for (const Position& neighbour : neighbours(world, at[0], at[1], at[2], options.openDoors)) {
+        for (const Position& neighbour :
+             neighbours(world, at[0], at[1], at[2], options.openDoors, options.amphibious)) {
             const std::int64_t next = pack(neighbour[0], neighbour[1], neighbour[2]);
             const float distance = distanceTo(at, neighbour);
             const float nextWalked = walked + distance;
-            const float tentative =
-                g + distance + static_cast<float>(malus(world, neighbour[0], neighbour[1], neighbour[2]));
+            const double stepMalus = options.amphibious
+                                         ? amphibiousMalus(world, neighbour[0], neighbour[1], neighbour[2])
+                                         : malus(world, neighbour[0], neighbour[1], neighbour[2]);
+            const float tentative = g + distance + static_cast<float>(stepMalus);
             const auto known = nodes.find(next);
             const bool inOpen = std::ranges::find(open, next) != open.end();
             if (nextWalked >= options.maxPathLength ||

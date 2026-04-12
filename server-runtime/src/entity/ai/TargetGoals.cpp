@@ -125,6 +125,11 @@ bool HurtByTargetGoal::canUse(MobContext& mob) {
     if (!mob.mob.hurtBy.has_value() || mob.mob.targetId.has_value()) {
         return false;
     }
+    // parity: under `universal_anger` a player's hit is left to `ResetUniversalAngerTargetGoal`.
+    if (mob.universalAnger && mob.playerById(*mob.mob.hurtBy) != nullptr) {
+        mob.mob.hurtBy.reset();
+        return false;
+    }
     // parity: a hit from one of the ignored types is let pass, and forgotten.
     if (const ServerEntity* by = mob.entityById(*mob.mob.hurtBy);
         by != nullptr && ignoreDamageFrom_.contains(by->type().path())) {

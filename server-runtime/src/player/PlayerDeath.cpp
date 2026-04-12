@@ -17,6 +17,8 @@ void killPlayer(PlayerSession& session, const std::string_view deathMessageId, c
     }
     session.dead = true;
     session.setHealth(0.0F);
+    // parity: `ServerPlayer.die` puts the shoulder parrots back in the world.
+    session.shoulderDropPending = true;
     // parity: `LivingEntity.die` empties the absorption pool, so respawning starts without it.
     session.absorption = 0.0F;
     session.stats.increment(storage::stats::deaths());

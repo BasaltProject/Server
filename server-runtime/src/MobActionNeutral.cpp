@@ -3,6 +3,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
 #include <cmath>
@@ -25,6 +26,11 @@ constexpr std::int32_t kAlertMax = 6 * 20;
 constexpr double kAlertRangeY = 10.0;
 /// parity: `SPEED_MODIFIER_ATTACKING`, a flat 0.05 while angry.
 constexpr std::string_view kAttackingModifier = "minecraft:attacking";
+/// parity: `Enderman.SPEED_MODIFIER_ATTACKING`, 0.15 while it has a target.
+constexpr double kEndermanAttackingSpeed = static_cast<double>(0.15F);
+/// parity: `tellNeutralMobsThatIDied`, 32 across and 10 up or down of where they died.
+constexpr double kForgiveRange = 32.0;
+constexpr double kForgiveRangeY = 10.0;
 
 } // namespace
 
@@ -81,6 +87,58 @@ void MobActionSystem::updateNeutralAnger(world::LoadedWorld& world, ServerEntity
                 (peaceful || player->gamemode == Gamemode::Creative || player->gamemode == Gamemode::Spectator)) {
                 neutral::stop(mob, anger);
             }
+        }
+    }
+}
+
+void MobActionSystem::tickNeutralMob(world::LoadedWorld& world, ServerEntity& mob, random::RandomSource& random) {
+    neutral::Anger& anger = neutral::stateOf(mob);
+    if (anger.legacyTime.has_value()) {
+        anger.endTime = world.gameTime() + *std::exchange(anger.legacyTime, std::nullopt);
+    }
+    updateNeutralAnger(world, mob, anger, random, true, neutral::kAngerMinTicks, neutral::kAngerMaxTicks);
+    if (mob.type().path() != "enderman") {
+        return;
+    }
+    // parity: `Enderman.setTarget`: the attacking speed with a target, and none of it or the stare
+    // without one.
+    auto& speed = mob.attributeModifiers["minecraft:movement_speed"];
+    if (mob.targetId.has_value()) {
+        speed[std::string{kAttackingModifier}] =
+            entity::AttributeModifier{.id = std::string{kAttackingModifier}, .amount = kEndermanAttackingSpeed};
+    } else {
+        speed.erase(std::string{kAttackingModifier});
+        if (anger.hadTarget) {
+            anger.staredAt = false;
+        }
+    }
+    anger.hadTarget = mob.targetId.has_value();
+}
+
+void MobActionSystem::forgiveDeadPlayers(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers) {
+    for (PlayerSession* player : watchers) {
+        if (!player->dead) {
+            mourned_.erase(player->entityId());
+            continue;
+        }
+        if (!mourned_.insert(player->entityId()).second ||
+            !world.gameRules().get(world::gameRules::kForgiveDeadPlayers)) {
+            continue;
+        }
+        const double x = std::floor(player->x);
+        const double y = std::floor(player->y);
+        const double z = std::floor(player->z);
+        for (ServerEntity* mob : world.state().entities()) {
+            if (mob->removed || !neutral::isNeutral(mob->type())) {
+                continue;
+            }
+            const double half = mob->width() / 2.0;
+            if (mob->x + half <= x - kForgiveRange || mob->x - half >= x + 1.0 + kForgiveRange ||
+                mob->y + mob->height() <= y - kForgiveRangeY || mob->y >= y + 1.0 + kForgiveRangeY ||
+                mob->z + half <= z - kForgiveRange || mob->z - half >= z + 1.0 + kForgiveRange) {
+                continue;
+            }
+            neutral::playerDied(*mob, player->uuid());
         }
     }
 }

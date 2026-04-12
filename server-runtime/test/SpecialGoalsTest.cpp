@@ -3,6 +3,8 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/ai/EndermanGoals.hpp>
+#include <basalt/server/runtime/entity/ai/MobContext.hpp>
 #include <basalt/server/runtime/entity/ai/SpecialGoals.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 
@@ -115,16 +117,18 @@ TEST_CASE("an enderman notices a stare only after a few ticks of it") {
         ai::PlayerView{.entityId = 100, .uuid = "watcher", .x = 8.0, .y = 64.0, .z = 40.0, .yaw = 180.0F});
 
     ai::MobContext context = fixture.context(enderman);
-    ai::StareTriggerGoal stare;
-    CHECK(stare.canUse(context));
+    ai::EndermanLookForPlayerGoal look;
+    CHECK(look.canUse(context));
 
-    stare.start(context);
+    look.start(context);
     // parity: five ticks, halved because the goal does not ask to run every tick.
-    CHECK(stare.canContinueToUse(context));
-    CHECK(stare.canContinueToUse(context));
-    CHECK(stare.canContinueToUse(context));
-    CHECK_FALSE(enderman.targetId.has_value());
-    CHECK_FALSE(stare.canContinueToUse(context));
+    for (std::int32_t tick = 0; tick < 2; ++tick) {
+        CHECK(look.canContinueToUse(context));
+        look.tick(context);
+        CHECK_FALSE(enderman.targetId.has_value());
+    }
+    CHECK(look.canContinueToUse(context));
+    look.tick(context);
     CHECK(enderman.targetId == 100);
 }
 
@@ -135,18 +139,18 @@ TEST_CASE("an enderman ignores a player who is not looking at it") {
         ai::PlayerView{.entityId = 100, .uuid = "watcher", .x = 8.0, .y = 64.0, .z = 40.0, .yaw = 0.0F});
 
     ai::MobContext context = fixture.context(enderman);
-    ai::StareTriggerGoal stare;
-    CHECK_FALSE(stare.canUse(context));
+    ai::EndermanLookForPlayerGoal look;
+    CHECK_FALSE(look.canUse(context));
 
-    // Out past sixty-four blocks the stare does not reach either.
+    // Past its sixty-four blocks of follow range the stare does not reach either.
     fixture.players.back().yaw = 180.0F;
     fixture.players.back().z = 100.0;
-    CHECK_FALSE(stare.canUse(context));
+    CHECK_FALSE(look.canUse(context));
 
-    // And a mob that already has something to chase does not go looking.
+    // A carved pumpkin on the head hides the stare.
     fixture.players.back().z = 40.0;
-    enderman.targetId = 7;
-    CHECK_FALSE(stare.canUse(context));
+    fixture.players.back().gazeDisguised = true;
+    CHECK_FALSE(look.canUse(context));
 }
 
 TEST_CASE("standing in water hurts an enderman and moves it on") {

@@ -322,7 +322,9 @@ bool AdvancementTriggers::accepts(const adv::GenericCondition& condition, const 
     }
     for (const auto& [field, wanted] : condition.ids) {
         const auto id = event.ids.find(field);
-        const std::string_view registry = field == "potion" ? "potion" : field == "recipes" ? "recipe" : "block";
+        const std::string_view registry = field == "potion"                            ? "potion"
+                                          : field == "recipes" || field == "recipe_id" ? "recipe"
+                                                                                       : "block";
         if (id == event.ids.end() || !loot::matchesIdsOrTag(wanted, registry, id->second, tags_)) {
             return false;
         }

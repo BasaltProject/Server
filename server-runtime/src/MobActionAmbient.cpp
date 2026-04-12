@@ -276,6 +276,10 @@ std::optional<std::string> MobActionSystem::ambientSoundOf(world::LoadedWorld& w
     if (path == "trader_llama") {
         return std::string{"entity.llama.ambient"};
     }
+    // parity: `Enderman.getAmbientSound`, the scream while `isCreepy`.
+    if (path == "enderman" && mob.targetId.has_value()) {
+        return own("scream");
+    }
     if (path == "enderman" || path == "endermite" || path == "silverfish" || path == "blaze" || path == "ravager" ||
         path == "illusioner" || path == "stray" || path == "parched" || path == "zombie_villager" || path == "vex" ||
         path == "pillager" || path == "skeleton" || path == "frog" || path == "phantom" || path == "vindicator" ||
