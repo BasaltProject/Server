@@ -15,6 +15,18 @@
 #include <string>
 #include <vector>
 
+namespace basalt::server::runtime::entity::boats {
+struct BoatState;
+}
+
+namespace basalt::server::runtime::entity::horses {
+struct HorseState;
+}
+
+namespace basalt::server::runtime::entity::creakings {
+struct CreakingState;
+}
+
 namespace basalt::server::runtime::entity {
 
 namespace enderDragon {
@@ -75,6 +87,22 @@ struct AxolotlState;
 
 namespace goats {
 struct GoatState;
+}
+
+namespace camels {
+struct CamelState;
+}
+
+namespace sniffers {
+struct SnifferState;
+}
+
+namespace armadillos {
+struct ArmadilloState;
+}
+
+namespace breezes {
+struct BreezeState;
 }
 
 namespace frogs {
@@ -264,6 +292,16 @@ public:
     /// parity: `LightningBolt.blocksSetOnFire` and `hitEntities`, what `lightning_strike` reads.
     std::int32_t boltFiresSet = 0;
     std::vector<std::int32_t> boltHitIds;
+    /// A boat's floating state, made on its first turn.
+    std::shared_ptr<boats::BoatState> boat;
+    /// A mount's counters and a camel's dash, made on first use.
+    std::shared_ptr<horses::HorseState> horse;
+    /// parity: `Creaking`'s brain, its freeze and the heart it is bound to.
+    std::shared_ptr<creakings::CreakingState> creaking;
+    /// parity: `AbstractBoat.outOfControlTicks` and the two paddles its driver pulls, for a boat.
+    float boatOutOfControl = 0.0F;
+    bool paddleLeft = false;
+    bool paddleRight = false;
     /// parity: `IsImmuneToZombification`.
     bool immuneToZombification = false;
     /// parity: `LivingEntity.zza` and `yya` as a smooth swimmer last left them.
@@ -379,6 +417,8 @@ public:
     std::optional<wire::common::Identifier> firedFromWeapon;
     wire::nbt::NbtCompound firedFromWeaponComponents;
     std::vector<wire::common::Identifier> piercedAndKilled;
+    /// parity: `AbstractArrow.soundEvent`, a crossbow's hit until it first lands, the arrow's after.
+    bool arrowLanded = false;
 
     /// parity: `Ravager.attackTick`, `stunnedTick` and `roarTick`; any of them holds it still.
     std::int32_t ravagerAttackTicks = 0;
@@ -396,6 +436,11 @@ public:
 
     /// Ticks it has been alive for. parity: `Entity.tickCount`, which is what staggers the mobs.
     std::int32_t tickCount = 0;
+    /// parity: `Mob.ambientSoundTime`, the climbing odds of its next ambient sound.
+    std::int32_t ambientSoundTime = 0;
+    /// parity: `LivingEntity.DATA_STINGER_COUNT_ID` and `removeStingerTime`, the bee stings it wears.
+    std::int32_t stingerCount = 0;
+    std::int32_t removeStingerTime = 0;
 
     /// What the goals decided it is doing. parity: `Mob.goalSelector`, one set of goals per mob.
     std::shared_ptr<ai::GoalSelector> goals;
@@ -495,6 +540,14 @@ public:
     /// parity: `Frog`'s and `Tadpole`'s brains.
     std::shared_ptr<frogs::FrogState> frog;
     std::shared_ptr<frogs::TadpoleState> tadpole;
+    /// parity: `Camel`'s pose and brain.
+    std::shared_ptr<camels::CamelState> camel;
+    /// parity: `Sniffer`'s brain.
+    std::shared_ptr<sniffers::SnifferState> sniffer;
+    /// parity: `Armadillo`'s state and brain.
+    std::shared_ptr<armadillos::ArmadilloState> armadillo;
+    /// parity: `Breeze`'s brain.
+    std::shared_ptr<breezes::BreezeState> breeze;
     /// parity: `LivingEntity.discardFriction`, which a long jump turns on until it lands.
     bool discardFriction = false;
     /// Whether its move control swims this turn. parity: `AxolotlMoveControl`, which is

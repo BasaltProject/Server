@@ -111,8 +111,6 @@ struct VillagerState {
     /// parity: `Villager.lastTradedPlayer`.
     std::optional<std::int32_t> lastTradedPlayer;
     std::int32_t unhappyCounter = 0;
-    /// parity: `Mob.ambientSoundTime` as trading resets it: when it was last set back.
-    std::int64_t tradeSoundTime = -1000;
     /// parity: `DATA_VILLAGER_DATA_FINALIZED`.
     bool dataFinalized = false;
     /// Set whenever the profession changes, so the brain is rebuilt before its next turn.

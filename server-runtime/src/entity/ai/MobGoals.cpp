@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/entity/ai/DolphinItemGoals.hpp>
 #include <basalt/server/runtime/entity/ai/FlyingGoals.hpp>
 #include <basalt/server/runtime/entity/ai/GoalSelector.hpp>
+#include <basalt/server/runtime/entity/ai/HorseGoals.hpp>
 #include <basalt/server/runtime/entity/ai/Goals.hpp>
 #include <basalt/server/runtime/entity/ai/IllagerGoals.hpp>
 #include <basalt/server/runtime/entity/ai/LongDistancePatrolGoal.hpp>
@@ -155,17 +156,50 @@ std::unique_ptr<GoalSelector> mobGoals::forType(const wire::common::Identifier& 
 
 namespace {
 
-bool buildAnimal(GoalSelector& selector, const wire::common::Identifier& type, std::string_view path) {
-    static const Names kSlow{"horse", "donkey", "mule", "llama", "turtle", "panda", "fox", "strider"};
-    // parity: the brains' own speeds, `ArmadilloAi` and `SnifferAi`: two to flee and
-    // a quarter more to follow food or a parent; the camel's four, two and a half, and two to idle.
-    static const Names kBrained{"armadillo", "sniffer"};
-    if (kBrained.contains(path)) {
-        farmAnimal(selector, type, 2.0, 1.25, 1.25);
+/// parity: `AbstractHorse.registerGoals` and each kind's `addBehaviourGoals`, and `Llama.registerGoals`
+/// less its caravan and its spit.
+bool buildHorse(GoalSelector& selector, std::string_view path) {
+    if (path == "llama" || path == "trader_llama") {
+        add<FloatGoal>(selector, 0);
+        add<RunAroundLikeCrazyGoal>(selector, 1, 1.2);
+        add<PanicGoal>(selector, 3, 1.2);
+        add<BreedGoal>(selector, 4, 1.0);
+        add<TemptGoal>(selector, 5, 1.25, Names{"hay_block"});
+        add<FollowParentGoal>(selector, 6, 1.0);
+        add<RandomStrollGoal>(selector, 7, 0.7);
+        add<LookAtPlayerGoal>(selector, 8, kLookNear);
+        add<RandomLookAroundGoal>(selector, 9);
+        if (path == "trader_llama") {
+            add<PanicGoal>(selector, 1, 2.0);
+        }
         return true;
     }
-    if (path == "camel") {
-        farmAnimal(selector, type, 4.0, 2.5, 2.5, 2.0);
+    if (path != "horse" && path != "donkey" && path != "mule" && path != "skeleton_horse" && path != "zombie_horse") {
+        return false;
+    }
+    add<RunAroundLikeCrazyGoal>(selector, 1, 1.2);
+    add<BreedGoal>(selector, 2, 1.0);
+    add<FollowParentGoal>(selector, 4, 1.0);
+    add<RandomStrollGoal>(selector, 6, 0.7);
+    add<LookAtPlayerGoal>(selector, 7, kLookNear);
+    add<RandomLookAroundGoal>(selector, 8);
+    add<RandomStandGoal>(selector, 9);
+    if (path == "skeleton_horse") {
+        return true;
+    }
+    add<FloatGoal>(selector, 0);
+    if (path == "zombie_horse") {
+        add<TemptGoal>(selector, 3, 1.25, Names{"red_mushroom"});
+        return true;
+    }
+    add<PanicGoal>(selector, 1, 1.2);
+    add<TemptGoal>(selector, 3, 1.25, Names{"golden_carrot", "golden_apple", "enchanted_golden_apple"});
+    return true;
+}
+
+bool buildAnimal(GoalSelector& selector, const wire::common::Identifier& type, std::string_view path) {
+    static const Names kSlow{"turtle", "panda", "fox", "strider"};
+    if (buildHorse(selector, path)) {
         return true;
     }
     if (path == "cow" || path == "mooshroom") {
@@ -178,10 +212,6 @@ bool buildAnimal(GoalSelector& selector, const wire::common::Identifier& type, s
     }
     if (path == "chicken") {
         farmAnimal(selector, type, 1.4, 1.0, 1.1);
-        return true;
-    }
-    if (path == "trader_llama") {
-        farmAnimal(selector, type, 2.0, 1.2, 1.1);
         return true;
     }
     if (kSlow.contains(path)) {

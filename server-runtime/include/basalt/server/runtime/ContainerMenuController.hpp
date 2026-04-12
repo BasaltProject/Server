@@ -99,6 +99,14 @@ public:
 
     void openEnderChest(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos);
 
+    /// parity: `ContainerEntity.interactWithContainerVehicle`: a chest boat's or chest minecart's
+    /// twenty-seven slots, kept on the entity itself.
+    void openEntityChest(player::PlayerSession& session, entity::ServerEntity& vehicle);
+
+    /// parity: `ServerPlayer.openHorseInventory`: the saddle, the body armour and any chest a mount
+    /// carries, in `ClientboundMountScreenOpenPacket`'s window.
+    void openMountMenu(player::PlayerSession& session, entity::ServerEntity& mount);
+
     void openChest(player::PlayerSession& session, const wire::protocol::play::BlockPos& pos, const std::string& block);
 
     void openSmithingMenu(player::PlayerSession& session);
@@ -186,6 +194,19 @@ private:
     [[nodiscard]] std::int32_t allocateContainerId();
 
     [[nodiscard]] std::optional<storage::StoredItemStack> readBlockSlot(std::int32_t index) const;
+
+    /// A slot of the open entity's chest, and a write to it.
+    [[nodiscard]] std::optional<storage::StoredItemStack> entityContainerSlot(std::int32_t index) const;
+    void writeEntityContainerSlot(std::int32_t index, const std::optional<storage::StoredItemStack>& stack);
+
+    [[nodiscard]] bool mountOpen() const noexcept { return openEntity_.has_value() && openMount_; }
+
+    /// parity: `HorseInventoryMenu`'s `ArmorSlot.mayPlace`, and anything in the chest.
+    [[nodiscard]] bool mountAccepts(std::int32_t index, const storage::StoredItemStack& stack) const;
+
+    /// parity: `AbstractMountInventoryMenu.quickMoveStack`, armour first, then the saddle, then the chest.
+    void quickMoveMount(player::PlayerSession& session, const player::MenuSlot& slot,
+                        const storage::StoredItemStack& stack);
 
     void writeBlockSlot(std::int32_t index, const std::optional<storage::StoredItemStack>& stack);
 
@@ -326,6 +347,10 @@ private:
     std::optional<storage::StoredItemStack> carriedItem_;
 
     bool openEnderChest_ = false;
+    /// The chest boat, chest raft or chest minecart whose slots the open menu shows.
+    std::optional<std::int32_t> openEntity_;
+    /// Whether that entity is a mount, whose first two slots are its saddle and body armour.
+    bool openMount_ = false;
     std::optional<std::vector<std::optional<storage::StoredItemStack>>> pluginMenu_;
     std::function<void(std::int32_t)> pluginMenuClick_;
     std::optional<wire::protocol::play::BlockPos> openedAt_;

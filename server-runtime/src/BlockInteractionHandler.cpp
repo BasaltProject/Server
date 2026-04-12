@@ -194,6 +194,12 @@ player::BreakContext BlockInteractionHandler::breakContext() {
     context.slotChanged = [this](const PlayerSession&, const std::int32_t slot) { owner_->sendInventorySlot(slot); };
     context.stopDigging = [this] { stopDigging(); };
     context.dismount = [this](player::PlayerSession& player) { owner_->dismount(player); };
+    context.creakingHeartBroken = [this](world::LoadedWorld& world, const PlayerSession& player, const std::int32_t x,
+                                         const std::int32_t y, const std::int32_t z) {
+        if (MobActionSystem* mobs = owner_->options().mobs; mobs != nullptr) {
+            mobs->creakingHeartBroken(world, player, {x, y, z});
+        }
+    };
     context.guardedBroken = [this](world::LoadedWorld& world, const PlayerSession& player, const std::int32_t stateId) {
         MobActionSystem* mobs = owner_->options().mobs;
         const wire::common::Identifier* block = reg::blockStateDefinitions::blockOf(stateId);

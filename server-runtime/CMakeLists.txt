@@ -51,6 +51,7 @@ basalt_module(server-runtime-core
         src/entity/EntityNbt.cpp
         src/entity/EntityCollision.cpp
         src/entity/MobRules.cpp
+        src/entity/MobSounds.cpp
         src/entity/GeneratedEntityPresentation.cpp
         src/entity/Villagers.cpp
         src/entity/Raids.cpp
@@ -161,6 +162,7 @@ basalt_module(server-runtime-core
         src/CombatFireballs.cpp
         src/CombatHandler.cpp
         src/CombatSystem.cpp
+        src/CombatWindCharges.cpp
         src/ContainerClicks.cpp
         src/ContainerMenuController.cpp
         src/ContainerAnvil.cpp
@@ -187,13 +189,22 @@ basalt_module(server-runtime-core
         src/MobActionWarden.cpp
         src/MobDeathLoot.cpp
         src/MobActionAllay.cpp
+        src/MobActionHorses.cpp
+        src/MobActionCreaking.cpp
+        src/MobActionCreakingHeart.cpp
+        src/MobActionAmbient.cpp
+        src/MobActionArmadillo.cpp
         src/MobActionAxolotl.cpp
         src/MobActionBees.cpp
+        src/MobActionBreeze.cpp
+        src/MobActionBreezeJump.cpp
+        src/MobActionCamel.cpp
         src/MobActionFrog.cpp
         src/MobActionGoat.cpp
         src/MobActionHoglin.cpp
         src/MobActionNeutral.cpp
         src/MobActionPiglin.cpp
+        src/MobActionSniffer.cpp
         src/MobActionPiglinItems.cpp
         src/MobActionCopperGolem.cpp
         src/MobActionShulker.cpp
@@ -400,6 +411,17 @@ basalt_module(server-runtime-core
         src/world/BlockPickData.cpp
         src/player/PlayerTotem.cpp
         src/player/PlayerAttributes.cpp
+        src/CombatVehicles.cpp
+        src/CombatMounts.cpp
+        src/StructureBlockSystem.cpp
+        src/ContainerEntities.cpp
+        src/world/ContainerDrops.cpp
+        src/entity/Boats.cpp
+        src/entity/Horses.cpp
+        src/entity/Creakings.cpp
+        src/world/StructureBlocks.cpp
+        src/entity/HorseBreeding.cpp
+        src/entity/BoatPhysics.cpp
         src/world/Anvils.cpp
         src/world/Beacons.cpp
         src/world/Beehives.cpp
@@ -522,6 +544,7 @@ basalt_module(server-runtime-core
         src/entity/ai/Controls.cpp
         src/entity/ai/FlyingGoals.cpp
         src/entity/ai/HoverWanderGoal.cpp
+        src/entity/ai/HorseGoals.cpp
         src/entity/ai/PhantomGoals.cpp
         src/entity/ai/ShulkerGoals.cpp
         src/entity/ai/WardenGoals.cpp
@@ -1460,6 +1483,30 @@ basalt_test(server-runtime-player-stats-test
 basalt_test(server-runtime-player-arrow-pickup-test
     SOURCES
         test/PlayerArrowPickupTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-boats-test
+    SOURCES
+        test/BoatsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-horses-test
+    SOURCES
+        test/HorsesTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-creakings-test
+    SOURCES
+        test/CreakingsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-structure-blocks-test
+    SOURCES
+        test/StructureBlocksTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

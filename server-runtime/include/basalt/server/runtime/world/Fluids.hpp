@@ -2,7 +2,13 @@
 
 #include <cstdint>
 
+namespace basalt::server::runtime::entity {
+class ServerEntity;
+}
+
 namespace basalt::server::runtime::world {
+
+class WorldState;
 
 /// What a player is standing in, which is all the drowning and burning rules need to know.
 enum class Submersion : std::uint8_t { None, Water, Lava };
@@ -32,6 +38,9 @@ inline constexpr float kFireDamage = 1.0F;
 [[nodiscard]] double eyeHeight(bool sneaking);
 
 [[nodiscard]] Submersion of(std::int32_t stateId);
+
+/// parity: `Entity.isInLava`: lava in any square of the box, up to where its surface stands.
+[[nodiscard]] bool touchesLava(WorldState& world, const entity::ServerEntity& entity);
 
 /// parity: `LivingEntity.decreaseAirSupply`/`increaseAirSupply`: one tick down, four back up.
 [[nodiscard]] std::int32_t airAfterTick(std::int32_t air, bool eyesInWater);

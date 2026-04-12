@@ -2,9 +2,13 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/entity/Allays.hpp>
 #include <basalt/server/runtime/entity/AreaEffectClouds.hpp>
+#include <basalt/server/runtime/entity/Armadillos.hpp>
 #include <basalt/server/runtime/entity/Axolotls.hpp>
 #include <basalt/server/runtime/entity/Bees.hpp>
+#include <basalt/server/runtime/entity/Breezes.hpp>
+#include <basalt/server/runtime/entity/Camels.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
+#include <basalt/server/runtime/entity/Creakings.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/FireworkRockets.hpp>
@@ -12,11 +16,13 @@
 #include <basalt/server/runtime/entity/Frogs.hpp>
 #include <basalt/server/runtime/entity/GeneratedEntityPresentation.hpp>
 #include <basalt/server/runtime/entity/Goats.hpp>
+#include <basalt/server/runtime/entity/Horses.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
 #include <basalt/server/runtime/entity/Piglins.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/Shulkers.hpp>
+#include <basalt/server/runtime/entity/Sniffers.hpp>
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
@@ -27,6 +33,7 @@
 #include <cstdint>
 #include <map>
 #include <set>
+#include <tuple>
 #include <utility>
 
 namespace basalt::server::runtime::entity {
@@ -35,6 +42,8 @@ namespace {
 /// parity: `LivingEntity.DATA_EFFECT_PARTICLES` and `DATA_EFFECT_AMBIENCE_ID`.
 constexpr std::uint8_t kEffectParticlesDataIndex = 10;
 constexpr std::uint8_t kEffectAmbienceDataIndex = 11;
+/// parity: `LivingEntity.DATA_STINGER_COUNT_ID`, after the arrows stuck in it.
+constexpr std::uint8_t kStingerCountDataIndex = 13;
 
 /// parity: `ExperienceOrb.DATA_VALUE`.
 constexpr std::uint8_t kOrbValueDataIndex = 8;
@@ -49,7 +58,6 @@ using RegistryHolder = wire::protocol::play::RegistryHolder;
 /// `AbstractCubeMob.ID_SIZE`: two `AgeableMob` fields follow the common index 16.
 constexpr std::uint8_t kCubeSizeDataIndex = 18;
 constexpr std::uint8_t kAbstractHorseFlagsDataIndex = 18;
-constexpr std::int8_t kAbstractHorseTameFlag = 2;
 constexpr std::uint8_t kMobFlagsDataIndex = 15;
 constexpr std::uint8_t kAirSupplyDataIndex = 1;
 constexpr std::int32_t kDefaultAirSupply = 300;
@@ -485,6 +493,35 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
         (previous != nullptr || fireworkAttached->has_value())) {
         entries.push_back(Entry{.index = 9, .value = SetEntityDataPacket::OptionalUnsignedIntValue{*fireworkAttached}});
     }
+    if (stingers.has_value() && (previous == nullptr || previous->stingers != stingers) &&
+        (previous != nullptr || *stingers != 0)) {
+        entries.push_back(
+            Entry{.index = kStingerCountDataIndex, .value = SetEntityDataPacket::IntValue{.value = *stingers}});
+    }
+    if (armadilloState.has_value() && (previous == nullptr || previous->armadilloState != armadilloState) &&
+        (previous != nullptr || *armadilloState != 0)) {
+        entries.push_back(
+            Entry{.index = armadillos::kStateDataIndex,
+                  .value = SetEntityDataPacket::RegistryIdValue{
+                      .value = *armadilloState, .registry = wire::protocol::play::RegistryHolder::ArmadilloState}});
+    }
+    if (snifferState.has_value() && (previous == nullptr || previous->snifferState != snifferState) &&
+        (previous != nullptr || *snifferState != 0)) {
+        entries.push_back(
+            Entry{.index = sniffers::kStateDataIndex,
+                  .value = SetEntityDataPacket::RegistryIdValue{
+                      .value = *snifferState, .registry = wire::protocol::play::RegistryHolder::SnifferState}});
+    }
+    if (snifferDropSeed.has_value() && (previous == nullptr || previous->snifferDropSeed != snifferDropSeed) &&
+        (previous != nullptr || *snifferDropSeed != 0)) {
+        entries.push_back(Entry{.index = sniffers::kDropSeedDataIndex,
+                                .value = SetEntityDataPacket::IntValue{.value = *snifferDropSeed}});
+    }
+    if (camelPoseTick.has_value() && (previous == nullptr || previous->camelPoseTick != camelPoseTick) &&
+        (previous != nullptr || *camelPoseTick != 0)) {
+        entries.push_back(Entry{.index = camels::kLastPoseTickDataIndex,
+                                .value = SetEntityDataPacket::LongValue{.value = *camelPoseTick}});
+    }
     if (frogTongue.has_value() && (previous == nullptr || previous->frogTongue != frogTongue) &&
         (previous != nullptr || frogTongue->has_value())) {
         entries.push_back(Entry{.index = frogs::kTongueTargetDataIndex,
@@ -553,6 +590,30 @@ std::vector<Entry> RuntimeEntityMetadata::changesFrom(const RuntimeEntityMetadat
         (previous != nullptr || *horseFlags != 0)) {
         entries.push_back(Entry{.index = kAbstractHorseFlagsDataIndex,
                                 .value = SetEntityDataPacket::ByteValue{.value = *horseFlags}});
+    }
+    for (const auto& [now, before] : {std::pair{horseChest, previous == nullptr ? std::nullopt : previous->horseChest},
+                                      std::pair{camelDash, previous == nullptr ? std::nullopt : previous->camelDash}}) {
+        if (now.has_value() && (previous == nullptr ? *now : before != now)) {
+            entries.push_back(
+                Entry{.index = horses::kChestDataIndex, .value = SetEntityDataPacket::BoolValue{.value = *now}});
+        }
+    }
+    for (const auto& [index, now, before, unusual] :
+         {std::tuple{creakings::kCanMoveDataIndex, creakingCanMove,
+                     previous == nullptr ? std::nullopt : previous->creakingCanMove, false},
+          std::tuple{creakings::kActiveDataIndex, creakingActive,
+                     previous == nullptr ? std::nullopt : previous->creakingActive, true},
+          std::tuple{creakings::kTearingDownDataIndex, creakingTearingDown,
+                     previous == nullptr ? std::nullopt : previous->creakingTearingDown, true}}) {
+        // A new viewer is told only what differs from the default: moving, calm and whole.
+        if (now.has_value() && (previous == nullptr ? *now == unusual : before != now)) {
+            entries.push_back(Entry{.index = index, .value = SetEntityDataPacket::BoolValue{.value = *now}});
+        }
+    }
+    if (creakingHome.has_value() && (previous == nullptr || previous->creakingHome != creakingHome) &&
+        (previous != nullptr || creakingHome->has_value())) {
+        entries.push_back(Entry{.index = creakings::kHomeDataIndex,
+                                .value = SetEntityDataPacket::OptionalBlockPosValue{.pos = *creakingHome}});
     }
     if (crystalBeam.has_value() && (previous == nullptr || previous->crystalBeam != crystalBeam) &&
         (previous != nullptr || crystalBeam->has_value())) {
@@ -669,7 +730,13 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
         live.cubeSize = entity.cubeSize;
     }
     if (abstractHorseTypes().contains(entity.type().path())) {
-        live.horseFlags = entity.tamedHorse ? kAbstractHorseTameFlag : std::int8_t{0};
+        live.horseFlags = horses::flagsOf(entity);
+        if (horses::isChested(entity.type())) {
+            live.horseChest = horses::hasChest(entity);
+        }
+        if (horses::isCamel(entity.type())) {
+            live.camelDash = entity.horse != nullptr && entity.horse->dashing;
+        }
     }
     if (entity.type().path() == "experience_orb" && entity.sourceNbt.has_value()) {
         live.orbValue = entity.sourceNbt->getShort("Value");
@@ -690,6 +757,7 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
                                : std::nullopt});
         }
         live.effectParticles = std::move(particles);
+        live.stingers = entity.stingerCount;
         // parity: `areAllEffectsAmbient` over no effects at all answers false on a fresh entity.
         live.effectsAmbient = !entity.effects.empty() && swirl.allAmbient;
     }
@@ -730,6 +798,25 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
         } else {
             live.pose = wire::protocol::play::Pose::Standing;
         }
+    }
+    if (entity.breeze != nullptr) {
+        static constexpr std::array<wire::protocol::play::Pose, 5> kBreezePoses{
+            wire::protocol::play::Pose::Standing, wire::protocol::play::Pose::Sliding,
+            wire::protocol::play::Pose::LongJumping, wire::protocol::play::Pose::Inhaling,
+            wire::protocol::play::Pose::Shooting};
+        live.pose = kBreezePoses[static_cast<std::size_t>(entity.breeze->pose)];
+    }
+    if (entity.armadillo != nullptr) {
+        live.armadilloState = static_cast<std::int32_t>(entity.armadillo->state);
+    }
+    if (entity.sniffer != nullptr) {
+        live.snifferState = static_cast<std::int32_t>(entity.sniffer->pose);
+        live.snifferDropSeed = entity.sniffer->dropSeedAt;
+    }
+    if (entity.camel != nullptr) {
+        live.camelPoseTick = entity.camel->lastPoseTick;
+        live.pose =
+            camels::sitting(*entity.camel) ? wire::protocol::play::Pose::Sitting : wire::protocol::play::Pose::Standing;
     }
     if (entity.frog != nullptr) {
         live.frogTongue = entity.frog->tongueTarget;
@@ -794,6 +881,17 @@ RuntimeEntityMetadata runtimeEntityMetadata(const ServerEntity& entity) {
                                          wire::protocol::play::ParticleOptions::Number{cloud.particlePower}}}
                                    : std::nullopt};
             }
+        }
+    }
+    if (creakings::isCreaking(entity.type())) {
+        const creakings::CreakingState* state = entity.creaking.get();
+        live.creakingCanMove = state == nullptr || state->canMove;
+        live.creakingActive = state != nullptr && state->active;
+        live.creakingTearingDown = state != nullptr && state->tearingDown;
+        live.creakingHome = std::nullopt;
+        if (state != nullptr && state->home.has_value()) {
+            live.creakingHome = wire::protocol::play::BlockPos{
+                .x = (*state->home)[0], .y = (*state->home)[1], .z = (*state->home)[2]};
         }
     }
     if (world::endCrystals::isCrystal(entity.type())) {

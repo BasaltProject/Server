@@ -110,6 +110,8 @@ private:
     std::int32_t levitationTicks_ = 0;
     /// parity: `enteredNetherPosition`, where the overworld was left for the nether.
     std::optional<std::array<double, 3>> enteredNether_;
+    /// parity: `enteredLavaOnVehiclePosition`.
+    std::optional<std::array<double, 3>> enteredLavaOnVehicle_;
 };
 
 } // namespace basalt::server::runtime

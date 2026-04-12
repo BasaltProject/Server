@@ -5,6 +5,7 @@
 #include <basalt/wire/common/logging/Logger.hpp>
 
 #include <cstdint>
+#include <filesystem>
 #include <functional>
 #include <map>
 #include <mutex>
@@ -50,11 +51,23 @@ public:
     /// Every template pool the jar ships, which is what `/place jigsaw` grows one of.
     [[nodiscard]] const std::vector<wire::common::Identifier>& poolIds();
 
+    /// Where the structures a structure block saves go, `<root>/<namespace>/structure/<path>.nbt`.
+    /// parity: `LevelResource.GENERATED_DIR`, read before the jar. Unset, nothing is read or written.
+    void setGeneratedRoot(std::filesystem::path root);
+
+    /// parity: `StructureTemplateManager.getOrCreate` filled by a structure block, and `save` when
+    /// `toDisk`. Answers whether it was kept, and written when asked.
+    bool store(const wire::common::Identifier& id, const wire::nbt::NbtCompound& structure, bool toDisk);
+
+    /// parity: `StructureTemplateManager.remove`, which a corner block's signal asks for.
+    void forget(const wire::common::Identifier& id);
+
 private:
     [[nodiscard]] const std::vector<wire::common::Identifier>& idsUnder(const std::string& directory,
                                                                         std::string_view extension);
 
     Jar jar_;
+    std::optional<std::filesystem::path> generatedRoot_;
     wire::common::Logger logger_;
     std::mutex mutex_;
     /// A map rather than a vector: a pointer handed out has to survive the next read.

@@ -79,6 +79,10 @@ struct BreakContext {
         hiveBroken;
     /// parity: `Block.playerWillDestroy`'s `guarded_by_piglins` check, before the block goes.
     std::function<void(world::LoadedWorld& world, const PlayerSession& player, std::int32_t stateId)> guardedBroken;
+    /// parity: `CreakingHeartBlock.playerWillDestroy`, which takes its creaking with it.
+    std::function<void(world::LoadedWorld& world, const PlayerSession& player, std::int32_t x, std::int32_t y,
+                       std::int32_t z)>
+        creakingHeartBroken;
     /// Takes the player off whatever they ride. parity: `Entity.stopRiding`.
     std::function<void(PlayerSession& player)> dismount;
 };

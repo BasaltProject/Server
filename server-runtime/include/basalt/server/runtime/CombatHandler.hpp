@@ -1,9 +1,12 @@
 #pragma once
 
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
+#include <basalt/server/runtime/entity/MobEquipment.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
+#include <basalt/wire/protocol/play/PlayerStatePackets.hpp>
+#include <basalt/wire/protocol/play/VehiclePackets.hpp>
 
 #include <array>
 #include <cstdint>
@@ -61,6 +64,24 @@ public:
 
     void handleInteract(const wire::protocol::play::InteractPacket& interact);
 
+    /// parity: `ServerGamePacketListenerImpl.handleMoveVehicle`: the driver's client moves the vehicle
+    /// and the server takes it, unless it went too far at once.
+    void handleMoveVehicle(const wire::protocol::play::ServerboundMoveVehiclePacket& packet);
+
+    /// parity: `handlePaddleBoat`, the oars everyone else sees.
+    void handlePaddleBoat(const wire::protocol::play::ServerboundPaddleBoatPacket& packet);
+
+    /// parity: the riding jump and `OPEN_INVENTORY` of `handlePlayerCommand`.
+    void handleRidingCommand(wire::protocol::play::PlayerCommandPacket::Action action, std::int32_t data);
+
+    /// A mount's saddle or body armour, as a click or its window sets it: seen by everyone, with the
+    /// equip sound and game event.
+    void equipMount(entity::ServerEntity& mount, entity::mobEquipment::Slot slot,
+                    const std::optional<server::world::loot::ItemStack>& stack);
+
+    /// parity: `Entity.getControllingPassenger` as it answers this player.
+    [[nodiscard]] bool controls(const player::PlayerSession& session, const entity::ServerEntity& vehicle) const;
+
     /// What is left of a hit after armour, resistance, protection and the tags that bypass them.
     [[nodiscard]] float reduced(const player::PlayerSession& session, float amount,
                                 const std::optional<wire::common::Identifier>& damageType) const;
@@ -111,6 +132,29 @@ private:
 
     void mount(player::PlayerSession& session, entity::ServerEntity& vehicle);
 
+    /// parity: `getDismountLocationForPassenger`, where a vehicle sets its rider down, or nothing for
+    /// the vehicles that keep the old lift.
+    [[nodiscard]] std::optional<std::array<double, 3>> dismountSpot(const player::PlayerSession& session,
+                                                                    const entity::ServerEntity& vehicle) const;
+
+    /// parity: each horse kind's `mobInteract`. Answers whether the click was the mount's.
+    bool interactMount(player::PlayerSession& session, entity::ServerEntity& horse, bool mainHand);
+
+    /// parity: `fedFood` over `handleEating`. Answers whether it ate.
+    bool feedMount(player::PlayerSession& session, entity::ServerEntity& horse, const wire::common::Identifier& item);
+
+    void rideMount(player::PlayerSession& session, entity::ServerEntity& horse);
+
+    bool openMountInventory(player::PlayerSession& session, entity::ServerEntity& horse);
+
+    void mountSound(const entity::ServerEntity& mount, std::string_view sound, float volume, float pitch);
+
+    /// `nextFloat() - nextFloat()`, what vanilla spreads a pitch with.
+    [[nodiscard]] float soundRoll() const;
+
+    /// parity: `AbstractBoat.interact`. Answers whether the player got in.
+    bool boardBoat(player::PlayerSession& session, entity::ServerEntity& boat);
+
     /// parity: `VehicleEntity.hurtServer`, which is damage points rather than health.
     void breakVehicle(player::PlayerSession& session, entity::ServerEntity& vehicle);
 
@@ -134,6 +178,8 @@ private:
     ClientSession* owner_;
     Hooks hooks_;
     Options options_;
+    /// parity: `vehiclePositionLastResetAt`, the turn a vehicle this player does not drive was last put back.
+    std::int64_t vehicleResetAt_ = 0;
 };
 
 } // namespace basalt::server::runtime

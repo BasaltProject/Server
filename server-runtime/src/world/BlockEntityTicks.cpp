@@ -187,6 +187,12 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 }
                 continue;
             }
+            if (path == "creaking_heart") {
+                if (hooks.creakingHeart && hooks.creakingHeart(x, y, z, hives)) {
+                    chunk->markDirty();
+                }
+                continue;
+            }
             // parity: `HopperBlockEntity.pushItemsTick`, one move per turn and then a rest.
             if (path == "hopper") {
                 if (hooks.allowHopperMove && !hooks.allowHopperMove(worldName, x, y, z)) {

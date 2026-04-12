@@ -20,7 +20,9 @@ constexpr std::int32_t kLastLevel = 5;
 constexpr std::int32_t kPromotionRegeneration = 200;
 constexpr std::int32_t kPromotionOrbBonus = 5;
 /// parity: `ambientSoundTime > -getAmbientSoundInterval() + 20`, twenty ticks after a reset.
-constexpr std::int64_t kTradeSoundGap = 20;
+constexpr std::int32_t kTradeSoundGap = 20;
+/// parity: `Mob.getAmbientSoundInterval`, which neither trader overrides.
+constexpr std::int32_t kAmbientInterval = 80;
 
 void setUnhappy(ServerEntity& villager, VillagerWorld& world) {
     stateOf(villager).unhappyCounter = kUnhappyTicks;
@@ -110,15 +112,15 @@ bool startTrading(ServerEntity& villager, VillagerWorld& world, std::int32_t pla
 }
 
 void tradeUpdated(ServerEntity& villager, VillagerWorld& world, bool validTrade, std::int64_t gameTime) {
-    VillagerState& state = stateOf(villager);
-    if (gameTime - state.tradeSoundTime <= kTradeSoundGap) {
+    static_cast<void>(gameTime);
+    if (villager.ambientSoundTime <= -kAmbientInterval + kTradeSoundGap) {
         return;
     }
-    state.tradeSoundTime = gameTime;
+    villager.ambientSoundTime = -kAmbientInterval;
     world.sound(villager, validTrade ? "entity.villager.yes" : "entity.villager.no", 1.0F, 1.0F);
 }
 
-void noteTrade(ServerEntity& villager, std::int64_t gameTime) { stateOf(villager).tradeSoundTime = gameTime; }
+void noteTrade(ServerEntity& villager, std::int64_t /*gameTime*/) { villager.ambientSoundTime = -kAmbientInterval; }
 
 void stopTrading(ServerEntity& villager) {
     stateOf(villager).tradingPlayer.reset();

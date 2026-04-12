@@ -34,6 +34,14 @@ struct RuntimeEntityMetadata {
     std::optional<bool> baby;
     std::optional<std::int32_t> cubeSize;
     std::optional<std::int8_t> horseFlags;
+    /// parity: `AbstractChestedHorse.DATA_ID_CHEST` and `Camel.DASH`, both the byte after the flags.
+    std::optional<bool> horseChest;
+    std::optional<bool> camelDash;
+    /// parity: `Creaking.CAN_MOVE`, `IS_ACTIVE`, `IS_TEARING_DOWN` and `HOME_POS`.
+    std::optional<bool> creakingCanMove;
+    std::optional<bool> creakingActive;
+    std::optional<bool> creakingTearingDown;
+    std::optional<std::optional<wire::protocol::play::BlockPos>> creakingHome;
     /// parity: `EndCrystal`'s beam and base, which change while a dragon is being called back.
     std::optional<std::optional<wire::protocol::play::BlockPos>> crystalBeam;
     std::optional<bool> crystalBottom;
@@ -67,6 +75,15 @@ struct RuntimeEntityMetadata {
     /// parity: `FireworkRocketEntity`'s item, who it is stuck to and whether it was shot at an angle.
     std::optional<wire::protocol::play::WireItemStack> fireworkItem;
     std::optional<std::optional<std::int32_t>> fireworkAttached;
+    /// parity: `LivingEntity.DATA_STINGER_COUNT_ID`.
+    std::optional<std::int32_t> stingers;
+    /// parity: `Armadillo.ARMADILLO_STATE`.
+    std::optional<std::int32_t> armadilloState;
+    /// parity: `Sniffer.DATA_STATE` and `DATA_DROP_SEED_AT_TICK`.
+    std::optional<std::int32_t> snifferState;
+    std::optional<std::int32_t> snifferDropSeed;
+    /// parity: `Camel.LAST_POSE_CHANGE_TICK`.
+    std::optional<std::int64_t> camelPoseTick;
     /// parity: `Frog.DATA_TONGUE_TARGET_ID`.
     std::optional<std::optional<std::int32_t>> frogTongue;
     std::optional<bool> fireworkShotAtAngle;

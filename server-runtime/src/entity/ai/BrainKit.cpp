@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numbers>
 
 namespace basalt::server::runtime::entity::ai::brainKit {
 namespace {
@@ -371,6 +372,34 @@ void idleMovement(MobContext& mob, Motion& motion, const Look& look, std::int32_
             return;
         }
     }
+}
+
+void lookAround(MobContext& mob, Look& look, std::int32_t& gazeCooldown, std::int32_t min, std::int32_t max,
+                float maxYaw) {
+    if (look.entity.has_value() || look.at.has_value() || gazeCooldown > 0) {
+        return;
+    }
+    constexpr float kRadians = static_cast<float>(std::numbers::pi) / 180.0F;
+    constexpr auto kPi = static_cast<float>(std::numbers::pi);
+    // parity: the pitch is drawn even though its range is nothing.
+    const float pitch = std::clamp((mob.random.nextFloat() * 0.0F) + 0.0F, -90.0F, 90.0F);
+    float yaw = std::fmod(mob.mob.yaw + (2.0F * mob.random.nextFloat() * maxYaw) - maxYaw, 360.0F);
+    if (yaw >= 180.0F) {
+        yaw -= 360.0F;
+    }
+    if (yaw < -180.0F) {
+        yaw += 360.0F;
+    }
+    // parity: `Vec3.directionFromRotation` off the eyes, and a `BlockPosTracker` of that square.
+    const float yCos = mth::cos(static_cast<double>((-yaw * kRadians) - kPi));
+    const float ySin = mth::sin(static_cast<double>((-yaw * kRadians) - kPi));
+    const float xCos = -mth::cos(static_cast<double>(-pitch * kRadians));
+    const float xSin = mth::sin(static_cast<double>(-pitch * kRadians));
+    const double eyes = mob.mob.y + mobBreathing::eyeHeightOf(mob.mob);
+    const Block at{mth::floor(mob.mob.x + static_cast<double>(ySin * xCos)), mth::floor(eyes + xSin),
+                   mth::floor(mob.mob.z + static_cast<double>(yCos * xCos))};
+    look = Look{.at = Vec{at[0] + 0.5, at[1] + 0.5, at[2] + 0.5}};
+    gazeCooldown = min + mob.random.nextInt(max - min + 1);
 }
 
 bool panic(MobContext& mob, Motion& motion, std::int32_t& panicTicks, float speed) {

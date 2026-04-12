@@ -82,6 +82,10 @@ Menu Menu::rows(std::int32_t containerId, std::int32_t rows) {
     return Menu{containerId, 0, 0, blockWindow(rows * kColumns)};
 }
 
+Menu Menu::mount(std::int32_t containerId, std::int32_t columns) {
+    return Menu{containerId, 0, 0, blockWindow(2 + (columns * 3))};
+}
+
 Menu Menu::stonecutter(std::int32_t containerId) { return Menu{containerId, 0, 0, blockWindow(2)}; }
 
 Menu Menu::smithing(std::int32_t containerId) { return Menu{containerId, 0, 0, blockWindow(4)}; }

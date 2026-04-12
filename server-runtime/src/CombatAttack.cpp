@@ -1,3 +1,4 @@
+#include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Items.hpp>
 #include <basalt/server/registry/Registries.hpp>
@@ -5,15 +6,19 @@
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/CombatHandler.hpp>
 #include <basalt/server/runtime/CombatSystem.hpp>
+#include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/MapSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/VillagerTradeController.hpp>
 #include <basalt/server/runtime/entity/Allays.hpp>
+#include <basalt/server/runtime/entity/Armadillos.hpp>
+#include <basalt/server/runtime/entity/Boats.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/DragonState.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
+#include <basalt/server/runtime/entity/Horses.hpp>
 #include <basalt/server/runtime/entity/MobConversions.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -22,14 +27,18 @@
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
+#include <basalt/server/runtime/player/Menu.hpp>
 #include <basalt/server/runtime/player/PlayerAttributes.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
+#include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSweep.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
+#include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
+#include <basalt/server/runtime/world/ContainerDrops.hpp>
 #include <basalt/server/runtime/world/Cushions.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
@@ -49,6 +58,7 @@
 #include <cmath>
 #include <cstdint>
 #include <numbers>
+#include <random>
 
 namespace basalt::server::runtime {
 namespace {
@@ -130,7 +140,7 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     if (hooks_.attackAllowed && !hooks_.attackAllowed(*session, target->entityId())) {
         return;
     }
-    if (world::detectorRails::isMinecart(target->type())) {
+    if (world::detectorRails::isMinecart(target->type()) || entity::boats::isBoat(target->type())) {
         breakVehicle(*session, *target);
         return;
     }
@@ -318,9 +328,27 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
             return;
         }
     }
-    // parity: `AbstractMinecart.interact`, which seats whoever clicked it.
+    // parity: `Minecart.interact` seats whoever clicked it; `MinecartChest` opens its chest instead,
+    // and the other carts have no seat.
     if (world::detectorRails::isMinecart(entity->type())) {
-        mount(*session, *entity);
+        if (entity->type().path() == "minecart") {
+            if (!session->sneaking && entity->passengerIds.empty()) {
+                mount(*session, *entity);
+            }
+        } else if (entity->type().path() == "chest_minecart") {
+            owner_->menus().openEntityChest(*session, *entity);
+        }
+        return;
+    }
+    // parity: `AbstractBoat.interact`, a seat for a player not crouching.
+    if (entity::boats::isBoat(entity->type())) {
+        // parity: `AbstractChestBoat.interact`: a seat first, and the chest to a crouching player or
+        // when there is no seat to be had.
+        if (!boardBoat(*session, *entity) && entity::boats::hasChest(entity->type()) &&
+            (session->sneaking ||
+             static_cast<std::int32_t>(entity->passengerIds.size()) >= entity::boats::maxPassengers(entity->type()))) {
+            owner_->menus().openEntityChest(*session, *entity);
+        }
         return;
     }
     // parity: `Cushion.interact`: a player not sneaking sits on one nobody is on.
@@ -330,6 +358,10 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
             owner_->broadcastSound("minecraft:entity.cushion.sit", entity->x, entity->y, entity->z,
                                    SoundSource::Neutral);
         }
+        return;
+    }
+    if (entity::horses::isHorse(entity->type()) &&
+        interactMount(*session, *entity, interact.hand == wire::protocol::play::InteractPacket::kMainHand)) {
         return;
     }
     if (tameOrSit(*world, *session, *entity)) {
@@ -458,6 +490,17 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
             owner_->sendInventorySlot(heldSlot);
         }
         return;
+    }
+    // parity: `Armadillo.mobInteract`: a brush takes a scute off, and a curled one takes nothing else.
+    if (entity->type().path() == "armadillo") {
+        MobActionSystem* mobs = owner_->options().mobs;
+        if (item.has_value() && item->path() == "brush" && mobs != nullptr && mobs->brushArmadillo(*world, *entity)) {
+            owner_->blockInteraction().wearHeldItem(16);
+            return;
+        }
+        if (entity::armadillos::isScared(*entity)) {
+            return;
+        }
     }
     // parity: `Tadpole.feed`: the frog food takes a tenth of the wait off, in whole seconds.
     if (item.has_value() && entity->type().path() == "tadpole" && owner_->options().itemTags != nullptr &&
@@ -618,12 +661,21 @@ bool CombatHandler::tameOrSit(const world::LoadedWorld& world, PlayerSession& se
 }
 
 void CombatHandler::mount(PlayerSession& session, ServerEntity& vehicle) {
-    if (session.vehicleId.has_value()) {
+    if (session.vehicleId == vehicle.entityId()) {
         return;
+    }
+    // parity: `Entity.startRiding` leaves whatever it was on first.
+    if (session.vehicleId.has_value()) {
+        dismount(session);
     }
     session.vehicleId = vehicle.entityId();
     vehicle.passengerIds.push_back(session.entityId());
     broadcastPassengers(vehicle);
+    // parity: `GameEvent.ENTITY_MOUNT`, from the player at where the vehicle is.
+    if (world::LoadedWorld* world = owner_->currentWorld(); world != nullptr) {
+        world::vibrations::emit(world->state(), "entity_mount", vehicle.x, vehicle.y, vehicle.z, world->gameTime(),
+                                {.entity = session.uuid()});
+    }
     // parity: `Entity.startRiding` ends in `START_RIDING_TRIGGER` for every player now aboard.
     if (world::AdvancementTriggers* triggers = owner_->options().advancementTriggers; triggers != nullptr) {
         triggers->fire("started_riding", session.name(), session.uuid().toString());
@@ -631,13 +683,54 @@ void CombatHandler::mount(PlayerSession& session, ServerEntity& vehicle) {
 }
 
 void CombatHandler::breakVehicle(PlayerSession& session, ServerEntity& vehicle) {
+    world::LoadedWorld* world = owner_->currentWorld();
+    if (world == nullptr) {
+        return;
+    }
     broadcastDamageEvent(vehicle, world::damageTypes::kPlayerAttack, session.entityId());
-    if (session.gamemode != Gamemode::Creative) {
-        vehicle.vehicleDamage += kVehicleDamagePerPoint;
-        if (vehicle.vehicleDamage <= kVehicleBreakDamage) {
-            return;
+    // parity: `VehicleEntity.hurtServer`: ten points of damage a point of the hit, `ENTITY_DAMAGE`,
+    // and past forty it is destroyed; a creative player just takes it away.
+    world::RealEnchantments* enchantments = owner_->options().enchantments;
+    const auto hit = static_cast<float>(
+        player::playerAttributes::valueOf(session, "minecraft:attack_damage", [enchantments](const Identifier& id) {
+            return enchantments == nullptr ? nullptr : enchantments->definitionOf(id);
+        }));
+    vehicle.vehicleDamage += hit * kVehicleDamagePerPoint;
+    world::vibrations::emit(world->state(), "entity_damage", vehicle.x, vehicle.y, vehicle.z, world->gameTime(),
+                            {.entity = session.uuid()});
+    const bool creative = session.gamemode == Gamemode::Creative;
+    if (!creative && vehicle.vehicleDamage <= kVehicleBreakDamage) {
+        return;
+    }
+    if (!creative) {
+        // parity: `VehicleEntity.destroy`: killed, then its item with its name, if entities drop.
+        world::vibrations::emit(world->state(), "entity_die", vehicle.x, vehicle.y, vehicle.z, world->gameTime(),
+                                {.entity = vehicle.uuid()});
+        if (world->gameRules().get(world::gameRules::kEntityDrops)) {
+            wire::nbt::NbtCompound components;
+            if (const wire::nbt::NbtTag* name =
+                    vehicle.sourceNbt.has_value() ? vehicle.sourceNbt->find("CustomName") : nullptr;
+                name != nullptr) {
+                components.set("minecraft:custom_name", *name);
+            }
+            owner_->blockInteraction().spawnDroppedItem(vehicle.type(), 1, vehicle.x, vehicle.y, vehicle.z, 0.0, 0.0,
+                                                        0.0, 40, std::move(components));
         }
-        owner_->blockInteraction().spawnDroppedItem(vehicle.type(), 1, vehicle.x, vehicle.y, vehicle.z);
+    }
+    // parity: `AbstractChestBoat.remove` and `AbstractMinecartContainer.remove` spill the chest
+    // whatever the rules say, a creative player's discard included.
+    if ((entity::boats::hasChest(vehicle.type()) || vehicle.type().path() == "chest_minecart") &&
+        vehicle.sourceNbt.has_value()) {
+        random::RandomSource random = random::RandomSource::legacy(static_cast<std::int64_t>(std::random_device{}()));
+        for (const std::optional<server::world::loot::ItemStack>& slot :
+             world::blockInventory::read(*vehicle.sourceNbt, player::Menu::kChestSize)) {
+            if (slot.has_value() && slot->count > 0) {
+                world::containerDrops::dropItemStack(
+                    world->state(), vehicle.x, vehicle.y, vehicle.z, *slot, random,
+                    [this] { return owner_->options().playerRegistry->allocateEntityId(); });
+            }
+        }
+        static_cast<void>(vehicle.sourceNbt->remove("Items"));
     }
     for (const std::int32_t passenger : vehicle.passengerIds) {
         for (PlayerSession* rider : owner_->playersInSameWorld()) {

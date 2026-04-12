@@ -1,9 +1,11 @@
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/MobTickSystem.hpp>
 #include <basalt/server/runtime/entity/Bees.hpp>
+#include <basalt/server/runtime/entity/Boats.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
+#include <basalt/server/runtime/entity/Horses.hpp>
 #include <basalt/server/runtime/entity/MobBrain.hpp>
 #include <basalt/server/runtime/entity/MobCategory.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
@@ -29,6 +31,9 @@ constexpr double kAbstractSkeletonVehicleY = 0.7;
 constexpr double kWitherSkeletonVehicleY = 0.875;
 
 double passengerAttachment(const ServerEntity& vehicle) {
+    if (entity::boats::isBoat(vehicle.type())) {
+        return entity::boats::rideHeight(vehicle);
+    }
     return vehicle.type().path() == "spider" ? kSpiderPassengerY : vehicle.height();
 }
 
@@ -124,6 +129,16 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
     entity.idleTicks++;
     entity.tickCount++;
     entity::entityCombat::tick(entity);
+    actions_->tickAmbientSound(world, entity, random);
+    // parity: `LivingEntity.tick`: one stinger falls out every twenty times thirty less the count.
+    if (entity.stingerCount > 0) {
+        if (entity.removeStingerTime <= 0) {
+            entity.removeStingerTime = 20 * (30 - entity.stingerCount);
+        }
+        if (--entity.removeStingerTime <= 0) {
+            --entity.stingerCount;
+        }
+    }
     if (entity::wardens::isWarden(entity.type())) {
         actions_->tickWarden(world, watchers, entity);
         if (entity.removed) {
@@ -181,7 +196,13 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
             return;
         }
     }
-    if (!entity.noAi) {
+    // parity: a saddled mount a player steers moves by that player's client, not by its own goals.
+    const bool steered = entity::horses::isHorse(entity.type()) && entity::horses::saddled(entity) &&
+                         !entity.passengerIds.empty() &&
+                         std::ranges::any_of(watchers, [&entity](const PlayerSession* player) {
+                             return player->entityId() == entity.passengerIds.front();
+                         });
+    if (!entity.noAi && !steered) {
         actions_->tickMobAi(world, entity, views, living, random);
         if (entity.type().path() == "dolphin") {
             actions_->dolphinPicksUp(world, entity);
@@ -190,6 +211,9 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
         if (partner != nullptr) {
             actions_->breed(world, entity, *partner);
         }
+    }
+    if (entity::horses::isHorse(entity.type())) {
+        actions_->tickHorse(world, entity, random);
     }
     // parity: `Bee.customServerAiStep` and the rest of `Bee.aiStep`, after the goals.
     if (entity::bees::isBee(entity.type())) {

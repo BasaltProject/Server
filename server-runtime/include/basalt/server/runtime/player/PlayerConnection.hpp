@@ -49,12 +49,8 @@ enum class TitlePiece : std::uint8_t {
     Reset,
 };
 
-/// What a player's session needs of the connection they arrived on.
-///
-/// Five facts and one call, handed over rather than reached for: the session is what outlives a
-/// packet exchange, and a connection is only how it reaches the client. Keeping the seam this
-/// narrow is what lets the session, and everything built on it, be written and tested without the
-/// networking around it.
+/// What a player's session needs of the connection they arrived on, handed over rather than reached
+/// for so the session can be tested without the networking around it.
 struct PlayerConnection {
     /// What the client said in its handshake, and where it connected from: the same facts a ping
     /// carries.
@@ -204,12 +200,9 @@ struct PlayerConnection {
     /// Gives health back, up to whatever their maximum is.
     std::function<void(float amount)> heal;
 
-    /// Damage that goes through the ordinary path: armour, absorption, the death message and the
-    /// hurt animation. The message id is what a death sentence is looked up by, the type is what
-    /// the tags are tested against.
-    ///
-    /// The source travels with it because only the caller knows it: below there is an id and no way
-    /// to name whoever swung.
+    /// Damage through the ordinary path: armour, absorption, death message and hurt animation. The
+    /// message id picks the death sentence, the type is what tags are tested against, and the source
+    /// is passed because only the caller knows who swung.
     std::function<void(float amount, std::string_view deathMessageId, const wire::common::Identifier& damageType,
                        const std::optional<entity::DamageSource>& source)>
         hurt;
@@ -306,6 +299,9 @@ struct PlayerConnection {
     /// Moves the player and tells their client, which is the only way a position set on the server
     /// is believed: a client that was not told rubber-bands straight back.
     std::function<void(double x, double y, double z, float yaw, float pitch)> teleportTo;
+
+    /// Takes the player off whatever they ride, as crouching would. parity: `Entity.stopRiding`.
+    std::function<void()> dismount;
 
     /// Draws somebody lying in a bed, or standing up out of one, on **this** player's screen: the
     /// sleeper is named by entity, so the same call serves the sleeper and everyone watching them.

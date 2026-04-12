@@ -102,6 +102,7 @@ class MapSystem;
 class FireworkSystem;
 class WitherSystem;
 class MobActionSystem;
+class StructureBlockSystem;
 class ExplosionSystem;
 class BlockInteractionHandler;
 class ItemUseTimers;
@@ -269,6 +270,8 @@ public:
         FireworkSystem* fireworks = nullptr;
         /// What a mob does when something is used on it.
         MobActionSystem* mobs = nullptr;
+        /// What a structure block's screen asks for.
+        StructureBlockSystem* structureBlocks = nullptr;
         /// Experience left as orbs at a point.
         std::function<void(world::LoadedWorld& world, double x, double y, double z, std::int32_t amount)>
             awardExperience;

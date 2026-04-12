@@ -281,7 +281,8 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         // parity: `CommandBlock.useWithoutItem`, which is `player.openCommandBlock(entity)` for
         // anyone allowed to and nothing at all for anyone else. The client opens the screen itself,
         // so what the server owes it is the block entity's own data.
-        if (world::commandBlocks::modeOf(path).has_value()) {
+        // parity: `StructureBlockEntity.usedBy`, the same: the client opens its own screen.
+        if (world::commandBlocks::modeOf(path).has_value() || path == "structure_block") {
             if (mayUseGameMasterBlocks(*session)) {
                 sendBlockEntity(hit.pos);
                 ack();
@@ -411,9 +412,8 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
             return;
         }
         // parity: `AbstractCauldronBlock.useItemOn`, whatever the held item does to one.
-        if (path.ends_with("cauldron") &&
-            player::useCauldronFor(breakContext(), *session, *owner_->currentWorld(), hit.pos.x, hit.pos.y, hit.pos.z,
-                                   heldSlot, held)) {
+        if (path.ends_with("cauldron") && player::useCauldronFor(breakContext(), *session, *owner_->currentWorld(),
+                                                                 hit.pos.x, hit.pos.y, hit.pos.z, heldSlot, held)) {
             ack();
             return;
         }
@@ -426,8 +426,8 @@ void BlockInteractionHandler::handleUseItemOn(const play::ServerboundUseItemOnPa
         }
         // parity: `FlowerPotBlock`, a plant in or a plant out.
         if ((path == "flower_pot" || path.starts_with("potted_")) &&
-            player::useFlowerPotFor(breakContext(), *session, *owner_->currentWorld(), hit.pos.x, hit.pos.y,
-                                    hit.pos.z, heldSlot, held)) {
+            player::useFlowerPotFor(breakContext(), *session, *owner_->currentWorld(), hit.pos.x, hit.pos.y, hit.pos.z,
+                                    heldSlot, held)) {
             ack();
             return;
         }
@@ -703,6 +703,10 @@ void BlockInteractionHandler::handleUseItem(const play::ServerboundUseItemPacket
         const std::optional<storage::StoredItemStack> offhand = session->inventory.at(PlayerInventory::kOffhandSlot);
         const std::optional<Identifier> other = offhand.has_value() ? parsedOrNothing(offhand->id) : std::nullopt;
         if (!other.has_value() || owner_->itemUseTimers().onCooldown(*other)) {
+            return;
+        }
+        // parity: `CrossbowItem.use` and `BowItem.use` answer either hand.
+        if (owner_->itemUseTimers().startDrawing(*session, *other, PlayerInventory::kOffhandSlot)) {
             return;
         }
         // parity: `FishingRodItem.use` answers either hand.

@@ -49,6 +49,7 @@ void ContainerMenuController::openBrewingStand(PlayerSession& session, const Blo
     openBlock = pos;
     openBlockSecond.reset();
     openEnderChest_ = false;
+    openEntity_.reset();
     openStonecutter_ = false;
     openSmithing_ = false;
     openAnvil_ = false;
@@ -149,6 +150,10 @@ void ContainerMenuController::syncBrewingStand() {
 std::int32_t ContainerMenuController::slotCapacity(const MenuSlot& slot) const {
     const auto* block = std::get_if<player::menuSlot::Block>(&slot);
     if (block != nullptr && block->index < world::brewingStands::kBottles && brewingStandOpen()) {
+        return 1;
+    }
+    // parity: `ArmorSlot.getMaxStackSize`, a mount's saddle and armour.
+    if (block != nullptr && block->index < 2 && mountOpen()) {
         return 1;
     }
     return PlayerInventory::kMaxStack;

@@ -105,6 +105,9 @@ public:
     /// who is not an operator in creative, which is what `canUseGameMasterBlocks` asks.
     void programCommandBlock(const wire::protocol::play::SetCommandBlockPacket& packet);
 
+    /// parity: `handleSetStructureBlock`, for a player allowed game master blocks.
+    void setStructureBlock(const wire::protocol::play::SetStructureBlockPacket& packet);
+
     /// parity: `Level.updateNeighborsAt`, which is what makes a torch fall off a broken wall.
     void notifyNeighbours(const wire::protocol::play::BlockPos& pos);
 

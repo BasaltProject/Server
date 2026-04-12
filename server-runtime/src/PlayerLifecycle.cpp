@@ -12,6 +12,7 @@
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
+#include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
@@ -138,6 +139,22 @@ void PlayerLifecycle::tickTriggers(PlayerSession& session) {
         triggers->fire("effects_changed", name, uuid);
     }
     triggers->fire("tick", name, uuid);
+    // parity: `trackEnteredOrExitedLavaOnVehicle`: where the vehicle went into lava, and each turn it
+    // is still in it, `ride_entity_in_lava` from there.
+    world::LoadedWorld* world = owner_->currentWorld();
+    const entity::ServerEntity* vehicle =
+        world == nullptr || !session.vehicleId.has_value() ? nullptr : world->state().entity(*session.vehicleId);
+    const bool inLava = vehicle != nullptr && world::fluids::touchesLava(world->state(), *vehicle);
+    if (inLava) {
+        if (!enteredLavaOnVehicle_.has_value()) {
+            enteredLavaOnVehicle_ = std::array<double, 3>{session.x, session.y, session.z};
+        } else {
+            triggers->fire("ride_entity_in_lava", name, uuid,
+                           world::TriggerEvent{.startPosition = enteredLavaOnVehicle_});
+        }
+    } else {
+        enteredLavaOnVehicle_.reset();
+    }
     if (levitationStart_.has_value()) {
         triggers->fire(
             "levitation", name, uuid,

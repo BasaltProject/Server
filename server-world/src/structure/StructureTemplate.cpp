@@ -727,7 +727,10 @@ void StructureTemplate::placeInto(Chunk& chunk, const TemplatePlacement& placeme
             placeAppendedLoot(chunk, finalStateId, entry.worldPos, loot->second, entry.block->blockEntityNbt);
         }
     }
-    placeEntities(chunk, placement.position, placement.rotation, placement.mirror, placement.pivot, &placement.clipTo);
+    if (!placement.ignoreEntities) {
+        placeEntities(chunk, placement.position, placement.rotation, placement.mirror, placement.pivot,
+                      &placement.clipTo);
+    }
 }
 
 bool StructureTemplate::placeDecorationInto(Chunk& chunk, const StructurePos position, const StructureRotation rotation,

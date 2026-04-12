@@ -30,6 +30,8 @@
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 
+#include <map>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -49,6 +51,8 @@ constexpr double kPopSpread = 0.2;
 constexpr double kItemHalfHeight = 0.125;
 constexpr double kBreakDropLift = 0.2;
 constexpr std::int32_t kBreakDropPickupDelay = 10;
+/// parity: `ItemEntity.setDefaultPickUpDelay`.
+constexpr std::int32_t kCreativeHivePickupDelay = 10;
 
 [[nodiscard]] std::optional<Identifier> parsedOrNothing(const std::string& id) {
     const std::expected<Identifier, wire::common::IdentifierError> parsed = Identifier::parse(id);
@@ -345,6 +349,20 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
     if (broken.has_value() && context.guardedBroken) {
         context.guardedBroken(world, *session, *broken);
     }
+    if (brokenBlock != nullptr && brokenBlock->path() == "creaking_heart") {
+        if (context.creakingHeartBroken) {
+            context.creakingHeartBroken(world, *session, x, y, z);
+        }
+        // parity: `tryAwardExperience`: twenty to twenty-four for a natural heart, not in creative.
+        const std::map<std::string, std::string> properties =
+            reg::blockStateDefinitions::propertiesOf(broken.value_or(0));
+        const auto natural = properties.find("natural");
+        if (natural != properties.end() && natural->second == "true" && session->gamemode != Gamemode::Creative &&
+            context.awardExperience && world.gameRules().get(world::gameRules::kBlockDrops)) {
+            random::RandomSource random = random::RandomSource::legacy(seedFrom(context));
+            context.awardExperience(world, x + 0.5, y + 0.5, z + 0.5, random.nextIntBetweenInclusive(20, 24));
+        }
+    }
     // parity: `BeehiveBlock.playerDestroy` is handed the block entity as it was before the break.
     std::optional<wire::nbt::NbtCompound> hive;
     if (brokenBlock != nullptr && world::beehives::isHive(brokenBlock->path())) {
@@ -471,6 +489,28 @@ bool breakBlockFor(PlayerSession& player, world::LoadedWorld& world, const std::
             if (hive.has_value() && context.hiveBroken) {
                 context.hiveBroken(world, *session, x, y, z, broken.value_or(0), *hive, silkTouch);
             }
+        }
+    }
+    // parity: `BeehiveBlock.playerWillDestroy`: in creative, a hive with bees or honey drops itself
+    // with both, where drops are on.
+    if (session->gamemode == Gamemode::Creative && hive.has_value() && brokenBlock != nullptr &&
+        world.gameRules().get(world::gameRules::kBlockDrops)) {
+        const std::map<std::string, std::string> properties =
+            reg::blockStateDefinitions::propertiesOf(broken.value_or(0));
+        const auto honey = properties.find("honey_level");
+        const std::string honeyLevel = honey == properties.end() ? "0" : honey->second;
+        const wire::nbt::NbtList* bees = hive->getList("bees");
+        if ((bees != nullptr && !bees->empty()) || honeyLevel != "0") {
+            wire::nbt::NbtCompound components;
+            if (bees != nullptr) {
+                components.set("minecraft:bees", wire::nbt::NbtTag::ofList(*bees));
+            }
+            wire::nbt::NbtCompound blockState;
+            blockState.putString("honey_level", honeyLevel);
+            components.set("minecraft:block_state", wire::nbt::NbtTag::ofCompound(std::move(blockState)));
+            spawnDroppedItem(context, world, *brokenBlock, 1, static_cast<double>(x), static_cast<double>(y),
+                             static_cast<double>(z), (doubleFrom(context) * 0.2) - 0.1, 0.2,
+                             (doubleFrom(context) * 0.2) - 0.1, kCreativeHivePickupDelay, std::move(components));
         }
     }
     if (brokenBlock != nullptr) {

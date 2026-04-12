@@ -36,6 +36,7 @@ struct PlayerView {
     bool spectator = false;
     std::optional<wire::common::Identifier> heldItem;
     bool sneaking = false;
+    bool sprinting = false;
     /// parity: `Player.isSwimming`, sprinting in water.
     bool swimming = false;
     /// Where they are looking, which is what an enderman reads.
@@ -173,6 +174,15 @@ public:
 
     /// parity: `Level.broadcastEntityEvent`.
     virtual void entityEvent(ServerEntity& /*mob*/, std::int8_t /*event*/) {}
+
+    /// parity: `AbstractHorse.tameWithName`, for the player riding it.
+    virtual void tameHorse(ServerEntity& /*horse*/, std::int32_t /*playerId*/) {}
+
+    /// parity: `RunAroundLikeCrazyGoal`'s `ejectPassengers`, `makeMad` and the smoke.
+    virtual void throwRiders(ServerEntity& /*horse*/) {}
+
+    /// parity: `RandomStandGoal.start`: up on its hind legs with its ambient sound.
+    virtual void horseRears(ServerEntity& /*horse*/) {}
 
     /// parity: `LivingEntity.dropFromGiftLootTable`: a gift table rolled for this mob, dropped in front
     /// of it.

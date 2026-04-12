@@ -151,7 +151,7 @@ bool ItemUseTimers::startDrawing(PlayerSession& session, const Identifier& item,
         crossbowCharging_ = {};
         drawingSlot_ = slot;
         drawingTicks_ = 0;
-        setUsingItem(true, item);
+        setUsingItem(true, item, slot == PlayerInventory::kOffhandSlot);
         return true;
     }
     if (item.path() != kBow) {
@@ -164,7 +164,7 @@ bool ItemUseTimers::startDrawing(PlayerSession& session, const Identifier& item,
     }
     drawingSlot_ = slot;
     drawingTicks_ = 0;
-    setUsingItem(true, item);
+    setUsingItem(true, item, slot == PlayerInventory::kOffhandSlot);
     return true;
 }
 
@@ -181,7 +181,8 @@ void ItemUseTimers::tickDrawing(PlayerSession& session) {
     const std::optional<storage::StoredItemStack>& held = session.inventory.at(drawingSlot_);
     const std::optional<Identifier> id = held.has_value() ? parsedOrNothing(held->id) : std::nullopt;
     if (!id.has_value() || (id->path() != kBow && id->path() != kCrossbow) ||
-        drawingSlot_ != PlayerInventory::kHotbarStart + session.inventory.heldSlot()) {
+        (drawingSlot_ != PlayerInventory::kOffhandSlot &&
+         drawingSlot_ != PlayerInventory::kHotbarStart + session.inventory.heldSlot())) {
         stopDrawing();
         return;
     }

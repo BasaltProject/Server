@@ -864,4 +864,14 @@ std::vector<WorldState::Spilled> WorldState::takeSpilledContents() {
     return std::exchange(spilled_, {});
 }
 
+void WorldState::queueStructureTrigger(std::int32_t x, std::int32_t y, std::int32_t z) {
+    const WorldWriteLock lock{mutex_};
+    structureTriggers_.push_back({x, y, z});
+}
+
+std::vector<std::array<std::int32_t, 3>> WorldState::takeStructureTriggers() {
+    const WorldWriteLock lock{mutex_};
+    return std::exchange(structureTriggers_, {});
+}
+
 } // namespace basalt::server::runtime::world

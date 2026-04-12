@@ -1,11 +1,15 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/entity/Allays.hpp>
 #include <basalt/server/runtime/entity/Bees.hpp>
+#include <basalt/server/runtime/entity/Armadillos.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/FireworkRockets.hpp>
+#include <basalt/server/runtime/entity/Camels.hpp>
 #include <basalt/server/runtime/entity/Frogs.hpp>
+#include <basalt/server/runtime/entity/Sniffers.hpp>
 #include <basalt/server/runtime/entity/Goats.hpp>
+#include <basalt/server/runtime/entity/Horses.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/MobStatusEffects.hpp>
 #include <basalt/server/runtime/entity/NeutralAnger.hpp>
@@ -398,6 +402,15 @@ NbtCompound encode(const ServerEntity& entity) {
     if (path == "frog") {
         frogs::write(entity, tag);
     }
+    if (camels::isCamel(entity.type())) {
+        camels::write(entity, tag);
+    }
+    if (path == "sniffer") {
+        sniffers::write(entity, tag);
+    }
+    if (path == "armadillo") {
+        armadillos::write(entity, tag);
+    }
     if (patrols(path)) {
         if (entity.patrolTarget.has_value()) {
             tag.putIntArray("patrol_target", {entity.patrolTarget->begin(), entity.patrolTarget->end()});
@@ -428,6 +441,8 @@ NbtCompound encode(const ServerEntity& entity) {
     if (path == "skeleton_horse") {
         tag.putBoolean("SkeletonTrap", entity.skeletonTrap);
         tag.putInt("SkeletonTrapTime", entity.skeletonTrapTime);
+    }
+    if (horses::isHorse(entity.type())) {
         tag.putBoolean("Tame", entity.tamedHorse);
     }
     if (entity.leashHolderUuid.has_value()) {
@@ -617,6 +632,8 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
     if (path == "skeleton_horse") {
         entity->skeletonTrap = numericBoolean(tag, "SkeletonTrap");
         entity->skeletonTrapTime = numericInt(tag, "SkeletonTrapTime");
+    }
+    if (horses::isHorse(entity->type())) {
         entity->tamedHorse = numericBoolean(tag, "Tame");
     }
     if (const std::optional<Uuid> leash = uuidIn(compoundOf(tag, "leash"), "UUID");

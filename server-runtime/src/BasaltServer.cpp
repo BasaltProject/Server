@@ -701,6 +701,11 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                        std::vector<world::BlockChange>& pending) {
                     return mobActions_ != nullptr && mobActions_->tickBeehive(world, x, y, z, pending);
                 },
+            .tickCreakingHeart =
+                [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                       std::vector<world::BlockChange>& pending) {
+                    return mobActions_ != nullptr && mobActions_->tickCreakingHeart(world, x, y, z, pending);
+                },
             .shriekerHeard =
                 [this](world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival) {
                     if (shriekers_ != nullptr) {
@@ -812,6 +817,10 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
             }
         }
     };
+    // parity: `LevelResource.GENERATED_DIR`, beside the worlds rather than inside one of them.
+    vanillaData_.structureTemplates.setGeneratedRoot(std::filesystem::path{options_.worldsRoot}.parent_path() /
+                                                     "generated");
+    structureBlocks_ = std::make_unique<StructureBlockSystem>(vanillaData_.structureTemplates, playerRegistry_);
     mobActions_ =
         std::make_unique<MobActionSystem>(playerRegistry_, *broadcaster_, *explosions_, *spawning_, *combat_, *raids_,
                                           vanillaData_.lootTables, model.allWorlds, std::move(mobHooks),

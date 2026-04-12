@@ -11,6 +11,8 @@
 #include <basalt/server/runtime/entity/Attributes.hpp>
 #include <basalt/server/runtime/entity/Bees.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
+#include <basalt/server/runtime/entity/Horses.hpp>
+#include <basalt/server/runtime/entity/Camels.hpp>
 #include <basalt/server/runtime/entity/FlyingMovement.hpp>
 #include <basalt/server/runtime/entity/Frogs.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
@@ -25,6 +27,7 @@
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
+#include <basalt/server/runtime/world/DroppedItem.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
@@ -241,11 +244,26 @@ using BrainTick = void (MobActionSystem::*)(world::LoadedWorld&, entity::ai::Mob
     if (path == "goat") {
         return &MobActionSystem::tickGoat;
     }
+    if (entity::camels::isCamel(type)) {
+        return &MobActionSystem::tickCamel;
+    }
+    if (path == "breeze") {
+        return &MobActionSystem::tickBreeze;
+    }
+    if (path == "armadillo") {
+        return &MobActionSystem::tickArmadillo;
+    }
+    if (path == "sniffer") {
+        return &MobActionSystem::tickSniffer;
+    }
     if (path == "frog") {
         return &MobActionSystem::tickFrog;
     }
     if (path == "tadpole") {
         return &MobActionSystem::tickTadpole;
+    }
+    if (path == "creaking") {
+        return &MobActionSystem::tickCreaking;
     }
     return nullptr;
 }
@@ -482,13 +500,39 @@ void MobActionSystem::breed(world::LoadedWorld& world, ServerEntity& animal, Ser
     }
     // parity: `Frog.spawnChildFromBreeding`: no child, a frog carrying spawn to lay by the water.
     const bool frog = animal.type().path() == "frog";
-    const wire::common::Identifier childType = animal.type();
+    const wire::common::Identifier childType =
+        entity::horses::isHorse(animal.type()) ? entity::horses::offspringType(animal, partner) : animal.type();
+    const bool sniffer = animal.type().path() == "sniffer";
     if (frog) {
         entity::frogs::stateOf(animal).pregnant = true;
+    } else if (sniffer) {
+        // parity: `Sniffer.spawnChildFromBreeding`: an egg dropped where it stands, with a plop.
+        random::RandomSource random = freshRandom();
+        world.state().spawnItem(world::DroppedItem{.entityId = players_->allocateEntityId(),
+                                                   .uuid = wire::common::Uuid::random(),
+                                                   .item = wire::common::Identifier::vanilla("sniffer_egg"),
+                                                   .count = 1,
+                                                   .x = animal.x,
+                                                   .y = animal.y,
+                                                   .z = animal.z,
+                                                   .velocityX = (random.nextDouble() * 0.2) - 0.1,
+                                                   .velocityY = 0.2,
+                                                   .velocityZ = (random.nextDouble() * 0.2) - 0.1,
+                                                   .pickupDelay = world::kSpawnedPickupDelay});
+        playSound(world, animal, "entity.sniffer.egg_plop", 1.0F,
+                  ((random.nextFloat() - random.nextFloat()) * 0.2F) + 0.5F,
+                  wire::protocol::play::SoundSource::Neutral);
     } else {
+        const server::registry::EntityTypeEntry* childEntry = server::registry::entityTypes::of(childType);
         auto baby = std::make_unique<ServerEntity>(players_->allocateEntityId(), wire::common::Uuid::random(),
-                                                   animal.type(), entry->protocolId, animal.x, animal.y, animal.z);
+                                                   childType, childEntry == nullptr ? entry->protocolId
+                                                                                    : childEntry->protocolId,
+                                                   animal.x, animal.y, animal.z);
         baby->age = entity::breeding::kBabyAge;
+        if (entity::horses::isHorse(animal.type())) {
+            random::RandomSource random = freshRandom();
+            entity::horses::inherit(*baby, animal, partner, random);
+        }
         world.state().spawnEntity(std::move(baby));
     }
     // parity: `finalizeSpawnChildFromBreeding` credits whoever fed either parent, the first one first.

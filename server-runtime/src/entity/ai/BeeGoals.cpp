@@ -580,6 +580,8 @@ public:
 /// parity: `BeeHurtByOtherGoal`, which lets go once the anger is over.
 class HurtByOtherGoal final : public Goal {
 public:
+    HurtByOtherGoal() { inner_.alertOnlyInSight(); }
+
     [[nodiscard]] std::set<GoalFlag> flags() const override { return inner_.flags(); }
 
     [[nodiscard]] bool canUse(MobContext& mob) override { return inner_.canUse(mob); }

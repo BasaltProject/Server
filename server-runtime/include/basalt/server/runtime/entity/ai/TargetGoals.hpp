@@ -65,6 +65,10 @@ public:
     /// parity: the types whose hits it ignores, and `setAlertOthers` with the types it leaves out.
     explicit HurtByTargetGoal(Types ignoreDamageFrom = {}, bool alertOthers = false, Types ignoreAlert = {});
 
+    /// parity: `BeeHurtByOtherGoal.alertOther`, which only calls the others while it sees the
+    /// attacker.
+    void alertOnlyInSight() { alertInSight_ = true; }
+
     [[nodiscard]] std::set<GoalFlag> flags() const override { return {GoalFlag::Target}; }
 
     [[nodiscard]] bool canUse(MobContext& mob) override;
@@ -79,6 +83,7 @@ private:
     Types ignoreDamageFrom_;
     bool alertOthers_;
     Types ignoreAlert_;
+    bool alertInSight_ = false;
 };
 
 /// parity: `MeleeAttackGoal`: walk the target down, repath every four to ten ticks, and swing once a

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/VillagerWorldSystem.hpp>
+#include <basalt/server/runtime/entity/Creakings.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/MobConversions.hpp>
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
@@ -17,6 +18,7 @@
 #include <basalt/wire/protocol/play/EntityData.hpp>
 #include <basalt/wire/protocol/play/HudPackets.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -52,6 +54,18 @@ struct Anger;
 
 namespace basalt::server::runtime::entity::frogs {
 struct FrogState;
+}
+
+namespace basalt::server::runtime::entity::sniffers {
+struct SnifferState;
+}
+
+namespace basalt::server::runtime::entity::armadillos {
+struct ArmadilloState;
+}
+
+namespace basalt::server::runtime::entity::breezes {
+struct BreezeState;
 }
 
 namespace basalt::server::runtime::entity::goats {
@@ -208,6 +222,33 @@ public:
     [[nodiscard]] std::optional<std::array<std::int32_t, 3>> nearestTreasure(const entity::ServerEntity& mob) override;
 
     void entityEvent(entity::ServerEntity& mob, std::int8_t event) override;
+
+    void tameHorse(entity::ServerEntity& horse, std::int32_t playerId) override;
+
+    void throwRiders(entity::ServerEntity& horse) override;
+
+    void horseRears(entity::ServerEntity& horse) override;
+
+    /// parity: `AbstractHorse.makeMad`: up on its hind legs and its angry sound.
+    void makeHorseMad(entity::ServerEntity& horse);
+
+    /// parity: the rest of `AbstractHorse.aiStep` and `tick` after the goals: healing, grazing, the
+    /// mouth and the rearing running out, and a camel's dash cooling down.
+    void tickHorse(world::LoadedWorld& world, entity::ServerEntity& horse, random::RandomSource& random);
+
+    /// parity: `Creaking.tick`, `aiStep` and its brain over `CreakingAi`.
+    void tickCreaking(world::LoadedWorld& world, entity::ai::MobContext& context);
+
+    /// parity: `Creaking.tearDown`.
+    void tearDownCreaking(world::LoadedWorld& world, entity::ServerEntity& creaking);
+
+    /// parity: `CreakingHeartBlockEntity.serverTick`. Answers whether the heart's tag changed.
+    bool tickCreakingHeart(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                           std::vector<world::BlockChange>& pending);
+
+    /// parity: `CreakingHeartBlock.playerWillDestroy`, which kills its creaking at the player's hand.
+    void creakingHeartBroken(world::LoadedWorld& world, const player::PlayerSession& player,
+                             const std::array<std::int32_t, 3>& at);
 
     /// parity: `Mob.aiStep`'s looting and `Dolphin.pickUpItem`: an empty mouth takes what it touches.
     void dolphinPicksUp(world::LoadedWorld& world, entity::ServerEntity& dolphin);
@@ -383,6 +424,64 @@ public:
     [[nodiscard]] bool milkGoat(world::LoadedWorld& world, player::PlayerSession& player, entity::ServerEntity& goat,
                                 std::int32_t slot);
 
+    /// parity: `Camel.customServerAiStep` over `CamelAi`, the husk's too.
+    void tickCamel(world::LoadedWorld& world, entity::ai::MobContext& context);
+
+    /// parity: `Mob.baseTick`'s ambient sound, at the mob's own volume, pitch and category.
+    void tickAmbientSound(world::LoadedWorld& world, entity::ServerEntity& mob, random::RandomSource& random);
+
+    /// parity: each mob's `getAmbientSound`, and the `playAmbientSound` overrides that stay quiet.
+    [[nodiscard]] std::optional<std::string> ambientSoundOf(world::LoadedWorld& world, entity::ServerEntity& mob,
+                                                            random::RandomSource& random);
+
+    /// parity: `Breeze.customServerAiStep` over `BreezeAi`.
+    void tickBreeze(world::LoadedWorld& world, entity::ai::MobContext& context);
+
+    /// The fight activity: `Shoot`, `LongJump`, `ShootWhenStuck` and `Slide`, as they start.
+    void breezeFights(world::LoadedWorld& world, entity::ai::MobContext& context, entity::breezes::BreezeState& state,
+                      const std::array<double, 3>& target, bool inWater);
+
+    /// parity: `Shoot.tick` and `stop`.
+    void breezeShoots(world::LoadedWorld& world, entity::ai::MobContext& context, entity::breezes::BreezeState& state);
+
+    /// parity: `LongJump.canRun`, which picks the landing when it can.
+    bool breezeCanJump(entity::ai::MobContext& context, entity::breezes::BreezeState& state,
+                       const std::optional<std::array<double, 3>>& target);
+
+    /// parity: `LongJump.start`.
+    void breezeStartsJump(world::LoadedWorld& world, entity::ai::MobContext& context,
+                          entity::breezes::BreezeState& state);
+
+    /// parity: `LongJump.tick` and `stop`.
+    void breezeJumps(world::LoadedWorld& world, entity::ai::MobContext& context, entity::breezes::BreezeState& state);
+
+    /// Where the breeze's target looks, which the jump and the slide land behind.
+    [[nodiscard]] static float breezeTargetHeadYaw(const entity::ai::MobContext& context, std::int32_t targetId);
+
+    /// parity: `Armadillo.customServerAiStep` over `ArmadilloAi`.
+    void tickArmadillo(world::LoadedWorld& world, entity::ai::MobContext& context);
+
+    /// parity: `ArmadilloBallUp.tick`: rolled, scared, peeking and unrolling.
+    void armadilloBallsUp(world::LoadedWorld& world, entity::ai::MobContext& context,
+                          entity::armadillos::ArmadilloState& state);
+
+    /// One of the armadillo's loot tables dropped at its feet. Answers whether anything came out.
+    bool armadilloDrops(world::LoadedWorld& world, const entity::ServerEntity& armadillo, std::string_view tableId);
+
+    /// parity: `Armadillo.brushOffScute`. Answers whether the brush did anything.
+    bool brushArmadillo(world::LoadedWorld& world, entity::ServerEntity& armadillo);
+
+    /// parity: `Sniffer.customServerAiStep` over `SnifferAi`.
+    void tickSniffer(world::LoadedWorld& world, entity::ai::MobContext& context);
+
+    /// The sniffer's behaviours that run for a while: their end, and what each leaves behind.
+    void snifferRunning(world::LoadedWorld& world, entity::ai::MobContext& context,
+                        entity::sniffers::SnifferState& state, bool canSniff, bool canDig);
+
+    /// parity: `Sniffer.dropSeed`.
+    void snifferDropsSeed(world::LoadedWorld& world, const entity::ServerEntity& sniffer,
+                          const std::array<std::int32_t, 3>& head);
+
     /// parity: `Frog.customServerAiStep` over `FrogAi`.
     void tickFrog(world::LoadedWorld& world, entity::ai::MobContext& context);
 
@@ -459,6 +558,34 @@ public:
     [[nodiscard]] static bool touchesCart(const entity::ServerEntity& cart, const player::PlayerSession& player);
 
 private:
+    /// Whether the heart at `home` still claims this creaking, or nothing once the heart is gone.
+    [[nodiscard]] std::optional<bool> heartClaims(world::LoadedWorld& world, const std::array<std::int32_t, 3>& home,
+                                                  const entity::ServerEntity& creaking);
+
+    /// parity: `CreakingHeartBlockEntity.getCreakingProtector`.
+    entity::ServerEntity* heartProtector(world::LoadedWorld& world, const std::array<std::int32_t, 3>& at,
+                                         entity::creakings::HeartState& heart);
+
+    void heartParticles(world::LoadedWorld& world, const std::array<std::int32_t, 3>& at,
+                        const entity::ServerEntity& creaking, std::int32_t count, bool towardsCreaking,
+                        random::RandomSource& random);
+
+    /// parity: `CreakingHeartBlockEntity.creakingHurt`.
+    void creakingHeartHurt(world::LoadedWorld& world, const std::array<std::int32_t, 3>& at);
+
+    /// parity: `spreadResin`.
+    std::optional<std::array<std::int32_t, 3>> spreadResin(world::LoadedWorld& world,
+                                                           const std::array<std::int32_t, 3>& from,
+                                                           random::RandomSource& random);
+
+    /// parity: `removeProtector`, torn down or, with a breaker, killed by them.
+    void removeCreakingProtector(world::LoadedWorld& world, const std::array<std::int32_t, 3>& at,
+                                 const player::PlayerSession* breaker);
+
+    /// parity: `spawnProtector`.
+    entity::ServerEntity* spawnProtector(world::LoadedWorld& world, const std::array<std::int32_t, 3>& at,
+                                         random::RandomSource& random);
+
     /// The world this mob is in, which is the one thing a goal never hands over.
     [[nodiscard]] world::LoadedWorld* worldOf(const entity::ServerEntity& mob);
 
@@ -623,6 +750,11 @@ private:
     Hooks hooks_;
     Options options_;
     std::unique_ptr<VillagerWorldSystem> villagers_;
+    /// Whether each hive had fire beside it at its last turn, by world and square, so that only
+    /// fire that has just arrived empties it.
+    std::map<std::pair<std::string, std::array<std::int32_t, 3>>, bool> hivesByFire_;
+    /// Each creaking heart's unsaved counters, by world and square.
+    std::map<std::pair<std::string, std::array<std::int32_t, 3>>, entity::creakings::HeartState> creakingHearts_;
 };
 
 } // namespace basalt::server::runtime

@@ -164,12 +164,21 @@ private:
                             double fromY, double fromZ);
 
     /// parity: what `AbstractArrow.onHitEntity` tells its shooting player's advancements.
+    /// parity: `AbstractArrow`'s hit sound, on a hit and on landing.
+    void arrowHitSound(const std::vector<player::PlayerSession*>& watchers, const entity::ServerEntity& arrow);
+
     void arrowTriggers(const world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
                        entity::ServerEntity& arrow, const entity::ServerEntity& mob, float damage, bool died);
 
-    /// The gust a wind charge leaves where it landed.
-    void gustWhereItLanded(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers, double x,
-                           double y, double z);
+    /// The gust a wind charge leaves where it landed: the blocks it triggers, the push it gives
+    /// everything around, and the burst the clients see and hear.
+    void gustWhereItLanded(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                           const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& charge,
+                           double x, double y, double z);
+
+    /// parity: `Breeze.isInvulnerableTo`: nothing a breeze fired hurts another breeze.
+    [[nodiscard]] static bool breezeProof(const std::vector<entity::ServerEntity*>& living,
+                                          const entity::ServerEntity& charge, const entity::ServerEntity& target);
 
     /// The fire a small fireball leaves where it landed.
     void lightWhereItLanded(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,

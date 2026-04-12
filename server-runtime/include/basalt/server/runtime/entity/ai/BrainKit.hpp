@@ -146,6 +146,11 @@ void lookSometimes(MobContext& mob, Look& look, std::int32_t& ticker, double ran
 /// `DoNothing(30, 60)`, weighted two, two and one.
 void idleMovement(MobContext& mob, Motion& motion, const Look& look, std::int32_t& idleTicks, float speed);
 
+/// parity: `RandomLookAround(min..max, maxYaw, 0, 0)`: with no look target and the gaze rested, a
+/// glance up to `maxYaw` degrees either side of where the body faces.
+void lookAround(MobContext& mob, Look& look, std::int32_t& gazeCooldown, std::int32_t min, std::int32_t max,
+                float maxYaw);
+
 /// parity: `AnimalPanic`: a hundred to a hundred and twenty ticks of running after a hit. Answers
 /// whether it is panicking.
 bool panic(MobContext& mob, Motion& motion, std::int32_t& panicTicks, float speed);

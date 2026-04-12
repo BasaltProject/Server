@@ -73,6 +73,21 @@ struct AllayState {
     /// The last game event heard, by time and count within that tick.
     std::int64_t heardTime = -1;
     std::size_t heardCount = 0;
+    /// parity: `NEAREST_VISIBLE_WANTED_ITEM`, by entity id, and the sensor's own countdown to its
+    /// next look, every twenty ticks from a random start.
+    std::optional<std::int32_t> wantedItem;
+    std::int32_t itemSensorTicks = -1;
+
+    /// parity: `VibrationSystem.Data`: the note heard this tick, the one on its way and its travel.
+    struct Vibration {
+        Pos pos{};
+        float distance = 0.0F;
+        std::int64_t tick = 0;
+    };
+
+    std::optional<Vibration> vibrationCandidate;
+    std::optional<Vibration> vibrationTravelling;
+    std::int32_t vibrationTicks = 0;
 };
 
 [[nodiscard]] bool isAllay(const wire::common::Identifier& type);

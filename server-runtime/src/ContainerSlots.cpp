@@ -126,6 +126,9 @@ std::optional<storage::StoredItemStack> ContainerMenuController::readBlockSlot(s
         }
         return session->enderChest[static_cast<std::size_t>(index)];
     }
+    if (openEntity_.has_value()) {
+        return entityContainerSlot(index);
+    }
     const std::optional<std::pair<BlockPos, std::int32_t>> half = halfFor(index);
     world::LoadedWorld* world = owner_->currentWorld();
     if (!half.has_value() || world == nullptr) {
@@ -267,6 +270,10 @@ void ContainerMenuController::writeBlockSlot(std::int32_t index, const std::opti
             return;
         }
         session->enderChest[static_cast<std::size_t>(index)] = stack;
+        return;
+    }
+    if (openEntity_.has_value()) {
+        writeEntityContainerSlot(index, stack);
         return;
     }
     const std::optional<std::pair<BlockPos, std::int32_t>> half = halfFor(index);
@@ -538,7 +545,7 @@ bool ContainerMenuController::canPlaceInto(const MenuSlot& slot) const {
 }
 
 bool ContainerMenuController::hasBlockSlots() const {
-    return openBlock.has_value() || openEnderChest_ || openMerchant_ || openStonecutter_ || openSmithing_ ||
+    return openBlock.has_value() || openEnderChest_ || openEntity_.has_value() || openMerchant_ || openStonecutter_ || openSmithing_ ||
            openAnvil_ || openGrindstone_ || openEnchantment_ || openBeacon_ || openLoom_ || openCartography_;
 }
 
@@ -546,6 +553,9 @@ bool ContainerMenuController::accepts(const MenuSlot& target, const storage::Sto
     const auto* block = std::get_if<player::menuSlot::Block>(&target);
     if (block == nullptr) {
         return true;
+    }
+    if (mountOpen()) {
+        return mountAccepts(block->index, stack);
     }
     // parity: `BeaconMenu.PaymentSlot.mayPlace`, which is the `beacon_payment_items` tag.
     if (openBeacon_) {

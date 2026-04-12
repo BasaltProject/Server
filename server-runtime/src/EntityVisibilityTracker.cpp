@@ -1,3 +1,4 @@
+#include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/EntityVisibilityTracker.hpp>
@@ -16,6 +17,8 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <map>
+#include <vector>
 
 namespace basalt::server::runtime {
 namespace {
@@ -38,6 +41,68 @@ constexpr double kRotationEpsilon = 0.5;
 constexpr std::uint8_t kTextDisplayTextIndex = 23;
 constexpr std::uint8_t kDisplayBillboardIndex = 15;
 constexpr std::int8_t kBillboardCenter = 3;
+
+/// parity: the attributes `Attribute.setSyncable` marks, which a client moves and draws with.
+[[nodiscard]] bool syncable(std::string_view name) {
+    static constexpr std::array<std::string_view, 32> kSynced{
+        "air_drag_modifier",   "armor",
+        "armor_toughness",     "attack_speed",
+        "below_name_distance", "block_break_speed",
+        "block_interaction_range", "bounciness",
+        "burning_time",        "camera_distance",
+        "explosion_knockback_resistance", "entity_interaction_range",
+        "fall_damage_multiplier", "flying_speed",
+        "friction_modifier",   "gravity",
+        "jump_strength",       "luck",
+        "max_absorption",      "max_health",
+        "mining_efficiency",   "movement_efficiency",
+        "movement_speed",      "name_tag_distance",
+        "oxygen_bonus",        "safe_fall_distance",
+        "scale",               "sneaking_speed",
+        "step_height",         "submerged_mining_speed",
+        "sweeping_damage_ratio", "water_movement_efficiency"};
+    const std::string_view path = name.starts_with("minecraft:") ? name.substr(10) : name;
+    return std::ranges::find(kSynced, path) != kSynced.end();
+}
+
+/// parity: `ServerEntity.sendPairingData`'s `ClientboundUpdateAttributesPacket`, for the synced
+/// attributes that differ from what the client builds the mob with on its own.
+[[nodiscard]] std::vector<wire::protocol::play::UpdateAttributesPacket::AttributeSnapshot>
+pairingAttributes(const ServerEntity& entity) {
+    using Packet = wire::protocol::play::UpdateAttributesPacket;
+    std::map<std::int32_t, Packet::AttributeSnapshot> snapshots;
+    const auto record = [&](std::string_view name) {
+        const std::optional<std::int32_t> id = server::registry::attributeIds::protocolId(name);
+        if (!syncable(name) || !id.has_value() || snapshots.contains(*id)) {
+            return;
+        }
+        Packet::AttributeSnapshot snapshot{.attribute = *id, .base = entity.attribute(name)};
+        if (const auto found = entity.attributeModifiers.find(name); found != entity.attributeModifiers.end()) {
+            for (const auto& [key, modifier] : found->second) {
+                const auto modifierId = Identifier::parse(modifier.id);
+                if (modifierId.has_value()) {
+                    snapshot.modifiers.push_back(
+                        Packet::Modifier{.id = *modifierId,
+                                         .amount = modifier.amount,
+                                         .operation = static_cast<Packet::Operation>(modifier.operation)});
+                }
+            }
+        }
+        snapshots.emplace(*id, std::move(snapshot));
+    };
+    for (const auto& [name, base] : entity.attributeValues) {
+        record(name);
+    }
+    for (const auto& [name, modifiers] : entity.attributeModifiers) {
+        record(name);
+    }
+    std::vector<Packet::AttributeSnapshot> out;
+    out.reserve(snapshots.size());
+    for (auto& [id, snapshot] : snapshots) {
+        out.push_back(std::move(snapshot));
+    }
+    return out;
+}
 
 /// The equipment slots a player is drawn wearing, in the order they are read off the inventory.
 constexpr std::array<SetEquipmentPacket::SlotType, 6> kEquipmentSlots{
@@ -171,6 +236,16 @@ void EntityVisibilityTracker::syncSummonedEntities() {
                         SetEquipmentPacket{.entityId = entity->entityId(), .slots = equipment}.write(buffer);
                     });
                 }
+            }
+            if (const std::vector<wire::protocol::play::UpdateAttributesPacket::AttributeSnapshot> attributes =
+                    pairingAttributes(*entity);
+                !attributes.empty()) {
+                owner_->sendPlayPacket(wire::protocol::play::UpdateAttributesPacket::kId,
+                                       [&](wire::io::ByteBuffer& buffer) {
+                                           wire::protocol::play::UpdateAttributesPacket{
+                                               .entityId = entity->entityId(), .attributes = attributes}
+                                               .write(buffer);
+                                       });
             }
             if (entity->displayText.has_value()) {
                 sendDisplayText(entity->entityId(), *entity->displayText);

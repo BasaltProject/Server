@@ -46,6 +46,12 @@ struct State {
 
 enum class Event : std::uint8_t { None, Jumped, Landed };
 
+/// parity: `LongJumpUtil.calculateJumpVectorForAngle`: the launch that lands on `target` at this
+/// angle, if one within `maxVelocity` exists and, when asked, clears the blocks on the way.
+[[nodiscard]] std::optional<brainKit::Vec> vectorForAngle(MobContext& context, const brainKit::Vec& target,
+                                                          float maxVelocity, std::int32_t angle, double width,
+                                                          double height, bool checkCollision);
+
 /// parity: `defaultAcceptableLandingSpot`: something whole below and nothing in the way.
 [[nodiscard]] bool defaultAcceptable(const MobContext& mob, const brainKit::Block& target);
 

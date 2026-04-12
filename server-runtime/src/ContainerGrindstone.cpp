@@ -28,6 +28,7 @@ void ContainerMenuController::openGrindstoneMenu(PlayerSession& session, const B
     openBlock = pos;
     openBlockSecond.reset();
     openEnderChest_ = false;
+    openEntity_.reset();
     openStonecutter_ = false;
     openSmithing_ = false;
     openAnvil_ = false;
