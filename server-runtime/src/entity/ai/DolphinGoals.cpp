@@ -249,7 +249,7 @@ bool DolphinSwimWithPlayerGoal::canContinueToUse(MobContext& mob) {
 
 void DolphinSwimWithPlayerGoal::start(MobContext& mob) {
     if (player_.has_value()) {
-        mob.actions.applyEffect(*player_, "dolphins_grace", 100, 0);
+        mob.actions.applyEffect(*player_, "dolphins_grace", 100, 0, mob.mob.entityId());
     }
 }
 
@@ -271,7 +271,7 @@ void DolphinSwimWithPlayerGoal::tick(MobContext& mob) {
         static_cast<void>(navigation::moveTo(mob.world, mob.mob, player->x, player->y, player->z, speedModifier_));
     }
     if (player->swimming && mob.random.nextInt(6) == 0) {
-        mob.actions.applyEffect(*player_, "dolphins_grace", 100, 0);
+        mob.actions.applyEffect(*player_, "dolphins_grace", 100, 0, mob.mob.entityId());
     }
 }
 

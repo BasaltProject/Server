@@ -546,6 +546,7 @@ void WitherSystem::skullLanded(world::LoadedWorld& world, const std::vector<Play
         if (player->dead && ownedByLiving && owner != nullptr) {
             heal(*owner, kKillHeal);
         } else if (witherSeconds > 0 && player->connection().addEffect) {
+            player->noteEffectSource(skull.ownerId.value_or(skull.entityId()));
             player->connection().addEffect(world::mobEffects::wither(), 20 * witherSeconds, kWitherEffectAmplifier);
         }
     }

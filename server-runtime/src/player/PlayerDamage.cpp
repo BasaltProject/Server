@@ -505,10 +505,13 @@ void hurtPlayer(PlayerSession& player, const float amount, const std::string_vie
             showDamage(*session, damageType, source.has_value() ? source->entityId : -1, context);
         }
         // parity: a hit the shield took whole deals no knockback; only the attacker's own shove lands.
+        // parity: `hurtServer` skips `dealDefaultKnockback` for a type in `no_knockback`.
         const bool fullyBlocked = blocked.amount > 0.0F && incoming <= 0.0F;
         if (source.has_value() && !fullyBlocked) {
-            pushAway(*session, *source, blocked.pushed,
-                     playerAttributes::valueOf(*session, "minecraft:knockback_resistance", definitionsOf(context)));
+            if (!tagged(context, "no_knockback", damageType)) {
+                pushAway(*session, *source, blocked.pushed,
+                         playerAttributes::valueOf(*session, "minecraft:knockback_resistance", definitionsOf(context)));
+            }
         } else if (blocked.thrown.has_value()) {
             shove(*session, *blocked.thrown);
         }

@@ -426,12 +426,19 @@ void placeDisk(PlacementRegion& region, random::RandomSource& random, std::int32
             if (dx * dx + dz * dz > radiusSquared) {
                 continue;
             }
+            bool placedAbove = false;
             for (std::int32_t y = originY + config.halfHeight; y >= originY - config.halfHeight; --y) {
                 const std::optional<std::int32_t> current = region.blockStateId(x, y, z);
                 if (!current.has_value() || config.targets.find(*current) == config.targets.end()) {
+                    placedAbove = false;
                     continue;
                 }
                 region.setBlockStateId(x, y, z, config.state(region, x, y, z));
+                // parity: `DiskFeature.placeColumn` marks over the topmost block of each column.
+                if (!placedAbove) {
+                    region.chunk().markAboveForPostProcessing(x, y, z);
+                    placedAbove = true;
+                }
             }
         }
     }

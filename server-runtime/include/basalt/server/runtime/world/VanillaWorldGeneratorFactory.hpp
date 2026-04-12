@@ -26,9 +26,8 @@ namespace basalt::server::runtime::world {
 
 /// Builds one correctly seeded normal-terrain generator for each loaded world.
 ///
-/// The pieces of a world's generator (the router, the surface environment, every structure
-/// generator and their caches) are held here for the life of the factory: they are shared by every
-/// generation worker, and each of them has to outlive the chunk function that closes over it.
+/// Owns each world's generator pieces (router, surface environment, structure generators, caches):
+/// every generation worker shares them and they must outlive the chunk functions that capture them.
 class VanillaWorldGeneratorFactory {
 public:
     /// The jar as this reads it. Callbacks rather than `ServerJarAssets`, the same as every other
@@ -39,12 +38,9 @@ public:
         StructureTemplates::DataIds dataIds;
     };
 
-    /// A world's terrain, and the structure generator behind it when there is one worth naming. The
-    /// pipeline is unset when the jar cannot supply what the dimension needs: a generator without the
-    /// operator's own noise files would crash on its first chunk rather than make a wrong one.
-    ///
-    /// The generator is handed back because `/place structure` and `/locate structure` need the very
-    /// object generation uses: a second one built from the same seed would still be a second one.
+    /// A world's terrain and its structure generator, if any. The pipeline is unset when the jar
+    /// cannot supply what the dimension needs. The structure generator is the very one generation
+    /// uses, which `/place structure` and `/locate structure` need.
     struct Generators {
         /// The steps from terrain to decoration. The loading, finishing and saving hooks are the world's.
         server::world::terrain::ProtoChunks::Hooks pipeline;
@@ -84,6 +80,8 @@ private:
     [[nodiscard]] Generators overworld(std::int64_t seed, bool spawnMobs, std::string_view settings);
     /// The jar's `data/` as the worldgen loaders read it.
     [[nodiscard]] server::world::densityfunction::WorldgenReader worldgenReader() const;
+    /// parity: the `flat` preset: its layers in plains, with the villages it overrides back in.
+    [[nodiscard]] Generators flat(std::int64_t seed, bool spawnMobs);
     [[nodiscard]] Generators nether(std::int64_t seed, bool spawnMobs);
     [[nodiscard]] Generators end(std::int64_t seed);
 

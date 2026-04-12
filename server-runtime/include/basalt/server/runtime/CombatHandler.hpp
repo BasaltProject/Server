@@ -136,6 +136,20 @@ private:
     bool stab(player::PlayerSession& session, world::LoadedWorld& world, std::int32_t targetId, std::int32_t slot,
               float base, bool dealsDamage, bool dealsKnockback, bool dismounts, std::optional<float> strength);
 
+    /// What a stab carries once the weapon has been read.
+    struct StabBlow {
+        float total = 0.0F;
+        float magic = 0.0F;
+        float extraKnockback = 0.0F;
+        bool dealsDamage = false;
+        bool dealsKnockback = false;
+        bool dismounts = false;
+    };
+
+    /// `stab` landing on another player, whose motion is theirs to apply.
+    bool stabPlayer(player::PlayerSession& session, player::PlayerSession& victim, std::int32_t slot,
+                    const StabBlow& blow);
+
     /// parity: `LivingEntity.postPiercingAttack`, which is lunge.
     void postPiercingAttack(player::PlayerSession& session, world::LoadedWorld& world, std::int32_t slot);
 

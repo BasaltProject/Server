@@ -221,7 +221,7 @@ void MobActionSystem::beeStung(world::LoadedWorld& world, ServerEntity& bee, Pla
     }
     if (seconds > 0) {
         if (player != nullptr) {
-            applyEffect(player->entityId(), "poison", seconds * 20, 0);
+            applyEffect(player->entityId(), "poison", seconds * 20, 0, bee.entityId());
         } else if (mob != nullptr) {
             villagersIn(world).addEffect(*mob, "poison", seconds * 20, 0);
         }

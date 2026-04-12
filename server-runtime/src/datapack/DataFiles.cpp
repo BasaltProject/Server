@@ -15,6 +15,12 @@ constexpr std::string_view kDataRoot = "data/";
 
 } // namespace
 
+bool registryFileOrder(const Identifier& left, const Identifier& right, std::string_view extension) {
+    const std::string a = left.path() + std::string{extension};
+    const std::string b = right.path() + std::string{extension};
+    return a != b ? a < b : left.namespaceName() < right.namespaceName();
+}
+
 std::vector<std::pair<Identifier, std::string>> dataFiles(const EntriesUnder& entriesUnder, std::string_view directory,
                                                           std::string_view extension) {
     std::vector<std::pair<Identifier, std::string>> found;
@@ -36,7 +42,9 @@ std::vector<std::pair<Identifier, std::string>> dataFiles(const EntriesUnder& en
         const std::string_view path = inside.substr(wanted.size(), inside.size() - wanted.size() - extension.size());
         found.emplace_back(Identifier{std::string{rest.substr(0, slash)}, std::string{path}}, entry);
     }
-    std::ranges::sort(found, [](const auto& left, const auto& right) { return left.first < right.first; });
+    std::ranges::sort(found, [extension](const auto& left, const auto& right) {
+        return registryFileOrder(left.first, right.first, extension);
+    });
     return found;
 }
 

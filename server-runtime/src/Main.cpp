@@ -16,6 +16,7 @@
 #include <basalt/server/runtime/registry/PackRegistries.hpp>
 #include <basalt/server/runtime/registry/VanillaConfigurationRegistries.hpp>
 #include <basalt/server/runtime/world/VanillaWorldGeneratorFactory.hpp>
+#include <basalt/server/runtime/world/VariantSpawnConditions.hpp>
 #include <basalt/wire/auth/HttpsClient.hpp>
 #include <basalt/wire/auth/MojangSessionService.hpp>
 #include <basalt/wire/auth/SessionKeyPair.hpp>
@@ -201,6 +202,7 @@ bool gSafeMode = false;
         }
         registry::applyPackRegistries(registries, *instance->datapacks->resources(), builtIn);
         registry::installRegistries(std::move(registries));
+        world::variantSpawnConditions::install(jarHooks.entriesUnder, jarHooks.readText);
     }
     instance->generators =
         std::make_unique<world::VanillaWorldGeneratorFactory>(world::VanillaWorldGeneratorFactory::Jar{
@@ -300,12 +302,8 @@ int main(int argc, char** argv) {
     // one pointing at an instance that has already stopped.
     wire::io::shutdownSignal::install();
 
-    // The console outlives the server it talks to, because `/restart` replaces that server while
-    // this thread is parked inside a blocking read of standard input.
-    //
-    // What it is handed is an atomic and not the instance itself: the console thread reads this
-    // while this one is building or dropping a server, and a plain pointer read there is a race
-    // that hands the console a half-built dispatcher.
+    // The console outlives the server, since `/restart` replaces it while this thread blocks on stdin.
+    // It gets an atomic, not the instance: a plain pointer here races with building a new server.
     std::unique_ptr<Instance> running;
     std::atomic<command::CommandDispatcher*> live{nullptr};
     command::consoleReader::start([&live] { return live.load(std::memory_order_acquire); });

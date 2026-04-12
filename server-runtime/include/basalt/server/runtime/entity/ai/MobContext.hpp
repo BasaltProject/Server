@@ -112,9 +112,10 @@ public:
     /// parity: `Evoker.EvokerSummonSpellGoal`, which is where vexes come from.
     virtual void summonVexes(ServerEntity& mob, std::int32_t count) = 0;
 
-    /// parity: an effect put on a player by something that is not a potion they drank.
+    /// parity: an effect put on a player by something that is not a potion they drank; `sourceId` is
+    /// the entity `addEffect` names as its source.
     virtual void applyEffect(std::int32_t playerId, std::string_view effect, std::int32_t durationTicks,
-                             std::int32_t amplifier) = 0;
+                             std::int32_t amplifier, std::optional<std::int32_t> sourceId) = 0;
 
     /// parity: `Villager` sleeping, which is a pose the client draws lying in the bed.
     virtual void setSleeping(ServerEntity& mob, bool sleeping) = 0;

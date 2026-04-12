@@ -224,6 +224,7 @@ void MobActionSystem::tickWarden(world::LoadedWorld& world, const std::vector<Pl
             held == player->effects.end() ||
             (!held->second.infinite() && held->second.remainingTicks <= brain::kDarknessDisplayLimit - 1);
         if (renew && player->connection().addEffect) {
+            player->noteEffectSource(warden.entityId());
             player->connection().addEffect(world::mobEffects::darkness(), brain::kDarknessTicks, 0);
         }
     }

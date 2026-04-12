@@ -289,6 +289,7 @@ basalt_module(server-runtime-core
         src/datapack/PackMetadata.cpp
         src/datapack/PackRepository.cpp
         src/datapack/ResourceStack.cpp
+        src/datapack/RegistryValidation.cpp
         src/player/FoodData.cpp
         src/player/PlayerArrowPickup.cpp
         src/player/PlayerMovementStats.cpp
@@ -296,7 +297,6 @@ basalt_module(server-runtime-core
         src/player/PlayerEntityData.cpp
         src/player/PlayerImpulse.cpp
         src/player/PlayerPersistence.cpp
-        src/datapack/RegistryValidation.cpp
         src/player/PlayerBlockUpdates.cpp
         src/player/PlayerDeath.cpp
         src/player/PlayerBeehives.cpp
@@ -431,6 +431,10 @@ basalt_module(server-runtime-core
         src/world/maps/MapStorage.cpp
         src/world/Waxing.cpp
         src/world/CommandPredicates.cpp
+        src/world/AdvancementTree.cpp
+        src/world/PlayerAdvancements.cpp
+        src/world/VanillaAdvancementImport.cpp
+        src/world/VariantSpawnConditions.cpp
         src/world/WindBursts.cpp
         src/world/RedstoneWire.cpp
         src/world/Geysers.cpp
@@ -438,9 +442,6 @@ basalt_module(server-runtime-core
         src/world/CopperChests.cpp
         src/world/Signs.cpp
         src/world/BiomeZoomSeed.cpp
-        src/world/AdvancementTree.cpp
-        src/world/PlayerAdvancements.cpp
-        src/world/VanillaAdvancementImport.cpp
         src/world/Beds.cpp
         src/world/ClimbingPlantGrowth.cpp
         src/world/Fluids.cpp
@@ -2559,6 +2560,12 @@ target_compile_definitions(server-runtime-function-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 
+basalt_test(server-runtime-player-advancements-test
+    SOURCES
+        test/PlayerAdvancementsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
 basalt_test(server-runtime-datapack-test
     SOURCES
         test/DataPackTest.cpp
@@ -2566,12 +2573,6 @@ basalt_test(server-runtime-datapack-test
 )
 
 target_compile_definitions(server-runtime-datapack-test
-basalt_test(server-runtime-player-advancements-test
-    SOURCES
-        test/PlayerAdvancementsTest.cpp
-    DEPENDS basalt::server-runtime-core
-)
-
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 

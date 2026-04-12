@@ -288,6 +288,13 @@ public:
     /// Status effects this player carries, by effect id. parity: `LivingEntity.activeEffects`.
     std::map<wire::common::Identifier, world::ActiveEffect> effects;
 
+    /// Who put an effect on this player since the last tick, one entry per `addEffect`: the source
+    /// `EffectsChangedTrigger` is told about.
+    std::vector<std::optional<std::int32_t>> effectSources;
+
+    /// Records the entity behind an effect about to be added, or none.
+    void noteEffectSource(std::optional<std::int32_t> sourceId) { effectSources.push_back(sourceId); }
+
     /// How close this player is to summoning a warden. parity: `ServerPlayer.wardenSpawnTracker`,
     /// kept for the session only.
     world::wardenSpawnTracker::Tracker wardenTracker;

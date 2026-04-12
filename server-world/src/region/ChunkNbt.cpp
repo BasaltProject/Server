@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <format>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -328,6 +329,28 @@ NbtCompound write(const Chunk& chunk) {
     tag.set("block_entities", NbtTag::ofList(NbtList{blockEntityType, std::move(blockEntities)}));
     tag.set("block_ticks", encodeTicks(chunk, chunk.scheduledBlockTicks()));
     tag.set("fluid_ticks", encodeTicks(chunk, chunk.scheduledFluidTicks()));
+
+    if (chunk.stage() != ChunkStage::Full) {
+        std::vector<std::vector<NbtTag>> perSection(chunk.sectionCount());
+        for (const std::span<const ChunkShapeUpdate> marks : {chunk.fluidUpdates(), chunk.shapeUpdates()}) {
+            for (const ChunkShapeUpdate& mark : marks) {
+                const std::int32_t section = (mark.y >> 4) - chunk.verticalBounds().minSection();
+                if ((mark.x >> 4) != chunk.chunkX() || (mark.z >> 4) != chunk.chunkZ() || section < 0 ||
+                    static_cast<std::size_t>(section) >= perSection.size()) {
+                    continue;
+                }
+                perSection[static_cast<std::size_t>(section)].push_back(NbtTag::ofShort(
+                    static_cast<std::int16_t>((mark.x & 15) | ((mark.z & 15) << 4) | ((mark.y & 15) << 8))));
+            }
+        }
+        std::vector<NbtTag> post;
+        post.reserve(perSection.size());
+        for (std::vector<NbtTag>& offsets : perSection) {
+            const NbtType offsetType = offsets.empty() ? NbtType::End : NbtType::Short;
+            post.push_back(NbtTag::ofList(NbtList{offsetType, std::move(offsets)}));
+        }
+        tag.set("PostProcessing", NbtTag::ofList(NbtList{NbtType::List, std::move(post)}));
+    }
 
     std::vector<NbtTag> generated;
     generated.reserve(chunk.generatedEntities().size());
@@ -688,6 +711,25 @@ std::expected<Chunk, ChunkNbtError> read(const NbtCompound& tag, ChunkHeight bou
     }
     chunk.setSavedEntities(std::move(entities));
     decodeStructures(tag.getCompound("structures"), chunk.structures());
+    // parity: `PostProcessing`, one list of packed offsets per section, kept by a proto chunk.
+    if (const NbtList* post = tag.getList("PostProcessing"); post != nullptr) {
+        for (std::size_t index = 0; index < post->size(); ++index) {
+            const NbtList* offsets = (*post)[index].get<NbtList>();
+            if (offsets == nullptr) {
+                continue;
+            }
+            const std::int32_t baseY = (bounds.minSection() + static_cast<std::int32_t>(index)) * 16;
+            for (const NbtTag& entry : *offsets) {
+                const std::int16_t* packed = entry.get<std::int16_t>();
+                if (packed == nullptr) {
+                    continue;
+                }
+                const auto offset = static_cast<std::uint16_t>(*packed);
+                chunk.markShapeUpdate((chunk.chunkX() * 16) + (offset & 15), baseY + ((offset >> 8) & 15),
+                                      (chunk.chunkZ() * 16) + ((offset >> 4) & 15));
+            }
+        }
+    }
     // Straight off disk, so nothing here is newer than the file it came from.
     chunk.markClean();
     return chunk;

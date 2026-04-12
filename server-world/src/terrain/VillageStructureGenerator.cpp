@@ -116,6 +116,9 @@ std::pair<std::size_t, std::int64_t> VillageStructureGenerator::assemblyStats() 
 }
 
 std::int32_t VillageStructureGenerator::surfaceHeightAt(std::int32_t x, std::int32_t z, Samplers& samplers) const {
+    if (flatSurface_.has_value()) {
+        return *flatSurface_;
+    }
     const std::int32_t chunkX = x >> 4;
     const std::int32_t chunkZ = z >> 4;
     const std::int64_t key =

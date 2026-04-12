@@ -431,6 +431,8 @@ void CombatSystem::splashPotion(world::LoadedWorld& world, const std::vector<Pla
         if (ticks <= 0 || !player->connection().addEffect) {
             continue;
         }
+        // parity: `getEffectSource`, the thrower or else the bottle.
+        player->noteEffectSource(bottle.ownerId.value_or(bottle.entityId()));
         player->connection().addEffect(Identifier::vanilla(*bottle.potionEffect), ticks, 0);
     }
     broadcaster_.sendEffects(watchers, static_cast<std::int32_t>(std::floor(bottle.x)),

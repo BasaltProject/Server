@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/Containers.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
+#include <basalt/server/runtime/world/FallingBlocks.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/runtime/world/NaturalSpawnObstruction.hpp>
@@ -21,6 +22,7 @@
 #include <cmath>
 #include <cstdint>
 #include <map>
+#include <span>
 #include <utility>
 
 namespace basalt::server::runtime::world {
@@ -411,18 +413,35 @@ Chunk& WorldState::installLocked(Chunk chunk) {
     }
     // parity: `LevelChunk.postProcessGeneration` ticks every fluid the aquifer marked, which is what
     // starts a lake running. Scheduling is this world's way of saying the same thing.
-    for (const server::world::ChunkShapeUpdate& mark : installed.fluidUpdates()) {
-        if (mark.y < installed.verticalBounds().minY() || mark.y > installed.verticalBounds().maxY()) {
-            continue;
-        }
-        const std::int32_t stateId = installed.blockStateId(mark.x & 15, mark.y, mark.z & 15);
-        if (const std::optional<FluidKind> kind = fluidFlow::kindOf(stateId); kind.has_value()) {
-            installed.scheduleFluidTick(
-                server::world::ChunkScheduledTick{.type = fluidId(*kind, isSourceFluid(stateId)),
-                                                  .localX = mark.x & 15,
-                                                  .y = mark.y,
-                                                  .localZ = mark.z & 15,
-                                                  .delay = 0});
+    // A feature's marks are the same list in vanilla: a fluid there ticks, and a block that falls
+    // reshapes, which books its fall.
+    for (const std::span<const server::world::ChunkShapeUpdate> marks :
+         {installed.fluidUpdates(), installed.shapeUpdates()}) {
+        for (const server::world::ChunkShapeUpdate& mark : marks) {
+            if (mark.y < installed.verticalBounds().minY() || mark.y > installed.verticalBounds().maxY() ||
+                (mark.x >> 4) != chunkX || (mark.z >> 4) != chunkZ) {
+                continue;
+            }
+            const std::int32_t stateId = installed.blockStateId(mark.x & 15, mark.y, mark.z & 15);
+            if (const std::optional<FluidKind> kind = fluidFlow::kindOf(stateId); kind.has_value()) {
+                installed.scheduleFluidTick(
+                    server::world::ChunkScheduledTick{.type = fluidId(*kind, isSourceFluid(stateId)),
+                                                      .localX = mark.x & 15,
+                                                      .y = mark.y,
+                                                      .localZ = mark.z & 15,
+                                                      .delay = 0});
+            } else if (fallingBlocks::falls(stateId)) {
+                // parity: `FallingBlock.updateShape`, booked whether or not there is room below.
+                if (const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
+                    block != nullptr) {
+                    installed.scheduleBlockTick(
+                        server::world::ChunkScheduledTick{.type = *block,
+                                                          .localX = mark.x & 15,
+                                                          .y = mark.y,
+                                                          .localZ = mark.z & 15,
+                                                          .delay = fallingBlocks::kFallDelayTicks});
+                }
+            }
         }
     }
     // A neighbour that was waiting on this chunk gets its own marked blocks redone now.

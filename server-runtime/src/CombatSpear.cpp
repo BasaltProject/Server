@@ -68,6 +68,48 @@ constexpr std::int32_t kLungeGraceTicks = 10;
     return spear::Box{x - (width / 2.0), y, z - (width / 2.0), x + (width / 2.0), y + height, z + (width / 2.0)};
 }
 
+/// parity: `damageStatsAndHearts`'s dark hearts, for a hit that took more than a heart.
+void showDamageIndicator(const std::vector<PlayerSession*>& players, double x, double y, double z, float lost) {
+    if (lost <= kIndicatorThreshold) {
+        return;
+    }
+    const server::registry::ParticleType* type =
+        server::registry::particleTypes::of(Identifier::vanilla("damage_indicator"));
+    if (type == nullptr) {
+        return;
+    }
+    wire::protocol::play::LevelParticlesPacket packet{.particleTypeId = type->protocolId,
+                                                      .x = x,
+                                                      .y = y,
+                                                      .z = z,
+                                                      .offsetX = 0.1F,
+                                                      .offsetZ = 0.1F,
+                                                      .count =
+                                                          static_cast<std::int32_t>(static_cast<double>(lost) * 0.5)};
+    packet.setMaxSpeed(0.2F);
+    for (const PlayerSession* player : players) {
+        player::showParticleFor(*player, type->id.toString(), packet);
+    }
+}
+
+/// parity: `causeExtraKnockback` on a `ServerPlayer`: the push goes out as the player's motion and
+/// the server keeps what it had, since the client is the one that moves them.
+void sendMotion(PlayerSession& player, const std::array<double, 3>& motion, float fromYaw) {
+    if (player.connection().pushBack) {
+        player.connection().pushBack(motion[0], motion[1], motion[2], fromYaw);
+        return;
+    }
+    if (!player.connection().sendPlayPacket) {
+        return;
+    }
+    player.connection().sendPlayPacket(
+        wire::protocol::play::SetEntityMotionPacket::kId, [&](wire::io::ByteBuffer& buffer) {
+            wire::protocol::play::SetEntityMotionPacket{
+                .entityId = player.entityId(), .velocityX = motion[0], .velocityY = motion[1], .velocityZ = motion[2]}
+                .write(buffer);
+        });
+}
+
 [[nodiscard]] Identifier idOf(const std::string& id) {
     const auto parsed = Identifier::parse(id);
     return parsed.has_value() ? *parsed : Identifier::vanilla("air");
@@ -305,16 +347,13 @@ bool CombatHandler::stab(PlayerSession& session, world::LoadedWorld& world, std:
                              : 0.0F)) /
         2.0F;
     if (victim != nullptr) {
-        if (dealsDamage && victim->connection().hurt) {
-            victim->connection().hurt(total, "spear", world::damageTypes::kSpear,
-                                      entity::DamageSource{.entityId = session.entityId(),
-                                                           .x = session.x,
-                                                           .z = session.z,
-                                                           .name = wire::text::Component::text(session.name()),
-                                                           .ownerId = session.entityId()});
-        }
-        session.food.addExhaustion(kStabExhaustion);
-        return true;
+        return stabPlayer(session, *victim, slot,
+                          StabBlow{.total = total,
+                                   .magic = magic,
+                                   .extraKnockback = extra,
+                                   .dealsDamage = dealsDamage,
+                                   .dealsKnockback = dealsKnockback,
+                                   .dismounts = dismounts});
     }
     bool hurt = false;
     bool died = false;
@@ -381,30 +420,97 @@ bool CombatHandler::stab(PlayerSession& session, world::LoadedWorld& world, std:
     // parity: `damageStatsAndHearts`, the stat and the dark hearts for what the health lost.
     const auto lost = static_cast<float>(before - std::max(mob->health, 0.0));
     session.stats.addDamageDealt(lost);
-    if (lost > kIndicatorThreshold) {
-        const server::registry::ParticleType* type =
-            server::registry::particleTypes::of(Identifier::vanilla("damage_indicator"));
-        if (type != nullptr) {
-            wire::protocol::play::LevelParticlesPacket packet{
-                .particleTypeId = type->protocolId,
-                .x = mob->x,
-                .y = mob->y + (mob->height() * 0.5),
-                .z = mob->z,
-                .offsetX = 0.1F,
-                .offsetZ = 0.1F,
-                .count = static_cast<std::int32_t>(static_cast<double>(lost) * 0.5)};
-            packet.setMaxSpeed(0.2F);
-            for (const PlayerSession* player : owner_->playersInSameWorld()) {
-                player::showParticleFor(*player, type->id.toString(), packet);
-            }
-        }
-    }
+    showDamageIndicator(owner_->playersInSameWorld(), mob->x, mob->y + (mob->height() * 0.5), mob->z, lost);
     session.food.addExhaustion(kStabExhaustion);
     if (died) {
         killEntity(*mob);
     } else if (hurt) {
         owner_->broadcastSound(entity::entityCombat::hurtSound(*mob), mob->x, mob->y, mob->z, SoundSource::Hostile);
     }
+    return true;
+}
+
+bool CombatHandler::stabPlayer(PlayerSession& session, PlayerSession& victim, std::int32_t slot, const StabBlow& blow) {
+    const std::optional<storage::StoredItemStack> weapon = session.inventory.at(slot);
+    const float before = victim.health();
+    const float shieldBefore = victim.absorption;
+    const std::int32_t cooldownBefore = victim.invulnerableTicks;
+    const std::array<double, 3> oldMovement = victim.deltaMovement;
+    if (blow.dealsDamage && victim.connection().hurt) {
+        victim.connection().hurt(blow.total, "spear", world::damageTypes::kSpear,
+                                 entity::DamageSource{.entityId = session.entityId(),
+                                                      .x = session.x,
+                                                      .z = session.z,
+                                                      .name = wire::text::Component::text(session.name()),
+                                                      .ownerId = session.entityId()});
+    }
+    // parity: `hurtOrSimulate` answered yes: health or absorption went, or a fresh cooldown began.
+    const bool hurt = blow.dealsDamage && (victim.health() < before || victim.absorption < shieldBefore ||
+                                           victim.invulnerableTicks > cooldownBefore);
+    if (blow.dealsKnockback && !victim.dead) {
+        world::RealEnchantments* enchantments = owner_->options().enchantments;
+        const world::weaponDamage::DefinitionOf definitionOf = [enchantments](const Identifier& id) {
+            return enchantments == nullptr ? nullptr : enchantments->definitionOf(id);
+        };
+        const double resistance =
+            player::playerAttributes::valueOf(victim, "minecraft:knockback_resistance", definitionOf);
+        const float yaw = session.yaw * (std::numbers::pi_v<float> / 180.0F);
+        const auto towardsX = static_cast<double>(mth::sin(yaw));
+        const auto towardsZ = static_cast<double>(-mth::cos(yaw));
+        const auto fromYaw =
+            static_cast<float>(std::atan2(session.z - victim.z, session.x - victim.x) * 180.0 / std::numbers::pi) -
+            victim.yaw;
+        // parity: each push starts again from the motion before the blow, and goes out on its own.
+        for (const double power : {kStabKnockback, static_cast<double>(blow.extraKnockback)}) {
+            if (power <= 0.0) {
+                continue;
+            }
+            sendMotion(victim,
+                       player::combat::knockback(power, towardsX, towardsZ, oldMovement[0], oldMovement[1],
+                                                 oldMovement[2], victim.onGround, resistance),
+                       fromYaw);
+        }
+        victim.deltaMovement = oldMovement;
+        session.sprinting = false;
+    }
+    // parity: `stopRiding`; a player is never in `cannot_be_dismounted_by_item_usage`.
+    bool dismounted = false;
+    if (blow.dismounts && victim.vehicleId.has_value() && victim.connection().dismount) {
+        victim.connection().dismount();
+        dismounted = true;
+    }
+    if (!hurt && !blow.dealsKnockback && !dismounted) {
+        return false;
+    }
+    if (blow.magic > 0.0F) {
+        broadcastAnimation(victim.entityId(), wire::protocol::play::AnimatePacket::kMagicCriticalHit);
+    }
+    if (hurt) {
+        if (world::AdvancementTriggers* triggers = owner_->options().advancementTriggers;
+            triggers != nullptr && triggers->listensTo("player_hurt_entity")) {
+            const server::world::loot::EntityFacts attacker = world::triggerFacts::ofPlayer(session);
+            triggers->fire("player_hurt_entity", session.name(), session.uuid().toString(),
+                           world::TriggerEvent{.entities = {{"entity", world::triggerFacts::ofPlayer(victim)}},
+                                               .damage = world::TriggerDamage{.dealt = blow.total,
+                                                                              .taken = blow.total,
+                                                                              .type = world::damageTypes::kSpear,
+                                                                              .direct = attacker,
+                                                                              .source = attacker,
+                                                                              .directHit = true}});
+        }
+    }
+    // parity: `itemAttackInteraction`: a `weapon` counts as used and wears on any living target.
+    if (weapon.has_value() && item::itemWear::costPerAttack(*weapon) > 0) {
+        player::statAwards::used(session, weapon->id);
+        player::wearItemIn(owner_->blockInteraction().breakContext(), session, slot,
+                           item::itemWear::costPerAttack(*weapon));
+    }
+    const float lost = before - std::max(victim.health(), 0.0F);
+    session.stats.addDamageDealt(lost);
+    showDamageIndicator(owner_->playersInSameWorld(), victim.x,
+                        victim.y + (server::registry::entityTypeShapes::heightOf(Identifier::vanilla("player")) * 0.5),
+                        victim.z, lost);
+    session.food.addExhaustion(kStabExhaustion);
     return true;
 }
 

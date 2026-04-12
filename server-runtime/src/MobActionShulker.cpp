@@ -341,6 +341,7 @@ void MobActionSystem::bulletHitsEntity(world::LoadedWorld& world, const std::vec
                                                                    : entity::entityCombat::displayName(bullet),
                                                        .ownerId = bullet.ownerId});
         if (player->connection().addEffect && player->gamemode != wire::protocol::play::Gamemode::Creative) {
+            player->noteEffectSource(bullet.ownerId.value_or(bullet.entityId()));
             player->connection().addEffect(levitation.effect, kLevitationTicks, 0);
         }
     }

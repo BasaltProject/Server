@@ -19,9 +19,14 @@ using EntriesUnder = std::function<std::vector<std::string>(std::string_view pre
 using ReadText = std::function<std::optional<std::string>(std::string_view name)>;
 
 /// Every `data/<namespace>/<directory>/<path><extension>` entry, as its id and entry name, over
-/// every namespace. parity: `FileToIdConverter.listMatchingResources`, sorted by id.
+/// every namespace. parity: `FileToIdConverter.listMatchingResources`, in `registryFileOrder`.
 [[nodiscard]] std::vector<std::pair<wire::common::Identifier, std::string>>
 dataFiles(const EntriesUnder& entriesUnder, std::string_view directory, std::string_view extension = ".json");
+
+/// parity: `ResourceManagerRegistryLoadTask` registers by file id (`Identifier.compareTo`): the
+/// path with its extension first, the namespace only on a tie.
+[[nodiscard]] bool registryFileOrder(const wire::common::Identifier& left, const wire::common::Identifier& right,
+                                     std::string_view extension = ".json");
 
 /// Every tag file of one registry (`item`, `worldgen/biome`...), read and parsed, by tag id. A file
 /// that does not parse is logged and skipped. parity: `TagLoader.load`.

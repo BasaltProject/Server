@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/world/MobSpawnAttributes.hpp>
 #include <basalt/server/runtime/world/MobSpawnFinalization.hpp>
 #include <basalt/server/runtime/world/MobSpawnVariantData.hpp>
+#include <basalt/server/runtime/world/VariantSpawnConditions.hpp>
 
 #include <algorithm>
 #include <array>
@@ -10,6 +11,7 @@
 namespace basalt::server::runtime::world::mobVariantSpawnFinalizer {
 namespace {
 
+using wire::common::Identifier;
 using wire::nbt::NbtCompound;
 using wire::nbt::NbtTag;
 
@@ -112,6 +114,31 @@ void writeBrainMemories(NbtCompound& data, const std::vector<std::pair<std::stri
         return 7;
     }
     return mobSpawnVariantData::badlandsBiomes().contains(biome) ? 8 : 0;
+}
+
+/// The packs' variant for this spawn, left unset when none matched as vanilla's `ifPresent`.
+void writePackVariant(std::string_view registry, const MobSpawnContext& context, NbtCompound& data) {
+    const VariantSpawnFacts facts{.biome = context.biome};
+    if (const auto index = variantSpawnConditions::pick(registry, facts, *context.random); index.has_value()) {
+        data.set("variant", NbtTag::ofString(variantSpawnConditions::entries(registry)[*index].toString()));
+    }
+}
+
+void writePackSoundVariant(std::string_view registry, random::RandomSource& random, NbtCompound& data) {
+    if (const auto id = variantSpawnConditions::randomEntry(registry, random); id.has_value()) {
+        data.set("sound_variant", NbtTag::ofString(id->toString()));
+    }
+}
+
+/// parity: `Wolf.finalizeSpawn` falls back to `WolfVariants.DEFAULT` when nothing matched.
+[[nodiscard]] std::int32_t pickPackWolfVariant(const MobSpawnContext& context) {
+    const VariantSpawnFacts facts{.biome = context.biome};
+    if (const auto index = variantSpawnConditions::pick("wolf_variant", facts, *context.random); index.has_value()) {
+        return static_cast<std::int32_t>(*index);
+    }
+    const std::vector<Identifier>& wolves = variantSpawnConditions::entries("wolf_variant");
+    const auto pale = std::ranges::find(wolves, Identifier::vanilla("pale"));
+    return pale == wolves.end() ? 0 : static_cast<std::int32_t>(pale - wolves.begin());
 }
 
 void writeFoxEquipment(random::RandomSource& random, NbtCompound& data) {
@@ -218,6 +245,9 @@ bool beforeCommon(std::string_view type, const MobSpawnContext& context, MobSpaw
     } else if (type == "camel" || type == "camel_husk") {
         // parity: `Camel.finalizeSpawn` starts every natural camel in the fully standing pose.
         data.putLong("LastPoseTick", std::max<std::int64_t>(0, context.gameTime - kCamelFullStandTicks));
+    } else if ((type == "chicken" || type == "cow" || type == "pig") && variantSpawnConditions::installed()) {
+        writePackVariant(std::string{type} + "_variant", context, data);
+        writePackSoundVariant(std::string{type} + "_sound_variant", random, data);
     } else if (type == "chicken" || type == "cow" || type == "pig") {
         data.set("variant",
                  NbtTag::ofString(registryKey(selectTemperatureVariant(
@@ -237,9 +267,13 @@ bool beforeCommon(std::string_view type, const MobSpawnContext& context, MobSpaw
         data.set("Type", NbtTag::ofString(variant == kFoxSnow ? "snow" : "red"));
         writeFoxEquipment(random, data);
     } else if (type == "frog") {
-        data.set("variant",
-                 NbtTag::ofString(registryKey(selectTemperatureVariant(
-                     biome, random, mobSpawnVariantData::warmFrogBiomes(), mobSpawnVariantData::coldFrogBiomes()))));
+        if (variantSpawnConditions::installed()) {
+            writePackVariant("frog_variant", context, data);
+        } else {
+            data.set("variant", NbtTag::ofString(registryKey(
+                                    selectTemperatureVariant(biome, random, mobSpawnVariantData::warmFrogBiomes(),
+                                                             mobSpawnVariantData::coldFrogBiomes()))));
+        }
         writeBrainMemories(data, {{"minecraft:long_jump_cooldown_ticks",
                                    kFrogMinLongJumpCooldown + random.nextInt(kFrogLongJumpCooldownRange)}});
     } else if (type == "goat") {
@@ -295,6 +329,13 @@ bool beforeCommon(std::string_view type, const MobSpawnContext& context, MobSpaw
     } else if (type == "turtle") {
         // parity: `Turtle.finalizeSpawn` anchors navigation and egg laying to its birth block.
         data.putIntArray("home_pos", {blockX, blockY, blockZ});
+    } else if (type == "wolf" && variantSpawnConditions::installed()) {
+        const std::int32_t variant = sharedVariant(group, [&context] { return pickPackWolfVariant(context); });
+        const std::vector<Identifier>& wolves = variantSpawnConditions::entries("wolf_variant");
+        if (static_cast<std::size_t>(variant) < wolves.size()) {
+            data.set("variant", NbtTag::ofString(wolves[static_cast<std::size_t>(variant)].toString()));
+        }
+        writePackSoundVariant("wolf_sound_variant", random, data);
     } else if (type == "wolf") {
         const std::int32_t variant =
             sharedVariant(group, [biome, &random] { return selectWolfVariant(biome, random); });
@@ -305,9 +346,13 @@ bool beforeCommon(std::string_view type, const MobSpawnContext& context, MobSpaw
                  NbtTag::ofString(registryKey(
                      sounds[static_cast<std::size_t>(random.nextInt(static_cast<std::int32_t>(sounds.size())))])));
     } else if (type == "zombie_nautilus") {
-        // parity: `PriorityProvider` still consumes `nextInt(1)` after choosing the highest match.
-        static_cast<void>(random.nextInt(1));
-        data.set("variant", NbtTag::ofString(registryKey(biome == "warm_ocean" ? "warm" : "temperate")));
+        if (variantSpawnConditions::installed()) {
+            writePackVariant("zombie_nautilus_variant", context, data);
+        } else {
+            // parity: `PriorityProvider` still consumes `nextInt(1)` after choosing the highest match.
+            static_cast<void>(random.nextInt(1));
+            data.set("variant", NbtTag::ofString(registryKey(biome == "warm_ocean" ? "warm" : "temperate")));
+        }
         writeBrainMemories(data, {{"minecraft:attack_target_cooldown",
                                    kNautilusMinAttackCooldown + random.nextInt(kNautilusAttackCooldownRange)}});
     }

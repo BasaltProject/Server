@@ -157,7 +157,7 @@ void CastSpellGoal::tick(MobContext& mob) {
         break;
     case Spell::Blindness:
         if (target->playerId.has_value()) {
-            mob.actions.applyEffect(*target->playerId, "blindness", kBlindnessTicks, 0);
+            mob.actions.applyEffect(*target->playerId, "blindness", kBlindnessTicks, 0, mob.mob.entityId());
         }
         break;
     }

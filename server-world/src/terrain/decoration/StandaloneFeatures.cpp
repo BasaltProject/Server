@@ -495,6 +495,9 @@ bool placeLake(Chunk& chunk, random::RandomSource& random, const DecorationPos& 
                 const DecorationPos position = offset(base, x, y, z);
                 if (canReplaceLakeBody(stateAt(chunk, position))) {
                     set(chunk, position, y >= kLakeFluidHeight ? state("cave_air") : fluid);
+                    if (y >= kLakeFluidHeight) {
+                        chunk.markAboveForPostProcessing(position.x, position.y, position.z);
+                    }
                 }
             }
         }
@@ -511,6 +514,7 @@ bool placeLake(Chunk& chunk, random::RandomSource& random, const DecorationPos& 
                     const std::int32_t stateId = stateAt(chunk, position);
                     if (registry::blockShapes::isSolidState(stateId) && canReplaceLakeBarrier(stateId)) {
                         set(chunk, position, barrier);
+                        chunk.markAboveForPostProcessing(position.x, position.y, position.z);
                     }
                 }
             }

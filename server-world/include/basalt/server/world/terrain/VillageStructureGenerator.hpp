@@ -29,12 +29,10 @@ struct LocatedVillage {
     std::int32_t chunkZ = 0;
 };
 
-/// Places villages during chunk generation, choosing the variant from the biome at each candidate
-/// position like vanilla's shared `villages` structure set.
+/// Places villages during chunk generation, picking the variant from the biome at each candidate.
 ///
-/// parity, narrowed: vanilla caches the assembled pieces in the placement chunk's saved data, but
-/// chunks here are stateless, so `generateInto` recomputes the assembly per nearby candidate and
-/// keeps what lands here. Starts are rebuilt with vanilla's independent legacy structure seed.
+/// parity, narrowed: vanilla caches the assembled pieces in the placement chunk; chunks here are
+/// stateless, so `generateInto` reassembles each nearby candidate. Starts use the legacy structure seed.
 class VillageStructureGenerator {
 public:
     using BiomeAt = std::function<std::string(std::int32_t, std::int32_t, std::int32_t)>;
@@ -73,13 +71,10 @@ public:
     /// Every village structure this generator can make, by the id `/locate` and `/place` name.
     [[nodiscard]] static const std::vector<wire::common::Identifier>& structureIds();
 
-    /// The nearest chunk where `structure` would generate, searched outward over the placement grid.
+    /// The nearest chunk where `structure` would generate, searched ring by ring over the placement grid.
     ///
-    /// parity: `ChunkGenerator.findNearestMapStructure`, which walks the structure set's own cells
-    /// ring by ring rather than scanning chunks, and tests each candidate exactly as generation
-    /// would: the same weighted draw against the biome at the candidate's own centre column. A
-    /// candidate that draws a different village is not a match, which is why this cannot be answered
-    /// from the grid alone.
+    /// parity: `ChunkGenerator.findNearestMapStructure`: each candidate runs generation's weighted draw
+    /// against its centre biome, so one that draws a different village is not a match.
     [[nodiscard]] std::optional<LocatedVillage>
     locate(std::int64_t seed, std::int32_t fromChunkX, std::int32_t fromChunkZ,
            const wire::common::Identifier* structure, std::int32_t maxCells = kDefaultSearchCells,
@@ -92,13 +87,10 @@ public:
     assembleAt(const wire::common::Identifier& structure, std::int32_t chunkX, std::int32_t chunkZ,
                std::int64_t seed) const;
 
-    /// Assembles any template pool by name, which is what `/place jigsaw` does: no structure, no
-    /// placement grid and no biome, just a start pool and a depth.
+    /// Assembles any template pool by name, as `/place jigsaw` does: just a start pool and a depth.
     ///
-    /// parity: `PlaceCommand.placeJigsaw`, minus its `target` argument. Vanilla uses it to pick which
-    /// jigsaw block of the start piece the assembly grows from; this assembly grows from every
-    /// jigsaw of the start piece, so naming one narrows nothing and the argument is accepted and
-    /// ignored rather than pretended.
+    /// parity: `PlaceCommand.placeJigsaw`; its `target` is accepted and ignored, since this assembly
+    /// grows from every jigsaw of the start piece anyway.
     [[nodiscard]] std::vector<structure::PlacedStructurePiece> assemblePool(std::string_view pool, std::int32_t chunkX,
                                                                             std::int32_t chunkZ, std::int32_t maxDepth,
                                                                             std::int64_t seed) const;
@@ -108,6 +100,9 @@ public:
 
     /// Writes the part of `pieces` that lands in `chunk`. The caller repeats it per chunk they cover.
     void placeInto(Chunk& chunk, const std::vector<structure::PlacedStructurePiece>& pieces, std::int64_t seed) const;
+
+    /// parity: `FlatLevelSource.getBaseHeight`, one surface height everywhere instead of the router's.
+    void useFlatSurface(std::int32_t height) noexcept { flatSurface_ = height; }
 
     /// parity: `Beardifier.forStructuresInChunk`, this structure's share of it.
     void addBeard(StructureBeard& beard, std::int32_t chunkX, std::int32_t chunkZ, std::int64_t seed);
@@ -144,15 +139,13 @@ private:
     [[nodiscard]] std::shared_ptr<const VillageStart> assembledStart(std::int32_t candidateChunkX,
                                                                      std::int32_t candidateChunkZ, std::int64_t seed);
 
-    /// parity: `ChunkGenerator`'s own structure-set generation loop, its real branch for multi-entry
-    /// sets: the five real `village_*` structures share one `villages` set, all weight one, and are
-    /// tried in a seeded weighted draw without replacement until one's `has_structure/village_*`
-    /// biome tag matches the biome at the candidate's own centre column, sampled at the
-    /// density-derived surface height. No match anywhere means no village at that candidate.
-    /// parity: `villages.json`'s five entries in file order, all weight one, each with its own real
-    /// `has_structure/village_*` biome tag contents.
+    /// parity: `villages.json`'s five entries in file order, all weight one, each with its own
+    /// `has_structure/village_*` biome tag.
     [[nodiscard]] static const std::vector<Variant>& villageVariants();
 
+    /// parity: `ChunkGenerator`'s structure-set loop for multi-entry sets: a seeded weighted draw
+    /// without replacement until a variant's biome tag matches the candidate's centre column, sampled
+    /// at the density-derived surface height. No match means no village there.
     [[nodiscard]] const Variant* selectVariant(std::int32_t candidateChunkX, std::int32_t candidateChunkZ,
                                                std::int64_t seed, Samplers& samplers) const;
 
@@ -166,6 +159,7 @@ private:
                                                                         random::RandomSource& random) const;
 
     NoiseRouter router_;
+    std::optional<std::int32_t> flatSurface_;
     structure::StructurePlacementGrid grid_;
     BiomeAt biomeAt_;
     std::int32_t maxDepth_;
