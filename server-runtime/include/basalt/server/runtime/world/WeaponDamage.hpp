@@ -12,19 +12,32 @@
 
 namespace basalt::server::runtime::world {
 
-/// What the enchantments on a weapon add to a hit.
-///
-/// parity: `EnchantmentHelper.modifyDamage` over each enchantment's `minecraft:damage` effects. The
-/// ones that ask something of what was hit (smite, bane of arthropods) carry a requirement on the
-/// target's entity type, and they are left out until entity type tags are loaded: counting them
-/// against everything would make a sword hit harder than vanilla's.
+/// What the enchantments on a weapon add to a hit. parity: `EnchantmentHelper.modifyDamage` over
+/// each `minecraft:damage` effect. Effects requiring a target entity type (smite, bane of
+/// arthropods) are left out until entity type tags are loaded, rather than applied to everything.
 namespace weaponDamage {
 
 /// An enchantment's definition as the jar wrote it, or nothing for one the registry does not know.
 using DefinitionOf = std::function<const wire::nbt::NbtCompound*(const wire::common::Identifier&)>;
 
+/// What was hit, as the `entity_properties` requirements of impaling, smite and bane read it.
+struct Victim {
+    wire::common::Identifier type;
+    /// Whether that type is in an entity type tag.
+    std::function<bool(const wire::common::Identifier& tag)> inTag;
+};
+
 [[nodiscard]] float of(const std::optional<storage::StoredItemStack>& stack, float base,
-                       const DefinitionOf& definitionOf);
+                       const DefinitionOf& definitionOf, const Victim* victim = nullptr);
+
+/// parity: `EnchantmentHelper.runIterationOnItem` over one value effect component, such as
+/// `trident_return_acceleration` or `trident_spin_attack_strength`, starting from `base`.
+[[nodiscard]] float valueEffect(const storage::StoredItemStack& stack, std::string_view component, float base,
+                                const DefinitionOf& definitionOf);
+
+/// parity: `EnchantmentHelper.pickHighestLevel` over a list-per-level component, `trident_sound`.
+[[nodiscard]] std::optional<std::string>
+highestLevelEntry(const storage::StoredItemStack& stack, std::string_view component, const DefinitionOf& definitionOf);
 
 } // namespace weaponDamage
 

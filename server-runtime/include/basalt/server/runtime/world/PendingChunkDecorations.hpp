@@ -8,8 +8,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
-#include <optional>
-#include <unordered_map>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -22,12 +21,11 @@ struct GeneratedWorldEntity {
     server::world::ChunkGeneratedEntity descriptor;
 };
 
-/// Decorations that crossed a chunk border during generation (block writes, block entities,
-/// scheduled ticks) and the mobs a template spawned, plus the runtime identities handed out for the
-/// generated entities a chunk carries.
+/// The mobs a template spawned and the runtime identities handed out for the generated entities a
+/// chunk carries, plus what a chunk decorated on its own left past its edge.
 ///
-/// The deliver and apply methods take no lock of their own: callers already hold the world's mutex.
-/// The two that are reached without one held take it themselves.
+/// The deliver methods take no lock of their own: callers already hold the world's mutex. The two
+/// that are reached without one held take it themselves.
 class PendingChunkDecorations {
 public:
     /// What the world says is loaded at a packed chunk key, or nothing when it is not.
@@ -42,50 +40,23 @@ public:
     /// held.
     void addPendingGeneratedEntities(std::vector<server::world::ChunkGeneratedEntity> entities);
 
-    /// parity: what a neighbour already wrote into a chunk that has not generated yet. In vanilla
-    /// that write lands in the neighbour's proto chunk, so every later read sees it; here it waits
-    /// in the queue, and a reader that skips it takes the block for undecorated terrain.
-    [[nodiscard]] std::optional<std::int32_t> queuedWriteAt(std::int32_t worldX, std::int32_t y,
-                                                            std::int32_t worldZ) const;
-
-    /// Forgets which write won each cell of this now-evicted chunk.
-    void forgetGeneratedWriteSources(std::int64_t chunkKey);
-
     /// Forgets the generated-entity identities that belonged to this now-evicted chunk.
     void forgetGeneratedEntities(std::int64_t chunkKey);
 
-    /// When a queued write gets to land, relative to the receiving chunk's own decoration.
-    enum class WritePhase : std::uint8_t {
-        /// Everything a chunk that decorates earlier left for this one, so its decoration goes on
-        /// top of them, exactly as it does in vanilla.
-        BeforeDecoration,
-        /// Whatever is left, which is what later chunks wrote and what arrived after the fact.
-        AfterDecoration,
-    };
+    /// Writes a chunk decorated outside the generation pipeline left past its edge, landing in the
+    /// neighbours that are loaded. The pipeline writes into its neighbours directly and leaves none.
+    static void deliverGeneratedBlockWrites(std::span<const server::world::ChunkGeneratedBlockWrite> writes,
+                                            const ChunkAt& chunkAt);
 
-    /// Delivers decorations that crossed out of their source chunk without ever wrapping them back
-    /// into it. A target that has not arrived yet keeps the write until its own install.
-    /// `sourceSequence` is when the source decorated, which is what decides a contested cell.
-    void deliverGeneratedBlockWrites(std::span<const server::world::ChunkGeneratedBlockWrite> writes,
-                                     std::uint64_t sourceSequence, const ChunkAt& chunkAt);
+    static void deliverGeneratedBlockEntityWrites(std::span<const server::world::ChunkGeneratedBlockEntityWrite> writes,
+                                                  const ChunkAt& chunkAt);
 
-    void applyPendingGeneratedBlockWrites(server::world::Chunk& chunk, WritePhase phase);
-
-    void deliverGeneratedBlockEntityWrites(std::span<const server::world::ChunkGeneratedBlockEntityWrite> writes,
+    static void deliverGeneratedBlockTicks(std::span<const server::world::ChunkGeneratedBlockTick> ticks,
                                            const ChunkAt& chunkAt);
 
-    void applyPendingGeneratedBlockEntityWrites(server::world::Chunk& chunk);
-
-    void deliverGeneratedBlockTicks(std::span<const server::world::ChunkGeneratedBlockTick> ticks,
-                                    const ChunkAt& chunkAt);
-
-    void applyPendingGeneratedBlockTicks(server::world::Chunk& chunk);
-
     /// Runtime identities for the entities of generated chunks within `radiusChunks` of the centre.
-    ///
-    /// Bounded because this runs once per player per tick holding the world's mutex, against the
-    /// lock the generation workers need. Walked in coordinate order rather than sorted, so an
-    /// entity's id still depends only on position; a chunk eviction is what forgets them.
+    /// Bounded because it runs per player per tick under the world's mutex. Walked in coordinate
+    /// order, so an id depends only on position; evicting the chunk forgets them.
     [[nodiscard]] std::vector<GeneratedWorldEntity>
     generatedEntities(const std::function<std::int32_t()>& allocateEntityId, std::int32_t centerChunkX,
                       std::int32_t centerChunkZ, std::int32_t radiusChunks, const ChunkAt& chunkAt);
@@ -107,26 +78,6 @@ private:
     WorldMutex* mutex_;
     std::map<GeneratedEntityKey, GeneratedWorldEntity> generatedEntitiesByKey_;
     std::vector<server::world::ChunkGeneratedEntity> pendingGeneratedEntities_;
-
-    /// A queued write plus when its source decorated, which is what decides whether it lands under
-    /// the receiver's own decoration or over it.
-    struct QueuedBlockWrite {
-        server::world::ChunkGeneratedBlockWrite write;
-        std::uint64_t sourceSequence = 0;
-    };
-
-    std::map<std::int64_t, std::vector<QueuedBlockWrite>> pendingGeneratedBlockWrites_;
-
-    /// The latest decoration that wrote each cell, so two neighbours competing for one resolve by
-    /// which decorated last rather than by which generation thread delivered first.
-    std::map<std::int64_t, std::unordered_map<std::int64_t, std::uint64_t>> writeSourceByCell_;
-
-    /// Answers whether this source may write the cell, remembering it when it may.
-    [[nodiscard]] bool sourceMayWrite(std::int64_t chunkKey, std::int64_t cellKey, std::uint64_t sourceSequence);
-
-    std::map<std::int64_t, std::vector<server::world::ChunkGeneratedBlockEntityWrite>>
-        pendingGeneratedBlockEntityWrites_;
-    std::map<std::int64_t, std::vector<server::world::ChunkGeneratedBlockTick>> pendingGeneratedBlockTicks_;
 };
 
 } // namespace basalt::server::runtime::world

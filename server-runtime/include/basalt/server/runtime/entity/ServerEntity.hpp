@@ -388,6 +388,9 @@ public:
     /// Runtime and save identities of the entity holding this mob's leash.
     std::optional<std::int32_t> leashHolderId;
     std::optional<std::string> leashHolderUuid;
+    /// parity: `LeashData` naming a knot by its fence, and `angularMomentum`, the turn the rope gives.
+    std::optional<std::array<std::int32_t, 3>> leashKnotAt;
+    double leashAngularMomentum = 0.0;
 
     /// Skeleton-horse thunder trap state, including its persisted eighteen-thousand-tick lifetime.
     bool skeletonTrap = false;
@@ -428,6 +431,21 @@ public:
     std::vector<wire::common::Identifier> piercedAndKilled;
     /// parity: `AbstractArrow.soundEvent`, a crossbow's hit until it first lands, the arrow's after.
     bool arrowLanded = false;
+    /// parity: `AbstractArrow.inGroundTime` and `life`, the turns it has been stuck and the despawn
+    /// clock that runs meanwhile.
+    std::int32_t inGroundTime = 0;
+    std::int32_t arrowLife = 0;
+    /// parity: `AbstractArrow.isNoPhysics`, a trident flying home through whatever is in the way.
+    bool noPhysics = false;
+    /// parity: `ThrownTrident.ID_LOYALTY`, `ID_FOIL`, `dealtDamage` and its return sound played.
+    std::int8_t tridentLoyalty = -1;
+    bool tridentFoil = false;
+    bool tridentDealtDamage = false;
+    bool tridentReturning = false;
+    /// parity: `LightningBolt.cause` and `visualOnly`: the player a channeled bolt answers to, and a
+    /// trap's bolt that hurts and burns nothing.
+    std::optional<std::int32_t> boltCause;
+    bool boltVisualOnly = false;
 
     /// parity: `Ravager.attackTick`, `stunnedTick` and `roarTick`; any of them holds it still.
     std::int32_t ravagerAttackTicks = 0;

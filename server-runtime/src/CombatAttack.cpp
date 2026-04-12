@@ -134,7 +134,7 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
                                                static_cast<double>(box.width), static_cast<double>(box.height))) {
             return;
         }
-    } else if (!owner_->withinAttackReach(*session, *target)) {
+    } else if (!spinning_ && !owner_->withinAttackReach(*session, *target)) {
         return;
     }
     if (hooks_.attackAllowed && !hooks_.attackAllowed(*session, target->entityId())) {
@@ -152,6 +152,12 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     }
     if (world::cushions::isCushion(target->type())) {
         breakCushion(*session, *target);
+        return;
+    }
+    // parity: `BlockAttachedEntity.hurtServer` on a knot: it goes, untied, and its mobs lose the lead.
+    if (target->type().path() == "leash_knot") {
+        target->removed = true;
+        owner_->broadcastSound("minecraft:entity.lead.untied", target->x, target->y, target->z, SoundSource::Neutral);
         return;
     }
     if (world::endCrystals::isCrystal(target->type())) {
@@ -183,7 +189,9 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
         return;
     }
 
-    const std::optional<storage::StoredItemStack>& heldStack = session->inventory.heldItem();
+    // parity: `Player.getWeaponItem` is the riptide's trident while it spins.
+    const std::optional<storage::StoredItemStack>& heldStack =
+        spinning_ && session->autoSpinItem.has_value() ? session->autoSpinItem : session->inventory.heldItem();
     const std::optional<Identifier> weapon = heldStack.has_value() ? parsedOrNothing(heldStack->id) : std::nullopt;
     world::RealEnchantments* enchantments = owner_->options().enchantments;
     const player::playerAttributes::DefinitionOf definitionOf = [enchantments](const Identifier& id) {
@@ -194,11 +202,20 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
         session->ticksSinceSwing, player::playerAttributes::valueOf(*session, "minecraft:attack_speed", definitionOf));
     session->ticksSinceSwing = 0;
 
+    // parity: `Player.attack`, the spin's own damage instead of the attribute while spinning.
     const auto base =
-        static_cast<float>(player::playerAttributes::valueOf(*session, "minecraft:attack_damage", definitionOf));
+        spinning_
+            ? session->autoSpinDamage
+            : static_cast<float>(player::playerAttributes::valueOf(*session, "minecraft:attack_damage", definitionOf));
     // parity: what the enchantments add rides on the swing but not on the critical, and is put back
     // on top after the charge and the critical have had the base to themselves.
-    const float enchanted = world::weaponDamage::of(heldStack, base, definitionOf);
+    const world::realEntityTypeTags::TagMembers* entityTags = owner_->options().entityTypeTags;
+    const world::weaponDamage::Victim victim{
+        .type = target->type(), .inTag = [entityTags, target](const Identifier& tag) {
+            return entityTags != nullptr &&
+                   world::realEntityTypeTags::membersOf(*entityTags, tag).contains(target->type());
+        }};
+    const float enchanted = world::weaponDamage::of(heldStack, base, definitionOf, &victim);
     const player::combat::Swing swing =
         player::combat::swingOf(strength, base, enchanted, fallDistance > 0.0, session->onGround, session->sprinting);
     const float damage = swing.damage;
@@ -318,6 +335,36 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
     // parity: `ItemFrame.interact`, which comes before anything a mob would do with the click.
     if (world::itemFrames::isFrame(entity->type()) && useItemFrame(*session, *entity)) {
         return;
+    }
+    // parity: `Entity.interact`'s leashes, before the mob's own `mobInteract`, and the knot's own.
+    if (MobActionSystem* mobs = owner_->options().mobs; mobs != nullptr) {
+        const bool mainHand = interact.hand == wire::protocol::play::InteractPacket::kMainHand;
+        const std::int32_t slot =
+            mainHand ? PlayerInventory::kHotbarStart + session->inventory.heldSlot() : PlayerInventory::kOffhandSlot;
+        const std::optional<storage::StoredItemStack> inHand = session->inventory.at(slot);
+        const bool shears = inHand.has_value() && inHand->id == "minecraft:shears";
+        const MobActionSystem::LeashUse use =
+            entity->type().path() == "leash_knot"
+                ? mobs->useOnKnot(*world, *session, *entity, shears)
+                : mobs->useOnLeashable(*world, *session, *entity, inHand.has_value() && inHand->id == "minecraft:lead",
+                                       shears);
+        switch (use) {
+        case MobActionSystem::LeashUse::Pass:
+            break;
+        case MobActionSystem::LeashUse::Done:
+            return;
+        case MobActionSystem::LeashUse::DamageShears:
+            owner_->blockInteraction().wearHeldItem(1);
+            return;
+        case MobActionSystem::LeashUse::ConsumeOne:
+            if (session->gamemode != Gamemode::Creative && inHand.has_value()) {
+                storage::StoredItemStack left = *inHand;
+                left.count -= 1;
+                session->inventory.set(slot, left.count <= 0 ? std::nullopt : std::optional{left});
+                owner_->sendInventorySlot(slot);
+            }
+            return;
+        }
     }
     // parity: `Villager.mobInteract`, which a villager spawn egg skips.
     if (entity->type() == entity::villagers::type()) {

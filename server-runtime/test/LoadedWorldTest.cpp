@@ -2,6 +2,7 @@
 
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/world/terrain/ProtoRegion.hpp>
 
 #include <doctest.h>
 
@@ -271,7 +272,7 @@ TEST_CASE("the spawn of a void world is whatever its metadata says") {
     LoadedWorld world{declarationOf("world", WorldType::Void), WorldSettings{}, metadata, root,
                       basalt::wire::common::Logger{"Test"}};
 
-    world.warmSpawnArea(0);
+    world.warmSpawnArea();
 
     CHECK(world.spawn()[0] == doctest::Approx(100.5));
     CHECK(world.spawn()[1] == doctest::Approx(65.0));
@@ -283,7 +284,7 @@ TEST_CASE("a flat world puts its spawn on the first block that can hold a player
     LoadedWorld world{declarationOf("world"), WorldSettings{}, metadataOf(), root,
                       basalt::wire::common::Logger{"Test"}};
 
-    world.warmSpawnArea(1);
+    world.warmSpawnArea();
 
     CHECK(world.spawn()[1] > -64.0);
     CHECK(world.state().isLoaded(0, 0));
@@ -320,20 +321,30 @@ TEST_CASE("a world with a scheduler of its own shares it with everything in that
 
 TEST_CASE("a generator handed in is what the world generates with") {
     const std::string root = scratch("loaded-world-generator");
-    std::int32_t calls = 0;
+    std::int32_t terrains = 0;
+    std::int32_t decorations = 0;
     LoadedWorldOptions options;
-    options.normalGenerator = [&calls](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t, std::string_view,
-                                       const std::function<void(Chunk&)>&) {
-        calls++;
+    options.pipeline.terrain = [&terrains](std::int32_t chunkX, std::int32_t chunkZ) {
+        terrains++;
         Chunk chunk{chunkX, chunkZ};
         chunk.setBlockStateId(0, 0, 0, reg::blocks::bedrock().stateId);
-        return chunk;
+        return basalt::server::world::terrain::realTerrainGenerator::GeneratedTerrain{std::move(chunk), nullptr,
+                                                                                      nullptr};
     };
+    options.pipeline.adopt = [](Chunk chunk) {
+        return basalt::server::world::terrain::realTerrainGenerator::GeneratedTerrain{std::move(chunk), nullptr,
+                                                                                      nullptr};
+    };
+    options.pipeline.decorate = [&decorations](basalt::server::world::terrain::realTerrainGenerator::GeneratedTerrain&,
+                                               basalt::server::world::terrain::ProtoRegion&) { decorations++; };
     LoadedWorld world{declarationOf("world", WorldType::Normal), WorldSettings{}, metadataOf(), root,
                       basalt::wire::common::Logger{"Test"},      options};
 
     static_cast<void>(world.state().getOrGenerateChunk(0, 0));
 
-    CHECK(calls == 1);
+    // parity: a chunk is full once its eight neighbours decorated, and each of those needed its own
+    // eight to have terrain.
+    CHECK(terrains == 25);
+    CHECK(decorations == 9);
     CHECK(world.state().blockState(0, 0, 0).value_or(0) == reg::blocks::bedrock().stateId);
 }

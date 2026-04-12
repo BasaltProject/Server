@@ -51,7 +51,7 @@ TEST_CASE("each kind carries what vanilla gives it") {
 
     CHECK(projectiles::snowball().gravity == doctest::Approx(0.03));
     CHECK_FALSE(projectiles::snowball().sticks);
-    CHECK(projectiles::all().size() == 13);
+    CHECK(projectiles::all().size() == 14);
 }
 
 TEST_CASE("the whole table of kinds, since a wrong number here is a projectile that flies wrong") {
@@ -66,6 +66,7 @@ TEST_CASE("the whole table of kinds, since a wrong number here is a projectile t
     // parity: `AbstractArrow`, `AbstractHurtingProjectile` and `ThrowableProjectile`'s own defaults.
     const std::vector<Row> table{{"arrow", 0.05, 0.99, true},
                                  {"spectral_arrow", 0.05, 0.99, true},
+                                 {"trident", 0.05, 0.99, true},
                                  {"snowball", 0.03, 0.99, false},
                                  {"egg", 0.03, 0.99, false},
                                  {"ender_pearl", 0.03, 0.99, false},

@@ -1,4 +1,5 @@
 #include <basalt/server/random/RandomSource.hpp>
+#include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/LightningBoltSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
@@ -16,6 +17,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 namespace basalt::server::runtime {
 namespace {
@@ -80,7 +82,7 @@ void LightningBoltSystem::tick(world::LoadedWorld& world, const std::vector<Play
         // whole number hits the block under its feet and not the air it is in.
         world::lightning::strike(world.state(), mth::floor(bolt.x), mth::floor(bolt.y - 1.0e-6), mth::floor(bolt.z),
                                  false, random, changes);
-        if (fierce &&
+        if (fierce && !bolt.boltVisualOnly &&
             canSpreadFireAround(world, watchers, mth::floor(bolt.x), mth::floor(bolt.y), mth::floor(bolt.z))) {
             const std::size_t before = changes.size();
             world::lightning::spawnFire(world.state(), mth::floor(bolt.x), mth::floor(bolt.y), mth::floor(bolt.z),
@@ -98,7 +100,8 @@ void LightningBoltSystem::tick(world::LoadedWorld& world, const std::vector<Play
         } else if (bolt.boltLife < -random.nextInt(10)) {
             bolt.boltFlashes--;
             bolt.boltLife = 1;
-            if (canSpreadFireAround(world, watchers, mth::floor(bolt.x), mth::floor(bolt.y), mth::floor(bolt.z))) {
+            if (!bolt.boltVisualOnly &&
+                canSpreadFireAround(world, watchers, mth::floor(bolt.x), mth::floor(bolt.y), mth::floor(bolt.z))) {
                 const std::size_t before = changes.size();
                 world::lightning::spawnFire(world.state(), mth::floor(bolt.x), mth::floor(bolt.y), mth::floor(bolt.z),
                                             0, random, changes);
@@ -109,7 +112,7 @@ void LightningBoltSystem::tick(world::LoadedWorld& world, const std::vector<Play
     for (const world::BlockChange& change : changes) {
         broadcaster_->announceRedstone(world, watchers, change);
     }
-    if (bolt.boltLife >= 0) {
+    if (bolt.boltLife >= 0 && !bolt.boltVisualOnly) {
         hitAround(world, watchers, living, bolt);
     }
 }
@@ -120,6 +123,8 @@ void LightningBoltSystem::hitAround(world::LoadedWorld& world, const std::vector
         return x + halfWidth > bolt.x - kReach && x - halfWidth < bolt.x + kReach && y + height > bolt.y - kReach &&
                y < bolt.y + kHeight + kReach && z + halfWidth > bolt.z - kReach && z - halfWidth < bolt.z + kReach;
     };
+    // parity: `CHANNELED_LIGHTNING` for the bolt's cause, every turn, with whatever this turn touched.
+    world::TriggerEvent channeled;
     for (ServerEntity* entity : living) {
         if (entity == &bolt || entity->removed || entity->dying || entity->health <= 0.0 ||
             entity->type() == world::lightning::bolt() ||
@@ -128,6 +133,7 @@ void LightningBoltSystem::hitAround(world::LoadedWorld& world, const std::vector
         }
         mobs_->thunderHit(world, watchers, *entity, bolt.entityId());
         bolt.boltHitIds.push_back(entity->entityId());
+        channeled.victims.push_back(world::triggerFacts::ofEntity(world, *entity));
     }
     // parity: `Entity.thunderHit` on an item: five points against its five health, and gone.
     for (const world::DroppedItem& item : world.state().nearbyItems(bolt.x, bolt.y, bolt.z, 2.0 * (kReach + kHeight))) {
@@ -149,7 +155,29 @@ void LightningBoltSystem::hitAround(world::LoadedWorld& world, const std::vector
             player->connection().hurt(kLightningDamage, "lightningBolt", world::damageTypes::kLightningBolt,
                                       std::nullopt);
         }
+        channeled.victims.push_back(world::triggerFacts::ofPlayer(*player));
     }
+    if (triggers_ == nullptr || !bolt.boltCause.has_value()) {
+        return;
+    }
+    for (PlayerSession* cause : watchers) {
+        if (cause->entityId() == *bolt.boltCause) {
+            triggers_->fire("channeled_lightning", cause->name(), cause->uuid().toString(), channeled);
+        }
+    }
+}
+
+ServerEntity* LightningBoltSystem::spawn(world::LoadedWorld& world, double x, double y, double z, std::int32_t entityId,
+                                         std::optional<std::int32_t> cause, bool visualOnly) {
+    const server::registry::EntityTypeEntry* entry = server::registry::entityTypes::of(world::lightning::bolt());
+    if (entry == nullptr) {
+        return nullptr;
+    }
+    auto bolt = std::make_unique<ServerEntity>(entityId, wire::common::Uuid::random(), world::lightning::bolt(),
+                                               entry->protocolId, x, y, z);
+    bolt->boltCause = cause;
+    bolt->boltVisualOnly = visualOnly;
+    return &world.state().spawnEntity(std::move(bolt));
 }
 
 void LightningBoltSystem::announceStrike(const world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,

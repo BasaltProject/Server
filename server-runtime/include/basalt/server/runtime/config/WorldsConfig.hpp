@@ -34,19 +34,13 @@ struct WorldSettings {
     friend bool operator==(const WorldSettings&, const WorldSettings&) = default;
 };
 
-/// How a world's terrain is made.
-///
-/// `Amplified` is declared but not implemented: vanilla builds it from a second set of density
-/// functions under `overworld_amplified` whose splines this build does not port, and this project's
-/// own rule is that a parity gap is declared rather than approximated. Selecting it fails at
-/// startup with that explanation instead of quietly generating normal terrain under its name.
-enum class WorldType : std::uint8_t { Normal, Flat, Void, Amplified };
+/// How a world's terrain is made. parity: the `world_preset` registry, save `single_biome_surface`,
+/// plus `Void`, which is ours.
+enum class WorldType : std::uint8_t { Normal, Flat, Void, Amplified, LargeBiomes, Debug };
 
 [[nodiscard]] std::string_view worldTypeName(WorldType type) noexcept;
 
 [[nodiscard]] std::optional<WorldType> worldTypeByName(std::string_view name);
-
-[[nodiscard]] constexpr bool isImplemented(WorldType type) noexcept { return type != WorldType::Amplified; }
 
 /// The vanilla dimension whose rules and generator a declared world uses.
 enum class WorldDimension : std::uint8_t { Overworld, Nether, End };
@@ -99,11 +93,9 @@ struct DimensionFacts {
 [[nodiscard]] constexpr bool hasClock(WorldDimension dimension) noexcept { return dimension != WorldDimension::Nether; }
 
 /// One world as `worlds.toml` declares it. The seed is absent when the operator left it to chance.
-///
-/// `linkedTo` is what makes several sets of dimensions possible: a Nether or an End names the
-/// Overworld whose portals lead to it, so `skyblock_nether` belongs to `skyblock` and not to
-/// whichever Nether happened to be declared first. Absent on an Overworld, and on a secondary
-/// dimension that left it out, which then belongs to the default world.
+/// `linkedTo` names the Overworld a Nether or End belongs to (`skyblock_nether` to `skyblock`), which
+/// allows several sets of dimensions. Absent on an Overworld; a secondary dimension without it
+/// belongs to the default world.
 struct WorldDeclaration {
     std::string name;
     WorldDimension dimension = WorldDimension::Overworld;
@@ -147,11 +139,8 @@ public:
     [[nodiscard]] const WorldDeclaration* portalTarget(const WorldDeclaration& world, WorldDimension dimension) const;
 
     /// The settings for `world`, generating its `settings.toml` if the world directory already
-    /// exists and does not have one yet.
-    ///
-    /// Not generated for a world that has never been created: writing a settings file into an
-    /// empty directory would make the directory exist, and an existing directory is how "this
-    /// world was already created" is decided elsewhere.
+    /// exists and lacks one. Never for a world not yet created: writing the file would create the
+    /// directory, and an existing directory is what marks a world as already created.
     [[nodiscard]] WorldSettings settingsFor(const WorldDeclaration& world) const;
 
 private:

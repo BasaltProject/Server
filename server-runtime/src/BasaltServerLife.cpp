@@ -840,7 +840,12 @@ void BasaltServer::startBedrockListener() {
                     player::playerAttributes::valueOf(*session, "minecraft:attack_damage", definitionOf));
                 // parity: what the enchantments add rides on the swing but never on the critical, so
                 // it is worked out here and handed to the same arithmetic the other door uses.
-                const float enchanted = world::weaponDamage::of(held, base, definitionOf);
+                const world::realEntityTypeTags::TagMembers* entityTags = &vanillaData_.entityTags;
+                const world::weaponDamage::Victim victim{
+                    .type = target->type(), .inTag = [entityTags, target](const wire::common::Identifier& tag) {
+                        return world::realEntityTypeTags::membersOf(*entityTags, tag).contains(target->type());
+                    }};
+                const float enchanted = world::weaponDamage::of(held, base, definitionOf, &victim);
                 const player::combat::Swing swing =
                     player::combat::swingOf(strength, base, enchanted, falling, session->onGround, session->sprinting);
                 if (swing.damage <= 0.0F) {

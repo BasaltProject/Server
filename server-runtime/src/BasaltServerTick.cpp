@@ -910,6 +910,9 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         // parity: `AbstractBoat.tick`: floats and drifts with nobody at the oars, and scoops up mobs.
         if (entity::boats::isBoat(entity->type())) {
             tickBoat(world, watchers, living, *entity);
+            if (mobActions_ != nullptr) {
+                mobActions_->tickLeash(world, *entity);
+            }
         }
         // parity: `Mob.aiStep`, which is what makes an animal wander rather than stand there.
         if (entity::mobs::isMob(entity->type())) {

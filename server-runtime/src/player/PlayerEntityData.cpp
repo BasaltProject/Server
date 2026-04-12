@@ -66,6 +66,9 @@ struct Dimensions {
     if (session.fallFlying) {
         return Pose::FallFlying;
     }
+    if (session.autoSpinTicks > 0) {
+        return Pose::SpinAttack;
+    }
     return session.sneaking && !session.flying ? Pose::Crouching : Pose::Standing;
 }
 
@@ -124,6 +127,9 @@ PlayerEntityData PlayerEntityData::of(const PlayerSession& session) {
     data.pose = session.dead ? Pose::Dying : session.pose;
     if (session.usingItem) {
         data.livingFlags = kLivingFlagUsingItem | (session.usingOffhand ? kLivingFlagOffhand : 0);
+    }
+    if (session.autoSpinTicks > 0) {
+        data.livingFlags |= kLivingFlagSpinAttack;
     }
     data.health = session.health();
     if (!spectator && !session.effects.empty()) {

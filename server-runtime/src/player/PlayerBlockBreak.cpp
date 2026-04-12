@@ -293,8 +293,12 @@ void wearHeldItemOnBreak(const BreakContext& context, PlayerSession& player, con
 }
 
 void wearHeldItem(const BreakContext& context, PlayerSession& player, const std::int32_t cost) {
+    wearItemIn(context, player, PlayerInventory::kHotbarStart + player.inventory.heldSlot(), cost);
+}
+
+void wearItemIn(const BreakContext& context, PlayerSession& player, const std::int32_t heldSlot,
+                const std::int32_t cost) {
     PlayerSession* session = &player;
-    const std::int32_t heldSlot = PlayerInventory::kHotbarStart + session->inventory.heldSlot();
     const std::optional<storage::StoredItemStack> held = session->inventory.at(heldSlot);
     if (session->gamemode == Gamemode::Creative || !held.has_value() || cost <= 0) {
         return;
@@ -314,7 +318,10 @@ void wearHeldItem(const BreakContext& context, PlayerSession& player, const std:
     world::triggerFacts::durabilityChanged(context.triggers, *session, *held, worn);
     session->inventory.set(heldSlot, worn);
     if (!worn.has_value()) {
-        statAwards::itemBroken(*session, held->id, statAwards::kBreakMainHand, context.registry);
+        statAwards::itemBroken(*session, held->id,
+                               heldSlot == PlayerInventory::kOffhandSlot ? statAwards::kBreakOffHand
+                                                                         : statAwards::kBreakMainHand,
+                               context.registry);
     }
     if (context.slotChanged) {
         context.slotChanged(*session, heldSlot);

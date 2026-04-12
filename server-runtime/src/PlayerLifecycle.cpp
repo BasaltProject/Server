@@ -81,6 +81,11 @@ void PlayerLifecycle::tickPlayer() {
     if (session == nullptr) {
         return;
     }
+    // parity: `LivingEntity.aiStep` counts a riptide's spin down, and it stops at nothing.
+    if (session->autoSpinTicks > 0 && --session->autoSpinTicks <= 0) {
+        session->autoSpinDamage = 0.0F;
+        session->autoSpinItem.reset();
+    }
     // parity: `ServerPlayer.tick`'s five clocks, in its order.
     owner_->playTimeTicks++;
     session->stats.noteOnly(storage::stats::playTime(), 1);
@@ -107,6 +112,7 @@ void PlayerLifecycle::tickPlayer() {
     owner_->itemUseTimers().tickEating(*session);
     owner_->itemUseTimers().tickDrawing(*session);
     owner_->itemUseTimers().tickBlocking(*session);
+    owner_->combat().tickCharge(*session);
     owner_->itemUseTimers().tickSpyglass(*session);
     owner_->blockInteraction().tickDigging(*session);
 }

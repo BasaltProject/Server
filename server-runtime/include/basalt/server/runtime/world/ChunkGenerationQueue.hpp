@@ -16,14 +16,15 @@
 #include <utility>
 #include <vector>
 
+namespace basalt::server::world::terrain {
+class ProtoChunks;
+} // namespace basalt::server::world::terrain
+
 namespace basalt::server::runtime::world {
 
-/// The one place chunks get generated off the thread that asked for them: a fixed pool pulling from a
-/// queue ordered by distance to a player, instead of spawning eight threads per chunk boundary
-/// crossing and blocking on the slowest.
-///
-/// Per dimension, not global: that is the seam a regional scheduler would shard on. Workers poll
-/// rather than wait, which keeps shutdown to one flag.
+/// The one place chunks get generated off the requesting thread: a fixed pool pulling from a queue
+/// ordered by distance to a player. Per dimension, the seam a regional scheduler would shard on.
+/// Workers poll rather than wait, which keeps shutdown to one flag.
 class ChunkGenerationQueue {
 public:
     /// Cores minus one for the tick loop and one for the connection threads.
@@ -49,6 +50,10 @@ public:
     ~ChunkGenerationQueue();
 
     [[nodiscard]] const std::string& dimension() const noexcept { return dimension_; }
+
+    /// Hands generation to the chunk pipeline: a request becomes a demand on it, and a worker's
+    /// turn is one of its steps. Set once, before the first request.
+    void usePipeline(server::world::terrain::ProtoChunks* pipeline) noexcept { pipeline_ = pipeline; }
 
     [[nodiscard]] static std::int64_t pack(std::int32_t chunkX, std::int32_t chunkZ);
     [[nodiscard]] static std::int32_t unpackX(std::int64_t key);
@@ -107,11 +112,13 @@ private:
 
     void markInstalled(std::int64_t key);
 
+    bool generatePiped();
+
+    server::world::terrain::ProtoChunks* pipeline_ = nullptr;
     std::shared_ptr<Live> live_ = std::make_shared<Live>();
     mutable std::mutex mutex_;
     std::unordered_map<std::int64_t, std::int32_t> queued_;
-    /// Keyed by priority as well, so the barrier can tell an earlier neighbour from a later one
-    /// once it has left the queue.
+    /// Taken, or handed to the world and not installed yet.
     std::unordered_map<std::int64_t, std::int32_t> inProgress_;
     std::atomic<bool> running_{true};
     std::vector<std::jthread> workers_;

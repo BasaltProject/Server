@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/sched/RegionScheduler.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/ArrowButtons.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
@@ -15,7 +16,6 @@
 #include <basalt/server/runtime/world/CommandBlocks.hpp>
 #include <basalt/server/runtime/world/ComparatorReading.hpp>
 #include <basalt/server/runtime/world/Composters.hpp>
-#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/Crafters.hpp>
 #include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/Dispensers.hpp>
@@ -96,11 +96,10 @@ void RedstoneTickSystem::crafterCrafted(world::LoadedWorld& world, std::int32_t 
     }
     std::vector<world::TriggerItem> ingredients;
     for (const std::optional<server::world::loot::ItemStack>& slot : grid) {
-        ingredients.push_back(slot.has_value() ? world::TriggerItem{.item = slot->item,
-                                                                    .count = slot->count,
-                                                                    .components = slot->components}
-                                               : world::TriggerItem{.item = wire::common::Identifier::vanilla("air"),
-                                                                    .count = 0});
+        ingredients.push_back(
+            slot.has_value()
+                ? world::TriggerItem{.item = slot->item, .count = slot->count, .components = slot->components}
+                : world::TriggerItem{.item = wire::common::Identifier::vanilla("air"), .count = 0});
     }
     constexpr double kHalfBox = 8.5;
     for (PlayerSession* player : watchersOf(world)) {
@@ -403,7 +402,7 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                  .allocateEntityId = [this] { return players_->allocateEntityId(); },
                  .crafted =
                      [this, &world, x, y, z](const server::world::crafting::CraftingInput& input,
-                                            const world::blockInventory::Slots& grid) {
+                                             const world::blockInventory::Slots& grid) {
                          crafterCrafted(world, x, y, z, input, grid);
                      }});
             crafted.has_value()) {

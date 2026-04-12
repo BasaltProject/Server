@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/player/PlayerCooldowns.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
 #include <basalt/server/runtime/player/PlayerDeath.hpp>
+#include <basalt/server/runtime/player/PlayerImpulse.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSounds.hpp>
 #include <basalt/server/runtime/registry/VanillaRegistryData.hpp>
@@ -122,6 +123,9 @@ void CombatHandler::trackFall(PlayerSession& session, double y, bool onGround,
         (feetState.has_value() && (world::fluids::of(*feetState) != world::Submersion::None || climbing));
     if (cancelled) {
         resetFall(session);
+        session.fallDistance = 0.0;
+        // parity: `handleMovePlayer` lets go of the impulse in liquid, on a ladder or as a spectator.
+        player::impulse::tryReset(session);
         return;
     }
     if (!onGround && y < session.y) {
@@ -138,7 +142,8 @@ void CombatHandler::trackFall(PlayerSession& session, double y, bool onGround,
             world != nullptr) {
             world::TriggerEvent event{.startPosition = session.explosionImpact};
             if (session.explosionCause.has_value()) {
-                if (const entity::ServerEntity* cause = world->state().entity(*session.explosionCause); cause != nullptr) {
+                if (const entity::ServerEntity* cause = world->state().entity(*session.explosionCause);
+                    cause != nullptr) {
                     event.entities.emplace("cause", world::triggerFacts::ofEntity(*world, *cause));
                 }
             }
@@ -166,6 +171,10 @@ void CombatHandler::trackFall(PlayerSession& session, double y, bool onGround,
     if (onGround) {
         resetFall(session);
     }
+    if (onGround || session.fallFlying) {
+        player::impulse::tryReset(session);
+    }
+    session.fallDistance = fallDistance;
 }
 
 void CombatHandler::resetFall(const PlayerSession& session) {
@@ -216,10 +225,12 @@ void CombatHandler::applyFallDamage(PlayerSession& session, const double landing
                                static_cast<std::int32_t>(std::floor(session.z)));
     const world::fallLanding::Landing landing =
         under.has_value() ? world::fallLanding::of(*under, session.sneaking) : world::fallLanding::Landing{};
-    const std::int32_t damage = world::fallLanding::damage(fallDistance, landing, player::combat::kSafeFallDistance);
+    const double fallen = player::impulse::effectiveFallDistance(session, fallDistance, landingY);
+    const std::int32_t damage = world::fallLanding::damage(fallen, landing, player::combat::kSafeFallDistance);
     if (damage <= 0) {
         return;
     }
+    player::impulse::reset(session);
     session.stats.addFallen(fallDistance * landing.distanceScale + landing.extraDistance);
     if (landing.stalagmite) {
         owner_->hurt(static_cast<float>(damage), "stalagmite", world::damageTypes::kStalagmite);

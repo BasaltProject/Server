@@ -288,6 +288,7 @@ void MobActionSystem::emitPlayerMovement(world::LoadedWorld& world,
         const double dx = player->x - (*from)[0];
         const double dy = player->y - (*from)[1];
         const double dz = player->z - (*from)[2];
+        player->knownMovement = {dx, dy, dz};
         // parity: `Player.getMovementEmission`: nothing flying or crouched on the ground, and a
         // spectator's `noPhysics` move emits nothing either.
         if ((dx * dx) + (dy * dy) + (dz * dz) > kTeleportSquared || player->flying ||

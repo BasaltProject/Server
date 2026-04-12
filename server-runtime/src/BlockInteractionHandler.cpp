@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
+#include <basalt/server/runtime/CombatHandler.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/ItemUseTimers.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
@@ -424,9 +425,13 @@ void BlockInteractionHandler::handlePlayerAction(const play::ServerboundPlayerAc
         owner_->itemUseTimers().releaseBow();
         owner_->itemUseTimers().stopBlocking();
         owner_->itemUseTimers().stopSpyglass();
+        owner_->combat().stopCharge();
         break;
     case Action::SwapItemWithOffhand:
         owner_->swapWithOffhand();
+        break;
+    case Action::Stab:
+        owner_->combat().jab();
         break;
     default:
         break;

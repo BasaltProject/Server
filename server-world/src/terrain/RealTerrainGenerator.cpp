@@ -262,17 +262,18 @@ void decorate(GeneratedTerrain& terrain, std::int64_t seed, const NeighbourTerra
     }
 }
 
+GeneratedTerrain adopt(const surface::SurfaceRuleEnvironment& environment, Chunk chunk) {
+    auto context = std::make_unique<densityfunction::SamplerContext>(
+        densityfunction::SamplerContext::Options{.enableCaches = true});
+    auto biomes = std::make_unique<surface::ChunkBiomeEnvironment>(environment, context.get());
+    return GeneratedTerrain{std::move(chunk), std::move(context), std::move(biomes)};
+}
+
 Chunk generate(const NoiseRouter& router, const surface::SurfaceRuleEnvironment& environment, std::int32_t chunkX,
                std::int32_t chunkZ, std::int64_t seed, const TerrainStructureGenerators& generators,
-               NeighbourTerrainCache* neighbours, const structure::TemplateLoader& templates,
-               const BeforeDecoration& beforeDecoration) {
+               const structure::TemplateLoader& templates) {
     GeneratedTerrain terrain = generateTerrain(router, environment, chunkX, chunkZ, seed, generators);
-    if (beforeDecoration) {
-        beforeDecoration(terrain.chunk());
-    }
-    const std::unique_ptr<NeighbourTerrain> around =
-        neighbours == nullptr ? nullptr : neighbours->around(chunkX, chunkZ);
-    decorate(terrain, seed, around.get(), generators, templates);
+    decorate(terrain, seed, nullptr, generators, templates);
     return std::move(terrain.chunk());
 }
 

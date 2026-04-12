@@ -287,6 +287,8 @@ basalt_module(server-runtime-core
         src/player/PlayerSpawnItems.cpp
         src/player/PlayerSweep.cpp
         src/player/PlayerThrown.cpp
+        src/player/PlayerSpear.cpp
+        src/player/PlayerTrident.cpp
         src/player/PlayerGliding.cpp
         src/player/PlayerFireworks.cpp
         src/player/PlayerCrossbow.cpp
@@ -415,6 +417,9 @@ basalt_module(server-runtime-core
         src/player/PlayerAttributes.cpp
         src/CombatVehicles.cpp
         src/CombatMounts.cpp
+        src/CombatSpear.cpp
+        src/CombatSpin.cpp
+        src/CombatTridents.cpp
         src/StructureBlockSystem.cpp
         src/ContainerEntities.cpp
         src/world/ContainerDrops.cpp
@@ -592,6 +597,8 @@ basalt_module(server-runtime-core
         src/MobActionParrots.cpp
         src/MobActionMovement.cpp
         src/entity/MobSteps.cpp
+        src/entity/Leashes.cpp
+        src/MobActionLeash.cpp
         src/entity/ai/DoorInteraction.cpp
         src/world/VillageDataLoader.cpp
         src/world/VillageGolemSpawner.cpp
@@ -599,6 +606,7 @@ basalt_module(server-runtime-core
         src/world/poi/PoiManager.cpp
         src/world/poi/PoiStorage.cpp
         src/world/poi/PoiTypes.cpp
+        src/world/PostPiercingEffects.cpp
         src/world/WeaponDamage.cpp
         src/world/WorldState.cpp
         src/world/SpawnPotential.cpp
@@ -709,6 +717,12 @@ basalt_test(server-runtime-real-loot-tables-test
 basalt_test(server-runtime-real-enchantments-test
     SOURCES
         test/RealEnchantmentsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-post-piercing-effects-test
+    SOURCES
+        test/PostPiercingEffectsTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
@@ -1503,6 +1517,12 @@ basalt_test(server-runtime-player-arrow-pickup-test
 basalt_test(server-runtime-boats-test
     SOURCES
         test/BoatsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-leashes-test
+    SOURCES
+        test/LeashesTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 

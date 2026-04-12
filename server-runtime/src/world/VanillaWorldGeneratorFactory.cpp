@@ -26,6 +26,7 @@
 #include <basalt/server/world/terrain/NoiseRouterData.hpp>
 #include <basalt/server/world/terrain/OceanMonumentStructureGenerator.hpp>
 #include <basalt/server/world/terrain/OceanRuinStructureGenerator.hpp>
+#include <basalt/server/world/terrain/ProtoRegion.hpp>
 #include <basalt/server/world/terrain/RealTerrainGenerator.hpp>
 #include <basalt/server/world/terrain/RuinedPortalStructureGenerator.hpp>
 #include <basalt/server/world/terrain/ShipwreckStructureGenerator.hpp>
@@ -161,18 +162,13 @@ struct VanillaWorldGeneratorFactory::Built {
     std::unique_ptr<terrain::JigsawStructureGenerator> trialChambers;
     std::unique_ptr<terrain::NetherStructureGenerator> netherStructures;
     std::unique_ptr<terrain::EndCityStructureGenerator> endCities;
-    std::unique_ptr<terrain::NeighbourTerrainCache> neighbours;
-    /// Its own, not the one the features read: a structure height query generates chunks a feature
-    /// never asked for, and sharing the cache moves what the features find in it.
+    /// A structure height query reaches chunks no decoration asked for, so it keeps undecorated
+    /// terrain of its own.
     std::unique_ptr<terrain::NeighbourTerrainCache> structureHeights;
     std::unique_ptr<SpawnEquipmentFinalizer> equipment;
     terrain::TerrainStructureGenerators generators;
     std::int64_t seed = 0;
     bool spawnMobs = false;
-    /// Stamped on a chunk as its decoration starts, so a cell two chunks write goes to the one
-    /// that decorated later. Taken before the write a neighbour left for it is delivered, which is
-    /// where the two have to be comparable.
-    std::atomic<std::uint64_t> decorating{0};
 };
 
 VanillaWorldGeneratorFactory::VanillaWorldGeneratorFactory(Jar jar, wire::common::Logger logger)
@@ -212,7 +208,11 @@ VanillaWorldGeneratorFactory::create(const config::WorldDeclaration& declaration
     const bool spawnMobs = metadata.gameRules.get(gameRules::kSpawnMobs);
     switch (declaration.dimension) {
     case config::WorldDimension::Overworld:
-        return overworld(metadata.seed, spawnMobs);
+        // parity: the `world_preset`s differ only in the noise settings their overworld names.
+        return overworld(metadata.seed, spawnMobs,
+                         declaration.type == config::WorldType::Amplified     ? "minecraft:amplified"
+                         : declaration.type == config::WorldType::LargeBiomes ? "minecraft:large_biomes"
+                                                                               : "minecraft:overworld");
     case config::WorldDimension::Nether:
         return nether(metadata.seed, spawnMobs);
     case config::WorldDimension::End:
@@ -221,7 +221,8 @@ VanillaWorldGeneratorFactory::create(const config::WorldDeclaration& declaration
     return {};
 }
 
-VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld(std::int64_t seed, bool spawnMobs) {
+VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld(std::int64_t seed, bool spawnMobs,
+                                                                                std::string_view settings) {
     auto built = std::make_unique<Built>();
     built->seed = seed;
     built->spawnMobs = spawnMobs;
@@ -237,7 +238,7 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
     // parity: the overworld's shape is the jar's own `noise_settings`. Without it there is no terrain
     // to make, so the world says so rather than handing back a generator that dereferences nothing.
     std::expected<terrain::NoiseRouter, std::string> router =
-        terrain::noiseRouterData::load("minecraft:overworld", seed, worldgenReader());
+        terrain::noiseRouterData::load(settings, seed, worldgenReader());
     if (!router.has_value()) {
         logger_.warn([&router] { return "No normal terrain can be generated: " + router.error(); });
         return {};
@@ -362,18 +363,7 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
                                                             .ancientCity = built->ancientCities.get(),
                                                             .trialChamber = built->trialChambers.get()};
 
-    // Step one's bodies read past the chunk edge, so decoration needs the neighbours' undecorated
-    // terrain. One cache per world: a neighbour generated for one chunk is read by the next.
     Built& world = *built;
-    built->neighbours =
-        std::make_unique<terrain::NeighbourTerrainCache>([&world](std::int32_t neighbourX, std::int32_t neighbourZ) {
-            // Moved out rather than copied: a chunk owns its sections, and the terrain that made
-            // it is finished with them the moment it answers.
-            terrain::realTerrainGenerator::GeneratedTerrain terrain = terrain::realTerrainGenerator::generateTerrain(
-                *world.overworldRouter, *world.overworldSurface, neighbourX, neighbourZ, world.seed, world.generators);
-            return std::move(terrain.chunk());
-        });
-
     built->structureHeights =
         std::make_unique<terrain::NeighbourTerrainCache>([&world](std::int32_t neighbourX, std::int32_t neighbourZ) {
             terrain::realTerrainGenerator::GeneratedTerrain terrain = terrain::realTerrainGenerator::generateTerrain(
@@ -382,16 +372,6 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
         });
 
     Generators answer;
-    answer.useQueuedWrites = [&world](terrain::NeighbourTerrainCache::QueuedAt queuedAt) {
-        if (world.neighbours != nullptr) {
-            world.neighbours->setQueuedAt(std::move(queuedAt));
-        }
-    };
-    answer.useInstalledChunks = [&world](terrain::NeighbourTerrainCache::QueuedAt installedAt) {
-        if (world.neighbours != nullptr) {
-            world.neighbours->setInstalledAt(std::move(installedAt));
-        }
-    };
     answer.villages = built->village.get();
     answer.camps = built->camps.get();
     const auto onGrid = [](const structure::StructurePlacementGrid& grid, auto startsAt) {
@@ -480,31 +460,35 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::overworld
                                               })});
     }
     answer.strongholds = built->strongholds.get();
-    answer.generate = [&world](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t gameTime,
-                               const std::string& difficulty,
-                               const std::function<void(server::world::Chunk&)>& beforeDecoration) {
-        const auto stamped = [&world, &beforeDecoration](server::world::Chunk& chunk) {
-            chunk.setDecorationSequence(++world.decorating);
-            if (beforeDecoration) {
-                beforeDecoration(chunk);
-            }
-        };
-        server::world::Chunk chunk = terrain::realTerrainGenerator::generate(
-            *world.overworldRouter, *world.overworldSurface, chunkX, chunkZ, world.seed, world.generators,
-            world.neighbours.get(), world.loader->templateLoader(), stamped);
-        if (world.spawnMobs) {
-            const std::expected<Identifier, wire::common::IdentifierError> biome = Identifier::parse(
-                world.overworldSurface->biomeAt(chunkX << 4, chunk.verticalBounds().maxY(), chunkZ << 4));
-            if (biome.has_value()) {
-                random::RandomSource random = random::RandomSource::legacy(0);
-                static_cast<void>(random::setDecorationSeed(random, world.seed, chunkX << 4, chunkZ << 4));
-                static_cast<void>(originalMobSpawner::spawnInto(
-                    chunk, world.biomeSpawns->listFor(*biome, "creature"),
-                    world.biomeSpawns->creatureProbabilityFor(*biome), random,
-                    {.gameTime = gameTime, .difficulty = difficulty, .equipment = world.equipment.get()}));
-            }
+    answer.pipeline.terrain = [&world](std::int32_t chunkX, std::int32_t chunkZ) {
+        return terrain::realTerrainGenerator::generateTerrain(*world.overworldRouter, *world.overworldSurface, chunkX,
+                                                              chunkZ, world.seed, world.generators);
+    };
+    answer.pipeline.adopt = [&world](server::world::Chunk chunk) {
+        return terrain::realTerrainGenerator::adopt(*world.overworldSurface, std::move(chunk));
+    };
+    answer.pipeline.decorate = [&world](terrain::realTerrainGenerator::GeneratedTerrain& generated,
+                                        terrain::ProtoRegion& region) {
+        const server::world::Chunk::RegionScope scope{generated.chunk(), region};
+        terrain::realTerrainGenerator::decorate(generated, world.seed, &region, world.generators,
+                                                world.loader->templateLoader());
+    };
+    answer.spawnMobs = [&world](server::world::Chunk& chunk, std::int64_t gameTime, const std::string& difficulty) {
+        if (!world.spawnMobs) {
+            return;
         }
-        return chunk;
+        const std::int32_t chunkX = chunk.chunkX();
+        const std::int32_t chunkZ = chunk.chunkZ();
+        const std::expected<Identifier, wire::common::IdentifierError> biome = Identifier::parse(
+            world.overworldSurface->biomeAt(chunkX << 4, chunk.verticalBounds().maxY(), chunkZ << 4));
+        if (biome.has_value()) {
+            random::RandomSource random = random::RandomSource::legacy(0);
+            static_cast<void>(random::setDecorationSeed(random, world.seed, chunkX << 4, chunkZ << 4));
+            static_cast<void>(originalMobSpawner::spawnInto(
+                chunk, world.biomeSpawns->listFor(*biome, "creature"),
+                world.biomeSpawns->creatureProbabilityFor(*biome), random,
+                {.gameTime = gameTime, .difficulty = difficulty, .equipment = world.equipment.get()}));
+        }
     };
     answer.spawnChunk = [&world] {
         const terrain::NoiseRouter& router = *world.overworldRouter;
@@ -550,52 +534,39 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::nether(st
         biomesOf(*built->tags, "minecraft:has_structure/mineshaft_mesa"));
 
     Built& world = *built;
-    // The Nether's springs, patches and blobs read the block next to them, so decoration needs the
-    // neighbours' undecorated terrain, exactly like the Overworld's.
-    built->neighbours = std::make_unique<terrain::NeighbourTerrainCache>([&world](std::int32_t neighbourX,
-                                                                                  std::int32_t neighbourZ) {
-        return terrain::dimensionTerrainGenerator::netherTerrain(*world.netherRouter, *world.netherBiomes, neighbourX,
-                                                                 neighbourZ, world.seed, world.netherStructures.get());
-    });
     Generators answer;
-    answer.useQueuedWrites = [&world](terrain::NeighbourTerrainCache::QueuedAt queuedAt) {
-        if (world.neighbours != nullptr) {
-            world.neighbours->setQueuedAt(std::move(queuedAt));
-        }
+    answer.pipeline.terrain = [&world](std::int32_t chunkX, std::int32_t chunkZ) {
+        return terrain::realTerrainGenerator::GeneratedTerrain{
+            terrain::dimensionTerrainGenerator::netherTerrain(*world.netherRouter, *world.netherBiomes, chunkX, chunkZ,
+                                                              world.seed, world.netherStructures.get()),
+            nullptr, nullptr};
     };
-    answer.useInstalledChunks = [&world](terrain::NeighbourTerrainCache::QueuedAt installedAt) {
-        if (world.neighbours != nullptr) {
-            world.neighbours->setInstalledAt(std::move(installedAt));
-        }
+    answer.pipeline.adopt = [](server::world::Chunk chunk) {
+        return terrain::realTerrainGenerator::GeneratedTerrain{std::move(chunk), nullptr, nullptr};
     };
-    answer.generate = [&world](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t gameTime,
-                               const std::string& difficulty,
-                               const std::function<void(server::world::Chunk&)>& beforeDecoration) {
-        const auto stamped = [&world, &beforeDecoration](server::world::Chunk& chunk) {
-            chunk.setDecorationSequence(++world.decorating);
-            if (beforeDecoration) {
-                beforeDecoration(chunk);
-            }
-        };
-        server::world::Chunk chunk = terrain::dimensionTerrainGenerator::nether(
-            *world.netherRouter, *world.netherBiomes, chunkX, chunkZ, world.seed, world.netherStructures.get(),
-            world.neighbours.get(), stamped);
-        if (world.spawnMobs) {
-            const std::expected<Identifier, wire::common::IdentifierError> biome =
-                Identifier::parse(world.netherBiomes->biomeAt(chunkX << 4, chunk.verticalBounds().maxY(), chunkZ << 4));
-            if (biome.has_value()) {
-                random::RandomSource random = random::RandomSource::legacy(0);
-                static_cast<void>(random::setDecorationSeed(random, world.seed, chunkX << 4, chunkZ << 4));
-                static_cast<void>(originalMobSpawner::spawnInto(chunk, world.biomeSpawns->listFor(*biome, "creature"),
-                                                                world.biomeSpawns->creatureProbabilityFor(*biome),
-                                                                random,
-                                                                {.hasCeiling = true,
-                                                                 .gameTime = gameTime,
-                                                                 .difficulty = difficulty,
-                                                                 .equipment = world.equipment.get()}));
-            }
+    answer.pipeline.decorate = [&world](terrain::realTerrainGenerator::GeneratedTerrain& generated,
+                                        terrain::ProtoRegion& region) {
+        const server::world::Chunk::RegionScope scope{generated.chunk(), region};
+        terrain::dimensionTerrainGenerator::decorateNether(generated.chunk(), *world.netherBiomes, world.seed, &region);
+    };
+    answer.spawnMobs = [&world](server::world::Chunk& chunk, std::int64_t gameTime, const std::string& difficulty) {
+        if (!world.spawnMobs) {
+            return;
         }
-        return chunk;
+        const std::int32_t chunkX = chunk.chunkX();
+        const std::int32_t chunkZ = chunk.chunkZ();
+        const std::expected<Identifier, wire::common::IdentifierError> biome =
+            Identifier::parse(world.netherBiomes->biomeAt(chunkX << 4, chunk.verticalBounds().maxY(), chunkZ << 4));
+        if (biome.has_value()) {
+            random::RandomSource random = random::RandomSource::legacy(0);
+            static_cast<void>(random::setDecorationSeed(random, world.seed, chunkX << 4, chunkZ << 4));
+            static_cast<void>(originalMobSpawner::spawnInto(chunk, world.biomeSpawns->listFor(*biome, "creature"),
+                                                            world.biomeSpawns->creatureProbabilityFor(*biome), random,
+                                                            {.hasCeiling = true,
+                                                             .gameTime = gameTime,
+                                                             .difficulty = difficulty,
+                                                             .equipment = world.equipment.get()}));
+        }
     };
     built_.push_back(std::move(built));
     return answer;
@@ -622,26 +593,20 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::end(std::
 
     Built& world = *built;
     Generators answer;
-    answer.useQueuedWrites = [&world](terrain::NeighbourTerrainCache::QueuedAt queuedAt) {
-        if (world.neighbours != nullptr) {
-            world.neighbours->setQueuedAt(std::move(queuedAt));
-        }
+    answer.pipeline.terrain = [&world](std::int32_t chunkX, std::int32_t chunkZ) {
+        return terrain::realTerrainGenerator::GeneratedTerrain{
+            terrain::dimensionTerrainGenerator::endTerrain(*world.endRouter, *world.endBiomes, chunkX, chunkZ,
+                                                           world.seed, world.endCities.get()),
+            nullptr, nullptr};
     };
-    answer.useInstalledChunks = [&world](terrain::NeighbourTerrainCache::QueuedAt installedAt) {
-        if (world.neighbours != nullptr) {
-            world.neighbours->setInstalledAt(std::move(installedAt));
-        }
+    answer.pipeline.adopt = [](server::world::Chunk chunk) {
+        return terrain::realTerrainGenerator::GeneratedTerrain{std::move(chunk), nullptr, nullptr};
     };
-    answer.generate = [&world](std::int32_t chunkX, std::int32_t chunkZ, std::int64_t, const std::string&,
-                               const std::function<void(server::world::Chunk&)>& beforeDecoration) {
-        const auto stamped = [&world, &beforeDecoration](server::world::Chunk& chunk) {
-            chunk.setDecorationSequence(++world.decorating);
-            if (beforeDecoration) {
-                beforeDecoration(chunk);
-            }
-        };
-        return terrain::dimensionTerrainGenerator::end(*world.endRouter, *world.endBiomes, chunkX, chunkZ, world.seed,
-                                                       world.endCities.get(), stamped);
+    answer.pipeline.decorate = [&world](terrain::realTerrainGenerator::GeneratedTerrain& generated,
+                                        terrain::ProtoRegion& region) {
+        const server::world::Chunk::RegionScope scope{generated.chunk(), region};
+        terrain::dimensionTerrainGenerator::decorateEnd(generated.chunk(), *world.endRouter, *world.endBiomes,
+                                                        world.seed);
     };
     built_.push_back(std::move(built));
     return answer;

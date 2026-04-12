@@ -429,6 +429,7 @@ void ClientSession::updatePosition(double x, double y, double z, float yaw, floa
         session->stats.increment(storage::stats::jump());
     }
     combat_->trackFall(*session, y, onGround, feet);
+    combat_->spinAttack(*session, x, y, z);
     const double dx = x - session->x;
     const double dy = y - session->y;
     const double dz = z - session->z;

@@ -8,6 +8,9 @@
 #include <array>
 #include <cstdint>
 #include <format>
+#include <optional>
+#include <string>
+#include <string_view>
 #include <utility>
 
 namespace basalt::server::world::region::chunkNbt {
@@ -251,6 +254,41 @@ template <typename ToNbt>
 
 } // namespace
 
+namespace {
+
+/// parity: the `ChunkStatus` names. Every status from `features` to `spawn` is a decorated proto chunk.
+[[nodiscard]] std::string_view statusName(ChunkStage stage) {
+    switch (stage) {
+    case ChunkStage::Terrain:
+        return "minecraft:terrain";
+    case ChunkStage::Decorated:
+        return "minecraft:features";
+    case ChunkStage::Full:
+    default:
+        return "minecraft:full";
+    }
+}
+
+/// Nothing for a chunk saved before its terrain, which is as good as never generated. A missing
+/// status is an older save of ours, where every chunk was full.
+[[nodiscard]] std::optional<ChunkStage> stageOf(std::string_view status) {
+    if (status.empty() || status == "minecraft:full" || status == "full") {
+        return ChunkStage::Full;
+    }
+    if (status.starts_with("minecraft:")) {
+        status.remove_prefix(10);
+    }
+    if (status == "terrain") {
+        return ChunkStage::Terrain;
+    }
+    if (status == "features" || status == "initialize_light" || status == "light" || status == "spawn") {
+        return ChunkStage::Decorated;
+    }
+    return std::nullopt;
+}
+
+} // namespace
+
 NbtCompound write(const Chunk& chunk) {
     NbtCompound tag;
     tag.putInt("DataVersion", kDataVersion);
@@ -259,7 +297,7 @@ NbtCompound write(const Chunk& chunk) {
     tag.putInt("zPos", chunk.chunkZ());
     tag.putLong("LastUpdate", 0);
     tag.putLong("InhabitedTime", chunk.inhabitedTime());
-    tag.putString("Status", "minecraft:full");
+    tag.putString("Status", std::string{statusName(chunk.stage())});
 
     PaletteScratch scratch;
     std::vector<NbtTag> sections;
@@ -512,7 +550,12 @@ void decodeStructures(const NbtCompound* tag, structure::ChunkStructures& into) 
 } // namespace
 
 std::expected<Chunk, ChunkNbtError> read(const NbtCompound& tag, ChunkHeight bounds) {
+    const std::optional<ChunkStage> stage = stageOf(tag.getString("Status"));
+    if (!stage.has_value()) {
+        return std::unexpected(ChunkNbtError{"saved before it had terrain"});
+    }
     Chunk chunk{tag.getInt("xPos"), tag.getInt("zPos"), bounds};
+    chunk.setStage(*stage);
     chunk.restoreInhabitedTime(tag.getLong("InhabitedTime"));
 
     const NbtList* sections = tag.getList("sections");

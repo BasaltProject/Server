@@ -6,7 +6,7 @@
 #include <basalt/server/runtime/world/WorldMetadata.hpp>
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/server/world/densityfunction/DensityFunctionJson.hpp>
-#include <basalt/server/world/terrain/NeighbourTerrain.hpp>
+#include <basalt/server/world/terrain/ProtoChunks.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 
 #include <cstdint>
@@ -39,20 +39,17 @@ public:
         StructureTemplates::DataIds dataIds;
     };
 
-    /// A world's terrain, and the structure generator behind it when there is one worth naming.
-    /// `generate` is unset when the jar cannot supply what the dimension needs: a generator without the
+    /// A world's terrain, and the structure generator behind it when there is one worth naming. The
+    /// pipeline is unset when the jar cannot supply what the dimension needs: a generator without the
     /// operator's own noise files would crash on its first chunk rather than make a wrong one.
     ///
     /// The generator is handed back because `/place structure` and `/locate structure` need the very
     /// object generation uses: a second one built from the same seed would still be a second one.
     struct Generators {
-        /// `beforeDecoration` runs on the finished terrain, before the chunk decorates itself: it is
-        /// where a write a neighbour queued for this chunk gets delivered, which is the point vanilla
-        /// has it because there the neighbour is already a proto chunk.
-        std::function<server::world::Chunk(std::int32_t chunkX, std::int32_t chunkZ, std::int64_t gameTime,
-                                           const std::string& difficulty,
-                                           const std::function<void(server::world::Chunk&)>& beforeDecoration)>
-            generate;
+        /// The steps from terrain to decoration. The loading, finishing and saving hooks are the world's.
+        server::world::terrain::ProtoChunks::Hooks pipeline;
+        /// parity: `ChunkGenerator.spawnOriginalMobs`, run once the chunk is full.
+        std::function<void(server::world::Chunk&, std::int64_t gameTime, const std::string& difficulty)> spawnMobs;
         server::world::terrain::VillageStructureGenerator* villages = nullptr;
         server::world::terrain::VillageStructureGenerator* camps = nullptr;
         /// The single-generator structures `/locate` can find.
@@ -60,10 +57,6 @@ public:
         server::world::terrain::StrongholdStructureGenerator* strongholds = nullptr;
         /// parity: `randomState().sampler().findSpawnPosition()`, in chunk coordinates.
         std::function<std::pair<std::int32_t, std::int32_t>()> spawnChunk;
-        /// Installs the lookup that lets a neighbour read see what another chunk already queued for
-        /// it, the way vanilla's proto chunk already holds that write.
-        std::function<void(server::world::terrain::NeighbourTerrainCache::QueuedAt)> useQueuedWrites;
-        std::function<void(server::world::terrain::NeighbourTerrainCache::QueuedAt)> useInstalledChunks;
     };
 
     /// What the structure caches hold across every world built by this factory.
@@ -87,7 +80,8 @@ public:
 private:
     struct Built;
 
-    [[nodiscard]] Generators overworld(std::int64_t seed, bool spawnMobs);
+    /// `settings` is the `noise_settings` the preset names: overworld, amplified or large_biomes.
+    [[nodiscard]] Generators overworld(std::int64_t seed, bool spawnMobs, std::string_view settings);
     /// The jar's `data/` as the worldgen loaders read it.
     [[nodiscard]] server::world::densityfunction::WorldgenReader worldgenReader() const;
     [[nodiscard]] Generators nether(std::int64_t seed, bool spawnMobs);

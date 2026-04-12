@@ -221,6 +221,9 @@ namespace parts = loot::lootTableJson::parts;
             }
         } else if (std::ranges::find(kItemFields, key) != kItemFields.end() && object != nullptr) {
             built.items.emplace(key, parts::parseItemPredicate(*object));
+        } else if (key == "count" && trigger == "minecraft:spear_mobs") {
+            // parity: `SpearMobsTrigger`, whose count is a floor rather than a range.
+            built.numbers.emplace(key, loot::DoubleBounds{.min = parts::doubleBounds(&value).min});
         } else if (std::ranges::find(kNumberFields, key) != kNumberFields.end() ||
                    (key == "distance" && trigger == "minecraft:used_ender_eye")) {
             built.numbers.emplace(key, parts::doubleBounds(&value));

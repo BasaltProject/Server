@@ -164,7 +164,8 @@ void ContainerMenuController::quickMoveMount(PlayerSession& session, const MenuS
         if (chest == 0 || !moveInto(chestSlots, PlayerInventory::kMaxStack)) {
             // parity: nothing on the mount takes it, so it crosses between storage and hotbar.
             if (fromInventory->index >= PlayerInventory::kHotbarStart) {
-                static_cast<void>(moveInto(players(0, PlayerInventory::kHotbarStart, false), PlayerInventory::kMaxStack));
+                static_cast<void>(
+                    moveInto(players(0, PlayerInventory::kHotbarStart, false), PlayerInventory::kMaxStack));
             } else {
                 static_cast<void>(moveInto(players(PlayerInventory::kHotbarStart, PlayerInventory::kMainSlots, false),
                                            PlayerInventory::kMaxStack));

@@ -100,6 +100,12 @@ inline const wire::common::Identifier kFireworks = wire::common::Identifier::van
 /// parity: `DamageTypes.ARROW`, which blames whoever shot it.
 inline const wire::common::Identifier kArrow = wire::common::Identifier::vanilla("arrow");
 
+/// parity: `DamageTypes.TRIDENT`, blamed on whoever threw it.
+inline const wire::common::Identifier kTrident = wire::common::Identifier::vanilla("trident");
+
+/// parity: `DamageTypes.SPEAR`, every spear's own `damage_type` component.
+inline const wire::common::Identifier kSpear = wire::common::Identifier::vanilla("spear");
+
 } // namespace damageTypes
 
 } // namespace basalt::server::runtime::world

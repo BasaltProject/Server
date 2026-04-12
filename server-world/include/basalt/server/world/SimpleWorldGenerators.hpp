@@ -8,24 +8,17 @@
 namespace basalt::server::world {
 
 /// The single hardcoded layer stack every chunk gets: bedrock, two layers of dirt, grass on top.
-///
-/// parity: matches vanilla's default flat preset layers, confirmed live rather than assumed: a real
-/// 26.2 server with `level-type=minecraft:flat` and no explicit `generator-settings` was run, its
-/// saved region read back with this project's own Anvil reader, and every one of the 98,304 blocks
-/// in chunk (0,0) matched this generator's output exactly. Real flat worlds have a configurable
-/// layer stack (`generator-settings`), which this does not read yet.
+/// parity: vanilla's default flat preset, checked block for block against a real server's chunk.
+/// `generator-settings` is not read yet.
 namespace flatWorldGenerator {
 
 [[nodiscard]] Chunk generate(std::int32_t chunkX, std::int32_t chunkZ, ChunkHeight verticalBounds = kOverworldHeight);
 
 } // namespace flatWorldGenerator
 
-/// Nothing at all: every chunk is air. A Basalt world type rather than a parity one, since
-/// vanilla's closest is a superflat preset with an empty layer stack. It exists because a lobby
-/// wants an empty canvas and no generation cost, which today means installing a plugin.
-///
-/// `platformRadius` blocks of stone go under the world spawn so nobody falls out of a fresh void
-/// world before building anything; 0 gives a truly empty one.
+/// Nothing at all: every chunk is air. A Basalt world type (vanilla's closest is an empty superflat)
+/// for lobbies. `platformRadius` blocks of stone go under the spawn so nobody falls out; 0 gives a
+/// truly empty world.
 namespace voidWorldGenerator {
 
 inline constexpr std::int32_t kDefaultPlatformRadius = 4;
@@ -36,5 +29,19 @@ inline constexpr std::int32_t kDefaultPlatformRadius = 4;
                              ChunkHeight verticalBounds = kOverworldHeight);
 
 } // namespace voidWorldGenerator
+
+/// parity: `DebugLevelSource`, every block state in id order on a grid of odd coordinates at y 70,
+/// over a barrier floor at y 60.
+namespace debugWorldGenerator {
+
+inline constexpr std::int32_t kStateY = 70;
+inline constexpr std::int32_t kBarrierY = 60;
+
+/// The state at a column, air between the grid points and past the last state.
+[[nodiscard]] std::int32_t stateAt(std::int32_t worldX, std::int32_t worldZ);
+
+[[nodiscard]] Chunk generate(std::int32_t chunkX, std::int32_t chunkZ, ChunkHeight verticalBounds = kOverworldHeight);
+
+} // namespace debugWorldGenerator
 
 } // namespace basalt::server::world

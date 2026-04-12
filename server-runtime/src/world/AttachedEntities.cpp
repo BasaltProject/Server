@@ -63,7 +63,7 @@ namespace {
 } // namespace
 
 bool isAttached(const wire::common::Identifier& type) {
-    return itemFrames::isFrame(type) || isPainting(type) || cushions::isCushion(type);
+    return itemFrames::isFrame(type) || isPainting(type) || cushions::isCushion(type) || type.path() == "leash_knot";
 }
 
 bool dueForCheck(entity::ServerEntity& attached) {
@@ -84,6 +84,15 @@ bool survives(const WorldState& world, const entity::ServerEntity& attached, con
     if (cushions::isCushion(attached.type())) {
         return !burning(world, attached, tagged) &&
                cushions::survivesAt(world, attached.x, attached.y, attached.z, tagged);
+    }
+    // parity: `LeashFenceKnotEntity.survives`, a fence under it still.
+    if (attached.type().path() == "leash_knot") {
+        const std::optional<std::int32_t> fence = world.blockState(static_cast<std::int32_t>(std::floor(attached.x)),
+                                                                   static_cast<std::int32_t>(std::floor(attached.y)),
+                                                                   static_cast<std::int32_t>(std::floor(attached.z)));
+        const wire::common::Identifier* block =
+            fence.has_value() ? server::registry::blockStateDefinitions::blockOf(*fence) : nullptr;
+        return block != nullptr && tagged && tagged("minecraft:fences", *block);
     }
     return true;
 }
@@ -114,6 +123,10 @@ std::vector<server::world::loot::ItemStack> drops(const entity::ServerEntity& at
 }
 
 std::string_view breakSound(const wire::common::Identifier& type) {
+    // parity: `LeashFenceKnotEntity.dropItem`, which drops nothing and only unties.
+    if (type.path() == "leash_knot") {
+        return "minecraft:entity.lead.untied";
+    }
     if (cushions::isCushion(type)) {
         return "minecraft:entity.cushion.break";
     }

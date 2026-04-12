@@ -10,22 +10,15 @@
 namespace basalt::server::runtime::world {
 
 /// The bedrock podium at the middle of the End, where the exit portal stands.
-///
-/// parity: `EndPodiumFeature`, closed, because in vanilla the dragon is still alive when it goes
-/// down; the dragon fight lights it when the dragon dies. An operator may ask for it open from the
-/// start (`worlds.toml`), which the fight then reads as a dragon already killed: deliberate
-/// divergence, off by default.
-///
-/// *When* it goes down is a second divergence and not deliberate: vanilla builds it the first time a
-/// player stands in the End, we build it at startup. Measured on seed 12345 as 65 cells around (0,0).
+/// parity: `EndPodiumFeature`, closed, since the dragon is alive when it goes down; the fight lights
+/// it on the dragon's death. `worlds.toml` may ask for it open from the start, read as a dragon
+/// already killed: a deliberate divergence, off by default.
 namespace endPodium {
 
 inline constexpr std::int32_t kPodiumRadius = 4;
 
-/// Whether the podium is already there, which is what stops it being rebuilt on every load.
-///
-/// The vertical bounds come in as an argument rather than off the world: `LoadedWorld` is not
-/// ported, and they are the dimension's own, which for this one is always the End's.
+/// Whether the podium is already there, which stops it being rebuilt on every load. `bounds` are the
+/// dimension's own, always the End's.
 [[nodiscard]] bool exists(const WorldState& world, server::world::ChunkHeight bounds = server::world::kEndHeight);
 
 /// Where the podium's portal layer is, found by its pillar, or nothing when there is no podium.

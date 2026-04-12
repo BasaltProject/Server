@@ -4,10 +4,10 @@
 #include <basalt/server/runtime/entity/Projectiles.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
-#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
@@ -272,10 +272,11 @@ void durabilityChanged(AdvancementTriggers* triggers, const player::PlayerSessio
     if (!item.has_value() || newDamage == item::itemWear::damage(before)) {
         return;
     }
-    triggers->fire("item_durability_changed", player.name(), player.uuid().toString(),
-                   TriggerEvent{.items = {{"item", *item}},
-                                .numbers = {{"durability", static_cast<double>(max - newDamage)},
-                                            {"delta", static_cast<double>(item::itemWear::damage(before) - newDamage)}}});
+    triggers->fire(
+        "item_durability_changed", player.name(), player.uuid().toString(),
+        TriggerEvent{.items = {{"item", *item}},
+                     .numbers = {{"durability", static_cast<double>(max - newDamage)},
+                                 {"delta", static_cast<double>(item::itemWear::damage(before) - newDamage)}}});
 }
 
 void playerHurtEntity(AdvancementTriggers& triggers, const LoadedWorld& world, const player::PlayerSession& player,

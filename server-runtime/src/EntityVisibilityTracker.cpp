@@ -44,23 +44,38 @@ constexpr std::int8_t kBillboardCenter = 3;
 
 /// parity: the attributes `Attribute.setSyncable` marks, which a client moves and draws with.
 [[nodiscard]] bool syncable(std::string_view name) {
-    static constexpr std::array<std::string_view, 32> kSynced{
-        "air_drag_modifier",   "armor",
-        "armor_toughness",     "attack_speed",
-        "below_name_distance", "block_break_speed",
-        "block_interaction_range", "bounciness",
-        "burning_time",        "camera_distance",
-        "explosion_knockback_resistance", "entity_interaction_range",
-        "fall_damage_multiplier", "flying_speed",
-        "friction_modifier",   "gravity",
-        "jump_strength",       "luck",
-        "max_absorption",      "max_health",
-        "mining_efficiency",   "movement_efficiency",
-        "movement_speed",      "name_tag_distance",
-        "oxygen_bonus",        "safe_fall_distance",
-        "scale",               "sneaking_speed",
-        "step_height",         "submerged_mining_speed",
-        "sweeping_damage_ratio", "water_movement_efficiency"};
+    static constexpr std::array<std::string_view, 32> kSynced{"air_drag_modifier",
+                                                              "armor",
+                                                              "armor_toughness",
+                                                              "attack_speed",
+                                                              "below_name_distance",
+                                                              "block_break_speed",
+                                                              "block_interaction_range",
+                                                              "bounciness",
+                                                              "burning_time",
+                                                              "camera_distance",
+                                                              "explosion_knockback_resistance",
+                                                              "entity_interaction_range",
+                                                              "fall_damage_multiplier",
+                                                              "flying_speed",
+                                                              "friction_modifier",
+                                                              "gravity",
+                                                              "jump_strength",
+                                                              "luck",
+                                                              "max_absorption",
+                                                              "max_health",
+                                                              "mining_efficiency",
+                                                              "movement_efficiency",
+                                                              "movement_speed",
+                                                              "name_tag_distance",
+                                                              "oxygen_bonus",
+                                                              "safe_fall_distance",
+                                                              "scale",
+                                                              "sneaking_speed",
+                                                              "step_height",
+                                                              "submerged_mining_speed",
+                                                              "sweeping_damage_ratio",
+                                                              "water_movement_efficiency"};
     const std::string_view path = name.starts_with("minecraft:") ? name.substr(10) : name;
     return std::ranges::find(kSynced, path) != kSynced.end();
 }
@@ -243,8 +258,8 @@ void EntityVisibilityTracker::syncSummonedEntities() {
                 !attributes.empty()) {
                 owner_->sendPlayPacket(wire::protocol::play::UpdateAttributesPacket::kId,
                                        [&](wire::io::ByteBuffer& buffer) {
-                                           wire::protocol::play::UpdateAttributesPacket{
-                                               .entityId = entity->entityId(), .attributes = attributes}
+                                           wire::protocol::play::UpdateAttributesPacket{.entityId = entity->entityId(),
+                                                                                        .attributes = attributes}
                                                .write(buffer);
                                        });
             }
