@@ -5,10 +5,11 @@ namespace basalt::server::storage {
 StoredProgress ProgressRepository::load(std::string_view uuid) {
     StoredProgress progress;
     sql::Statement criteria =
-        database_->prepare("SELECT advancement, criterion FROM advancement_criterion WHERE uuid = ?");
+        database_->prepare("SELECT advancement, criterion, obtained FROM advancement_criterion WHERE uuid = ?");
     criteria.bind(1, uuid);
     while (criteria.step()) {
         progress.criteria[criteria.text(0)].insert(criteria.text(1));
+        progress.obtained[criteria.text(0)][criteria.text(1)] = criteria.integer(2);
     }
     sql::Statement recipes = database_->prepare("SELECT recipe FROM known_recipe WHERE uuid = ?");
     recipes.bind(1, uuid);
@@ -18,13 +19,14 @@ StoredProgress ProgressRepository::load(std::string_view uuid) {
     return progress;
 }
 
-void ProgressRepository::grantCriterion(std::string_view uuid, std::string_view advancement,
-                                        std::string_view criterion) {
+void ProgressRepository::grantCriterion(std::string_view uuid, std::string_view advancement, std::string_view criterion,
+                                        std::int64_t obtainedMillis) {
     sql::Statement statement = database_->prepare(
-        "INSERT OR IGNORE INTO advancement_criterion(uuid, advancement, criterion) VALUES (?, ?, ?)");
+        "INSERT OR IGNORE INTO advancement_criterion(uuid, advancement, criterion, obtained) VALUES (?, ?, ?, ?)");
     statement.bind(1, uuid);
     statement.bind(2, advancement);
     statement.bind(3, criterion);
+    statement.bind(4, obtainedMillis);
     statement.execute();
 }
 

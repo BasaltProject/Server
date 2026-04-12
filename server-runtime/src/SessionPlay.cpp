@@ -17,8 +17,10 @@
 #include <basalt/server/runtime/player/PlayerPersistence.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/Dialogs.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/PlayerAdvancements.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
@@ -214,6 +216,26 @@ void ClientSession::sendSuggestions(const play::CommandSuggestionRequestPacket& 
             .id = request.id, .start = result.start, .length = result.length, .suggestions = result.suggestions}
             .write(buffer);
     });
+}
+
+void ClientSession::seenAdvancements(wire::io::ByteBuffer& body) {
+    // parity: `handleSeenAdvancements`: only an opened tab of a known advancement selects anything.
+    const std::optional<play::SeenAdvancementsPacket> seen = play::SeenAdvancementsPacket::read(body);
+    PlayerSession* session = playerSession_.get();
+    if (!seen.has_value() || session == nullptr || options_.advancements == nullptr ||
+        seen->action != play::SeenAdvancementsPacket::Action::OpenedTab || !seen->tab.has_value()) {
+        return;
+    }
+    const std::expected<Identifier, wire::common::IdentifierError> tab = Identifier::parse(*seen->tab);
+    if (!tab.has_value()) {
+        return;
+    }
+    const std::optional<play::SelectAdvancementsTabPacket> selected =
+        options_.advancements->selectTab(session->uuid().toString(), *tab);
+    if (selected.has_value()) {
+        sendPlayPacket(play::SelectAdvancementsTabPacket::kId,
+                       [&selected](wire::io::ByteBuffer& buffer) { selected->write(buffer); });
+    }
 }
 
 player::PlayerConnection ClientSession::playerConnection() {
@@ -586,6 +608,12 @@ void ClientSession::enterPlay() {
     if (options_.progress != nullptr) {
         options_.progress->load(player.uuid().toString());
     }
+    if (options_.advancements != nullptr) {
+        options_.advancements->join(player.uuid().toString());
+    }
+    if (options_.advancementTriggers != nullptr) {
+        options_.advancementTriggers->grantAutomatic(player.name(), player.uuid().toString());
+    }
     logger_.info([&player, entityId] {
         return player.name() + " logged in with entity id " + std::to_string(entityId) + " at (" +
                oneDecimal(player.x) + ", " + oneDecimal(player.y) + ", " + oneDecimal(player.z) + ")";
@@ -706,6 +734,10 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
     if (handleChatPacket(packetId, body)) {
         return;
     }
+    if (packetId == play::SeenAdvancementsPacket::kId) {
+        seenAdvancements(body);
+        return;
+    }
     if (packetId == play::CommandSuggestionRequestPacket::kId) {
         const std::optional<play::CommandSuggestionRequestPacket> request =
             play::CommandSuggestionRequestPacket::read(body);
@@ -814,14 +846,16 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         return;
     }
     if (packetId == play::ServerboundMoveVehiclePacket::kId) {
-        if (const std::optional<play::ServerboundMoveVehiclePacket> packet = play::ServerboundMoveVehiclePacket::read(body);
+        if (const std::optional<play::ServerboundMoveVehiclePacket> packet =
+                play::ServerboundMoveVehiclePacket::read(body);
             packet.has_value()) {
             combat_->handleMoveVehicle(*packet);
         }
         return;
     }
     if (packetId == play::ServerboundPaddleBoatPacket::kId) {
-        if (const std::optional<play::ServerboundPaddleBoatPacket> packet = play::ServerboundPaddleBoatPacket::read(body);
+        if (const std::optional<play::ServerboundPaddleBoatPacket> packet =
+                play::ServerboundPaddleBoatPacket::read(body);
             packet.has_value()) {
             combat_->handlePaddleBoat(*packet);
         }
@@ -890,6 +924,14 @@ void ClientSession::handlePlay(std::int32_t packetId, wire::io::ByteBuffer& body
         const std::optional<play::SetCommandBlockPacket> packet = play::SetCommandBlockPacket::read(body);
         if (packet.has_value()) {
             blockInteraction_->programCommandBlock(*packet);
+        }
+        return;
+    }
+    if (packetId == play::ServerboundSetCommandMinecartPacket::kId) {
+        if (const std::optional<play::ServerboundSetCommandMinecartPacket> packet =
+                play::ServerboundSetCommandMinecartPacket::read(body);
+            packet.has_value()) {
+            blockInteraction_->programCommandMinecart(*packet);
         }
         return;
     }

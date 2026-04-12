@@ -125,6 +125,10 @@ public:
     /// parity: `AbstractSkeleton.performRangedAttack`, an arrow at 1.6 with the difficulty's spread.
     virtual void shootArrow(ServerEntity& mob, double targetX, double targetY, double targetZ, float power) = 0;
 
+    /// parity: `Llama.spit`, aimed at a third of the target's height, with its sound.
+    virtual void llamaSpit(ServerEntity& /*llama*/, double /*targetX*/, double /*targetY*/, double /*targetZ*/,
+                           double /*targetHeight*/) {}
+
     /// parity: `Roar.start`, the warden's roar at somebody it is about to fight.
     virtual void wardenRoar(ServerEntity& /*warden*/, std::int32_t /*targetId*/) {}
 

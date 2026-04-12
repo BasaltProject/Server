@@ -47,6 +47,10 @@ struct BoatState {
     double lastYd = 0.0;
     /// parity: `paddlePositions`, how far round each oar has turned.
     std::array<float, 2> paddlePositions{};
+    /// parity: `isAboveBubbleColumn`, `bubbleColumnDirectionIsDown` and `DATA_ID_BUBBLE_TIME`.
+    bool aboveBubbleColumn = false;
+    bool bubbleColumnDown = false;
+    std::int32_t bubbleTime = 0;
 };
 
 /// parity: `rideHeight`: a third of the boat, or eight ninths of a raft.
@@ -56,8 +60,6 @@ struct BoatState {
 struct TickResult {
     /// parity: sunk for three seconds: everybody aboard goes.
     bool ejectAll = false;
-    /// Mobs the boat scooped up, already seated in it.
-    std::vector<ServerEntity*> boarded;
 
     /// parity: the oar strokes that splash this turn, as the sound and where it is heard.
     struct Stroke {
@@ -70,13 +72,9 @@ struct TickResult {
     std::vector<Stroke> strokes;
 };
 
-/// Whether an entity type is in `cannot_be_pushed_onto_boats`.
-using CannotBoard = std::function<bool(const wire::common::Identifier& type)>;
-
 /// parity: `AbstractBoat.tick` on the server: the status, the out-of-control clock, the float and the
-/// move when no player drives it, and the mobs it picks up as it bumps into them.
-[[nodiscard]] TickResult tick(world::WorldState& world, ServerEntity& boat, bool drivenByPlayer,
-                              const std::vector<ServerEntity*>& living, const CannotBoard& cannotBoard);
+/// move when no player drives it. What it bumps into is `VehicleSystem::boatPushes`.
+[[nodiscard]] TickResult tick(world::WorldState& world, ServerEntity& boat, bool drivenByPlayer);
 
 } // namespace boats
 

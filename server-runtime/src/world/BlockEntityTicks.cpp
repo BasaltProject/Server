@@ -218,6 +218,18 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
             if (entity == nullptr) {
                 continue;
             }
+            // parity: `SpawnerBlock.getTicker`, and `BoundTickingBlockEntity`, which only ticks a block
+            // entity whose block is still the one it belongs to.
+            if (path == "mob_spawner") {
+                const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
+                const wire::common::Identifier* block =
+                    stateId.has_value() ? registry::blockStateDefinitions::blockOf(*stateId) : nullptr;
+                if (block != nullptr && block->path() == "spawner" && hooks.spawnerTick &&
+                    hooks.spawnerTick(entity->data(), x, y, z)) {
+                    chunk->markDirty();
+                }
+                continue;
+            }
             // parity: `CampfireBlockEntity.cookTick` while it burns and `cooldownTick` when it does
             // not: what is on a fire that went out loses its progress two at a time.
             if (campfires::isCampfire(path)) {

@@ -23,7 +23,9 @@ void RedstoneTickSystem::tickBlockEvents(world::LoadedWorld& world, const sched:
     std::vector<world::BlockEvent> again;
     while (event.has_value()) {
         if (region.owns(event->x >> 4, event->z >> 4)) {
-            broadcaster_->runPistonEvent(world, *event, watchers);
+            if (!runSpawnerEvent(world, *event, watchers)) {
+                broadcaster_->runPistonEvent(world, *event, watchers);
+            }
         } else {
             again.push_back(std::move(*event));
         }

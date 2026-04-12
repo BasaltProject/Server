@@ -110,6 +110,8 @@ CREATE TABLE IF NOT EXISTS advancement_criterion (
     uuid TEXT NOT NULL,
     advancement TEXT NOT NULL,
     criterion TEXT NOT NULL,
+    -- When it was granted, in epoch milliseconds: what the advancement screen shows.
+    obtained INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (uuid, advancement, criterion)
 );
 

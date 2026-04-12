@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/wire/nbt/NbtTag.hpp>
+#include <basalt/wire/protocol/configuration/ConfigurationPackets.hpp>
 
 #include <cstdint>
 #include <string>
@@ -98,6 +99,10 @@ struct Painting {
 /// The goat horn carries a default instrument component resolving `ponder_goat_horn` by key. All
 /// eight are included; they differ only by the sound event's index.
 [[nodiscard]] const std::vector<Entry>& instruments();
+
+/// Makes every list above answer in the order and with the entries the client is sent, from the
+/// final registry packets. Before this, they answer with the built-in data alone.
+void install(const std::vector<wire::protocol::configuration::RegistryDataPacket>& packets);
 
 } // namespace vanillaRegistryData
 

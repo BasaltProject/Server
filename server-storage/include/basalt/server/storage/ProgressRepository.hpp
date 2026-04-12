@@ -2,6 +2,7 @@
 
 #include <basalt/server/storage/Sqlite.hpp>
 
+#include <cstdint>
 #include <map>
 #include <set>
 #include <string>
@@ -12,6 +13,8 @@ namespace basalt::server::storage {
 /// One player's granted criteria, by advancement id, and the recipes in their book.
 struct StoredProgress {
     std::map<std::string, std::set<std::string, std::less<>>, std::less<>> criteria;
+    /// When each criterion was granted, in epoch milliseconds, by advancement then criterion.
+    std::map<std::string, std::map<std::string, std::int64_t, std::less<>>, std::less<>> obtained;
     std::set<std::string, std::less<>> recipes;
 };
 
@@ -26,7 +29,8 @@ public:
 
     [[nodiscard]] StoredProgress load(std::string_view uuid);
 
-    void grantCriterion(std::string_view uuid, std::string_view advancement, std::string_view criterion);
+    void grantCriterion(std::string_view uuid, std::string_view advancement, std::string_view criterion,
+                        std::int64_t obtainedMillis = 0);
 
     void revokeCriterion(std::string_view uuid, std::string_view advancement, std::string_view criterion);
 

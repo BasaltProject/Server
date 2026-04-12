@@ -1,17 +1,21 @@
 #include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
 #include <basalt/server/runtime/BuildInfo.hpp>
 #include <basalt/server/runtime/entity/Breeding.hpp>
 #include <basalt/server/runtime/entity/CopperGolem.hpp>
+#include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
+#include <basalt/server/runtime/entity/WardenBrain.hpp>
 #include <basalt/server/runtime/placeholder/AnimationPlaceholders.hpp>
 #include <basalt/server/runtime/placeholder/PlayerPlaceholders.hpp>
 #include <basalt/server/runtime/placeholder/ServerPlaceholders.hpp>
 #include <basalt/server/runtime/player/PlayerContainers.hpp>
 #include <basalt/server/runtime/player/StatAwards.hpp>
 #include <basalt/server/runtime/plugins/PluginsCommand.hpp>
+#include <basalt/server/runtime/world/BiomeTagLoader.hpp>
 #include <basalt/server/runtime/world/EndPodium.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/RecipeBook.hpp>
@@ -22,7 +26,11 @@
 #include <basalt/wire/text/TranslationResolver.hpp>
 
 #include <cstdint>
+#include <map>
+#include <memory>
 #include <random>
+#include <set>
+#include <string>
 #include <utility>
 
 namespace basalt::server::runtime {
@@ -171,6 +179,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         }
         return world::triggerFacts::ofPlayerAt(vanillaData_.lootTables, *found->second, *player, &playerRegistry_);
     };
+    addAdvancementHooks(triggerHooks);
     advancementTriggers_ = std::make_unique<world::AdvancementTriggers>(vanillaData_.advancements, *playerProgress_,
                                                                         std::move(triggerHooks));
 
@@ -568,6 +577,43 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     spawning_ = std::make_unique<NaturalSpawningSystem>(
         playerRegistry_, vanillaData_.biomeSpawns, chunkSimulation_, *spawnEquipment_, NaturalSpawningSystem::Hooks{},
         NaturalSpawningSystem::Options{.nextSeed = [] { return scratchSeed(); }});
+    // parity: the biome tags a spawner's rules ask, read once: `BiomeTagLoader` caches as it goes.
+    auto spawnerBiomes = std::make_shared<std::map<std::string, std::set<std::string>, std::less<>>>();
+    world::BiomeTagLoader biomeTags{jar.readText};
+    for (const std::string tag :
+         {"minecraft:more_frequent_drowned_spawns", "minecraft:allows_tropical_fish_spawns_at_any_height",
+          "minecraft:polar_bears_spawn_on_alternate_blocks", "minecraft:allows_surface_slime_spawns"}) {
+        spawnerBiomes->emplace(tag, biomeTags.biomesIn(tag));
+    }
+    mobSpawners_ = std::make_unique<MobSpawnerSystem>(
+        playerRegistry_, *spawning_,
+        MobSpawnerSystem::Options{
+            .nextSeed = [] { return scratchSeed(); },
+            .facts = {.blockTagged =
+                          [this](std::string_view tag, const wire::common::Identifier& block) {
+                              return world::realBlockTags::contains(vanillaData_.blockTags, tag, block);
+                          },
+                      .biomeTagged =
+                          [spawnerBiomes](std::string_view tag, const wire::common::Identifier& biome) {
+                              const auto found = spawnerBiomes->find(tag);
+                              return found != spawnerBiomes->end() && found->second.contains(biome.toString());
+                          },
+                      .playerWithin =
+                          [this](const world::LoadedWorld& world, double x, double y, double z, double range) {
+                              for (const player::PlayerSession* player : playerRegistry_.snapshot()) {
+                                  const double dx = player->x - x;
+                                  const double dy = player->y - y;
+                                  const double dz = player->z - z;
+                                  if (player->worldName == world.name() &&
+                                      player->gamemode != wire::protocol::play::Gamemode::Creative &&
+                                      player->gamemode != wire::protocol::play::Gamemode::Spectator &&
+                                      (range < 0.0 || (dx * dx) + (dy * dy) + (dz * dz) < range * range)) {
+                                      return true;
+                                  }
+                              }
+                              return false;
+                          }},
+            .lootTables = &vanillaData_.lootTables});
     combat_ = std::make_unique<CombatSystem>(
         *broadcaster_, *explosions_, CombatSystem::Hooks{},
         CombatSystem::Options{
@@ -578,6 +624,10 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                : static_cast<std::int32_t>(scratchRandom()() % static_cast<std::uint64_t>(bound));
                 },
             .nextSeed = [] { return scratchSeed(); },
+            .hurtVehicle =
+                [this](world::LoadedWorld& world, entity::ServerEntity& vehicle, const VehicleSystem::Hit& hit) {
+                    return vehicles_ != nullptr && vehicles_->hurt(world, vehicle, hit);
+                },
             .blockTags = &vanillaData_.blockTags,
             .entityTags = &vanillaData_.entityTags,
             .dragonFireballLanded =
@@ -748,7 +798,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                     if (shriekers_ != nullptr) {
                         shriekers_->heard(world, arrival);
                     }
-                }});
+                },
+            .mobSpawners = mobSpawners_.get()});
     // parity: `Raid.absorbRaidOmen` and `Raid.tick`'s victory, each a statistic and a trigger.
     RaidSystem::Hooks raidHooks;
     raidHooks.raidTriggered = [this](player::PlayerSession& player) {
@@ -876,7 +927,69 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         playerRegistry_, *broadcaster_,
         SculkCatalystSystem::Options{.nextSeed = [] { return scratchSeed(); }, .blockTags = &vanillaData_.blockTags});
     lightning_ = std::make_unique<LightningBoltSystem>(*broadcaster_, *mobActions_, advancementTriggers_.get());
-    mobTicks_ = std::make_unique<MobTickSystem>(*mobActions_);
+    pushes_ = std::make_unique<EntityPushSystem>(
+        playerRegistry_, *combat_,
+        EntityPushSystem::Hooks{
+            // parity: `Warden.doPush`: once a second, anger at what it bumped into and a look there.
+            .wardenTouched =
+                [this](world::LoadedWorld& world, entity::ServerEntity& warden, const EntityPushSystem::Body& touched) {
+                    static_cast<void>(world);
+                    if (warden.noAi || warden.touchCooldown > 0) {
+                        return;
+                    }
+                    warden.touchCooldown = 20;
+                    const double x = touched.mob != nullptr ? touched.mob->x : touched.player->x;
+                    const double y = touched.mob != nullptr ? touched.mob->y : touched.player->y;
+                    const double z = touched.mob != nullptr ? touched.mob->z : touched.player->z;
+                    const bool targetable =
+                        touched.player != nullptr
+                            ? !touched.player->dead &&
+                                  (touched.player->gamemode == wire::protocol::play::Gamemode::Survival ||
+                                   touched.player->gamemode == wire::protocol::play::Gamemode::Adventure)
+                            : registry::entityAttributes::isLiving(touched.mob->type()) && !touched.mob->dying &&
+                                  !entity::wardens::isWarden(touched.mob->type()) &&
+                                  touched.mob->type().path() != "armor_stand";
+                    if (targetable) {
+                        mobActions_->wardenAngered(
+                            warden, touched.mob != nullptr ? touched.mob->entityId() : touched.player->entityId(),
+                            entity::wardens::kHeard, true);
+                    }
+                    entity::wardenBrain::setDisturbance(warden, {static_cast<std::int32_t>(std::floor(x)),
+                                                                 static_cast<std::int32_t>(std::floor(y)),
+                                                                 static_cast<std::int32_t>(std::floor(z))});
+                },
+            .golemTouched = [](entity::ServerEntity& golem,
+                               entity::ServerEntity& monster) { golem.targetId = monster.entityId(); }},
+        EntityPushSystem::Options{.nextSeed = [] { return scratchSeed(); },
+                                  .blockTags = &vanillaData_.blockTags,
+                                  .teams = &teams_,
+                                  .minecartImprovements = [this] { return minecartImprovements(); }});
+    vehicles_ = std::make_unique<VehicleSystem>(
+        playerRegistry_, *broadcaster_, *explosions_, *pushes_, *mobActions_,
+        VehicleSystem::Options{
+            .nextSeed = [] { return scratchSeed(); },
+            .minecartImprovements = [this] { return minecartImprovements(); },
+            .itemTags = &vanillaData_.itemTags,
+            .blockTags = &vanillaData_.blockTags,
+            .damageTypeTags = &vanillaData_.damageTypeTags,
+            .entityTags = &vanillaData_.entityTags,
+            // parity: `MinecartCommandBlock.MinecartCommandBase.createCommandSourceStack`, at the cart
+            // with permission two, speaking under `command_block_output` like a block.
+            .runCommand =
+                [this](world::LoadedWorld& world, entity::ServerEntity& cart, const std::string& line) {
+                    static_cast<void>(world);
+                    command::CommandDispatcher* dispatcher = commands();
+                    if (dispatcher == nullptr) {
+                        return 0;
+                    }
+                    const command::CommandBlockSource source{
+                        {cart.x, cart.y, cart.z}, "@", true, wire::common::Logger{"CommandBlock"}};
+                    std::int32_t successes = 0;
+                    static_cast<void>(
+                        dispatcher->execute(source, line.starts_with('/') ? line.substr(1) : line, successes));
+                    return successes;
+                }});
+    mobTicks_ = std::make_unique<MobTickSystem>(*mobActions_, *pushes_);
 
     // The online count comes from the registry rather than from a counter kept alongside it: a
     // second source of truth for "how many players are connected" is how a server ends up

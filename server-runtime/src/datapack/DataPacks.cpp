@@ -31,7 +31,7 @@ DataPacks::DataPacks(Options options, wire::common::Logger logger)
         }
         return "Loaded data packs: " + named;
     });
-    if (!options_.worldRoot.empty()) {
+    if (!options_.worldRoot.empty() && options_.persist) {
         save();
     }
 }
@@ -51,7 +51,7 @@ void DataPacks::commit(const std::vector<std::string>& ids, std::shared_ptr<cons
     resources_ = std::move(resources);
     repository_.setSelected(ids);
     configuration_.dataPacks = selectedPacks(repository_, true);
-    if (!options_.worldRoot.empty()) {
+    if (!options_.worldRoot.empty() && options_.persist) {
         save();
     }
 }

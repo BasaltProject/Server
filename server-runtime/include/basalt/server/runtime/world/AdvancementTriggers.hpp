@@ -91,12 +91,29 @@ public:
         /// What a player's own predicates run in: their facts as `this` and their position as the
         /// origin. parity: `EntityPredicate.createContext(player, player)`.
         std::function<std::optional<server::world::loot::LootContext>(std::string_view uuid)> playerContext;
+        /// parity: `AdvancementRewards.grant`'s loot, rolled for the player and handed to them.
+        std::function<void(std::string_view uuid, const std::vector<wire::common::Identifier>& tables)> awardLoot;
+        /// parity: `AdvancementRewards.grant`'s function, run as the player.
+        std::function<void(std::string_view uuid, const wire::common::Identifier& function)> runFunction;
+        /// parity: `PlayerAdvancements.flushDirty`, which `/advancement grant everything` calls itself.
+        std::function<void(std::string_view uuid, bool showAdvancements)> flush;
     };
 
     AdvancementTriggers(const RealAdvancements& advancements, PlayerProgress& progress, Hooks hooks = {});
 
     /// Indexes the criteria again, after `/reload` replaced the advancements.
     void reindex();
+
+    /// parity: `PlayerAdvancements.award`: grants one criterion, and on completing the advancement
+    /// hands out its rewards and announces it. Answers whether the criterion was new.
+    bool award(std::string_view player, std::string_view uuid, const wire::common::Identifier& advancement,
+               std::string_view criterion);
+
+    /// parity: `checkForAutomaticTriggers`, which pays out every advancement with no criteria at load.
+    void grantAutomatic(std::string_view player, std::string_view uuid);
+
+    /// parity: `flushDirty`, for a command that shows or hides the toasts of what it grants.
+    void flush(std::string_view uuid, bool showAdvancements) const;
 
     /// Fires any trigger read field by field, by its id. parity: `SimpleCriterionTrigger.trigger`.
     void fire(std::string_view trigger, std::string_view player, std::string_view uuid, const TriggerEvent& event = {});
@@ -131,6 +148,9 @@ private:
 
     void complete(std::string_view player, std::string_view uuid, const wire::common::Identifier& id,
                   const server::world::advancement::Advancement& advancement);
+
+    void reward(std::string_view player, std::string_view uuid,
+                const server::world::advancement::AdvancementRewards& rewards);
 
     [[nodiscard]] bool matches(const server::world::advancement::ItemMatcher& matcher,
                                const wire::common::Identifier& item) const;

@@ -88,14 +88,18 @@ inline constexpr std::int32_t kCapChunks = 289;
 [[nodiscard]] bool canSpawnAt(LoadedWorld& world, const wire::common::Identifier* type, entity::MobCategory category,
                               std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random);
 
-/// parity: `NaturalSpawner.isValidEmptySpawnBlock`, for custom spawners at one position.
+/// parity: `NaturalSpawner.isValidEmptySpawnBlock`, for custom spawners at one position. With
+/// `fluidCounts` off the block's fluid is ignored, which is `IronGolem` passing `Fluids.EMPTY`.
 [[nodiscard]] bool isValidEmptySpawnBlock(LoadedWorld& world, const wire::common::Identifier& type, std::int32_t x,
-                                          std::int32_t y, std::int32_t z);
+                                          std::int32_t y, std::int32_t z, bool fluidCounts = true);
 
 /// parity: `Mob.checkMobSpawnRules`, whose patrol path only asks about the block below.
 [[nodiscard]] bool canSpawnOnGround(LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
 [[nodiscard]] bool canSeeSky(LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z);
+
+/// parity: `LevelReader.canSeeSkyFromBelowWater`, including dampening non-liquid blocks.
+[[nodiscard]] bool canSeeSkyFromBelowWater(LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z);
 
 /// parity: the constant eight-keyframe `timeline/moon` gameplay track.
 [[nodiscard]] float surfaceSlimeChance(std::int64_t clockTicks);

@@ -76,6 +76,9 @@ inline const wire::common::Identifier kBadRespawnPoint = wire::common::Identifie
 /// parity: `DamageTypes.WIND_CHARGE`, the single point a gust deals on its way past.
 inline const wire::common::Identifier kWindCharge = wire::common::Identifier::vanilla("wind_charge");
 
+/// parity: `DamageTypes.SPIT`, the single point a llama's spit deals.
+inline const wire::common::Identifier kSpit = wire::common::Identifier::vanilla("spit");
+
 /// parity: `DamageTypes.EXPLOSION`, what TNT with nobody to blame kills you with.
 inline const wire::common::Identifier kExplosion = wire::common::Identifier::vanilla("explosion");
 
@@ -105,6 +108,9 @@ inline const wire::common::Identifier kTrident = wire::common::Identifier::vanil
 
 /// parity: `DamageTypes.SPEAR`, every spear's own `damage_type` component.
 inline const wire::common::Identifier kSpear = wire::common::Identifier::vanilla("spear");
+
+/// parity: `DamageTypes.CRAMMING`, too many bodies in one place.
+inline const wire::common::Identifier kCramming = wire::common::Identifier::vanilla("cramming");
 
 } // namespace damageTypes
 

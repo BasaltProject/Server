@@ -19,6 +19,10 @@ namespace basalt::server::runtime::entity::boats {
 struct BoatState;
 }
 
+namespace basalt::server::runtime::entity::minecarts {
+struct CartState;
+}
+
 namespace basalt::server::runtime::entity::horses {
 struct HorseState;
 }
@@ -257,6 +261,11 @@ public:
     /// What a vehicle has taken, times ten. parity: `VehicleEntity.getDamage`, which counts up by
     /// ten a point, falls by one a tick, and breaks the cart past forty.
     float vehicleDamage = 0.0F;
+    /// parity: `VehicleEntity.DATA_ID_HURT` and `DATA_ID_HURTDIR`, the shake a hit gives it.
+    std::int32_t vehicleHurtTime = 0;
+    std::int32_t vehicleHurtDir = 1;
+    /// parity: `Entity.boardingCooldown`, the three seconds a mob that left a seat waits.
+    std::int32_t boardingCooldown = 0;
 
     /// parity: `Mob.attackTime`, the ticks a mob waits between swings.
     std::int32_t attackCooldown = 0;
@@ -303,6 +312,8 @@ public:
     std::vector<std::int32_t> boltHitIds;
     /// A boat's floating state, made on its first turn.
     std::shared_ptr<boats::BoatState> boat;
+    /// A minecart's rails, rotation, fuel and fuse, made on its first turn.
+    std::shared_ptr<minecarts::CartState> cart;
     /// A mount's counters and a camel's dash, made on first use.
     std::shared_ptr<horses::HorseState> horse;
     /// parity: `Creaking`'s brain, its freeze and the heart it is bound to.
@@ -391,6 +402,12 @@ public:
     /// parity: `LeashData` naming a knot by its fence, and `angularMomentum`, the turn the rope gives.
     std::optional<std::array<std::int32_t, 3>> leashKnotAt;
     double leashAngularMomentum = 0.0;
+
+    /// parity: `Llama.caravanHead` and `caravanTail`, by entity id. A caravan is never saved.
+    std::optional<std::int32_t> caravanHead;
+    std::optional<std::int32_t> caravanTail;
+    /// parity: `Llama.didSpit`, which ends a llama's revenge after one spit.
+    bool didSpit = false;
 
     /// Skeleton-horse thunder trap state, including its persisted eighteen-thousand-tick lifetime.
     bool skeletonTrap = false;

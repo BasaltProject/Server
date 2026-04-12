@@ -1,5 +1,6 @@
 #pragma once
 
+#include <basalt/server/runtime/VehicleSystem.hpp>
 #include <basalt/server/runtime/entity/DragonState.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/Projectiles.hpp>
@@ -40,6 +41,9 @@ public:
     struct Options {
         std::function<std::int32_t(std::int32_t bound)> nextInt;
         std::function<std::int64_t()> nextSeed;
+        /// A hit on a minecart or a boat. parity: `VehicleEntity.hurtServer`; answers whether it counted.
+        std::function<bool(world::LoadedWorld& world, entity::ServerEntity& vehicle, const VehicleSystem::Hit& hit)>
+            hurtVehicle;
         /// What the `blocks_wind_charge_explosions` tag holds, the only thing that shortens a gust.
         const world::realBlockTags::TagMembers* blockTags = nullptr;
         /// What `deflects_projectiles` holds: the breeze.
@@ -117,6 +121,11 @@ public:
                        entity::ServerEntity& mob, const world::ActiveEffect& effect, std::int32_t sourceId = -1) const;
 
     /// Tells a wither the hit about to land comes from an undead, through its projectile or blast.
+    /// A projectile's blow on a minecart or a boat, handed to `VehicleEntity.hurtServer`. Answers
+    /// whether `target` was one.
+    bool hitVehicle(world::LoadedWorld& world, entity::ServerEntity* target, float amount,
+                    const wire::common::Identifier& type, const entity::ServerEntity& projectile);
+
     static void markWitherFriend(world::LoadedWorld& world, entity::ServerEntity& target,
                                  std::optional<std::int32_t> sourceId);
 
@@ -142,10 +151,26 @@ private:
         std::optional<entity::enderDragon::Part> dragonPart;
     };
 
+    /// `margin` grows every box it is tested against. parity: `ProjectileUtil.computeMargin`.
     [[nodiscard]] static std::optional<Target> targetAlong(const std::vector<player::PlayerSession*>& watchers,
                                                            const std::vector<entity::ServerEntity*>& living,
                                                            const entity::ServerEntity& projectile, double fromX,
-                                                           double fromY, double fromZ);
+                                                           double fromY, double fromZ, double margin = 0.0);
+
+    /// parity: `LlamaSpit.tick`: it moves on the movement it started the tick with, whatever it hit.
+    void tickLlamaSpit(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                       const std::vector<entity::ServerEntity*>& living, entity::ServerEntity& spit,
+                       const entity::projectiles::Kind& kind);
+
+    /// parity: `LlamaSpit.onHitEntity`: one point, and only while its owner is alive.
+    void spitHits(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                  const std::vector<entity::ServerEntity*>& living, const entity::ServerEntity& spit,
+                  const Target& target, double fromX, double fromZ);
+
+    /// parity: `Projectile.onHitBlock` and the `PROJECTILE_LAND` of `onHit`: what the block does
+    /// about being hit.
+    void hitBlock(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                  const entity::ServerEntity& projectile, const entity::BlockHit& hit, bool byArrow);
 
     /// Whether whoever fired it is a player, which is what an ender dragon asks of a hit.
     [[nodiscard]] static bool firedByPlayer(const std::vector<player::PlayerSession*>& watchers,

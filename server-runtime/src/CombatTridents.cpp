@@ -2,9 +2,11 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/CombatSystem.hpp>
+#include <basalt/server/runtime/entity/Boats.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/DetectorRails.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
@@ -184,6 +186,21 @@ CombatSystem::ArrowHit CombatSystem::tridentHitEntity(world::LoadedWorld& world,
     if (target->mob != nullptr && world::endCrystals::isCrystal(target->mob->type())) {
         hitCrystal(world, watchers, *target->mob, false, false,
                    firedByPlayer(watchers, trident) ? trident.ownerId : std::nullopt);
+    } else if (target->mob != nullptr &&
+               (world::detectorRails::isMinecart(target->mob->type()) || entity::boats::isBoat(target->mob->type()))) {
+        // parity: `ThrownTrident.onHitEntity` on a vehicle: the hit, then channeling on it.
+        const double hitX = target->mob->x;
+        const double hitY = target->mob->y;
+        const double hitZ = target->mob->z;
+        if (options_.hurtVehicle &&
+            options_.hurtVehicle(world, *target->mob,
+                                 VehicleSystem::Hit{.amount = damage,
+                                                    .type = world::damageTypes::kTrident,
+                                                    .causeId = trident.ownerId,
+                                                    .directId = trident.entityId(),
+                                                    .burningProjectile = trident.fireTicks > 0})) {
+            channel(hitX, hitY, hitZ, SoundSource::Neutral);
+        }
     } else if (target->mob != nullptr) {
         ServerEntity& mob = *target->mob;
         if (mob.dragon != nullptr) {

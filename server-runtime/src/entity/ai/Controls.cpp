@@ -1,5 +1,6 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/runtime/entity/CreakingNavigation.hpp>
 #include <basalt/server/runtime/entity/FlyingMovement.hpp>
 #include <basalt/server/runtime/entity/FlyingPathFinder.hpp>
 #include <basalt/server/runtime/entity/LivingMovement.hpp>
@@ -119,7 +120,12 @@ bool start(ServerEntity& mob, std::vector<std::array<std::int32_t, 3>> nodes, co
 
 } // namespace
 
-bool moveTo(world::WorldState& world, ServerEntity& mob, double x, double y, double z, double speedModifier) {
+bool moveTo(world::WorldState& world, ServerEntity& mob, double x, double y, double z, double speedModifier,
+            std::int32_t reachRange) {
+    // parity: `Creaking.CreakingPathNavigation`, a navigation of its own.
+    if (mob.creaking != nullptr) {
+        return creakingNavigation::moveTo(world, mob, x, y, z, reachRange, speedModifier);
+    }
     std::optional<std::vector<std::array<std::int32_t, 3>>> path = pathFor(world, mob, x, y, z);
     if (!path.has_value() || path->empty()) {
         return false;
@@ -182,34 +188,34 @@ namespace {
     return !state.has_value() || !pathFinder::isMobDoor(*state);
 }
 
-/// parity: `PathNavigation.doStuckDetection`.
-void detectStuck(ServerEntity& mob) {
+} // namespace
+
+void detectStuck(ServerEntity& mob, const std::array<double, 3>& position, std::int64_t time) {
     ServerEntity::NavigationWatch& watch = mob.navigationWatch;
     if (watch.tick - watch.lastStuckCheck > 100) {
         const float speed = mob.aiSpeed >= 1.0F ? mob.aiSpeed : mob.aiSpeed * mob.aiSpeed;
         const float threshold = speed * 100.0F * 0.25F;
-        const double dx = mob.x - watch.lastStuckCheckPos[0];
-        const double dy = mob.y - watch.lastStuckCheckPos[1];
-        const double dz = mob.z - watch.lastStuckCheckPos[2];
+        const double dx = position[0] - watch.lastStuckCheckPos[0];
+        const double dy = position[1] - watch.lastStuckCheckPos[1];
+        const double dz = position[2] - watch.lastStuckCheckPos[2];
         watch.stuck = (dx * dx) + (dy * dy) + (dz * dz) < static_cast<double>(threshold * threshold);
         if (watch.stuck) {
             stop(mob);
         }
         watch.lastStuckCheck = watch.tick;
-        watch.lastStuckCheckPos = {mob.x, mob.y, mob.z};
+        watch.lastStuckCheckPos = position;
     }
     if (isDone(mob)) {
         return;
     }
     const std::array<std::int32_t, 3>& node = (*mob.path)[static_cast<std::size_t>(mob.pathIndex)];
-    const std::int64_t time = watch.tick;
     if (node == watch.timeoutNode) {
         watch.timeoutTimer += time - watch.lastTimeoutCheck;
     } else {
         watch.timeoutNode = node;
-        const double dx = mob.x - (node[0] + 0.5);
-        const double dy = mob.y - node[1];
-        const double dz = mob.z - (node[2] + 0.5);
+        const double dx = position[0] - (node[0] + 0.5);
+        const double dy = position[1] - node[1];
+        const double dz = position[2] - (node[2] + 0.5);
         const double distance = std::sqrt((dx * dx) + (dy * dy) + (dz * dz));
         watch.timeoutLimit = mob.aiSpeed > 0.0F ? distance / static_cast<double>(mob.aiSpeed) * 20.0 : 0.0;
     }
@@ -220,9 +226,11 @@ void detectStuck(ServerEntity& mob) {
     watch.lastTimeoutCheck = time;
 }
 
-} // namespace
-
 void tick(world::WorldState& world, ServerEntity& mob) {
+    if (mob.creaking != nullptr) {
+        creakingNavigation::tick(world, mob);
+        return;
+    }
     mob.navigationWatch.tick++;
     if (!mob.path.has_value()) {
         return;
@@ -241,7 +249,7 @@ void tick(world::WorldState& world, ServerEntity& mob) {
     if (close || (canCutCorner(world, current) && shouldTargetNextNode(mob))) {
         mob.pathIndex++;
     }
-    detectStuck(mob);
+    detectStuck(mob, {mob.x, mob.y, mob.z}, mob.navigationWatch.tick);
     if (isDone(mob)) {
         stop(mob);
         return;

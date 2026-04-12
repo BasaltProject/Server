@@ -406,31 +406,63 @@ bool AdvancementTriggers::accepts(const adv::GenericCondition& condition, const 
 }
 
 void AdvancementTriggers::grant(std::string_view player, std::string_view uuid, const CriterionRef& candidate) {
-    const adv::Advancement* advancement = advancements_->find(candidate.advancement);
+    static_cast<void>(award(player, uuid, candidate.advancement, candidate.criterion));
+}
+
+bool AdvancementTriggers::award(std::string_view player, std::string_view uuid, const Identifier& id,
+                                std::string_view criterion) {
+    const adv::Advancement* advancement = advancements_->find(id);
     if (advancement == nullptr) {
-        return;
+        return false;
     }
-    const bool wasDone = advancement->isComplete(progress_->grantedCriteria(uuid, candidate.advancement));
-    if (!progress_->grantCriterion(uuid, candidate.advancement, candidate.criterion) || wasDone) {
-        return;
+    const bool wasDone = advancement->isComplete(progress_->grantedCriteria(uuid, id));
+    if (!progress_->grantCriterion(uuid, id, criterion)) {
+        return false;
     }
-    if (!advancement->isComplete(progress_->grantedCriteria(uuid, candidate.advancement))) {
-        return;
+    if (!wasDone && advancement->isComplete(progress_->grantedCriteria(uuid, id))) {
+        complete(player, uuid, id, *advancement);
     }
-    complete(player, uuid, candidate.advancement, *advancement);
+    return true;
+}
+
+void AdvancementTriggers::grantAutomatic(std::string_view player, std::string_view uuid) {
+    for (const Identifier& id : advancements_->ids()) {
+        const adv::Advancement* advancement = advancements_->find(id);
+        if (advancement != nullptr && advancement->criteria.empty()) {
+            reward(player, uuid, advancement->rewards);
+        }
+    }
+}
+
+void AdvancementTriggers::flush(std::string_view uuid, bool showAdvancements) const {
+    if (hooks_.flush) {
+        hooks_.flush(uuid, showAdvancements);
+    }
+}
+
+void AdvancementTriggers::reward(std::string_view player, std::string_view uuid,
+                                 const adv::AdvancementRewards& rewards) {
+    // parity: `AdvancementRewards.grant`: experience, loot, recipes, then the function.
+    if (rewards.experience != 0 && hooks_.awardExperience) {
+        hooks_.awardExperience(player, rewards.experience);
+    }
+    if (!rewards.loot.empty() && hooks_.awardLoot) {
+        hooks_.awardLoot(uuid, rewards.loot);
+    }
+    for (const Identifier& recipe : rewards.recipes) {
+        if (progress_->learn(uuid, recipe) && hooks_.awardRecipe) {
+            hooks_.awardRecipe(player, recipe);
+        }
+    }
+    if (rewards.function.has_value() && hooks_.runFunction) {
+        hooks_.runFunction(uuid, *rewards.function);
+    }
 }
 
 void AdvancementTriggers::complete(std::string_view player, std::string_view uuid, const Identifier& id,
                                    const adv::Advancement& advancement) {
     static_cast<void>(id);
-    if (advancement.rewards.experience > 0 && hooks_.awardExperience) {
-        hooks_.awardExperience(player, advancement.rewards.experience);
-    }
-    for (const Identifier& recipe : advancement.rewards.recipes) {
-        if (progress_->learn(uuid, recipe) && hooks_.awardRecipe) {
-            hooks_.awardRecipe(player, recipe);
-        }
-    }
+    reward(player, uuid, advancement.rewards);
     if (!advancement.display.has_value() || !advancement.display->announceToChat || !hooks_.announce) {
         return;
     }

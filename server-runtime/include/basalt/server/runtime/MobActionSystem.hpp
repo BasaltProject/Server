@@ -196,6 +196,9 @@ public:
 
     void shootArrow(entity::ServerEntity& mob, double targetX, double targetY, double targetZ, float power) override;
 
+    void llamaSpit(entity::ServerEntity& llama, double targetX, double targetY, double targetZ,
+                   double targetHeight) override;
+
     void wardenRoar(entity::ServerEntity& warden, std::int32_t targetId) override;
 
     void wardenAngered(entity::ServerEntity& warden, std::int32_t suspectId, std::int32_t amount, bool sound) override;
@@ -297,6 +300,10 @@ public:
 
     /// parity: `Leashable.dropLeash` and `removeLeash`, the lead dropped as an item or not.
     void dropLeash(world::LoadedWorld& world, entity::ServerEntity& leashed, bool dropLead);
+
+    /// parity: `Entity.propagateFallToPassengers`.
+    void propagateFall(world::LoadedWorld& world, entity::ServerEntity& vehicle, double fallen,
+                       const world::fallLanding::Landing& landing);
 
     /// parity: `Camel.tickRidden`, the rider's forward key standing it up.
     void camelRidden(world::LoadedWorld& world, entity::ServerEntity& camel, const player::PlayerSession& rider);
@@ -829,9 +836,6 @@ private:
     bool cutLeashes(world::LoadedWorld& world, entity::ServerEntity& entity, const player::PlayerSession* player);
     /// parity: `LivingEntity.checkFallDamage` on landing: the dust, `fallOn` and `causeFallDamage`.
     void landMob(world::LoadedWorld& world, entity::ServerEntity& mob);
-    /// parity: `Entity.propagateFallToPassengers`.
-    void propagateFall(world::LoadedWorld& world, entity::ServerEntity& vehicle, double fallen,
-                       const world::fallLanding::Landing& landing);
     /// parity: `walkingStepSound` on the square at `at`.
     void stepSound(world::LoadedWorld& world, entity::ServerEntity& mob, const std::array<std::int32_t, 3>& at,
                    std::int32_t stateId);

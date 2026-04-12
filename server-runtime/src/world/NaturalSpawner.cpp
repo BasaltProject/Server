@@ -122,10 +122,11 @@ constexpr std::int64_t kSlimeChunkSalt = 987234911;
     return hurtsOnContact().contains(path);
 }
 
-/// parity: `NaturalSpawner.isValidEmptySpawnBlock`, all four of its answers.
-[[nodiscard]] bool canStandIn(std::int32_t stateId, const Identifier* type) {
+/// parity: `NaturalSpawner.isValidEmptySpawnBlock`, all four of its answers. `fluidCounts` is off
+/// where the caller hands it `Fluids.EMPTY` instead of the block's own fluid.
+[[nodiscard]] bool canStandIn(std::int32_t stateId, const Identifier* type, bool fluidCounts = true) {
     if (reg::blockShapes::isFullCube(stateId) || redstone::isSignalSource(stateId) ||
-        reg::blockFluids::hasFluid(stateId)) {
+        (fluidCounts && reg::blockFluids::hasFluid(stateId))) {
         return false;
     }
     const std::string_view path = blockPathOf(stateId);
@@ -181,28 +182,6 @@ constexpr std::int64_t kSlimeChunkSalt = 987234911;
     }
     const bool slimeChunk = isSlimeChunk(world.metadata().seed, x >> 4, z >> 4);
     return random.nextInt(10) == 0 && slimeChunk && y < 40;
-}
-
-/// parity: `LevelReader.canSeeSkyFromBelowWater`, including dampening non-liquid blocks.
-[[nodiscard]] bool canSeeSkyFromBelowWater(LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
-    const std::int32_t seaLevel = config::dimensionFacts(world.declaration().dimension).seaLevel;
-    if (y >= seaLevel) {
-        return canSeeSky(world, x, y, z);
-    }
-    if (!canSeeSky(world, x, seaLevel, z)) {
-        return false;
-    }
-    for (std::int32_t scanY = seaLevel - 1; scanY > y; scanY--) {
-        const std::optional<std::int32_t> state = world.state().blockState(x, scanY, z);
-        if (!state.has_value()) {
-            return false;
-        }
-        const std::string_view block = blockPathOf(*state);
-        if (reg::blockShapes::dampening(*state) > 0 && block != "water" && block != "lava") {
-            return false;
-        }
-    }
-    return true;
 }
 
 /// parity: `SpawnPlacementTypes.IN_WATER` plus the common water-animal predicates.
@@ -363,6 +342,27 @@ bool containsSpawnData(const std::vector<SpawnerEntry>& entries, const SpawnerEn
     });
 }
 
+bool canSeeSkyFromBelowWater(LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    const std::int32_t seaLevel = config::dimensionFacts(world.declaration().dimension).seaLevel;
+    if (y >= seaLevel) {
+        return canSeeSky(world, x, y, z);
+    }
+    if (!canSeeSky(world, x, seaLevel, z)) {
+        return false;
+    }
+    for (std::int32_t scanY = seaLevel - 1; scanY > y; scanY--) {
+        const std::optional<std::int32_t> state = world.state().blockState(x, scanY, z);
+        if (!state.has_value()) {
+            return false;
+        }
+        const std::string_view block = blockPathOf(*state);
+        if (reg::blockShapes::dampening(*state) > 0 && block != "water" && block != "lava") {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool canSeeSky(LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     return worldLight::skyLight(world.state(), x, y, z) >= worldLight::kMaxLevel;
 }
@@ -512,10 +512,10 @@ bool canSpawnAt(LoadedWorld& world, const Identifier* type, MobCategory category
     return true;
 }
 
-bool isValidEmptySpawnBlock(LoadedWorld& world, const Identifier& type, std::int32_t x, std::int32_t y,
-                            std::int32_t z) {
+bool isValidEmptySpawnBlock(LoadedWorld& world, const Identifier& type, std::int32_t x, std::int32_t y, std::int32_t z,
+                            bool fluidCounts) {
     const std::optional<std::int32_t> state = world.state().blockState(x, y, z);
-    return state.has_value() && canStandIn(*state, &type);
+    return state.has_value() && canStandIn(*state, &type, fluidCounts);
 }
 
 bool canSpawnOnGround(LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {

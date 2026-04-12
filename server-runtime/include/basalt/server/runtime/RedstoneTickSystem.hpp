@@ -36,6 +36,7 @@ namespace basalt::server::runtime {
 
 class BlockChangeBroadcaster;
 class ChunkSimulationView;
+class MobSpawnerSystem;
 
 /// Everything that runs on the world's own clock rather than a player's: scheduled block ticks
 /// (fire, redstone, pistons, buttons), fluids, random block ticks, block entities, falling blocks,
@@ -106,6 +107,8 @@ public:
             tickSculkCatalyst;
         /// A noise that reached a shrieker, handed to whoever knows the players.
         std::function<void(world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival)> shriekerHeard;
+        /// What runs a monster spawner block's turn. Null leaves every spawner idle.
+        MobSpawnerSystem* mobSpawners = nullptr;
     };
 
     /// `runCommand` is what a command block runs its command with. It is a constructor parameter and
@@ -172,6 +175,16 @@ public:
     void tickInhabitedTime(world::LoadedWorld& world, const sched::Region& region);
 
 private:
+    /// parity: `SpawnerBlockEntity.serverTick`, with the block's own event and block entity update.
+    /// Answers whether the spawner's data changed.
+    bool tickSpawner(world::LoadedWorld& world, wire::nbt::NbtCompound& data, std::int32_t x, std::int32_t y,
+                     std::int32_t z);
+
+    /// parity: `ServerLevel.doBlockEvent` for a spawner: the event is the block entity's, and the
+    /// players within sixty-four blocks are told. Answers whether the event was the spawner's.
+    bool runSpawnerEvent(world::LoadedWorld& world, const world::BlockEvent& event,
+                         const std::vector<player::PlayerSession*>& watchers);
+
     /// Puts what a hatching block left behind in the world, and empties the list.
     void releaseHatchlings(world::LoadedWorld& world, std::vector<world::scheduledBlocks::Hatchling>& hatched);
 

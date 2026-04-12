@@ -1,3 +1,4 @@
+#include <basalt/server/runtime/world/VanillaAdvancementImport.hpp>
 #include <basalt/server/runtime/world/VanillaSaveImport.hpp>
 #include <basalt/server/storage/PlayerRepository.hpp>
 #include <basalt/server/storage/VanillaPlayerData.hpp>
@@ -25,7 +26,8 @@ using wire::common::JsonValue;
 std::expected<ImportReport, std::string> importVanillaSave(const std::string& savePath,
                                                            storage::PlayerRepository& repository,
                                                            const std::string& worldName, std::int64_t nowEpochSeconds,
-                                                           const wire::common::Logger& logger) {
+                                                           const wire::common::Logger& logger,
+                                                           storage::ProgressRepository* progress) {
     const std::string cachePath = savePath + "/usercache.json";
     const std::optional<std::string> cacheText = wire::io::fileIO::readText(cachePath);
     if (!cacheText.has_value()) {
@@ -73,6 +75,13 @@ std::expected<ImportReport, std::string> importVanillaSave(const std::string& sa
             continue;
         }
         repository.save(*player);
+        if (progress != nullptr) {
+            if (const std::optional<std::string> advancements =
+                    wire::io::fileIO::readText(savePath + "/advancements/" + *uuid + ".json");
+                advancements.has_value()) {
+                static_cast<void>(importVanillaAdvancements(*advancements, *uuid, *progress));
+            }
+        }
         report.imported++;
     }
 

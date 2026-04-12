@@ -92,6 +92,44 @@ void FunctionCommand::build(const CommandNodeBuilder& root) const {
             context.source(), ExecutionSource::Changes{.permission = std::max(context.source().permissionLevel(),
                                                                               permissionLevel::kGamemasters),
                                                        .silent = true}};
+        if (runner_->insideFunction()) {
+            // parity: `queueFunctions`: behind this command, and whatever waits on the result told
+            // once, with the sum of what returned, after the last of them.
+            const ExecutionSource* execution = context.source().asExecution();
+            std::vector<ExecutionSource::OnResult> waiting =
+                execution == nullptr ? std::vector<ExecutionSource::OnResult>{} : execution->resultCallbacks();
+            struct Sum {
+                std::size_t left = 0;
+                bool any = false;
+                std::int32_t total = 0;
+            };
+            auto sum = std::make_shared<Sum>(Sum{.left = functions->size()});
+            for (const function::ServerFunction* one : *functions) {
+                const Parsed<void> queued =
+                    runner_->defer(context.dispatcher(), running, *one, arguments,
+                                   [sum, waiting](const std::optional<FunctionRunner::Returned>& returned) {
+                                       if (returned.has_value()) {
+                                           sum->any = true;
+                                           sum->total += returned->value;
+                                       }
+                                       if (--sum->left == 0 && sum->any) {
+                                           for (const ExecutionSource::OnResult& told : waiting) {
+                                               told(true, sum->total);
+                                           }
+                                       }
+                                   });
+                if (!queued.has_value()) {
+                    return std::unexpected{CommandSyntaxError{
+                        .component =
+                            Component::translatable("commands.function.instantiationFailure",
+                                                    {Component::text(one->id.toString()), queued.error().component})}};
+                }
+            }
+            if (!waiting.empty()) {
+                CommandDispatcher::deferResult();
+            }
+            return 0;
+        }
         std::int32_t total = 0;
         for (const function::ServerFunction* one : *functions) {
             const Parsed<std::optional<FunctionRunner::Returned>> ran =

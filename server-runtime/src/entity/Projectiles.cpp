@@ -125,7 +125,7 @@ const Kind& snowball() {
 }
 
 std::span<const Kind> all() {
-    static const std::array<Kind, 14> kinds{
+    static const std::array<Kind, 15> kinds{
         arrow(), make("spectral_arrow", 0.05, 0.99, true),
         // parity: `ThrownTrident` is an arrow whose water inertia is its air drag.
         make("trident", 0.05, 0.99, true), snowball(), make("egg", 0.03, 0.99, false),
@@ -134,8 +134,10 @@ std::span<const Kind> all() {
         // parity: `AbstractWindCharge` neither slows down nor speeds up: inertia one, acceleration
         // zeroed in its constructor.
         make("wind_charge", 0.0, 1.0, false), make("breeze_wind_charge", 0.0, 1.0, false),
-        make("dragon_fireball", 0.0, 0.95, false, kAcceleration),
-        make("wither_skull", 0.0, 0.95, false, kAcceleration)};
+        make("dragon_fireball", 0.0, 0.95, false, kAcceleration), make("wither_skull", 0.0, 0.95, false, kAcceleration),
+        // parity: `LlamaSpit.getDefaultGravity` and `getAirDrag`, the drag a float widened. Its own
+        // tick is `CombatSystem`'s, not the thrown one.
+        make("llama_spit", 0.06, static_cast<double>(0.99F), false)};
     return kinds;
 }
 

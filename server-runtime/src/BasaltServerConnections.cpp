@@ -81,6 +81,7 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     options.whitelistEnforced = [this] { return whitelistEnforced_; };
     options.enchantments = &vanillaData_.enchantments;
     options.progress = playerProgress_.get();
+    options.advancements = playerAdvancements_.get();
     options.advancementTriggers = advancementTriggers_.get();
     options.blockTags = &vanillaData_.blockTags;
     options.itemTags = &vanillaData_.itemTags;
@@ -92,7 +93,6 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     options.entityTypeTags = &vanillaData_.entityTags;
     options.dialogs = &vanillaData_.dialogs;
     options.timelines = &vanillaData_.timelines;
-    options.packRegistries = packRegistries();
     options.substitutionLabels = substitutionLabels_.get();
     options.bossBars = &bossBars_;
     options.protocolGate = protocolGate_;
@@ -103,6 +103,8 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     options.blocks = broadcaster_.get();
     options.explosions = explosions_.get();
     options.combat = combat_.get();
+    options.vehicles = vehicles_.get();
+    options.enabledFeatures = [this] { return enabledFeatures(); };
     options.endFight = endFight_.get();
     options.fishing = fishing_.get();
     options.maps = maps_.get();

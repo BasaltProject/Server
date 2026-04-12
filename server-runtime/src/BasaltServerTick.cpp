@@ -106,6 +106,7 @@ void BasaltServer::tickWorlds(const bool worldRuns) {
     if (worldRuns) {
         tickFunctions();
     }
+    flushAdvancements();
 
     // What the world has loaded decides what its regions are, and it is worked out here, at the tick
     // boundary, before any of them starts: a chunk changing hands mid-tick is the one thing this
@@ -349,12 +350,9 @@ void BasaltServer::tickBoat(world::LoadedWorld& world, const std::vector<player:
             driver = player;
         }
     }
-    const entity::boats::TickResult result = entity::boats::tick(
-        world.state(), boat, driver != nullptr, living, [this](const wire::common::Identifier& type) {
-            return world::realEntityTypeTags::membersOf(
-                       vanillaData_.entityTags, wire::common::Identifier::vanilla("cannot_be_pushed_onto_boats"))
-                .contains(type);
-        });
+    const entity::boats::TickResult result = entity::boats::tick(world.state(), boat, driver != nullptr);
+    // parity: `applyEffectsFromBlocks` and `tickBubbleColumn`, then the pushes at the end of the turn.
+    vehicles_->tickBoatBubbles(world, boat, driver != nullptr);
     // parity: `level.playSound(null, ...)` for each stroke, heard by everyone including the rower.
     for (const entity::boats::TickResult::Stroke& stroke : result.strokes) {
         random::RandomSource random = random::RandomSource::legacy(scratchSeed());
@@ -364,7 +362,7 @@ void BasaltServer::tickBoat(world::LoadedWorld& world, const std::vector<player:
                                  stroke.z, 1.0F, pitch, random.nextLong());
         }
     }
-    bool changed = !result.boarded.empty();
+    bool changed = false;
     if (result.ejectAll) {
         // parity: `ejectPassengers`, the last one first.
         const std::vector<std::int32_t> aboard = boat.passengerIds;
@@ -379,12 +377,14 @@ void BasaltServer::tickBoat(world::LoadedWorld& world, const std::vector<player:
             if (!wasPlayer) {
                 if (entity::ServerEntity* mob = world.state().entity(*id); mob != nullptr) {
                     mob->vehicleId.reset();
+                    mob->boardingCooldown = 60;
                 }
                 std::erase(boat.passengerIds, *id);
                 changed = true;
             }
         }
     }
+    vehicles_->boatPushes(world, boat, driver != nullptr);
     if (!changed) {
         return;
     }
@@ -512,6 +512,12 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
     for (player::PlayerSession* player : playerRegistry_.snapshot()) {
         if (player->worldName == world.name()) {
             watchers.push_back(player);
+        }
+    }
+    // parity: `LivingEntity.pushEntities` on each player's own turn, which comes before the level's.
+    for (player::PlayerSession* player : watchers) {
+        if (region.ownsPosition(player->x, player->z)) {
+            pushes_->pushByPlayer(world, *player);
         }
     }
 
@@ -828,32 +834,16 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
         }
         // parity: `AbstractMinecart.tick`: on a rail it follows the track, and off one it falls.
         if (world::detectorRails::isMinecart(entity->type())) {
-            // parity: `AbstractMinecart.tick`, where what a cart has taken heals a point a tick.
-            if (entity->vehicleDamage > 0.0F) {
-                entity->vehicleDamage -= 1.0F;
+            vehicles_->tickMinecart(world, *entity);
+            if (entity->removed) {
+                continue;
             }
             player::PlayerSession* rider = nullptr;
             for (player::PlayerSession* player : watchers) {
-                if (std::ranges::find(entity->passengerIds, player->entityId()) != entity->passengerIds.end()) {
+                if (!entity->passengerIds.empty() && player->entityId() == entity->passengerIds.front()) {
                     rider = player;
                     break;
                 }
-            }
-            // parity: `AbstractMinecart.push`, the shove a cart takes from anybody stood in it.
-            for (player::PlayerSession* player : watchers) {
-                if (rider != nullptr && player->entityId() == rider->entityId()) {
-                    continue;
-                }
-                if (MobActionSystem::touchesCart(*entity, *player)) {
-                    entity::minecarts::pushedBy(*entity, player->x, player->z);
-                }
-            }
-            const std::array<double, 2> intent =
-                rider == nullptr ? std::array<double, 2>{0.0, 0.0}
-                                 : entity::minecarts::intentOf(rider->inputForward, rider->inputBack, rider->inputLeft,
-                                                               rider->inputRight, rider->yaw);
-            if (!entity::minecarts::moveAlongTrack(world.state(), *entity, intent[0], intent[1], rider != nullptr)) {
-                entity::minecarts::comeOffTrack(world.state(), *entity, RedstoneTickSystem::kMinecartGravity);
             }
             // The rider's own copy of where they are comes from the cart: the client draws itself on
             // the cart, and the server needs the same answer to load chunks around it.
@@ -861,30 +851,6 @@ void BasaltServer::tickEntities(world::LoadedWorld& world, const sched::Region& 
                 rider->x = entity->x;
                 rider->y = entity->y;
                 rider->z = entity->z;
-            }
-            // parity: the activator rail, which tells the cart it is on every turn it is over one:
-            // a hopper cart stops while the rail is powered and a tnt cart lights its fuse.
-            entity::minecarts::activateOnRail(world.state(), *entity,
-                                              world.gameRules().get(world::gameRules::kTntExplodes));
-            // parity: `MinecartTNT.tick`, which counts the fuse down after the movement and blows up
-            // on the turn it reaches zero. The power is vanilla's own base plus what the speed adds.
-            if (entity->type().path() == "tnt_minecart" && entity->fuse >= 0) {
-                if (entity->fuse > 0) {
-                    --entity->fuse;
-                } else {
-                    entity->removed = true;
-                    if (world.gameRules().get(world::gameRules::kTntExplodes)) {
-                        const double speed = std::min(std::sqrt((entity->velocityX * entity->velocityX) +
-                                                                (entity->velocityZ * entity->velocityZ)),
-                                                      entity::minecarts::kTntCartSpeedCap);
-                        const double power = entity::minecarts::kTntCartPower + (random.nextDouble() * 1.5 * speed);
-                        explosions_->blowUp(world, watchers, entity->x, entity->y, entity->z, static_cast<float>(power),
-                                            "tnt", entity->entityId(), world::explosions::sparesRails);
-                        world::vibrations::emit(world.state(), "explode", entity->x, entity->y, entity->z,
-                                                world.gameTime(), {.entity = entity->uuid()});
-                    }
-                    continue;
-                }
             }
             // parity: `MinecartHopper.tick` sucks after the movement, and with no cooldown at all:
             // a cart parked under a chest takes one item every tick it is enabled. It is no block

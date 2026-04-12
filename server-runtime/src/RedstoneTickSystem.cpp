@@ -770,7 +770,9 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
             [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z) {
                 return options_.tickSculkCatalyst && options_.tickSculkCatalyst(world, x, y, z);
             },
-        .ticking = tickingChunks(world, region, 1)};
+        .ticking = tickingChunks(world, region, 1),
+        .spawnerTick = [this, &world](wire::nbt::NbtCompound& data, std::int32_t x, std::int32_t y,
+                                      std::int32_t z) { return tickSpawner(world, data, x, y, z); }};
     random::RandomSource random = freshRandom();
     std::vector<world::BlockChange> changes = world::blockEntityTicks::tick(
         world.state(), world.name(), world.clock(), world.skyDarken(), world.gameTime(), chunks, random, hooks,

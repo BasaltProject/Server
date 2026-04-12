@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/EntityVisibilityTracker.hpp>
+#include <basalt/server/runtime/entity/Minecarts.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/item/ItemComponentCodecs.hpp>
@@ -11,6 +12,7 @@
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
 #include <basalt/wire/protocol/play/PlayerStatePackets.hpp>
+#include <basalt/wire/protocol/play/VehiclePackets.hpp>
 #include <basalt/wire/text/MiniMessage.hpp>
 
 #include <algorithm>
@@ -287,6 +289,37 @@ void EntityVisibilityTracker::syncSummonedEntities() {
                            std::abs(last->second[2] - entity->z) > kPositionEpsilon ||
                            std::abs(last->second[3] - static_cast<double>(entity->yaw)) > kRotationEpsilon ||
                            std::abs(last->second[4] - static_cast<double>(entity->headYaw)) > kRotationEpsilon;
+        // parity: `ServerEntity.handleMinecartPosRot` under `minecart_improvements`: the cart's turn as
+        // the steps it went through, or where it is now when it took none.
+        if (entity->cart != nullptr && entity->cart->experimental && !entity->vehicleId.has_value()) {
+            world::LoadedWorld* here = owner_->currentWorld();
+            const bool fresh = here != nullptr && entity->cart->lerpStepsTick == here->gameTime();
+            wire::protocol::play::ClientboundMoveMinecartPacket packet{.entityId = entity->entityId()};
+            if (fresh && !entity->cart->lerpSteps.empty()) {
+                for (const entity::minecarts::Step& step : entity->cart->lerpSteps) {
+                    packet.steps.push_back({.position = step.position,
+                                            .movement = step.movement,
+                                            .yRot = step.yaw,
+                                            .xRot = step.pitch,
+                                            .weight = step.weight});
+                }
+            } else if (moved) {
+                packet.steps.push_back({.position = {entity->x, entity->y, entity->z},
+                                        .movement = {entity->velocityX, entity->velocityY, entity->velocityZ},
+                                        .yRot = entity->yaw,
+                                        .xRot = entity->pitch,
+                                        .weight = 1.0F});
+            }
+            if (!packet.steps.empty()) {
+                owner_->sendPlayPacket(wire::protocol::play::ClientboundMoveMinecartPacket::kId,
+                                       [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+            }
+            lastEntityPositions_.insert_or_assign(entity->entityId(),
+                                                  std::array<double, 5>{entity->x, entity->y, entity->z,
+                                                                        static_cast<double>(entity->yaw),
+                                                                        static_cast<double>(entity->headYaw)});
+            continue;
+        }
         if (!moved) {
             continue;
         }

@@ -1,6 +1,7 @@
 #include <basalt/server/runtime/BlockInteractionHandler.hpp>
 #include <basalt/server/runtime/ChunkStreamer.hpp>
 #include <basalt/server/runtime/ClientSession.hpp>
+#include <basalt/server/runtime/world/PlayerAdvancements.hpp>
 #include <basalt/server/runtime/CombatHandler.hpp>
 #include <basalt/server/runtime/ContainerMenuController.hpp>
 #include <basalt/server/runtime/EntityVisibilityTracker.hpp>
@@ -434,6 +435,9 @@ void PlayerLifecycle::leavePlayIfPresent() {
     registry->remove(session->uuid());
     if (owner_->options().progress != nullptr) {
         owner_->options().progress->unload(session->uuid().toString());
+    }
+    if (owner_->options().advancements != nullptr) {
+        owner_->options().advancements->leave(session->uuid().toString());
     }
     owner_->logger().info([&] { return session->name() + " left the game"; });
     if (hooks_.quit) {

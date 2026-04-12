@@ -189,6 +189,26 @@ ServerEntity* NaturalSpawningSystem::spawnEventRaider(world::LoadedWorld& world,
     return materializeForest(world, forest, "event", true, initialize);
 }
 
+world::MobSpawnForest NaturalSpawningSystem::finalizeForSpawner(world::LoadedWorld& world, const Identifier& type,
+                                                                double x, double y, double z, float yaw,
+                                                                random::RandomSource& random) {
+    const auto blockX = static_cast<std::int32_t>(std::floor(x));
+    const auto blockY = static_cast<std::int32_t>(std::floor(y));
+    const auto blockZ = static_cast<std::int32_t>(std::floor(z));
+    const world::MobSpawnContext context{.random = &random,
+                                         .specialMultiplier = specialMultiplierAt(world, blockX, blockZ),
+                                         .difficulty = world.difficulty(),
+                                         .equipment = equipment_,
+                                         .biome = world::naturalSpawner::biomeAt(world, blockX, blockY, blockZ),
+                                         .gameTime = world.gameTime(),
+                                         .reason = world::MobSpawnReason::Spawner,
+                                         .entityRandomFactory = [this] { return freshRandom(); }};
+    wire::nbt::NbtCompound data;
+    world::MobSpawnGroupData group;
+    return world::writeGeneratedForest(data, type, 0, context, group, blockX, blockY, blockZ, x, y, z, yaw,
+                                       spawnEnvironment(world));
+}
+
 ServerEntity* NaturalSpawningSystem::materializeForest(world::LoadedWorld& world, const world::MobSpawnForest& forest,
                                                        std::string_view eventReason, bool checkMain,
                                                        const std::function<void(ServerEntity&)>& initialize) {

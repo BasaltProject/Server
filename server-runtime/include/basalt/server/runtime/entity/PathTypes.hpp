@@ -61,6 +61,10 @@ using Maluses = std::array<float, kCount>;
     return maluses[static_cast<std::size_t>(type)];
 }
 
+/// parity: `BlockBehaviour.isPathfindable(LAND)`, which `WalkNodeEvaluator.getStart` asks of what is
+/// under a mob in the air.
+[[nodiscard]] bool isPathfindableOnLand(std::int32_t stateId);
+
 /// parity: `WalkNodeEvaluator.getPathTypeFromState`, the block on its own.
 [[nodiscard]] PathType fromState(const world::WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z);
 

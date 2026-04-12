@@ -28,6 +28,28 @@ struct GeneratedEquipment {
 
 [[nodiscard]] std::vector<GeneratedEquipment> generatedEntityEquipment(const wire::nbt::NbtCompound& data);
 
+/// parity: `VehicleEntity`'s hurt clock, direction and damage, and what each vehicle adds on top.
+struct VehicleData {
+    std::int32_t hurtTime = 0;
+    std::int32_t hurtDir = 1;
+    float damage = 0.0F;
+    /// parity: `MinecartFurnace.DATA_ID_FUEL`.
+    std::optional<bool> furnaceFuel;
+    /// parity: `AbstractBoat.DATA_ID_BUBBLE_TIME`.
+    std::optional<std::int32_t> bubbleTime;
+    /// parity: `MinecartCommandBlock.DATA_ID_COMMAND_NAME`.
+    std::optional<std::string> command;
+
+    friend bool operator==(const VehicleData&, const VehicleData&) = default;
+};
+
+/// What a minecart or a boat shows, or nothing for anything else.
+[[nodiscard]] std::optional<VehicleData> vehicleDataOf(const ServerEntity& entity);
+
+/// Initial non-default vehicle fields, or the ones that changed since `before`.
+void appendVehicleChanges(std::vector<wire::protocol::play::SetEntityDataPacket::Entry>& entries,
+                          const VehicleData& now, const VehicleData* before);
+
 /// The live synchronized fields this server mutates after an entity has spawned.
 struct RuntimeEntityMetadata {
     std::int32_t airSupply = 0;
@@ -110,6 +132,7 @@ struct RuntimeEntityMetadata {
     /// parity: `Goat`'s horns, which a ram into stone can knock off.
     std::optional<bool> goatLeftHorn;
     std::optional<bool> goatRightHorn;
+    std::optional<VehicleData> vehicle;
 
     /// Initial non-default fields, or every field whose live value changed since `previous`.
     [[nodiscard]] std::vector<wire::protocol::play::SetEntityDataPacket::Entry>

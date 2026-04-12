@@ -6,6 +6,7 @@
 #include <basalt/server/runtime/world/WorldClock.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/server/world/crafting/Crafting.hpp>
+#include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <array>
 #include <cstdint>
@@ -83,6 +84,10 @@ struct Hooks {
     std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z)> sculkCatalyst;
     /// The chunks that tick this turn, which a shrieker's noise waits on. Unset, every loaded one.
     WorldState::Ticking ticking;
+    /// A monster spawner's turn, over its own saved fields: spawning takes the players and the mobs,
+    /// which this module does not know. Answers whether the data changed. parity:
+    /// `SpawnerBlockEntity.serverTick`.
+    std::function<bool(wire::nbt::NbtCompound& data, std::int32_t x, std::int32_t y, std::int32_t z)> spawnerTick;
 };
 
 /// Ticks every block entity in `chunks` that has something to do, answering the blocks that changed.

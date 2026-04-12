@@ -2,6 +2,7 @@
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/ExplosionSystem.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
+#include <basalt/server/runtime/entity/Attributes.hpp>
 #include <basalt/server/runtime/entity/BlockRay.hpp>
 #include <basalt/server/runtime/entity/Creakings.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
@@ -19,8 +20,10 @@
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <numbers>
+#include <string>
 #include <vector>
 
 namespace basalt::server::runtime {
@@ -38,7 +41,9 @@ constexpr double kFollowRange = 32.0;
 /// parity: `Creaking.ACTIVATION_RANGE_SQ`.
 constexpr double kActivationRangeSquared = 144.0;
 /// parity: `EntityType.CREAKING`'s eyes.
-constexpr double kEyeHeight = 2.3;
+constexpr float kEyeHeight = 2.3F;
+/// parity: `LivingEntity.hasLineOfSight`, which gives up past this.
+constexpr double kSightRange = 128.0;
 
 /// One player the creaking's sensor sees.
 struct Nearby {
@@ -46,40 +51,66 @@ struct Nearby {
     double distanceSquared = 0.0;
 };
 
-[[nodiscard]] double eyeOf(const PlayerSession& player) { return player.y + world::fluids::eyeHeight(player.sneaking); }
-
-/// parity: `LivingEntity.hasLineOfSight(target, block, fluid, eyeY)` from the player to the creaking.
-[[nodiscard]] bool playerSees(world::WorldState& world, const PlayerSession& player, const ServerEntity& creaking,
-                              double gazeY) {
-    const double dx = creaking.x - player.x;
-    const double dy = gazeY - eyeOf(player);
-    const double dz = creaking.z - player.z;
-    if (std::sqrt((dx * dx) + (dy * dy) + (dz * dz)) > 128.0) {
-        return false;
-    }
-    return !entity::blockRay::cast(world, player.x, eyeOf(player), player.z, creaking.x, gazeY, creaking.z).has_value();
+/// parity: `Player`'s eyes, standing or crouched, as floats.
+[[nodiscard]] double eyeOf(const PlayerSession& player) {
+    return player.y + static_cast<double>(player.sneaking ? 1.27F : 1.62F);
 }
 
-/// parity: `LivingEntity.isLookingAtMe(player, 0.5, false, true, heights)`.
+/// parity: `LivingEntity.getScale`.
+[[nodiscard]] float scaleOf(const ServerEntity& creaking) {
+    return static_cast<float>(creaking.attributeWithModifiers(entity::attribute::kScale));
+}
+
+[[nodiscard]] double creakingEye(const ServerEntity& creaking) {
+    return creaking.y + static_cast<double>(kEyeHeight * scaleOf(creaking));
+}
+
+/// parity: `LivingEntity.hasLineOfSight(target, block, NONE, eyeY)`: nothing past 128 blocks, else a clip.
+[[nodiscard]] bool hasLineOfSight(world::WorldState& world, double fromX, double fromY, double fromZ, double toX,
+                                  double toY, double toZ, entity::blockRay::ClipShape shape,
+                                  const entity::blockRay::ClipViewer& viewer) {
+    const double dx = fromX - toX;
+    const double dy = fromY - toY;
+    const double dz = fromZ - toZ;
+    if (std::sqrt((dx * dx) + (dy * dy) + (dz * dz)) > kSightRange) {
+        return false;
+    }
+    return !entity::blockRay::clips(world, fromX, fromY, fromZ, toX, toY, toZ, shape, viewer);
+}
+
+/// parity: `Vec3.normalize`, nothing at all under a float 1.0E-5.
+[[nodiscard]] std::array<double, 3> normalized(double x, double y, double z) {
+    const double length = std::sqrt((x * x) + (y * y) + (z * z));
+    if (length < static_cast<double>(1.0E-5F)) {
+        return {0.0, 0.0, 0.0};
+    }
+    return {x / length, y / length, z / length};
+}
+
+/// parity: `LivingEntity.isLookingAtMe(player, 0.5, false, true, heights)`: the player's view within the
+/// cone of one of the three heights, and nothing but see-through blocks in between.
 [[nodiscard]] bool isLookingAt(world::WorldState& world, const PlayerSession& player, const ServerEntity& creaking) {
+    // parity: `Entity.calculateViewVector`, normalised.
     constexpr float kRadians = std::numbers::pi_v<float> / 180.0F;
     const float pitch = player.pitch * kRadians;
     const float yaw = -player.yaw * kRadians;
-    const double lookX = static_cast<double>(mth::sin(yaw) * mth::cos(pitch));
-    const double lookY = static_cast<double>(-mth::sin(pitch));
-    const double lookZ = static_cast<double>(mth::cos(yaw) * mth::cos(pitch));
-    const double lookLength = std::sqrt((lookX * lookX) + (lookY * lookY) + (lookZ * lookZ));
-    const double eye = creaking.y + kEyeHeight;
-    for (const double gaze : {eye, creaking.y + 0.5, (eye + creaking.y) / 2.0}) {
-        const double dx = creaking.x - player.x;
-        const double dy = gaze - eyeOf(player);
-        const double dz = creaking.z - player.z;
-        const double length = std::sqrt((dx * dx) + (dy * dy) + (dz * dz));
-        if (length < 1.0E-4 || lookLength < 1.0E-4) {
-            continue;
-        }
-        const double dot = ((lookX * dx) + (lookY * dy) + (lookZ * dz)) / (lookLength * length);
-        if (dot > 1.0 - 0.5 && playerSees(world, player, creaking, gaze)) {
+    const float yawCos = mth::cos(yaw);
+    const float yawSin = mth::sin(yaw);
+    const float pitchCos = mth::cos(pitch);
+    const float pitchSin = mth::sin(pitch);
+    const std::array<double, 3> look = normalized(
+        static_cast<double>(yawSin * pitchCos), static_cast<double>(-pitchSin), static_cast<double>(yawCos * pitchCos));
+    const double eye = creakingEye(creaking);
+    const entity::blockRay::ClipViewer viewer{
+        .feetY = player.y, .descending = player.sneaking, .fallDistance = player.fallDistance};
+    const std::array<double, 3> gazes{eye, creaking.y + (0.5 * static_cast<double>(scaleOf(creaking))),
+                                      (eye + creaking.y) / 2.0};
+    for (const double gaze : gazes) {
+        const std::array<double, 3> towards =
+            normalized(creaking.x - player.x, gaze - eyeOf(player), creaking.z - player.z);
+        const double dot = (look[0] * towards[0]) + (look[1] * towards[1]) + (look[2] * towards[2]);
+        if (dot > 1.0 - (0.5 / 1.0) && hasLineOfSight(world, player.x, eyeOf(player), player.z, creaking.x, gaze,
+                                                      creaking.z, entity::blockRay::ClipShape::Visual, viewer)) {
             return true;
         }
     }
@@ -127,6 +158,10 @@ void MobActionSystem::tickCreaking(world::LoadedWorld& world, entity::ai::MobCon
     ServerEntity& creaking = context.mob;
     creakings::CreakingState& state = creakings::stateOf(creaking);
     const std::int64_t now = context.gameTime;
+    // parity: what its navigation reads of the level: `getGameTime` and the difficulty's id.
+    state.gameTime = now;
+    const std::string& difficulty = world.difficulty();
+    state.difficulty = difficulty == "peaceful" ? 0 : difficulty == "easy" ? 1 : difficulty == "hard" ? 3 : 2;
     // parity: `Creaking.tick`: one bound to a heart that no longer claims it goes; a heart broken
     // out from under it tore it down.
     if (state.home.has_value()) {
@@ -221,10 +256,13 @@ void MobActionSystem::tickCreaking(world::LoadedWorld& world, entity::ai::MobCon
         if (nowCanMove) {
             makeSound(world, creaking, "entity.creaking.unfreeze", 1.0F);
         } else {
-            // parity: `stopInPlace`.
+            // parity: `stopInPlace`, and `MoveToTargetSink` stops with the path it loses.
             entity::ai::navigation::stop(creaking);
+            state.pathNodeTypes.clear();
             state.motion.walk.reset();
+            creaking.aiSpeed = 0.0F;
             creaking.velocityX = 0.0;
+            creaking.velocityY = 0.0;
             creaking.velocityZ = 0.0;
             makeSound(world, creaking, "entity.creaking.freeze", 1.0F);
         }
@@ -243,13 +281,13 @@ void MobActionSystem::tickCreaking(world::LoadedWorld& world, entity::ai::MobCon
         }
         return 0;
     }();
-    // parity: `NEAREST_VISIBLE_ATTACKABLE_PLAYER(S)`, in sight of its eyes.
+    // parity: `NEAREST_VISIBLE_ATTACKABLE_PLAYER(S)`, in sight of its eyes through what it collides with.
     std::vector<std::int32_t> visible;
+    const entity::blockRay::ClipViewer ownView{.feetY = creaking.y, .fallDistance = creaking.fallDistance};
     for (const Nearby& seen : players) {
         if (attackable(*seen.player) &&
-            !entity::blockRay::cast(world.state(), creaking.x, creaking.y + kEyeHeight, creaking.z, seen.player->x,
-                                    eyeOf(*seen.player), seen.player->z)
-                 .has_value()) {
+            hasLineOfSight(world.state(), creaking.x, creakingEye(creaking), creaking.z, seen.player->x,
+                           eyeOf(*seen.player), seen.player->z, entity::blockRay::ClipShape::Collider, ownView)) {
             visible.push_back(seen.player->entityId());
         }
     }
@@ -279,13 +317,10 @@ void MobActionSystem::tickCreaking(world::LoadedWorld& world, entity::ai::MobCon
             }
         }
     }
-    // parity: `CreakingMoveControl`, `CreakingLookControl` and the navigation, all still while frozen.
-    if (state.canMove) {
-        kit::moveToTarget(context, state.motion);
-        kit::lookAtTarget(context, state.look);
-    } else {
-        entity::ai::navigation::stop(creaking);
-    }
+    // parity: the core's `MoveToTargetSink` and `LookAtTargetSink` run frozen or not; it is the
+    // creaking's own navigation, move and look controls that hold still.
+    kit::moveToTarget(context, state.motion);
+    kit::lookAtTarget(context, state.look);
 }
 
 } // namespace basalt::server::runtime

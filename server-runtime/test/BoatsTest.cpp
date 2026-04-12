@@ -46,22 +46,16 @@ struct Pond {
 
 } // namespace
 
-TEST_CASE("a boat dropped over water settles on it and scoops up a mob it floats into") {
+TEST_CASE("a boat dropped over water settles on it") {
     Pond pond;
     const std::unique_ptr<ServerEntity> boat = spawn(1, "oak_boat", 8.0, 65.0, 8.0);
-    const std::unique_ptr<ServerEntity> pig = spawn(2, "pig", 8.6, 63.5, 8.0);
-    const std::vector<ServerEntity*> living{boat.get(), pig.get()};
-    bool boarded = false;
     for (std::int32_t turn = 0; turn < 60; ++turn) {
-        const boats::TickResult result = boats::tick(pond.world, *boat, false, living, {});
-        boarded = boarded || !result.boarded.empty();
+        static_cast<void>(boats::tick(pond.world, *boat, false));
     }
     REQUIRE(boat->boat != nullptr);
     CHECK(boat->boat->status == boats::Status::InWater);
     // parity: it rests with its bottom in the water, below the surface at eight ninths.
     CHECK(boat->y > 63.0);
     CHECK(boat->y < 63.0 + (8.0 / 9.0));
-    CHECK(boarded);
-    CHECK(pig->vehicleId == boat->entityId());
     CHECK(boats::maxPassengers(Identifier::vanilla("oak_chest_boat")) == 1);
 }

@@ -3,6 +3,7 @@
 #include <basalt/server/world/loot/LootCondition.hpp>
 #include <basalt/server/world/loot/LootPredicates.hpp>
 #include <basalt/wire/common/Identifier.hpp>
+#include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/text/Component.hpp>
 
 #include <cstdint>
@@ -114,16 +115,29 @@ struct AdvancementRewards {
     std::int32_t experience = 0;
     std::vector<wire::common::Identifier> loot;
     std::vector<wire::common::Identifier> recipes;
+    /// parity: `AdvancementRewards.function`, run as the player when it is earned.
+    std::optional<wire::common::Identifier> function;
 };
 
-/// What a completed advancement says in chat. parity: `DisplayInfo` plus `AdvancementType`, of which
-/// only the parts an announcement needs are kept: nothing here draws the advancement screen.
+/// The item an advancement's frame shows. parity: `ItemStackTemplate`.
+struct AdvancementIcon {
+    wire::common::Identifier item = wire::common::Identifier::vanilla("air");
+    std::int32_t count = 1;
+    /// The `components` patch as the file writes it.
+    std::optional<wire::common::JsonValue> components;
+};
+
+/// How an advancement is drawn and announced. parity: `DisplayInfo` plus `AdvancementType`.
 struct AdvancementDisplay {
     wire::text::Component title;
     wire::text::Component description;
     /// `task`, `goal` or `challenge`, which decides the message key and the colour.
     std::string type = "task";
     bool announceToChat = true;
+    AdvancementIcon icon;
+    std::optional<std::string> background;
+    bool showToast = true;
+    bool hidden = false;
 };
 
 /// One advancement definition. parity: vanilla's `Advancement` record. The criteria keep the order
@@ -134,6 +148,7 @@ struct Advancement {
     AdvancementRequirements requirements;
     AdvancementRewards rewards;
     std::optional<AdvancementDisplay> display;
+    bool sendsTelemetryEvent = false;
 
     [[nodiscard]] const AdvancementCriterion* criterion(std::string_view name) const;
 

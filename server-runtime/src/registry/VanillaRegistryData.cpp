@@ -3,7 +3,11 @@
 #include <basalt/wire/text/ComponentNbt.hpp>
 #include <basalt/wire/text/TextColor.hpp>
 
+#include <algorithm>
 #include <cstdint>
+#include <deque>
+#include <map>
+#include <optional>
 #include <utility>
 
 namespace basalt::server::runtime::registry::vanillaRegistryData {
@@ -76,6 +80,42 @@ using wire::nbt::NbtTag;
     return value;
 }
 
+/// The synchronised registries as installed from the selected packs, or nothing before that.
+struct Installed {
+    std::map<std::string, std::vector<std::string>, std::less<>> paths;
+    std::map<std::string, std::vector<Entry>, std::less<>> entries;
+    std::optional<std::vector<Painting>> paintings;
+    std::optional<std::vector<std::pair<std::string, std::int32_t>>> trims;
+    /// Owns the ids the installed paintings view.
+    std::deque<std::string> names;
+};
+
+[[nodiscard]] Installed& installed() {
+    static Installed state;
+    return state;
+}
+
+[[nodiscard]] const std::vector<std::string>& installedPaths(std::string_view registry,
+                                                             const std::vector<std::string>& fallback) {
+    const auto found = installed().paths.find(registry);
+    return found == installed().paths.end() ? fallback : found->second;
+}
+
+[[nodiscard]] const std::vector<Entry>& installedEntries(std::string_view registry,
+                                                         const std::vector<Entry>& fallback) {
+    const auto found = installed().entries.find(registry);
+    return found == installed().entries.end() ? fallback : found->second;
+}
+
+[[nodiscard]] const std::vector<Painting>& installedPaintings(const std::vector<Painting>& fallback) {
+    return installed().paintings.has_value() ? *installed().paintings : fallback;
+}
+
+[[nodiscard]] const std::vector<std::pair<std::string, std::int32_t>>&
+installedTrims(const std::vector<std::pair<std::string, std::int32_t>>& fallback) {
+    return installed().trims.has_value() ? *installed().trims : fallback;
+}
+
 } // namespace
 
 const std::vector<std::string>& bannerPatterns() {
@@ -122,7 +162,7 @@ const std::vector<std::string>& bannerPatterns() {
                                                 "piglin",
                                                 "flow",
                                                 "guster"};
-    return built;
+    return installedPaths("minecraft:banner_pattern", built);
 }
 
 NbtCompound bannerPattern(std::string_view id) {
@@ -135,7 +175,7 @@ NbtCompound bannerPattern(std::string_view id) {
 const std::vector<std::string>& wolfVariants() {
     static const std::vector<std::string> built{"pale",  "spotted", "snowy",    "black",  "ashen",
                                                 "rusty", "woods",   "chestnut", "striped"};
-    return built;
+    return installedPaths("minecraft:wolf_variant", built);
 }
 
 NbtCompound wolfVariant(std::string_view id) {
@@ -153,7 +193,7 @@ NbtCompound wolfVariant(std::string_view id) {
 
 const std::vector<std::string>& wolfSoundVariants() {
     static const std::vector<std::string> built{"classic", "puglin", "sad", "angry", "grumpy", "big", "cute"};
-    return built;
+    return installedPaths("minecraft:wolf_sound_variant", built);
 }
 
 NbtCompound wolfSoundVariant(std::string_view id) {
@@ -165,7 +205,7 @@ NbtCompound wolfSoundVariant(std::string_view id) {
 
 const std::vector<std::string>& pigVariants() {
     static const std::vector<std::string> built{"temperate", "warm", "cold"};
-    return built;
+    return installedPaths("minecraft:pig_variant", built);
 }
 
 NbtCompound pigVariant(std::string_view id) {
@@ -180,7 +220,7 @@ NbtCompound pigVariant(std::string_view id) {
 
 const std::vector<std::string>& pigSoundVariants() {
     static const std::vector<std::string> built{"classic", "big", "mini"};
-    return built;
+    return installedPaths("minecraft:pig_sound_variant", built);
 }
 
 NbtCompound pigSoundVariant(std::string_view id) {
@@ -191,7 +231,7 @@ NbtCompound pigSoundVariant(std::string_view id) {
 
 const std::vector<std::string>& frogVariants() {
     static const std::vector<std::string> built{"temperate", "warm", "cold"};
-    return built;
+    return installedPaths("minecraft:frog_variant", built);
 }
 
 NbtCompound frogVariant(std::string_view id) {
@@ -203,7 +243,7 @@ NbtCompound frogVariant(std::string_view id) {
 const std::vector<std::string>& catVariants() {
     static const std::vector<std::string> built{"tabby",   "black",   "red",   "siamese", "british_shorthair", "calico",
                                                 "persian", "ragdoll", "white", "jellie",  "all_black"};
-    return built;
+    return installedPaths("minecraft:cat_variant", built);
 }
 
 NbtCompound catVariant(std::string_view id) {
@@ -215,7 +255,7 @@ NbtCompound catVariant(std::string_view id) {
 
 const std::vector<std::string>& catSoundVariants() {
     static const std::vector<std::string> built{"classic", "royal"};
-    return built;
+    return installedPaths("minecraft:cat_sound_variant", built);
 }
 
 NbtCompound catSoundVariant(std::string_view id) {
@@ -237,7 +277,7 @@ NbtCompound catSoundVariant(std::string_view id) {
 
 const std::vector<std::string>& cowVariants() {
     static const std::vector<std::string> built{"temperate", "warm", "cold"};
-    return built;
+    return installedPaths("minecraft:cow_variant", built);
 }
 
 NbtCompound cowVariant(std::string_view id) {
@@ -252,7 +292,7 @@ NbtCompound cowVariant(std::string_view id) {
 
 const std::vector<std::string>& cowSoundVariants() {
     static const std::vector<std::string> built{"classic", "moody"};
-    return built;
+    return installedPaths("minecraft:cow_sound_variant", built);
 }
 
 NbtCompound cowSoundVariant(std::string_view id) {
@@ -268,7 +308,7 @@ NbtCompound cowSoundVariant(std::string_view id) {
 
 const std::vector<std::string>& chickenVariants() {
     static const std::vector<std::string> built{"temperate", "warm", "cold"};
-    return built;
+    return installedPaths("minecraft:chicken_variant", built);
 }
 
 NbtCompound chickenVariant(std::string_view id) {
@@ -283,7 +323,7 @@ NbtCompound chickenVariant(std::string_view id) {
 
 const std::vector<std::string>& chickenSoundVariants() {
     static const std::vector<std::string> built{"classic", "picky"};
-    return built;
+    return installedPaths("minecraft:chicken_sound_variant", built);
 }
 
 NbtCompound chickenSoundVariant(std::string_view id) {
@@ -294,7 +334,7 @@ NbtCompound chickenSoundVariant(std::string_view id) {
 
 const std::vector<std::string>& zombieNautilusVariants() {
     static const std::vector<std::string> built{"temperate", "warm"};
-    return built;
+    return installedPaths("minecraft:zombie_nautilus_variant", built);
 }
 
 NbtCompound zombieNautilusVariant(std::string_view id) {
@@ -324,7 +364,7 @@ const std::vector<Painting>& paintingVariants() {
         {"stage", 2, 2},        {"sunflowers", 3, 3},  {"sunset", 2, 1},       {"tides", 3, 3},
         {"unpacked", 4, 4},     {"void", 2, 2},        {"wanderer", 1, 2},     {"wasteland", 1, 1},
         {"water", 2, 2, false}, {"wind", 2, 2, false}, {"wither", 2, 2, false}};
-    return built;
+    return installedPaintings(built);
 }
 
 NbtCompound paintingVariant(const Painting& painting) {
@@ -352,7 +392,7 @@ const std::vector<std::pair<std::string, std::int32_t>>& trimMaterials() {
         {"quartz", 14931140}, {"iron", 15527148},     {"netherite", 6445145}, {"redstone", 9901575},
         {"copper", 11823181}, {"gold", 14594349},     {"emerald", 1155126},   {"diamond", 7269586},
         {"lapis", 4288151},   {"amethyst", 10116294}, {"resin", 16545810}};
-    return built;
+    return installedTrims(built);
 }
 
 NbtCompound trimMaterial(std::string_view id, std::int32_t colorRgb) {
@@ -417,7 +457,7 @@ const std::vector<Entry>& damageTypes() {
         {"generic_kill", damageType("genericKill", 0.0F)},
         {"wind_charge", damageType("mob", 0.1F)},
         {"mace_smash", damageType("mace_smash", 0.1F)}};
-    return built;
+    return installedEntries("minecraft:damage_type", built);
 }
 
 const std::vector<Entry>& jukeboxSongs() {
@@ -446,7 +486,7 @@ const std::vector<Entry>& jukeboxSongs() {
         {"pigstep", jukeboxSong("minecraft:music_disc.pigstep", "jukebox_song.minecraft.pigstep", 149.0F, 13)},
         {"precipice", jukeboxSong("minecraft:music_disc.precipice", "jukebox_song.minecraft.precipice", 299.0F, 13)},
         {"tears", jukeboxSong("minecraft:music_disc.tears", "jukebox_song.minecraft.tears", 175.0F, 10)}};
-    return built;
+    return installedEntries("minecraft:jukebox_song", built);
 }
 
 const std::vector<Entry>& instruments() {
@@ -459,7 +499,56 @@ const std::vector<Entry>& instruments() {
         {"call_goat_horn", instrumentOf("minecraft:item.goat_horn.sound.5", "instrument.minecraft.call_goat_horn")},
         {"yearn_goat_horn", instrumentOf("minecraft:item.goat_horn.sound.6", "instrument.minecraft.yearn_goat_horn")},
         {"dream_goat_horn", instrumentOf("minecraft:item.goat_horn.sound.7", "instrument.minecraft.dream_goat_horn")}};
-    return built;
+    return installedEntries("minecraft:instrument", built);
+}
+
+void install(const std::vector<wire::protocol::configuration::RegistryDataPacket>& packets) {
+    // Built before anything reads it, so the paths the defaults returned are the same objects.
+    const std::vector<Painting> vanillaPaintings = paintingVariants();
+    const std::vector<std::pair<std::string, std::int32_t>> vanillaTrims = trimMaterials();
+    Installed& state = installed();
+    for (const wire::protocol::configuration::RegistryDataPacket& packet : packets) {
+        std::vector<std::string> keys;
+        std::vector<Entry> entries;
+        for (const wire::protocol::configuration::RegistryEntry& entry : packet.entries) {
+            std::string_view key = entry.key;
+            if (key.starts_with("minecraft:")) {
+                key.remove_prefix(std::string_view{"minecraft:"}.size());
+            }
+            keys.emplace_back(key);
+            const auto* compound = entry.value.has_value() ? entry.value->get<NbtCompound>() : nullptr;
+            entries.emplace_back(std::string{key}, compound == nullptr ? NbtCompound{} : *compound);
+        }
+        const std::string& registry = packet.registryId;
+        if (registry == "minecraft:painting_variant") {
+            std::vector<Painting> paintings;
+            for (const Entry& entry : entries) {
+                const auto known = std::ranges::find(vanillaPaintings, entry.first, &Painting::id);
+                if (known != vanillaPaintings.end()) {
+                    paintings.push_back(*known);
+                    continue;
+                }
+                state.names.push_back(entry.first);
+                paintings.push_back(Painting{.id = state.names.back(),
+                                             .width = entry.second.getInt("width", 1),
+                                             .height = entry.second.getInt("height", 1),
+                                             .hasAuthor = entry.second.contains("author")});
+            }
+            state.paintings = std::move(paintings);
+        } else if (registry == "minecraft:trim_material") {
+            std::vector<std::pair<std::string, std::int32_t>> trims;
+            for (const std::string& key : keys) {
+                const auto known = std::ranges::find(vanillaTrims, key, &std::pair<std::string, std::int32_t>::first);
+                trims.emplace_back(key, known == vanillaTrims.end() ? 0 : known->second);
+            }
+            state.trims = std::move(trims);
+        } else if (registry == "minecraft:damage_type" || registry == "minecraft:jukebox_song" ||
+                   registry == "minecraft:instrument") {
+            state.entries.insert_or_assign(registry, std::move(entries));
+        } else {
+            state.paths.insert_or_assign(registry, std::move(keys));
+        }
+    }
 }
 
 } // namespace basalt::server::runtime::registry::vanillaRegistryData

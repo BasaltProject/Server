@@ -50,25 +50,35 @@ void AdvancementCommand::build(const CommandNodeBuilder& root) const {
         return std::nullopt;
     };
 
-    const auto apply = [this, report](const CommandContext& context, bool granting,
-                                      const std::vector<Identifier>& ids) -> Parsed<std::int32_t> {
+    const auto apply = [this, report](const CommandContext& context, bool granting, const std::vector<Identifier>& ids,
+                                      bool showAdvancements = true) -> Parsed<std::int32_t> {
         const std::vector<player::PlayerSession*>& targets = targetsOf(context);
+        world::AdvancementTriggers* triggers = context.environment().options().advancementTriggers;
         std::int32_t changed = 0;
         for (const player::PlayerSession* target : targets) {
+            const std::string uuid = target->uuid().toString();
+            // parity: `Action.perform` flushes what was pending before hiding the toasts of the rest.
+            if (!showAdvancements && triggers != nullptr) {
+                triggers->flush(uuid, true);
+            }
             for (const Identifier& id : ids) {
                 const server::world::advancement::Advancement* advancement = advancements_->find(id);
                 if (advancement == nullptr) {
                     continue;
                 }
                 if (granting) {
+                    bool any = false;
                     for (const auto& [criterion, definition] : advancement->criteria) {
-                        if (progress_->grantCriterion(target->uuid().toString(), id, criterion)) {
-                            changed++;
-                        }
+                        any |= triggers != nullptr ? triggers->award(target->name(), uuid, id, criterion)
+                                                   : progress_->grantCriterion(uuid, id, criterion);
                     }
-                } else if (progress_->revokeAll(target->uuid().toString(), id)) {
+                    changed += any ? 1 : 0;
+                } else if (progress_->revokeAll(uuid, id)) {
                     changed++;
                 }
+            }
+            if (!showAdvancements && triggers != nullptr) {
+                triggers->flush(uuid, false);
             }
         }
         if (const std::optional<CommandSyntaxError> failure =
@@ -94,8 +104,12 @@ void AdvancementCommand::build(const CommandNodeBuilder& root) const {
         const std::vector<player::PlayerSession*>& targets = targetsOf(context);
         std::int32_t changed = 0;
         for (const player::PlayerSession* target : targets) {
-            const bool moved = granting ? progress_->grantCriterion(target->uuid().toString(), id, *criterion)
-                                        : progress_->revokeCriterion(target->uuid().toString(), id, *criterion);
+            world::AdvancementTriggers* triggers = context.environment().options().advancementTriggers;
+            const bool moved =
+                granting
+                    ? (triggers != nullptr ? triggers->award(target->name(), target->uuid().toString(), id, *criterion)
+                                           : progress_->grantCriterion(target->uuid().toString(), id, *criterion))
+                    : progress_->revokeCriterion(target->uuid().toString(), id, *criterion);
             if (moved) {
                 changed++;
             }
@@ -146,7 +160,8 @@ void AdvancementCommand::build(const CommandNodeBuilder& root) const {
                 [this, granting, apply, selection](const CommandNodeBuilder& targets) {
                     targets.literal("everything", [this, granting, apply](const CommandNodeBuilder& everything) {
                         everything.executes([this, granting, apply](const CommandContext& context) {
-                            return apply(context, granting, advancements_->ids());
+                            // parity: only granting everything hides the toasts.
+                            return apply(context, granting, advancements_->ids(), !granting);
                         });
                     });
                     for (const std::string_view mode : {"only", "from", "through", "until"}) {

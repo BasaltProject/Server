@@ -46,6 +46,9 @@ private:
     const CommandSource* typist_;
 };
 
+/// Set by a command that answers later; the thread's own, since commands run on several.
+thread_local bool resultDeferred = false;
+
 using wire::protocol::play::CommandNodeData;
 using wire::protocol::play::CommandsPacket;
 using wire::protocol::play::CommandSuggestion;
@@ -268,6 +271,7 @@ CommandNode& CommandDispatcher::registerNode(std::string name,
 }
 
 void CommandDispatcher::unregisterNode(const CommandNode* node) {
+    ++generation_;
     std::vector<const CommandNode*> aliases;
     for (const std::unique_ptr<CommandNode>& child : root_.children()) {
         if (child->redirect == node) {
@@ -290,6 +294,7 @@ CommandNode& CommandDispatcher::registerAlias(std::string name, CommandNode& tar
 }
 
 void CommandDispatcher::rebuild() {
+    ++generation_;
     root_.clearChildren();
     registerCustom();
     const std::vector<std::shared_ptr<const Command>> remembered = registered_;
@@ -331,7 +336,8 @@ std::int32_t CommandDispatcher::execute(const CommandSource& source, const std::
     return result;
 }
 
-std::optional<CommandSyntaxError> CommandDispatcher::check(const CommandSource& source, const std::string& input) const {
+std::optional<CommandSyntaxError> CommandDispatcher::check(const CommandSource& source,
+                                                           const std::string& input) const {
     StringReader reader{input};
     const DeferredSource deferred{source};
     const Parsed<std::vector<Link>> links = parse(reader, root_, deferred, {});
@@ -380,14 +386,16 @@ Parsed<std::int32_t> CommandDispatcher::runChain(const std::vector<Link>& links,
         if (!link.executor) {
             return std::unexpected{reader.syntaxError(std::string{kUnknownCommand})};
         }
+        resultDeferred = false;
         const Parsed<std::int32_t> result = link.executor(CommandContext{source, *this, input, link.arguments});
+        const bool deferred = std::exchange(resultDeferred, false);
         // parity: brigadier tells its consumer `true` for a leaf that ran at all, whatever it
         // answered, and `false` only for one that threw. That is what a command block counts.
         if (result.has_value()) {
             ++successes;
         }
         const ExecutionSource* execution = source.asExecution();
-        if (execution != nullptr) {
+        if (execution != nullptr && !deferred) {
             execution->report(result.has_value() ? *result : 0);
         }
         return result;
@@ -395,8 +403,9 @@ Parsed<std::int32_t> CommandDispatcher::runChain(const std::vector<Link>& links,
     if (!link.modifier) {
         return runChain(links, index + 1, source, input, reader, successes);
     }
-    const std::vector<std::shared_ptr<const CommandSource>> sources =
-        link.modifier(CommandContext{source, *this, input, link.arguments});
+    CommandContext modifierContext{source, *this, input, link.arguments};
+    modifierContext.setTail(link.node, link.cursor);
+    const std::vector<std::shared_ptr<const CommandSource>> sources = link.modifier(modifierContext);
     if (!link.forks) {
         if (sources.size() != 1) {
             return 0;
@@ -405,13 +414,12 @@ Parsed<std::int32_t> CommandDispatcher::runChain(const std::vector<Link>& links,
     }
     // parity: `max_command_forks`, which stops a fork that would hand on that many sources.
     const world::LoadedWorld* world = worldIn(source, *environment_);
-    const std::int32_t forkLimit =
-        world == nullptr ? std::numeric_limits<std::int32_t>::max()
-                         : world->gameRules().number(world::gameRules::kMaxCommandForks);
+    const std::int32_t forkLimit = world == nullptr ? std::numeric_limits<std::int32_t>::max()
+                                                    : world->gameRules().number(world::gameRules::kMaxCommandForks);
     if (std::cmp_greater_equal(sources.size(), forkLimit)) {
-        return std::unexpected{CommandSyntaxError{
-            .component = wire::text::Component::translatable("command.forkLimit",
-                                                             {wire::text::Component::text(std::to_string(forkLimit))})}};
+        return std::unexpected{
+            CommandSyntaxError{.component = wire::text::Component::translatable(
+                                   "command.forkLimit", {wire::text::Component::text(std::to_string(forkLimit))})}};
     }
     std::int32_t worked = 0;
     for (const std::shared_ptr<const CommandSource>& next : sources) {
@@ -422,6 +430,23 @@ Parsed<std::int32_t> CommandDispatcher::runChain(const std::vector<Link>& links,
         }
     }
     return worked;
+}
+
+void CommandDispatcher::deferResult() { resultDeferred = true; }
+
+std::int32_t CommandDispatcher::continueTail(const CommandNode& node, std::int32_t cursor, const std::string& input,
+                                             const CommandSource& source, std::uint64_t generation) const {
+    if (generation != generation_) {
+        return 0;
+    }
+    std::int32_t successes = 0;
+    const Link link{.arguments = {}, .modifier = {}, .forks = false, .executor = {}, .node = &node, .cursor = cursor};
+    const Parsed<std::int32_t> ran = runTail(link, source, input, successes);
+    if (!ran.has_value()) {
+        reportSyntaxError(source, ran.error(), input);
+        return 0;
+    }
+    return *ran;
 }
 
 Parsed<std::int32_t> CommandDispatcher::runTail(const Link& link, const CommandSource& source, const std::string& input,
