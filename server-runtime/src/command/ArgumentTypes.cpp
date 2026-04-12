@@ -38,6 +38,24 @@ public:
     }
 };
 
+/// `brigadier:string` in its `QUOTABLE_PHRASE` form: a word, or anything in quotes.
+class QuotableStringArgument final : public ArgumentType {
+public:
+    [[nodiscard]] Parsed<ArgumentValue> parse(StringReader& reader, const CommandSource&,
+                                              const CommandEnvironment&) const override {
+        Parsed<std::string> text = reader.readString();
+        if (!text.has_value()) {
+            return std::unexpected{text.error()};
+        }
+        return ArgumentValue::of(std::move(*text));
+    }
+
+    [[nodiscard]] ArgumentParser wire() const override {
+        return ArgumentParser{parserId::kBrigadierString,
+                              ArgumentParser::StringProperties{.kind = ArgumentParser::StringKind::QuotablePhrase}};
+    }
+};
+
 class BoolArgument final : public ArgumentType {
 public:
     [[nodiscard]] Parsed<ArgumentValue> parse(StringReader& reader, const CommandSource&,
@@ -462,6 +480,11 @@ public:
 
 std::shared_ptr<const ArgumentType> wordArgument() {
     static const auto type = std::make_shared<const WordArgument>();
+    return type;
+}
+
+std::shared_ptr<const ArgumentType> stringArgument() {
+    static const auto type = std::make_shared<const QuotableStringArgument>();
     return type;
 }
 

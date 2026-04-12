@@ -1,5 +1,7 @@
 #include <basalt/server/assets/ServerJarAssets.hpp>
 #include <basalt/server/runtime/VanillaGameData.hpp>
+#include <basalt/server/runtime/datapack/PackFiles.hpp>
+#include <basalt/server/runtime/datapack/ResourceStack.hpp>
 #include <basalt/server/runtime/world/BrewingStands.hpp>
 
 #include <utility>
@@ -33,6 +35,29 @@ VanillaGameData::Jar VanillaGameData::jarOf(const assets::ServerJarAssets* asset
     };
 }
 
+datapack::PackFiles VanillaGameData::jarFilesOf(const assets::ServerJarAssets* assets) {
+    if (assets == nullptr) {
+        return {};
+    }
+    return datapack::PackFiles{
+        .list = [assets] { return assets->entriesUnder(""); },
+        .read = [assets](std::string_view name) { return assets->readEntry(name); },
+    };
+}
+
+VanillaGameData::Jar VanillaGameData::jarOf(std::shared_ptr<const datapack::ResourceStack> resources) {
+    if (resources == nullptr) {
+        return {};
+    }
+    return Jar{
+        .readText = [resources](std::string_view name) { return resources->readText(name); },
+        .entriesUnder = [resources](std::string_view prefix) { return resources->entriesUnder(prefix); },
+        .readEntry = [resources](std::string_view name) { return resources->read(name); },
+        .dataIds = [resources](std::string_view directory,
+                               std::string_view extension) { return resources->dataIds(directory, extension); },
+    };
+}
+
 VanillaGameData::VanillaGameData(const Jar& jar, wire::common::Logger logger)
     : lootTables({.readText = jar.readText, .entriesUnder = jar.entriesUnder}), biomeSpawns({.readText = jar.readText}),
       villagerTrades({.readText = jar.readText}), blockTransformers(jar.readText), jukeboxSongs(jar.readText),
@@ -56,11 +81,7 @@ VanillaGameData::VanillaGameData(const Jar& jar, wire::common::Logger logger)
       structureTemplates({.readEntry = jar.readEntry, .dataIds = jar.dataIds}) {
     lootTables.useRegistries(&lootRegistries);
     villagerTrades.useLootTables(&lootTables);
-    std::vector<server::world::crafting::Recipe> brews;
-    for (const server::world::crafting::Recipe* recipe : recipes.brewing()) {
-        brews.push_back(*recipe);
-    }
-    world::brewingStands::useRecipes(std::move(brews));
+    useBrewingRecipes();
     // Loud on purpose: a client whose overworld timeline tag is empty renders a sky that never
     // moves, and nothing else in the log would say why.
     const std::set<Identifier>& overworld =
@@ -71,6 +92,38 @@ VanillaGameData::VanillaGameData(const Jar& jar, wire::common::Logger logger)
                                "The server jar's data is missing or could not be read."};
         });
     }
+}
+
+void VanillaGameData::useBrewingRecipes() const {
+    std::vector<server::world::crafting::Recipe> brews;
+    for (const server::world::crafting::Recipe* recipe : recipes.brewing()) {
+        brews.push_back(*recipe);
+    }
+    world::brewingStands::useRecipes(std::move(brews));
+}
+
+void VanillaGameData::reload(const Jar& jar, const wire::common::Logger& logger) {
+    blockTags = world::realBlockTags::load(readerOf<world::realBlockTags::JarReader>(jar), logger);
+    itemTags = world::realItemTags::load(readerOf<world::realItemTags::JarReader>(jar), logger);
+    fluidTags = world::realFluidTags::load(readerOf<world::realFluidTags::JarReader>(jar), logger);
+    timelineTags = world::realTimelineTags::load(readerOf<world::realTimelineTags::JarReader>(jar), logger);
+    damageTypeTags = world::realDamageTypeTags::load(readerOf<world::realDamageTypeTags::JarReader>(jar), logger);
+    entityTags = world::realEntityTypeTags::load(readerOf<world::realEntityTypeTags::JarReader>(jar), logger);
+    bannerPatterns = world::realBannerPatterns::load(readerOf<world::realBannerPatterns::JarReader>(jar), logger);
+    enchantmentTags = world::realEnchantmentTags::load(
+        readerOf<world::realEnchantmentTags::JarReader>(jar),
+        [this](const Identifier& id) { return enchantments.contains(id); }, logger);
+    // Rebuilt where it stands: its own callbacks point at itself, and the loot tables at it.
+    std::destroy_at(&lootRegistries);
+    std::construct_at(&lootRegistries,
+                      world::LootRegistries::Jar{.entriesUnder = jar.entriesUnder, .readText = jar.readText},
+                      enchantments, logger);
+    lootTables.reload({.readText = jar.readText, .entriesUnder = jar.entriesUnder});
+    recipes = world::RealRecipes({.readText = jar.readText, .entriesUnder = jar.entriesUnder});
+    useBrewingRecipes();
+    advancements = world::RealAdvancements(
+        world::RealAdvancements::Jar{.entriesUnder = jar.entriesUnder, .readText = jar.readText});
+    structureTemplates.reload({.readEntry = jar.readEntry, .dataIds = jar.dataIds});
 }
 
 } // namespace basalt::server::runtime

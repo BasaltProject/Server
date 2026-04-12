@@ -92,6 +92,7 @@ void BasaltServer::serveConnection(wire::io::TcpConnection connection) {
     options.entityTypeTags = &vanillaData_.entityTags;
     options.dialogs = &vanillaData_.dialogs;
     options.timelines = &vanillaData_.timelines;
+    options.packRegistries = packRegistries();
     options.substitutionLabels = substitutionLabels_.get();
     options.bossBars = &bossBars_;
     options.protocolGate = protocolGate_;

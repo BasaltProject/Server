@@ -26,12 +26,9 @@ struct LootTableParseError {
 };
 
 /// The named entries loot data refers to by id: `predicate`, `item_modifier`,
-/// `context_int_provider` and `context_float_provider`.
-///
-/// parity: 26.3 made every condition, modifier and number a registry holder, so a file may name an
-/// entry instead of writing it out. The registries are fixed once the data is loaded, so an entry is
-/// resolved into its value the first time it is named and shared from then on. Several threads may
-/// parse at once, so the cache has one owner and it is this lock.
+/// `context_int_provider` and `context_float_provider`. Resolved the first time each is named and
+/// shared after; several threads may parse at once, so the lock owns the cache.
+/// parity: 26.3 made conditions, modifiers and numbers registry holders, so a file may name an entry.
 class LootReferences {
 public:
     /// One registry entry's JSON, `registry` being the folder name under `data/<namespace>/`.
@@ -44,6 +41,9 @@ public:
     [[nodiscard]] std::optional<std::string> read(std::string_view registry, const wire::common::Identifier& id) const;
     [[nodiscard]] std::optional<Entry> cached(const std::string& key) const;
     void remember(const std::string& key, Entry entry);
+
+    /// Reads from somewhere else from now on, forgetting everything resolved so far: `/reload`.
+    void replace(ReadEntry read);
 
 private:
     ReadEntry read_;

@@ -110,7 +110,8 @@ void heardBySculk(const BreakContext& context, world::LoadedWorld& world, std::s
 /// Puts a stack into the world. Telling anyone about it belongs to each connection's own thread.
 void spawnDroppedItem(const BreakContext& context, world::LoadedWorld& world, const wire::common::Identifier& item,
                       std::int32_t count, double x, double y, double z, double velocityX, double velocityY,
-                      double velocityZ, std::int32_t pickupDelay, wire::nbt::NbtCompound components);
+                      double velocityZ, std::int32_t pickupDelay, wire::nbt::NbtCompound components,
+                      std::optional<wire::common::Uuid> thrower = std::nullopt);
 
 /// What the block leaves on the ground.
 void dropLootFor(const BreakContext& context, world::LoadedWorld& world, const wire::common::Identifier& block,

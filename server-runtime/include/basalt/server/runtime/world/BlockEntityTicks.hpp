@@ -78,6 +78,9 @@ struct Hooks {
     /// state goes in `pending` like a hive's; answers whether the heart's tag changed.
     std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z, std::vector<BlockChange>& pending)>
         creakingHeart;
+    /// parity: `SculkCatalystBlockEntity.serverTick`, run once every block entity has had its turn
+    /// because it rewrites blocks and their block entities; answers whether its cursors changed.
+    std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z)> sculkCatalyst;
     /// The chunks that tick this turn, which a shrieker's noise waits on. Unset, every loaded one.
     WorldState::Ticking ticking;
 };

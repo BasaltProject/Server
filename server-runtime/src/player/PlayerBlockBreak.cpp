@@ -9,7 +9,6 @@
 #include <basalt/server/runtime/item/ItemDamageEffects.hpp>
 #include <basalt/server/runtime/item/ItemWear.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
-#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
@@ -26,6 +25,7 @@
 #include <basalt/server/runtime/world/Redstone.hpp>
 #include <basalt/server/runtime/world/Shulkers.hpp>
 #include <basalt/server/runtime/world/SnowyBlocks.hpp>
+#include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Tripwires.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
@@ -160,7 +160,7 @@ void heardBySculk(const BreakContext& context, world::LoadedWorld& world, const 
 void spawnDroppedItem(const BreakContext& context, world::LoadedWorld& world, const Identifier& item,
                       const std::int32_t count, const double x, const double y, const double z, const double velocityX,
                       const double velocityY, const double velocityZ, const std::int32_t pickupDelay,
-                      wire::nbt::NbtCompound components) {
+                      wire::nbt::NbtCompound components, std::optional<wire::common::Uuid> thrower) {
     if (count <= 0 || reg::items::registry().byName(item) == nullptr) {
         return;
     }
@@ -184,7 +184,8 @@ void spawnDroppedItem(const BreakContext& context, world::LoadedWorld& world, co
                                                                  .velocityY = velocityY,
                                                                  .velocityZ = velocityZ,
                                                                  .pickupDelay = pickupDelay,
-                                                                 .components = std::move(components)}));
+                                                                 .components = std::move(components),
+                                                                 .thrower = thrower}));
 }
 
 void dropLootFor(const BreakContext& context, world::LoadedWorld& world, const Identifier& block,

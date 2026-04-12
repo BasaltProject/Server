@@ -90,11 +90,11 @@ TEST_CASE("what is not a readable tag file is passed over, and the rest still lo
     CHECK(tags::membersOf(loaded, fluid("wet")).size() == 3);
 }
 
-TEST_CASE("a required fluid outside the five sinks the whole graph") {
+TEST_CASE("a required fluid outside the five leaves out that tag alone, as vanilla does") {
     FakeJar jar = twoTags();
     jar.entries["data/minecraft/tags/fluid/wrong.json"] = R"({"values": ["minecraft:milk"]})";
 
-    CHECK(tags::load(jar.reader()).empty());
+    CHECK(tags::load(jar.reader()).size() == 2);
 
     jar.entries["data/minecraft/tags/fluid/wrong.json"] =
         R"({"values": [{"id": "minecraft:milk", "required": false}]})";
@@ -109,15 +109,4 @@ TEST_CASE("no jar at all, or half of one, reads as no tags rather than a crash")
     CHECK(tags::load(tags::JarReader{}).empty());
     CHECK(tags::load(tags::JarReader{twoTags().reader().entriesUnder, {}}).empty());
     CHECK(tags::load(tags::JarReader{{}, twoTags().reader().readText}).empty());
-}
-
-TEST_CASE("an entry the listing hands back from outside the tag directory keeps its whole path") {
-    const tags::JarReader jar{[](std::string_view) { return std::vector<std::string>{"elsewhere/water.json"}; },
-                              [](std::string_view) -> std::optional<std::string> {
-                                  return std::string{R"({"values": ["minecraft:water"]})"};
-                              }};
-    const tags::TagMembers loaded = tags::load(jar);
-
-    CHECK(loaded.size() == 1);
-    CHECK(tags::membersOf(loaded, fluid("elsewhere/water")).size() == 1);
 }

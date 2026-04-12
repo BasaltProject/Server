@@ -350,6 +350,10 @@ void CombatHandler::handleInteract(const wire::protocol::play::InteractPacket& i
                                        shears);
         switch (use) {
         case MobActionSystem::LeashUse::Pass:
+            // parity: `Entity.interact`, the equipment sheared once no lead was there to cut.
+            if (shears && shearEquipment(*session, *entity, slot)) {
+                return;
+            }
             break;
         case MobActionSystem::LeashUse::Done:
             return;

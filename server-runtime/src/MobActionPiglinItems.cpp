@@ -16,6 +16,7 @@
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
+#include <basalt/server/runtime/world/ThrownItemTriggers.hpp>
 #include <basalt/wire/common/Mth.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 
@@ -121,6 +122,8 @@ void MobActionSystem::throwFromMob(world::LoadedWorld& world, const ServerEntity
     dropped.velocityY = ty * scale;
     dropped.velocityZ = tz * scale;
     dropped.pickupDelay = world::kSpawnedPickupDelay;
+    // parity: `BehaviorUtils.throwItem` sets the thrower.
+    dropped.thrower = mob.uuid();
     world.state().spawnItem(std::move(dropped));
 }
 
@@ -202,6 +205,9 @@ void MobActionSystem::piglinPicksUp(world::LoadedWorld& world, ServerEntity& pig
         if (!piglinWantsToPickUp(piglin, state, whole, now)) {
             continue;
         }
+        // parity: `Piglin.pickUpItem` tells the thrower before `PiglinAi.pickUpItem` takes any of it.
+        world::thrownItems::pickedUpByMob(options_.advancementTriggers, world, watchersOf(world), item, item.count,
+                                          piglin);
         // parity: `PiglinAi.pickUpItem`: the walk stops, and a nugget stack goes whole, anything else one.
         state.motion.walk.reset();
         entity::ai::navigation::stop(piglin);
@@ -322,7 +328,7 @@ void MobActionSystem::piglinStopHoldingOffhand(world::LoadedWorld& world, Server
     }
 }
 
-void MobActionSystem::piglinSetAngerTarget(world::LoadedWorld& world, ServerEntity& piglin, PiglinState& state,
+void MobActionSystem::piglinSetAngerTarget(world::LoadedWorld& world, ServerEntity& /*piglin*/, PiglinState& state,
                                            std::int32_t targetId) {
     const std::int64_t now = world.gameTime();
     std::optional<wire::common::Uuid> uuid;
@@ -436,8 +442,10 @@ void MobActionSystem::piglinWasHurtBy(world::LoadedWorld& world, entity::ai::Mob
     }
     if (state.avoidTarget.has(now)) {
         const ServerEntity* avoided = world.state().entity(*state.avoidTarget.value);
-        const std::string_view avoidedType = avoided == nullptr ? "player" : avoided->type().path();
-        const std::string_view attackerType = attacker == nullptr ? "player" : attacker->type().path();
+        const std::string_view avoidedType =
+            avoided == nullptr ? std::string_view{"player"} : std::string_view{avoided->type().path()};
+        const std::string_view attackerType =
+            attacker == nullptr ? std::string_view{"player"} : std::string_view{attacker->type().path()};
         if (avoidedType != attackerType) {
             state.avoidTarget.erase();
         }

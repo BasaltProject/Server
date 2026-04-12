@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/entity/Creakings.hpp>
 #include <basalt/server/runtime/entity/EnderDragon.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
+#include <basalt/server/runtime/entity/Horses.hpp>
 #include <basalt/server/runtime/entity/MobSounds.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/Shulkers.hpp>
@@ -202,6 +203,9 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
     if (!cooling && !planted) {
         knockback(entity, kDefaultKnockback, sourceX.value_or(entity.x) - entity.x,
                   sourceZ.value_or(entity.z) - entity.z);
+    }
+    if (entity.horse != nullptr) {
+        entity.horse->hurt = true;
     }
     if (died && hooks.died) {
         hooks.died(entity, attackerName);

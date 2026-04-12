@@ -18,6 +18,9 @@ namespace deathDrops {
 /// Whether its loot table rolls. parity: `LivingEntity.shouldDropLoot`, and `Monster`'s.
 [[nodiscard]] bool dropsLoot(const ServerEntity& entity, bool mobDrops);
 
+/// parity: `LivingEntity.shouldDropExperience` and its overrides, which a sculk catalyst asks alone.
+[[nodiscard]] bool shouldDropExperience(const ServerEntity& entity);
+
 /// Whether it leaves experience. parity: `LivingEntity.dropExperience`.
 [[nodiscard]] bool dropsExperience(const ServerEntity& entity, bool mobDrops);
 

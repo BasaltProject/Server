@@ -76,7 +76,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                            config::LiveConfigs& live, Options options)
     : config_(&config), worldsConfig_(&worldsConfig), live_(&live), options_(std::move(options)),
       protocolGate_(options_.compatibility.gate(wire::multiversion::java::javaTranslators::supported(), logger_)),
-      vanillaData_(VanillaGameData::jarOf(options_.serverJar), logger_), chunkSimulation_(playerRegistry_) {
+      vanillaData_(dataJar(), logger_), chunkSimulation_(playerRegistry_) {
     if (options_.compatibility.nameSubstitutes()) {
         substitutionLabels_ = std::make_unique<SubstituteLabels>();
     }
@@ -174,7 +174,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     advancementTriggers_ = std::make_unique<world::AdvancementTriggers>(vanillaData_.advancements, *playerProgress_,
                                                                         std::move(triggerHooks));
 
-    const VanillaGameData::Jar jar = VanillaGameData::jarOf(options_.serverJar);
+    const VanillaGameData::Jar jar = dataJar();
     spawnEquipment_ = std::make_unique<world::SpawnEquipmentFinalizer>(
         world::SpawnEquipmentJar{.entriesUnder = jar.entriesUnder, .readText = jar.readText});
 
@@ -293,8 +293,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                           .onUnloadInterval = [this] { persistence_->unloadUnreachableChunks(); },
                           .onTick = [this](bool worldRuns) { tickWorlds(worldRuns); }});
 
-    functions_.reload();
-    functionRunner_ = std::make_unique<command::commands::FunctionRunner>(functions_);
+    functionRunner_ = makeFunctionRunner(config.functionPermissionLevel);
     consoleSource_ = std::make_unique<command::ConsoleCommandSource>(
         logger_, options_.lang, [this] { return worldRegistry_->defaultWorld().spawn(); });
     stopwatches_ = std::make_unique<command::commands::Stopwatches>([this] {
@@ -323,6 +322,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
         if (maps_ != nullptr) {
             maps_->save();
         }
+        saveSchedule();
     };
     persistence_ = std::make_unique<PersistenceCoordinator>(
         std::move(persistenceHooks), playerRegistry_, *playerStore_, commandStorage_, metrics_,
@@ -364,6 +364,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     wiring.functions = &functions_;
     wiring.functionRunner = functionRunner_.get();
     wiring.functionSchedule = &functionSchedule_;
+    wiring.datapacks = command::commands::DataPackControl{
+        .packs = options_.datapacks,
+        .reload = [this](const std::vector<std::string>& selected) { return reloadData(selected); }};
     wiring.bossBars = &bossBars_;
     wiring.commandStorage = &commandStorage_;
     wiring.stopwatches = stopwatches_.get();
@@ -418,6 +421,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     wiring.setWhitelistEnforced = [this](bool value) { whitelistEnforced_ = value; };
     wiring.setIdleTimeout = [this](std::int32_t minutes) { idleTimeoutMinutes_ = minutes; };
     wired_ = buildCommands(wiring);
+    loadFunctions();
 
     // The seam the plugins see the server through. Everything they run goes on the global owner: it
     // is the one owner that exists in both scheduler modes and is a single thread in both.
@@ -555,7 +559,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                            },
                            .itemTags = &vanillaData_.itemTags,
                            .nextSeed = [] { return scratchSeed(); },
-                           .readJar = VanillaGameData::jarOf(options_.serverJar).readText});
+                           .readJar = dataJar().readText});
     vanillaData_.lootTables.useExplorationMaps([this](world::LoadedWorld& world, server::world::loot::ItemStack& stack,
                                                       const server::world::loot::ExplorationMapRequest& request,
                                                       const std::array<double, 3>& origin) {
@@ -678,6 +682,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                     if (shriekers_ != nullptr) {
                         shriekers_->scheduledTick(world, watchers, x, y, z);
                     }
+                    if (sculkCatalysts_ != nullptr) {
+                        static_cast<void>(sculkCatalysts_->scheduledTick(world, x, y, z));
+                    }
                 },
             .skullPlaced =
                 [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
@@ -731,6 +738,10 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                 [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                        std::vector<world::BlockChange>& pending) {
                     return mobActions_ != nullptr && mobActions_->tickCreakingHeart(world, x, y, z, pending);
+                },
+            .tickSculkCatalyst =
+                [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+                    return sculkCatalysts_ != nullptr && sculkCatalysts_->tick(world, x, y, z);
                 },
             .shriekerHeard =
                 [this](world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival) {
@@ -861,6 +872,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                                                    .advancementTriggers = advancementTriggers_.get()});
     shriekers_ = std::make_unique<ShriekerSystem>(playerRegistry_, *broadcaster_, *spawning_, *mobActions_,
                                                   ShriekerSystem::Options{.nextSeed = [] { return scratchSeed(); }});
+    sculkCatalysts_ = std::make_unique<SculkCatalystSystem>(
+        playerRegistry_, *broadcaster_,
+        SculkCatalystSystem::Options{.nextSeed = [] { return scratchSeed(); }, .blockTags = &vanillaData_.blockTags});
     lightning_ = std::make_unique<LightningBoltSystem>(*broadcaster_, *mobActions_, advancementTriggers_.get());
     mobTicks_ = std::make_unique<MobTickSystem>(*mobActions_);
 

@@ -1,3 +1,4 @@
+#include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
@@ -9,6 +10,8 @@
 #include <basalt/server/runtime/player/PlayerEntityData.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/player/PlayerSounds.hpp>
+#include <basalt/server/runtime/player/PlayerVelocity.hpp>
 #include <basalt/server/runtime/player/PlayerVitals.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/Beds.hpp>
@@ -23,6 +26,7 @@
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/SkeletonHorseTrap.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
+#include <basalt/wire/protocol/play/EntityPackets.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -53,6 +57,8 @@ constexpr double kPlayerHalfWidth = 0.3;
 constexpr double kPlayerHeight = 1.8;
 /// parity: `Entity.checkInsideBlocks` shrinks the box this much before asking the blocks.
 constexpr double kInsideMargin = 1.0E-5;
+/// parity: `EntityEvent.HONEY_SLIDE`, the specks the client draws.
+constexpr std::int8_t kHoneySlideEvent = 53;
 /// parity: `PlayerList.broadcast` for a block event, sixty-four blocks.
 constexpr double kBlockEventRange = 64.0;
 
@@ -187,15 +193,16 @@ void EnvironmentTickSystem::tickLocation(world::LoadedWorld& world) {
 // rather than on a clock. Asking once a tick instead grants the same criteria a moment earlier at
 // worst: what a criterion reads is the block, and a player who stands in one was moved into it.
 void EnvironmentTickSystem::tickInsideBlocks(world::LoadedWorld& world) {
-    if (options_.advancementTriggers == nullptr || !options_.advancementTriggers->listensTo("enter_block")) {
-        return;
-    }
+    const bool entering =
+        options_.advancementTriggers != nullptr && options_.advancementTriggers->listensTo("enter_block");
     const auto low = [](double value) { return static_cast<std::int32_t>(std::floor(value + kInsideMargin)); };
     const auto high = [](double value) { return static_cast<std::int32_t>(std::floor(value - kInsideMargin)); };
-    for (const PlayerSession* player : players_->snapshot()) {
+    for (PlayerSession* player : players_->snapshot()) {
         if (player->worldName != world.name()) {
             continue;
         }
+        // parity: `LivingEntity.aiStep` wears the server's motion down before the blocks are asked.
+        player::velocity::decay(*player);
         for (std::int32_t x = low(player->x - kPlayerHalfWidth); x <= high(player->x + kPlayerHalfWidth); ++x) {
             for (std::int32_t y = low(player->y); y <= high(player->y + kPlayerHeight); ++y) {
                 for (std::int32_t z = low(player->z - kPlayerHalfWidth); z <= high(player->z + kPlayerHalfWidth); ++z) {
@@ -205,14 +212,52 @@ void EnvironmentTickSystem::tickInsideBlocks(world::LoadedWorld& world) {
                         continue;
                     }
                     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(*state);
-                    if (block != nullptr) {
+                    if (block != nullptr && entering) {
                         options_.advancementTriggers->fire(
                             "enter_block", player->name(), player->uuid().toString(),
                             world::TriggerEvent{.ids = {{"block", *block}},
                                                 .state = registry::blockStateDefinitions::propertiesOf(*state)});
                     }
+                    if (block != nullptr && block->path() == "honey_block") {
+                        honeySlide(world, *player, x, y, z, *state);
+                    }
                 }
             }
+        }
+    }
+}
+
+void EnvironmentTickSystem::honeySlide(world::LoadedWorld& world, PlayerSession& player, std::int32_t x, std::int32_t y,
+                                       std::int32_t z, std::int32_t state) {
+    // parity: `HoneyBlock.entityInside`, measured against the motion the server keeps.
+    if (!player::velocity::slidingDown(player, x, y, z)) {
+        return;
+    }
+    if (world.gameTime() % kLocationIntervalTicks == 0 && options_.advancementTriggers != nullptr) {
+        options_.advancementTriggers->fire(
+            "slide_down_block", player.name(), player.uuid().toString(),
+            world::TriggerEvent{.ids = {{"block", wire::common::Identifier::vanilla("honey_block")}},
+                                .state = registry::blockStateDefinitions::propertiesOf(state)});
+    }
+    player::velocity::slide(player);
+    // parity: `maybeDoSlideEffects`, the sound and the honey specks one time in five each.
+    random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
+    const bool sound = random.nextInt(5) == 0;
+    const bool specks = random.nextInt(5) == 0;
+    const std::int64_t seed = options_.nextSeed ? options_.nextSeed() : 0;
+    const wire::protocol::play::EntityEventPacket packet{.entityId = player.entityId(), .eventId = kHoneySlideEvent};
+    for (PlayerSession* watcher : players_->snapshot()) {
+        if (watcher->worldName != world.name()) {
+            continue;
+        }
+        if (sound) {
+            player::playSoundFor(*watcher, "minecraft:block.honey_block.slide",
+                                 wire::protocol::play::SoundSource::Players, player.x, player.y, player.z, 1.0F, 1.0F,
+                                 seed);
+        }
+        if (specks && watcher->connection().sendPlayPacket) {
+            watcher->connection().sendPlayPacket(wire::protocol::play::EntityEventPacket::kId,
+                                                 [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
         }
     }
 }

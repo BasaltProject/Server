@@ -25,6 +25,7 @@
 #include <basalt/server/runtime/RedstoneTickSystem.hpp>
 #include <basalt/server/runtime/ServerListStatus.hpp>
 #include <basalt/server/runtime/ServerMetrics.hpp>
+#include <basalt/server/runtime/SculkCatalystSystem.hpp>
 #include <basalt/server/runtime/ShriekerSystem.hpp>
 #include <basalt/server/runtime/StatusEffectSystem.hpp>
 #include <basalt/server/runtime/SubstituteLabels.hpp>
@@ -38,6 +39,7 @@
 #include <basalt/server/runtime/command/commands/SaveCommands.hpp>
 #include <basalt/server/runtime/config/CompatibilityConfig.hpp>
 #include <basalt/server/runtime/config/LiveConfigs.hpp>
+#include <basalt/server/runtime/datapack/DataPacks.hpp>
 #include <basalt/server/runtime/function/FunctionLibrary.hpp>
 #include <basalt/server/runtime/player/PlayerBlockBreak.hpp>
 #include <basalt/server/runtime/player/PlayerDamage.hpp>
@@ -49,6 +51,7 @@
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
 #include <basalt/server/runtime/world/PlayerProgress.hpp>
 #include <basalt/server/runtime/world/maps/MapStorage.hpp>
+#include <basalt/wire/protocol/configuration/ConfigurationPackets.hpp>
 #include <basalt/wire/auth/SessionKeyPair.hpp>
 #include <basalt/wire/auth/SignatureValidator.hpp>
 #include <basalt/wire/io/TcpSocket.hpp>
@@ -79,6 +82,8 @@ public:
     struct Options {
         /// The operator's own jar. Null in a test that never breaks a block in survival.
         assets::ServerJarAssets* serverJar = nullptr;
+        /// The data packs everything reads through. Null in a test, which reads the jar alone.
+        datapack::DataPacks* datapacks = nullptr;
         world::VanillaWorldGeneratorFactory* generators = nullptr;
         /// Online mode's own key pair and session service, or null for offline mode.
         const wire::auth::SessionKeyPair* keyPair = nullptr;
@@ -144,6 +149,9 @@ private:
     /// so this is run wherever a kill can have been made: after the queued commands, which is where
     /// vanilla's command phase is and the only thing that runs while `/tick freeze` holds, and again
     /// after the entities have moved, which is where a mob killed by another one dies.
+    /// parity: the sculk catalyst's `CatalystListener` on a death. Answers whether it took the
+    /// experience, so none drops.
+    bool drinkBySculk(world::LoadedWorld& world, const entity::ServerEntity& dead);
     void tickDeaths(world::LoadedWorld& world, const sched::Region& region);
 
     /// The objectives the server keeps itself: deaths, kills, health, food, air, armour and
@@ -238,6 +246,31 @@ private:
     void rollBedrockEnchantment(player::PlayerSession& session, world::LoadedWorld& world,
                                 bedrock::BedrockWindows& windows);
 
+    /// What the data is read through: the selected packs, or the jar alone without them.
+    [[nodiscard]] VanillaGameData::Jar dataJar() const;
+
+    [[nodiscard]] std::unique_ptr<command::commands::FunctionRunner> makeFunctionRunner(std::int32_t permissionLevel);
+
+    /// parity: the `scheduled_events` saved data, kept beside the default world's `level.nbt`.
+    [[nodiscard]] std::string schedulePath() const;
+    void saveSchedule() const;
+
+    /// Compiles every function against the command tree, which is why it waits for the tree.
+    void loadFunctions();
+
+    /// parity: `MinecraftServer.reloadResources`. Answers whether the selection loaded.
+    bool reloadData(const std::vector<std::string>& selected);
+
+    /// parity: `ServerFunctionManager.tick` and the scheduled functions of `TimerQueue`.
+    void tickFunctions();
+
+    /// Tells every player what a reload changed. parity: `PlayerList.reloadResources`.
+    void resyncAfterReload();
+
+    /// What the selected packs change in the registries a joining client is sent.
+    [[nodiscard]] std::function<void(std::vector<wire::protocol::configuration::RegistryDataPacket>&)>
+    packRegistries() const;
+
     VanillaGameData vanillaData_;
     ChunkSimulationView chunkSimulation_;
     /// What a mob spawns holding, out of the operator's own jar.
@@ -296,6 +329,7 @@ private:
     std::unique_ptr<WitherSystem> withers_;
     std::unique_ptr<LightningBoltSystem> lightning_;
     std::unique_ptr<ShriekerSystem> shriekers_;
+    std::unique_ptr<SculkCatalystSystem> sculkCatalysts_;
     std::unique_ptr<CombatSystem> combat_;
     std::unique_ptr<FireworkSystem> fireworks_;
     std::unique_ptr<AreaEffectCloudSystem> clouds_;

@@ -107,6 +107,11 @@ void MobActionSystem::landMob(world::LoadedWorld& world, ServerEntity& mob) {
     }
     const bool horse =
         path == "horse" || path == "donkey" || path == "mule" || path == "skeleton_horse" || path == "zombie_horse";
+    const bool mount = horse || path == "llama" || path == "trader_llama" || path == "camel" || path == "camel_husk";
+    // parity: `LivingEntity.causeFallDamage` hands the fall on before anything, a mount only once hurt.
+    if (!mount) {
+        propagateFall(world, mob, fallen, landing);
+    }
     if (horse && distance > 1.0) {
         movementSound(world, mob, mob.age < 0 ? "entity.horse.land_baby" : "entity.horse.land", 0.4F, 1.0F);
     }
@@ -143,6 +148,9 @@ void MobActionSystem::landMob(world::LoadedWorld& world, ServerEntity& mob) {
         combat_->announceEntityHit(watchersOf(world), mob,
                                    landing.stalagmite ? world::damageTypes::kStalagmite : world::damageTypes::kFall, -1,
                                    result.died);
+    }
+    if (mount) {
+        propagateFall(world, mob, fallen, landing);
     }
 }
 

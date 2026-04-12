@@ -77,7 +77,8 @@ void DebugCommand::build(const CommandNodeBuilder& root) const {
                     return std::unexpected{
                         CommandSyntaxError{.component = Component::text("No functions are loaded.")}};
                 }
-                const auto* id = context.get<Identifier>("name");
+                const auto* named = context.get<FunctionName>("name");
+                const Identifier* id = named == nullptr ? nullptr : &named->id;
                 const std::optional<std::int32_t> result = id == nullptr ? std::nullopt : runFunction_(context, *id);
                 if (!result.has_value()) {
                     return std::unexpected{

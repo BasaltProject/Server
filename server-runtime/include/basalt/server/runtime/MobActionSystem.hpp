@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
 #include <basalt/server/runtime/world/Beehives.hpp>
 #include <basalt/server/runtime/world/BlockChange.hpp>
+#include <basalt/server/runtime/world/FallLanding.hpp>
 #include <basalt/server/runtime/world/MobEffects.hpp>
 #include <basalt/server/runtime/world/RealBlockTags.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
@@ -828,6 +829,9 @@ private:
     bool cutLeashes(world::LoadedWorld& world, entity::ServerEntity& entity, const player::PlayerSession* player);
     /// parity: `LivingEntity.checkFallDamage` on landing: the dust, `fallOn` and `causeFallDamage`.
     void landMob(world::LoadedWorld& world, entity::ServerEntity& mob);
+    /// parity: `Entity.propagateFallToPassengers`.
+    void propagateFall(world::LoadedWorld& world, entity::ServerEntity& vehicle, double fallen,
+                       const world::fallLanding::Landing& landing);
     /// parity: `walkingStepSound` on the square at `at`.
     void stepSound(world::LoadedWorld& world, entity::ServerEntity& mob, const std::array<std::int32_t, 3>& at,
                    std::int32_t stateId);

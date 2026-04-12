@@ -441,14 +441,16 @@ void CombatHandler::postPiercingAttack(PlayerSession& session, world::LoadedWorl
         session.food.addExhaustion(outcome.exhaustion);
     }
     if (outcome.pushed) {
-        // parity: `ApplyEntityImpulse` sends a player its motion at once, and the fall under it is spared.
+        // parity: `ApplyEntityImpulse` adds to the motion and sends a player the sum at once.
+        auto& [dx, dy, dz] = session.deltaMovement;
+        dx += outcome.impulse[0];
+        dy += outcome.impulse[1];
+        dz += outcome.impulse[2];
         if (session.connection().pushBack) {
-            session.connection().pushBack(outcome.impulse[0], outcome.impulse[1], outcome.impulse[2], session.yaw);
+            session.connection().pushBack(dx, dy, dz, session.yaw);
         } else if (session.connection().sendPlayPacket) {
-            const wire::protocol::play::SetEntityMotionPacket packet{.entityId = session.entityId(),
-                                                                     .velocityX = outcome.impulse[0],
-                                                                     .velocityY = outcome.impulse[1],
-                                                                     .velocityZ = outcome.impulse[2]};
+            const wire::protocol::play::SetEntityMotionPacket packet{
+                .entityId = session.entityId(), .velocityX = dx, .velocityY = dy, .velocityZ = dz};
             session.connection().sendPlayPacket(wire::protocol::play::SetEntityMotionPacket::kId,
                                                 [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
         }

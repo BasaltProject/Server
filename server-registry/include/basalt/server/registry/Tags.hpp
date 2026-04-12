@@ -47,13 +47,10 @@ struct TagError {
 /// Whether a concrete element exists in the registry these tags belong to.
 using ElementExists = std::function<bool(const wire::common::Identifier&)>;
 
-/// Flattens a set of tag files, all from one registry's tag directory, into resolved element sets.
+/// Flattens one registry's tag files into resolved element sets.
 ///
-/// parity: `TagLoader.build`. Tags can refer to other tags, so a tag is resolved by resolving the
-/// tags it refers to first, and a missing required element or reference is an error while a missing
-/// optional one is dropped in silence. Vanilla sorts the whole graph up front; resolving depth first
-/// and remembering the answer reaches the same result, each tag still resolved exactly once and
-/// always after the ones it refers to.
+/// parity: `TagLoader.build`. Referenced tags resolve first; a missing required element or reference
+/// is an error, a missing optional one is dropped. Depth first with memoisation matches vanilla's sort.
 [[nodiscard]] std::expected<std::map<wire::common::Identifier, std::set<wire::common::Identifier>>, TagError>
 resolve(const std::map<wire::common::Identifier, TagFile>& files, const ElementExists& elementExists);
 
@@ -61,6 +58,29 @@ resolve(const std::map<wire::common::Identifier, TagFile>& files, const ElementE
 /// parity: the `LinkedHashSet` `TagLoader.build` fills, which is the order a random pick draws over.
 [[nodiscard]] std::expected<std::map<wire::common::Identifier, std::vector<wire::common::Identifier>>, TagError>
 resolveOrdered(const std::map<wire::common::Identifier, TagFile>& files, const ElementExists& elementExists);
+
+/// One tag that could not be built, and every required reference it was missing.
+struct TagFailure {
+    wire::common::Identifier tag;
+    std::vector<std::string> missing;
+
+    /// parity: `TagLoader.build`'s "Couldn't load tag {} as it is missing following references: {}".
+    [[nodiscard]] std::string message() const;
+};
+
+using TagFailed = std::function<void(const TagFailure&)>;
+
+/// parity: `TagLoader.build`. A tag missing a required element or tag is left out and reported,
+/// with everything that refers to it in turn, and every other tag still loads. A tag reached again
+/// while it is being built counts as missing, which is how a cycle fails.
+[[nodiscard]] std::map<wire::common::Identifier, std::set<wire::common::Identifier>>
+resolveEach(const std::map<wire::common::Identifier, TagFile>& files, const ElementExists& elementExists,
+            const TagFailed& failed = {});
+
+/// The same in file order, first occurrence winning.
+[[nodiscard]] std::map<wire::common::Identifier, std::vector<wire::common::Identifier>>
+resolveEachOrdered(const std::map<wire::common::Identifier, TagFile>& files, const ElementExists& elementExists,
+                   const TagFailed& failed = {});
 
 /// Reads the real vanilla tag file schema, `{"replace": bool, "values": [...]}`.
 ///

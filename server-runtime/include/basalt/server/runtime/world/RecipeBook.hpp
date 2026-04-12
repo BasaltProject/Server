@@ -22,6 +22,11 @@ void add(const player::PlayerSession& target, const RealRecipes& recipes,
 void remove(const player::PlayerSession& target, const RealRecipes& recipes,
             const std::vector<wire::common::Identifier>& ids);
 
+/// The whole book again, replacing what the client had: its numbers change when recipes reload.
+/// parity: `ServerRecipeBook.sendInitialRecipeBook`.
+void resend(const player::PlayerSession& target, const RealRecipes& recipes,
+            const std::vector<wire::common::Identifier>& ids);
+
 /// One book entry, or nothing for a recipe this build did not parse and so cannot draw.
 [[nodiscard]] std::optional<wire::protocol::play::RecipeBookEntry> entryFor(const RealRecipes& recipes,
                                                                             const wire::common::Identifier& id);

@@ -1,5 +1,6 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/registry/Tags.hpp>
+#include <basalt/server/runtime/datapack/DataFiles.hpp>
 #include <basalt/server/runtime/world/LootRegistries.hpp>
 #include <basalt/server/runtime/world/RealEnchantments.hpp>
 #include <basalt/server/runtime/world/WeaponDamage.hpp>
@@ -20,8 +21,6 @@ using wire::nbt::NbtCompound;
 using wire::nbt::NbtList;
 using wire::nbt::NbtTag;
 
-constexpr std::string_view kTagPrefix = "data/minecraft/tags/";
-constexpr std::string_view kJsonSuffix = ".json";
 constexpr std::array<std::string_view, 5> kRegistries{"enchantment", "instrument", "item", "fluid",
                                                       "worldgen/structure"};
 
@@ -96,41 +95,15 @@ LootRegistries::LootRegistries(const Jar& jar, const RealEnchantments& enchantme
         definitions_.push_back(std::move(built));
     }
 
-    if (jar.entriesUnder && jar.readText) {
-        for (const std::string_view registry : kRegistries) {
-            const std::string prefix = std::string{kTagPrefix} + std::string{registry} + "/";
-            std::map<Identifier, reg::tags::TagFile> files;
-            for (const std::string& entry : jar.entriesUnder(prefix)) {
-                if (!entry.ends_with(kJsonSuffix)) {
-                    continue;
-                }
-                const std::optional<std::string> text = jar.readText(entry);
-                const std::expected<reg::tags::TagFile, reg::tags::tagFileJson::ParseError> file =
-                    text.has_value() ? reg::tags::tagFileJson::parse(*text)
-                                     : std::unexpected(reg::tags::tagFileJson::ParseError::NotAnObject);
-                if (!file.has_value()) {
-                    continue;
-                }
-                std::string path = entry.substr(prefix.size());
-                path.resize(path.size() - kJsonSuffix.size());
-                files.insert_or_assign(Identifier::vanilla(path), *file);
+    for (const std::string_view registry : kRegistries) {
+        const reg::tags::ElementExists exists = [this, registry](const Identifier& id) {
+            if (registry == "item") {
+                return reg::items::registry().byName(id) != nullptr;
             }
-            const reg::tags::ElementExists exists = [this, registry](const Identifier& id) {
-                if (registry == "item") {
-                    return reg::items::registry().byName(id) != nullptr;
-                }
-                return registry != "enchantment" || indices_.contains(id);
-            };
-            auto resolved = reg::tags::resolveOrdered(files, exists);
-            if (!resolved.has_value()) {
-                logger.warn([&] {
-                    return "Ordered " + std::string{registry} +
-                           " tags could not be resolved: " + resolved.error().message();
-                });
-                continue;
-            }
-            tags_.insert_or_assign(std::string{registry}, std::move(*resolved));
-        }
+            return registry != "enchantment" || indices_.contains(id);
+        };
+        tags_.insert_or_assign(std::string{registry},
+                               datapack::resolveTagsOrdered(jar.entriesUnder, jar.readText, registry, exists, logger));
     }
 
     enchanting_ = loot::Enchanting{

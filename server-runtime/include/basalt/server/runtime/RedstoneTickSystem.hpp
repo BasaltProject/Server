@@ -101,6 +101,9 @@ public:
         std::function<bool(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
                            std::vector<world::BlockChange>& pending)>
             tickCreakingHeart;
+        /// A sculk catalyst's spreader. parity: `SculkCatalystBlockEntity.serverTick`.
+        std::function<bool(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)>
+            tickSculkCatalyst;
         /// A noise that reached a shrieker, handed to whoever knows the players.
         std::function<void(world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival)> shriekerHeard;
     };

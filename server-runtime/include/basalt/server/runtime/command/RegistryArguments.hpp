@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/command/CommandTree.hpp>
+#include <basalt/wire/common/Identifier.hpp>
 
 #include <cstdint>
 #include <memory>
@@ -8,12 +9,9 @@
 
 namespace basalt::server::runtime::command {
 
-/// A registry entry by name, declared the way vanilla declares it. The text accepted is the same as
-/// `resourceLocationArgument`'s; what changes is what the client is told, since a
-/// `minecraft:resource_location` has no completions of its own.
-///
-/// The `#tag` forms are refused: nothing behind these commands resolves a tag yet, so they fail by
-/// name rather than silently matching nothing.
+/// A registry entry by name, declared the way vanilla declares it: same text as
+/// `resourceLocationArgument`, but the client gets completions. `#tag` forms are refused, since
+/// nothing behind these commands resolves a tag yet.
 
 /// `minecraft:resource`: an entry that has to be loaded right now.
 [[nodiscard]] std::shared_ptr<const ArgumentType> resourceArgument(std::string registry);
@@ -28,7 +26,13 @@ namespace basalt::server::runtime::command {
 /// `minecraft:resource_selector`: a name or a pattern matching several.
 [[nodiscard]] std::shared_ptr<const ArgumentType> resourceSelectorArgument(std::string registry);
 
-/// `minecraft:function`: a function or a `#tag` of them.
+/// What `functionArgument` parses to: a function, or with `isTag` a function tag.
+struct FunctionName {
+    wire::common::Identifier id;
+    bool isTag = false;
+};
+
+/// `minecraft:function`: a function or a `#tag` of them. The value is a `FunctionName`.
 [[nodiscard]] std::shared_ptr<const ArgumentType> functionArgument();
 
 /// `minecraft:dialog`: a dialog id, or an inline dialog the client parses itself.

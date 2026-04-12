@@ -13,6 +13,7 @@
 #include <doctest.h>
 
 #include <algorithm>
+#include <map>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
@@ -191,200 +192,177 @@ using basalt::wire::nbt::NbtCompound;
 
 namespace {
 
-/// A datapack on disk with one function in it, which is the only way the library reads any.
-[[nodiscard]] std::string packWith(const std::string& root, const std::string& name,
-                                   const std::vector<std::string>& lines) {
-    const std::string dir = root + "/pack/data/test/function";
-    std::error_code ignored;
-    std::filesystem::create_directories(dir, ignored);
-    std::ofstream meta{root + "/pack/pack.mcmeta"};
-    meta << R"({"pack":{"pack_format":81,"description":"test"}})";
-    meta.close();
-    std::ofstream file{dir + "/" + name + ".mcfunction"};
-    for (const std::string& line : lines) {
-        file << line << "\n";
+/// A library read out of an in-memory pack, one function per entry.
+void load(FunctionLibrary& library, const std::map<std::string, std::vector<std::string>>& functions,
+          const std::map<std::string, std::string>& tags = {}) {
+    auto files = std::make_shared<std::map<std::string, std::string>>();
+    for (const auto& [name, lines] : functions) {
+        std::string text;
+        for (const std::string& line : lines) {
+            text += line + "\n";
+        }
+        (*files)["data/test/function/" + name + ".mcfunction"] = text;
     }
-    return root;
+    for (const auto& [name, json] : tags) {
+        (*files)["data/test/tags/function/" + name + ".json"] = json;
+    }
+    static_cast<void>(library.load(
+        [files](std::string_view prefix) {
+            std::vector<std::string> names;
+            for (const auto& [name, text] : *files) {
+                if (name.starts_with(prefix)) {
+                    names.push_back(name);
+                }
+            }
+            return names;
+        },
+        [files](std::string_view name) -> std::optional<std::string> {
+            const auto found = files->find(std::string{name});
+            return found == files->end() ? std::nullopt : std::optional{found->second};
+        }));
+}
+
+[[nodiscard]] commands::FunctionRunner runnerOf(const FunctionLibrary& library) {
+    return commands::FunctionRunner{library, commands::FunctionRunner::Settings{.permissionLevel = 2,
+                                                                                .commandLimit = {}}};
+}
+
+[[nodiscard]] std::string heard(const std::vector<Component>& lines) {
+    std::string all;
+    for (const Component& line : lines) {
+        all += flatten(line) + "\n";
+    }
+    return all;
 }
 
 } // namespace
 
-TEST_CASE("a function runs its lines and reports the last result") {
+TEST_CASE("function runs a function or a tag, says so first, and names what it cannot find") {
     Fixture fixture{scratch("function-run")};
-    const std::string root = packWith(scratch("function-run-packs"), "greet", {"say hello", "seed"});
-    FunctionLibrary library{root};
-    library.reload();
-    commands::FunctionRunner runner{library};
-    fixture.dispatcher.registerCommand(std::make_shared<commands::FunctionCommand>(library, runner));
+    FunctionLibrary library;
+    load(library, {{"greet", {"say hello"}}, {"other", {"say there"}}},
+         {{"both", R"({"values":["test:greet","test:other","test:greet"]})"}, {"empty", R"({"values":[]})"}});
+    fixture.add("Steve");
+    commands::FunctionRunner runner = runnerOf(library);
+    fixture.dispatcher.registerCommand(std::make_shared<commands::FunctionCommand>(runner));
     fixture.dispatcher.registerCommand(std::make_shared<commands::SayCommand>());
-    fixture.dispatcher.registerCommand(std::make_shared<commands::SeedCommand>());
 
     static_cast<void>(fixture.dispatcher.execute(fixture.source, "function test:greet"));
-    std::string all;
-    for (const Component& line : fixture.source.said) {
-        all += flatten(line);
-    }
-    CHECK(all.find("commands.function.result") != std::string::npos);
+    CHECK(fixture.source.lastAsText().find("commands.function.scheduled.single") != std::string::npos);
+    static_cast<void>(fixture.dispatcher.execute(fixture.source, "function #test:both"));
+    CHECK(fixture.source.lastAsText().find("commands.function.scheduled.multiple") != std::string::npos);
+    CHECK(heard(fixture.clients[0]->messages).find("there") != std::string::npos);
 
     CHECK(fixture.dispatcher.execute(fixture.source, "function test:missing") == 0);
     CHECK(fixture.source.lastAsText().find("arguments.function.unknown") != std::string::npos);
+    CHECK(fixture.dispatcher.execute(fixture.source, "function #test:empty") == 0);
+    CHECK(fixture.source.lastAsText().find("commands.function.scheduled.no_functions") != std::string::npos);
 }
 
-TEST_CASE("a macro line takes its arguments, and refuses when it was given none") {
+TEST_CASE("a macro is filled in before it runs, and refuses what it cannot fill") {
     Fixture fixture{scratch("function-macro")};
-    const std::string root = packWith(scratch("function-macro-packs"), "greet", {"$say hello $(who)"});
-    FunctionLibrary library{root};
-    library.reload();
-    // `/say` reaches players rather than the caller, so one has to be there to hear the macro.
+    FunctionLibrary library;
+    load(library, {{"greet", {"$say hello $(who)"}}});
     fixture.add("Steve");
-    commands::FunctionRunner runner{library};
-    fixture.dispatcher.registerCommand(std::make_shared<commands::FunctionCommand>(library, runner));
+    commands::FunctionRunner runner = runnerOf(library);
+    fixture.dispatcher.registerCommand(std::make_shared<commands::FunctionCommand>(runner));
     fixture.dispatcher.registerCommand(std::make_shared<commands::SayCommand>());
 
     CHECK(fixture.dispatcher.execute(fixture.source, "function test:greet") == 0);
     CHECK(fixture.source.lastAsText().find("commands.function.error.missing_arguments") != std::string::npos);
 
     static_cast<void>(fixture.dispatcher.execute(fixture.source, R"(function test:greet {who:"world"})"));
-    std::string all;
-    for (const Component& line : fixture.clients[0]->messages) {
-        all += flatten(line);
-    }
-    CHECK(all.find("hello world") != std::string::npos);
+    CHECK(heard(fixture.clients[0]->messages).find("hello world") != std::string::npos);
+    static_cast<void>(fixture.dispatcher.execute(fixture.source, "function test:greet {who:1.5d}"));
+    CHECK(heard(fixture.clients[0]->messages).find("hello 1.5") != std::string::npos);
 
     CHECK(fixture.dispatcher.execute(fixture.source, R"(function test:greet {other:"x"})") == 0);
-    CHECK(fixture.source.lastAsText().find("commands.function.error.parameter_not_found") != std::string::npos);
+    CHECK(fixture.source.lastAsText().find("commands.function.error.missing_argument") != std::string::npos);
 }
 
 TEST_CASE("function with storage reads its arguments out of a holder") {
     Fixture fixture{scratch("function-with")};
-    const std::string root = packWith(scratch("function-with-packs"), "greet", {"$say hello $(who)"});
-    FunctionLibrary library{root};
-    library.reload();
+    FunctionLibrary library;
+    load(library, {{"greet", {"$say hello $(who)"}}});
     CommandStorage storage{scratch("function-with-storage") + "/command_storage.nbt"};
     NbtCompound arguments;
     arguments.putString("who", "world");
     storage.set(*Identifier::parse("test:args"), arguments);
     const DataAccess access{storage};
     fixture.add("Steve");
-    commands::FunctionRunner runner{library};
-    fixture.dispatcher.registerCommand(std::make_shared<commands::FunctionCommand>(library, runner, &access));
+    commands::FunctionRunner runner = runnerOf(library);
+    fixture.dispatcher.registerCommand(std::make_shared<commands::FunctionCommand>(runner, &access));
     fixture.dispatcher.registerCommand(std::make_shared<commands::SayCommand>());
 
     static_cast<void>(fixture.dispatcher.execute(fixture.source, "function test:greet with storage test:args"));
-    std::string all;
-    for (const Component& line : fixture.clients[0]->messages) {
-        all += flatten(line);
-    }
-    CHECK(all.find("hello world") != std::string::npos);
+    CHECK(heard(fixture.clients[0]->messages).find("hello world") != std::string::npos);
 }
 
-TEST_CASE("return only works inside a function, and stops the rest of it") {
+TEST_CASE("return ends a function with its value, and outside one only ends the command") {
     Fixture fixture{scratch("function-return")};
-    const std::string root = packWith(scratch("function-return-packs"), "early", {"return 7", "say never"});
-    FunctionLibrary library{root};
-    library.reload();
-    commands::FunctionRunner runner{library};
-    fixture.dispatcher.registerCommand(std::make_shared<commands::FunctionCommand>(library, runner));
+    FunctionLibrary library;
+    load(library, {{"early", {"return 7", "say never"}}, {"forwarded", {"return run say first", "say never"}}});
+    commands::FunctionRunner runner = runnerOf(library);
+    fixture.dispatcher.registerCommand(std::make_shared<commands::FunctionCommand>(runner));
     fixture.dispatcher.registerCommand(std::make_shared<commands::ReturnCommand>(runner));
     fixture.dispatcher.registerCommand(std::make_shared<commands::SayCommand>());
 
-    CHECK(fixture.dispatcher.execute(fixture.source, "return 5") == 0);
-    CHECK(fixture.source.lastAsText().find("only works inside a function") != std::string::npos);
+    CHECK(fixture.dispatcher.execute(fixture.source, "return 5") == 5);
 
     fixture.add("Steve");
     CHECK(fixture.dispatcher.execute(fixture.source, "function test:early") == 7);
-    std::string all;
-    for (const Component& line : fixture.clients[0]->messages) {
-        all += flatten(line);
-    }
-    CHECK(all.find("never") == std::string::npos);
-}
-
-TEST_CASE("return run hands the nested command's result back as the function's") {
-    Fixture fixture{scratch("function-return-run")};
-    const std::string root =
-        packWith(scratch("function-return-run-packs"), "forwarded", {"return run say first", "say never"});
-    FunctionLibrary library{root};
-    library.reload();
-    commands::FunctionRunner runner{library};
-    fixture.dispatcher.registerCommand(std::make_shared<commands::FunctionCommand>(library, runner));
-    fixture.dispatcher.registerCommand(std::make_shared<commands::ReturnCommand>(runner));
-    fixture.dispatcher.registerCommand(std::make_shared<commands::SayCommand>());
-
-    fixture.add("Steve");
+    CHECK(fixture.source.lastAsText().find("commands.function.result") != std::string::npos);
     CHECK(fixture.dispatcher.execute(fixture.source, "function test:forwarded") == 1);
-    std::string all;
-    for (const Component& line : fixture.clients[0]->messages) {
-        all += flatten(line);
-    }
+    const std::string all = heard(fixture.clients[0]->messages);
     CHECK(all.find("first") != std::string::npos);
     CHECK(all.find("never") == std::string::npos);
 }
 
-TEST_CASE("a function that calls itself is stopped rather than left to recurse") {
+TEST_CASE("a function that calls itself stops instead of running forever") {
     Fixture fixture{scratch("function-recursion")};
-    const std::string root = packWith(scratch("function-recursion-packs"), "loop", {"function test:loop"});
-    FunctionLibrary library{root};
-    library.reload();
-    commands::FunctionRunner runner{library};
-    fixture.dispatcher.registerCommand(std::make_shared<commands::FunctionCommand>(library, runner));
+    FunctionLibrary library;
+    load(library, {{"loop", {"function test:loop"}}});
+    commands::FunctionRunner runner = runnerOf(library);
+    fixture.dispatcher.registerCommand(std::make_shared<commands::FunctionCommand>(runner));
 
     CHECK(fixture.dispatcher.execute(fixture.source, "function test:loop") == 0);
-    std::string all;
-    for (const Component& line : fixture.source.said) {
-        all += flatten(line);
-    }
-    CHECK(all.find("recursed more than") != std::string::npos);
 }
 
-TEST_CASE("the schedule keeps entries until their tick comes round") {
+TEST_CASE("the schedule runs what is due, in trigger then schedule order") {
     commands::FunctionSchedule schedule;
     const Identifier greet = *Identifier::parse("test:greet");
     const Identifier other = *Identifier::parse("test:other");
 
-    CHECK(schedule.schedule(greet, 2, true) == 2);
-    CHECK(schedule.scheduledIds().size() == 1);
-    CHECK(schedule.tick().empty());
-    const std::vector<Identifier> due = schedule.tick();
-    REQUIRE(due.size() == 1);
-    CHECK(due.front() == greet);
-    CHECK(schedule.scheduledIds().empty());
+    schedule.schedule(greet, false, 12);
+    schedule.schedule(other, true, 10);
+    CHECK(schedule.names() == std::vector<std::string>{"test:greet", "#test:other"});
+    CHECK(schedule.due(9).empty());
+    const std::vector<commands::FunctionSchedule::Event> due = schedule.due(12);
+    REQUIRE(due.size() == 2);
+    CHECK(due[0].name == "#test:other");
+    CHECK(due[1].name == "test:greet");
 
-    // `replace` drops what was waiting under that id; `append` leaves it alone.
-    static_cast<void>(schedule.schedule(other, 10, true));
-    static_cast<void>(schedule.schedule(other, 20, false));
-    CHECK(schedule.clear(other) == 2);
-    CHECK(schedule.clear(other) == 0);
+    schedule.schedule(other, false, 20);
+    schedule.schedule(other, false, 30);
+    CHECK(schedule.remove("test:other") == 2);
+    CHECK(schedule.remove("test:other") == 0);
 }
 
-TEST_CASE("schedule reports when it was cleared and refuses when there was nothing") {
+TEST_CASE("schedule answers the game time it runs at and refuses the same tick and macros") {
     Fixture fixture{scratch("function-schedule")};
-    const std::string root = packWith(scratch("function-schedule-packs"), "greet", {"say hi"});
-    FunctionLibrary library{root};
-    library.reload();
+    FunctionLibrary library;
+    load(library, {{"greet", {"say hi"}}, {"macro", {"$say $(x)"}}});
     commands::FunctionSchedule schedule;
-    fixture.dispatcher.registerCommand(std::make_shared<commands::ScheduleCommand>(library, schedule));
+    fixture.dispatcher.registerCommand(std::make_shared<commands::ScheduleCommand>(
+        library, schedule, [](const basalt::server::runtime::command::CommandContext&) { return 100; }));
 
-    CHECK(fixture.dispatcher.execute(fixture.source, "schedule function test:greet 40") == 40);
+    CHECK(fixture.dispatcher.execute(fixture.source, "schedule function test:greet 40") == 140);
     CHECK(fixture.source.lastAsText().find("commands.schedule.created.function") != std::string::npos);
+    CHECK(fixture.dispatcher.execute(fixture.source, "schedule function test:greet 0") == 0);
+    CHECK(fixture.source.lastAsText().find("commands.schedule.same_tick") != std::string::npos);
+    CHECK(fixture.dispatcher.execute(fixture.source, "schedule function test:macro 5") == 0);
+    CHECK(fixture.source.lastAsText().find("commands.schedule.macro") != std::string::npos);
     CHECK(fixture.dispatcher.execute(fixture.source, "schedule clear test:greet") == 1);
     CHECK(fixture.dispatcher.execute(fixture.source, "schedule clear test:greet") == 0);
     CHECK(fixture.source.lastAsText().find("commands.schedule.cleared.failure") != std::string::npos);
-}
-
-TEST_CASE("datapack lists, enables and disables what the library found") {
-    Fixture fixture{scratch("function-datapack")};
-    const std::string root = packWith(scratch("function-datapack-packs"), "greet", {"say hi"});
-    FunctionLibrary library{root};
-    library.reload();
-    fixture.dispatcher.registerCommand(std::make_shared<commands::DataPackCommand>(library));
-
-    CHECK(fixture.dispatcher.execute(fixture.source, "datapack list") == 1);
-    CHECK(fixture.source.lastAsText().find("commands.datapack.list.available.success") != std::string::npos);
-
-    CHECK(fixture.dispatcher.execute(fixture.source, "datapack disable pack") == 0);
-    CHECK(fixture.dispatcher.execute(fixture.source, "datapack list enabled") == 0);
-    CHECK(fixture.dispatcher.execute(fixture.source, "datapack enable pack") == 1);
-    CHECK(fixture.dispatcher.execute(fixture.source, "datapack enable pack") == 0);
-    CHECK(fixture.source.lastAsText().find("commands.datapack.enable.failed") != std::string::npos);
 }

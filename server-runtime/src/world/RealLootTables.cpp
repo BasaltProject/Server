@@ -1,6 +1,7 @@
 #include <basalt/server/registry/BlockShapes.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
+#include <basalt/server/runtime/datapack/DataFiles.hpp>
 #include <basalt/server/runtime/scoreboard/Scoreboard.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/Fluids.hpp>
@@ -24,18 +25,9 @@ namespace {
 using server::world::loot::LootTable;
 using wire::common::Identifier;
 
-constexpr std::string_view kPrefix = "data/minecraft/loot_table/";
-constexpr std::string_view kJsonSuffix = ".json";
-
-[[nodiscard]] std::string stripped(const std::string& entry) {
-    std::string path = entry;
-    if (path.starts_with(kPrefix)) {
-        path.erase(0, kPrefix.size());
-    }
-    if (path.ends_with(kJsonSuffix)) {
-        path.resize(path.size() - kJsonSuffix.size());
-    }
-    return path;
+/// Where a table's file lives: `data/<namespace>/loot_table/<path>.json`.
+[[nodiscard]] std::string fileOf(const Identifier& id) {
+    return "data/" + id.namespaceName() + "/loot_table/" + id.path() + ".json";
 }
 
 /// The block a wall-mounted one drops as, or nothing when it is not one of them. parity:
@@ -120,33 +112,48 @@ void fluidOf(std::int32_t state, server::world::loot::PlaceFacts& place) {
 
 } // namespace
 
-// parity: 26.3 loot data names `predicate`, `item_modifier` and the two `context_*_provider`
-// registries by id, and those live beside the tables in the same jar.
+namespace {
+
+/// parity: 26.3 loot data names `predicate`, `item_modifier` and the two `context_*_provider`
+/// registries by id, and those live beside the tables in the same packs.
+[[nodiscard]] server::world::loot::LootReferences::ReadEntry referencesOf(const RealLootTables::ReadText& read) {
+    return [read](std::string_view registry, const Identifier& id) -> std::optional<std::string> {
+        if (!read) {
+            return std::nullopt;
+        }
+        return read("data/" + std::string{id.namespaceName()} + "/" + std::string{registry} + "/" + id.path() +
+                    ".json");
+    };
+}
+
+} // namespace
+
 RealLootTables::RealLootTables(Jar jar, wire::common::Logger logger)
-    : jar_(std::move(jar)), logger_(std::move(logger)),
-      references_(
-          [read = jar_.readText](std::string_view registry, const Identifier& id) -> std::optional<std::string> {
-              if (!read) {
-                  return std::nullopt;
-              }
-              return read("data/" + std::string{id.namespaceName()} + "/" + std::string{registry} + "/" + id.path() +
-                          ".json");
-          }) {}
+    : jar_(std::move(jar)), logger_(std::move(logger)), references_(referencesOf(jar_.readText)) {}
+
+void RealLootTables::reload(Jar jar) {
+    const std::lock_guard<std::mutex> guard(mutex_);
+    retired_ = std::move(cache_);
+    cache_.clear();
+    jar_ = std::move(jar);
+    references_.replace(referencesOf(jar_.readText));
+}
 
 const LootTable* RealLootTables::byId(const Identifier& id) {
-    return read(id, std::string{kPrefix} + id.path() + std::string{kJsonSuffix}, "rolls nothing");
+    return read(id, fileOf(id), "rolls nothing");
 }
 
 const LootTable* RealLootTables::forEntity(const Identifier& type) {
-    return read(Identifier::vanilla("entities/" + type.path()),
-                std::string{kPrefix} + "entities/" + type.path() + std::string{kJsonSuffix}, "rolls nothing");
+    // parity: `EntityType.getDefaultLootTable`, the type's own namespace under `entities/`.
+    const Identifier table{type.namespaceName(), "entities/" + type.path()};
+    return read(table, fileOf(table), "rolls nothing");
 }
 
 const LootTable* RealLootTables::forBlock(const Identifier& block) {
     const std::optional<std::string> standing = standingForm(block);
     const std::string& path = standing.value_or(block.path());
-    return read(standing.has_value() ? Identifier::vanilla(path) : block,
-                std::string{kPrefix} + "blocks/" + path + std::string{kJsonSuffix}, "drops nothing");
+    const Identifier table{block.namespaceName(), "blocks/" + path};
+    return read(table, fileOf(table), "drops nothing");
 }
 
 void RealLootTables::prepare(server::world::loot::LootContext& context) {
@@ -239,14 +246,8 @@ void RealLootTables::prepareAt(server::world::loot::LootContext& context, Loaded
 
 std::vector<Identifier> RealLootTables::ids() const {
     std::vector<Identifier> ids;
-    if (!jar_.entriesUnder) {
-        return ids;
-    }
-    for (const std::string& entry : jar_.entriesUnder(kPrefix)) {
-        if (!entry.ends_with(kJsonSuffix)) {
-            continue;
-        }
-        ids.push_back(Identifier::vanilla(stripped(entry)));
+    for (const auto& [id, entry] : datapack::dataFiles(jar_.entriesUnder, "loot_table")) {
+        ids.push_back(id);
     }
     return ids;
 }

@@ -129,7 +129,8 @@ public:
 
     void spawnDroppedItem(const wire::common::Identifier& item, std::int32_t count, double x, double y, double z,
                           double velocityX = 0.0, double velocityY = 0.0, double velocityZ = 0.0,
-                          std::int32_t pickupDelay = 40, wire::nbt::NbtCompound components = {});
+                          std::int32_t pickupDelay = 40, wire::nbt::NbtCompound components = {},
+                          std::optional<wire::common::Uuid> thrower = std::nullopt);
 
     void handleUseItemOn(const wire::protocol::play::ServerboundUseItemOnPacket& useItemOn);
 

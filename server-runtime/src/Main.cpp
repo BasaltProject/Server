@@ -11,6 +11,7 @@
 #include <basalt/server/runtime/config/LiveConfigs.hpp>
 #include <basalt/server/runtime/config/ServerListConfig.hpp>
 #include <basalt/server/runtime/config/WorldsConfig.hpp>
+#include <basalt/server/runtime/datapack/DataPacks.hpp>
 #include <basalt/server/runtime/world/VanillaWorldGeneratorFactory.hpp>
 #include <basalt/wire/auth/HttpsClient.hpp>
 #include <basalt/wire/auth/MojangSessionService.hpp>
@@ -82,6 +83,7 @@ struct Instance {
     config::WorldsConfig worlds;
     std::unique_ptr<config::LiveConfigs> live;
     std::unique_ptr<server::assets::ServerJarAssets> serverJar;
+    std::unique_ptr<datapack::DataPacks> datapacks;
     std::unique_ptr<world::VanillaWorldGeneratorFactory> generators;
     std::optional<wire::auth::SessionKeyPair> keyPair;
     std::unique_ptr<wire::auth::MojangSessionService> sessions;
@@ -98,6 +100,9 @@ template <typename T>
     }
     return std::move(*loaded);
 }
+
+/// parity: `--safeMode`, which loads the vanilla data pack alone whatever the world saved.
+bool gSafeMode = false;
 
 /// Builds one server from the configuration as it stands right now. Called again on every restart.
 [[nodiscard]] std::unique_ptr<Instance> buildServer() {
@@ -155,7 +160,16 @@ template <typename T>
         });
     }
 
-    const VanillaGameData::Jar jarHooks = VanillaGameData::jarOf(instance->serverJar.get());
+    // The packs come before anything that reads data: the world generators read the worldgen of the
+    // selected packs, as vanilla loads its world registries from them.
+    instance->datapacks = std::make_unique<datapack::DataPacks>(datapack::DataPacks::Options{
+        .jar = VanillaGameData::jarFilesOf(instance->serverJar.get()),
+        .worldRoot = std::string{config::WorldsConfig::kDefaultWorldsRoot} + "/" + instance->worlds.defaultWorld().name,
+        .initial = datapack::DataPackConfig{.enabled = instance->config.initialEnabledPacks,
+                                            .disabled = instance->config.initialDisabledPacks},
+        .safeMode = gSafeMode,
+    });
+    const VanillaGameData::Jar jarHooks = VanillaGameData::jarOf(instance->datapacks->resources());
     instance->generators =
         std::make_unique<world::VanillaWorldGeneratorFactory>(world::VanillaWorldGeneratorFactory::Jar{
             .readText = jarHooks.readText, .readEntry = jarHooks.readEntry, .dataIds = jarHooks.dataIds});
@@ -170,6 +184,7 @@ template <typename T>
 
     BasaltServer::Options options;
     options.serverJar = instance->serverJar.get();
+    options.datapacks = instance->datapacks.get();
     options.generators = instance->generators.get();
     options.compatibility =
         orExit(config::CompatibilityConfig::load(config::ConfigDirectory{}, configLogger), configLogger);
@@ -208,6 +223,8 @@ int main(int argc, char** argv) {
     // Before anything that could fail: a crash from here on says what it was and where, instead of
     // leaving the operator with one line from their shell.
     wire::common::panic::install("Basalt Server", std::string{buildInfo::kVersion}, std::string{kIssuesUrl});
+
+    gSafeMode = hasFlag(argc, argv, "--safeMode");
 
     // No prompts and no TTY detection: identical behaviour interactive, headless or containerized.
     // `--accept-eula` is a deliberate operator act, not a fallback.

@@ -38,6 +38,13 @@ public:
         /// Who `@s` is, which `/execute as` sets and which can be something other than a player.
         std::optional<CommandTarget> entity;
         OnResult onResult;
+        /// parity: `withPermission`, what a function runs its lines with.
+        std::optional<std::int32_t> permission;
+        /// parity: `withSuppressedOutput`.
+        bool silent;
+        /// Allowed every command node: a function's lines were compiled against its own permission
+        /// level already, which is what vanilla checks and all it checks.
+        bool trusted;
     };
 
     ExecutionSource(const CommandSource& base, Changes changes = {});
@@ -57,6 +64,8 @@ public:
     [[nodiscard]] bool hasPermission(std::optional<std::string_view> node) const override;
 
     [[nodiscard]] const ExecutionSource* asExecution() const override { return this; }
+
+    [[nodiscard]] bool silent() const override { return silent_; }
 
     /// parity: a modified `CommandSourceStack` keeps the signing context it came from.
     [[nodiscard]] const chat::SignedArguments* signedArguments() const override { return base_->signedArguments(); }
@@ -84,6 +93,9 @@ private:
     bool anchorEyes_ = false;
     std::optional<CommandTarget> entity_;
     OnResult onResult_;
+    std::optional<std::int32_t> permission_;
+    bool silent_ = false;
+    bool trusted_ = false;
 };
 
 /// The world a source acts in: what `/execute in` chose, else the runner's own.

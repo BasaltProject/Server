@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 #include <vector>
 
 namespace basalt::server::runtime {
@@ -148,6 +149,10 @@ void MobActionSystem::tickHorse(world::LoadedWorld& world, ServerEntity& horse, 
     if (state.standCounter > 0 && --state.standCounter <= 0) {
         state.standing = false;
         state.standCounter = 0;
+    }
+    // parity: `AbstractHorse.hurtServer`, one hit in three rears it.
+    if (std::exchange(state.hurt, false) && random.nextInt(3) == 0) {
+        horses::standIfPossible(horse);
     }
     if (!horses::isCamel(horse.type())) {
         return;

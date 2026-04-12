@@ -69,7 +69,6 @@ basalt_module(server-world
     src/structure/StructureTransform.cpp
     src/structure/VillagePoolJson.cpp
         src/terrain/carver/Carvers.cpp
-    src/terrain/decoration/AquaticDecoration.cpp
     src/terrain/decoration/AquaticPatchDecoration.cpp
     src/terrain/decoration/AquaticSupport.cpp
     src/terrain/decoration/BiomeDecoration.cpp
@@ -391,12 +390,6 @@ basalt_test(server-world-lush-cave-test
 basalt_test(server-world-bamboo-test
     SOURCES
         test/BambooTest.cpp
-    DEPENDS basalt::server-world
-)
-
-basalt_test(server-world-aquatic-vegetal-test
-    SOURCES
-        test/AquaticVegetalTest.cpp
     DEPENDS basalt::server-world
 )
 

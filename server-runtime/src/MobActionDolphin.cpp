@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/world/Fluids.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
+#include <basalt/server/runtime/world/ThrownItemTriggers.hpp>
 #include <basalt/server/world/Chunk.hpp>
 #include <basalt/wire/common/Mth.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
@@ -84,6 +85,7 @@ bool MobActionSystem::throwHeldItem(ServerEntity& mob) {
     dropped.velocityY = static_cast<double>(0.3F * mth::sin(pitch) * 1.5F);
     dropped.velocityZ = static_cast<double>((0.3F * mth::cos(yaw) * mth::cos(pitch)) + (mth::sin(direction) * spread));
     dropped.pickupDelay = kThrownPickupDelay;
+    dropped.thrower = mob.uuid();
     world->state().spawnItem(std::move(dropped));
     entity::copperGolems::setMainHand(mob, std::nullopt, false);
     heldItemChanged(mob);
@@ -159,6 +161,8 @@ void MobActionSystem::dolphinPicksUp(world::LoadedWorld& world, ServerEntity& do
         if (!taken.has_value()) {
             continue;
         }
+        world::thrownItems::pickedUpByMob(options_.advancementTriggers, world, watchersOf(world), *taken, taken->count,
+                                          dolphin);
         // parity: the whole stack into the mouth, and dropped on death whatever the odds.
         entity::copperGolems::setMainHand(
             dolphin,

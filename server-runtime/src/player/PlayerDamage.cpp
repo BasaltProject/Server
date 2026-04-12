@@ -257,17 +257,19 @@ void showDamage(const PlayerSession& session, const std::optional<Identifier>& d
 /// parity: `LivingEntity.knockback` as it lands on a player, plus the hurt animation. A blocked hit
 /// first runs `blockedByItem`, whose half-block push points the other way and is halved by the
 /// default one after it; a blocked hit also draws no hurt direction.
-void pushAway(const PlayerSession& session, const entity::DamageSource& source, bool blocked, double resistance) {
+void pushAway(PlayerSession& session, const entity::DamageSource& source, bool blocked, double resistance) {
     const double towardsX = source.x - session.x;
     const double towardsZ = source.z - session.z;
-    std::array<double, 3> start{0.0, 0.0, 0.0};
+    // parity: the push starts from what the server still has of the player's motion.
+    std::array<double, 3> start = session.deltaMovement;
     if (blocked) {
-        start =
-            player::combat::knockback(kBlockedPush, -towardsX, -towardsZ, 0.0, 0.0, 0.0, session.onGround, resistance);
+        start = player::combat::knockback(kBlockedPush, -towardsX, -towardsZ, start[0], start[1], start[2],
+                                          session.onGround, resistance);
     }
     const std::array<double, 3> moved =
         player::combat::knockback(entity::entityCombat::kDefaultKnockback, towardsX, towardsZ, start[0], start[1],
                                   start[2], session.onGround, resistance);
+    session.deltaMovement = moved;
     const auto angle = static_cast<float>(std::atan2(towardsZ, towardsX) * kRadiansToDegrees) - session.yaw;
     if (session.connection().pushBack) {
         session.connection().pushBack(moved[0], moved[1], moved[2], angle);
@@ -292,7 +294,8 @@ void pushAway(const PlayerSession& session, const entity::DamageSource& source, 
 }
 
 /// A push the server decides on its own, sent as the player's new motion.
-void shove(const PlayerSession& session, const entity::shieldBlows::Push& push) {
+void shove(PlayerSession& session, const entity::shieldBlows::Push& push) {
+    session.deltaMovement = {push.x, push.y, push.z};
     if (session.connection().pushBack) {
         session.connection().pushBack(push.x, push.y, push.z, session.yaw);
         return;

@@ -54,6 +54,14 @@ AdvancementTriggers::AdvancementTriggers(const RealAdvancements& advancements, P
             return registry == "entity_type" && hooks_.entityTagged && hooks_.entityTagged(id, tag);
         };
     }
+    reindex();
+}
+
+void AdvancementTriggers::reindex() {
+    byItem_.clear();
+    byRecipe_.clear();
+    byKind_.clear();
+    byTrigger_.clear();
     for (const Identifier& id : advancements_->ids()) {
         const adv::Advancement* advancement = advancements_->find(id);
         if (advancement == nullptr) {

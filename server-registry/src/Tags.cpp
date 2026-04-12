@@ -112,6 +112,87 @@ std::expected<ResolvedOrder, TagError> resolveOrdered(const std::map<Identifier,
     return resolveAll<std::vector<Identifier>>(files, elementExists);
 }
 
+namespace {
+
+/// Builds each tag once, after the ones it refers to; a failure is remembered as an absence.
+template <typename Values>
+struct LenientResolver {
+    const std::map<Identifier, TagFile>& files;
+    const ElementExists& elementExists;
+    const TagFailed& failed;
+    std::map<Identifier, Values> resolved;
+    std::set<Identifier> visited;
+
+    const Values* build(const Identifier& id) {
+        if (const auto done = resolved.find(id); done != resolved.end()) {
+            return &done->second;
+        }
+        const auto file = files.find(id);
+        if (file == files.end() || !visited.insert(id).second) {
+            return nullptr;
+        }
+        Values values;
+        std::vector<std::string> missing;
+        for (const TagEntry& entry : file->second.entries) {
+            if (entry.isTag) {
+                const Values* referenced = build(entry.id);
+                if (referenced == nullptr) {
+                    if (entry.required) {
+                        missing.push_back("#" + entry.id.toString());
+                    }
+                    continue;
+                }
+                for (const Identifier& member : *referenced) {
+                    addTo(values, member);
+                }
+            } else if (elementExists(entry.id)) {
+                addTo(values, entry.id);
+            } else if (entry.required) {
+                missing.push_back(entry.id.toString());
+            }
+        }
+        if (!missing.empty()) {
+            if (failed) {
+                failed(TagFailure{.tag = id, .missing = std::move(missing)});
+            }
+            return nullptr;
+        }
+        return &resolved.emplace(id, std::move(values)).first->second;
+    }
+};
+
+template <typename Values>
+[[nodiscard]] std::map<Identifier, Values> resolveLeniently(const std::map<Identifier, TagFile>& files,
+                                                            const ElementExists& elementExists,
+                                                            const TagFailed& failed) {
+    LenientResolver<Values> resolver{files, elementExists, failed, {}, {}};
+    for (const auto& [id, unused] : files) {
+        static_cast<void>(resolver.build(id));
+    }
+    return std::move(resolver.resolved);
+}
+
+} // namespace
+
+std::string TagFailure::message() const {
+    std::string joined;
+    for (const std::string& reference : missing) {
+        joined += joined.empty() ? reference : ", " + reference;
+    }
+    return "Couldn't load tag " + tag.toString() + " as it is missing following references: " + joined;
+}
+
+std::map<Identifier, std::set<Identifier>> resolveEach(const std::map<Identifier, TagFile>& files,
+                                                       const ElementExists& elementExists, const TagFailed& failed) {
+    return resolveLeniently<std::set<Identifier>>(files, elementExists, failed);
+}
+
+std::map<Identifier, std::vector<Identifier>> resolveEachOrdered(const std::map<Identifier, TagFile>& files,
+                                                                 const ElementExists& elementExists,
+                                                                 const TagFailed& failed) {
+    return resolveLeniently<std::vector<Identifier>>(files, elementExists, failed);
+}
+
 namespace tagFileJson {
 namespace {
 

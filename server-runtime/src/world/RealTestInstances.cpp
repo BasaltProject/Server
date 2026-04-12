@@ -1,3 +1,4 @@
+#include <basalt/server/runtime/datapack/DataFiles.hpp>
 #include <basalt/server/runtime/world/RealTestInstances.hpp>
 #include <basalt/wire/common/json/Json.hpp>
 
@@ -14,22 +15,8 @@ using wire::common::Identifier;
 using wire::common::JsonObject;
 using wire::common::JsonValue;
 
-constexpr std::string_view kPrefix = "data/minecraft/test_instance/";
-constexpr std::string_view kJsonSuffix = ".json";
-
 /// parity: `GameTestInstance`'s own default, the tick budget a test that names none gets.
 constexpr std::int32_t kDefaultMaxTicks = 100;
-
-[[nodiscard]] std::string stripped(const std::string& entry) {
-    std::string path = entry;
-    if (path.starts_with(kPrefix)) {
-        path.erase(0, kPrefix.size());
-    }
-    if (path.ends_with(kJsonSuffix)) {
-        path.resize(path.size() - kJsonSuffix.size());
-    }
-    return path;
-}
 
 /// An id field. Only a string is one: a number would parse as an identifier without ever being one.
 [[nodiscard]] std::optional<Identifier> identifierAt(const JsonObject& root, std::string_view key) {
@@ -122,17 +109,13 @@ RealTestInstances::RealTestInstances(const Jar& jar, wire::common::Logger logger
     if (!jar.entriesUnder || !jar.readText) {
         return;
     }
-    std::vector<std::string> names = jar.entriesUnder(kPrefix);
-    std::sort(names.begin(), names.end());
-    for (const std::string& entry : names) {
-        if (!entry.ends_with(kJsonSuffix)) {
-            continue;
-        }
-        std::expected<TestInstance, std::string> instance = declared(stripped(entry), jar.readText(entry));
+    for (const auto& [id, entry] : datapack::dataFiles(jar.entriesUnder, "test_instance")) {
+        std::expected<TestInstance, std::string> instance = declared(id.path(), jar.readText(entry));
         if (!instance.has_value()) {
             logger_.debug([&] { return "Skipped test instance " + entry + ": " + instance.error(); });
             continue;
         }
+        instance->id = id;
         all_.push_back(std::move(*instance));
     }
     if (!all_.empty()) {

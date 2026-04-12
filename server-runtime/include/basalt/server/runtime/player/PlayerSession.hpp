@@ -126,6 +126,8 @@ public:
     std::optional<std::array<double, 3>> emittedFrom;
     /// parity: `ServerPlayer.getKnownMovement`, what the client moved it by last tick.
     std::array<double, 3> knownMovement{};
+    /// parity: `Entity.deltaMovement` as the server keeps it for a player. See `PlayerVelocity`.
+    std::array<double, 3> deltaMovement{};
     float moveDist = 0.0F;
     float nextStep = 1.0F;
     std::int64_t lastCrystalSoundTime = 0;
@@ -269,9 +271,6 @@ public:
     /// who gets the kill credit.
     std::optional<std::int32_t> lastHurtByPlayerId;
     std::atomic<std::int32_t> lastHurtByPlayerTime{0};
-
-    /// What this player may not use yet, and the turn of the world each one frees up on.
-    ///
     /// parity: `LivingEntity.lastHurtByMob`, the kind of mob that hurt them last, kept for as long.
     std::optional<wire::common::Identifier> lastHurtByMobType;
     std::atomic<std::int32_t> lastHurtByMobTime{0};
@@ -279,6 +278,9 @@ public:
     /// blast caught them and what set it off, until their next fall starts.
     std::optional<std::array<double, 3>> explosionImpact;
     std::optional<std::int32_t> explosionCause;
+
+    /// What this player may not use yet, and the turn of the world each one frees up on.
+    ///
     /// parity: `ItemCooldowns`, which belongs to the player and not to the connection: both doors
     /// throw the same pearl, so both wait the same.
     std::map<std::string, std::int64_t, std::less<>> itemCooldowns;

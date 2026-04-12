@@ -19,13 +19,9 @@ namespace basalt::server::runtime::command {
 
 class ExecutionSource;
 
-/// Vanilla's own permission ladder (`Commands.LEVEL_*`), recorded per command as the parity fact it
-/// is: it is what the real server demands for each of them, and what a client is eventually told
-/// about itself.
-///
-/// It is **not** what authorises anything here. Authorisation is by named permission, because a
-/// number in a configuration file tells an operator nothing and cannot be referred to by
-/// `commands.toml` or by a plugin.
+/// Vanilla's permission ladder (`Commands.LEVEL_*`), recorded per command as a parity fact: what the
+/// real server demands and what a client is told about itself. It does **not** authorise anything
+/// here: authorisation is by named permission, which `commands.toml` and plugins can refer to.
 namespace permissionLevel {
 
 inline constexpr std::int32_t kAll = 0;
@@ -42,15 +38,10 @@ inline constexpr std::int32_t kOwners = 4;
 /// file and the same way as everything else. `*` covers it, so an operator gets them by default.
 inline constexpr std::string_view kAdminPermission = "basalt.admin.broadcast";
 
-/// Whoever ran a command: a player, or the operator at the console.
-///
-/// Deliberately not a handle on "the server": commands reach the world and the player list through
-/// `CommandEnvironment`, which is passed in, so nothing here needs a global. That is the same
-/// reason the position lives on the source, the way vanilla's `CommandSourceStack` carries one:
-/// relative coordinates (`~ ~ ~`) resolve against the runner, whoever that is.
-///
-/// Virtual because a source is asked about once per command, not once per block: this is the one
-/// place in the runtime where a small hierarchy costs nothing and says exactly what it means.
+/// Whoever ran a command: a player, or the operator at the console. Commands reach the world through
+/// `CommandEnvironment`, not a global; the position lives here, as in vanilla's `CommandSourceStack`,
+/// so relative coordinates (`~ ~ ~`) resolve against the runner. Virtual because a source is asked
+/// about once per command, never on a hot path.
 class CommandSource {
 public:
     CommandSource() = default;
@@ -91,6 +82,10 @@ public:
     /// selector that matches nobody here is no error yet. parity: brigadier resolves a selector
     /// when the command runs, once per source, not when it parses.
     [[nodiscard]] virtual bool defersSelectors() const { return false; }
+
+    /// parity: `CommandSourceStack.isSilent`: a source whose command feedback nobody hears, which
+    /// is what a function runs as.
+    [[nodiscard]] virtual bool silent() const { return false; }
 
     /// parity: `CommandSourceStack.getSigningContext`: the message arguments a player signed for
     /// this line, or null when nothing was signed.

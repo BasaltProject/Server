@@ -88,6 +88,8 @@ basalt_module(server-runtime-core
         src/command/commands/ExecuteConditions.cpp
         src/command/commands/ExecuteContext.cpp
         src/command/commands/FunctionCommands.cpp
+        src/command/commands/FunctionRunner.cpp
+        src/command/commands/DataPackCommand.cpp
         src/command/commands/GroupCommands.cpp
         src/command/commands/HudCommands.cpp
         src/command/commands/PlaceCommand.cpp
@@ -134,6 +136,7 @@ basalt_module(server-runtime-core
         src/BasaltServer.cpp
         src/BasaltServerConnections.cpp
         src/BasaltServerLife.cpp
+        src/BasaltServerData.cpp
         src/BasaltServerTick.cpp
         src/BasaltServerScores.cpp
         src/BlockInteractionHandler.cpp
@@ -211,6 +214,7 @@ basalt_module(server-runtime-core
         src/MobActionGifts.cpp
         src/MobActionDolphin.cpp
         src/MobActionWardenHearing.cpp
+        src/SculkCatalystSystem.cpp
         src/ShriekerSystem.cpp
         src/LightningBoltSystem.cpp
         src/NaturalSpawningMaterialize.cpp
@@ -260,6 +264,13 @@ basalt_module(server-runtime-core
         src/item/ItemDamageEffects.cpp
         src/item/ItemComponentPayloads.cpp
         src/function/FunctionLibrary.cpp
+        src/datapack/DataFiles.cpp
+        src/datapack/DataPacks.cpp
+        src/datapack/DataPackSelection.cpp
+        src/datapack/PackFiles.cpp
+        src/datapack/PackMetadata.cpp
+        src/datapack/PackRepository.cpp
+        src/datapack/ResourceStack.cpp
         src/player/FoodData.cpp
         src/player/PlayerArrowPickup.cpp
         src/player/PlayerMovementStats.cpp
@@ -289,6 +300,7 @@ basalt_module(server-runtime-core
         src/player/PlayerThrown.cpp
         src/player/PlayerSpear.cpp
         src/player/PlayerTrident.cpp
+        src/player/PlayerVelocity.cpp
         src/player/PlayerGliding.cpp
         src/player/PlayerFireworks.cpp
         src/player/PlayerCrossbow.cpp
@@ -317,6 +329,8 @@ basalt_module(server-runtime-core
         src/registry/VanillaOverworldBiomesB.cpp
         src/registry/VanillaRegistryData.cpp
         src/registry/VanillaTagData.cpp
+        src/registry/SyncedTags.cpp
+        src/registry/PackRegistries.cpp
         src/sched/Owner.cpp
         src/sched/RegionMap.cpp
         src/sched/RegionScheduler.cpp
@@ -397,6 +411,7 @@ basalt_module(server-runtime-core
         src/world/maps/MapRenderer.cpp
         src/world/maps/MapStorage.cpp
         src/world/Waxing.cpp
+        src/world/CommandPredicates.cpp
         src/world/WindBursts.cpp
         src/world/RedstoneWire.cpp
         src/world/Geysers.cpp
@@ -417,6 +432,7 @@ basalt_module(server-runtime-core
         src/player/PlayerAttributes.cpp
         src/CombatVehicles.cpp
         src/CombatMounts.cpp
+        src/CombatShearing.cpp
         src/CombatSpear.cpp
         src/CombatSpin.cpp
         src/CombatTridents.cpp
@@ -498,6 +514,8 @@ basalt_module(server-runtime-core
         src/world/RedstoneComponents.cpp
         src/world/RedstoneReactors.cpp
         src/world/ScheduledBlocks.cpp
+        src/world/SculkSpreading.cpp
+        src/world/ThrownItemTriggers.cpp
         src/world/Shelves.cpp
         src/world/Shulkers.cpp
         src/world/SnowyBlocks.cpp
@@ -596,6 +614,7 @@ basalt_module(server-runtime-core
         src/entity/Parrots.cpp
         src/MobActionParrots.cpp
         src/MobActionMovement.cpp
+        src/MobActionRiderFalls.cpp
         src/entity/MobSteps.cpp
         src/entity/Leashes.cpp
         src/MobActionLeash.cpp
@@ -723,6 +742,12 @@ basalt_test(server-runtime-real-enchantments-test
 basalt_test(server-runtime-post-piercing-effects-test
     SOURCES
         test/PostPiercingEffectsTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+basalt_test(server-runtime-sculk-spreading-test
+    SOURCES
+        test/SculkSpreadingTest.cpp
     DEPENDS basalt::server-runtime-core
 )
 
@@ -2501,6 +2526,16 @@ basalt_test(server-runtime-function-test
 
 # The only test here that writes files, so it is told where inside the build tree to put them.
 target_compile_definitions(server-runtime-function-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
+)
+
+basalt_test(server-runtime-datapack-test
+    SOURCES
+        test/DataPackTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-datapack-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/test-data"
 )
 

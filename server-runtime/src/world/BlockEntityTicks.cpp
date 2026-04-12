@@ -127,6 +127,7 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
     }
     std::vector<vibrations::ShriekerArrival> shrieks;
     std::vector<BlockChange> hives;
+    std::vector<std::array<std::int32_t, 3>> catalysts;
     for (const std::array<std::int32_t, 2>& position : chunks) {
         server::world::Chunk* chunk = world.chunkIfLoaded(position[0], position[1]);
         if (chunk == nullptr || chunk->blockEntityCount() == 0) {
@@ -185,6 +186,10 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
                 if (hooks.beehive && hooks.beehive(x, y, z, hives)) {
                     chunk->markDirty();
                 }
+                continue;
+            }
+            if (path == "sculk_catalyst") {
+                catalysts.push_back({x, y, z});
                 continue;
             }
             if (path == "creaking_heart") {
@@ -374,6 +379,11 @@ std::vector<BlockChange> tick(WorldState& world, std::string_view worldName, con
     for (BlockChange& honey : hives) {
         if (world.setBlockState(honey.x, honey.y, honey.z, honey.stateId)) {
             changes.push_back(std::move(honey));
+        }
+    }
+    if (hooks.sculkCatalyst) {
+        for (const auto& [x, y, z] : catalysts) {
+            static_cast<void>(hooks.sculkCatalyst(x, y, z));
         }
     }
     return changes;

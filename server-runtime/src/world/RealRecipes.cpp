@@ -1,5 +1,6 @@
 #include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/registry/Tags.hpp>
+#include <basalt/server/runtime/datapack/DataFiles.hpp>
 #include <basalt/server/runtime/world/RealRecipes.hpp>
 #include <basalt/server/world/crafting/RecipeJson.hpp>
 
@@ -12,57 +13,12 @@ namespace {
 using wire::common::Identifier;
 namespace crafting = server::world::crafting;
 
-constexpr std::string_view kRecipePrefix = "data/minecraft/recipe/";
-constexpr std::string_view kItemTagPrefix = "data/minecraft/tags/item/";
-constexpr std::string_view kJsonSuffix = ".json";
-
-[[nodiscard]] std::string stripped(const std::string& entry, std::string_view prefix) {
-    std::string path = entry;
-    if (path.starts_with(prefix)) {
-        path.erase(0, prefix.size());
-    }
-    if (path.ends_with(kJsonSuffix)) {
-        path.resize(path.size() - kJsonSuffix.size());
-    }
-    return path;
-}
-
 /// The item tag graph, flattened.
-///
-/// A tag whose members this build's registry does not know is dropped rather than fatal: the
-/// registry is generated from the same jar, so a mismatch there means something else is already
-/// wrong, and refusing to craft anything is not the way to say so.
 [[nodiscard]] std::map<Identifier, std::set<Identifier>> loadItemTags(const RealRecipes::Jar& jar,
                                                                       const wire::common::Logger& logger) {
-    std::map<Identifier, registry::tags::TagFile> files;
-    for (const std::string& entry : jar.entriesUnder(kItemTagPrefix)) {
-        if (!entry.ends_with(kJsonSuffix)) {
-            continue;
-        }
-        const std::optional<std::string> text = jar.readText(entry);
-        if (!text.has_value()) {
-            logger.debug([&] { return "Skipped item tag " + entry + ": no such entry"; });
-            continue;
-        }
-        const std::expected<registry::tags::TagFile, registry::tags::tagFileJson::ParseError> file =
-            registry::tags::tagFileJson::parse(*text);
-        if (!file.has_value()) {
-            logger.debug([&] { return "Skipped item tag " + entry + ": malformed"; });
-            continue;
-        }
-        files.emplace(Identifier::vanilla(stripped(entry, kItemTagPrefix)), *file);
-    }
-    const std::expected<std::map<Identifier, std::set<Identifier>>, registry::tags::TagError> resolved =
-        registry::tags::resolve(files,
-                                [](const Identifier& id) { return registry::items::registry().byName(id) != nullptr; });
-    if (!resolved.has_value()) {
-        logger.warn([&] {
-            return "Item tags could not be resolved, so tag-based recipes will not match: " +
-                   resolved.error().message();
-        });
-        return {};
-    }
-    return *resolved;
+    return datapack::resolveTags(
+        jar.entriesUnder, jar.readText, "item",
+        [](const Identifier& id) { return registry::items::registry().byName(id) != nullptr; }, logger);
 }
 
 } // namespace
@@ -109,16 +65,11 @@ void RealRecipes::load(const Jar& jar) {
         return members;
     };
 
-    std::vector<std::string> entries = jar.entriesUnder(kRecipePrefix);
-    std::sort(entries.begin(), entries.end());
+    const std::vector<std::pair<Identifier, std::string>> entries = datapack::dataFiles(jar.entriesUnder, "recipe");
     std::int32_t skipped = 0;
     // Reserved up front: a parsed recipe is handed out by pointer, so the vector must not grow later.
     recipes_.reserve(entries.size());
-    for (const std::string& entry : entries) {
-        if (!entry.ends_with(kJsonSuffix)) {
-            continue;
-        }
-        const Identifier id = Identifier::vanilla(stripped(entry, kRecipePrefix));
+    for (const auto& [id, entry] : entries) {
         ids_.insert(id);
         const std::optional<std::string> text = jar.readText(entry);
         // A type with no model here, or a file this build could not read: both are named, because a

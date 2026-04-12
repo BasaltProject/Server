@@ -12,12 +12,14 @@
 #include <basalt/server/runtime/world/RealTimelines.hpp>
 #include <basalt/server/storage/AccessRepository.hpp>
 #include <basalt/server/storage/PlayerRepository.hpp>
+#include <basalt/wire/common/json/Json.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 #include <basalt/wire/common/placeholder/Placeholders.hpp>
 #include <basalt/wire/common/timings/Timings.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
 #include <basalt/wire/text/LangTable.hpp>
 
+#include <array>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -37,6 +39,8 @@ class ServerEntity;
 }
 
 namespace basalt::server::runtime::command {
+
+class CommandTarget;
 
 /// The clock update a world would send right now, for a join or a change.
 [[nodiscard]] wire::protocol::play::SetTimePacket timePacketOf(const world::LoadedWorld& world);
@@ -127,6 +131,12 @@ public:
         world::PlayerProgress* progress = nullptr;
         /// What a command hands a criterion to, so `/recipe give` awards what learning it would.
         world::AdvancementTriggers* advancementTriggers = nullptr;
+        /// parity: `predicate=` and `execute if predicate`: a `minecraft:predicate`, by id (a JSON
+        /// string) or inline, tested with `self` as this entity at `origin`. Nothing for an id no
+        /// pack declares. Null where no data is loaded, and nothing matches.
+        std::function<std::optional<bool>(const wire::common::JsonValue& predicate, const CommandTarget* self,
+                                          world::LoadedWorld* world, const std::array<double, 3>& origin)>
+            predicate;
     };
 
     CommandEnvironment(player::PlayerRegistry& players, Options options);
