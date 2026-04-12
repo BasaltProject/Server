@@ -8,6 +8,7 @@
 #include <basalt/server/runtime/ClientSession.hpp>
 #include <basalt/server/runtime/CombatSystem.hpp>
 #include <basalt/server/runtime/CommandWiring.hpp>
+#include <basalt/server/runtime/ConduitSystem.hpp>
 #include <basalt/server/runtime/EndFightSystem.hpp>
 #include <basalt/server/runtime/EntityPushSystem.hpp>
 #include <basalt/server/runtime/EnvironmentTickSystem.hpp>
@@ -149,11 +150,6 @@ private:
     /// Ticks the entities that are not players, items or falling blocks.
     void tickEntities(world::LoadedWorld& world, const sched::Region& region);
 
-    /// parity: `LivingEntity.die` is not a sweep: it runs where the damage happened, so the loot and
-    /// the `ENTITY_DIE` a sculk sensor hears come out on that very tick. Here the kill leaves a flag,
-    /// so this is run wherever a kill can have been made: after the queued commands, which is where
-    /// vanilla's command phase is and the only thing that runs while `/tick freeze` holds, and again
-    /// after the entities have moved, which is where a mob killed by another one dies.
     /// parity: the sculk catalyst's `CatalystListener` on a death. Answers whether it took the
     /// experience, so none drops.
     bool drinkBySculk(world::LoadedWorld& world, const entity::ServerEntity& dead);
@@ -161,6 +157,9 @@ private:
     [[nodiscard]] std::vector<std::string> enabledFeatures() const;
     /// parity: `AbstractMinecart.useExperimentalMovement`.
     [[nodiscard]] bool minecartImprovements() const;
+    /// parity: `LivingEntity.die` runs on the tick of the damage; here a kill leaves a flag, so this runs
+    /// after the queued commands (vanilla's command phase, all `/tick freeze` lets run) and again after
+    /// entities move, where a mob killed by another dies.
     void tickDeaths(world::LoadedWorld& world, const sched::Region& region);
 
     /// The objectives the server keeps itself: deaths, kills, health, food, air, armour and
@@ -358,6 +357,7 @@ private:
     std::unique_ptr<LightningBoltSystem> lightning_;
     std::unique_ptr<ShriekerSystem> shriekers_;
     std::unique_ptr<SculkCatalystSystem> sculkCatalysts_;
+    std::unique_ptr<ConduitSystem> conduits_;
     std::unique_ptr<CombatSystem> combat_;
     std::unique_ptr<FireworkSystem> fireworks_;
     std::unique_ptr<AreaEffectCloudSystem> clouds_;

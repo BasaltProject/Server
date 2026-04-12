@@ -793,6 +793,11 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                 [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z) {
                     return sculkCatalysts_ != nullptr && sculkCatalysts_->tick(world, x, y, z);
                 },
+            .tickConduit =
+                [this](world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                       wire::nbt::NbtCompound& data) {
+                    return conduits_ != nullptr && conduits_->tick(world, x, y, z, data);
+                },
             .shriekerHeard =
                 [this](world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival) {
                     if (shriekers_ != nullptr) {
@@ -926,6 +931,9 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     sculkCatalysts_ = std::make_unique<SculkCatalystSystem>(
         playerRegistry_, *broadcaster_,
         SculkCatalystSystem::Options{.nextSeed = [] { return scratchSeed(); }, .blockTags = &vanillaData_.blockTags});
+    conduits_ = std::make_unique<ConduitSystem>(
+        playerRegistry_, *broadcaster_,
+        ConduitSystem::Options{.nextSeed = [] { return scratchSeed(); }, .blockTags = &vanillaData_.blockTags});
     lightning_ = std::make_unique<LightningBoltSystem>(*broadcaster_, *mobActions_, advancementTriggers_.get());
     pushes_ = std::make_unique<EntityPushSystem>(
         playerRegistry_, *combat_,

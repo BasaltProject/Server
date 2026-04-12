@@ -105,6 +105,10 @@ public:
         /// A sculk catalyst's spreader. parity: `SculkCatalystBlockEntity.serverTick`.
         std::function<bool(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z)>
             tickSculkCatalyst;
+        /// A conduit's turn. parity: `ConduitBlockEntity.serverTick`.
+        std::function<bool(world::LoadedWorld& world, std::int32_t x, std::int32_t y, std::int32_t z,
+                           wire::nbt::NbtCompound& data)>
+            tickConduit;
         /// A noise that reached a shrieker, handed to whoever knows the players.
         std::function<void(world::LoadedWorld& world, const world::vibrations::ShriekerArrival& arrival)> shriekerHeard;
         /// What runs a monster spawner block's turn. Null leaves every spawner idle.

@@ -18,11 +18,8 @@
 namespace basalt::server::runtime::world {
 
 /// The block entities that do something on their own, ticked once each per tick. parity:
-/// `LevelChunk.tickersInLevel`, so a tick visits the few that want one instead of every chest in the
-/// world.
-///
-/// Only the chunks the caller passes are visited, so a furnace far from every player is as still as
-/// vanilla's.
+/// `LevelChunk.tickersInLevel`. Only the chunks the caller passes are visited, so a far furnace is
+/// as still as vanilla's.
 namespace blockEntityTicks {
 
 /// Something a block entity handed back to the world, which the caller has to spawn.
@@ -33,12 +30,9 @@ struct Dropped {
     server::world::loot::ItemStack stack;
 };
 
-/// What each machine needs from outside this file.
-///
-/// `recipeFor` answers what a cooker makes of a stack: the world's recipe book is what knows, and
-/// this has no business reaching for it. The two event hooks are how a plugin says no; both live in
-/// `server-plugins`, which the runtime core does not depend on, so they arrive as callbacks. An
-/// unset hook means nobody is listening, which is one comparison per machine.
+/// What each machine needs from outside this file. `recipeFor` asks the world's recipe book; the two
+/// event hooks live in `server-plugins`, which the core does not depend on. An unset hook means nobody
+/// is listening.
 struct Hooks {
     std::function<const server::world::crafting::Recipe*(server::world::crafting::Cooker,
                                                          const server::world::loot::ItemStack&)>
@@ -84,6 +78,8 @@ struct Hooks {
     /// parity: `SculkCatalystBlockEntity.serverTick`, run once every block entity has had its turn
     /// because it rewrites blocks and their block entities; answers whether its cursors changed.
     std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z)> sculkCatalyst;
+    /// parity: `ConduitBlockEntity.serverTick`, over its own saved fields; answers whether they changed.
+    std::function<bool(wire::nbt::NbtCompound& data, std::int32_t x, std::int32_t y, std::int32_t z)> conduit;
     /// The chunks that tick this turn, which a shrieker's noise waits on. Unset, every loaded one.
     WorldState::Ticking ticking;
     /// A monster spawner's turn, over its own saved fields: spawning takes the players and the mobs,
