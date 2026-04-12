@@ -27,10 +27,12 @@ constexpr double kMaxKnockbackLift = 0.4;
 
 } // namespace
 
-float afterArmour(float damage, float armour, float toughness) {
+float afterArmour(float damage, float armour, float toughness, float fractionAdd) {
     const float scale = kBaseToughness + (toughness / kToughnessDivider);
     const float effective = std::clamp(armour - (damage / scale), armour * kMinArmourRatio, kMaxArmour);
-    return damage * (1.0F - (effective / kProtectionDivider));
+    const float fraction = effective / kProtectionDivider;
+    // parity: `modifyArmorEffectiveness` only runs for a hit with a weapon, and is clamped to [0, 1].
+    return damage * (1.0F - (fractionAdd == 0.0F ? fraction : std::clamp(fraction + fractionAdd, 0.0F, 1.0F)));
 }
 
 float afterProtection(float damage, float protection) {
@@ -99,7 +101,7 @@ bool withinAttackReach(const double playerX, const double playerY, const double 
 }
 
 Swing swingOf(const float strength, const float base, const float enchanted, const bool falling, const bool onGround,
-              const bool sprinting) {
+              const bool sprinting, const float bonus) {
     /// parity: `Player.attack`, where a swing counts as charged from nine tenths.
     constexpr float kFullStrength = 0.9F;
 
@@ -107,7 +109,7 @@ Swing swingOf(const float strength, const float base, const float enchanted, con
     swing.fullStrength = strength > kFullStrength;
     swing.critical = swing.fullStrength && falling && !onGround && !sprinting;
     swing.knockbackAttack = sprinting && swing.fullStrength;
-    swing.damage = base * chargeScale(strength);
+    swing.damage = (base * chargeScale(strength)) + bonus;
     if (swing.critical) {
         swing.damage *= kCriticalMultiplier;
     }

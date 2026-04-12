@@ -61,7 +61,8 @@ struct DamageContext {
 /// What is left of a hit after armour, resistance, protection and the tags that bypass them.
 [[nodiscard]] float damageAfterProtection(const PlayerSession& session, float amount,
                                           const std::optional<wire::common::Identifier>& damageType,
-                                          const DamageContext& context, float* resisted = nullptr);
+                                          const DamageContext& context, float* resisted = nullptr,
+                                          float armorFractionAdd = 0.0F);
 
 /// Hurts a player who is neither dead nor invulnerable: the cooldown, the armour, the absorption,
 /// the flash everyone sees, the shove, and dying when it takes the last of them.

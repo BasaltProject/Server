@@ -26,6 +26,8 @@ constexpr std::int32_t kDifficultyWeight = 7;
 constexpr std::int32_t kAgeWeight = 30;
 constexpr std::int32_t kBurnAgeBias = 10;
 constexpr std::int32_t kBurnAgeLimit = 5;
+/// parity: `INCREASED_FIRE_BURNOUT` takes fifty off every burn-out chance.
+constexpr std::int32_t kIncreasedBurnout = -50;
 
 [[nodiscard]] std::int32_t stateAt(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
     return world.blockState(x, y, z).value_or(registry::blocks::air().stateId);
@@ -51,20 +53,28 @@ void put(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std:
     changes.push_back(BlockChange{.x = x, .y = y, .z = z, .stateId = stateId});
 }
 
-/// Whether rain is falling on this block.
-///
-/// parity: `Level.isRainingAt` without its biome half: it asks whether the sky is open, which is the
-/// part that decides whether a roof keeps a fire alight.
-[[nodiscard]] bool rainingOn(const WorldState& world, const WorldWeather& weather, std::int32_t x, std::int32_t y,
-                             std::int32_t z) {
+/// Whether rain is falling on this block. parity: `Level.isRainingAt`.
+[[nodiscard]] bool rainingOn(const WorldState& world, const WorldWeather& weather, const Surroundings& surroundings,
+                             std::int32_t x, std::int32_t y, std::int32_t z) {
     if (!weather.raining) {
         return false;
+    }
+    if (surroundings.rainingAt) {
+        return surroundings.rainingAt(x, y, z);
     }
     const server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
     if (chunk == nullptr) {
         return false;
     }
     return chunk->heightAt(x & 15, z & 15, server::world::HeightmapType::MotionBlocking) <= y;
+}
+
+/// parity: `FireBlock.isNearRain`, the block and the four beside it.
+[[nodiscard]] bool nearRain(const WorldState& world, const WorldWeather& weather, const Surroundings& surroundings,
+                            std::int32_t x, std::int32_t y, std::int32_t z) {
+    return rainingOn(world, weather, surroundings, x, y, z) || rainingOn(world, weather, surroundings, x - 1, y, z) ||
+           rainingOn(world, weather, surroundings, x + 1, y, z) ||
+           rainingOn(world, weather, surroundings, x, y, z - 1) || rainingOn(world, weather, surroundings, x, y, z + 1);
 }
 
 [[nodiscard]] std::int32_t difficultyOf(std::string_view difficulty) {
@@ -139,23 +149,25 @@ void put(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, std:
 }
 
 /// parity: the dimension's `infiniburn` tag, which in the Nether is what keeps fire alight.
-[[nodiscard]] bool burnsForever(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+[[nodiscard]] bool burnsForever(const WorldState& world, const Surroundings& surroundings, std::int32_t x,
+                                std::int32_t y, std::int32_t z) {
     const wire::common::Identifier* below = registry::blockStateDefinitions::blockOf(stateAt(world, x, y - 1, z));
     if (below == nullptr) {
         return false;
     }
     const std::string_view path = below->path();
-    return path == "netherrack" || path == "magma_block" || path == "bedrock";
+    return path == "netherrack" || path == "magma_block" || (surroundings.bedrockBurnsForever && path == "bedrock");
 }
 
 /// parity: `FireBlock.checkBurnOut`, which either takes the block or leaves fire in its place.
-void burnOut(WorldState& world, const WorldWeather& weather, std::int32_t x, std::int32_t y, std::int32_t z,
-             std::int32_t chance, random::RandomSource& random, std::int32_t age, std::vector<BlockChange>& changes) {
+void burnOut(WorldState& world, const WorldWeather& weather, const Surroundings& surroundings, std::int32_t x,
+             std::int32_t y, std::int32_t z, std::int32_t chance, random::RandomSource& random, std::int32_t age,
+             std::vector<BlockChange>& changes) {
     const std::int32_t stateId = stateAt(world, x, y, z);
     if (random.nextInt(chance) >= registry::fireOdds::burnOdds(stateId)) {
         return;
     }
-    if (random.nextInt(age + kBurnAgeBias) < kBurnAgeLimit && !rainingOn(world, weather, x, y, z)) {
+    if (random.nextInt(age + kBurnAgeBias) < kBurnAgeLimit && !rainingOn(world, weather, surroundings, x, y, z)) {
         const std::optional<std::int32_t> fire =
             fireFor(world, x, y, z, std::min(age + random.nextInt(5) / 4, kMaxAge));
         if (!fire.has_value()) {
@@ -169,8 +181,9 @@ void burnOut(WorldState& world, const WorldWeather& weather, std::int32_t x, std
 }
 
 /// parity: the 3x3 column from one below to four above, with the odds thinning as it climbs.
-void spread(WorldState& world, const WorldWeather& weather, std::string_view difficulty, std::int32_t x, std::int32_t y,
-            std::int32_t z, random::RandomSource& random, std::int32_t age, std::vector<BlockChange>& changes) {
+void spread(WorldState& world, const WorldWeather& weather, const Surroundings& surroundings,
+            std::string_view difficulty, std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random,
+            std::int32_t age, std::vector<BlockChange>& changes) {
     const std::int32_t hardness = difficultyOf(difficulty);
     for (std::int32_t dx = -1; dx <= 1; ++dx) {
         for (std::int32_t dz = -1; dz <= 1; ++dz) {
@@ -189,11 +202,14 @@ void spread(WorldState& world, const WorldWeather& weather, std::string_view dif
                 if (ignite <= 0) {
                     continue;
                 }
-                const std::int32_t odds = (ignite + kIgniteBonus + (hardness * kDifficultyWeight)) / (age + kAgeWeight);
+                std::int32_t odds = (ignite + kIgniteBonus + (hardness * kDifficultyWeight)) / (age + kAgeWeight);
+                if (surroundings.increasedBurnout) {
+                    odds /= 2;
+                }
                 if (odds <= 0 || random.nextInt(rate) > odds) {
                     continue;
                 }
-                if (rainingOn(world, weather, tx, ty, tz)) {
+                if (weather.raining && nearRain(world, weather, surroundings, tx, ty, tz)) {
                     continue;
                 }
                 const std::optional<std::int32_t> fire =
@@ -262,7 +278,8 @@ bool ignite(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, r
 
 std::vector<BlockChange> tick(WorldState& world, const WorldWeather& weather, std::string_view difficulty,
                               std::int32_t x, std::int32_t y, std::int32_t z, random::RandomSource& random,
-                              const blockSurvival::ScaffoldingHasFallen& scaffoldingHasFallen, bool hasSkylight) {
+                              const blockSurvival::ScaffoldingHasFallen& scaffoldingHasFallen, bool hasSkylight,
+                              const Surroundings& surroundings) {
     const std::optional<std::int32_t> stateId = world.blockState(x, y, z);
     if (!stateId.has_value() || !isFire(*stateId)) {
         return {};
@@ -272,14 +289,21 @@ std::vector<BlockChange> tick(WorldState& world, const WorldWeather& weather, st
         return {};
     }
     std::vector<BlockChange> changes;
-    const std::int32_t age = ageOf(*stateId);
-
-    if (!blockSurvival::isSupported(world, x, y, z, *stateId, scaffoldingHasFallen, hasSkylight)) {
-        put(world, x, y, z, registry::blocks::air().stateId, changes);
+    // parity: `FireBlock.tick` books its next turn before anything else, so that roll comes first.
+    schedule(world, x, y, z, random);
+    if (!surroundings.canSpread) {
         return changes;
     }
+    const std::int32_t age = ageOf(*stateId);
+
+    // parity: a fire that cannot stand is removed, and the turn carries on regardless: a fire that
+    // then ages is written back with its new age.
+    if (!blockSurvival::isSupported(world, x, y, z, *stateId, scaffoldingHasFallen, hasSkylight)) {
+        put(world, x, y, z, registry::blocks::air().stateId, changes);
+    }
+    const bool infiniBurn = burnsForever(world, surroundings, x, y, z);
     // parity: rain puts a fire out on a roll that gets likelier as the fire ages.
-    if (rainingOn(world, weather, x, y, z) &&
+    if (!infiniBurn && weather.raining && nearRain(world, weather, surroundings, x, y, z) &&
         random.nextFloat() < kRainBase + (static_cast<float>(age) * kRainPerAge)) {
         put(world, x, y, z, registry::blocks::air().stateId, changes);
         return changes;
@@ -293,31 +317,32 @@ std::vector<BlockChange> tick(WorldState& world, const WorldWeather& weather, st
             put(world, x, y, z, *older, changes);
         }
     }
-    schedule(world, x, y, z, random);
 
-    if (!burnsForever(world, x, y, z)) {
+    // parity: from here on the jar reads the age the fire started the turn with.
+    if (!infiniBurn) {
         if (!hasSomethingToBurn(world, x, y, z)) {
             const std::int32_t below = stateAt(world, x, y - 1, z);
-            if (!registry::blockShapes::isFaceSturdy(below, registry::BlockFace::Up) || aged > kOldEnoughToDie) {
+            if (!registry::blockShapes::isFaceSturdy(below, registry::BlockFace::Up) || age > kOldEnoughToDie) {
                 put(world, x, y, z, registry::blocks::air().stateId, changes);
             }
             return changes;
         }
         // parity: an old fire over something that will not burn goes out on a roll of four.
-        if (aged == kMaxAge && random.nextInt(4) == 0 &&
+        if (age == kMaxAge && random.nextInt(4) == 0 &&
             registry::fireOdds::burnOdds(stateAt(world, x, y - 1, z)) == 0) {
             put(world, x, y, z, registry::blocks::air().stateId, changes);
             return changes;
         }
     }
 
-    burnOut(world, weather, x + 1, y, z, kSideChance, random, aged, changes);
-    burnOut(world, weather, x - 1, y, z, kSideChance, random, aged, changes);
-    burnOut(world, weather, x, y - 1, z, kVerticalChance, random, aged, changes);
-    burnOut(world, weather, x, y + 1, z, kVerticalChance, random, aged, changes);
-    burnOut(world, weather, x, y, z - 1, kSideChance, random, aged, changes);
-    burnOut(world, weather, x, y, z + 1, kSideChance, random, aged, changes);
-    spread(world, weather, difficulty, x, y, z, random, aged, changes);
+    const std::int32_t extra = surroundings.increasedBurnout ? kIncreasedBurnout : 0;
+    burnOut(world, weather, surroundings, x + 1, y, z, kSideChance + extra, random, age, changes);
+    burnOut(world, weather, surroundings, x - 1, y, z, kSideChance + extra, random, age, changes);
+    burnOut(world, weather, surroundings, x, y - 1, z, kVerticalChance + extra, random, age, changes);
+    burnOut(world, weather, surroundings, x, y + 1, z, kVerticalChance + extra, random, age, changes);
+    burnOut(world, weather, surroundings, x, y, z - 1, kSideChance + extra, random, age, changes);
+    burnOut(world, weather, surroundings, x, y, z + 1, kSideChance + extra, random, age, changes);
+    spread(world, weather, surroundings, difficulty, x, y, z, random, age, changes);
     return changes;
 }
 

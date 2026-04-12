@@ -42,7 +42,7 @@ using wire::nbt::NbtTag;
     return std::nullopt;
 }
 
-/// parity: `LevelBasedValue`: a constant, or `linear`.
+/// parity: `LevelBasedValue`: a constant, `linear`, or `lookup` with its fallback.
 [[nodiscard]] float levelBased(const NbtTag* tag, std::int32_t level) {
     if (const std::optional<double> constant = numberOf(tag); constant.has_value()) {
         return static_cast<float>(*constant);
@@ -50,6 +50,14 @@ using wire::nbt::NbtTag;
     const auto* value = tag == nullptr ? nullptr : tag->get<NbtCompound>();
     if (value == nullptr) {
         return 0.0F;
+    }
+    if (const std::string* type = stringAt(*value, "type"); type != nullptr && *type == "minecraft:lookup") {
+        const NbtTag* found = value->find("values");
+        const auto* values = found == nullptr ? nullptr : found->get<NbtList>();
+        if (values != nullptr && level >= 1 && static_cast<std::size_t>(level) <= values->size()) {
+            return static_cast<float>(numberOf(&(*values)[static_cast<std::size_t>(level - 1)]).value_or(0.0));
+        }
+        return levelBased(value->find("fallback"), level);
     }
     const auto base = static_cast<float>(numberOf(value->find("base")).value_or(0.0));
     const auto perLevel = static_cast<float>(numberOf(value->find("per_level_above_first")).value_or(0.0));
@@ -102,6 +110,48 @@ using wire::nbt::NbtTag;
     }
     const auto id = Identifier::parse(*wanted);
     return id.has_value() && *id == victim->type;
+}
+
+/// A range as `MinMaxBounds` writes it, a bare number being both ends.
+[[nodiscard]] bool inRange(const NbtTag* bounds, double value) {
+    if (const std::optional<double> exact = numberOf(bounds); exact.has_value()) {
+        return value == *exact;
+    }
+    const auto* range = bounds == nullptr ? nullptr : bounds->get<NbtCompound>();
+    if (range == nullptr) {
+        return false;
+    }
+    const std::optional<double> min = numberOf(range->find("min"));
+    const std::optional<double> max = numberOf(range->find("max"));
+    return (!min.has_value() || value >= *min) && (!max.has_value() || value <= *max);
+}
+
+/// The attacker's flags and movement, which is all wind burst asks of them; anything else is unmet.
+[[nodiscard]] bool attackerIs(const NbtCompound& predicate, const Hit& hit) {
+    for (std::size_t at = 0; at < predicate.size(); ++at) {
+        const std::string& key = predicate.names()[at];
+        const auto* inner = predicate.values()[at].get<NbtCompound>();
+        if (inner == nullptr) {
+            return false;
+        }
+        for (std::size_t field = 0; field < inner->size(); ++field) {
+            const std::string& name = inner->names()[field];
+            const NbtTag& value = inner->values()[field];
+            if (key == "minecraft:flags" && name == "is_flying") {
+                const auto* flag = value.get<std::int8_t>();
+                if (flag == nullptr || (*flag != 0) != hit.attackerFlying) {
+                    return false;
+                }
+            } else if (key == "minecraft:movement" && name == "fall_distance") {
+                if (!inRange(&value, hit.attackerFallDistance)) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 /// parity: the loot conditions an enchanted-damage context can answer; anything else is unmet.
@@ -160,7 +210,13 @@ using wire::nbt::NbtTag;
     if (*type == "minecraft:entity_properties") {
         const std::string* entity = stringAt(*requirement, "entity");
         const NbtCompound* predicate = compoundAt(*requirement, "predicate");
-        return entity != nullptr && *entity == "this" && predicate != nullptr && victimIs(*predicate, hit.victim);
+        if (entity == nullptr || predicate == nullptr) {
+            return false;
+        }
+        if (*entity == "this") {
+            return victimIs(*predicate, hit.victim);
+        }
+        return (*entity == "attacker" || *entity == "direct_attacker") && attackerIs(*predicate, hit);
     }
     return false;
 }
@@ -191,6 +247,25 @@ void apply(const NbtCompound* effect, std::int32_t level, Side target, Side owne
             const float max = levelBased(effect->find("max_damage"), level);
             outcome.damages.push_back(Damage{.target = target, .type = *id, .amount = randomBetween(random, min, max)});
         }
+    } else if (*type == "minecraft:explode") {
+        const auto particle = [effect](std::string_view key) {
+            const NbtCompound* options = compoundAt(*effect, key);
+            const std::string* name = options == nullptr ? nullptr : stringAt(*options, "type");
+            return name == nullptr ? std::string{} : *name;
+        };
+        const std::string* interaction = stringAt(*effect, "block_interaction");
+        const std::string* immune = stringAt(*effect, "immune_blocks");
+        const std::string* sound = stringAt(*effect, "sound");
+        const NbtTag* multiplier = effect->find("knockback_multiplier");
+        outcome.explosions.push_back(Explosion{
+            .target = target,
+            .radius = std::max(levelBased(effect->find("radius"), level), 0.0F),
+            .knockbackMultiplier = multiplier == nullptr ? std::nullopt : std::optional{levelBased(multiplier, level)},
+            .triggersBlocks = interaction != nullptr && *interaction == "trigger",
+            .immuneBlocks = immune == nullptr ? std::string{} : *immune,
+            .smallParticle = particle("small_particle"),
+            .largeParticle = particle("large_particle"),
+            .sound = sound == nullptr ? std::string{} : *sound});
     } else if (*type == "minecraft:change_item_damage") {
         outcome.wear.push_back(
             ItemWear{.owner = owner,

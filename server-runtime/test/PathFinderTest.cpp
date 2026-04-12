@@ -409,3 +409,17 @@ TEST_CASE("a creaking's heart keeps its paths within thirty-two blocks of it") {
     REQUIRE_FALSE(bound.nodes.empty());
     CHECK(bound.nodes.back().at == Position{31, 64, 8});
 }
+
+TEST_CASE("the level remembers where a collision shape changed, and nothing else") {
+    Loaded loaded;
+    std::vector<Position> changed;
+    bool overflowed = false;
+    const std::uint64_t start = loaded.state.shapeChangesSince(0, changed, overflowed);
+    changed.clear();
+    REQUIRE(loaded.state.setBlockState(3, 64, 3, stateOf("stone")));
+    REQUIRE(loaded.state.setBlockState(4, 64, 3, stateOf("short_grass")));
+    const std::uint64_t after = loaded.state.shapeChangesSince(start, changed, overflowed);
+    CHECK(after == start + 1);
+    CHECK_FALSE(overflowed);
+    CHECK(changed == std::vector<Position>{{3, 64, 3}});
+}

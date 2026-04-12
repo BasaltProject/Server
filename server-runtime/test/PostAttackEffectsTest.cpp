@@ -38,6 +38,16 @@ constexpr std::string_view kSlow = R"({slots: ["mainhand"], effects: {"minecraft
     requirements: {type: "minecraft:entity_properties", entity: "this",
                    predicate: {"minecraft:entity_type": "#test:bugs"}}}]}})";
 
+constexpr std::string_view kBurst = R"({slots: ["mainhand"], effects: {"minecraft:post_attack": [{
+    affected: "attacker", enchanted: "attacker",
+    effect: {type: "minecraft:explode", block_interaction: "trigger", radius: 3.5f,
+             knockback_multiplier: {type: "minecraft:lookup", values: [1.2f, 1.75f, 2.2f],
+                                    fallback: {type: "minecraft:linear", base: 1.5f, per_level_above_first: 0.35f}},
+             small_particle: {type: "minecraft:gust_emitter_small"}, large_particle: {type: "minecraft:gust_emitter_large"},
+             sound: "minecraft:entity.wind_charge.wind_burst"},
+    requirements: {type: "minecraft:entity_properties", entity: "direct_attacker",
+                   predicate: {"minecraft:flags": {is_flying: 0b}, "minecraft:movement": {fall_distance: {min: 1.5d}}}}}]}})";
+
 [[nodiscard]] NbtCompound parsed(std::string_view snbt) {
     return *basalt::wire::nbt::snbt::parse(snbt)->get<NbtCompound>();
 }
@@ -56,6 +66,7 @@ struct Fixture {
     NbtCompound ignite = parsed(kIgnite);
     NbtCompound reflect = parsed(kReflect);
     NbtCompound slow = parsed(kSlow);
+    NbtCompound burst = parsed(kBurst);
 
     [[nodiscard]] weaponDamage::DefinitionOf definitions() const {
         return [this](const Identifier& id) -> const NbtCompound* {
@@ -64,6 +75,9 @@ struct Fixture {
             }
             if (id.path() == "reflect") {
                 return &reflect;
+            }
+            if (id.path() == "burst") {
+                return &burst;
             }
             return id.path() == "slow" ? &slow : nullptr;
         };
@@ -129,4 +143,27 @@ TEST_CASE("an effect waits on the victim's entity type") {
 
     hit.victim = &player;
     CHECK(postAttack::of(hit, fixture.definitions(), random).effects.empty());
+}
+
+TEST_CASE("a gust answers a fall that is not a glide, its push looked up by level") {
+    const Fixture fixture;
+    const weaponDamage::Victim victim{.type = Identifier::vanilla("zombie"), .inTag = {}};
+    auto random = basalt::server::random::RandomSource::legacy(5);
+    Hit hit{
+        .weapon =
+            Equipped{.slot = 27, .equipmentSlot = "mainhand", .stack = enchanted("minecraft:mace", "test:burst", 2)},
+        .victim = &victim,
+        .attackerFallDistance = 2.0};
+    const Outcome outcome = postAttack::of(hit, fixture.definitions(), random);
+    REQUIRE(outcome.explosions.size() == 1);
+    CHECK(outcome.explosions[0].target == Side::kAttacker);
+    CHECK(outcome.explosions[0].radius == doctest::Approx(3.5F));
+    CHECK(*outcome.explosions[0].knockbackMultiplier == doctest::Approx(1.75F));
+    CHECK(outcome.explosions[0].triggersBlocks);
+
+    hit.attackerFlying = true;
+    CHECK(postAttack::of(hit, fixture.definitions(), random).explosions.empty());
+    hit.attackerFlying = false;
+    hit.attackerFallDistance = 1.0;
+    CHECK(postAttack::of(hit, fixture.definitions(), random).explosions.empty());
 }

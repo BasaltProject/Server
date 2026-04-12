@@ -105,37 +105,76 @@ void CombatSystem::gustWhereItLanded(world::LoadedWorld& world, const std::vecto
                                      const std::vector<ServerEntity*>& living, const ServerEntity& charge, double x,
                                      double y, double z) {
     const bool breeze = charge.type().path() == "breeze_wind_charge";
-    const float radius = breeze ? world::windBursts::kBreezeRadius : world::windBursts::kRadius;
+    gust(world, watchers, living,
+         Gust{.x = x,
+              .y = y,
+              .z = z,
+              .radius = breeze ? world::windBursts::kBreezeRadius : world::windBursts::kRadius,
+              .knockbackMultiplier = breeze ? 1.0F : kPlayerChargeKnockback,
+              .sourceId = charge.entityId(),
+              .windCharge = charge.type().path() == "wind_charge",
+              .particle = breeze ? "gust_emitter_large" : "gust_emitter_small",
+              .sound = breeze ? "entity.breeze.wind_burst" : "entity.wind_charge.wind_burst",
+              .silent = charge.sourceNbt.has_value() && charge.sourceNbt->getBoolean("Silent")});
+}
+
+CombatSystem::Gust CombatSystem::gustOf(const world::postAttack::Explosion& blast, double x, double y, double z) {
+    const auto bare = [](const std::string& id) {
+        return id.starts_with("minecraft:") ? id.substr(std::string_view{"minecraft:"}.size()) : id;
+    };
+    const bool small = blast.radius < 2.0F || !blast.triggersBlocks;
+    return Gust{.x = x,
+                .y = y,
+                .z = z,
+                .radius = blast.radius,
+                .knockbackMultiplier = blast.knockbackMultiplier.value_or(1.0F),
+                .sourceId = std::nullopt,
+                .windCharge = false,
+                .triggersBlocks = blast.triggersBlocks,
+                .immuneTag = blast.immuneBlocks,
+                .particle = bare(small ? blast.smallParticle : blast.largeParticle),
+                .sound = bare(blast.sound),
+                .silent = false};
+}
+
+void CombatSystem::gust(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
+                        const std::vector<ServerEntity*>& living, const Gust& blast) {
+    const double x = blast.x;
+    const double y = blast.y;
+    const double z = blast.z;
+    const float radius = blast.radius;
     random::RandomSource random = random::RandomSource::legacy(options_.nextSeed ? options_.nextSeed() : 0);
     const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
-    // parity: `hurtEntities` runs before the blocks: the push, which is all a wind charge's blast does
-    // to what it reaches.
-    const float mobMultiplier = breeze ? 1.0F : kPlayerChargeKnockback;
+    // parity: `hurtEntities` runs before the blocks: the push, which is all this blast does to what
+    // it reaches.
     for (ServerEntity* mob : living) {
-        if (mob == &charge || mob->removed || mob->dying ||
+        if (mob->entityId() == blast.sourceId || mob->removed || mob->dying ||
             !server::registry::entityAttributes::isLiving(mob->type())) {
             continue;
         }
         const double eyes = mob->y + entity::mobBreathing::eyeHeightOf(*mob);
-        if (const std::optional<std::array<double, 3>> push =
-                pushFor(world.state(), x, y, z, radius, {mob->x, mob->y, mob->z}, eyes,
-                        entity::Aabb::of(mob->x, mob->y, mob->z, mob->width(), mob->height()), mobMultiplier,
-                        mob->attributeWithModifiers("minecraft:explosion_knockback_resistance"));
+        if (const std::optional<std::array<double, 3>> push = pushFor(
+                world.state(), x, y, z, radius, {mob->x, mob->y, mob->z}, eyes,
+                entity::Aabb::of(mob->x, mob->y, mob->z, mob->width(), mob->height()), blast.knockbackMultiplier,
+                mob->attributeWithModifiers("minecraft:explosion_knockback_resistance"));
             push.has_value()) {
             mob->velocityX += (*push)[0];
             mob->velocityY += (*push)[1];
             mob->velocityZ += (*push)[2];
         }
     }
-    const world::explosions::Spares stops = [this](world::WorldState&, std::int32_t, std::int32_t, std::int32_t,
-                                                   std::int32_t stateId) {
-        const Identifier* block = server::registry::blockStateDefinitions::blockOf(stateId);
-        return options_.blockTags != nullptr && block != nullptr &&
-               world::realBlockTags::contains(*options_.blockTags, "minecraft:blocks_wind_charge_explosions", *block);
-    };
-    const std::vector<world::BlockChange> knocked =
-        world::windBursts::burst(world.state(), facts.chunkHeight.minY(), facts.chunkHeight.maxY(), x, y, z,
-                                 world.gameTime(), random, stops, radius);
+    std::vector<world::BlockChange> knocked;
+    if (blast.triggersBlocks) {
+        const std::string immune = blast.immuneTag.starts_with('#') ? blast.immuneTag.substr(1) : blast.immuneTag;
+        const world::explosions::Spares stops = [this, immune](world::WorldState&, std::int32_t, std::int32_t,
+                                                               std::int32_t, std::int32_t stateId) {
+            const Identifier* block = server::registry::blockStateDefinitions::blockOf(stateId);
+            return options_.blockTags != nullptr && block != nullptr &&
+                   world::realBlockTags::contains(*options_.blockTags, immune, *block);
+        };
+        knocked = world::windBursts::burst(world.state(), facts.chunkHeight.minY(), facts.chunkHeight.maxY(), x, y, z,
+                                           world.gameTime(), random, stops, radius);
+    }
     for (const world::BlockChange& change : knocked) {
         broadcaster_.announceRedstone(world, watchers, change);
         // parity: `updateNeighbours` tells the wall a button or a lever is stuck to, which is what
@@ -154,33 +193,31 @@ void CombatSystem::gustWhereItLanded(world::LoadedWorld& world, const std::vecto
     }
     // parity: `ServerLevel.explode`'s packet: the gust, its burst sound, and each player's own push,
     // which the client applies to itself.
-    const bool silent = charge.sourceNbt.has_value() && charge.sourceNbt->getBoolean("Silent");
     for (PlayerSession* player : watchers) {
         const double dx = player->x - x;
         const double dy = player->y - y;
         const double dz = player->z - z;
         // parity: `ServerExplosion.hurtEntities`' `onExplosionHit`, which only a player's own wind
         // charge makes an impulse that spares the fall.
-        if (player->gamemode != play::Gamemode::Spectator &&
+        if (player->gamemode != play::Gamemode::Spectator && player->entityId() != blast.sourceId &&
             std::sqrt((dx * dx) + (dy * dy) + (dz * dz)) / (static_cast<double>(radius) * 2.0) <= 1.0) {
-            player::impulse::onExplosionHit(*player, charge.type().path() == "wind_charge");
+            player::impulse::onExplosionHit(*player, blast.windCharge);
         }
         if ((dx * dx) + (dy * dy) + (dz * dz) >= kPacketRangeSquared) {
             continue;
         }
-        play::ExplodePacket packet{
-            .x = x,
-            .y = y,
-            .z = z,
-            .radius = radius,
-            .blockCount = static_cast<std::int32_t>(knocked.size()),
-            .particleId = ExplosionSystem::particleId(breeze ? "gust_emitter_large" : "gust_emitter_small"),
-            .sound = breeze ? "entity.breeze.wind_burst" : "entity.wind_charge.wind_burst",
-            .playSound = !silent};
+        play::ExplodePacket packet{.x = x,
+                                   .y = y,
+                                   .z = z,
+                                   .radius = radius,
+                                   .blockCount = static_cast<std::int32_t>(knocked.size()),
+                                   .particleId = ExplosionSystem::particleId(blast.particle),
+                                   .sound = blast.sound,
+                                   .playSound = !blast.silent};
         const bool spectator = player->gamemode == play::Gamemode::Spectator;
         const bool creativeFlying = player->gamemode == play::Gamemode::Creative && player->flying;
-        if (!spectator && !creativeFlying) {
-            const float multiplier = player->flying ? 0.0F : mobMultiplier;
+        if (!spectator && !creativeFlying && player->entityId() != blast.sourceId) {
+            const float multiplier = player->flying ? 0.0F : blast.knockbackMultiplier;
             if (const std::optional<std::array<double, 3>> push = pushFor(
                     world.state(), x, y, z, radius, {player->x, player->y, player->z}, player->y + kPlayerEyes,
                     entity::Aabb::of(player->x, player->y, player->z, kPlayerWidth, kPlayerHeight), multiplier, 0.0);

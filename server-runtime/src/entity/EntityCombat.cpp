@@ -34,13 +34,13 @@ constexpr std::int32_t kCooldownHalfTicks = kHurtCooldownTicks / 2;
 }
 
 /// parity: a mob's own `armor` and `armor_toughness` attributes, which most leave at zero.
-[[nodiscard]] float afterArmour(const ServerEntity& entity, float amount) {
+[[nodiscard]] float afterArmour(const ServerEntity& entity, float amount, float fractionAdd) {
     const float armour = attributeOf(entity.type(), reg::entityAttributes::kArmor);
     if (armour <= 0.0F) {
         return amount;
     }
     return player::combat::afterArmour(amount, armour,
-                                       attributeOf(entity.type(), reg::entityAttributes::kArmorToughness));
+                                       attributeOf(entity.type(), reg::entityAttributes::kArmorToughness), fractionAdd);
 }
 
 } // namespace
@@ -70,7 +70,7 @@ std::int64_t nextRaidBarStamp() {
 
 Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, std::optional<double> sourceZ,
             const Hooks& hooks, std::string_view cause, const std::optional<std::string>& attackerName,
-            const bool byPlayer) {
+            const bool byPlayer, const float armorFractionAdd) {
     const ServerEntity::Blame blamed = std::exchange(entity.nextBlame, {});
     // parity: `Raider.hurtServer` calls `updateBossbar` before anything else.
     if (entity.raidId.has_value()) {
@@ -168,7 +168,7 @@ Result hurt(ServerEntity& entity, float amount, std::optional<double> sourceX, s
         entity.lastHurtByMob = blamed.causingId;
         entity.lastHurtByMobTimestamp = entity.tickCount;
     }
-    const float reduced = afterArmour(entity, incoming);
+    const float reduced = afterArmour(entity, incoming, armorFractionAdd);
     if (reduced <= 0.0F) {
         return {};
     }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/runtime/entity/Aabb.hpp>
+#include <basalt/server/runtime/world/PostAttackEffects.hpp>
 #include <basalt/server/runtime/world/RealEntityTypeTags.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
 
@@ -54,6 +55,10 @@ struct Context {
     /// Tells everyone that a mob the sweep caught was hurt, and kills it when the blow did.
     std::function<void(entity::ServerEntity& mob, bool died)> sweptMob;
     std::function<std::int64_t()> nextSeed;
+    /// parity: `ExplodeEffect`, a post-attack blast at that point: wind burst's gust.
+    std::function<void(world::LoadedWorld& world, const world::postAttack::Explosion& blast, double x, double y,
+                       double z)>
+        explode;
 };
 
 /// The swing as the attacker's side worked it out.
@@ -75,6 +80,25 @@ struct Swing {
 /// statistic and the dark hearts. Answers whether the blow landed.
 bool attack(PlayerSession& attacker, PlayerSession& victim, world::LoadedWorld& world, const Context& context,
             const Swing& swing);
+
+/// parity: `EnchantmentHelper.doPostAttackEffectsWithItemSource` after a player's blow on `victim`,
+/// a player, or on `mob`: both sides' enchantments.
+void postAttack(const Context& context, world::LoadedWorld& world, PlayerSession& attacker, PlayerSession* victim,
+                entity::ServerEntity* mob, const std::optional<storage::StoredItemStack>& weapon,
+                std::int32_t weaponSlot);
+
+/// parity: `Player.itemAttackInteraction` for a blow that landed: the mace's smash, the post-attack
+/// enchantments, and the weapon counted and worn.
+void itemAttackInteraction(const Context& context, world::LoadedWorld& world, PlayerSession& attacker,
+                           PlayerSession* victim, entity::ServerEntity* mob,
+                           const std::optional<storage::StoredItemStack>& weapon, std::int32_t weaponSlot);
+
+/// parity: `LivingEntity.getKnockback`, the attribute and the knockback enchantment, halved.
+[[nodiscard]] float knockbackOf(const Context& context, const PlayerSession& attacker,
+                                const std::optional<storage::StoredItemStack>& weapon);
+
+/// parity: `causeExtraKnockback` on a mob, along the attacker's facing, which also ends the sprint.
+void knockMob(PlayerSession& attacker, entity::ServerEntity& mob, float power);
 
 /// parity: `doSweepAttack`: everything living in the target's box grown by one and a quarter,
 /// within three blocks of the attacker and not on their team, mobs and players alike.

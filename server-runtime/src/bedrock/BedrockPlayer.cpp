@@ -22,6 +22,7 @@
 #include <basalt/wire/text/Serializers.hpp>
 #include <basalt/wire/text/TranslationResolver.hpp>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
@@ -828,6 +829,8 @@ void BedrockPlayer::move(const double x, const double y, const double z, const f
     }
     // How far they have dropped without landing. parity: `Entity.fallDistance`, which is what
     // decides whether a swing counts as a critical: only a hit on the way down does.
+    // parity: `resetFallDistance` from elsewhere, a mace's smash among them, lands here too.
+    fallDistance_ = std::min(fallDistance_, session_->fallDistance);
     if (session_->onGround) {
         fallDistance_ = 0.0;
     } else if (y < session_->y) {

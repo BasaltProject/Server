@@ -1,5 +1,6 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/entity/Camels.hpp>
+#include <basalt/server/runtime/entity/EntityNbt.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobCategory.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
@@ -234,9 +235,22 @@ constexpr std::array<BabyBox, 36> kBabyBoxes{{
     const auto width = static_cast<float>(registry::entityTypeShapes::widthOf(type));
     const auto height = static_cast<float>(registry::entityTypeShapes::heightOf(type));
     const std::string_view path = type.path();
-    if (path == "slime" || path == "magma_cube") {
+    if (path == "slime" || path == "magma_cube" || path == "sulfur_cube") {
         const auto size = static_cast<float>(entity.cubeSize);
         return {width * size, height * size};
+    }
+    // parity: `Phantom.getDefaultDimensions`, fifteen per cent more a size.
+    if (path == "phantom") {
+        const std::int32_t size = entity.sourceNbt.has_value() ? entityNbt::numericInt(*entity.sourceNbt, "size") : 0;
+        const float scale = 1.0F + (0.15F * static_cast<float>(size));
+        return {width * scale, height * scale};
+    }
+    // parity: `Pufferfish.getScale`: half deflated, seven tenths half puffed, whole when puffed up.
+    if (path == "pufferfish") {
+        const std::int32_t state =
+            entity.sourceNbt.has_value() ? entityNbt::numericInt(*entity.sourceNbt, "PuffState") : 0;
+        const float scale = state == 0 ? 0.5F : (state == 1 ? 0.7F : 1.0F);
+        return {width * scale, height * scale};
     }
     if (!baby(entity)) {
         return {width, height};

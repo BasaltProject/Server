@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/entity/Attributes.hpp>
 #include <basalt/server/runtime/entity/CreakingNavigation.hpp>
 #include <basalt/server/runtime/entity/Creakings.hpp>
+#include <basalt/server/runtime/entity/MobEquipment.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/WalkNodeEvaluator.hpp>
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
@@ -236,7 +237,29 @@ void followThePath(ServerEntity& creaking, const creakings::CreakingState& state
                            .canPassDoors = true,
                            .minY = minY};
     mob.home = state.home;
+    // parity: `PowderSnowBlock.canEntityWalkOnPowderSnow`: leather boots let it stand on the snow.
+    const std::optional<server::world::loot::ItemStack> feet = mobEquipment::get(creaking, mobEquipment::Slot::Feet);
+    mob.walksOnPowderSnow = feet.has_value() && feet->item == wire::common::Identifier::vanilla("leather_boots");
+    mob.fallDistance = creaking.fallDistance;
+    mob.border = state.border;
     return mob;
+}
+
+/// parity: `PathNavigation.shouldRecomputePath`: a change nearer the middle of what is left of the
+/// path than the nodes left to walk.
+[[nodiscard]] bool shouldRecompute(const ServerEntity& creaking, const Block& changed) {
+    if (!creaking.path.has_value() || ai::navigation::isDone(creaking) || creaking.path->empty()) {
+        return false;
+    }
+    const Block& end = creaking.path->back();
+    const double midX = (end[0] + creaking.x) / 2.0;
+    const double midY = (end[1] + creaking.y) / 2.0;
+    const double midZ = (end[2] + creaking.z) / 2.0;
+    const double dx = changed[0] + 0.5 - midX;
+    const double dy = changed[1] + 0.5 - midY;
+    const double dz = changed[2] + 0.5 - midZ;
+    const auto left = static_cast<double>(creaking.path->size() - static_cast<std::size_t>(creaking.pathIndex));
+    return (dx * dx) + (dy * dy) + (dz * dz) < left * left;
 }
 
 void clearPath(ServerEntity& creaking, creakings::CreakingState& state) {
@@ -258,50 +281,101 @@ pathTypes::Maluses maluses(bool heartBound) {
     return costs;
 }
 
-bool moveTo(world::WorldState& world, ServerEntity& creaking, double x, double y, double z, std::int32_t reachRange,
-            double speedModifier) {
-    creakings::CreakingState& state = creakings::stateOf(creaking);
-    // parity: `GroundPathNavigation.createPath`: nothing towards a chunk that is not loaded.
-    Block target{floorOf(x), floorOf(y), floorOf(z)};
+namespace {
+
+/// parity: `GroundPathNavigation.createPath` towards `target`, answering whether a path could be
+/// drawn at all. A `recompute` replaces the path it walks; a fresh ask keeps it when it still leads
+/// the same way, as `PathNavigation.createPath` and `moveTo(Path)` do.
+bool drawPath(world::WorldState& world, ServerEntity& creaking, creakings::CreakingState& state, Block target,
+              std::int32_t reachRange, bool recompute) {
+    // parity: nothing towards a chunk that is not loaded.
     const server::world::Chunk* column = world.chunkIfLoaded(target[0] >> 4, target[2] >> 4);
     const server::world::Chunk* own = world.chunkIfLoaded(floorOf(creaking.x) >> 4, floorOf(creaking.z) >> 4);
     const std::int32_t minY = own != nullptr ? own->verticalBounds().minY() : kFallbackMinY;
-    bool drawn = false;
-    if (column != nullptr) {
+    if (column == nullptr) {
+        return false;
+    }
+    if (!recompute) {
         target = surfaceOf(world, target, column->verticalBounds().minY(), column->verticalBounds().maxY());
-        // parity: `PathNavigation.createPath`: the path it walks is kept while it still leads there.
-        const bool current = creaking.path.has_value() && !ai::navigation::isDone(creaking) &&
-                             state.pathTarget == target && state.pathNodeTypes.size() == creaking.path->size();
-        if (creaking.y >= static_cast<double>(minY) && canUpdatePath(world, creaking)) {
-            drawn = true;
+    }
+    const bool current = !recompute && creaking.path.has_value() && !ai::navigation::isDone(creaking) &&
+                         state.pathTarget == target && state.pathNodeTypes.size() == creaking.path->size();
+    if (creaking.y < static_cast<double>(minY) || !canUpdatePath(world, creaking)) {
+        return false;
+    }
+    state.pathReach = reachRange;
+    if (current) {
+        return true;
+    }
+    const float maxPathLength =
+        std::max(static_cast<float>(creaking.attributeWithModifiers(kFollowRange)), kRequiredPathLength);
+    const auto maxVisited = static_cast<std::int32_t>(std::floor(creaking.attribute(kFollowRange) * 16.0));
+    walkNodes::Path path =
+        walkNodes::findPath(world, walker(world, creaking, state, minY), target, maxPathLength, reachRange, maxVisited);
+    state.pathTarget = path.target;
+    creaking.navigationWatch.timeoutNode = {};
+    creaking.navigationWatch.timeoutTimer = 0;
+    creaking.navigationWatch.timeoutLimit = 0.0;
+    creaking.navigationWatch.stuck = false;
+    std::vector<Block> nodes;
+    std::vector<std::uint8_t> types;
+    for (const walkNodes::Node& node : path.nodes) {
+        nodes.push_back(node.at);
+        types.push_back(static_cast<std::uint8_t>(node.type));
+    }
+    // parity: `moveTo(Path)` keeps the path it has, and how far along it is, when the new one is the same.
+    if (recompute || !creaking.path.has_value() || *creaking.path != nodes ||
+        state.pathNodeTypes.size() != creaking.path->size()) {
+        creaking.path = std::move(nodes);
+        creaking.pathIndex = 0;
+        state.pathNodeTypes = std::move(types);
+    }
+    if (recompute && creaking.path.has_value()) {
+        trimPath(world, *creaking.path, state.pathNodeTypes);
+    }
+    return true;
+}
+
+/// parity: `PathNavigation.recomputePath`: at most once a second, and only while it can update.
+void recomputePath(world::WorldState& world, ServerEntity& creaking, creakings::CreakingState& state) {
+    if (state.gameTime - state.lastRecompute > 20 && canUpdatePath(world, creaking)) {
+        if (state.pathTarget.has_value()) {
+            creaking.path.reset();
+            state.pathNodeTypes.clear();
+            static_cast<void>(drawPath(world, creaking, state, *state.pathTarget, state.pathReach, true));
+            state.lastRecompute = state.gameTime;
+            state.delayedRecompute = false;
         }
-        if (drawn && !current) {
-            const float maxPathLength =
-                std::max(static_cast<float>(creaking.attributeWithModifiers(kFollowRange)), kRequiredPathLength);
-            const auto maxVisited = static_cast<std::int32_t>(std::floor(creaking.attribute(kFollowRange) * 16.0));
-            walkNodes::Path path = walkNodes::findPath(world, walker(world, creaking, state, minY), target,
-                                                       maxPathLength, reachRange, maxVisited);
-            state.pathTarget = path.target;
-            creaking.navigationWatch.timeoutNode = {};
-            creaking.navigationWatch.timeoutTimer = 0;
-            creaking.navigationWatch.timeoutLimit = 0.0;
-            creaking.navigationWatch.stuck = false;
-            std::vector<Block> nodes;
-            std::vector<std::uint8_t> types;
-            for (const walkNodes::Node& node : path.nodes) {
-                nodes.push_back(node.at);
-                types.push_back(static_cast<std::uint8_t>(node.type));
-            }
-            // parity: `moveTo(Path)` keeps the path it has, and how far along it is, when the new one is the same.
-            if (!creaking.path.has_value() || *creaking.path != nodes ||
-                state.pathNodeTypes.size() != creaking.path->size()) {
-                creaking.path = std::move(nodes);
-                creaking.pathIndex = 0;
-                state.pathNodeTypes = std::move(types);
-            }
+    } else {
+        state.delayedRecompute = true;
+    }
+}
+
+/// parity: `ServerLevel.sendBlockUpdated` over the level's navigating mobs, for the squares whose
+/// collision changed since this creaking last looked.
+void noticeShapeChanges(world::WorldState& world, ServerEntity& creaking, creakings::CreakingState& state) {
+    std::vector<Block> changed;
+    bool overflowed = false;
+    const std::uint64_t seen = state.shapeChangesSeen;
+    state.shapeChangesSeen = world.shapeChangesSince(seen, changed, overflowed);
+    // parity: `shouldRecomputePath` answers no while a recomputation already waits.
+    if (seen == 0 || state.delayedRecompute) {
+        return;
+    }
+    for (const Block& at : changed) {
+        if (shouldRecompute(creaking, at)) {
+            recomputePath(world, creaking, state);
+            return;
         }
     }
-    if (!drawn) {
+}
+
+} // namespace
+
+bool moveTo(world::WorldState& world, ServerEntity& creaking, double x, double y, double z, std::int32_t reachRange,
+            double speedModifier) {
+    creakings::CreakingState& state = creakings::stateOf(creaking);
+    if (!drawPath(world, creaking, state, Block{floorOf(x), floorOf(y), floorOf(z)}, reachRange, false)) {
         clearPath(creaking, state);
         return false;
     }
@@ -326,6 +400,11 @@ void tick(world::WorldState& world, ServerEntity& creaking) {
         return;
     }
     creaking.navigationWatch.tick++;
+    noticeShapeChanges(world, creaking, state);
+    // parity: `PathNavigation.tick` first runs a recomputation that had to wait.
+    if (state.delayedRecompute) {
+        recomputePath(world, creaking, state);
+    }
     if (!creaking.path.has_value()) {
         return;
     }

@@ -32,6 +32,7 @@
 #include <basalt/server/runtime/player/Menu.hpp>
 #include <basalt/server/runtime/player/PlayerAttributes.hpp>
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
+#include <basalt/server/runtime/player/PlayerMace.hpp>
 #include <basalt/server/runtime/player/PlayerParticles.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerVersusPlayer.hpp>
@@ -229,9 +230,13 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
                    world::realEntityTypeTags::membersOf(*entityTags, tag).contains(target->type());
         }};
     const float enchanted = world::weaponDamage::of(heldStack, base, definitionOf, &victim);
+    // parity: `MaceItem.getAttackDamageBonus` and its `mace_smash` source.
+    const bool smash = player::mace::smashes(*session, heldStack);
+    const float bonus = player::mace::damageBonus(*session, heldStack, definitionOf);
     const player::combat::Swing swing = player::combat::swingOf(
         strength, base, enchanted, player::pvp::criticalPossible(*session, *world, fallDistance > 0.0),
-        session->onGround, session->sprinting);
+        session->onGround, session->sprinting, bonus);
+    const Identifier& damageType = smash ? world::damageTypes::kMaceSmash : world::damageTypes::kPlayerAttack;
     const float damage = swing.damage;
     const bool fullStrength = swing.fullStrength;
     const bool critical = swing.critical;
@@ -248,32 +253,35 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
     }
     entity::entityCombat::blame(*target, session->entityId(), session->entityId(), Identifier::vanilla("player"));
     const entity::entityCombat::Result result =
-        entity::entityCombat::hurt(*target, damage, session->x, session->z, {}, "attack", session->name(), true);
+        entity::entityCombat::hurt(*target, damage, session->x, session->z, {}, smash ? "mace_smash" : "attack",
+                                   session->name(), true, player::mace::armorFractionAdd(heldStack, definitionOf));
     if (!result.landed) {
         owner_->broadcastSound(kSoundAttackNoDamage, session->x, session->y, session->z, SoundSource::Players);
         return;
     }
     if (world::AdvancementTriggers* triggers = owner_->options().advancementTriggers; triggers != nullptr) {
-        world::triggerFacts::playerHurtEntity(*triggers, *world, *session, *target, damage,
-                                              Identifier::vanilla("player_attack"));
+        world::triggerFacts::playerHurtEntity(*triggers, *world, *session, *target, damage, damageType);
     }
     // parity: `LivingEntity.hurtServer` raises `ENTITY_DAMAGE` at whoever took the hit.
     world::vibrations::emit(world->state(), "entity_damage", target->x, target->y, target->z, world->gameTime(),
                             {.entity = target->uuid()});
-    // parity: `causeExtraKnockback`, which is the half a sprinting hit adds and nothing else without
-    // enchantments: the 0.4 every hit is worth was already taken inside the hit.
-    if (knockbackAttack) {
-        entity::entityCombat::knockback(*target, kSprintKnockback, session->x - target->x, session->z - target->z);
-    }
+    const player::BreakContext blocks = owner_->blockInteraction().breakContext();
+    const player::pvp::Context melee = meleeContext(blocks);
+    // parity: `causeExtraKnockback`: the attribute and the knockback enchantment halved, and the half
+    // a sprinting hit adds, along the attacker's facing; the 0.4 every hit is worth was inside it.
+    player::pvp::knockMob(*session, *target,
+                          player::pvp::knockbackOf(melee, *session, heldStack) +
+                              (knockbackAttack ? static_cast<float>(kSprintKnockback) : 0.0F));
     // parity: `isSweepAttack`: a sword, on the ground, walking, and a swing that is neither a
     // critical nor a sprinting one.
     const bool sweep = fullStrength && !critical && !knockbackAttack && session->onGround &&
                        owner_->lastStepSquared < kSweepSpeedLimit * kSweepSpeedLimit && weapon.has_value() &&
                        weapon->path().ends_with(kSwordSuffix);
     if (sweep) {
-        sweepAround(*session, *target, *world, strength, base * player::combat::chargeScale(strength), heldStack);
+        sweepAround(*session, *target, *world, strength, (base * player::combat::chargeScale(strength)) + bonus,
+                    heldStack);
     }
-    broadcastDamageEvent(*target, world::damageTypes::kPlayerAttack, session->entityId());
+    broadcastDamageEvent(*target, damageType, session->entityId());
     broadcastMotion(*target);
     // parity: `HurtByTargetGoal` and `PanicGoal` both read the last thing that hurt it: one sends a
     // monster after whoever swung, the other sends an animal running.
@@ -301,12 +309,9 @@ void CombatHandler::handleAttack(const wire::protocol::play::AttackPacket& attac
                                SoundSource::Players);
     }
     session->stats.addDamageDealt(result.damage);
-    // parity: `ItemStack.hurtEnemy` counts a `weapon` as used, and `postHurtEnemy` wears it.
-    if (const std::optional<storage::StoredItemStack> weapon = session->inventory.heldItem();
-        weapon.has_value() && item::itemWear::costPerAttack(*weapon) > 0) {
-        player::statAwards::used(*session, weapon->id);
-        owner_->blockInteraction().wearHeldItem(item::itemWear::costPerAttack(*weapon));
-    }
+    // parity: `itemAttackInteraction`: the mace's smash, the post-attack enchantments, the wear.
+    player::pvp::itemAttackInteraction(melee, *world, *session, nullptr, target, heldStack,
+                                       PlayerInventory::kHotbarStart + session->inventory.heldSlot());
     session->food.addExhaustion(kAttackExhaustion);
     if (result.died) {
         killEntity(*target);
@@ -327,23 +332,30 @@ void CombatHandler::sweepAround(PlayerSession& session, const ServerEntity& targ
 
 player::pvp::Context CombatHandler::meleeContext(const player::BreakContext& blocks) {
     const ClientSession::Options& options = owner_->options();
-    return player::pvp::Context{.registry = options.playerRegistry,
-                                .enchantments = options.enchantments,
-                                .entityTags = options.entityTypeTags,
-                                .teams = options.commands == nullptr ? nullptr
-                                                                     : options.commands->environment().options().teams,
-                                .blocks = &blocks,
-                                .sweptMob =
-                                    [this](ServerEntity& mob, bool died) {
-                                        const PlayerSession* session = owner_->playerSession();
-                                        broadcastDamageEvent(mob, world::damageTypes::kPlayerAttack,
-                                                             session == nullptr ? -1 : session->entityId());
-                                        broadcastMotion(mob);
-                                        if (died) {
-                                            killEntity(mob);
-                                        }
-                                    },
-                                .nextSeed = [] { return static_cast<std::int64_t>(std::random_device{}()); }};
+    return player::pvp::Context{
+        .registry = options.playerRegistry,
+        .enchantments = options.enchantments,
+        .entityTags = options.entityTypeTags,
+        .teams = options.commands == nullptr ? nullptr : options.commands->environment().options().teams,
+        .blocks = &blocks,
+        .sweptMob =
+            [this](ServerEntity& mob, bool died) {
+                const PlayerSession* session = owner_->playerSession();
+                broadcastDamageEvent(mob, world::damageTypes::kPlayerAttack,
+                                     session == nullptr ? -1 : session->entityId());
+                broadcastMotion(mob);
+                if (died) {
+                    killEntity(mob);
+                }
+            },
+        .nextSeed = [] { return static_cast<std::int64_t>(std::random_device{}()); },
+        .explode =
+            [this](world::LoadedWorld& world, const world::postAttack::Explosion& blast, double x, double y, double z) {
+                if (CombatSystem* combat = owner_->options().combat; combat != nullptr) {
+                    combat->gust(world, owner_->playersInSameWorld(), world.state().entities(),
+                                 CombatSystem::gustOf(blast, x, y, z));
+                }
+            }};
 }
 
 void CombatHandler::attackPlayer(PlayerSession& session, PlayerSession& victim, world::LoadedWorld& world) {

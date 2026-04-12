@@ -115,6 +115,8 @@ void CombatHandler::dismount(PlayerSession& session) {
 
 void CombatHandler::trackFall(PlayerSession& session, double y, bool onGround,
                               const std::optional<std::int32_t>& feetState) {
+    // parity: `resetFallDistance` from elsewhere, a mace's smash among them, lands here too.
+    fallDistance = std::min(fallDistance, session.fallDistance);
     const bool climbing = feetState.has_value() && [&] {
         const std::optional<server::registry::BlockState> block = server::registry::blocks::byStateId(*feetState);
         return block.has_value() && climbableBlocks().contains(block->block.path());

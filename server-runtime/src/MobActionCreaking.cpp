@@ -162,6 +162,10 @@ void MobActionSystem::tickCreaking(world::LoadedWorld& world, entity::ai::MobCon
     state.gameTime = now;
     const std::string& difficulty = world.difficulty();
     state.difficulty = difficulty == "peaceful" ? 0 : difficulty == "easy" ? 1 : difficulty == "hard" ? 3 : 2;
+    const world::WorldBorder& border = world.border();
+    const double half = border.size() / 2.0;
+    state.border = std::array<double, 4>{border.centerX() - half, border.centerZ() - half, border.centerX() + half,
+                                         border.centerZ() + half};
     // parity: `Creaking.tick`: one bound to a heart that no longer claims it goes; a heart broken
     // out from under it tore it down.
     if (state.home.has_value()) {

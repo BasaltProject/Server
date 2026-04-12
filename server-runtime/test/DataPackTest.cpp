@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/datapack/PackMetadata.hpp>
 #include <basalt/server/runtime/datapack/PackRepository.hpp>
 #include <basalt/server/runtime/datapack/RegistrySchemas.hpp>
+#include <basalt/server/runtime/datapack/ReloadableElements.hpp>
 #include <basalt/server/runtime/datapack/ResourceStack.hpp>
 #include <basalt/server/runtime/registry/PackRegistries.hpp>
 #include <basalt/server/runtime/registry/VanillaConfigurationRegistries.hpp>
@@ -207,5 +208,30 @@ TEST_CASE("an element missing what its codec requires is refused, and one that h
     CHECK(datapack::schemaError("painting_variant", object(R"({"width":"1","height":1,"asset_id":"a:b"})")) ==
           "width: Not a number");
     // A registry without a schema here is not judged.
-    CHECK_FALSE(datapack::schemaError("enchantment", object("{}")).has_value());
+    CHECK_FALSE(datapack::schemaError("timeline", object("{}")).has_value());
+}
+
+TEST_CASE("a reloadable element fails on what vanilla does not know, not on what this build has yet to model") {
+    const PackFiles files =
+        memoryFiles({{"data/p/predicate/lucky.json", R"({"type":"minecraft:random_chance","chance":0.5})"}});
+    const ResourceStack stack{
+        {ResourceStack::Layer{.contents = std::make_shared<const PackContents>("p", files, std::vector<std::string>{},
+                                                                               basalt::wire::common::Logger{"Test"}),
+                              .filter = {}}}};
+    const ItemTags tags = itemTagsOf(stack);
+    const auto error = [&](std::string_view registry, std::string_view text) {
+        return reloadableElementError(registry, text, stack, tags);
+    };
+    CHECK_FALSE(
+        error("loot_table", R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:stone"}],
+        "condition":"p:lucky"}]})")
+            .has_value());
+    CHECK(error("loot_table", R"({"pools":[{"rolls":1,"entries":[{"type":"p:odd"}]}]})").has_value());
+    CHECK(error("loot_table", R"({"pools":[{"rolls":1,"entries":[{"type":"minecraft:item","name":"minecraft:stone"}],
+        "condition":"p:missing"}]})")
+              .has_value());
+    CHECK(error("predicate", R"({"type":"p:nothing"})").has_value());
+    CHECK(error("recipe", R"({"type":"p:machine"})").has_value());
+    CHECK(error("advancement", R"({"criteria":{"a":{"trigger":"p:never"}}})") == "Unknown trigger: p:never");
+    CHECK_FALSE(error("advancement", R"({"criteria":{"a":{"trigger":"minecraft:impossible"}}})").has_value());
 }

@@ -1,5 +1,6 @@
 #include <basalt/server/registry/Entities.hpp>
 #include <basalt/server/runtime/BasaltServer.hpp>
+#include <basalt/server/runtime/CombatSystem.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/Combat.hpp>
@@ -10,6 +11,7 @@
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 
 #include <cstdint>
+#include <vector>
 
 namespace basalt::server::runtime {
 
@@ -20,7 +22,18 @@ player::pvp::Context BasaltServer::meleeContext(const player::BreakContext& bloc
                                 .teams = &teams_,
                                 .blocks = &blocks,
                                 .sweptMob = {},
-                                .nextSeed = blocks.nextSeed};
+                                .nextSeed = blocks.nextSeed,
+                                .explode = [this](world::LoadedWorld& world, const world::postAttack::Explosion& blast,
+                                                  double x, double y, double z) {
+                                    std::vector<player::PlayerSession*> watchers;
+                                    for (player::PlayerSession* player : playerRegistry_.snapshot()) {
+                                        if (player->worldName == world.name()) {
+                                            watchers.push_back(player);
+                                        }
+                                    }
+                                    combat_->gust(world, watchers, world.state().entities(),
+                                                  CombatSystem::gustOf(blast, x, y, z));
+                                }};
 }
 
 void BasaltServer::bedrockAttackPlayer(player::PlayerSession& session, player::PlayerSession& victim,

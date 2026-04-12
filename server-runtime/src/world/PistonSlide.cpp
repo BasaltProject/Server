@@ -92,10 +92,6 @@ using namespace internal;
     return registry::blockStateDefinitions::stateIdOf(*block, properties, std::nullopt);
 }
 
-/// parity: `checkIfExtend`'s test for a head that has not finished going out yet: the square two along
-/// is a `moving_piston` facing our way that is still extending. Vanilla also lets it through on
-/// progress or on the tick it last moved, which inside a tick is always true.
-
 /// The half of a write a piston does for every square it touches: the shapes around it are redrawn
 /// and whatever they no longer hold up falls, and nobody re-reads the signal. parity: `moveBlocks`
 /// writes with `UPDATE_MOVE_BY_PISTON`, and what falls out writes its own air with `UPDATE_ALL`, so
@@ -141,6 +137,8 @@ void settleAround(const Context& context, const std::vector<Position>& touched, 
     }
 }
 
+/// parity: the two loops in `moveBlocks`. `moving` is where the blocks go: the piston's facing on a
+/// push, its opposite on a pull.
 void slide(const Context& context, const Push& push, BlockFace moving, BlockFace facing, bool extending,
            std::vector<BlockChange>* changes = nullptr) {
     // parity: `moveBlocks` builds the pushed block's `moving_piston` from the default state with only
@@ -190,8 +188,6 @@ void slide(const Context& context, const Push& push, BlockFace moving, BlockFace
     settleAround(context, touched, changes);
 }
 
-/// The push going out: the blocks slide, the arm turns into the head it is about to be, and the body
-/// takes `extended` from the moment the slide starts.
 /// parity: `PistonBaseBlock.moveBlocks` walks what it breaks **backwards**, drops it and only then
 /// puts air there. Doing it before the slide matters: the arm lands on that square next, and reading
 /// what it was afterwards would read the arm.
@@ -211,11 +207,10 @@ void destroyPushed(const Context& context, const Push& push, std::vector<BlockCh
         vibrations::emit(context.world, "block_destroy", static_cast<double>((*position)[0]) + 0.5,
                          static_cast<double>((*position)[1]) + 0.5, static_cast<double>((*position)[2]) + 0.5,
                          context.gameTime);
-        // parity: `moveBlocks` runs `affectNeighborsAfterRemoval` on every square it clears, and with
-        // `movedByPiston` **false**. `RedStoneWireBlock`'s does three things and the order is the
-        // whole point: first `updateNeighborsAt` on each of its six squares, **while the line still
-        // holds the strength it had**, then its own power update, and then the wires again. That is
-        // why a lamp two squares from the cut lights for its four ticks before going out.
+        // parity: `moveBlocks` runs `affectNeighborsAfterRemoval` on every cleared square with `movedByPiston`
+        // false. `RedStoneWireBlock`'s first updates its six neighbours **while the line still holds its
+        // strength**, then its own power, then the wires again: a lamp two squares from the cut lights for
+        // four ticks before going out.
         const registry::BlockFace kSix[]{registry::BlockFace::Down,  registry::BlockFace::Up,
                                          registry::BlockFace::North, registry::BlockFace::South,
                                          registry::BlockFace::West,  registry::BlockFace::East};
@@ -255,8 +250,6 @@ void destroyPushed(const Context& context, const Push& push, std::vector<BlockCh
     }
 }
 
-/// Puts every carried block down where it already stands, which is what
-/// `PistonMovingBlockEntity.finalTick` does when the slide ends.
 /// parity: `PistonMovingBlockEntity.tick` dries what it lands: a block that arrives waterlogged is
 /// written with `waterlogged` at false, so a slab full of water pushed into the air lands empty and
 /// the water is simply lost. Only the ticker does it; `finalTick` writes the state as it is.
@@ -273,6 +266,7 @@ void destroyPushed(const Context& context, const Push& push, std::vector<BlockCh
     return registry::blockStateDefinitions::stateIdOf(*block, {{"waterlogged", "false"}}, stateId).value_or(stateId);
 }
 
+/// Puts every carried block down where it already stands. parity: `PistonMovingBlockEntity.finalTick`.
 [[nodiscard]] std::vector<BlockChange> landCarried(const Context& context, const std::vector<Carried>& carried) {
     std::vector<BlockChange> changes;
     std::vector<Position> landed;
@@ -280,7 +274,7 @@ void destroyPushed(const Context& context, const Push& push, std::vector<BlockCh
         // parity: `PistonMovingBlockEntity` runs `Block.updateFromNeighbourShapes` on the state it is
         // carrying **before** drying it, and every `updateShape` of a flooded block opens by booking
         // a turn of water. So the jar leaves a water turn on the square even though the block lands
-        // dry: a turn that will find nothing and do nothing. Measured in `pistonanegado`.
+        // dry: a turn that will find nothing and do nothing.
         if (registry::blockFluids::hasWaterFluid(entry.stateId)) {
             context.world.scheduleFluidTick(entry.at[0], entry.at[1], entry.at[2], fluidId(FluidKind::Water, true),
                                             fluidFlow::kWaterTickDelay);
@@ -292,8 +286,7 @@ void destroyPushed(const Context& context, const Push& push, std::vector<BlockCh
         }
     }
     // parity: `PistonMovingBlockEntity.finalTick` ends in `neighborChanged` on the square the block
-    // landed on, so a lamp that arrives with nothing powering it any more goes dark. Without it a
-    // block kept whatever state it was carrying for ever.
+    // landed on, so a lamp that arrives with nothing powering it any more goes dark.
     for (const Position& at : landed) {
         // parity: the flag is sixty-seven, so the write itself tells the six neighbours before the
         // block's own `neighborChanged` runs.
@@ -307,11 +300,24 @@ void destroyPushed(const Context& context, const Push& push, std::vector<BlockCh
     return changes;
 }
 
-/// The slide ending, whichever way it was going.
-///
-/// parity: `PistonMovingBlockEntity.finalTick`. The body, the arm and every block on the move took
-/// their places when the slide began; what is left is turning each `moving_piston` into the state it
-/// has been carrying, where it already stands.
+/// The boxes of one state's collision shape, moved to `x, y, z`.
+void addBoxes(std::vector<entity::Aabb>& boxes, std::int32_t stateId, double x, double y, double z) {
+    constexpr double kUnits = registry::blockShapes::kUnits;
+    const std::span<const std::int32_t> shape = registry::blockShapes::collisionBoxes(stateId);
+    for (std::size_t at = 0; at + 5 < shape.size(); at += registry::blockShapes::kCorners) {
+        boxes.push_back(entity::Aabb{.minX = x + (shape[at] / kUnits),
+                                     .minY = y + (shape[at + 1] / kUnits),
+                                     .minZ = z + (shape[at + 2] / kUnits),
+                                     .maxX = x + (shape[at + 3] / kUnits),
+                                     .maxY = y + (shape[at + 4] / kUnits),
+                                     .maxZ = z + (shape[at + 5] / kUnits)});
+    }
+}
+
+[[nodiscard]] std::optional<std::int32_t> withProperties(const wire::common::Identifier& block,
+                                                         std::map<std::string, std::string> properties) {
+    return registry::blockStateDefinitions::stateIdOf(block, properties, std::nullopt);
+}
 
 } // namespace
 
@@ -337,12 +343,9 @@ void destroyPushed(const Context& context, const Push& push, std::vector<BlockCh
     return false;
 }
 
-/// parity: `MovingPistonBlock` and its block entity: while the arm slides, each block on the way is a
-/// `moving_piston` carrying the state it will become. That is what a client draws mid-slide, and it
-/// is why a block being pushed is not solid for those two ticks.
-///
-/// parity: the two loops in `moveBlocks`. `moving` is where the blocks go, which is the piston's own
-
+/// The push going out: the blocks slide, the arm turns into the head it is about to be, and the body
+/// takes `extended` at once. parity: `MovingPistonBlock`: each square on the way is a `moving_piston`
+/// carrying the state it will become, which is why a pushed block is not solid for those two ticks.
 void beginMove(const Context& context, const Push& push, BlockFace direction, bool sticky, std::int32_t pistonX,
                std::int32_t pistonY, std::int32_t pistonZ, const std::string& path, std::vector<BlockChange>& changes) {
     destroyPushed(context, push, changes);
@@ -380,10 +383,8 @@ void beginMove(const Context& context, const Push& push, BlockFace direction, bo
     settleAround(context, {Position{pistonX, pistonY, pistonZ}, head}, &changes);
 }
 
-/// The pull back starting, which vanilla also does the moment the event runs rather than when the
-/// blocks land: the body itself becomes a `moving_piston` carrying the piston at rest, the head goes,
-/// and a sticky piston drags one block back with it.
-///
+/// The pull back starts when the event runs, not when the blocks land: the body becomes a `moving_piston`
+/// carrying the piston at rest, the head goes, and a sticky piston drags one block back.
 /// parity: `PistonBaseBlock.triggerEvent` for `b0` 1 and 2, plus `moveBlocks` with `extending` false.
 void beginRetract(const Context& context, std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId,
                   BlockFace direction, bool sticky, const std::string& path, bool sliding) {
@@ -425,10 +426,8 @@ void beginRetract(const Context& context, std::int32_t x, std::int32_t y, std::i
     slide(context, *push, registry::opposite(direction), direction, false);
 }
 
-/// The blocks mid-slide: this piston's own `moving_piston` squares, furthest along first so nothing
-/// lands on a block that has not moved yet. Found by walking out from the piston, not by sweeping
-/// the chunks around it: what one piston moves is face-connected, and sweeping also picked up a
-/// second piston's slide four squares away, landing its blocks a tick early.
+/// Walks out from the piston rather than sweeping the chunks around it: what one piston moves is
+/// face-connected, and a sweep would also land a neighbouring piston's slide a tick early.
 [[nodiscard]] std::vector<Carried> carriedBlocks(const Context& context, std::int32_t pistonX, std::int32_t pistonY,
                                                  std::int32_t pistonZ, BlockFace direction) {
     std::vector<Carried> carried;
@@ -586,6 +585,56 @@ void dragAlong(const Context& context, const std::vector<Position>& moving, regi
                                           .z = player.z + registry::stepZ(direction)});
         }
     }
+}
+
+std::vector<entity::Aabb> movingCollision(const WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z) {
+    std::vector<entity::Aabb> boxes;
+    const server::world::Chunk* chunk = world.chunkIfLoaded(x >> 4, z >> 4);
+    const server::world::ChunkBlockEntity* entity =
+        chunk == nullptr ? nullptr : chunk->blockEntityAt(x & 15, y, z & 15);
+    if (entity == nullptr || entity->type() != block()) {
+        return boxes;
+    }
+    const wire::nbt::NbtCompound& data = entity->data();
+    const std::optional<std::int32_t> carried = carriedState(data);
+    const std::int32_t facingIndex = data.getInt("facing");
+    if (!carried.has_value() || facingIndex < 0 || facingIndex >= registry::kBlockFaceCount) {
+        return boxes;
+    }
+    const auto direction = static_cast<BlockFace>(facingIndex);
+    const bool extending = data.getBoolean("extending");
+    const bool source = data.getBoolean("source");
+    const float progress = data.getFloat("progress");
+    static constexpr std::array<std::string_view, registry::kBlockFaceCount> kNames{"down",  "up",   "north",
+                                                                                    "south", "west", "east"};
+    const std::string carriedPath = pathOf(*carried);
+    const bool pistonBase = carriedPath == "piston" || carriedPath == "sticky_piston";
+    // parity: a retracting base keeps the arm it had out, where it stands.
+    if (!extending && source && pistonBase) {
+        std::map<std::string, std::string> properties = registry::blockStateDefinitions::propertiesOf(*carried);
+        properties["extended"] = "true";
+        if (const std::optional<std::int32_t> extended =
+                withProperties(*registry::blockStateDefinitions::blockOf(*carried), properties);
+            extended.has_value()) {
+            addBoxes(boxes, *extended, x, y, z);
+        }
+    }
+    std::optional<std::int32_t> moved = carried;
+    if (source) {
+        // parity: the source square is the head, short while it is nearly home.
+        moved = withProperties(wire::common::Identifier::vanilla("piston_head"),
+                               {{"facing", std::string{kNames[static_cast<std::size_t>(facingIndex)]}},
+                                {"short", extending != (1.0F - progress < 0.25F) ? "true" : "false"},
+                                {"type", "normal"}});
+    }
+    if (!moved.has_value()) {
+        return boxes;
+    }
+    const float along = extending ? progress - 1.0F : 1.0F - progress;
+    addBoxes(boxes, *moved, x + static_cast<double>(static_cast<float>(registry::stepX(direction)) * along),
+             y + static_cast<double>(static_cast<float>(registry::stepY(direction)) * along),
+             z + static_cast<double>(static_cast<float>(registry::stepZ(direction)) * along));
+    return boxes;
 }
 
 } // namespace basalt::server::runtime::world::pistons

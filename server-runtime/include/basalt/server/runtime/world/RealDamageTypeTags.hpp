@@ -13,12 +13,8 @@
 
 namespace basalt::server::runtime::world {
 
-/// The damage type tags out of the operator's own `server.jar`.
-///
-/// They are what decides whether a hit goes through armour at all: starving, drowning, withering
-/// and almost everything else this build can do to a player is in `bypasses_armor`, and reading
-/// that from the jar is the difference between armour meaning something and armour meaning
-/// everything.
+/// The damage type tags out of the operator's own `server.jar`. They decide whether a hit goes
+/// through armour at all (`bypasses_armor` covers starving, drowning, withering and more).
 namespace realDamageTypeTags {
 
 /// The jar's directory listing and its file reader, as callbacks rather than the jar itself: this
@@ -84,6 +80,7 @@ inline const wire::common::Identifier kExplosion = wire::common::Identifier::van
 
 /// parity: `DamageTypes.PLAYER_ATTACK`, a player's own hand or weapon.
 inline const wire::common::Identifier kPlayerAttack = wire::common::Identifier::vanilla("player_attack");
+inline const wire::common::Identifier kMaceSmash = wire::common::Identifier::vanilla("mace_smash");
 
 /// parity: `DamageTypes.MOB_ATTACK`, what a mob that walked up to you deals.
 inline const wire::common::Identifier kMobAttack = wire::common::Identifier::vanilla("mob_attack");

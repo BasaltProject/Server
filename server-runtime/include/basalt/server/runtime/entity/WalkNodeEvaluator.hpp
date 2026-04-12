@@ -10,11 +10,9 @@
 
 namespace basalt::server::runtime::entity {
 
-/// A way over the ground, found the way vanilla finds it.
-///
-/// parity: `PathFinder` over `WalkNodeEvaluator`: A* on vanilla's own binary heap, each square judged
-/// through the mob's whole box and priced by its maluses, a step up as high as it jumps, a drop as far
-/// as it will fall, and a path that ends at the node that came nearest whether it got there or not.
+/// A way over the ground. parity: `PathFinder` over `WalkNodeEvaluator`: A* on vanilla's binary heap,
+/// each square judged through the mob's whole box and priced by its maluses, and a path that ends at
+/// the node that came nearest whether it got there or not.
 namespace walkNodes {
 
 using Position = std::array<std::int32_t, 3>;
@@ -43,6 +41,13 @@ struct WalkMob {
     /// parity: `Creaking.HomeNodeEvaluator`: a square more than thirty-two blocks from here, and no nearer
     /// to it than the mob already is, is blocked.
     std::optional<Position> home;
+    /// parity: `PowderSnowBlock.canEntityWalkOnPowderSnow`, leather boots or the tag; with it the
+    /// snow below its feet is solid to it. Its fall and crouch decide the rest of the snow's shape.
+    bool walksOnPowderSnow = false;
+    double fallDistance = 0.0;
+    bool descending = false;
+    /// The world border as min x, min z, max x, max z. parity: `noBorderCollision` for the mob.
+    std::optional<std::array<double, 4>> border;
 };
 
 /// parity: `Node`, as far as a path keeps it.
