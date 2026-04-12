@@ -29,12 +29,9 @@ namespace randomTicks {
 inline constexpr std::int32_t kWalkMultiplier = 3;
 inline constexpr std::int32_t kWalkAddend = 1013904223;
 
-/// Asked before a random tick changes a block, and answers whether it may.
-///
-/// One place rather than forty: the families that live in this file all end in one block becoming
-/// another, so the question is asked where that happens and `cause` says which kind it was:
-/// `fade` for something being taken away, `grow` for anything else. The families that live in their
-/// own files write their own blocks and are not asked.
+/// Asked before a random tick changes a block, and answers whether it may. `cause` is `fade` when
+/// something is taken away and `grow` otherwise. Only the families in this file ask; those in their
+/// own files write their own blocks.
 using MayChange = std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t from, std::int32_t to,
                                      std::string_view cause)>;
 
@@ -70,6 +67,8 @@ struct Context {
     MayChange mayChange;
     /// `#minecraft:flowers`, which a growing sapling looks for. Unset, there are none.
     saplingGrowth::Flowering flowering;
+    /// A numbered level event at a block that did not change: a stalactite's drip.
+    std::function<void(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t type)> levelEvent;
 };
 
 /// parity: `CropBlock.getGrowthSpeed`, farmland underneath and the neighbours' rows and all.

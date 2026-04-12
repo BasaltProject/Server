@@ -616,24 +616,29 @@ void RedstoneTickSystem::tickRandomBlocks(world::LoadedWorld& world, const sched
         return;
     }
     const config::DimensionFacts& facts = config::dimensionFacts(world.declaration().dimension);
-    const world::randomTicks::Context context{.world = world.state(),
-                                              .worldName = world.name(),
-                                              .seed = world.metadata().seed,
-                                              .maxY = facts.chunkHeight.maxY(),
-                                              .gameRules = world.gameRules(),
-                                              .clock = world.clock(),
-                                              .difficulty = world.difficulty(),
-                                              .hasSkylight = facts.hasSkylight,
-                                              .raining = world.weather().raining,
-                                              .evaporates = !facts.hasSkylight,
-                                              .spawnsPortalPiglins = facts.spawnsPortalPiglins,
-                                              .allocateEntityId = [this] { return players_->allocateEntityId(); },
-                                              .mayChange = hooks_.mayChange,
-                                              .flowering =
-                                                  [tags = options_.blockTags](const wire::common::Identifier& block) {
-                                                      return tags != nullptr && world::realBlockTags::contains(
-                                                                                    *tags, "minecraft:flowers", block);
-                                                  }};
+    const world::randomTicks::Context context{
+        .world = world.state(),
+        .worldName = world.name(),
+        .seed = world.metadata().seed,
+        .maxY = facts.chunkHeight.maxY(),
+        .gameRules = world.gameRules(),
+        .clock = world.clock(),
+        .difficulty = world.difficulty(),
+        .hasSkylight = facts.hasSkylight,
+        .raining = world.weather().raining,
+        .evaporates = !facts.hasSkylight,
+        .spawnsPortalPiglins = facts.spawnsPortalPiglins,
+        .allocateEntityId = [this] { return players_->allocateEntityId(); },
+        .mayChange = hooks_.mayChange,
+        .flowering =
+            [tags = options_.blockTags](const wire::common::Identifier& block) {
+                return tags != nullptr && world::realBlockTags::contains(*tags, "minecraft:flowers", block);
+            },
+        .levelEvent =
+            [this, &world](std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t type) {
+                broadcaster_->sendEffects(watchersOf(world), x, y, z, world.state().blockState(x, y, z).value_or(0),
+                                          {world::blockEffect::Effect{.type = type}});
+            }};
     random::RandomSource random = freshRandom();
     const std::vector<world::BlockChange> changes = randomTicks_.tick(context, chunks, speed, random);
     if (changes.empty()) {
