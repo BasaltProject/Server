@@ -433,6 +433,28 @@ TEST_CASE("a piston cannot be powered by what it is about to push") {
     CHECK(effects.empty());
 }
 
+TEST_CASE("a diode pointing head-on at a piston does not fire it") {
+    Loaded loaded;
+    WorldState& world = loaded.state;
+    REQUIRE(world.setBlockState(8, 64, 8, piston("east", "false")));
+    // parity: `getNeighborSignal` skips the piston's own face, and its `hasSignal(pos, DOWN)` asks
+    // the piston's own square, which would be the line that lets a diode aiming at that face fire
+    // it. It never answers in 26.3, because `Blocks.pistonProperties()` sets
+    // `isRedstoneConductor(never)`: the piston neither emits nor conducts, so the strong signal the
+    // diode pumps into it goes nowhere. The ask stays in `signalToPiston` because the jar has it.
+    const std::optional<std::int32_t> repeater = registry::blockStateDefinitions::stateIdOf(
+        basalt::wire::common::Identifier::vanilla("repeater"),
+        {{"facing", "west"}, {"locked", "false"}, {"powered", "true"}}, std::nullopt);
+    REQUIRE(repeater.has_value());
+    REQUIRE(world.setBlockState(9, 64, 8, *repeater));
+    std::vector<BlockChange> effects;
+
+    pistons::trigger(loaded.context(), 8, 64, 8);
+    effects = fireEvents(loaded);
+
+    CHECK(effects.empty());
+}
+
 TEST_CASE("a signal two blocks up fires the piston too") {
     Loaded loaded;
     WorldState& world = loaded.state;
