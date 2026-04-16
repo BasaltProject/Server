@@ -19,6 +19,7 @@
 #include <basalt/server/runtime/world/BlockInteractions.hpp>
 #include <basalt/server/runtime/world/BlockSurvival.hpp>
 #include <basalt/server/runtime/world/Dripleaves.hpp>
+#include <basalt/server/runtime/world/EndGateways.hpp>
 #include <basalt/server/runtime/world/FallingBlocks.hpp>
 #include <basalt/server/runtime/world/FluidFlow.hpp>
 #include <basalt/server/runtime/world/GameRules.hpp>
@@ -45,6 +46,9 @@ namespace {
 /// parity: `Entity.getOnPosLegacy`, `getOnPos(0.2f)`: the square a fifth of a block under the feet is
 /// the one an entity is standing on.
 constexpr double kOnPosDepth = 0.2;
+
+/// parity: `BlockEventDispatcher`'s reach, the sixty-four blocks a block event travels to a player.
+constexpr double kBlockEventRange = 64.0;
 
 using player::PlayerSession;
 using wire::protocol::play::BlockPos;
@@ -784,6 +788,23 @@ void RedstoneTickSystem::tickBlockEntities(world::LoadedWorld& world, const sche
             [this, &world](wire::nbt::NbtCompound& data, const std::int32_t x, const std::int32_t y,
                            const std::int32_t z) {
                 return options_.tickConduit && options_.tickConduit(world, x, y, z, data);
+            },
+        .gatewayBeam =
+            [this, &world](const std::int32_t x, const std::int32_t y, const std::int32_t z) {
+                const std::optional<std::int32_t> state = world.state().blockState(x, y, z);
+                if (!state.has_value()) {
+                    return;
+                }
+                for (PlayerSession* watcher : watchersOf(world)) {
+                    const double dx = watcher->x - x;
+                    const double dy = watcher->y - y;
+                    const double dz = watcher->z - z;
+                    if (watcher->worldName != world.name() || !watcher->connection().sendBlockEvent ||
+                        (dx * dx) + (dy * dy) + (dz * dz) >= kBlockEventRange * kBlockEventRange) {
+                        continue;
+                    }
+                    watcher->connection().sendBlockEvent(x, y, z, *state, world::endGateways::kBeamEvent, 0);
+                }
             },
         .ticking = tickingChunks(world, region, 1),
         .spawnerTick = [this, &world](wire::nbt::NbtCompound& data, std::int32_t x, std::int32_t y,
