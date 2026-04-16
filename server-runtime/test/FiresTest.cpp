@@ -2,6 +2,7 @@
 
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
+#include <basalt/server/registry/World.hpp>
 #include <basalt/server/runtime/world/Fires.hpp>
 
 #include <doctest.h>
@@ -216,6 +217,31 @@ TEST_CASE("rain on an open sky puts a fire out") {
     // A fresh fire is doused on a roll of one in five, so it never lasts the fifteen turns it takes
     // to die of old age.
     CHECK(turns == 4);
+}
+
+TEST_CASE("rain does not put a fire out in a biome without precipitation") {
+    WorldState world = emptyWorld();
+    floor(world);
+    REQUIRE(world.setBlockState(8, 64, 8, fireAged(0)));
+    const std::optional<std::int32_t> desert =
+        registry::biomes::registry().idOf(basalt::wire::common::Identifier::vanilla("desert"));
+    REQUIRE(desert.has_value());
+    Chunk& chunk = world.getOrGenerateChunk(0, 0);
+    for (std::int32_t quartX = 0; quartX < 4; ++quartX) {
+        for (std::int32_t quartZ = 0; quartZ < 4; ++quartZ) {
+            chunk.setBiomeId(quartX, 32, quartZ, *desert);
+        }
+    }
+    rng::RandomSource random = rng::RandomSource::legacy(3);
+
+    // parity: `Level.isRainingAt` is false where the biome does not precipitate, so desert rain
+    // never rolls the douse and the fire dies of old age exactly like in dry weather.
+    std::int32_t turns = 0;
+    while (world.blockState(8, 64, 8) != registry::blocks::air().stateId && turns < 100) {
+        static_cast<void>(fires::tick(world, rain(), "normal", 8, 64, 8, random));
+        ++turns;
+    }
+    CHECK(turns == 16);
 }
 
 TEST_CASE("a roof keeps the rain off") {

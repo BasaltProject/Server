@@ -51,7 +51,7 @@ void schedule(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
 
 /// What a fire's turn asks of the world beyond the blocks.
 struct Surroundings {
-    /// parity: `Level.isRainingAt`, biome and all. Unset, rain falls wherever the sky is open.
+    /// parity: `Level.isRainingAt`, biome and all. Unset, the biome in the chunk decides.
     std::function<bool(std::int32_t x, std::int32_t y, std::int32_t z)> rainingAt;
     /// parity: the `increased_fire_burnout` attribute where the fire is.
     bool increasedBurnout = false;
