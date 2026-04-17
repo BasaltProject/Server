@@ -45,9 +45,13 @@ struct State {
 /// `Containers.dropItemStack` at the stand, which only the caller can do.
 using DropRemainder = std::function<void(const server::world::loot::ItemStack&)>;
 
+/// The members of a potion tag, in no particular order. Empty for one no datapack defines.
+using PotionTagMembers = std::function<std::vector<wire::common::Identifier>(const wire::common::Identifier& tag)>;
+
 /// The jar's `minecraft:brewing` recipes, set once at startup before any stand ticks. Until then,
-/// or when the jar has none, the generated mix table stands in.
-void useRecipes(std::vector<server::world::crafting::Recipe> recipes);
+/// or when the jar has none, the generated mix table stands in. A `#tag` among a recipe's potions
+/// resolves through `potionTags`, empty by default, which is what a tag no datapack defines matches.
+void useRecipes(std::vector<server::world::crafting::Recipe> recipes, PotionTagMembers potionTags = {});
 
 /// What a bottle holding `potion` becomes with `reagent`, or nothing. parity: 26.3
 /// `BrewingRecipe.matches` and `assemble`, which hands out the recipe's own output.

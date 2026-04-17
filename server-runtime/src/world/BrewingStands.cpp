@@ -59,9 +59,14 @@ using ItemStack = server::world::loot::ItemStack;
 
 namespace crafting = server::world::crafting;
 
-std::vector<crafting::Recipe>& installed() {
-    static std::vector<crafting::Recipe> recipes;
-    return recipes;
+struct Installed {
+    std::vector<crafting::Recipe> recipes;
+    brewingStands::PotionTagMembers potionTags;
+};
+
+Installed& installed() {
+    static Installed instance;
+    return instance;
 }
 
 /// The potion a result carries, without its namespace, the way `State::potions` keeps it.
@@ -74,7 +79,8 @@ std::vector<crafting::Recipe>& installed() {
     return potion.empty() ? std::nullopt : std::optional{std::string{potion}};
 }
 
-/// parity: `PotionsPredicate.matches`. A potion tag has no loader here, so it matches nothing.
+/// parity: `PotionsPredicate.matches`: the bottle's potion must sit in the holder set, where a
+/// `#tag` entry binds to the potion tags a datapack loaded.
 [[nodiscard]] bool holdsOneOf(const std::vector<std::string>& potions, const std::optional<std::string>& potion) {
     if (potions.empty()) {
         return true;
@@ -83,7 +89,25 @@ std::vector<crafting::Recipe>& installed() {
         return false;
     }
     const std::string qualified = potion->find(':') == std::string::npos ? "minecraft:" + *potion : *potion;
-    return std::ranges::find(potions, qualified) != potions.end();
+    for (const std::string& entry : potions) {
+        if (!entry.starts_with('#')) {
+            if (entry == qualified) {
+                return true;
+            }
+            continue;
+        }
+        const std::expected<wire::common::Identifier, wire::common::IdentifierError> tag =
+            wire::common::Identifier::parse(std::string_view{entry}.substr(1));
+        if (!tag.has_value() || !installed().potionTags) {
+            continue;
+        }
+        for (const wire::common::Identifier& member : installed().potionTags(*tag)) {
+            if (member.toString() == qualified) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 [[nodiscard]] std::string potionKey(std::int32_t slot) { return std::string{kPotionsKey} + std::to_string(slot); }
@@ -112,16 +136,16 @@ void brew(State& state, const DropRemainder& drop) {
 
 } // namespace
 
-void useRecipes(std::vector<crafting::Recipe> recipes) {
+void useRecipes(std::vector<crafting::Recipe> recipes, PotionTagMembers potionTags) {
     std::erase_if(recipes, [](const crafting::Recipe& recipe) { return recipe.kind != crafting::RecipeKind::Brewing; });
-    installed() = std::move(recipes);
+    installed() = Installed{.recipes = std::move(recipes), .potionTags = std::move(potionTags)};
 }
 
 std::optional<ItemStack> brewed(const ItemStack& bottle, const std::optional<std::string>& potion,
                                 const wire::common::Identifier& reagent) {
-    if (!installed().empty()) {
+    if (!installed().recipes.empty()) {
         const ItemStack reagentStack{.item = reagent, .count = 1};
-        for (const crafting::Recipe& recipe : installed()) {
+        for (const crafting::Recipe& recipe : installed().recipes) {
             if (recipe.base.test(&bottle) && holdsOneOf(recipe.potions, potion) &&
                 recipe.ingredient.test(&reagentStack)) {
                 return recipe.result;
@@ -143,12 +167,13 @@ std::optional<ItemStack> brewed(const ItemStack& bottle, const std::optional<std
 }
 
 bool isReagent(const wire::common::Identifier& item) {
-    if (installed().empty()) {
+    if (installed().recipes.empty()) {
         return registry::brewing::isIngredient(item);
     }
     const std::string name = item.toString();
-    return std::ranges::any_of(
-        installed(), [&name](const crafting::Recipe& recipe) { return recipe.ingredient.items.contains(name); });
+    return std::ranges::any_of(installed().recipes, [&name](const crafting::Recipe& recipe) {
+        return recipe.ingredient.items.contains(name);
+    });
 }
 
 bool isPotionInput(const wire::common::Identifier& item) {
@@ -159,7 +184,7 @@ bool isPotionInput(const wire::common::Identifier& item) {
         return true;
     }
     const std::string name = item.toString();
-    return std::ranges::any_of(installed(),
+    return std::ranges::any_of(installed().recipes,
                                [&name](const crafting::Recipe& recipe) { return recipe.base.items.contains(name); });
 }
 

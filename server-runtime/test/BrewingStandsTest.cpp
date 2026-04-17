@@ -312,3 +312,34 @@ TEST_CASE("with the jar's recipes a stand brews only what they list") {
 
     brewingStands::useRecipes({});
 }
+
+TEST_CASE("a brewing recipe's potion tag matches what the tag holds") {
+    namespace crafting = basalt::server::world::crafting;
+    crafting::Recipe recipe{.kind = crafting::RecipeKind::Brewing, .result = stack("splash_potion")};
+    recipe.base.items = {"minecraft:potion"};
+    recipe.ingredient.items = {"minecraft:gunpowder"};
+    recipe.potions = {"#minecraft:boom"};
+    brewingStands::useRecipes({recipe}, [](const basalt::wire::common::Identifier& tag) {
+        // parity: `PotionsPredicate.matches` asks the holder set the tag file bound.
+        return tag.path() == "boom" ? std::vector<basalt::wire::common::Identifier>{item("water")}
+                                    : std::vector<basalt::wire::common::Identifier>{};
+    });
+
+    brewingStands::State state = loaded(1);
+    state.items[brewingStands::kIngredientSlot] = stack("gunpowder");
+    state.fuel = 2;
+    REQUIRE(brewingStands::isBrewable(state));
+    REQUIRE(brewingStands::tick(state));
+    while (state.brewTime > 0) {
+        brewingStands::tick(state);
+    }
+    CHECK(state.items[0]->item == item("splash_potion"));
+
+    // A tag no datapack defines binds to nothing, like vanilla's unbound holder set.
+    brewingStands::useRecipes({recipe});
+    brewingStands::State bare = loaded(1);
+    bare.items[brewingStands::kIngredientSlot] = stack("gunpowder");
+    CHECK_FALSE(brewingStands::isBrewable(bare));
+
+    brewingStands::useRecipes({});
+}
