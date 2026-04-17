@@ -277,3 +277,31 @@ TEST_CASE("a plugin that refuses a breeding leaves the pair childless") {
     refusing.breed(cow, partner);
     CHECK(fixture.raid.spawn.base.world->state().entities().size() == before);
 }
+
+TEST_CASE("a mob landing on the shelf mushroom plays its bounce sound") {
+    ActionFixture fixture{scratch("actions-bounce")};
+    LoadedWorld& world = *fixture.raid.spawn.base.world;
+    REQUIRE(world.state().setBlockState(8, 63, 8, blocks::named("shelf_mushroom")->stateId));
+    fixture.raid.spawn.base.packets.clear();
+
+    // The mob comes down a block onto the mushroom and lands, carrying the fall it counted.
+    ServerEntity& zombie = fixture.spawn("zombie", 8.5, 64.0, 8.5);
+    zombie.emittedFrom = std::array{8.5, 65.0, 8.5};
+    zombie.fallDistance = 1.0;
+    zombie.onGround = true;
+    fixture.actions.emitMovement(world, zombie);
+    CHECK(fixture.raid.spawn.base.sentCount(play::SoundPacket::kId) == 1);
+
+    // A fall shorter than gravity is no bounce at all, so the mushroom stays quiet.
+    ServerEntity& hop = fixture.spawn("zombie", 8.5, 64.0, 8.5);
+    hop.emittedFrom = std::array{8.5, 64.0, 8.5};
+    hop.fallDistance = 0.05;
+    hop.onGround = true;
+    fixture.actions.emitMovement(world, hop);
+    CHECK(fixture.raid.spawn.base.sentCount(play::SoundPacket::kId) == 1);
+
+    // parity: `ShelfMushroomBlock.bounceOn` is silent for an item entity and primed tnt.
+    CHECK(basalt::server::runtime::world::fallLanding::isSilentBouncer(Identifier::vanilla("item")));
+    CHECK(basalt::server::runtime::world::fallLanding::isSilentBouncer(Identifier::vanilla("tnt")));
+    CHECK_FALSE(basalt::server::runtime::world::fallLanding::isSilentBouncer(Identifier::vanilla("zombie")));
+}

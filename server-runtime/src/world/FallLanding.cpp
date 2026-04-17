@@ -24,6 +24,10 @@ constexpr double kEpsilon = 1.0E-6;
 
 } // namespace
 
+bool isSilentBouncer(const wire::common::Identifier& entityType) {
+    return entityType.path() == "item" || entityType.path() == "tnt";
+}
+
 Landing of(std::int32_t stateId, bool suppressingBounce) {
     const wire::common::Identifier* block = registry::blockStateDefinitions::blockOf(stateId);
     if (block == nullptr) {

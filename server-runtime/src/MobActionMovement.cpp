@@ -91,6 +91,26 @@ void MobActionSystem::landMob(world::LoadedWorld& world, ServerEntity& mob) {
         }
     }
     world::vibrations::emit(world.state(), "hit_ground", mob.x, mob.y, mob.z, world.gameTime(), {.entity = mob.uuid()});
+    // parity: `restituteMovementAfterCollisions` with `ShelfMushroomBlock.bounceOn`: a fall faster
+    // than gravity onto the shelf mushroom bounces, and the bounce sounds from the block for every
+    // entity but an item entity and primed tnt. The bounce itself happens in the colliding move,
+    // which this build leaves to the client for players and does not restitute for mobs; the sound
+    // is the part a watcher can be told.
+    constexpr double kBounceMinFall = 0.08;
+    constexpr double kBounceProbeDepth = 0.500001;
+    const Pos bounceAt = below(mob, kBounceProbeDepth);
+    const std::int32_t bounceState = world.state().blockState(bounceAt[0], bounceAt[1], bounceAt[2]).value_or(0);
+    const wire::common::Identifier* bounceBlock = server::registry::blockStateDefinitions::blockOf(bounceState);
+    if (!world::fallLanding::isSilentBouncer(mob.type()) && fallen > kBounceMinFall && bounceBlock != nullptr &&
+        bounceBlock->path() == "shelf_mushroom" && server::registry::blockMovement::bouncinessOf(bounceState) > 0.0F) {
+        random::RandomSource random = freshRandom();
+        const std::int64_t seed = random.nextLong();
+        for (const player::PlayerSession* watcher : watchersOf(world)) {
+            player::playSoundFor(*watcher, "minecraft:block.shelf_mushroom.bounce",
+                                 wire::protocol::play::SoundSource::Blocks, bounceAt[0] + 0.5, bounceAt[1] + 0.5,
+                                 bounceAt[2] + 0.5, 1.0F, 1.0F, seed);
+        }
+    }
     // parity: `Block.fallOn` then `causeFallDamage`, which the fall-immune skip whole.
     const bool immune = options_.entityTags != nullptr &&
                         world::realEntityTypeTags::membersOf(*options_.entityTags,
