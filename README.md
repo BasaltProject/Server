@@ -5,7 +5,7 @@
 <h2 align="center">Basalt Server</h2>
 
 <p align="center">
-  <strong>A Minecraft server rewritten from scratch in C++23. No JVM.</strong>
+  <strong>A Minecraft server rewritten from scratch in C++23. No external JVM.</strong>
 </p>
 
 <p align="center">
@@ -26,12 +26,17 @@
 
 Basalt Server is a complete reimplementation of the Minecraft server, written
 entirely in **C++23** and shipped as a native binary for each platform.
-There is no JVM anywhere in the runtime: no bundled JRE, no embedded VM, no hidden
-Java process.
+The native core requires no external JVM. Future Java plugin compatibility will
+use Shim, a JVM implemented in C++, once that project is complete.
 
 It speaks Java Edition's protocol and uses its world format, so that is the client
 it serves today. Older Java clients and Bedrock clients are planned, translated at
 the edge, and neither is implemented yet.
+
+Bukkit compatibility is planned as a dedicated Server module after Shim is
+complete. Server will implement the Bukkit APIs and plugin lifecycle; Shim only
+provides Java bytecode execution. The former external JVM bridge design has
+been discarded. This compatibility is not available yet.
 
 Two goals drive every decision:
 
@@ -45,7 +50,7 @@ Two goals drive every decision:
 
 | | |
 |---|---|
-| Language | C++23, 100 %. No Java, no JVM at runtime |
+| Language | C++23 native core; no external JVM required |
 | Target version | Minecraft 26.3 (protocol 777) |
 | Distribution | Native binaries per platform |
 | World storage | Linear regions by default; Anvil worlds are read and converted on load |
