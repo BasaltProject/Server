@@ -1,5 +1,6 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
 #include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/world/BlockInventory.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
@@ -128,6 +129,45 @@ TEST_CASE("blocks are read and written through the chunk they are in") {
     // the tick thread.
     CHECK_FALSE(world.setBlockState(0, 5000, 0, stateOf("stone")));
     CHECK_FALSE(world.setBlockState(0, -5000, 0, stateOf("stone")));
+}
+
+TEST_CASE("a write that leaves a block with an entity creates the entity, whatever the write was") {
+    WorldState world = emptyWorld();
+    world.getOrGenerateChunk(0, 0);
+    const Chunk* chunk = world.chunkIfLoaded(0, 0);
+    REQUIRE(chunk != nullptr);
+
+    // parity: `LevelChunk.setBlockState` gives a state that owns a block entity one whenever none
+    // is there, with no say from the flags of the write.
+    CHECK(world.setBlockState(8, 64, 8, stateOf("chest")));
+    const basalt::server::world::ChunkBlockEntity* chest = chunk->blockEntityAt(8, 64, 8);
+    REQUIRE(chest != nullptr);
+    CHECK(chest->type() == Identifier::vanilla("chest"));
+
+    // A rewrite of the same block keeps the entity it already has.
+    const std::optional<std::int32_t> turned =
+        registry::blockStateDefinitions::stateIdOf(Identifier::vanilla("chest"), {{"type", "left"}}, stateOf("chest"));
+    REQUIRE(turned.has_value());
+    CHECK(world.setBlockState(8, 64, 8, *turned));
+    CHECK(chunk->blockEntityAt(8, 64, 8) == chest);
+
+    // A block change replaces the entity, like the jar removing the old one and making a fresh one.
+    CHECK(world.setBlockState(8, 64, 8, stateOf("furnace")));
+    const basalt::server::world::ChunkBlockEntity* furnace = chunk->blockEntityAt(8, 64, 8);
+    REQUIRE(furnace != nullptr);
+    CHECK(furnace->type() == Identifier::vanilla("furnace"));
+
+    // `moving_piston` is the one the jar never leaves default: the piston writes the carrying
+    // entity itself in the same breath.
+    const std::optional<std::int32_t> moving = registry::blockStateDefinitions::stateIdOf(
+        Identifier::vanilla("moving_piston"), {{"facing", "north"}, {"type", "normal"}}, std::nullopt);
+    REQUIRE(moving.has_value());
+    CHECK(world.setBlockState(9, 64, 8, *moving));
+    CHECK(chunk->blockEntityAt(9, 64, 8) == nullptr);
+
+    // And a block that owns nothing leaves nothing behind.
+    CHECK(world.setBlockState(8, 64, 8, stateOf("stone")));
+    CHECK(chunk->blockEntityAt(8, 64, 8) == nullptr);
 }
 
 TEST_CASE("a block that changed makes its neighbours light themselves again") {

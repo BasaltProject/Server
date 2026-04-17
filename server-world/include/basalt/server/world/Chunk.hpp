@@ -146,6 +146,10 @@ public:
     /// back would lose whatever else is in it. The caller marks the chunk dirty.
     [[nodiscard]] ChunkBlockEntity* blockEntityAt(std::int32_t localX, std::int32_t y, std::int32_t localZ);
 
+    /// Takes the entity off a square, which is what reading corrupt data or a test that wants the
+    /// half-built case does: a write of the block always puts one back.
+    void removeBlockEntityAt(std::int32_t x, std::int32_t y, std::int32_t z);
+
     [[nodiscard]] std::vector<ChunkBlockEntity> blockEntities() const;
 
     [[nodiscard]] std::size_t blockEntityCount() const noexcept { return blockEntities_.size(); }
@@ -329,8 +333,6 @@ private:
     [[nodiscard]] std::size_t sectionIndexFor(std::int32_t y) const;
 
     [[nodiscard]] std::int32_t blockEntityKey(std::int32_t x, std::int32_t y, std::int32_t z) const;
-
-    void removeBlockEntityAt(std::int32_t x, std::int32_t y, std::int32_t z);
 
     void updateHeights(std::int32_t x, std::int32_t y, std::int32_t z, std::int32_t stateId);
 

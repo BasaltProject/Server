@@ -138,6 +138,9 @@ TEST_CASE("asking an empty jukebox what it plays leaves it as it was") {
     Loaded loaded;
     WorldState& world = loaded.state;
     REQUIRE(world.setBlockState(8, 64, 8, stateOf("jukebox", {{"has_record", "false"}})));
+    // The write gives the block its entity like `LevelChunk.setBlockState` does, so the empty case
+    // this asks about is one whose entity a caller took away.
+    world.chunkIfLoaded(0, 0)->removeBlockEntityAt(8, 64, 8);
 
     CHECK_FALSE(jukeboxes::songAt(world, 8, 64, 8).has_value());
     CHECK_FALSE(jukeboxes::eject(world, 8, 64, 8).has_value());

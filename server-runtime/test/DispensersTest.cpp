@@ -390,6 +390,9 @@ TEST_CASE("a dispenser with no block entity does nothing at all") {
     Fixture fixture;
     WorldState& world = fixture.world;
     REQUIRE(world.setBlockState(8, 64, 8, dispenser("north", "true")));
+    // The write gives the block its entity like `LevelChunk.setBlockState` does, so the missing
+    // case this asks about is one whose entity a caller took away.
+    world.chunkIfLoaded(0, 0)->removeBlockEntityAt(8, 64, 8);
 
     const dispensers::Result result = dispensers::fire(fixture.context(), 8, 64, 8, ids());
 
@@ -754,8 +757,9 @@ TEST_CASE("a container in front with no block entity takes nothing") {
     Fixture fixture;
     WorldState& world = fixture.world;
     oneItem(world, "north", ItemStack{.item = item("stone"), .count = 1});
-    // A chest that was never given its contents, which is what a half-built world looks like.
+    // A chest whose entity a caller took away, which is what a half-built world looks like.
     REQUIRE(world.setBlockState(8, 64, 7, stateOf("chest")));
+    world.chunkIfLoaded(0, 0)->removeBlockEntityAt(8, 64, 7);
 
     const dispensers::Result result = dispensers::fire(fixture.context(), 8, 64, 8, ids());
 
