@@ -268,13 +268,14 @@ namespace {
     return static_cast<std::int32_t>(worlds.size());
 }
 
-/// Puts the targets in the world, at its spawn.
+/// Puts the targets in the world, at its spawn, or where they already stand.
 ///
-/// At the spawn rather than at the same coordinates: the two worlds share nothing, and the same x/z
-/// in another world is as likely to be inside a mountain as anywhere else. `/tp` is still there for
-/// landing somewhere exact.
-[[nodiscard]] Parsed<std::int32_t>
-sendTo(const CommandContext& context, const std::vector<player::PlayerSession*>& targets, world::LoadedWorld& world) {
+/// Keeping the coordinates is the vanilla dimension change (`/execute in <dim> run tp @s ~ ~ ~`)
+/// and what the bare `/world <name>` does; the spawn is what `spawn` names, since the same x/z in
+/// another world is as likely to be inside a mountain as anywhere else.
+[[nodiscard]] Parsed<std::int32_t> sendTo(const CommandContext& context,
+                                          const std::vector<player::PlayerSession*>& targets, world::LoadedWorld& world,
+                                          bool atSpawn) {
     const std::array<double, 3>& spawn = world.spawn();
     std::int32_t moved = 0;
     for (player::PlayerSession* target : targets) {
@@ -285,7 +286,8 @@ sendTo(const CommandContext& context, const std::vector<player::PlayerSession*>&
             }
             continue;
         }
-        if (target->connection().switchWorld && target->connection().switchWorld(world, spawn[0], spawn[1], spawn[2])) {
+        const std::array<double, 3> at = atSpawn ? spawn : std::array<double, 3>{target->x, target->y, target->z};
+        if (target->connection().switchWorld && target->connection().switchWorld(world, at[0], at[1], at[2])) {
             moved++;
         }
     }
@@ -339,7 +341,8 @@ void WorldCommand::build(const CommandNodeBuilder& root) const {
             });
         });
     });
-    // `/world <name>` sends whoever ran it, which is the form anyone actually types.
+    // `/world <name>` moves whoever ran it keeping their coordinates, the way vanilla changes
+    // dimension with `/execute in <dim> run tp @s ~ ~ ~`; `spawn` lands on the world spawn instead.
     root.argument("world", worldArgument(), [](const CommandNodeBuilder& named) {
         named.executes([](const CommandContext& context) -> Parsed<std::int32_t> {
             const Parsed<player::PlayerSession*> self = context.requirePlayer();
@@ -347,7 +350,7 @@ void WorldCommand::build(const CommandNodeBuilder& root) const {
                 return std::unexpected{self.error()};
             }
             auto* const* found = context.get<world::LoadedWorld*>("world");
-            return found == nullptr || *found == nullptr ? 0 : sendTo(context, {*self}, **found);
+            return found == nullptr || *found == nullptr ? 0 : sendTo(context, {*self}, **found, false);
         });
         named.argument("targets", playersArgument(false), [](const CommandNodeBuilder& targets) {
             targets.executes([](const CommandContext& context) -> Parsed<std::int32_t> {
@@ -356,7 +359,29 @@ void WorldCommand::build(const CommandNodeBuilder& root) const {
                 if (matched == nullptr || found == nullptr || *found == nullptr) {
                     return 0;
                 }
-                return sendTo(context, *matched, **found);
+                return sendTo(context, *matched, **found, false);
+            });
+        });
+    });
+    root.literal("spawn", [](const CommandNodeBuilder& spawn) {
+        spawn.argument("world", worldArgument(), [](const CommandNodeBuilder& named) {
+            named.executes([](const CommandContext& context) -> Parsed<std::int32_t> {
+                const Parsed<player::PlayerSession*> self = context.requirePlayer();
+                if (!self.has_value()) {
+                    return std::unexpected{self.error()};
+                }
+                auto* const* found = context.get<world::LoadedWorld*>("world");
+                return found == nullptr || *found == nullptr ? 0 : sendTo(context, {*self}, **found, true);
+            });
+            named.argument("targets", playersArgument(false), [](const CommandNodeBuilder& targets) {
+                targets.executes([](const CommandContext& context) -> Parsed<std::int32_t> {
+                    const auto* matched = context.get<std::vector<player::PlayerSession*>>("targets");
+                    auto* const* found = context.get<world::LoadedWorld*>("world");
+                    if (matched == nullptr || found == nullptr || *found == nullptr) {
+                        return 0;
+                    }
+                    return sendTo(context, *matched, **found, true);
+                });
             });
         });
     });

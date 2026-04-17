@@ -21,6 +21,7 @@
 using basalt::server::runtime::command::CommandDispatcher;
 using basalt::server::runtime::command::CommandEnvironment;
 using basalt::server::runtime::command::CommandSource;
+using basalt::server::runtime::command::ExecutionSource;
 using basalt::server::runtime::player::PlayerConnection;
 using basalt::server::runtime::player::PlayerRegistry;
 using basalt::server::runtime::player::PlayerSession;
@@ -79,6 +80,7 @@ struct Client {
     float healed = 0.0F;
     float hurt = 0.0F;
     std::vector<std::string> switched;
+    std::vector<std::array<double, 3>> switchedAt;
     /// Set once the session exists, so a switch can move it the way the real connection does.
     PlayerSession* session = nullptr;
 
@@ -102,8 +104,10 @@ struct Client {
                                  const std::optional<basalt::server::runtime::entity::DamageSource>&) {
             hurt += amount;
         };
-        connection.switchWorld = [this](basalt::server::runtime::world::LoadedWorld& world, double, double, double) {
+        connection.switchWorld = [this](basalt::server::runtime::world::LoadedWorld& world, double x, double y,
+                                        double z) {
             switched.push_back(world.name());
+            switchedAt.push_back({x, y, z});
             if (session != nullptr) {
                 session->worldName = world.name();
             }
@@ -271,8 +275,53 @@ TEST_CASE("world moves whoever it names, and refuses when they are already there
     CHECK(fixture.source.lastAsText().find("is already in world") != std::string::npos);
 
     steve.worldName = "elsewhere";
+    steve.x = 12.0;
+    steve.y = 70.0;
+    steve.z = -8.0;
     CHECK(fixture.dispatcher.execute(fixture.source, "world world Steve") == 1);
     REQUIRE(fixture.clients[0]->switched.size() == 1);
     CHECK(fixture.clients[0]->switched[0] == "world");
+    // The bare form keeps the traveller's coordinates, like `/execute in <dim> run tp @s ~ ~ ~`.
+    REQUIRE(fixture.clients[0]->switchedAt.size() == 1);
+    CHECK(fixture.clients[0]->switchedAt[0][0] == doctest::Approx(12.0));
+    CHECK(fixture.clients[0]->switchedAt[0][1] == doctest::Approx(70.0));
+    CHECK(fixture.clients[0]->switchedAt[0][2] == doctest::Approx(-8.0));
     CHECK(fixture.source.lastAsText().find("Moved Steve to world.") != std::string::npos);
+}
+
+TEST_CASE("world with no targets moves whoever runs it, keeping their coordinates") {
+    Fixture fixture{scratch("world-command-self")};
+    PlayerSession& steve = fixture.add("Steve");
+    steve.worldName = "elsewhere";
+    steve.x = 3.5;
+    steve.y = 64.0;
+    steve.z = 9.5;
+    fixture.dispatcher.registerCommand(std::make_shared<commands::WorldCommand>());
+    const ExecutionSource asSteve{fixture.source, ExecutionSource::Changes{.player = &steve}};
+
+    CHECK(fixture.dispatcher.execute(asSteve, "world world") == 1);
+    REQUIRE(fixture.clients[0]->switched.size() == 1);
+    REQUIRE(fixture.clients[0]->switchedAt.size() == 1);
+    CHECK(fixture.clients[0]->switchedAt[0][0] == doctest::Approx(3.5));
+    CHECK(fixture.clients[0]->switchedAt[0][2] == doctest::Approx(9.5));
+    CHECK(fixture.source.lastAsText().find("Moved Steve to world.") != std::string::npos);
+}
+
+TEST_CASE("world spawn lands on the world spawn instead of keeping coordinates") {
+    Fixture fixture{scratch("world-command-spawn")};
+    PlayerSession& steve = fixture.add("Steve");
+    steve.worldName = "elsewhere";
+    steve.x = 3.5;
+    steve.y = 64.0;
+    steve.z = 9.5;
+    fixture.world->setSpawn(10, 65, -4, 0.0F);
+    fixture.dispatcher.registerCommand(std::make_shared<commands::WorldCommand>());
+
+    CHECK(fixture.dispatcher.execute(fixture.source, "world spawn world Steve") == 1);
+    REQUIRE(fixture.clients[0]->switched.size() == 1);
+    REQUIRE(fixture.clients[0]->switchedAt.size() == 1);
+    // parity: a spawn set from block coordinates is centre corrected, like `/setworldspawn`.
+    CHECK(fixture.clients[0]->switchedAt[0][0] == doctest::Approx(10.5));
+    CHECK(fixture.clients[0]->switchedAt[0][1] == doctest::Approx(65.0));
+    CHECK(fixture.clients[0]->switchedAt[0][2] == doctest::Approx(-3.5));
 }
