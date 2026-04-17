@@ -919,6 +919,7 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                                           vanillaData_.lootTables, model.allWorlds, std::move(mobHooks),
                                           MobActionSystem::Options{.nextSeed = [] { return scratchSeed(); },
                                                                    .entityTags = &vanillaData_.entityTags,
+                                                                   .teams = &teams_,
                                                                    .nextDouble = [] { return scratchDouble(); },
                                                                    .recipes = &vanillaData_.recipes,
                                                                    .damageTypeTags = &vanillaData_.damageTypeTags,

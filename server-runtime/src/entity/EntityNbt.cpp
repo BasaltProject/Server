@@ -388,6 +388,10 @@ NbtCompound encode(const ServerEntity& entity) {
         tag.putBoolean("GotFish", entity.gotFish);
         tag.putInt("Moistness", entity.moistness);
     }
+    // parity: `Pufferfish.addAdditionalSaveData`, written whether it is puffed or not.
+    if (path == "pufferfish") {
+        tag.putInt("PuffState", entity.puffState);
+    }
     if (entity.wither != nullptr) {
         tag.putInt(std::string{witherBoss::kInvulnerableKey}, entity.wither->invulnerableTicks);
     }
@@ -625,6 +629,10 @@ std::unique_ptr<ServerEntity> decode(const NbtCompound& tag, std::int32_t entity
     if (path == "dolphin") {
         entity->gotFish = numericBoolean(tag, "GotFish");
         entity->moistness = tag.contains("Moistness") ? numericInt(tag, "Moistness") : 2400;
+    }
+    if (path == "pufferfish") {
+        // parity: `Pufferfish.readAdditionalSaveData`, capped at the fully puffed state.
+        entity->puffState = std::min(numericInt(tag, "PuffState"), 2);
     }
     if (path == "wither") {
         entity->wither = std::make_shared<witherBoss::WitherState>();

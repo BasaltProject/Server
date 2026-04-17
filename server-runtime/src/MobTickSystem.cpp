@@ -256,6 +256,11 @@ void MobTickSystem::tickMob(world::LoadedWorld& world, ServerEntity& entity,
     if (entity.type().path() == "parrot") {
         actions_->tickParrot(world, entity);
     }
+    // parity: `Pufferfish.tick` and `aiStep`: the puffing up, the sting and the deflating, after
+    // the travel they belong to.
+    if (entity.type().path() == "pufferfish") {
+        actions_->tickPufferfish(world, watchers, entity, living);
+    }
     // parity: `LivingEntity.aiStep`'s `pushEntities`, after the travel.
     pushes_->pushByMob(world, entity);
     actions_->emitMovement(world, entity);

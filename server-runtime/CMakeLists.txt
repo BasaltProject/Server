@@ -221,6 +221,7 @@ basalt_module(server-runtime-core
         src/MobActionLlama.cpp
         src/MobActionGifts.cpp
         src/MobActionDolphin.cpp
+        src/MobActionPufferfish.cpp
         src/MobActionWardenHearing.cpp
         src/BasaltServerFeatures.cpp
         src/EntityPushSystem.cpp
@@ -1259,6 +1260,15 @@ basalt_test(server-runtime-mob-tick-system-test
 )
 
 target_compile_definitions(server-runtime-mob-tick-system-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
+
+basalt_test(server-runtime-pufferfish-test
+    SOURCES
+        test/PufferfishTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-pufferfish-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
 
 basalt_test(server-runtime-mob-action-system-test

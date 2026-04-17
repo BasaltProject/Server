@@ -75,6 +75,10 @@ namespace basalt::server::runtime::entity::goats {
 struct GoatState;
 }
 
+namespace basalt::server::runtime::scoreboard {
+class Teams;
+}
+
 namespace basalt::server::runtime {
 
 class BlockChangeBroadcaster;
@@ -131,6 +135,8 @@ public:
         std::function<std::int64_t()> nextSeed;
         /// The entity type tags, which a death roll asks about its killer.
         const world::realEntityTypeTags::TagMembers* entityTags = nullptr;
+        /// The scoreboard teams, which `LivingEntity.doTeamsAllowDamage` asks about a sting.
+        const scoreboard::Teams* teams = nullptr;
         std::function<double()> nextDouble;
         /// What a furnace makes of an item, which a mob that burned to death drops.
         const world::RealRecipes* recipes = nullptr;
@@ -310,6 +316,11 @@ public:
 
     /// parity: `Parrot.aiStep`'s one in four hundred imitation of a mob nearby.
     void tickParrot(world::LoadedWorld& world, entity::ServerEntity& parrot);
+
+    /// parity: `Pufferfish.tick` and `aiStep`, and its PuffGoal: the puffing up when something
+    /// scary draws near, the sting and the poison while it is puffed, and the deflating after.
+    void tickPufferfish(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers,
+                        entity::ServerEntity& fish, const std::vector<entity::ServerEntity*>& living);
 
     /// parity: `ServerPlayer.handleShoulderEntities` and `removeEntitiesOnShoulder` for every player.
     void tickShoulders(world::LoadedWorld& world, const std::vector<player::PlayerSession*>& watchers);

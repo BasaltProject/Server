@@ -108,6 +108,8 @@ struct RuntimeEntityMetadata {
     /// parity: `Sniffer.DATA_STATE` and `DATA_DROP_SEED_AT_TICK`.
     std::optional<std::int32_t> snifferState;
     std::optional<std::int32_t> snifferDropSeed;
+    /// parity: `Pufferfish`'s PUFF_STATE, the integer right after `AbstractFish`'s moving flag.
+    std::optional<std::int32_t> pufferfishPuff;
     /// parity: `Camel.LAST_POSE_CHANGE_TICK`.
     std::optional<std::int64_t> camelPoseTick;
     /// parity: `Frog.DATA_TONGUE_TARGET_ID`.

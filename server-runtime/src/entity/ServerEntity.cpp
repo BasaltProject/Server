@@ -247,9 +247,7 @@ constexpr std::array<BabyBox, 36> kBabyBoxes{{
     }
     // parity: `Pufferfish.getScale`: half deflated, seven tenths half puffed, whole when puffed up.
     if (path == "pufferfish") {
-        const std::int32_t state =
-            entity.sourceNbt.has_value() ? entityNbt::numericInt(*entity.sourceNbt, "PuffState") : 0;
-        const float scale = state == 0 ? 0.5F : (state == 1 ? 0.7F : 1.0F);
+        const float scale = entity.puffState == 0 ? 0.5F : (entity.puffState == 1 ? 0.7F : 1.0F);
         return {width * scale, height * scale};
     }
     if (!baby(entity)) {
