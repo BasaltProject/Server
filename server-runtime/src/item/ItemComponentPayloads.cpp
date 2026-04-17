@@ -260,6 +260,23 @@ bool writeExplosion(ByteBuffer& buffer, const NbtTag& value) {
     return entry == nullptr ? std::nullopt : std::optional{entry->protocolId};
 }
 
+/// parity: `ItemStackTemplate.STREAM_CODEC`: the item, the count, then the component patch that
+/// follows it (the added components, then the removed ids).
+void writeStackTemplate(ByteBuffer& buffer, std::int32_t item, std::int32_t count, const NbtCompound* components) {
+    wire::protocol::varInt::write(buffer, item);
+    wire::protocol::varInt::write(buffer, count);
+    const std::vector<ItemComponent> patch =
+        components == nullptr
+            ? std::vector<ItemComponent>{}
+            : itemComponentCodecs::toWire(*components, [](const Identifier&) { return std::optional<std::int32_t>{}; });
+    wire::protocol::varInt::write(buffer, static_cast<std::int32_t>(patch.size()));
+    wire::protocol::varInt::write(buffer, 0);
+    for (const ItemComponent& component : patch) {
+        wire::protocol::varInt::write(buffer, component.id());
+        component.writePayload(buffer);
+    }
+}
+
 [[nodiscard]] const std::map<std::string, Encoder, std::less<>>& encoders() {
     static const std::map<std::string, Encoder, std::less<>> built = [] {
         std::map<std::string, Encoder, std::less<>> table;
@@ -290,20 +307,8 @@ bool writeExplosion(ByteBuffer& buffer, const NbtTag& value) {
                 if (item == nullptr) {
                     return false;
                 }
-                wire::protocol::varInt::write(buffer, item->protocolId);
-                wire::protocol::varInt::write(buffer, stack->getInt("count", 1));
-                const NbtCompound* components = stack->getCompound("components");
-                const std::vector<ItemComponent> patch =
-                    components == nullptr ? std::vector<ItemComponent>{}
-                                          : itemComponentCodecs::toWire(*components, [](const Identifier&) {
-                                                return std::optional<std::int32_t>{};
-                                            });
-                wire::protocol::varInt::write(buffer, static_cast<std::int32_t>(patch.size()));
-                wire::protocol::varInt::write(buffer, 0);
-                for (const ItemComponent& component : patch) {
-                    wire::protocol::varInt::write(buffer, component.id());
-                    component.writePayload(buffer);
-                }
+                writeStackTemplate(buffer, item->protocolId, stack->getInt("count", 1),
+                                   stack->getCompound("components"));
             }
             return true;
         });
@@ -471,8 +476,8 @@ bool writeExplosion(ByteBuffer& buffer, const NbtTag& value) {
         };
         table.emplace("minecraft:attack_animation", swing);
         table.emplace("minecraft:interact_animation", swing);
-        // parity: `PotDecorations.STREAM_CODEC`, four optional `ItemStackTemplate`s. A sherd carrying
-        // components of its own is not written: this build has no component patch encoder here.
+        // parity: `PotDecorations.STREAM_CODEC`, four optional `ItemStackTemplate`s, a sherd's own
+        // components riding along in its patch.
         table.emplace("minecraft:pot_decorations", [](ByteBuffer& buffer, const NbtTag& value) {
             const NbtCompound* compound = value.get<NbtCompound>();
             if (compound == nullptr) {
@@ -486,20 +491,13 @@ bool writeExplosion(ByteBuffer& buffer, const NbtTag& value) {
                 }
                 const NbtCompound* stack = entry->get<NbtCompound>();
                 const std::string_view name = stack == nullptr ? stringOf(entry) : stringOf(stack->find("id"));
-                if (stack != nullptr && stack->getCompound("components") != nullptr &&
-                    stack->getCompound("components")->size() > 0) {
-                    return false;
-                }
                 const std::expected<Identifier, wire::common::IdentifierError> item = Identifier::parse(name);
                 const std::optional<std::int32_t> id = item.has_value() ? itemProtocolId(*item) : std::nullopt;
                 if (!id.has_value()) {
                     return false;
                 }
-                wire::protocol::varInt::write(buffer, *id);
-                wire::protocol::varInt::write(buffer, stack == nullptr ? 1 : intField(*entry, "count").value_or(1));
-                // An empty component patch: nothing added, nothing removed.
-                wire::protocol::varInt::write(buffer, 0);
-                wire::protocol::varInt::write(buffer, 0);
+                writeStackTemplate(buffer, *id, stack == nullptr ? 1 : intField(*entry, "count").value_or(1),
+                                   stack == nullptr ? nullptr : stack->getCompound("components"));
             }
             return true;
         });
