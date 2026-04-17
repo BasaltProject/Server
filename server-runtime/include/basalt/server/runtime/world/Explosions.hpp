@@ -27,6 +27,9 @@ struct Broken {
     std::int32_t stateId = 0;
     /// A beehive's block entity as it was, which `BeehiveBlock.getDrops` empties.
     std::optional<wire::nbt::NbtCompound> hive;
+    /// A jukebox whose song the blast cut short, which `JukeboxBlockEntity.setRemoved` tells the
+    /// world about with the stop event even when no player took the disc out.
+    bool songWasPlaying = false;
 
     friend bool operator==(const Broken&, const Broken&) = default;
 };

@@ -5,11 +5,13 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
+#include <basalt/server/runtime/world/BlockChange.hpp>
 #include <basalt/server/runtime/world/Explosions.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/NeighbourUpdates.hpp>
 #include <basalt/server/runtime/world/RealDamageTypeTags.hpp>
 #include <basalt/server/runtime/world/RealLootTables.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 #include <basalt/server/runtime/world/WorldState.hpp>
 #include <basalt/wire/protocol/play/SimplePackets.hpp>
 #include <basalt/wire/protocol/play/WorldPackets.hpp>
@@ -136,6 +138,20 @@ void ExplosionSystem::blowUp(world::LoadedWorld& world, const std::vector<player
         }
         if (block.hive.has_value() && hooks_.hiveBlown) {
             hooks_.hiveBlown(world, block.x, block.y, block.z, block.stateId, *block.hive, sourceEntityId);
+        }
+        // parity: `JukeboxBlockEntity.setRemoved`, which a blast reaches without any player: the 1011
+        // that tells the clients the song is over and the `jukebox_stop_play` an allay dancing to it
+        // hears. Vanilla raises both for the disc-less box too; this server keeps no block entity for
+        // one of those, so only a song that was playing is reported.
+        if (block.songWasPlaying) {
+            for (const player::PlayerSession* watcher : watchers) {
+                if (watcher->connection().sendLevelEvent) {
+                    watcher->connection().sendLevelEvent(world::blockEffect::Effect::kStopJukeboxSong, block.x, block.y,
+                                                         block.z, 0);
+                }
+            }
+            world::vibrations::emit(world.state(), "jukebox_stop_play", block.x + 0.5, block.y + 0.5, block.z + 0.5,
+                                    world.gameTime());
         }
     }
 
