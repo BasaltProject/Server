@@ -194,6 +194,20 @@ std::string smartUsage(const CommandNode& node, const CommandSource& source, boo
     return self;
 }
 
+std::vector<std::string> smartUsages(const CommandNode& node, const CommandSource& source) {
+    // parity: `getSmartUsage` reads the node's own command for the children's optionality and
+    // skips a child the source may not use (it answers null in brigadier).
+    const bool optional = static_cast<bool>(node.executor);
+    std::vector<std::string> usages;
+    for (const CommandNode* child : node.sortedChildren()) {
+        if (child->kind() == NodeKind::Root || !mayUse(source, *child)) {
+            continue;
+        }
+        usages.push_back(smartUsage(*child, source, optional, false));
+    }
+    return usages;
+}
+
 Command::Command(std::string name, std::int32_t level, std::vector<std::string> aliases,
                  std::optional<std::string> permission)
     : name_(std::move(name)), level_(level), aliases_(std::move(aliases)),
@@ -748,6 +762,66 @@ std::vector<CommandNode*> CommandDispatcher::usableCommands(const CommandSource&
         }
     }
     return usable;
+}
+
+namespace {
+
+/// The deepest node a help line reaches below `node`, with the reader left where that parse ended.
+/// parity: `CommandDispatcher.parseNodes` as `ParseResults.getContext().getNodes()` keeps it: a
+/// match with trailing data still counts, and a branch that got further wins over one that did not.
+const CommandNode* deepestIn(StringReader& reader, const CommandNode& node, const CommandSource& source,
+                             const CommandEnvironment& environment, std::int32_t& reached) {
+    const CommandNode& target = node.redirect == nullptr ? node : *node.redirect;
+    if (node.kind() != NodeKind::Root) {
+        if (!reader.canRead() || reader.peek() != ' ') {
+            reached = reader.cursor();
+            return nullptr;
+        }
+        reader.skip();
+    }
+    const std::int32_t start = reader.cursor();
+    const CommandNode* best = nullptr;
+    std::int32_t bestAt = start;
+    for (CommandNode* child : target.sortedChildren()) {
+        if (!mayUse(source, *child)) {
+            continue;
+        }
+        reader.setCursor(start);
+        bool matched = false;
+        if (child->kind() == NodeKind::Literal) {
+            matched = reader.readLiteral(child->name());
+        } else if (child->kind() == NodeKind::Argument) {
+            matched = child->type()->parse(reader, source, environment).has_value();
+        }
+        if (!matched) {
+            continue;
+        }
+        const CommandNode* candidate = child;
+        std::int32_t at = reader.cursor();
+        if (reader.canRead() && reader.peek() == ' ') {
+            std::int32_t deeperAt = at;
+            if (const CommandNode* deeper = deepestIn(reader, *child, source, environment, deeperAt);
+                deeper != nullptr) {
+                candidate = deeper;
+                at = deeperAt;
+            }
+        }
+        if (best == nullptr || at > bestAt) {
+            best = candidate;
+            bestAt = at;
+        }
+    }
+    reached = best == nullptr ? start : bestAt;
+    reader.setCursor(reached);
+    return best;
+}
+
+} // namespace
+
+const CommandNode* CommandDispatcher::deepestParsed(const CommandSource& source, const std::string& input) const {
+    StringReader reader{input};
+    std::int32_t reached = 0;
+    return deepestIn(reader, root_, source, *environment_, reached);
 }
 
 } // namespace basalt::server::runtime::command

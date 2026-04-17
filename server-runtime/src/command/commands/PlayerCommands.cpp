@@ -188,18 +188,22 @@ void HelpCommand::build(const CommandNodeBuilder& root) const {
             return context.matching(names);
         });
         command.executes([](const CommandContext& context) -> Parsed<std::int32_t> {
-            // Greedy, as vanilla declares it, but only the command named by the first word is
-            // described: see the class docs for why the rest of the line is not.
+            // parity: `HelpCommand` parses the whole greedy line and describes the node it
+            // reached, echoing the input before each usage line.
             const std::string* line = context.get<std::string>("command");
-            const std::string name =
-                line == nullptr ? std::string{} : line->substr(0, std::min(line->find(' '), line->size()));
-            for (const CommandNode* node : context.dispatcher().usableCommands(context.source())) {
-                if (node->name() == name) {
-                    context.source().sendSystemMessage(Component::text("/" + smartUsage(*node, context.source())));
-                    return 1;
-                }
+            if (line == nullptr) {
+                return 0;
             }
-            return std::unexpected{CommandSyntaxError{.component = Component::translatable("commands.help.failed")}};
+            const CommandNode* node = context.dispatcher().deepestParsed(context.source(), *line);
+            if (node == nullptr) {
+                return std::unexpected{
+                    CommandSyntaxError{.component = Component::translatable("commands.help.failed")}};
+            }
+            const std::vector<std::string> usages = smartUsages(*node, context.source());
+            for (const std::string& usage : usages) {
+                context.source().sendSystemMessage(Component::text("/" + *line + " " + usage));
+            }
+            return static_cast<std::int32_t>(usages.size());
         });
     });
 }

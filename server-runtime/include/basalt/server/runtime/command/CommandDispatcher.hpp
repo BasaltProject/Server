@@ -130,6 +130,10 @@ private:
 [[nodiscard]] std::string smartUsage(const CommandNode& node, const CommandSource& source, bool optional = false,
                                      bool deep = false);
 
+/// The usage lines `/help <command>` prints for the node a line reached: one per usable child.
+/// parity: brigadier's `CommandDispatcher.getSmartUsage` map form.
+[[nodiscard]] std::vector<std::string> smartUsages(const CommandNode& node, const CommandSource& source);
+
 /// Parses and runs command lines, and hands out the tree the client needs to parse them itself.
 /// parity: `Commands.performCommand`: a parse error is followed by the grey `command.context.here`
 /// line; a command that fails reports `command.failed` and never takes the connection down.
@@ -228,6 +232,10 @@ public:
 
     /// Every registered top-level command name, in registration order. Used by `/help`.
     [[nodiscard]] std::vector<CommandNode*> usableCommands(const CommandSource& source) const;
+
+    /// The deepest node a line parses to for `source`, or null when nothing of it parses. What
+    /// `/help <line>` describes; the line is never run.
+    [[nodiscard]] const CommandNode* deepestParsed(const CommandSource& source, const std::string& input) const;
 
 private:
     /// One link of a parsed line: what it parsed, and what it does to the source for the next link.
