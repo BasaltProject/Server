@@ -36,6 +36,7 @@ public:
     ///
     /// The failure carries the path, because with several files "the configuration is broken" is
     /// not a useful thing to tell someone.
+    /// Reads have a 256 KiB ceiling; an oversized file fails instead of falling back to defaults.
     [[nodiscard]] std::expected<wire::common::toml::TomlTable, std::string>
     load(std::string_view fileName, std::string_view defaultContents) const;
 
