@@ -35,7 +35,8 @@ bool Connection::fill() {
 }
 
 bool Connection::nextPacket(wire::io::ByteBuffer& into) {
-    const auto got = wire::protocol::packetFraming::tryReadFrame(read_, compressionEnabled(), into);
+    const auto got =
+        wire::protocol::packetFraming::tryReadFrame(read_, compressionEnabled(), into, compressionThreshold_);
     if (!got) {
         socket_.close();
         return false;
@@ -56,7 +57,10 @@ void Connection::send(std::span<const std::uint8_t> packetIdAndData) {
             return;
         }
     } else {
-        wire::protocol::packetFraming::writeUncompressed(write_, packetIdAndData);
+        if (!wire::protocol::packetFraming::writeUncompressed(write_, packetIdAndData)) {
+            socket_.close();
+            return;
+        }
     }
     if (outbound_) {
         outbound_->encrypt(write_.mutableSpan(0));
