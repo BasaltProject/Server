@@ -33,6 +33,8 @@ struct BasaltConfig {
     /// Shutting both is refused, because then nobody can join at all.
     bool javaEnabled = true;
     std::int32_t port = 25565;
+    std::string javaBind = "0.0.0.0";
+    bool javaDualStack = false;
 
     bool bedrockEnabled = true;
     std::int32_t bedrockPort = 19132;

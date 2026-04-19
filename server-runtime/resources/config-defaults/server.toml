@@ -41,6 +41,11 @@ whitelist = false
 # nobody can join.
 enabled = true
 
+# Literal IPv4 or IPv6 listen address. Use 127.0.0.1 for a local proxy backend.
+bind = "0.0.0.0"
+# Accept IPv4 on an IPv6 listener only when explicitly enabled.
+dual-stack = false
+
 # Port the server listens on.
 port = 25565
 
