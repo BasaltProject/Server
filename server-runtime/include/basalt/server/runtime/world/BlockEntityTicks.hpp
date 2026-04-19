@@ -69,7 +69,8 @@ struct Hooks {
     /// whatever it was powering has to be told. parity: `JukeboxBlockEntity.onSongChanged`.
     std::function<void(std::int32_t x, std::int32_t y, std::int32_t z)> songStopped;
     /// A noise that reached a shrieker: whether it shrieks depends on the players, which this
-    /// module does not know. Called after every block entity has had its turn.
+    /// module does not know. parity: `VibrationSystem.Ticker.tick`'s `receiveVibration`, which
+    /// answers on the shrieker's own turn, inside the walk.
     std::function<void(const vibrations::ShriekerArrival& arrival)> shriekerHeard;
     /// parity: `BeehiveBlockEntity.serverTick`, which lets bees out and so needs the entities. The
     /// honey it adds goes in `pending`, set once every block entity has had its turn; answers whether

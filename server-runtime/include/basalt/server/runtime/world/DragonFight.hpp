@@ -42,6 +42,10 @@ struct DragonFight {
     std::int32_t aliveCrystals = 0;
     std::int32_t ticksSinceCrystalsScanned = 0;
     std::int32_t ticksSinceLastPlayerScan = 21;
+    /// Whether this fight's `TicketType.DRAGON` is held in the world's forced chunks. Vanilla
+    /// re-adds the ticket every tick while anyone fights and removes it when the arena empties;
+    /// this remembers which of the forced chunks are ours to take back.
+    bool dragonTicketHeld = false;
     /// The boss bar and who is being shown it.
     wire::common::Uuid barId = wire::common::Uuid::random();
     std::set<std::int32_t> barPlayers;

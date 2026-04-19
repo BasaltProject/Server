@@ -108,6 +108,10 @@ private:
     void findOrCreateDragon(world::LoadedWorld& world, world::DragonFight& fight,
                             const std::vector<entity::ServerEntity*>& living);
 
+    /// parity: `EnderDragonFight.tick`'s `removeTicketWithRadius(TicketType.DRAGON, ...)`, the
+    /// arena going when the last fighter leaves.
+    void releaseDragonTicket(world::LoadedWorld& world, world::DragonFight& fight);
+
     /// parity: `EnderDragonFight.createNewDragon`.
     void createNewDragon(world::LoadedWorld& world, world::DragonFight& fight);
 

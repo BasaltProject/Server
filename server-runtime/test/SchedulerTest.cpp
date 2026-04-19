@@ -292,6 +292,54 @@ TEST_CASE("a merge moves the work queued on the owner that goes away") {
     CHECK(survivor.pending() == 0);
 }
 
+TEST_CASE("console input waits for the turn's console point, not its start") {
+    Owner owner{"world"};
+    owner.bindToCurrentThread();
+    std::vector<std::string> ran;
+
+    // Queued from another thread, because an owner that is current runs its work on the spot.
+    std::thread{[&] {
+        owner.submitConsole([&ran] { ran.emplace_back("console"); });
+        owner.submit([&ran] { ran.emplace_back("task"); });
+    }}.join();
+    CHECK(ran.empty());
+    // parity: `DedicatedServer.handleConsoleInputs` runs after the levels and before
+    // `playerList.tick`, so the ordinary turn work goes first and the console point asks for
+    // what was typed on its own.
+    CHECK(owner.runPending() == 1);
+    CHECK(ran == std::vector<std::string>{"task"});
+    CHECK(owner.runConsole() == 1);
+    CHECK(ran == std::vector<std::string>{"task", "console"});
+    CHECK(owner.pending() == 0);
+}
+
+TEST_CASE("a closed owner hands back a cancelled console handle") {
+    Owner owner{"world"};
+    owner.bindToCurrentThread();
+    TaskHandle queued;
+    std::thread{[&] { queued = owner.submitConsole([] {}); }}.join();
+    owner.close();
+    CHECK(queued.isCancelled());
+    CHECK(owner.runConsole() == 0);
+}
+
+TEST_CASE("a merge carries console input over to the survivor") {
+    Owner gone{"gone"};
+    Owner survivor{"survivor"};
+    gone.bindToCurrentThread();
+    survivor.bindToCurrentThread();
+    std::vector<std::string> ran;
+    std::thread{[&] { gone.submitConsole([&ran] { ran.emplace_back("console"); }); }}.join();
+
+    gone.drainInto(survivor);
+    CHECK(gone.pending() == 0);
+    // It stays console input: it runs at the survivor's console point, not with its start.
+    CHECK(survivor.runPending() == 0);
+    CHECK(ran.empty());
+    CHECK(survivor.runConsole() == 1);
+    CHECK(ran == std::vector<std::string>{"console"});
+}
+
 TEST_CASE("strict mode says who touched what, and off it says nothing") {
     Owner owner{"world"};
     {

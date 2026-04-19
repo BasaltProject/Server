@@ -9,6 +9,7 @@
 #include <basalt/server/runtime/world/DaylightDetectors.hpp>
 #include <basalt/server/runtime/world/EndGateways.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
+#include <basalt/server/runtime/world/Vibrations.hpp>
 
 #include <doctest.h>
 
@@ -415,4 +416,43 @@ TEST_CASE("a brewing stand whose block already shows its bottles says nothing") 
     // The brew moved on, so it is written back, but the three bits were already right.
     CHECK(loaded.tick().empty());
     CHECK(brewingStands::read(entity->data()).brewTime > 0);
+}
+
+TEST_CASE("a shrieker that hears a click answers on its own turn, inside the walk") {
+    Loaded loaded;
+    // parity: `requiresAdjacentChunksToBeTicking`, the three by three the shrieker's noise waits on.
+    for (std::int32_t chunkX = kChunkX - 1; chunkX <= kChunkX + 1; ++chunkX) {
+        for (std::int32_t chunkZ = kChunkZ - 1; chunkZ <= kChunkZ + 1; ++chunkZ) {
+            loaded.state.getOrGenerateChunk(chunkX, chunkZ);
+        }
+    }
+    loaded.place("sculk_shrieker",
+                 stateOf("sculk_shrieker", {{"shrieking", "false"}, {"can_summon", "false"}, {"waterlogged", "false"}}),
+                 kX, 64, kZ);
+    // A later block entity in the same walk, whose turn comes after the shrieker's.
+    ChunkBlockEntity* conduit = loaded.place("conduit", stateOf("conduit", {{"waterlogged", "false"}}), kX + 1, 64, kZ);
+    static_cast<void>(conduit);
+
+    const basalt::wire::common::Uuid player{1, 2};
+    loaded.state.setPlayerCheck([player](const basalt::wire::common::Uuid& entity) { return entity == player; });
+    // parity: `SculkSensorBlock.activate` raises the click with the first noise's source, and the
+    // shrieker picks a noise heard on an earlier turn.
+    vibrations::emit(loaded.state, vibrations::kTendrilsClicking, kX + 0.5, 64.5, kZ + 0.5, 0, {.entity = player});
+
+    std::vector<std::string> order;
+    const blockEntityTicks::Hooks hooks{
+        .shriekerHeard = [&order](const vibrations::ShriekerArrival&) { order.emplace_back("shriek"); },
+        .conduit =
+            [&order](NbtCompound&, std::int32_t, std::int32_t, std::int32_t) {
+                order.emplace_back("conduit");
+                return false;
+            }};
+
+    static_cast<void>(blockEntityTicks::tick(loaded.state, "overworld", loaded.clock,
+                                             daylightDetectors::skyDarken(loaded.clock, loaded.weather), 1,
+                                             {{kChunkX, kChunkZ}}, loaded.random, hooks));
+
+    REQUIRE(order.size() == 2);
+    CHECK(order[0] == "shriek");
+    CHECK(order[1] == "conduit");
 }

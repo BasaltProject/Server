@@ -7,6 +7,7 @@
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
+#include <basalt/server/runtime/world/ChunkGenerationQueue.hpp>
 #include <basalt/server/runtime/world/EndCrystals.hpp>
 #include <basalt/server/runtime/world/EndGateways.hpp>
 #include <basalt/server/runtime/world/EndPodium.hpp>
@@ -40,6 +41,9 @@ constexpr std::int32_t kDragonSpawnY = 128;
 constexpr double kGatewayDistance = 96.0;
 constexpr std::int32_t kGatewayY = 75;
 constexpr std::int32_t kArenaChunks = 8;
+/// parity: `TicketType.DRAGON`'s radius, `addTicketWithRadius(..., 9)`: the nineteen by
+/// nineteen chunks around the exit portal stay loaded and ticking while the fight has players.
+constexpr std::int32_t kDragonTicketRadius = 9;
 /// parity: `LevelEvent.ANIMATION_END_GATEWAY_SPAWN`.
 constexpr std::int32_t kGatewaySpawnEvent = 3000;
 constexpr float kCrystalBlastOnDragon = 10.0F;
@@ -55,6 +59,19 @@ DragonFight* EndFightSystem::fightOf(world::LoadedWorld& world, const ServerEnti
     return fight != nullptr && fight->dragonUuid == dragon.uuid() ? fight : nullptr;
 }
 
+void EndFightSystem::releaseDragonTicket(world::LoadedWorld& world, DragonFight& fight) {
+    if (!fight.dragonTicketHeld) {
+        return;
+    }
+    fight.dragonTicketHeld = false;
+    for (std::int32_t chunkX = -kDragonTicketRadius; chunkX <= kDragonTicketRadius; ++chunkX) {
+        for (std::int32_t chunkZ = -kDragonTicketRadius; chunkZ <= kDragonTicketRadius; ++chunkZ) {
+            // Only ours to take: a `/forceload` on the same chunk outlives the fight.
+            static_cast<void>(world.forcedChunks().erase(world::ChunkGenerationQueue::pack(chunkX, chunkZ)));
+        }
+    }
+}
+
 void EndFightSystem::tickFight(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                const std::vector<ServerEntity*>& living) {
     DragonFight* fight = world.dragonFight();
@@ -67,7 +84,19 @@ void EndFightSystem::tickFight(world::LoadedWorld& world, const std::vector<Play
         fight->ticksSinceLastPlayerScan = 0;
     }
     if (fight->barPlayers.empty()) {
+        releaseDragonTicket(world, *fight);
         return;
+    }
+    // parity: `TicketType.DRAGON`, re-added every tick while somebody fights and taken back
+    // when the arena empties: the chunks the fight looks at stay loaded and ticking.
+    if (!fight->dragonTicketHeld) {
+        fight->dragonTicketHeld = true;
+        for (std::int32_t chunkX = -kDragonTicketRadius; chunkX <= kDragonTicketRadius; ++chunkX) {
+            for (std::int32_t chunkZ = -kDragonTicketRadius; chunkZ <= kDragonTicketRadius; ++chunkZ) {
+                static_cast<void>(world.forcedChunks().insert(world::ChunkGenerationQueue::pack(chunkX, chunkZ)));
+                world.generationQueue().request(chunkX, chunkZ, 0);
+            }
+        }
     }
     // parity: the dragon ticket holds the arena; here it is enough that the chunks are there.
     for (std::int32_t chunkX = -kArenaChunks; chunkX <= kArenaChunks; ++chunkX) {

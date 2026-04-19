@@ -95,6 +95,14 @@ public:
     /// that would otherwise be a tick stale.
     TaskHandle scheduleAtEnd(std::function<void()> task);
 
+    /// Runs `task` where `submit` would, but only when the turn asks for console input instead of
+    /// at its start. parity: `DedicatedServer.handleConsoleInputs`, which the jar runs after the
+    /// levels and before `playerList.tick`, so a console command sees the world this tick moved.
+    TaskHandle submitConsole(std::function<void()> task);
+
+    /// What the console typed since the last turn, in order. The other half of `submitConsole`.
+    std::size_t runConsole(const FailureHandler& onFailure = rethrowOnFailure());
+
     /// Runs what is waiting, on the owning thread. Answers how many ran.
     ///
     /// Takes the whole queue in one go and runs it outside the lock: a task that submits another
@@ -147,6 +155,9 @@ private:
 
     /// What asked to run at the end of the turn rather than at its start.
     std::deque<ScheduledTask> atEnd_;
+
+    /// What the console typed, held for the turn's console point instead of its start.
+    std::deque<ScheduledTask> console_;
 
     /// What is waiting for a number of ticks to pass. Scanned once a turn, so a list is enough.
     std::vector<ScheduledTask> delayed_;
