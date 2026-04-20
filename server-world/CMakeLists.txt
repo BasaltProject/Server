@@ -180,13 +180,6 @@ basalt_module(server-world
     src/crafting/Crafting.cpp
     src/crafting/RecipeJson.cpp
     src/crafting/StackedContents.cpp
-    src/datafix/DataFixer.cpp
-    src/datafix/FixSupport.cpp
-    src/datafix/Fixes4000.cpp
-    src/datafix/TextFixes.cpp
-    src/datafix/Fixes4300.cpp
-    src/datafix/Fixes4996.cpp
-    src/datafix/ItemWalk.cpp
     src/crafting/SpecialCrafting.cpp
     src/loot/ContextNumbers.cpp
     src/loot/Loot.cpp
@@ -240,8 +233,8 @@ basalt_module(server-world
     src/terrain/JigsawStructureGenerator.cpp
     src/terrain/JigsawStructureSettings.cpp
         src/noise/NormalNoise.cpp
-    DEPENDS basalt::server-random basalt::server-registry basalt::wire-common basalt::wire-io
-            basalt::wire-protocol basalt::wire-text
+    DEPENDS basalt::server-datafix basalt::server-random basalt::server-registry basalt::wire-common
+            basalt::wire-io basalt::wire-protocol basalt::wire-text
 )
 
 basalt_test(server-world-anvil-region-test
@@ -299,11 +292,5 @@ basalt_test(server-world-chunk-test
 basalt_bench(server-world-noise-bench
     SOURCES
         bench/NoiseBench.cpp
-    DEPENDS basalt::server-world
-)
-
-basalt_test(server-world-datafix-test
-    SOURCES
-        test/DataFixerTest.cpp
     DEPENDS basalt::server-world
 )

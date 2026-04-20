@@ -69,6 +69,19 @@ private:
     /// Caller holds `mutex_`; reads from disk if needed.
     [[nodiscard]] server::world::region::LinearRegion* region(std::int32_t regionX, std::int32_t regionZ);
 
+    struct RegionRead {
+        std::optional<server::world::region::LinearRegion> region;
+        /// A file is there but cannot be read; it must be left alone.
+        bool unreadable = false;
+    };
+
+    /// Moves the entities of a vanilla region's `entities/` file into its chunks.
+    void mergeVanillaEntities(server::world::region::LinearRegion& region, std::int32_t regionX,
+                              std::int32_t regionZ) const;
+
+    /// The region from its `.linear` file or, failing that, the `.mca` of a vanilla world.
+    [[nodiscard]] RegionRead readRegionFile(std::int32_t regionX, std::int32_t regionZ) const;
+
     server::world::region::LinearRegion& store(std::int64_t regionKey, server::world::region::LinearRegion region);
 
     /// Caller holds `mutex_`.

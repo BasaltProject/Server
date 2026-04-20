@@ -53,6 +53,9 @@ struct WorldMetadata {
 
     [[nodiscard]] static std::string pathFor(const std::string& worldRoot) { return worldRoot + "/level.nbt"; }
 
+    /// Reads the settings of a vanilla world copied into `worldRoot`: its `level.dat` and `data/minecraft`.
+    [[nodiscard]] static std::optional<WorldMetadata> fromVanilla(const std::string& worldRoot);
+
     bool writeTo(const std::string& worldRoot) const;
 
     [[nodiscard]] static std::optional<WorldMetadata> read(const std::string& worldRoot);

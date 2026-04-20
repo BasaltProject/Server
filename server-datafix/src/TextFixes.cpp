@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-namespace basalt::server::world::datafix {
+namespace basalt::server::datafix {
 namespace {
 
 using wire::common::JsonObject;
@@ -376,4 +376,4 @@ void addTextFixes(std::vector<Fix>& fixes) {
                               });
 }
 
-} // namespace basalt::server::world::datafix
+} // namespace basalt::server::datafix

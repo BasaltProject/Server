@@ -407,7 +407,9 @@ namespace {
         if (!block.has_value()) {
             return std::unexpected(ChunkNbtError{std::format("invalid block name {}", name)});
         }
-        std::optional<std::int32_t> stateId = registry::blockStateDefinitions::stateIdOf(*block, properties);
+        // parity: `BlockState.CODEC`, where whatever the entry leaves out keeps the block's default.
+        std::optional<std::int32_t> stateId =
+            registry::blockStateDefinitions::stateIdOf(*block, properties, registry::blocks::defaultStateIdOf(*block));
         if (!stateId.has_value()) {
             stateId = registry::blocks::stateIdOf(*block, properties);
         }
@@ -565,7 +567,7 @@ std::expected<Chunk, ChunkNbtError> read(const NbtCompound& tag, ChunkHeight bou
     }
     if (saved > 0 && saved < kDataVersion) {
         NbtCompound upgraded = tag;
-        datafix::upgrade(datafix::Domain::Chunk, upgraded, saved, {.overworld = bounds.minY() == -64});
+        server::datafix::upgrade(server::datafix::Domain::Chunk, upgraded, saved, {.overworld = bounds.minY() == -64});
         upgraded.putInt("DataVersion", kDataVersion);
         return read(upgraded, bounds);
     }

@@ -49,8 +49,12 @@ std::expected<ImportReport, std::string> importVanillaSave(const std::string& sa
         if (uuid == nullptr || name == nullptr) {
             continue;
         }
-        const std::optional<std::vector<std::uint8_t>> bytes =
-            wire::io::fileIO::readBytes(savePath + "/playerdata/" + *uuid + ".dat");
+        // parity: `PlayerStorageFileFix` moved the files from `playerdata/` to `players/data/`.
+        std::optional<std::vector<std::uint8_t>> bytes =
+            wire::io::fileIO::readBytes(savePath + "/players/data/" + *uuid + ".dat");
+        if (!bytes.has_value()) {
+            bytes = wire::io::fileIO::readBytes(savePath + "/playerdata/" + *uuid + ".dat");
+        }
         if (!bytes.has_value()) {
             report.skipped++;
             continue;

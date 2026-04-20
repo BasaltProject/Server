@@ -567,6 +567,7 @@ basalt_module(server-runtime-core
         src/world/WorldClock.cpp
         src/world/RegionStore.cpp
         src/world/WorldMetadata.cpp
+        src/world/WorldMetadataVanilla.cpp
         src/world/WorldSpawnPoint.cpp
         src/world/CustomSpawners.cpp
         src/world/MobSpawnAttributes.cpp

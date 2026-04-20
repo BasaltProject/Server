@@ -1,4 +1,5 @@
 #include <basalt/server/runtime/world/RegionStore.hpp>
+#include <basalt/server/world/region/AnvilRegion.hpp>
 #include <basalt/server/world/region/ChunkNbt.hpp>
 #include <basalt/wire/io/FileIO.hpp>
 #include <basalt/wire/nbt/NbtIO.hpp>
@@ -87,25 +88,78 @@ LinearRegion& RegionStore::store(std::int64_t regionKey, LinearRegion region) {
     return byKey_.at(regionKey)->region;
 }
 
+void RegionStore::mergeVanillaEntities(LinearRegion& region, std::int32_t regionX, std::int32_t regionZ) const {
+    const std::optional<std::vector<std::uint8_t>> bytes = wire::io::fileIO::readBytes(
+        worldRoot_ + "/entities/r." + std::to_string(regionX) + "." + std::to_string(regionZ) + ".mca");
+    if (!bytes.has_value()) {
+        return;
+    }
+    const std::expected<LinearRegion, server::world::region::AnvilError> entities =
+        server::world::region::anvilRegion::read(*bytes);
+    if (!entities.has_value()) {
+        return;
+    }
+    for (std::int32_t localZ = 0; localZ < LinearRegion::kDimension; ++localZ) {
+        for (std::int32_t localX = 0; localX < LinearRegion::kDimension; ++localX) {
+            if (!entities->hasChunkAt(localX, localZ) || !region.hasChunkAt(localX, localZ)) {
+                continue;
+            }
+            // parity: vanilla keeps a chunk's entities in `entities/`, Basalt keeps them with the chunk.
+            const auto saved = wire::nbt::nbtIO::read(entities->chunkAt(localX, localZ));
+            const auto stored = wire::nbt::nbtIO::read(region.chunkAt(localX, localZ));
+            const wire::nbt::NbtCompound* from = saved.has_value() ? saved->tag.get<wire::nbt::NbtCompound>() : nullptr;
+            const wire::nbt::NbtCompound* into =
+                stored.has_value() ? stored->tag.get<wire::nbt::NbtCompound>() : nullptr;
+            const wire::nbt::NbtTag* list = from == nullptr ? nullptr : from->find("Entities");
+            if (into == nullptr || list == nullptr || list->get<wire::nbt::NbtList>() == nullptr) {
+                continue;
+            }
+            wire::nbt::NbtCompound merged = *into;
+            merged.set(server::world::region::chunkNbt::kEntitiesKey, *list);
+            region.setChunk(localX, localZ, wire::nbt::nbtIO::write(wire::nbt::NbtTag::ofCompound(std::move(merged))),
+                            region.timestampAt(localX, localZ));
+        }
+    }
+}
+
+RegionStore::RegionRead RegionStore::readRegionFile(std::int32_t regionX, std::int32_t regionZ) const {
+    if (const std::optional<std::vector<std::uint8_t>> bytes =
+            wire::io::fileIO::readBytes(regionPath(regionX, regionZ));
+        bytes.has_value()) {
+        std::expected<LinearRegion, server::world::region::LinearError> read = LinearRegion::read(*bytes);
+        return read.has_value() ? RegionRead{std::move(*read), false} : RegionRead{std::nullopt, true};
+    }
+    const std::string anvilPath =
+        worldRoot_ + "/region/r." + std::to_string(regionX) + "." + std::to_string(regionZ) + ".mca";
+    if (const std::optional<std::vector<std::uint8_t>> bytes = wire::io::fileIO::readBytes(anvilPath);
+        bytes.has_value()) {
+        std::expected<LinearRegion, server::world::region::AnvilError> read =
+            server::world::region::anvilRegion::read(*bytes);
+        if (!read.has_value()) {
+            return RegionRead{std::nullopt, true};
+        }
+        mergeVanillaEntities(*read, regionX, regionZ);
+        return RegionRead{std::move(*read), false};
+    }
+    return {};
+}
+
 LinearRegion* RegionStore::region(std::int32_t regionX, std::int32_t regionZ) {
     const std::int64_t regionKey = key(regionX, regionZ);
     if (LinearRegion* cached = touch(regionKey); cached != nullptr) {
         return cached;
     }
-    const std::optional<std::vector<std::uint8_t>> bytes = wire::io::fileIO::readBytes(regionPath(regionX, regionZ));
-    if (!bytes.has_value()) {
-        return nullptr;
-    }
-    std::expected<LinearRegion, server::world::region::LinearError> decoded = LinearRegion::read(*bytes);
-    if (!decoded.has_value()) {
-        if (unreadableRegions_.insert(regionKey).second) {
+    RegionRead read = readRegionFile(regionX, regionZ);
+    if (!read.region.has_value()) {
+        if (read.unreadable && unreadableRegions_.insert(regionKey).second) {
             logger_.error([&] {
-                return "Region file " + regionPath(regionX, regionZ) + " cannot be read and will not be overwritten.";
+                return "Region r." + std::to_string(regionX) + "." + std::to_string(regionZ) +
+                       " cannot be read and will not be overwritten.";
             });
         }
         return nullptr;
     }
-    return &store(regionKey, *std::move(decoded));
+    return &store(regionKey, *std::move(read.region));
 }
 
 std::optional<Chunk> RegionStore::loadChunk(std::int32_t chunkX, std::int32_t chunkZ) {
@@ -119,25 +173,22 @@ std::optional<Chunk> RegionStore::loadChunk(std::int32_t chunkX, std::int32_t ch
         missing = touch(regionKey) == nullptr;
     }
     if (missing) {
-        const std::optional<std::vector<std::uint8_t>> bytes =
-            wire::io::fileIO::readBytes(regionPath(regionX, regionZ));
-        if (!bytes.has_value()) {
-            return std::nullopt;
-        }
-        std::expected<LinearRegion, server::world::region::LinearError> read = LinearRegion::read(*bytes);
-        if (!read.has_value()) {
-            const std::lock_guard<std::mutex> lock{mutex_};
-            if (unreadableRegions_.insert(regionKey).second) {
-                logger_.error([&] {
-                    return "Region file " + regionPath(regionX, regionZ) +
-                           " cannot be read and will not be overwritten.";
-                });
+        RegionRead read = readRegionFile(regionX, regionZ);
+        if (!read.region.has_value()) {
+            if (read.unreadable) {
+                const std::lock_guard<std::mutex> lock{mutex_};
+                if (unreadableRegions_.insert(regionKey).second) {
+                    logger_.error([&] {
+                        return "Region r." + std::to_string(regionX) + "." + std::to_string(regionZ) +
+                               " cannot be read and will not be overwritten.";
+                    });
+                }
             }
             return std::nullopt;
         }
         const std::lock_guard<std::mutex> lock{mutex_};
         if (touch(regionKey) == nullptr) {
-            store(regionKey, *std::move(read));
+            store(regionKey, *std::move(read.region));
         }
     }
 

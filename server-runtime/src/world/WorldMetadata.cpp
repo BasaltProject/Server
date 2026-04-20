@@ -125,6 +125,18 @@ WorldMetadata WorldMetadata::loadOrCreate(const std::string& worldRoot, std::opt
         return *std::move(existing);
     }
 
+    if (std::optional<WorldMetadata> vanilla = fromVanilla(worldRoot); vanilla.has_value()) {
+        logger.info([&worldRoot] { return "Imported the settings of the vanilla world in '" + worldRoot + "'."; });
+        if (declaredSeed.has_value() && *declaredSeed != vanilla->seed) {
+            logger.warn([&worldRoot, &vanilla] {
+                return "The vanilla world in '" + worldRoot + "' was generated with seed " +
+                       std::to_string(vanilla->seed) + "; that one is kept.";
+            });
+        }
+        static_cast<void>(vanilla->writeTo(worldRoot));
+        return *std::move(vanilla);
+    }
+
     std::int64_t seed = 0;
     if (declaredSeed.has_value()) {
         seed = *declaredSeed;

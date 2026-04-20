@@ -1,6 +1,6 @@
 #pragma once
 
-#include <basalt/server/world/datafix/DataFixer.hpp>
+#include <basalt/server/datafix/DataFixer.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-namespace basalt::server::world::datafix {
+namespace basalt::server::datafix {
 
 /// `Root` runs on the whole tree whatever the domain, for fixes that find their own places.
 enum class Target : std::uint8_t { Chunk, BlockEntity, ItemStack, Components, Palette, Root };
@@ -38,4 +38,4 @@ void addFixesFrom4300(std::vector<Fix>& fixes);
 
 void addFixesFrom4996(std::vector<Fix>& fixes);
 
-} // namespace basalt::server::world::datafix
+} // namespace basalt::server::datafix

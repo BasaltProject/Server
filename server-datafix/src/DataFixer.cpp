@@ -1,11 +1,11 @@
 #include "FixSupport.hpp"
 #include "ItemWalk.hpp"
 
-#include <basalt/server/world/datafix/DataFixer.hpp>
+#include <basalt/server/datafix/DataFixer.hpp>
 
 #include <algorithm>
 
-namespace basalt::server::world::datafix {
+namespace basalt::server::datafix {
 namespace {
 
 using wire::nbt::NbtCompound;
@@ -74,4 +74,4 @@ void upgrade(Domain domain, NbtCompound& root, std::int32_t fromVersion, const C
     }
 }
 
-} // namespace basalt::server::world::datafix
+} // namespace basalt::server::datafix
