@@ -1,8 +1,8 @@
-#include <basalt/server/lua/LuaCall.hpp>
 #include <basalt/server/plugins/PluginJson.hpp>
 #include <basalt/server/plugins/PluginObject.hpp>
 #include <basalt/server/plugins/PluginStore.hpp>
 #include <basalt/wire/io/FileIO.hpp>
+#include <basalt/wire/lua/LuaCall.hpp>
 
 #include <charconv>
 #include <cstdint>
@@ -11,7 +11,7 @@
 
 namespace basalt::server::plugins {
 namespace {
-using lua::LuaArgs;
+using wire::lua::LuaArgs;
 
 void pushStored(LuaArgs& lua, const std::string& stored) {
     std::int64_t whole = 0;
@@ -34,7 +34,7 @@ void pushStored(LuaArgs& lua, const std::string& stored) {
 
 void pushTop(LuaArgs& lua, PluginHost& host, const std::string& pluginId) {
     PluginHost* target = &host;
-    lua::pushHostFunction(lua, "store.top", [target, pluginId](LuaArgs& args) {
+    wire::lua::pushHostFunction(lua, "store.top", [target, pluginId](LuaArgs& args) {
         const std::int32_t first = firstArgument(args);
         const std::string key = args.checkString(first);
         const auto limit = static_cast<std::int32_t>(args.integerOr(first + 1, 10));
@@ -60,7 +60,7 @@ void pushStore(LuaArgs& lua, PluginHost& host, const std::string& pluginId) {
     PluginHost* target = &host;
     lua.pushTable();
     lua.pushTable();
-    lua::pushHostFunction(lua, "store.index", [target, pluginId](LuaArgs& args) {
+    wire::lua::pushHostFunction(lua, "store.index", [target, pluginId](LuaArgs& args) {
         const std::string key = args.checkString(2);
         if (key == "top") {
             pushTop(args, *target, pluginId);
@@ -75,7 +75,7 @@ void pushStore(LuaArgs& lua, PluginHost& host, const std::string& pluginId) {
         return 1;
     });
     lua.setField("__index");
-    lua::pushHostFunction(lua, "store.newindex", [target, pluginId](LuaArgs& args) {
+    wire::lua::pushHostFunction(lua, "store.newindex", [target, pluginId](LuaArgs& args) {
         const std::string key = args.checkString(2);
         target->services().storage().setPlayerValue(pluginId, kServerScope, key,
                                                     args.isNil(3) ? std::nullopt : std::optional{args.toText(3)});
@@ -93,9 +93,9 @@ std::string jsonPathOf(const std::string& folder, const std::string& name) {
 }
 
 void pushData(LuaArgs& lua, const std::string& folder) {
-    const auto loaded = std::make_shared<std::map<std::string, lua::LuaRef, std::less<>>>();
+    const auto loaded = std::make_shared<std::map<std::string, wire::lua::LuaRef, std::less<>>>();
     lua.pushTable();
-    lua::pushHostFunction(lua, "data.json", [folder, loaded](LuaArgs& args) {
+    wire::lua::pushHostFunction(lua, "data.json", [folder, loaded](LuaArgs& args) {
         const std::string name = args.checkString(firstArgument(args));
         if (const auto held = loaded->find(name); held != loaded->end()) {
             held->second.push(args);
@@ -107,11 +107,11 @@ void pushData(LuaArgs& lua, const std::string& folder) {
         } else {
             args.pushTable();
         }
-        loaded->emplace(name, lua::LuaRef::of(args.state(), -1));
+        loaded->emplace(name, wire::lua::LuaRef::of(args.state(), -1));
         return 1;
     });
     lua.setField("json");
-    lua::pushHostFunction(lua, "data.save", [folder, loaded](LuaArgs& args) {
+    wire::lua::pushHostFunction(lua, "data.save", [folder, loaded](LuaArgs& args) {
         const std::string name = args.checkString(firstArgument(args));
         const auto held = loaded->find(name);
         if (held == loaded->end()) {

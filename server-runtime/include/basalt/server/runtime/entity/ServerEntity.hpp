@@ -406,6 +406,11 @@ public:
     /// parity: a cube mob has no wanted position at all: `CubeMobMoveControl` only sets the speed.
     bool movingForward = false;
 
+    /// parity: `MoveControl.strafe`, the side and forward inputs, consumed on the next tick.
+    bool strafing = false;
+    double strafeRight = 0.0;
+    double strafeForward = 0.0;
+
     double lookX = 0.0;
     double lookY = 0.0;
     double lookZ = 0.0;

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <basalt/server/storage/Sqlite.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
+#include <basalt/wire/sql/Sqlite.hpp>
 
 #include <cstdint>
 #include <map>
@@ -19,7 +19,7 @@ struct PlayerSummary {
 
 class PlayerRepository {
 public:
-    explicit PlayerRepository(sql::Database& database) : database_(&database) {}
+    explicit PlayerRepository(wire::sql::Database& database) : database_(&database) {}
 
     [[nodiscard]] std::optional<StoredPlayer> load(std::string_view uuid);
 
@@ -54,6 +54,6 @@ public:
 private:
     [[nodiscard]] std::optional<StoredPlayer> loadOne(std::string_view sql, std::string_view key);
 
-    sql::Database* database_;
+    wire::sql::Database* database_;
 };
 } // namespace basalt::server::storage

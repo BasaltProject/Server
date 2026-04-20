@@ -1,8 +1,8 @@
-#include <basalt/server/lua/LuaCall.hpp>
 #include <basalt/server/plugins/PluginDispatch.hpp>
 #include <basalt/server/plugins/PluginEventView.hpp>
 #include <basalt/server/plugins/PluginHost.hpp>
 #include <basalt/server/plugins/PluginObjects.hpp>
+#include <basalt/wire/lua/LuaCall.hpp>
 
 #include <algorithm>
 #include <cstdint>
@@ -10,7 +10,7 @@
 
 namespace basalt::server::plugins {
 namespace {
-using lua::LuaArgs;
+using wire::lua::LuaArgs;
 
 template <typename T>
 [[nodiscard]] const T* fieldOf(const PluginEvent& event, std::string_view name) {
@@ -86,7 +86,7 @@ void pushArgument(LuaArgs& lua, const PluginCommandCall::Argument& argument) {
 } // namespace
 
 void PluginCommandDispatch::registerCommand(LoadedPlugin& plugin, PluginInstance& instance,
-                                            const PluginCommandSpec& spec, lua::LuaRef handler) {
+                                            const PluginCommandSpec& spec, wire::lua::LuaRef handler) {
     std::string key;
     for (const std::string& literal : spec.literals) {
         key += key.empty() ? literal : " " + literal;
@@ -161,9 +161,9 @@ void PluginEventDispatch::registerEventHandler(LoadedPlugin& plugin, PluginInsta
                                                const PluginEventType& type, PluginEventPriority priority, bool observer,
                                                bool wantsCancelled,
                                                std::map<std::string, PluginEventValue, std::less<>> filters,
-                                               lua::LuaRef handler) {
+                                               wire::lua::LuaRef handler) {
     const auto view = std::make_shared<std::unique_ptr<PluginEventView>>();
-    const auto held = std::make_shared<lua::LuaRef>(std::move(handler));
+    const auto held = std::make_shared<wire::lua::LuaRef>(std::move(handler));
     PluginHost* host = host_;
     LoadedPlugin* target = &plugin;
     PluginInstance* lane = &instance;
@@ -191,17 +191,17 @@ void PluginEventDispatch::registerEventHandler(LoadedPlugin& plugin, PluginInsta
 }
 
 void PluginEventDispatch::dispatch(PluginHost& host, LoadedPlugin& plugin, PluginInstance& instance,
-                                   const lua::LuaRef& handler, PluginEventView& view, bool observer,
+                                   const wire::lua::LuaRef& handler, PluginEventView& view, bool observer,
                                    const std::string& typeName) {
     view.bind();
     if (observer) {
         PluginHost* target = &host;
         LoadedPlugin* owner = &plugin;
         PluginInstance* lane = &instance;
-        const lua::LuaRef* fn = &handler;
+        const wire::lua::LuaRef* fn = &handler;
         PluginEventView* bound = &view;
         static_cast<void>(host.services().tasks().after(0, [target, owner, lane, fn, bound, typeName] {
-            target->enter(*owner, *lane, *fn, "watch " + typeName, [bound](lua::LuaArgs& lua) {
+            target->enter(*owner, *lane, *fn, "watch " + typeName, [bound](wire::lua::LuaArgs& lua) {
                 bound->push(lua);
                 return 1;
             });
@@ -221,7 +221,7 @@ void PluginEventDispatch::dispatch(PluginHost& host, LoadedPlugin& plugin, Plugi
         return;
     }
     instance.deciderDepth++;
-    host.enter(plugin, instance, handler, "on " + typeName, [&view](lua::LuaArgs& lua) {
+    host.enter(plugin, instance, handler, "on " + typeName, [&view](wire::lua::LuaArgs& lua) {
         view.push(lua);
         return 1;
     });

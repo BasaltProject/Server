@@ -1,7 +1,7 @@
 #pragma once
 
-#include <basalt/server/lua/LuaRef.hpp>
 #include <basalt/server/plugins/PluginEvents.hpp>
+#include <basalt/wire/lua/LuaRef.hpp>
 
 #include <cstdint>
 #include <map>
@@ -16,7 +16,7 @@ class PluginHost;
 
 class PluginChannelHost {
 public:
-    void listenOn(LoadedPlugin& plugin, const std::string& channel, lua::LuaRef fn);
+    void listenOn(LoadedPlugin& plugin, const std::string& channel, wire::lua::LuaRef fn);
 
     [[nodiscard]] bool listeningOnChannel(std::string_view channel) const;
 
@@ -26,7 +26,7 @@ public:
 private:
     struct ChannelListener {
         LoadedPlugin* plugin = nullptr;
-        lua::LuaRef fn;
+        wire::lua::LuaRef fn;
         std::int64_t id = 0;
     };
 

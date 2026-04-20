@@ -76,7 +76,7 @@ std::optional<std::string> PluginText::translation(std::string_view key) const {
     return std::nullopt;
 }
 
-std::string PluginText::resolve(std::string_view message, lua::LuaArgs* lua, std::int32_t arguments) const {
+std::string PluginText::resolve(std::string_view message, wire::lua::LuaArgs* lua, std::int32_t arguments) const {
     std::string text;
     if (message.starts_with('@')) {
         const std::string_view key = message.substr(1);

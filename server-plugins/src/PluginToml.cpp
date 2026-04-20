@@ -8,7 +8,7 @@ namespace basalt::server::plugins::pluginToml {
 using wire::common::toml::TomlTable;
 using wire::common::toml::TomlValue;
 
-void push(lua::LuaArgs& lua, const TomlTable& table) {
+void push(wire::lua::LuaArgs& lua, const TomlTable& table) {
     lua.pushTable();
     for (const std::string& key : table.keys()) {
         const TomlValue* value = table.find(key);
@@ -30,7 +30,7 @@ void push(lua::LuaArgs& lua, const TomlTable& table) {
     }
 }
 
-void pushValue(lua::LuaArgs& lua, const TomlValue& value) {
+void pushValue(wire::lua::LuaArgs& lua, const TomlValue& value) {
     if (const std::string* text = value.get<std::string>(); text != nullptr) {
         lua.pushString(*text);
         return;

@@ -226,6 +226,24 @@ std::optional<Spot> landPos(world::WorldState& world, const ServerEntity& mob, r
         weight);
 }
 
+std::optional<Spot> landPosHoglin(world::WorldState& world, const ServerEntity& mob, random::RandomSource& random,
+                                  std::int32_t horizontal, std::int32_t vertical,
+                                  const std::optional<std::array<std::int32_t, 3>>& repellent) {
+    // parity: `HoglinAi.isPosNearNearestRepellent` and `Hoglin.getWalkTargetValue`.
+    const Weight weight = [&world, &repellent](std::int32_t x, std::int32_t y, std::int32_t z) -> double {
+        if (repellent.has_value()) {
+            const double dx = x - (*repellent)[0];
+            const double dy = y - (*repellent)[1];
+            const double dz = z - (*repellent)[2];
+            if ((dx * dx) + (dy * dy) + (dz * dz) < 64.0) {
+                return -1.0;
+            }
+        }
+        return pathAt(world, {x, y - 1, z}) == "crimson_nylium" ? 10.0 : 0.0;
+    };
+    return landPos(world, mob, random, horizontal, vertical, weight);
+}
+
 namespace {
 
 [[nodiscard]] std::optional<Spot> landInDirection(world::WorldState& world, const ServerEntity& mob,

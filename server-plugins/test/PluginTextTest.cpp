@@ -1,8 +1,8 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 
-#include <basalt/server/lua/LuaCall.hpp>
 #include <basalt/server/plugins/PluginText.hpp>
 #include <basalt/wire/io/FileIO.hpp>
+#include <basalt/wire/lua/LuaCall.hpp>
 
 #include <doctest.h>
 
@@ -12,7 +12,7 @@
 #include <vector>
 
 using namespace basalt::server::plugins;
-using namespace basalt::server::lua;
+using namespace basalt::wire::lua;
 namespace fileIO = basalt::wire::io::fileIO;
 
 namespace {

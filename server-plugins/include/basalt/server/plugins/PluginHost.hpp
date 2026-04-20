@@ -1,7 +1,5 @@
 #pragma once
 
-#include <basalt/server/lua/LuaRef.hpp>
-#include <basalt/server/lua/LuaSandbox.hpp>
 #include <basalt/server/plugins/PluginChannelHost.hpp>
 #include <basalt/server/plugins/PluginCommandSpec.hpp>
 #include <basalt/server/plugins/PluginEvents.hpp>
@@ -16,6 +14,8 @@
 #include <basalt/server/plugins/PluginText.hpp>
 #include <basalt/wire/common/logging/Logger.hpp>
 #include <basalt/wire/common/toml/Toml.hpp>
+#include <basalt/wire/lua/LuaRef.hpp>
+#include <basalt/wire/lua/LuaSandbox.hpp>
 
 #include <chrono>
 #include <cstdint>
@@ -38,16 +38,16 @@ class PluginEventDispatch;
 
 struct PluginInstance {
     std::int32_t lane = 0;
-    std::unique_ptr<lua::LuaSandbox> sandbox;
-    std::vector<lua::LuaRef> onEnable;
-    std::vector<lua::LuaRef> onDisable;
+    std::unique_ptr<wire::lua::LuaSandbox> sandbox;
+    std::vector<wire::lua::LuaRef> onEnable;
+    std::vector<wire::lua::LuaRef> onDisable;
 
     std::int32_t deciderDepth = 0;
 };
 
 struct CommandEntry {
     PluginCommandSpec spec;
-    std::map<std::int32_t, lua::LuaRef> handlers;
+    std::map<std::int32_t, wire::lua::LuaRef> handlers;
     std::int32_t nextLane = 0;
 };
 
@@ -119,14 +119,14 @@ private:
 
 class PluginAnnouncements {
 public:
-    void announce(PluginHost& host, LoadedPlugin& plugin, const std::string& name, lua::LuaRef handler);
+    void announce(PluginHost& host, LoadedPlugin& plugin, const std::string& name, wire::lua::LuaRef handler);
 
-    std::int32_t emit(PluginHost& host, const std::string& name, const lua::LuaRef& payload);
+    std::int32_t emit(PluginHost& host, const std::string& name, const wire::lua::LuaRef& payload);
 
 private:
     struct Listener {
         LoadedPlugin* plugin = nullptr;
-        lua::LuaRef handler;
+        wire::lua::LuaRef handler;
         std::int64_t id = 0;
     };
 
@@ -141,7 +141,7 @@ public:
     using InstallApi =
         std::function<void(PluginInstance& instance, LoadedPlugin& plugin, PluginHost& host, std::int32_t lanes)>;
 
-    explicit PluginHost(PluginServices& services, std::int32_t lanes = 1, lua::LuaLimits limits = {},
+    explicit PluginHost(PluginServices& services, std::int32_t lanes = 1, wire::lua::LuaLimits limits = {},
                         std::int32_t strikeLimit = 3);
 
     PluginHost(const PluginHost&) = delete;
@@ -190,44 +190,45 @@ public:
 
     [[nodiscard]] LoadedPlugin* pluginById(std::string_view id) const;
 
-    void enter(LoadedPlugin& plugin, PluginInstance& instance, const lua::LuaRef& fn, std::string_view why,
-               const std::function<std::int32_t(lua::LuaArgs&)>& pushArguments = {});
+    void enter(LoadedPlugin& plugin, PluginInstance& instance, const wire::lua::LuaRef& fn, std::string_view why,
+               const std::function<std::int32_t(wire::lua::LuaArgs&)>& pushArguments = {});
 
-    bool ask(LoadedPlugin& plugin, const lua::LuaRef& fn, std::string_view why,
-             const std::function<std::int32_t(lua::LuaArgs&)>& pushArguments,
-             const std::function<void(lua::LuaArgs&)>& read);
+    bool ask(LoadedPlugin& plugin, const wire::lua::LuaRef& fn, std::string_view why,
+             const std::function<std::int32_t(wire::lua::LuaArgs&)>& pushArguments,
+             const std::function<void(wire::lua::LuaArgs&)>& read);
 
-    void report(LoadedPlugin& plugin, const lua::LuaFailure& failure, std::string_view why);
+    void report(LoadedPlugin& plugin, const wire::lua::LuaFailure& failure, std::string_view why);
 
     void resuming(LoadedPlugin& plugin, const std::function<void()>& resume);
 
-    [[nodiscard]] std::string answer(LoadedPlugin& plugin, const lua::LuaRef& fn, PluginPlayerRef* player,
+    [[nodiscard]] std::string answer(LoadedPlugin& plugin, const wire::lua::LuaRef& fn, PluginPlayerRef* player,
                                      std::string_view why);
 
-    [[nodiscard]] bool asks(LoadedPlugin& plugin, const lua::LuaRef& fn, PluginPlayerRef* player, std::string_view why);
+    [[nodiscard]] bool asks(LoadedPlugin& plugin, const wire::lua::LuaRef& fn, PluginPlayerRef* player,
+                            std::string_view why);
 
-    void clicked(LoadedPlugin& plugin, const lua::LuaRef& handler, PluginPlayerRef& player, std::int32_t slot);
+    void clicked(LoadedPlugin& plugin, const wire::lua::LuaRef& handler, PluginPlayerRef& player, std::int32_t slot);
 
-    void npcClicked(LoadedPlugin& plugin, const lua::LuaRef& handler, const std::string& playerUuid);
+    void npcClicked(LoadedPlugin& plugin, const wire::lua::LuaRef& handler, const std::string& playerUuid);
 
-    void deliverPacket(LoadedPlugin& plugin, const lua::LuaRef& fn, PluginPacket& packet);
+    void deliverPacket(LoadedPlugin& plugin, const wire::lua::LuaRef& fn, PluginPacket& packet);
 
     [[nodiscard]] PluginServiceRegistry& serviceRegistry() noexcept { return services_registry_; }
 
     [[nodiscard]] PluginPacketRegistry& packets() noexcept { return packets_; }
 
     void registerCommand(LoadedPlugin& plugin, PluginInstance& instance, const PluginCommandSpec& spec,
-                         lua::LuaRef handler);
+                         wire::lua::LuaRef handler);
 
     void registerEventHandler(LoadedPlugin& plugin, PluginInstance& instance, const PluginEventType& type,
                               PluginEventPriority priority, bool observer, bool wantsCancelled,
-                              std::map<std::string, PluginEventValue, std::less<>> filters, lua::LuaRef handler);
+                              std::map<std::string, PluginEventValue, std::less<>> filters, wire::lua::LuaRef handler);
 
-    void announce(LoadedPlugin& plugin, const std::string& name, lua::LuaRef handler);
+    void announce(LoadedPlugin& plugin, const std::string& name, wire::lua::LuaRef handler);
 
-    [[nodiscard]] std::int32_t emit(const std::string& name, const lua::LuaRef& payload);
+    [[nodiscard]] std::int32_t emit(const std::string& name, const wire::lua::LuaRef& payload);
 
-    void listenOn(LoadedPlugin& plugin, const std::string& channel, lua::LuaRef fn);
+    void listenOn(LoadedPlugin& plugin, const std::string& channel, wire::lua::LuaRef fn);
 
     [[nodiscard]] bool listeningOnChannel(std::string_view channel) const;
 
@@ -242,17 +243,17 @@ private:
 
     void stop(LoadedPlugin& plugin);
 
-    [[nodiscard]] std::unique_ptr<lua::LuaSandbox> sandboxFor(LoadedPlugin& plugin, std::int32_t lane);
+    [[nodiscard]] std::unique_ptr<wire::lua::LuaSandbox> sandboxFor(LoadedPlugin& plugin, std::int32_t lane);
 
     [[nodiscard]] std::optional<std::vector<std::uint8_t>> moduleSource(LoadedPlugin& plugin,
                                                                         std::string_view requested);
 
     bool inside(LoadedPlugin& plugin, std::string_view why,
-                const std::function<std::optional<lua::LuaFailure>(PluginInstance&)>& body);
+                const std::function<std::optional<wire::lua::LuaFailure>(PluginInstance&)>& body);
 
     PluginServices* services_;
     std::int32_t lanes_;
-    lua::LuaLimits limits_;
+    wire::lua::LuaLimits limits_;
     std::int32_t strikeLimit_;
     wire::common::Logger log_{"plugins"};
     std::vector<std::unique_ptr<LoadedPlugin>> plugins_;

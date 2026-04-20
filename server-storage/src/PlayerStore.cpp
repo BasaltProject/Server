@@ -9,7 +9,7 @@ namespace basalt::server::storage {
 namespace {
 [[nodiscard]] std::map<std::string, std::vector<std::string>, std::less<>> referenceColumns() {
     std::map<std::string, std::vector<std::string>, std::less<>> expected;
-    std::optional<sql::Database> reference = sql::Database::open(":memory:");
+    std::optional<wire::sql::Database> reference = wire::sql::Database::open(":memory:");
     if (!reference.has_value()) {
         return expected;
     }
@@ -20,7 +20,8 @@ namespace {
     return expected;
 }
 
-[[nodiscard]] std::optional<PlayerDatabaseSchemaError> verifySchema(sql::Database& database, const std::string& path) {
+[[nodiscard]] std::optional<PlayerDatabaseSchemaError> verifySchema(wire::sql::Database& database,
+                                                                    const std::string& path) {
     for (const auto& [table, columns] : referenceColumns()) {
         const std::vector<std::string> actual = database.columns(table);
         std::vector<std::string> missing;
@@ -48,7 +49,7 @@ namespace {
 }
 } // namespace
 
-PlayerStore::PlayerStore(std::unique_ptr<sql::Database> database)
+PlayerStore::PlayerStore(std::unique_ptr<wire::sql::Database> database)
     : database_(std::move(database)), players_(*database_), access_(*database_), progress_(*database_),
       pluginData_(*database_) {}
 
@@ -61,11 +62,11 @@ std::expected<std::unique_ptr<PlayerStore>, PlayerDatabaseSchemaError> PlayerSto
         std::filesystem::create_directories(parent, ignored);
     }
 
-    std::optional<sql::Database> opened = sql::Database::open(path);
+    std::optional<wire::sql::Database> opened = wire::sql::Database::open(path);
     if (!opened.has_value()) {
         return std::unexpected(PlayerDatabaseSchemaError{path + " could not be opened"});
     }
-    auto database = std::make_unique<sql::Database>(std::move(*opened));
+    auto database = std::make_unique<wire::sql::Database>(std::move(*opened));
     if (database->tables().empty() && !database->exec(schema::ddl())) {
         return std::unexpected(PlayerDatabaseSchemaError{path + " could not be created: " + database->error()});
     }

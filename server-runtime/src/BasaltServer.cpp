@@ -480,8 +480,8 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
     // Read once, not swapped by a reload: the limits are baked into a plugin's state when it loads.
     plugins_ = std::make_unique<server::plugins::PluginHost>(
         *pluginServices_, config.pluginLanes,
-        lua::LuaLimits{.instructionsPerTurn = config.pluginInstructionsPerTurn,
-                       .memoryBytes = static_cast<std::size_t>(config.pluginMemoryBytes)});
+        wire::lua::LuaLimits{.instructionsPerTurn = config.pluginInstructionsPerTurn,
+                             .memoryBytes = static_cast<std::size_t>(config.pluginMemoryBytes)});
     plugins_->setApiInstaller(&server::plugins::pluginApi::install);
     static_cast<void>(wired_.dispatcher->registerCommand(std::make_shared<plugins::PluginsCommand>(
         *plugins_, [this]() -> std::optional<std::string> { return options_.playersDatabasePath; })));
@@ -784,6 +784,10 @@ BasaltServer::BasaltServer(const config::BasaltConfig& config, const config::Wor
                     if (shriekers_ != nullptr) {
                         shriekers_->heard(world, arrival);
                     }
+                },
+            .brushArmadillo =
+                [this](world::LoadedWorld& world, entity::ServerEntity& armadillo) {
+                    return mobActions_ != nullptr && mobActions_->brushArmadillo(world, armadillo);
                 },
             .mobSpawners = mobSpawners_.get()});
     // parity: `Raid.absorbRaidOmen` and `Raid.tick`'s victory.

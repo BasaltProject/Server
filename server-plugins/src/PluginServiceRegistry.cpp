@@ -1,14 +1,14 @@
-#include <basalt/server/lua/LuaCall.hpp>
 #include <basalt/server/plugins/PluginHost.hpp>
 #include <basalt/server/plugins/PluginObjects.hpp>
 #include <basalt/server/plugins/PluginServiceRegistry.hpp>
+#include <basalt/wire/lua/LuaCall.hpp>
 
 #include <cstdint>
 #include <utility>
 
 namespace basalt::server::plugins {
 namespace {
-using lua::LuaArgs;
+using wire::lua::LuaArgs;
 } // namespace
 
 std::set<std::string> PluginServiceRegistry::names() const {
@@ -28,7 +28,8 @@ PluginHandle PluginServiceRegistry::provide(LuaArgs& lua, std::int32_t index, co
     lua.pushNil();
     while (lua.nextEntry(index)) {
         if (lua.isFunction(-1)) {
-            offer.functions.emplace(lua.toText(-2), std::make_shared<lua::LuaRef>(lua::LuaRef::of(lua.state(), -1)));
+            offer.functions.emplace(lua.toText(-2),
+                                    std::make_shared<wire::lua::LuaRef>(wire::lua::LuaRef::of(lua.state(), -1)));
         }
         lua.pop(1);
     }
@@ -54,9 +55,9 @@ void PluginServiceRegistry::consume(LuaArgs& lua, PluginHost& host, const std::s
     lua.pushTable();
     PluginHost* target = &host;
     for (const auto& [functionName, function] : offer->second.functions) {
-        const std::shared_ptr<lua::LuaRef> held = function;
+        const std::shared_ptr<wire::lua::LuaRef> held = function;
         const std::string providerId = offer->second.pluginId;
-        lua::pushHostFunction(lua, name + "." + functionName, [target, providerId, held](LuaArgs& args) {
+        wire::lua::pushHostFunction(lua, name + "." + functionName, [target, providerId, held](LuaArgs& args) {
             LoadedPlugin* owner = target->pluginById(providerId);
             if (owner == nullptr) {
                 args.raise("the plugin behind this service is gone");
@@ -113,7 +114,7 @@ void pushCrossed(LuaArgs& lua, const PluginCrossValue& value, PluginHost& host, 
     }
 }
 
-bool callService(PluginHost& host, LoadedPlugin& provider, const lua::LuaRef& function,
+bool callService(PluginHost& host, LoadedPlugin& provider, const wire::lua::LuaRef& function,
                  const std::vector<PluginCrossValue>& arguments, LuaArgs& caller) {
     if (provider.disabled) {
         caller.raise("the plugin behind this service is off");

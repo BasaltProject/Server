@@ -1,6 +1,6 @@
 #pragma once
 
-#include <basalt/server/storage/Sqlite.hpp>
+#include <basalt/wire/sql/Sqlite.hpp>
 
 #include <cstdint>
 #include <map>
@@ -17,7 +17,7 @@ struct StoredProgress {
 
 class ProgressRepository {
 public:
-    explicit ProgressRepository(sql::Database& database) : database_(&database) {}
+    explicit ProgressRepository(wire::sql::Database& database) : database_(&database) {}
 
     [[nodiscard]] StoredProgress load(std::string_view uuid);
 
@@ -33,6 +33,6 @@ public:
     void forgetRecipe(std::string_view uuid, std::string_view recipe);
 
 private:
-    sql::Database* database_;
+    wire::sql::Database* database_;
 };
 } // namespace basalt::server::storage

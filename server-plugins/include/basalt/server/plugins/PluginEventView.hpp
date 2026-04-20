@@ -1,8 +1,8 @@
 #pragma once
 
-#include <basalt/server/lua/LuaArgs.hpp>
-#include <basalt/server/lua/LuaSandbox.hpp>
 #include <basalt/server/plugins/PluginEvents.hpp>
+#include <basalt/wire/lua/LuaArgs.hpp>
+#include <basalt/wire/lua/LuaSandbox.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -16,7 +16,7 @@ class PluginEventView {
 public:
     using OnCancel = std::function<void(std::optional<std::string>)>;
 
-    using Objects = std::function<bool(lua::LuaArgs&, std::string_view name)>;
+    using Objects = std::function<bool(wire::lua::LuaArgs&, std::string_view name)>;
 
     using Resolve = std::function<std::string(std::string_view message)>;
 
@@ -24,19 +24,21 @@ public:
     PluginEventView& operator=(const PluginEventView&) = delete;
     ~PluginEventView();
 
-    [[nodiscard]] static std::unique_ptr<PluginEventView>
-    create(lua::LuaSandbox& sandbox, PluginEvent& event, OnCancel onCancel, Objects objects = {}, Resolve resolve = {});
+    [[nodiscard]] static std::unique_ptr<PluginEventView> create(wire::lua::LuaSandbox& sandbox, PluginEvent& event,
+                                                                 OnCancel onCancel, Objects objects = {},
+                                                                 Resolve resolve = {});
 
     void bind();
 
-    void push(lua::LuaArgs& lua) const;
+    void push(wire::lua::LuaArgs& lua) const;
 
 private:
-    PluginEventView(lua::LuaSandbox& sandbox, PluginEvent& event, OnCancel onCancel, Objects objects, Resolve resolve);
+    PluginEventView(wire::lua::LuaSandbox& sandbox, PluginEvent& event, OnCancel onCancel, Objects objects,
+                    Resolve resolve);
 
     friend struct ViewAccess;
 
-    lua::LuaSandbox* sandbox_;
+    wire::lua::LuaSandbox* sandbox_;
     PluginEvent* event_;
     OnCancel onCancel_;
     Objects objects_;

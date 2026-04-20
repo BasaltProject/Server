@@ -1,10 +1,10 @@
-#include <basalt/server/lua/LuaCall.hpp>
 #include <basalt/server/plugins/PluginConfig.hpp>
 #include <basalt/server/plugins/PluginDispatch.hpp>
 #include <basalt/server/plugins/PluginEventTypes.hpp>
 #include <basalt/server/plugins/PluginFolder.hpp>
 #include <basalt/server/plugins/PluginHost.hpp>
 #include <basalt/server/plugins/PluginOrder.hpp>
+#include <basalt/wire/lua/LuaCall.hpp>
 
 #include <algorithm>
 #include <cstdint>
@@ -39,10 +39,11 @@ CommandEntry* LoadedPlugin::commandNamed(std::string_view name) {
     return nullptr;
 }
 
-PluginHost::PluginHost(PluginServices& services, std::int32_t lanes, lua::LuaLimits limits, std::int32_t strikeLimit)
+PluginHost::PluginHost(PluginServices& services, std::int32_t lanes, wire::lua::LuaLimits limits,
+                       std::int32_t strikeLimit)
     : services_(&services), lanes_(lanes), limits_(limits), strikeLimit_(strikeLimit),
       surfaces_([this](const std::string& message) { log_.warn([&message] { return message; }); }),
-      packets_([this](LoadedPlugin& plugin, const lua::LuaRef& fn, PluginPacket& packet) {
+      packets_([this](LoadedPlugin& plugin, const wire::lua::LuaRef& fn, PluginPacket& packet) {
           deliverPacket(plugin, fn, packet);
       }),
       commandDispatch_(std::make_unique<PluginCommandDispatch>(*this)),
@@ -55,27 +56,27 @@ PluginHost::PluginHost(PluginServices& services, std::int32_t lanes, lua::LuaLim
 PluginHost::~PluginHost() { unloadAll(); }
 
 void PluginHost::registerCommand(LoadedPlugin& plugin, PluginInstance& instance, const PluginCommandSpec& spec,
-                                 lua::LuaRef handler) {
+                                 wire::lua::LuaRef handler) {
     commandDispatch_->registerCommand(plugin, instance, spec, std::move(handler));
 }
 
 void PluginHost::registerEventHandler(LoadedPlugin& plugin, PluginInstance& instance, const PluginEventType& type,
                                       PluginEventPriority priority, bool observer, bool wantsCancelled,
                                       std::map<std::string, PluginEventValue, std::less<>> filters,
-                                      lua::LuaRef handler) {
+                                      wire::lua::LuaRef handler) {
     eventDispatch_->registerEventHandler(plugin, instance, type, priority, observer, wantsCancelled, std::move(filters),
                                          std::move(handler));
 }
 
-void PluginHost::announce(LoadedPlugin& plugin, const std::string& name, lua::LuaRef handler) {
+void PluginHost::announce(LoadedPlugin& plugin, const std::string& name, wire::lua::LuaRef handler) {
     announcements_.announce(*this, plugin, name, std::move(handler));
 }
 
-std::int32_t PluginHost::emit(const std::string& name, const lua::LuaRef& payload) {
+std::int32_t PluginHost::emit(const std::string& name, const wire::lua::LuaRef& payload) {
     return announcements_.emit(*this, name, payload);
 }
 
-void PluginHost::listenOn(LoadedPlugin& plugin, const std::string& channel, lua::LuaRef fn) {
+void PluginHost::listenOn(LoadedPlugin& plugin, const std::string& channel, wire::lua::LuaRef fn) {
     channels_.listenOn(plugin, channel, std::move(fn));
 }
 
@@ -257,8 +258,8 @@ std::optional<std::string> PluginHost::interruptIfStuck(std::int64_t limitMillis
 
 void PluginHost::interruptAll() { watchdog_.interruptAll(plugins_); }
 
-std::unique_ptr<lua::LuaSandbox> PluginHost::sandboxFor(LoadedPlugin& plugin, std::int32_t lane) {
-    return lua::LuaSandbox::create(
+std::unique_ptr<wire::lua::LuaSandbox> PluginHost::sandboxFor(LoadedPlugin& plugin, std::int32_t lane) {
+    return wire::lua::LuaSandbox::create(
         plugin.manifest.id, limits_, seedFor(plugin.manifest.id, lane),
         [this, &plugin](std::string_view name) { return moduleSource(plugin, name); },
         [&plugin](std::string_view line) { plugin.log.info([&line] { return std::string{line}; }); });
@@ -310,14 +311,14 @@ bool PluginHost::start(const PluginManifest& manifest, const std::shared_ptr<Plu
     }
 
     const std::string chunkName = "@" + manifest.id + "/" + manifest.main;
-    std::unique_ptr<lua::LuaSandbox> first = sandboxFor(*plugin, 0);
+    std::unique_ptr<wire::lua::LuaSandbox> first = sandboxFor(*plugin, 0);
     if (first == nullptr) {
         plugin->log.error([&manifest] { return manifest.id + " could not be given a Lua state"; });
         return false;
     }
-    std::optional<lua::LuaChunk> prototype;
+    std::optional<wire::lua::LuaChunk> prototype;
     if (source.has_value()) {
-        std::expected<lua::LuaChunk, lua::LuaFailure> compiled = first->compile(*source, chunkName);
+        std::expected<wire::lua::LuaChunk, wire::lua::LuaFailure> compiled = first->compile(*source, chunkName);
         if (!compiled.has_value()) {
             plugin->log.error(
                 [&manifest, &compiled] { return manifest.id + " does not compile: " + compiled.error().message; });
@@ -329,7 +330,7 @@ bool PluginHost::start(const PluginManifest& manifest, const std::shared_ptr<Plu
     LoadedPlugin& loaded = *plugin;
     plugins_.push_back(std::move(plugin));
     for (std::int32_t lane = 0; lane < lanes_; lane++) {
-        std::unique_ptr<lua::LuaSandbox> sandbox = lane == 0 ? std::move(first) : sandboxFor(loaded, lane);
+        std::unique_ptr<wire::lua::LuaSandbox> sandbox = lane == 0 ? std::move(first) : sandboxFor(loaded, lane);
         if (sandbox == nullptr) {
             continue;
         }
@@ -342,12 +343,12 @@ bool PluginHost::start(const PluginManifest& manifest, const std::shared_ptr<Plu
             installApi_(added, loaded, *this, lanes_);
         }
         if (prototype.has_value()) {
-            const std::expected<void, lua::LuaFailure> bound = added.sandbox->bind(*prototype);
+            const std::expected<void, wire::lua::LuaFailure> bound = added.sandbox->bind(*prototype);
             if (!bound.has_value()) {
                 report(loaded, bound.error(), "load");
                 continue;
             }
-            const std::expected<void, lua::LuaFailure> ran = added.sandbox->run(*prototype);
+            const std::expected<void, wire::lua::LuaFailure> ran = added.sandbox->run(*prototype);
             if (!ran.has_value()) {
                 report(loaded, ran.error(), "load");
             }
@@ -361,7 +362,7 @@ bool PluginHost::start(const PluginManifest& manifest, const std::shared_ptr<Plu
         return false;
     }
     for (const std::unique_ptr<PluginInstance>& instance : loaded.instances) {
-        for (const lua::LuaRef& handler : instance->onEnable) {
+        for (const wire::lua::LuaRef& handler : instance->onEnable) {
             enter(loaded, *instance, handler, "plugin.enable");
         }
     }
@@ -372,7 +373,7 @@ bool PluginHost::start(const PluginManifest& manifest, const std::shared_ptr<Plu
 
 void PluginHost::stop(LoadedPlugin& plugin) {
     for (const std::unique_ptr<PluginInstance>& instance : plugin.instances) {
-        for (const lua::LuaRef& handler : instance->onDisable) {
+        for (const wire::lua::LuaRef& handler : instance->onDisable) {
             enter(plugin, *instance, handler, "plugin.disable");
         }
     }

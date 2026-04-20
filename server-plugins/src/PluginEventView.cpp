@@ -37,7 +37,7 @@ struct ViewAccess {
         }
     }
 
-    static void pushValue(lua::LuaArgs& lua, const PluginEventValue& value) {
+    static void pushValue(wire::lua::LuaArgs& lua, const PluginEventValue& value) {
         if (const bool* flag = std::get_if<bool>(&value)) {
             lua.pushBoolean(*flag);
             return;
@@ -57,7 +57,7 @@ struct ViewAccess {
         lua.pushNil();
     }
 
-    [[nodiscard]] static PluginEventValue valueOf(lua::LuaArgs& lua, std::int32_t index) {
+    [[nodiscard]] static PluginEventValue valueOf(wire::lua::LuaArgs& lua, std::int32_t index) {
         if (lua.isNil(index)) {
             return PluginEventValue{};
         }
@@ -80,7 +80,7 @@ struct ViewAccess {
             return luaL_error(state, "a %s event cannot be cancelled: it is telling you, not asking",
                               view.event_->type().name().c_str());
         }
-        lua::LuaArgs lua{state};
+        wire::lua::LuaArgs lua{state};
         std::int32_t first = 1;
         if (lua.isTable(1)) {
             first = 2;
@@ -98,7 +98,7 @@ struct ViewAccess {
 
     static int index(lua_State* state) {
         PluginEventView& view = *of(state);
-        lua::LuaArgs lua{state};
+        wire::lua::LuaArgs lua{state};
         const std::string key = lua.checkString(2);
         if (key == "cancel") {
             lua_pushvalue(state, lua_upvalueindex(2));
@@ -140,7 +140,7 @@ struct ViewAccess {
     static int newIndex(lua_State* state) {
         PluginEventView& view = *of(state);
         check(state, view);
-        lua::LuaArgs lua{state};
+        wire::lua::LuaArgs lua{state};
         const std::string key = lua.checkString(2);
         const PluginEventType& type = view.event_->type();
         if (!type.isMutable(key)) {
@@ -159,7 +159,7 @@ struct ViewAccess {
     }
 };
 
-PluginEventView::PluginEventView(lua::LuaSandbox& sandbox, PluginEvent& event, OnCancel onCancel, Objects objects,
+PluginEventView::PluginEventView(wire::lua::LuaSandbox& sandbox, PluginEvent& event, OnCancel onCancel, Objects objects,
                                  Resolve resolve)
     : sandbox_(&sandbox), event_(&event), onCancel_(std::move(onCancel)), objects_(std::move(objects)),
       resolve_(std::move(resolve)) {}
@@ -170,7 +170,7 @@ PluginEventView::~PluginEventView() {
     }
 }
 
-std::unique_ptr<PluginEventView> PluginEventView::create(lua::LuaSandbox& sandbox, PluginEvent& event,
+std::unique_ptr<PluginEventView> PluginEventView::create(wire::lua::LuaSandbox& sandbox, PluginEvent& event,
                                                          OnCancel onCancel, Objects objects, Resolve resolve) {
     std::unique_ptr<PluginEventView> view{
         new PluginEventView{sandbox, event, std::move(onCancel), std::move(objects), std::move(resolve)}};
@@ -195,5 +195,5 @@ std::unique_ptr<PluginEventView> PluginEventView::create(lua::LuaSandbox& sandbo
 
 void PluginEventView::bind() { generation_ = event_->generation(); }
 
-void PluginEventView::push(lua::LuaArgs& lua) const { lua_rawgeti(lua.state(), LUA_REGISTRYINDEX, tableRef_); }
+void PluginEventView::push(wire::lua::LuaArgs& lua) const { lua_rawgeti(lua.state(), LUA_REGISTRYINDEX, tableRef_); }
 } // namespace basalt::server::plugins

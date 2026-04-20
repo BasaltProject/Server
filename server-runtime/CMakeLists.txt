@@ -669,7 +669,7 @@ basalt_module(server-runtime-core
         src/world/WeaponDamage.cpp
         src/world/WorldState.cpp
         src/world/SpawnPotential.cpp
-    DEPENDS basalt::server-assets basalt::server-lua basalt::wire-bedrock basalt::server-plugins basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-storage basalt::server-world basalt::wire-auth basalt::wire-io
+    DEPENDS basalt::server-assets basalt::wire-lua basalt::wire-bedrock basalt::server-plugins basalt::server-random basalt::server-registry basalt::server-runtime-config-defaults basalt::server-storage basalt::server-world basalt::wire-auth basalt::wire-io
             basalt::wire-multiversion basalt::wire-nbt basalt::wire-protocol basalt::wire-text
 )
 
@@ -723,6 +723,15 @@ basalt_test(server-runtime-block-change-broadcaster-test
 )
 
 target_compile_definitions(server-runtime-block-change-broadcaster-test
+    PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
+
+basalt_test(server-runtime-dispenser-brush-test
+    SOURCES
+        test/DispenserBrushTest.cpp
+    DEPENDS basalt::server-runtime-core
+)
+
+target_compile_definitions(server-runtime-dispenser-brush-test
     PRIVATE BASALT_TEST_SCRATCH_DIR="${CMAKE_CURRENT_BINARY_DIR}/scratch")
 
 basalt_test(server-runtime-persistence-coordinator-test

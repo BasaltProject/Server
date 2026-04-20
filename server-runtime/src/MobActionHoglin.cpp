@@ -34,6 +34,41 @@ struct HoglinSense {
     return range[0] + random.nextInt(range[1] - range[0] + 1);
 }
 
+/// parity: `HoglinAi.createIdleMovementBehaviors`, the stroll weighed by `Hoglin.getWalkTargetValue`.
+void hoglinIdleMovement(entity::ai::MobContext& context, HoglinState& state,
+                        const std::optional<kit::Block>& repellent) {
+    if (state.idleTicks > 0) {
+        --state.idleTicks;
+        return;
+    }
+    for (const std::size_t choice : kit::shuffled(context.random, {2, 2, 1})) {
+        if (choice == 2) {
+            state.idleTicks = 30 + context.random.nextInt(31);
+            return;
+        }
+        if (state.motion.walk.has_value()) {
+            continue;
+        }
+        if (choice == 0) {
+            if (const std::optional<kit::Vec> spot =
+                    entity::ai::randomPos::landPosHoglin(context.world, context.mob, context.random, 10, 7, repellent);
+                spot.has_value()) {
+                kit::walkTo(state.motion, *spot, 0.4F, 0);
+                return;
+            }
+            continue;
+        }
+        std::optional<kit::Vec> at = state.look.at;
+        if (state.look.entity.has_value()) {
+            at = kit::positionOf(context, *state.look.entity, false);
+        }
+        if (at.has_value()) {
+            kit::walkTo(state.motion, *at, 0.4F, 3);
+            return;
+        }
+    }
+}
+
 } // namespace
 
 namespace entity::hoglins {
@@ -164,7 +199,7 @@ void MobActionSystem::tickHoglin(world::LoadedWorld& world, entity::ai::MobConte
         kit::lookSometimes(context, state.look, state.lookTicker, 8.0, 30, 60);
         // parity: `BabyFollowAdult(5..16, 0.6)`.
         static_cast<void>(kit::followAdult(context, state.motion, state.look, 5, 16, 0.6F));
-        kit::idleMovement(context, state.motion, state.look, state.idleTicks, 0.4F);
+        hoglinIdleMovement(context, state, sense.repellent);
         break;
     }
     case Activity::Fight: {
@@ -226,7 +261,7 @@ void MobActionSystem::tickHoglin(world::LoadedWorld& world, entity::ai::MobConte
                 kit::walkTo(state.motion, *flee, 1.3F, 0);
             }
         }
-        kit::idleMovement(context, state.motion, state.look, state.idleTicks, 0.4F);
+        hoglinIdleMovement(context, state, sense.repellent);
         kit::lookSometimes(context, state.look, state.lookTicker, 8.0, 30, 60);
         if (!isBaby(hoglin) && !piglinsOutnumber()) {
             state.avoidTarget.erase();

@@ -6,7 +6,7 @@
 
 namespace basalt::server::plugins::pluginJson {
 namespace {
-void writeValue(lua::LuaArgs& lua, std::int32_t index, std::string& out);
+void writeValue(wire::lua::LuaArgs& lua, std::int32_t index, std::string& out);
 
 void writeString(std::string_view value, std::string& out) {
     out += '"';
@@ -39,7 +39,7 @@ void writeString(std::string_view value, std::string& out) {
     out += '"';
 }
 
-void writeTable(lua::LuaArgs& lua, std::int32_t index, std::string& out) {
+void writeTable(wire::lua::LuaArgs& lua, std::int32_t index, std::string& out) {
     const std::int64_t length = lua.length(index);
     bool isArray = length > 0;
     if (isArray) {
@@ -77,7 +77,7 @@ void writeTable(lua::LuaArgs& lua, std::int32_t index, std::string& out) {
     out += '}';
 }
 
-void writeValue(lua::LuaArgs& lua, std::int32_t index, std::string& out) {
+void writeValue(wire::lua::LuaArgs& lua, std::int32_t index, std::string& out) {
     if (lua.isNil(index)) {
         out += "null";
         return;
@@ -103,7 +103,7 @@ void writeValue(lua::LuaArgs& lua, std::int32_t index, std::string& out) {
 
 class Reader {
 public:
-    Reader(lua::LuaArgs& lua, std::string_view text) : lua_(&lua), text_(text) {}
+    Reader(wire::lua::LuaArgs& lua, std::string_view text) : lua_(&lua), text_(text) {}
 
     void skipSpace() {
         while (index_ < text_.size() && std::isspace(static_cast<unsigned char>(text_[index_])) != 0) {
@@ -259,19 +259,19 @@ private:
         lua_->pushNil();
     }
 
-    lua::LuaArgs* lua_;
+    wire::lua::LuaArgs* lua_;
     std::string_view text_;
     std::size_t index_ = 0;
 };
 } // namespace
 
-std::string write(lua::LuaArgs& lua, std::int32_t index) {
+std::string write(wire::lua::LuaArgs& lua, std::int32_t index) {
     std::string out;
     writeValue(lua, index, out);
     return out;
 }
 
-void parse(lua::LuaArgs& lua, std::string_view text) {
+void parse(wire::lua::LuaArgs& lua, std::string_view text) {
     Reader reader{lua, text};
     reader.skipSpace();
     reader.value();

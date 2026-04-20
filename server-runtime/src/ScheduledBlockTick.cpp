@@ -4,6 +4,7 @@
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/RedstoneTickSystem.hpp>
 #include <basalt/server/runtime/entity/BlockTriggers.hpp>
+#include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/player/PlayerBlockUpdates.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
@@ -384,6 +385,10 @@ void RedstoneTickSystem::tickScheduledBlocks(world::LoadedWorld& world, const sc
                          if (options_.releaseHive) {
                              options_.releaseHive(world, hx, hy, hz, stateId);
                          }
+                     },
+                 .brushArmadillo =
+                     [this, &world](entity::ServerEntity& armadillo) {
+                         return options_.brushArmadillo != nullptr && options_.brushArmadillo(world, armadillo);
                      }});
             if (!result.effects.empty()) {
                 broadcaster_->sendEffects(watchers, x, y, z, world.state().blockState(x, y, z).value_or(0),
