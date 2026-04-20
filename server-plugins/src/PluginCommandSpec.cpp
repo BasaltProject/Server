@@ -62,18 +62,20 @@ namespace {
     return tokens;
 }
 
-[[nodiscard]] std::expected<PluginCommandArgument, ManifestError> argumentOf(std::string_view token,
-                                                                             std::string_view spec) {
+[[nodiscard]] std::expected<PluginCommandArgument, wire::plugins::ManifestError> argumentOf(std::string_view token,
+                                                                                            std::string_view spec) {
     const bool optional = token.starts_with('[');
     const char closing = optional ? ']' : '>';
     if (!token.ends_with(closing)) {
-        return std::unexpected(ManifestError{"'" + std::string{spec} + "' has an argument that never closes"});
+        return std::unexpected(
+            wire::plugins::ManifestError{"'" + std::string{spec} + "' has an argument that never closes"});
     }
     const std::string_view body = token.substr(1, token.size() - 2);
     const std::size_t colon = body.find(':');
     const std::string_view name = trimmed(colon == std::string_view::npos ? body : body.substr(0, colon));
     if (name.empty()) {
-        return std::unexpected(ManifestError{"'" + std::string{spec} + "' has an argument with no name"});
+        return std::unexpected(
+            wire::plugins::ManifestError{"'" + std::string{spec} + "' has an argument with no name"});
     }
     const std::string_view rest =
         trimmed(colon == std::string_view::npos ? std::string_view{"word"} : body.substr(colon + 1));
@@ -90,8 +92,9 @@ namespace {
     const std::string_view typeName = parts.empty() ? std::string_view{"word"} : parts.front();
     const std::optional<PluginArgumentType> type = argumentTypeOf(typeName);
     if (!type.has_value()) {
-        return std::unexpected(ManifestError{"'" + std::string{spec} + "' asks for the argument type '" +
-                                             std::string{typeName} + "', which this server does not have yet"});
+        return std::unexpected(wire::plugins::ManifestError{"'" + std::string{spec} + "' asks for the argument type '" +
+                                                            std::string{typeName} +
+                                                            "', which this server does not have yet"});
     }
     PluginCommandArgument argument{
         .name = std::string{name}, .type = *type, .optional = optional, .min = std::nullopt, .max = std::nullopt};
@@ -164,17 +167,17 @@ std::string PluginCommandSpec::usage() const {
     return text;
 }
 
-std::expected<PluginCommandSpec, ManifestError> PluginCommandSpec::parse(std::string_view spec,
-                                                                         std::optional<std::string> permission) {
+std::expected<PluginCommandSpec, wire::plugins::ManifestError>
+PluginCommandSpec::parse(std::string_view spec, std::optional<std::string> permission) {
     const std::vector<std::string> tokens = tokenize(spec);
     if (tokens.empty()) {
-        return std::unexpected(ManifestError{"a command with no name"});
+        return std::unexpected(wire::plugins::ManifestError{"a command with no name"});
     }
     PluginCommandSpec built;
     built.permission = std::move(permission);
     for (const std::string& token : tokens) {
         if (token.starts_with('<') || token.starts_with('[')) {
-            std::expected<PluginCommandArgument, ManifestError> argument = argumentOf(token, spec);
+            std::expected<PluginCommandArgument, wire::plugins::ManifestError> argument = argumentOf(token, spec);
             if (!argument.has_value()) {
                 return std::unexpected(argument.error());
             }
@@ -182,19 +185,20 @@ std::expected<PluginCommandSpec, ManifestError> PluginCommandSpec::parse(std::st
             continue;
         }
         if (!built.arguments.empty()) {
-            return std::unexpected(
-                ManifestError{"'" + std::string{spec} + "' puts the word '" + token + "' after an argument"});
+            return std::unexpected(wire::plugins::ManifestError{"'" + std::string{spec} + "' puts the word '" + token +
+                                                                "' after an argument"});
         }
         built.literals.push_back(token);
     }
     if (built.literals.empty()) {
-        return std::unexpected(ManifestError{"'" + std::string{spec} + "' starts with an argument instead of a name"});
+        return std::unexpected(
+            wire::plugins::ManifestError{"'" + std::string{spec} + "' starts with an argument instead of a name"});
     }
     bool seenOptional = false;
     for (const PluginCommandArgument& argument : built.arguments) {
         if (seenOptional && !argument.optional) {
-            return std::unexpected(ManifestError{"'" + std::string{spec} + "' has the required '" + argument.name +
-                                                 "' after an optional one"});
+            return std::unexpected(wire::plugins::ManifestError{"'" + std::string{spec} + "' has the required '" +
+                                                                argument.name + "' after an optional one"});
         }
         seenOptional = seenOptional || argument.optional;
     }

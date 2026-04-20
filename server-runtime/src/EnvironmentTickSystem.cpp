@@ -498,6 +498,17 @@ std::optional<std::array<double, 3>> EnvironmentTickSystem::enterGateway(world::
                                            world.declaration().dimension == config::WorldDimension::End);
 }
 
+bool EnvironmentTickSystem::triggerGatewayCooldown(const world::LoadedWorld& world, const std::int32_t x,
+                                                   const std::int32_t y, const std::int32_t z) {
+    const std::scoped_lock guard{gatewayLock_};
+    std::int32_t& cooldown = gatewayCooldowns_[{world.name(), {x, y, z}}];
+    if (cooldown > 0) {
+        return false;
+    }
+    cooldown = world::endGateways::kCooldownTicks;
+    return true;
+}
+
 void EnvironmentTickSystem::tickGatewayCooldowns(const world::LoadedWorld& world) {
     const std::scoped_lock guard{gatewayLock_};
     std::erase_if(gatewayCooldowns_,

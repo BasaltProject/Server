@@ -1,6 +1,6 @@
 #pragma once
 
-#include <basalt/server/plugins/PluginManifest.hpp>
+#include <basalt/wire/plugins/PluginManifest.hpp>
 
 #include <cstdint>
 #include <expected>
@@ -33,7 +33,7 @@ struct PluginCommandSpec {
 
     [[nodiscard]] std::string usage() const;
 
-    [[nodiscard]] static std::expected<PluginCommandSpec, ManifestError>
+    [[nodiscard]] static std::expected<PluginCommandSpec, wire::plugins::ManifestError>
     parse(std::string_view spec, std::optional<std::string> permission = std::nullopt);
 };
 } // namespace basalt::server::plugins

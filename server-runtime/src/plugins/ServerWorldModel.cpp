@@ -231,9 +231,57 @@ public:
         return block == nullptr ? std::nullopt : std::optional{block->toString()};
     }
 
+    [[nodiscard]] std::optional<std::string> blockState(std::int32_t x, std::int32_t y,
+                                                        std::int32_t z) const override {
+        const std::optional<std::int32_t> stateId = world_->state().blockState(x, y, z);
+        const Identifier* block = stateId.has_value() ? reg::blockStateDefinitions::blockOf(*stateId) : nullptr;
+        if (block == nullptr) {
+            return std::nullopt;
+        }
+        std::string text = block->toString();
+        const std::map<std::string, std::string> properties = reg::blockStateDefinitions::propertiesOf(*stateId);
+        char separator = '[';
+        for (const auto& [name, value] : properties) {
+            text += separator;
+            text += name + "=" + value;
+            separator = ',';
+        }
+        return properties.empty() ? text : text + "]";
+    }
+
+    [[nodiscard]] static std::optional<std::int32_t> parseState(std::string_view text) {
+        std::map<std::string, std::string> properties;
+        const std::size_t open = text.find('[');
+        if (open != std::string_view::npos) {
+            if (!text.ends_with(']')) {
+                return std::nullopt;
+            }
+            std::string_view list = text.substr(open + 1, text.size() - open - 2);
+            while (!list.empty()) {
+                const std::size_t comma = list.find(',');
+                const std::string_view pair = list.substr(0, comma);
+                const std::size_t equals = pair.find('=');
+                if (equals == std::string_view::npos || equals == 0 || equals + 1 == pair.size()) {
+                    return std::nullopt;
+                }
+                properties[std::string{pair.substr(0, equals)}] = std::string{pair.substr(equals + 1)};
+                list = comma == std::string_view::npos ? std::string_view{} : list.substr(comma + 1);
+            }
+            text = text.substr(0, open);
+        }
+        const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(std::string{text});
+        if (!id.has_value()) {
+            return std::nullopt;
+        }
+        const std::optional<std::int32_t> base = reg::blocks::defaultStateIdOf(*id);
+        if (!base.has_value() || properties.empty()) {
+            return base;
+        }
+        return reg::blockStateDefinitions::stateIdOf(*id, properties, base);
+    }
+
     bool setBlock(std::int32_t x, std::int32_t y, std::int32_t z, std::string_view block) override {
-        const std::expected<Identifier, wire::common::IdentifierError> id = Identifier::parse(std::string{block});
-        const std::optional<std::int32_t> stateId = id.has_value() ? reg::blocks::defaultStateIdOf(*id) : std::nullopt;
+        const std::optional<std::int32_t> stateId = parseState(block);
         if (!stateId.has_value() || !world_->state().setBlockState(x, y, z, *stateId)) {
             return false;
         }

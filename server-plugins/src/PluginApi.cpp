@@ -125,7 +125,7 @@ void installFiles(LuaArgs& lua, LoadedPlugin& plugin) {
         const std::string path = args.checkString(1);
         std::optional<std::string> text = wire::io::fileIO::readText(target->folder + "/" + path);
         if (!text.has_value()) {
-            text = target->pkg->readText(std::string{packageLayout::kResources} + path);
+            text = target->pkg->readText(std::string{wire::plugins::packageLayout::kResources} + path);
         }
         if (text.has_value()) {
             args.pushString(*text);
@@ -138,7 +138,7 @@ void installFiles(LuaArgs& lua, LoadedPlugin& plugin) {
     wire::lua::pushHostFunction(lua, "files.exists", [target](LuaArgs& args) {
         const std::string path = args.checkString(1);
         args.pushBoolean(wire::io::fileIO::exists(target->folder + "/" + path) ||
-                         target->pkg->exists(std::string{packageLayout::kResources} + path));
+                         target->pkg->exists(std::string{wire::plugins::packageLayout::kResources} + path));
         return 1;
     });
     lua.setField("exists");
@@ -562,7 +562,7 @@ void installListeners(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plug
         if (args.isTable(3)) {
             permission = stringField(args, 3, "permission");
         }
-        const std::expected<PluginCommandSpec, ManifestError> parsed =
+        const std::expected<PluginCommandSpec, wire::plugins::ManifestError> parsed =
             PluginCommandSpec::parse(spec, std::move(permission));
         if (!parsed.has_value()) {
             args.raise(parsed.error().message);
@@ -651,9 +651,9 @@ void installListeners(LuaArgs& lua, PluginInstance& instance, LoadedPlugin& plug
 void installGranted(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
     LoadedPlugin* target = &plugin;
     PluginHost* server = &host;
-    const std::set<PluginPermission> granted = host.allowed(plugin.manifest.id);
+    const std::set<wire::plugins::PluginPermission> granted = host.allowed(plugin.manifest.id);
 
-    if (plugin.manifest.capabilities.packets && granted.contains(PluginPermission::Packets)) {
+    if (plugin.manifest.capabilities.packets && granted.contains(wire::plugins::PluginPermission::Packets)) {
         lua.pushTable();
         for (const bool observer : {false, true}) {
             wire::lua::pushHostFunction(
@@ -713,7 +713,7 @@ void installGranted(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
         lua.setGlobal("packet");
     }
 
-    if (!plugin.manifest.capabilities.network.empty() && granted.contains(PluginPermission::Network)) {
+    if (!plugin.manifest.capabilities.network.empty() && granted.contains(wire::plugins::PluginPermission::Network)) {
         const std::set<std::string, std::less<>> allowed{plugin.manifest.capabilities.network.begin(),
                                                          plugin.manifest.capabilities.network.end()};
         const auto check = [target, allowed](LuaArgs& args, const std::string& name) {
@@ -766,7 +766,7 @@ void installGranted(LuaArgs& lua, LoadedPlugin& plugin, PluginHost& host) {
         lua.setGlobal("channel");
     }
 
-    if (plugin.manifest.capabilities.commands && granted.contains(PluginPermission::Commands)) {
+    if (plugin.manifest.capabilities.commands && granted.contains(wire::plugins::PluginPermission::Commands)) {
         wire::lua::pushHostFunction(lua, "run", [server, target](LuaArgs& args) {
             const std::string command = args.checkString(1);
             target->log.info([&command] { return "ran /" + command; });

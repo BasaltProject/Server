@@ -1,10 +1,10 @@
 #include <basalt/server/plugins/PluginConfig.hpp>
 #include <basalt/server/plugins/PluginDispatch.hpp>
 #include <basalt/server/plugins/PluginEventTypes.hpp>
-#include <basalt/server/plugins/PluginFolder.hpp>
 #include <basalt/server/plugins/PluginHost.hpp>
-#include <basalt/server/plugins/PluginOrder.hpp>
 #include <basalt/wire/lua/LuaCall.hpp>
+#include <basalt/wire/plugins/PluginFolder.hpp>
+#include <basalt/wire/plugins/PluginOrder.hpp>
 
 #include <algorithm>
 #include <cstdint>
@@ -22,8 +22,8 @@ namespace {
 }
 } // namespace
 
-LoadedPlugin::LoadedPlugin(PluginManifest manifest, std::shared_ptr<PluginPackage> pkg, wire::common::Logger log,
-                           wire::common::toml::TomlTable config, std::string folder,
+LoadedPlugin::LoadedPlugin(wire::plugins::PluginManifest manifest, std::shared_ptr<wire::plugins::PluginPackage> pkg,
+                           wire::common::Logger log, wire::common::toml::TomlTable config, std::string folder,
                            std::map<std::string, std::string, std::less<>> files)
     : manifest(std::move(manifest)), pkg(std::move(pkg)), log(std::move(log)), config(std::move(config)),
       folder(std::move(folder)), files(std::move(files)), text(this->folder, "en_us") {
@@ -87,8 +87,8 @@ void PluginHost::channelMessage(const std::string& channel, const std::string& p
     channels_.channelMessage(*this, channel, playerUuid, bytes);
 }
 
-std::set<PluginPermission> PluginHost::allowed(const std::string& pluginId) const {
-    return allowed_ ? allowed_(pluginId) : std::set<PluginPermission>{};
+std::set<wire::plugins::PluginPermission> PluginHost::allowed(const std::string& pluginId) const {
+    return allowed_ ? allowed_(pluginId) : std::set<wire::plugins::PluginPermission>{};
 }
 
 std::vector<PluginStatus> PluginHost::statuses() const {
@@ -127,21 +127,23 @@ LoadedPlugin* PluginHost::pluginById(std::string_view id) const {
 }
 
 PluginLoadReport PluginHost::loadAll() {
-    std::vector<std::pair<std::shared_ptr<PluginPackage>, PluginManifest>> candidates;
+    std::vector<std::pair<std::shared_ptr<wire::plugins::PluginPackage>, wire::plugins::PluginManifest>> candidates;
     PluginLoadReport report;
-    std::expected<std::vector<std::unique_ptr<PluginPackage>>, PluginLoadError> discovered =
-        discoverPackages(services_->paths().packages());
+    std::expected<std::vector<std::unique_ptr<wire::plugins::PluginPackage>>, wire::plugins::PluginLoadError>
+        discovered = wire::plugins::discoverPackages(services_->paths().packages(), ".bspkg");
     if (!discovered.has_value()) {
         return PluginLoadReport{.loaded = {}, .refused = {{"plugins/", discovered.error().message}}};
     }
-    for (std::unique_ptr<PluginPackage>& owned : *discovered) {
-        const std::shared_ptr<PluginPackage> pkg{std::move(owned)};
-        const std::optional<std::string> text = pkg->readText(packageLayout::kManifest);
+    for (std::unique_ptr<wire::plugins::PluginPackage>& owned : *discovered) {
+        const std::shared_ptr<wire::plugins::PluginPackage> pkg{std::move(owned)};
+        const std::optional<std::string> text = pkg->readText(wire::plugins::packageLayout::kManifest);
         if (!text.has_value()) {
-            report.refused.emplace_back(pkg->origin(), "it has no " + std::string{packageLayout::kManifest});
+            report.refused.emplace_back(pkg->origin(),
+                                        "it has no " + std::string{wire::plugins::packageLayout::kManifest});
             continue;
         }
-        const std::expected<PluginManifest, ManifestError> manifest = PluginManifest::parse(*text);
+        const std::expected<wire::plugins::PluginManifest, wire::plugins::ManifestError> manifest =
+            wire::plugins::PluginManifest::parse(*text);
         if (!manifest.has_value()) {
             report.refused.emplace_back(pkg->origin(), manifest.error().message);
             continue;
@@ -158,12 +160,12 @@ PluginLoadReport PluginHost::loadAll() {
         candidates.emplace_back(pkg, *manifest);
     }
 
-    std::vector<PluginManifest> manifests;
+    std::vector<wire::plugins::PluginManifest> manifests;
     manifests.reserve(candidates.size());
     for (const auto& [pkg, manifest] : candidates) {
         manifests.push_back(manifest);
     }
-    for (const PluginOrdering& decision : pluginOrder::resolve(manifests)) {
+    for (const wire::plugins::PluginOrdering& decision : wire::plugins::pluginOrder::resolve(manifests)) {
         if (!decision.loads()) {
             report.refused.emplace_back(decision.manifest.id, decision.refusal);
             continue;
@@ -189,12 +191,12 @@ std::vector<std::string> PluginHost::unload(std::string_view id) {
     if (pluginById(id) == nullptr) {
         return {};
     }
-    std::vector<PluginManifest> manifests;
+    std::vector<wire::plugins::PluginManifest> manifests;
     manifests.reserve(plugins_.size());
     for (const std::unique_ptr<LoadedPlugin>& plugin : plugins_) {
         manifests.push_back(plugin->manifest);
     }
-    std::vector<std::string> order = pluginOrder::dependents(id, manifests);
+    std::vector<std::string> order = wire::plugins::pluginOrder::dependents(id, manifests);
     if (!order.empty()) {
         std::string names;
         for (const std::string& each : order) {
@@ -265,7 +267,8 @@ std::unique_ptr<wire::lua::LuaSandbox> PluginHost::sandboxFor(LoadedPlugin& plug
         [&plugin](std::string_view line) { plugin.log.info([&line] { return std::string{line}; }); });
 }
 
-bool PluginHost::start(const PluginManifest& manifest, const std::shared_ptr<PluginPackage>& pkg) {
+bool PluginHost::start(const wire::plugins::PluginManifest& manifest,
+                       const std::shared_ptr<wire::plugins::PluginPackage>& pkg) {
     wire::common::Logger log{"plugin/" + manifest.id};
     const std::optional<std::string> source = pkg->readText(manifest.main);
     const bool library = !source.has_value() && !manifest.exports.modules.empty();
@@ -276,25 +279,27 @@ bool PluginHost::start(const PluginManifest& manifest, const std::shared_ptr<Plu
         return false;
     }
     const std::string folderPath = pkg->workingFolder().value_or(services_->paths().folder(manifest.id));
-    const PluginFolder folder{*pkg, manifest, folderPath};
+    const wire::plugins::PluginFolder folder{*pkg, manifest, folderPath};
     folder.materialize([&log](std::string_view message) { log.info([&message] { return std::string{message}; }); });
-    const std::expected<std::map<std::string, std::string, std::less<>>, PluginLoadError> files = folder.index();
+    const std::expected<std::map<std::string, std::string, std::less<>>, wire::plugins::PluginLoadError> files =
+        folder.index();
     if (!files.has_value()) {
         log.error([&manifest, &files] { return manifest.id + " did not load: " + files.error().message; });
         return false;
     }
-    const std::expected<wire::common::toml::TomlTable, PluginLoadError> config = pluginConfig::load(*files);
+    const std::expected<wire::common::toml::TomlTable, wire::plugins::PluginLoadError> config =
+        pluginConfig::load(*files);
     if (!config.has_value()) {
         log.error([&manifest, &config] { return manifest.id + " did not load: " + config.error().message; });
         return false;
     }
     auto plugin = std::make_unique<LoadedPlugin>(manifest, pkg, std::move(log), *config, folderPath, *files);
 
-    const std::set<PluginPermission> granted = allowed(manifest.id);
+    const std::set<wire::plugins::PluginPermission> granted = allowed(manifest.id);
     std::vector<std::string> missing;
-    for (const PluginPermission asked : manifest.capabilities.asks()) {
+    for (const wire::plugins::PluginPermission asked : manifest.capabilities.asks()) {
         if (!granted.contains(asked)) {
-            missing.emplace_back(permissionName(asked));
+            missing.emplace_back(wire::plugins::permissionName(asked));
         }
     }
     if (!missing.empty()) {
@@ -388,7 +393,7 @@ void PluginHost::stop(LoadedPlugin& plugin) {
 }
 
 std::optional<std::vector<std::uint8_t>> PluginHost::moduleSource(LoadedPlugin& plugin, std::string_view requested) {
-    const std::optional<std::string> own = packageLayout::moduleFile(requested);
+    const std::optional<std::string> own = wire::plugins::packageLayout::moduleFile(requested);
     if (!own.has_value()) {
         return std::nullopt;
     }
@@ -401,7 +406,7 @@ std::optional<std::vector<std::uint8_t>> PluginHost::moduleSource(LoadedPlugin& 
     }
     const std::string id{requested.substr(0, dot)};
     const std::string_view module = requested.substr(dot + 1);
-    const std::optional<std::string> file = packageLayout::moduleFile(module);
+    const std::optional<std::string> file = wire::plugins::packageLayout::moduleFile(module);
     if (!file.has_value()) {
         return std::nullopt;
     }

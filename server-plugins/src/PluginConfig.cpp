@@ -4,7 +4,7 @@
 #include <utility>
 
 namespace basalt::server::plugins::pluginConfig {
-std::expected<wire::common::toml::TomlTable, PluginLoadError>
+std::expected<wire::common::toml::TomlTable, wire::plugins::PluginLoadError>
 load(const std::map<std::string, std::string, std::less<>>& files) {
     wire::common::toml::TomlTable out;
     for (const auto& [relative, path] : files) {
@@ -18,7 +18,7 @@ load(const std::map<std::string, std::string, std::less<>>& files) {
         std::expected<wire::common::toml::TomlTable, wire::common::toml::TomlError> parsed =
             wire::common::toml::parse(*text);
         if (!parsed.has_value()) {
-            return std::unexpected(PluginLoadError{
+            return std::unexpected(wire::plugins::PluginLoadError{
                 .message =
                     path + " is malformed: " + std::string{wire::common::toml::tomlErrorMessage(parsed.error())}});
         }

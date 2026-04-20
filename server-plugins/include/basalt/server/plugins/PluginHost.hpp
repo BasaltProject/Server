@@ -3,8 +3,6 @@
 #include <basalt/server/plugins/PluginChannelHost.hpp>
 #include <basalt/server/plugins/PluginCommandSpec.hpp>
 #include <basalt/server/plugins/PluginEvents.hpp>
-#include <basalt/server/plugins/PluginManifest.hpp>
-#include <basalt/server/plugins/PluginPackage.hpp>
 #include <basalt/server/plugins/PluginPacketRegistry.hpp>
 #include <basalt/server/plugins/PluginPackets.hpp>
 #include <basalt/server/plugins/PluginRegistrations.hpp>
@@ -16,6 +14,8 @@
 #include <basalt/wire/common/toml/Toml.hpp>
 #include <basalt/wire/lua/LuaRef.hpp>
 #include <basalt/wire/lua/LuaSandbox.hpp>
+#include <basalt/wire/plugins/PluginManifest.hpp>
+#include <basalt/wire/plugins/PluginPackage.hpp>
 
 #include <chrono>
 #include <cstdint>
@@ -53,12 +53,12 @@ struct CommandEntry {
 
 class LoadedPlugin {
 public:
-    LoadedPlugin(PluginManifest manifest, std::shared_ptr<PluginPackage> pkg, wire::common::Logger log,
-                 wire::common::toml::TomlTable config, std::string folder,
+    LoadedPlugin(wire::plugins::PluginManifest manifest, std::shared_ptr<wire::plugins::PluginPackage> pkg,
+                 wire::common::Logger log, wire::common::toml::TomlTable config, std::string folder,
                  std::map<std::string, std::string, std::less<>> files);
 
-    PluginManifest manifest;
-    std::shared_ptr<PluginPackage> pkg;
+    wire::plugins::PluginManifest manifest;
+    std::shared_ptr<wire::plugins::PluginPackage> pkg;
     wire::common::Logger log;
     wire::common::toml::TomlTable config;
     std::string folder;
@@ -136,7 +136,7 @@ private:
 
 class PluginHost {
 public:
-    using Allowed = std::function<std::set<PluginPermission>(const std::string& pluginId)>;
+    using Allowed = std::function<std::set<wire::plugins::PluginPermission>(const std::string& pluginId)>;
 
     using InstallApi =
         std::function<void(PluginInstance& instance, LoadedPlugin& plugin, PluginHost& host, std::int32_t lanes)>;
@@ -158,7 +158,7 @@ public:
 
     void setAllowed(Allowed allowed) { allowed_ = std::move(allowed); }
 
-    [[nodiscard]] std::set<PluginPermission> allowed(const std::string& pluginId) const;
+    [[nodiscard]] std::set<wire::plugins::PluginPermission> allowed(const std::string& pluginId) const;
 
     void setOnPluginThread(std::function<bool()> onPluginThread) { onPluginThread_ = std::move(onPluginThread); }
 
@@ -239,7 +239,7 @@ public:
     void setTimings(RecordTime record) { recordTime_ = std::move(record); }
 
 private:
-    bool start(const PluginManifest& manifest, const std::shared_ptr<PluginPackage>& pkg);
+    bool start(const wire::plugins::PluginManifest& manifest, const std::shared_ptr<wire::plugins::PluginPackage>& pkg);
 
     void stop(LoadedPlugin& plugin);
 
