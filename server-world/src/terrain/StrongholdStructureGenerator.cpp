@@ -86,9 +86,9 @@ void draw(Chunk& chunk, const structure::StrongholdPiece& piece, const structure
 StrongholdStructureGenerator::StrongholdStructureGenerator(structure::ConcentricRingsPlacement rings, std::int64_t seed,
                                                            NoiseBiomeAt noiseBiomeAt,
                                                            std::set<std::string, std::less<>> overworldBiomes,
-                                                           std::int32_t seaLevel)
+                                                           std::int32_t seaLevel, std::int32_t generatorMinY)
     : rings_(rings), seed_(seed), noiseBiomeAt_(std::move(noiseBiomeAt)), overworldBiomes_(std::move(overworldBiomes)),
-      seaLevel_(seaLevel) {}
+      seaLevel_(seaLevel), generatorMinY_(generatorMinY) {}
 
 void StrongholdStructureGenerator::ensureRings() const {
     const std::scoped_lock lock{mutex_};
@@ -141,7 +141,7 @@ StrongholdStructureGenerator::layoutFor(std::int32_t startX, std::int32_t startZ
     random::RandomSource random = random::RandomSource::worldgen(random::RandomSource::legacy(0));
     std::vector<structure::StrongholdPiece> built = structure::strongholdLayout::build(
         random, [&](std::int32_t attempt) { random::setLargeFeatureSeed(random, seed + attempt, startX, startZ); },
-        startX, startZ, seaLevel_, kOverworldHeight.minY());
+        startX, startZ, seaLevel_, generatorMinY_);
     const std::scoped_lock lock{mutex_};
     if (const auto found = layouts_.find(chunkKey); found != layouts_.end()) {
         return found->second;

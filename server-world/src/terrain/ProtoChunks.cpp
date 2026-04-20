@@ -42,6 +42,8 @@ struct ProtoChunks::Request {
     std::int32_t priority = 0;
     bool resolved = false;
     bool waited = false;
+    /// Part of an area, which schedules the decorations of all its members as one.
+    bool member = false;
 };
 
 struct ProtoChunks::Task {
@@ -74,11 +76,50 @@ void ProtoChunks::demand(const std::int32_t chunkX, const std::int32_t chunkZ, c
     wantsStale_ = true;
 }
 
+void ProtoChunks::demandArea(const std::int32_t chunkX, const std::int32_t chunkZ, const std::int32_t fullRadius,
+                             const std::int32_t decorateRadius, const std::int32_t priority) {
+    const std::lock_guard lock{mutex_};
+    areas_.insert_or_assign(key(chunkX, chunkZ),
+                            Area{.priority = priority, .fullRadius = fullRadius, .decorateRadius = decorateRadius});
+    for (std::int32_t dx = -fullRadius; dx <= fullRadius; ++dx) {
+        for (std::int32_t dz = -fullRadius; dz <= fullRadius; ++dz) {
+            const std::int64_t at = key(chunkX + dx, chunkZ + dz);
+            if (full_.contains(at)) {
+                continue;
+            }
+            const auto [request, inserted] = requests_.try_emplace(at, Request{.priority = priority, .member = true});
+            if (!inserted && priority < request->second.priority) {
+                request->second.priority = priority;
+            }
+        }
+    }
+    wantsStale_ = true;
+}
+
+void ProtoChunks::releaseArea(const std::int32_t chunkX, const std::int32_t chunkZ) {
+    const std::lock_guard lock{mutex_};
+    const auto area = areas_.find(key(chunkX, chunkZ));
+    if (area == areas_.end()) {
+        return;
+    }
+    const std::int32_t radius = area->second.fullRadius;
+    areas_.erase(area);
+    for (std::int32_t dx = -radius; dx <= radius; ++dx) {
+        for (std::int32_t dz = -radius; dz <= radius; ++dz) {
+            if (const auto member = requests_.find(key(chunkX + dx, chunkZ + dz)); member != requests_.end()) {
+                member->second.member = false;
+            }
+        }
+    }
+    wantsStale_ = true;
+}
+
 std::size_t ProtoChunks::retainWhere(const std::function<bool(std::int32_t, std::int32_t)>& keep) {
     const std::lock_guard lock{mutex_};
     const std::size_t before = requests_.size();
     std::erase_if(requests_, [&](const auto& entry) {
-        return !entry.second.waited && !busy_.contains(entry.first) && !keep(xOf(entry.first), zOf(entry.first));
+        return !entry.second.waited && !entry.second.member && !busy_.contains(entry.first) &&
+               !keep(xOf(entry.first), zOf(entry.first));
     });
     if (requests_.size() != before) {
         wantsStale_ = true;
@@ -89,6 +130,7 @@ std::size_t ProtoChunks::retainWhere(const std::function<bool(std::int32_t, std:
 void ProtoChunks::clearDemands() {
     const std::lock_guard lock{mutex_};
     std::erase_if(requests_, [this](const auto& entry) { return !busy_.contains(entry.first); });
+    areas_.clear();
     wantsStale_ = true;
 }
 
@@ -127,34 +169,73 @@ void ProtoChunks::refreshWants() {
     decorationWants_.clear();
     terrainWants_.clear();
     unresolved_.clear();
-    std::vector<std::pair<std::int32_t, std::int64_t>> resolved;
-    resolved.reserve(requests_.size());
+
+    // Each unit is a request or an area, and brings the squares it needs decorated, in order.
+    struct Unit {
+        std::int32_t priority = 0;
+        std::int64_t at = 0;
+        std::int32_t firstRadius = 1;
+        std::int32_t secondRadius = 0;
+    };
+
+    std::vector<Unit> units;
+    units.reserve(requests_.size() + areas_.size());
     for (const auto& [at, request] : requests_) {
         if (!request.resolved) {
             unresolved_.push_back(at);
             continue;
         }
-        resolved.emplace_back(request.priority, at);
+        if (!request.member) {
+            units.push_back(Unit{.priority = request.priority, .at = at});
+        }
     }
-    std::ranges::sort(resolved, [](const auto& left, const auto& right) {
-        return std::tuple{left.first, xOf(left.second), zOf(left.second)} <
-               std::tuple{right.first, xOf(right.second), zOf(right.second)};
+    for (const auto& [at, area] : areas_) {
+        bool ready = true;
+        for (std::int32_t dx = -area.fullRadius; dx <= area.fullRadius && ready; ++dx) {
+            for (std::int32_t dz = -area.fullRadius; dz <= area.fullRadius && ready; ++dz) {
+                const auto member = requests_.find(key(xOf(at) + dx, zOf(at) + dz));
+                ready = member == requests_.end() || member->second.resolved;
+            }
+        }
+        if (ready) {
+            units.push_back(Unit{.priority = area.priority,
+                                 .at = at,
+                                 .firstRadius = area.fullRadius + 1,
+                                 .secondRadius = area.decorateRadius});
+        }
+    }
+    std::ranges::sort(units, [](const Unit& left, const Unit& right) {
+        return std::tuple{left.priority, xOf(left.at), zOf(left.at)} <
+               std::tuple{right.priority, xOf(right.at), zOf(right.at)};
     });
-    // parity: `ChunkGenerationTask` order is executor-dependent in vanilla.
+    // parity: `ChunkGenerationTask` order is the executor's in vanilla; here priority, then x, then z.
     decorationOrder_.clear();
-    for (const auto& [priority, at] : resolved) {
-        for (std::int32_t dx = -1; dx <= 1; ++dx) {
-            for (std::int32_t dz = -1; dz <= 1; ++dz) {
-                const std::int64_t around = key(xOf(at) + dx, zOf(at) + dz);
-                if (full_.contains(around) || decorationWants_.contains(around)) {
-                    continue;
+    const auto want = [this](std::int64_t around, std::int32_t priority) {
+        if (full_.contains(around) || decorationWants_.contains(around)) {
+            return;
+        }
+        const auto entry = entries_.find(around);
+        if (entry != entries_.end() && entry->second->stage == ChunkStage::Decorated) {
+            return;
+        }
+        decorationWants_.emplace(around, priority);
+        decorationOrder_.push_back(around);
+    };
+    for (const Unit& unit : units) {
+        // Each chunk the unit needs full brings its own 3x3, x outermost, and then the unit's outer rings.
+        const std::int32_t full = unit.firstRadius - 1;
+        for (std::int32_t fx = -full; fx <= full; ++fx) {
+            for (std::int32_t fz = -full; fz <= full; ++fz) {
+                for (std::int32_t dx = -1; dx <= 1; ++dx) {
+                    for (std::int32_t dz = -1; dz <= 1; ++dz) {
+                        want(key(xOf(unit.at) + fx + dx, zOf(unit.at) + fz + dz), unit.priority);
+                    }
                 }
-                const auto entry = entries_.find(around);
-                if (entry != entries_.end() && entry->second->stage == ChunkStage::Decorated) {
-                    continue;
-                }
-                decorationWants_.emplace(around, priority);
-                decorationOrder_.push_back(around);
+            }
+        }
+        for (std::int32_t dx = -unit.secondRadius; dx <= unit.secondRadius; ++dx) {
+            for (std::int32_t dz = -unit.secondRadius; dz <= unit.secondRadius; ++dz) {
+                want(key(xOf(unit.at) + dx, zOf(unit.at) + dz), unit.priority);
             }
         }
     }
@@ -417,6 +498,14 @@ std::vector<Chunk> ProtoChunks::evict() {
     }
     for (const std::int64_t at : decorating_) {
         around(at);
+    }
+    for (const auto& [at, area] : areas_) {
+        const std::int32_t reach = std::max(area.fullRadius + 1, area.decorateRadius) + 1;
+        for (std::int32_t dx = -reach; dx <= reach; ++dx) {
+            for (std::int32_t dz = -reach; dz <= reach; ++dz) {
+                needed.insert(key(xOf(at) + dx, zOf(at) + dz));
+            }
+        }
     }
     std::vector<std::pair<std::uint64_t, std::int64_t>> spare;
     for (const auto& [at, entry] : entries_) {

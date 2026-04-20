@@ -1,6 +1,7 @@
 #pragma once
 
 #include <basalt/server/world/Chunk.hpp>
+#include <basalt/server/world/datafix/DataFixer.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
 
 #include <cstdint>
@@ -11,13 +12,15 @@ namespace basalt::server::world::region {
 
 struct ChunkNbtError {
     std::string message;
+    /// False when the chunk only needs generating again; true when its saved data must be left alone.
+    bool incompatible = true;
 };
 
 /// parity: `SerializableChunkData`.
 namespace chunkNbt {
 
 /// The world version this build writes. parity: the `DataVersion` of 26.3.
-inline constexpr std::int32_t kDataVersion = 5023;
+inline constexpr std::int32_t kDataVersion = datafix::kCurrentVersion;
 
 inline constexpr std::string_view kEntitiesKey = "basalt_entities";
 inline constexpr std::string_view kGeneratedEntitiesKey = "basalt_generated_entities";

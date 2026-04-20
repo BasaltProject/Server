@@ -573,11 +573,24 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::flat(std:
         [](std::int32_t, std::int32_t, std::int32_t) { return kPlains; }, 6, 80, poolLookup, templateOf);
     // parity: `FlatLevelSource.getBaseHeight`, one above the top of the four default layers.
     built->village->useFlatSurface(server::world::kOverworldHeight.minY() + 4);
-    built->generators = terrain::TerrainStructureGenerators{.village = built->village.get()};
+    built->tags = std::make_unique<BiomeTagLoader>(jar_.readText);
+    BiomeTagLoader& tags = *built->tags;
+    const auto plainsEverywhere = [](std::int32_t, std::int32_t, std::int32_t) -> const std::string& {
+        return kPlains;
+    };
+    // parity: `FlatLevelSource` answers sea level -63 and min y 0, so its strongholds sit on top of the
+    // layers rather than under them.
+    built->strongholds = std::make_unique<terrain::StrongholdStructureGenerator>(
+        structure::ConcentricRingsPlacement{32, 3, 128, biomesOf(tags, "minecraft:stronghold_biased_to"),
+                                            plainsEverywhere},
+        seed, plainsEverywhere, biomesOf(tags, "minecraft:has_structure/stronghold"), -63, 0);
+    built->generators = terrain::TerrainStructureGenerators{.village = built->village.get(),
+                                                            .stronghold = built->strongholds.get()};
 
     Built& world = *built;
     Generators answer;
     answer.villages = built->village.get();
+    answer.strongholds = built->strongholds.get();
     answer.pipeline.terrain = [](std::int32_t chunkX, std::int32_t chunkZ) {
         return terrain::realTerrainGenerator::GeneratedTerrain{
             server::world::flatWorldGenerator::generate(chunkX, chunkZ), nullptr, nullptr};
@@ -590,18 +603,9 @@ VanillaWorldGeneratorFactory::Generators VanillaWorldGeneratorFactory::flat(std:
                                         terrain::ProtoRegion& region) {
         server::world::Chunk& chunk = generated.chunk();
         const server::world::Chunk::RegionScope scope{chunk, region};
+        // Both are `surface_structures`, each on its own feature seed, in the overworld's order.
         world.village->generateInto(chunk, chunk.chunkX(), chunk.chunkZ(), world.seed);
-    };
-    answer.spawnMobs = [&world](server::world::Chunk& chunk, std::int64_t gameTime, const std::string& difficulty) {
-        if (!world.spawnMobs) {
-            return;
-        }
-        const Identifier plains = Identifier::vanilla("plains");
-        random::RandomSource random = random::RandomSource::legacy(0);
-        static_cast<void>(random::setDecorationSeed(random, world.seed, chunk.chunkX() << 4, chunk.chunkZ() << 4));
-        static_cast<void>(originalMobSpawner::spawnInto(
-            chunk, world.biomeSpawns->listFor(plains, "creature"), world.biomeSpawns->creatureProbabilityFor(plains),
-            random, {.gameTime = gameTime, .difficulty = difficulty, .equipment = world.equipment.get()}));
+        world.strongholds->generateInto(chunk, world.seed);
     };
     built_.push_back(std::move(built));
     return answer;

@@ -131,7 +131,7 @@ LoadedWorld::LoadedWorld(config::WorldDeclaration declaration, config::WorldSett
     // parity: `TicketType.FORCED` persists.
     forcedChunks_.insert(metadata_.forcedChunks.begin(), metadata_.forcedChunks.end());
     for (const std::int64_t key : forcedChunks_) {
-        generationQueue_.request(ChunkGenerationQueue::unpackX(key), ChunkGenerationQueue::unpackZ(key), 0);
+        generationQueue_.requestForced(ChunkGenerationQueue::unpackX(key), ChunkGenerationQueue::unpackZ(key));
     }
     portals_.load(worldRoot_);
     randomSequences_.load(worldRoot_);
@@ -411,12 +411,24 @@ std::size_t LoadedWorld::unloadUnreachable(const std::vector<std::pair<std::int3
                    std::abs(chunkZ - position.second) <= retainRadius;
         });
     };
+    // parity: a forced ticket keeps its two full rings loaded too.
+    const auto nearForced = [this](std::int32_t chunkX, std::int32_t chunkZ) {
+        constexpr std::int32_t kRings = ChunkGenerationQueue::kForcedFullRings;
+        for (std::int32_t dx = -kRings; dx <= kRings; ++dx) {
+            for (std::int32_t dz = -kRings; dz <= kRings; ++dz) {
+                if (forcedChunks_.contains(ChunkGenerationQueue::pack(chunkX + dx, chunkZ + dz))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
     const std::vector<Chunk*> candidates = state_.evictionCandidates([&](std::int32_t chunkX, std::int32_t chunkZ) {
         if (std::abs(chunkX) <= spawnRadiusChunks && std::abs(chunkZ) <= spawnRadiusChunks) {
             return true;
         }
         const std::int64_t key = ChunkGenerationQueue::pack(chunkX, chunkZ);
-        if (forcedChunks_.contains(key) || pending.contains(key)) {
+        if (pending.contains(key) || nearForced(chunkX, chunkZ)) {
             return true;
         }
         return nearAPlayer(chunkX, chunkZ);

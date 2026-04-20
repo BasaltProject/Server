@@ -28,7 +28,7 @@ public:
 
     StrongholdStructureGenerator(structure::ConcentricRingsPlacement rings, std::int64_t seed,
                                  NoiseBiomeAt noiseBiomeAt, std::set<std::string, std::less<>> overworldBiomes,
-                                 std::int32_t seaLevel = 63);
+                                 std::int32_t seaLevel = 63, std::int32_t generatorMinY = -64);
 
     void generateInto(Chunk& chunk, std::int64_t seed);
 
@@ -61,6 +61,8 @@ private:
     NoiseBiomeAt noiseBiomeAt_;
     std::set<std::string, std::less<>> overworldBiomes_;
     std::int32_t seaLevel_;
+    /// parity: `ChunkGenerator.getMinY`, which is 0 for `FlatLevelSource` whatever the dimension says.
+    std::int32_t generatorMinY_;
     mutable std::mutex mutex_;
     /// parity: the order matters for `locate`.
     mutable std::vector<std::pair<std::int32_t, std::int32_t>> ringPositions_;

@@ -135,3 +135,27 @@ TEST_CASE("a proto chunk read back from disk decorates without being made again"
     CHECK(recorder.terrains == 24);
     CHECK(finished[0].blockStateId(5, 5, 5) == registry::blocks::bedrock().stateId);
 }
+
+TEST_CASE("a forced chunk is full with two rings round it and decorated five out") {
+    Recorder recorder;
+    ProtoChunks chunks{recorder.hooks()};
+    chunks.demandArea(0, 0, 2, 5, 0);
+    const std::vector<Chunk> finished = runDry(chunks);
+
+    CHECK(finished.size() == 25);
+    CHECK(recorder.decorated.size() == 121);
+    // parity: the full square's 7x7 goes before the rest of the area wherever the two overlap.
+    const auto turnOf = [&recorder](std::pair<std::int32_t, std::int32_t> chunk) {
+        return std::ranges::find(recorder.decorated, chunk) - recorder.decorated.begin();
+    };
+    for (const auto& inner : recorder.decorated) {
+        for (const auto& outer : recorder.decorated) {
+            const bool innerInBlock = std::abs(inner.first) <= 3 && std::abs(inner.second) <= 3;
+            const bool outerInBlock = std::abs(outer.first) <= 3 && std::abs(outer.second) <= 3;
+            if (innerInBlock && !outerInBlock &&
+                std::max(std::abs(inner.first - outer.first), std::abs(inner.second - outer.second)) <= 2) {
+                CHECK(turnOf(inner) < turnOf(outer));
+            }
+        }
+    }
+}

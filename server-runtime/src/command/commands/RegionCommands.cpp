@@ -379,7 +379,11 @@ chunkRange(const CommandContext& context, bool single) {
     if (adding) {
         // parity: a forced region is materialised in the order the command enumerates it.
         for (const auto& [x, z] : moved) {
-            (*world)->generationQueue().request(x, z, 0);
+            (*world)->generationQueue().requestForced(x, z);
+        }
+    } else {
+        for (const auto& [x, z] : moved) {
+            (*world)->generationQueue().releaseForced(x, z);
         }
     }
     context.success(
@@ -406,6 +410,10 @@ void ForceLoadCommand::build(const CommandNodeBuilder& root) const {
                         const Parsed<world::LoadedWorld*> world = context.world();
                         if (!world.has_value()) {
                             return std::unexpected{world.error()};
+                        }
+                        for (const std::int64_t key : (*world)->forcedChunks()) {
+                            (*world)->generationQueue().releaseForced(world::ChunkGenerationQueue::unpackX(key),
+                                                                      world::ChunkGenerationQueue::unpackZ(key));
                         }
                         (*world)->forcedChunks().clear();
                         context.success(Component::translatable("commands.forceload.removed.all",

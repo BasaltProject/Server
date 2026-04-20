@@ -1,13 +1,39 @@
 #include <basalt/server/assets/ServerJarAssets.hpp>
+#include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Blocks.hpp>
 #include <basalt/server/runtime/VanillaGameData.hpp>
 #include <basalt/server/runtime/datapack/PackFiles.hpp>
 #include <basalt/server/runtime/datapack/ResourceStack.hpp>
 #include <basalt/server/runtime/world/BrewingStands.hpp>
+#include <basalt/server/world/Chunk.hpp>
 
 #include <utility>
 
 namespace basalt::server::runtime {
 namespace {
+
+/// One flag per block state for every block a tag lists.
+[[nodiscard]] std::vector<bool> statesOf(const world::realBlockTags::TagMembers& tags, std::string_view tag) {
+    std::vector<bool> flags(static_cast<std::size_t>(registry::blocks::stateCount()), false);
+    for (const wire::common::Identifier& block : world::realBlockTags::membersOf(tags, tag)) {
+        if (const auto* definition = registry::blockStateDefinitions::of(block); definition != nullptr) {
+            for (std::int32_t offset = 0; offset < definition->stateCount(); ++offset) {
+                flags[static_cast<std::size_t>(definition->firstStateId() + offset)] = true;
+            }
+        } else if (const std::optional<std::int32_t> only = registry::blocks::registry().idOf(block);
+                   only.has_value()) {
+            flags[static_cast<std::size_t>(*only)] = true;
+        }
+    }
+    return flags;
+}
+
+// parity: `Heightmap.Types` read these two tags, so a datapack that edits them moves the heightmaps.
+void useHeightmapTags(const world::realBlockTags::TagMembers& tags) {
+    const std::vector<bool> motion = statesOf(tags, "minecraft:blocks_motion_in_heightmap");
+    const std::vector<bool> noLeaves = statesOf(tags, "minecraft:blocks_motion_in_heightmap_no_leaves");
+    server::world::useHeightmapBlockSets(motion, noLeaves);
+}
 
 using wire::common::Identifier;
 
@@ -79,6 +105,7 @@ VanillaGameData::VanillaGameData(const Jar& jar, wire::common::Logger logger)
       timelines({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
       testInstances({.readText = jar.readText, .entriesUnder = jar.entriesUnder}),
       structureTemplates({.readEntry = jar.readEntry, .dataIds = jar.dataIds}) {
+    useHeightmapTags(blockTags);
     lootTables.useRegistries(&lootRegistries);
     villagerTrades.useLootTables(&lootTables);
     useBrewingRecipes();
@@ -106,6 +133,7 @@ void VanillaGameData::useBrewingRecipes() const {
 
 void VanillaGameData::reload(const Jar& jar, const wire::common::Logger& logger) {
     blockTags = world::realBlockTags::load(readerOf<world::realBlockTags::JarReader>(jar), logger);
+    useHeightmapTags(blockTags);
     itemTags = world::realItemTags::load(readerOf<world::realItemTags::JarReader>(jar), logger);
     fluidTags = world::realFluidTags::load(readerOf<world::realFluidTags::JarReader>(jar), logger);
     timelineTags = world::realTimelineTags::load(readerOf<world::realTimelineTags::JarReader>(jar), logger);

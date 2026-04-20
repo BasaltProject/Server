@@ -131,6 +131,30 @@ void ChunkGenerationQueue::request(std::int32_t chunkX, std::int32_t chunkZ, std
     queued_.emplace(key, priority);
 }
 
+void ChunkGenerationQueue::requestForced(std::int32_t chunkX, std::int32_t chunkZ) {
+    // parity: level 31 leaves 33, full, two rings out, and the pyramid decorates three rings past that.
+    constexpr std::int32_t kDecoratedRings = kForcedFullRings + 3;
+    if (!running_.load()) {
+        return;
+    }
+    if (pipeline_ != nullptr) {
+        const std::lock_guard<std::mutex> lock{mutex_};
+        pipeline_->demandArea(chunkX, chunkZ, kForcedFullRings, kDecoratedRings, 0);
+        return;
+    }
+    for (std::int32_t dx = -kForcedFullRings; dx <= kForcedFullRings; ++dx) {
+        for (std::int32_t dz = -kForcedFullRings; dz <= kForcedFullRings; ++dz) {
+            request(chunkX + dx, chunkZ + dz, 0);
+        }
+    }
+}
+
+void ChunkGenerationQueue::releaseForced(std::int32_t chunkX, std::int32_t chunkZ) {
+    if (pipeline_ != nullptr) {
+        pipeline_->releaseArea(chunkX, chunkZ);
+    }
+}
+
 std::size_t
 ChunkGenerationQueue::retainWhere(const std::function<bool(std::int32_t chunkX, std::int32_t chunkZ)>& shouldKeep) {
     if (pipeline_ != nullptr) {

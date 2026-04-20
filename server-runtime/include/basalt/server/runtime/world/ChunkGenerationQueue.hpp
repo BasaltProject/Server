@@ -50,6 +50,13 @@ public:
 
     void request(std::int32_t chunkX, std::int32_t chunkZ, std::int32_t priority);
 
+    /// parity: `TicketType.FORCED`, the chunk and two rings full and decorated out to five.
+    void requestForced(std::int32_t chunkX, std::int32_t chunkZ);
+
+    void releaseForced(std::int32_t chunkX, std::int32_t chunkZ);
+
+    static constexpr std::int32_t kForcedFullRings = 2;
+
     /// Drops pending requests `shouldKeep` rejects: a player who moved on leaves requests nobody will look at.
     std::size_t retainWhere(const std::function<bool(std::int32_t chunkX, std::int32_t chunkZ)>& shouldKeep);
 
