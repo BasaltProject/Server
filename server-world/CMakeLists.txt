@@ -181,6 +181,11 @@ basalt_module(server-world
     src/crafting/RecipeJson.cpp
     src/crafting/StackedContents.cpp
     src/datafix/DataFixer.cpp
+    src/datafix/FixSupport.cpp
+    src/datafix/Fixes4000.cpp
+    src/datafix/TextFixes.cpp
+    src/datafix/Fixes4300.cpp
+    src/datafix/Fixes4996.cpp
     src/datafix/ItemWalk.cpp
     src/crafting/SpecialCrafting.cpp
     src/loot/ContextNumbers.cpp
