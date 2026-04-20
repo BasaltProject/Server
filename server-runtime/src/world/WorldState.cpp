@@ -393,13 +393,15 @@ Chunk& WorldState::installLocked(Chunk chunk) {
             [this](std::int32_t x, std::int32_t y, std::int32_t z) -> std::int32_t {
             return blockStateLocked(x, y, z).value_or(0);
         };
-        server::world::terrain::decoration::tree::leafDistances::settle(installed, worldBlockAt);
+        if (!installed.loadedComplete()) {
+            server::world::terrain::decoration::tree::leafDistances::settle(installed, worldBlockAt);
+        }
         // All eight: a diagonal neighbour's leaves are within six blocks of this chunk's logs too, and
         // once the whole 3x3 is in every chunk has been measured against its final neighbourhood.
         for (std::int32_t dx = -1; dx <= 1; ++dx) {
             for (std::int32_t dz = -1; dz <= 1; ++dz) {
                 if (Chunk* neighbour = chunkAtPos(chunkX + dx, chunkZ + dz);
-                    neighbour != nullptr && (dx != 0 || dz != 0)) {
+                    neighbour != nullptr && (dx != 0 || dz != 0) && !neighbour->loadedComplete()) {
                     server::world::terrain::decoration::tree::leafDistances::settle(*neighbour, worldBlockAt);
                 }
             }
@@ -409,7 +411,9 @@ Chunk& WorldState::installLocked(Chunk chunk) {
             [&chunkAtPos](std::int32_t otherX, std::int32_t otherZ) -> const server::world::Chunk* {
             return chunkAtPos(otherX, otherZ);
         };
-        server::world::terrain::decoration::bushSurvival::settle(installed, neighbourAt, hasSkylight_);
+        if (!installed.loadedComplete()) {
+            server::world::terrain::decoration::bushSurvival::settle(installed, neighbourAt, hasSkylight_);
+        }
     }
     // parity: `LevelChunk.postProcessGeneration` ticks every fluid the aquifer marked.
     for (const std::span<const server::world::ChunkShapeUpdate> marks :

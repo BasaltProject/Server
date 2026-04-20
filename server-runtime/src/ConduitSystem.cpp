@@ -1,6 +1,7 @@
 #include <basalt/server/random/RandomSource.hpp>
 #include <basalt/server/registry/BlockFluids.hpp>
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/ConduitSystem.hpp>
 #include <basalt/server/runtime/entity/EntityCombat.hpp>
@@ -16,6 +17,7 @@
 #include <basalt/server/runtime/world/Precipitation.hpp>
 #include <basalt/wire/common/Mth.hpp>
 #include <basalt/wire/nbt/NbtTag.hpp>
+#include <basalt/wire/protocol/play/BlockEntityPackets.hpp>
 
 #include <optional>
 
@@ -193,6 +195,20 @@ bool ConduitSystem::tick(world::LoadedWorld& world, const std::int32_t x, const 
             if (now != was) {
                 writeTarget(data, now);
                 changed = true;
+                // parity: `ConduitBlockEntity.getUpdatePacket`, so the client turns the eye towards the target.
+                if (const std::optional<std::int32_t> typeId =
+                        server::registry::blockEntityTypes::idOf(Identifier::vanilla("conduit"));
+                    typeId.has_value()) {
+                    const wire::protocol::play::BlockEntityDataPacket packet{
+                        .pos = {.x = x, .y = y, .z = z}, .typeId = *typeId, .tag = data};
+                    for (PlayerSession* watcher : watchersOf(world)) {
+                        if (watcher->connection().sendPlayPacket) {
+                            watcher->connection().sendPlayPacket(
+                                wire::protocol::play::BlockEntityDataPacket::kId,
+                                [&packet](wire::io::ByteBuffer& buffer) { packet.write(buffer); });
+                        }
+                    }
+                }
             }
         }
     }

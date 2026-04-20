@@ -129,6 +129,11 @@ public:
 
     [[nodiscard]] std::span<const wire::nbt::NbtCompound> savedEntities() const noexcept { return savedEntities_; }
 
+    /// Read back from storage already finished, so its blocks are final and nothing is settled over them.
+    [[nodiscard]] bool loadedComplete() const noexcept { return loadedComplete_; }
+
+    void markLoadedComplete() noexcept { loadedComplete_ = true; }
+
     void setSavedEntities(std::vector<wire::nbt::NbtCompound> entities);
 
     [[nodiscard]] std::vector<wire::nbt::NbtCompound> takeSavedEntities();
@@ -275,6 +280,7 @@ private:
     std::vector<std::int32_t> blockEntityOrder_;
     std::vector<ChunkGeneratedEntity> generatedEntities_;
     std::vector<wire::nbt::NbtCompound> savedEntities_;
+    bool loadedComplete_ = false;
     std::vector<ChunkScheduledTick> blockTicks_;
     std::vector<ChunkScheduledTick> fluidTicks_;
     structure::ChunkStructures structures_;

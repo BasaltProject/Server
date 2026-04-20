@@ -577,6 +577,9 @@ std::expected<Chunk, ChunkNbtError> read(const NbtCompound& tag, ChunkHeight bou
     }
     Chunk chunk{tag.getInt("xPos"), tag.getInt("zPos"), bounds};
     chunk.setStage(*stage);
+    if (*stage == ChunkStage::Full) {
+        chunk.markLoadedComplete();
+    }
     chunk.restoreInhabitedTime(tag.getLong("InhabitedTime"));
 
     const NbtList* sections = tag.getList("sections");

@@ -3,6 +3,8 @@
 #include <basalt/wire/nbt/NbtIO.hpp>
 
 #include <cstdint>
+#include <array>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -58,6 +60,21 @@ constexpr std::int32_t kOffhand = -106;
     return effects;
 }
 
+[[nodiscard]] std::optional<StoredItemStack> stackOf(const NbtCompound& item) {
+    const std::int32_t count = item.getInt("count");
+    if (count <= 0) {
+        return std::nullopt;
+    }
+    NbtCompound components;
+    if (const NbtTag* found = item.find("components"); found != nullptr) {
+        if (const NbtCompound* value = found->get<NbtCompound>(); value != nullptr) {
+            components = *value;
+        }
+    }
+    return StoredItemStack{
+        .id = std::string{item.getString("id")}, .count = count, .components = std::move(components)};
+}
+
 [[nodiscard]] StoredInventory readInventory(const NbtList* items, std::int32_t size) {
     StoredInventory inventory = StoredInventory::empty(size);
     if (items == nullptr) {
@@ -82,20 +99,32 @@ constexpr std::int32_t kOffhand = -106;
         if (slot < 0 || slot >= size) {
             continue;
         }
-        const std::int32_t count = item->getInt("count");
-        if (count <= 0) {
-            continue;
+        if (std::optional<StoredItemStack> stack = stackOf(*item); stack.has_value()) {
+            inventory.slots[static_cast<std::size_t>(slot)] = std::move(stack);
         }
-        NbtCompound components;
-        if (const NbtTag* found = item->find("components"); found != nullptr) {
-            if (const NbtCompound* value = found->get<NbtCompound>(); value != nullptr) {
-                components = *value;
-            }
-        }
-        inventory.slots[static_cast<std::size_t>(slot)] = StoredItemStack{
-            .id = std::string{item->getString("id")}, .count = count, .components = std::move(components)};
     }
     return inventory;
+}
+
+/// parity: `LivingEntity` keeps worn items and the offhand in `equipment`, one stack per slot, since 1.21.5.
+void readEquipment(const NbtCompound* equipment, StoredInventory& inventory) {
+    if (equipment == nullptr) {
+        return;
+    }
+    static constexpr std::array<std::pair<std::string_view, std::int32_t>, 5> kSlots{{{"feet", kMainSlots},
+                                                                                      {"legs", kMainSlots + 1},
+                                                                                      {"chest", kMainSlots + 2},
+                                                                                      {"head", kMainSlots + 3},
+                                                                                      {"offhand", kMainSlots + 4}}};
+    for (const auto& [name, slot] : kSlots) {
+        const NbtCompound* held = equipment->getCompound(name);
+        if (held == nullptr || static_cast<std::size_t>(slot) >= inventory.slots.size()) {
+            continue;
+        }
+        if (std::optional<StoredItemStack> stack = stackOf(*held); stack.has_value()) {
+            inventory.slots[static_cast<std::size_t>(slot)] = std::move(stack);
+        }
+    }
 }
 
 // parity: the `Score` and shoulder parrots a `.dat` keeps.
@@ -133,6 +162,8 @@ std::expected<StoredPlayer, StorageFormatError> read(std::string_view uuid, std:
 
     const NbtList* position = listOf(*root, "Pos");
     const NbtList* rotation = listOf(*root, "Rotation");
+    StoredInventory inventory = readInventory(listOf(*root, "Inventory"), StoredInventory::kPlayerSlots);
+    readEquipment(root->getCompound("equipment"), inventory);
     return StoredPlayer{
         .uuid = std::string{uuid},
         .name = std::string{name},
@@ -154,7 +185,7 @@ std::expected<StoredPlayer, StorageFormatError> read(std::string_view uuid, std:
         .xpTotal = root->getInt("XpTotal"),
         .gamemode = gamemodeById(root->getInt("playerGameType")),
         .group = std::nullopt,
-        .inventory = readInventory(listOf(*root, "Inventory"), StoredInventory::kPlayerSlots),
+        .inventory = std::move(inventory),
         .enderChest = readInventory(listOf(*root, "EnderItems"), StoredPlayer::kEnderChestSlots),
         .stats = {},
         .tags = {},
