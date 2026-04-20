@@ -95,6 +95,35 @@ void CombatSystem::emitVibration(world::LoadedWorld& world, std::string_view eve
     world::vibrations::emit(world.state(), event, x, y, z, world.gameTime(), {.entity = source});
 }
 
+/// parity: `Level.gameEvent`.
+void CombatSystem::emitVibration(world::LoadedWorld& world, std::string_view event, double x, double y, double z,
+                                 const world::vibrations::Source& source) {
+    world::vibrations::emit(world.state(), event, x, y, z, world.gameTime(), source);
+}
+
+/// parity: `Projectile.getOwner`, resolved to the uuid the NBT keeps under `Owner`.
+[[nodiscard]] std::optional<wire::common::Uuid> projectileOwnerOf(world::LoadedWorld& world,
+                                                                  const std::vector<PlayerSession*>& watchers,
+                                                                  const ServerEntity& projectile) {
+    if (projectile.ownerUuid.has_value()) {
+        return projectile.ownerUuid;
+    }
+    if (!projectile.ownerId.has_value()) {
+        return std::nullopt;
+    }
+    for (const PlayerSession* player : watchers) {
+        if (player->entityId() == *projectile.ownerId) {
+            return player->uuid();
+        }
+    }
+    for (const ServerEntity* other : world.state().entities()) {
+        if (other->entityId() == *projectile.ownerId) {
+            return other->uuid();
+        }
+    }
+    return std::nullopt;
+}
+
 void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                                   const std::vector<ServerEntity*>& living, ServerEntity& entity,
                                   const entity::projectiles::Kind& kind) {
@@ -110,10 +139,11 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
     const double fromY = entity.y;
     const double fromZ = entity.z;
     const std::optional<entity::BlockHit> hit = entity::projectiles::tick(world.state(), entity, kind);
-    // parity: `Projectile.tick`.
+    // parity: `Projectile.tick` answers the shoot with the owner as the source entity.
     if (!entity.announced) {
         entity.announced = true;
-        emitVibration(world, "projectile_shoot", entity.x, entity.y, entity.z, entity.uuid());
+        emitVibration(world, "projectile_shoot", entity.x, entity.y, entity.z,
+                      {.entity = projectileOwnerOf(world, watchers, entity)});
     }
     const std::string_view path = kind.type.path();
     if (deflected(watchers, living, entity, fromX, fromY, fromZ)) {
@@ -326,8 +356,9 @@ void CombatSystem::tickProjectile(world::LoadedWorld& world, const std::vector<P
 
 void CombatSystem::hitBlock(world::LoadedWorld& world, const std::vector<PlayerSession*>& watchers,
                             const ServerEntity& projectile, const entity::BlockHit& hit, bool byArrow) {
-    // parity: `Projectile.onHitBlock` sends `PROJECTILE_LAND` where it landed.
-    emitVibration(world, "projectile_land", hit.x, hit.y, hit.z, projectile.uuid());
+    // parity: `Projectile.onHitBlock` sends `PROJECTILE_LAND` where it landed, owning player included.
+    emitVibration(world, "projectile_land", hit.x, hit.y, hit.z,
+                  {.entity = projectile.uuid(), .projectileOwner = projectileOwnerOf(world, watchers, projectile)});
     // parity: `Entity.isOnFire`, which is what `TntBlock.onProjectileHit` asks the arrow.
     const std::optional<world::BlockChange> change = world::projectileHits::onHit(
         world.state(), world.gameTime(), hit, byArrow, projectile.fireTicks > 0,

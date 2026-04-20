@@ -30,10 +30,19 @@ std::int32_t ProxyLogin::beginQuery() {
         id = randomTransactionId();
     }
     transactionId_ = id;
+    if (forwarding_.mode == wire::auth::forwarding::ForwardingMode::Basalt) {
+        challenge_ = wire::auth::forwarding::native::newRequest(forwarding_.backendId);
+    }
     return transactionId_;
 }
 
-std::vector<std::uint8_t> ProxyLogin::query() const { return wire::auth::forwarding::velocity::request(); }
+std::vector<std::uint8_t> ProxyLogin::query() const {
+    if (forwarding_.mode == wire::auth::forwarding::ForwardingMode::Basalt) {
+        return challenge_.has_value() ? wire::auth::forwarding::native::encodeRequest(*challenge_)
+                                      : std::vector<std::uint8_t>{};
+    }
+    return wire::auth::forwarding::velocity::request();
+}
 
 ForwardingResult ProxyLogin::readAnswer(std::int32_t answeredId,
                                         const std::optional<std::vector<std::uint8_t>>& payload) {
@@ -49,7 +58,34 @@ ForwardingResult ProxyLogin::readAnswer(std::int32_t answeredId,
     if (!payload.has_value()) {
         return ForwardingResult{std::string{"the connection did not answer the forwarding query"}};
     }
+    if (forwarding_.mode == wire::auth::forwarding::ForwardingMode::Basalt) {
+        return readNativeAnswer(*payload);
+    }
     return wire::auth::forwarding::velocity::decode(*payload, forwarding_);
+}
+
+ForwardingResult ProxyLogin::readNativeAnswer(std::span<const std::uint8_t> payload) {
+    namespace native = wire::auth::forwarding::native;
+    if (const std::optional<std::string> broken = forwarding_.misconfiguration(); broken.has_value()) {
+        return ForwardingResult{*broken};
+    }
+    if (!challenge_.has_value()) {
+        return ForwardingResult{std::string{"no challenge was issued for this connection"}};
+    }
+    const native::Request issued = std::move(*challenge_);
+    challenge_.reset();
+    native::VerifyResult verified = native::verify(payload, issued, forwarding_.trustedKeys);
+    if (const std::string* reason = std::get_if<std::string>(&verified); reason != nullptr) {
+        return ForwardingResult{*reason};
+    }
+    native::Identity& identity = std::get<native::Verified>(verified).identity;
+    ForwardedLogin login;
+    login.host = std::move(identity.virtualHost);
+    login.address = std::move(identity.address);
+    login.profileId = identity.profileId;
+    login.name = std::move(identity.name);
+    login.properties = std::move(identity.properties);
+    return login;
 }
 
 std::optional<std::string> ProxyLogin::accept(const ForwardingResult& result, const std::optional<std::string>& name,

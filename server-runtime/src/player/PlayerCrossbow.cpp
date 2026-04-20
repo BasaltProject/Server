@@ -381,6 +381,7 @@ void shoot(const BreakContext& context, FireworkSystem* fireworks, PlayerSession
                     player.y + kEyeHeight - kArrowDrop, player.z, static_cast<double>(aim[0]),
                     static_cast<double>(aim[1]), static_cast<double>(aim[2]), power, 1.0F, random);
                 arrow.ownerId = player.entityId();
+                arrow.ownerUuid = player.uuid();
                 arrow.critical = true;
                 arrow.pierceLevel = pierce;
                 arrow.arrowPickup = projectile.components.contains(kIntangible)

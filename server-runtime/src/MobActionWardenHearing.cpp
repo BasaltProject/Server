@@ -1,13 +1,16 @@
 #include <basalt/server/registry/Entities.hpp>
+#include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/entity/MobBreathing.hpp>
 #include <basalt/server/runtime/entity/MobRules.hpp>
 #include <basalt/server/runtime/entity/ServerEntity.hpp>
 #include <basalt/server/runtime/entity/WardenBrain.hpp>
+#include <basalt/server/runtime/player/PlayerParticles.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/LoadedWorld.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
+#include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/common/Mth.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 
@@ -72,6 +75,48 @@ struct Somebody {
         }
     }
     return top;
+}
+
+/// parity: `VibrationSystem.Ticker` sending `VibrationParticleOption` from the event toward the warden.
+/// Returns whether a player within range received it.
+[[nodiscard]] bool vibrationParticle(const std::vector<PlayerSession*>& watchers, const ServerEntity& warden,
+                                     double eyeY, const brain::Heard& heard, std::int32_t arrivalTicks, double alpha) {
+    const server::registry::ParticleType* type =
+        server::registry::particleTypes::of(wire::common::Identifier::vanilla("vibration"));
+    if (type == nullptr) {
+        return false;
+    }
+    double x = heard.x;
+    double y = heard.y;
+    double z = heard.z;
+    if (alpha > 0.0) {
+        x += ((warden.x - heard.x) * alpha);
+        y += ((eyeY - heard.y) * alpha);
+        z += ((warden.z - heard.z) * alpha);
+    }
+    const wire::protocol::play::LevelParticlesPacket packet{
+        .particleTypeId = type->protocolId,
+        .x = x,
+        .y = y,
+        .z = z,
+        .count = 1,
+        .options = wire::protocol::play::ParticleOptions{wire::protocol::play::ParticleOptions::Vibration{
+            wire::protocol::play::ParticleOptions::Vibration::EntityTarget{warden.entityId(),
+                                                                           static_cast<float>(eyeY - warden.y)},
+            arrivalTicks}}};
+    constexpr double kParticleRange = 32.0;
+    bool anyone = false;
+    for (const PlayerSession* watcher : watchers) {
+        const double dx = watcher->x - x;
+        const double dy = watcher->y - y;
+        const double dz = watcher->z - z;
+        if ((dx * dx) + (dy * dy) + (dz * dz) >= kParticleRange * kParticleRange) {
+            continue;
+        }
+        player::showParticleFor(*watcher, "minecraft:vibration", packet);
+        anyone = true;
+    }
+    return anyone;
 }
 
 } // namespace
@@ -200,14 +245,26 @@ void MobActionSystem::wardenHears(world::LoadedWorld& world, const std::vector<P
     if (!state.travelling.has_value() && state.candidate.has_value() && state.candidate->tick < now) {
         state.travelling = std::exchange(state.candidate, std::nullopt);
         state.travelTicks = mth::floor(static_cast<double>(state.travelling->distance));
+        // parity: `trySelectAndScheduleVibration` arms the reload until the particle reaches a player.
+        state.vibrationParticlePending =
+            !vibrationParticle(watchers, warden, eyeY, *state.travelling, state.travelTicks, 0.0);
     }
     if (!state.travelling.has_value()) {
         return;
+    }
+    if (state.vibrationParticlePending) {
+        // parity: `tryReloadVibrationParticle` resends from the lerped origin until someone sees it.
+        const std::int32_t initial = mth::floor(static_cast<double>(state.travelling->distance));
+        const double alpha =
+            initial > 0 ? 1.0 - (static_cast<double>(state.travelTicks) / static_cast<double>(initial)) : 0.0;
+        state.vibrationParticlePending =
+            !vibrationParticle(watchers, warden, eyeY, *state.travelling, state.travelTicks, alpha);
     }
     state.travelTicks = std::max(0, state.travelTicks - 1);
     if (state.travelTicks > 0) {
         return;
     }
+    state.vibrationParticlePending = false;
     const brain::Heard heard = *std::exchange(state.travelling, std::nullopt);
     if (warden.dying) {
         return;

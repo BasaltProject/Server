@@ -191,7 +191,7 @@ TEST_CASE("a forwarding mode that is not one stops the server rather than being 
     REQUIRE_FALSE(config.has_value());
     CHECK(config.error() ==
           "config/server.toml: forwarding mode must be one of none, bungeecord, bungeeguard, safenet, "
-          "velocity, not \"velocitty\"");
+          "velocity, basalt, not \"velocitty\"");
 }
 
 TEST_CASE("a forwarding mode without the secret it needs is refused at startup") {

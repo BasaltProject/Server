@@ -44,6 +44,7 @@
 #include <basalt/server/runtime/player/PlayerInventory.hpp>
 #include <basalt/server/runtime/player/PlayerItemPickup.hpp>
 #include <basalt/server/runtime/player/PlayerMace.hpp>
+#include <basalt/server/runtime/player/PlayerParticles.hpp>
 #include <basalt/server/runtime/player/PlayerPick.hpp>
 #include <basalt/server/runtime/player/PlayerSigns.hpp>
 #include <basalt/server/runtime/player/PlayerSleep.hpp>
@@ -78,6 +79,8 @@
 #include <basalt/wire/bedrock/BedrockEntityIdentifiers.hpp>
 #include <basalt/wire/io/Platform.hpp>
 #include <basalt/wire/multiversion/ProtocolVersions.hpp>
+#include <basalt/wire/protocol/play/BlockPos.hpp>
+#include <basalt/wire/protocol/play/EntityPackets.hpp>
 #include <basalt/wire/text/Serializers.hpp>
 
 #include <algorithm>
@@ -171,6 +174,50 @@ void BasaltServer::start(const std::chrono::steady_clock::time_point startedAt) 
                                                         event.set(3, true);
                                                     }));
         });
+        // parity: `ServerLevel.sendParticles`, which only reaches players within thirty-two blocks.
+        world->state().setVibrationParticleSender(
+            [this, worldName = name](double x, double y, double z,
+                                     const world::WorldState::ParticleDestination& destination,
+                                     std::int32_t arrivalTicks) {
+                const server::registry::ParticleType* type =
+                    server::registry::particleTypes::of(wire::common::Identifier::vanilla("vibration"));
+                if (type == nullptr) {
+                    return false;
+                }
+                wire::protocol::play::ParticleOptions::Vibration vibration;
+                if (const auto& entity = destination.entity; entity.has_value()) {
+                    vibration.target =
+                        wire::protocol::play::ParticleOptions::Vibration::EntityTarget{entity->first, entity->second};
+                } else if (const auto& block = destination.block; block.has_value()) {
+                    vibration.target = wire::protocol::play::BlockPos{(*block)[0], (*block)[1], (*block)[2]};
+                } else {
+                    return false;
+                }
+                vibration.arrivalTicks = arrivalTicks;
+                const wire::protocol::play::LevelParticlesPacket packet{
+                    .particleTypeId = type->protocolId,
+                    .x = x,
+                    .y = y,
+                    .z = z,
+                    .count = 1,
+                    .options = wire::protocol::play::ParticleOptions{vibration}};
+                constexpr double kParticleRange = 32.0;
+                bool anyone = false;
+                for (player::PlayerSession* player : playerRegistry_.snapshot()) {
+                    if (player->worldName != worldName) {
+                        continue;
+                    }
+                    const double dx = player->x - x;
+                    const double dy = player->y - y;
+                    const double dz = player->z - z;
+                    if ((dx * dx) + (dy * dy) + (dz * dz) >= kParticleRange * kParticleRange) {
+                        continue;
+                    }
+                    player::showParticleFor(*player, "minecraft:vibration", packet);
+                    anyone = true;
+                }
+                return anyone;
+            });
     }
     // Emitted after the plugins are up, so the first thing a plugin is told is that everything is there.
     static_cast<void>(server::plugins::emit(&plugins_->events(), &server::plugins::pluginEventTypes::serverLoad(),

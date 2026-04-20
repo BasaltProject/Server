@@ -16,7 +16,7 @@ using wire::common::Identifier;
 
 void announceOpeners(const OpenersContext& context, world::LoadedWorld& world, const std::int32_t x,
                      const std::int32_t y, const std::int32_t z, const std::string_view block,
-                     const std::int32_t openers) {
+                     const std::int32_t openers, const std::optional<wire::common::Uuid> opener) {
     const std::optional<std::int32_t> stateId = world.state().blockState(x, y, z);
     if (!stateId.has_value()) {
         return;
@@ -49,10 +49,10 @@ void announceOpeners(const OpenersContext& context, world::LoadedWorld& world, c
     } else {
         return;
     }
-    // parity: `CONTAINER_OPEN` on the first in and `CONTAINER_CLOSE` on the last out.
+    // parity: `CONTAINER_OPEN` on the first in and `CONTAINER_CLOSE` on the last out, with the player.
     if (world.state().hasSculkSensorNear(x, y, z, world::vibrations::kCalibratedRange)) {
         world::vibrations::emit(world.state(), openers == 1 ? "container_open" : "container_close", x + 0.5, y + 0.5,
-                                z + 0.5, world.gameTime());
+                                z + 0.5, world.gameTime(), {.entity = opener});
     }
     const float roll = context.nextFloat ? context.nextFloat() : 0.5F;
     const std::int64_t seed = context.nextSeed ? context.nextSeed() : 0;

@@ -1,4 +1,5 @@
 #include <basalt/server/registry/BlockStateDefinitions.hpp>
+#include <basalt/server/registry/Registries.hpp>
 #include <basalt/server/runtime/BlockChangeBroadcaster.hpp>
 #include <basalt/server/runtime/MobActionSystem.hpp>
 #include <basalt/server/runtime/NaturalSpawningSystem.hpp>
@@ -12,6 +13,7 @@
 #include <basalt/server/runtime/entity/ai/Controls.hpp>
 #include <basalt/server/runtime/entity/ai/MobContext.hpp>
 #include <basalt/server/runtime/entity/ai/RandomPos.hpp>
+#include <basalt/server/runtime/player/PlayerParticles.hpp>
 #include <basalt/server/runtime/player/PlayerRegistry.hpp>
 #include <basalt/server/runtime/player/PlayerSession.hpp>
 #include <basalt/server/runtime/world/AdvancementTriggers.hpp>
@@ -21,6 +23,7 @@
 #include <basalt/server/runtime/world/ThrownItemTriggers.hpp>
 #include <basalt/server/runtime/world/TriggerFacts.hpp>
 #include <basalt/server/runtime/world/Vibrations.hpp>
+#include <basalt/wire/common/Identifier.hpp>
 #include <basalt/wire/common/Mth.hpp>
 #include <basalt/wire/protocol/play/EntityPackets.hpp>
 
@@ -104,7 +107,7 @@ void MobActionSystem::tickAllay(world::LoadedWorld& world, entity::ai::MobContex
             }
         }
     }
-    allayHears(world, allay, state);
+    allayHears(world, allay, state, watchersOf(world));
     // parity: `CountDownCooldownTicks` for both cooldowns, gone once they reach nothing.
     if (state.noteblockCooldown.has_value() && --*state.noteblockCooldown <= 0) {
         state.noteblockCooldown.reset();
@@ -335,7 +338,51 @@ void MobActionSystem::tickAllay(world::LoadedWorld& world, entity::ai::MobContex
     state.duplicationCooldown = std::max<std::int64_t>(state.duplicationCooldown - 1, 0);
 }
 
-void MobActionSystem::allayHears(world::LoadedWorld& world, ServerEntity& allay, allays::AllayState& state) {
+/// parity: `VibrationSystem.Ticker` sending `VibrationParticleOption` from the note block toward the allay.
+/// Returns whether a player within range received it.
+[[nodiscard]] bool allayVibrationParticle(const std::vector<PlayerSession*>& watchers, const ServerEntity& allay,
+                                          double eyeY, const allays::AllayState::Vibration& vibration,
+                                          std::int32_t arrivalTicks, double alpha) {
+    const server::registry::ParticleType* type =
+        server::registry::particleTypes::of(wire::common::Identifier::vanilla("vibration"));
+    if (type == nullptr) {
+        return false;
+    }
+    double x = vibration.x;
+    double y = vibration.y;
+    double z = vibration.z;
+    if (alpha > 0.0) {
+        x += ((allay.x - vibration.x) * alpha);
+        y += ((eyeY - vibration.y) * alpha);
+        z += ((allay.z - vibration.z) * alpha);
+    }
+    const wire::protocol::play::LevelParticlesPacket packet{
+        .particleTypeId = type->protocolId,
+        .x = x,
+        .y = y,
+        .z = z,
+        .count = 1,
+        .options = wire::protocol::play::ParticleOptions{wire::protocol::play::ParticleOptions::Vibration{
+            wire::protocol::play::ParticleOptions::Vibration::EntityTarget{allay.entityId(),
+                                                                           static_cast<float>(eyeY - allay.y)},
+            arrivalTicks}}};
+    constexpr double kParticleRange = 32.0;
+    bool anyone = false;
+    for (const PlayerSession* watcher : watchers) {
+        const double dx = watcher->x - x;
+        const double dy = watcher->y - y;
+        const double dz = watcher->z - z;
+        if ((dx * dx) + (dy * dy) + (dz * dz) >= kParticleRange * kParticleRange) {
+            continue;
+        }
+        player::showParticleFor(*watcher, "minecraft:vibration", packet);
+        anyone = true;
+    }
+    return anyone;
+}
+
+void MobActionSystem::allayHears(world::LoadedWorld& world, ServerEntity& allay, allays::AllayState& state,
+                                 const std::vector<PlayerSession*>& watchers) {
     const std::int64_t now = world.gameTime();
     const double eyeY = allay.y + entity::mobBreathing::eyeHeightOf(allay);
     std::int64_t lastTime = state.heardTime;
@@ -386,8 +433,8 @@ void MobActionSystem::allayHears(world::LoadedWorld& world, ServerEntity& allay,
         const auto distance = static_cast<float>(std::sqrt((dx * dx) + (dy * dy) + (dz * dz)));
         if (!state.vibrationCandidate.has_value() ||
             (state.vibrationCandidate->tick == record.gameTime && distance < state.vibrationCandidate->distance)) {
-            state.vibrationCandidate =
-                allays::AllayState::Vibration{.pos = pos, .distance = distance, .tick = record.gameTime};
+            state.vibrationCandidate = allays::AllayState::Vibration{
+                .pos = pos, .x = record.x, .y = record.y, .z = record.z, .distance = distance, .tick = record.gameTime};
         }
     }
     // parity: `VibrationSystem.Ticker.tick`.
@@ -395,10 +442,22 @@ void MobActionSystem::allayHears(world::LoadedWorld& world, ServerEntity& allay,
         state.vibrationCandidate->tick < now) {
         state.vibrationTravelling = std::exchange(state.vibrationCandidate, std::nullopt);
         state.vibrationTicks = mth::floor(static_cast<double>(state.vibrationTravelling->distance));
+        // parity: `trySelectAndScheduleVibration` arms the reload until the particle reaches a player.
+        state.vibrationParticlePending =
+            !allayVibrationParticle(watchers, allay, eyeY, *state.vibrationTravelling, state.vibrationTicks, 0.0);
     }
     if (state.vibrationTravelling.has_value()) {
+        if (state.vibrationParticlePending) {
+            // parity: `tryReloadVibrationParticle` resends from the lerped origin until someone sees it.
+            const std::int32_t initial = mth::floor(static_cast<double>(state.vibrationTravelling->distance));
+            const double alpha =
+                initial > 0 ? 1.0 - (static_cast<double>(state.vibrationTicks) / static_cast<double>(initial)) : 0.0;
+            state.vibrationParticlePending =
+                !allayVibrationParticle(watchers, allay, eyeY, *state.vibrationTravelling, state.vibrationTicks, alpha);
+        }
         state.vibrationTicks = std::max(0, state.vibrationTicks - 1);
         if (state.vibrationTicks <= 0) {
+            state.vibrationParticlePending = false;
             // parity: `AllayAi.hearNoteblock`.
             const allays::Pos pos = std::exchange(state.vibrationTravelling, std::nullopt)->pos;
             if (!state.likedNoteblock.has_value()) {

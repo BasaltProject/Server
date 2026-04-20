@@ -5,6 +5,7 @@
 #include <basalt/server/runtime/world/BrewingStands.hpp>
 #include <basalt/server/runtime/world/Furnaces.hpp>
 #include <basalt/server/storage/StoredPlayer.hpp>
+#include <basalt/wire/common/Uuid.hpp>
 #include <basalt/wire/protocol/play/InventoryPackets.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
 
@@ -275,7 +276,8 @@ private:
 
     void pickItem(player::PlayerSession& session, const storage::StoredItemStack& picked);
 
-    void announceOpeners(const wire::protocol::play::BlockPos& pos, const std::string& block, std::int32_t openers);
+    void announceOpeners(const wire::protocol::play::BlockPos& pos, const std::string& block, std::int32_t openers,
+                         std::optional<wire::common::Uuid> opener = std::nullopt);
 
     void fillPluginMenu(const std::map<std::int32_t, PluginMenuItem>& items);
 

@@ -257,6 +257,33 @@ void putUuid(wire::nbt::NbtCompound& tag, std::string_view key, const std::optio
     return entity == nullptr ? nullptr : &entity->data();
 }
 
+/// parity: `BlockPos.asLong`.
+[[nodiscard]] std::int64_t blockKey(std::int32_t x, std::int32_t y, std::int32_t z) {
+    return ((static_cast<std::int64_t>(x) & 0x3ffffff) << 38) | ((static_cast<std::int64_t>(z) & 0x3ffffff) << 12) |
+           (static_cast<std::int64_t>(y) & 0xfff);
+}
+
+/// parity: `VibrationSystem.Ticker.trySelectAndScheduleVibration` and `tryReloadVibrationParticle`.
+/// Returns whether a player within range received the particle.
+[[nodiscard]] bool particle(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::int32_t sensorZ,
+                            const Noise& noise, std::int32_t travelTicks, double alpha) {
+    const WorldState::VibrationParticleSender sender = world.vibrationParticleSender();
+    if (!sender) {
+        return false;
+    }
+    double x = noise.x;
+    double y = noise.y;
+    double z = noise.z;
+    if (alpha > 0.0) {
+        // parity: `BlockPositionSource.getPosition` answers the center of the block.
+        x += (((static_cast<double>(sensorX) + 0.5) - noise.x) * alpha);
+        y += (((static_cast<double>(sensorY) + 0.5) - noise.y) * alpha);
+        z += (((static_cast<double>(sensorZ) + 0.5) - noise.z) * alpha);
+    }
+    const WorldState::ParticleDestination destination{.block = std::array{sensorX, sensorY, sensorZ}};
+    return sender(x, y, z, destination, travelTicks);
+}
+
 void wake(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z, const wire::common::Identifier& block) {
     static_cast<void>(world);
     static_cast<void>(x);
@@ -400,6 +427,7 @@ void offer(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::i
 /// parity: `VibrationSystem.Ticker.tick`.
 [[nodiscard]] std::optional<Noise> countDown(WorldState& world, std::int32_t x, std::int32_t y, std::int32_t z,
                                              std::int64_t gameTime, const std::function<bool()>& mayLand) {
+    const std::int64_t packed = blockKey(x, y, z);
     wire::nbt::NbtCompound* data = heldBy(world, x, y, z);
     if (data == nullptr) {
         return std::nullopt;
@@ -412,6 +440,7 @@ void offer(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::i
     std::optional<Noise> current = read(listener.getCompound("event"));
     std::int32_t delay = listener.getInt("event_delay", 0);
     if (!current.has_value()) {
+        world.setVibrationParticlePending(packed, false);
         const wire::nbt::NbtCompound* chosen = listener.getCompound("selector");
         wire::nbt::NbtCompound selector = chosen == nullptr ? wire::nbt::NbtCompound{} : *chosen;
         current = read(selector.getCompound("event"));
@@ -424,9 +453,18 @@ void offer(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::i
         }
         // parity: `VibrationSystem.User.calculateTravelTimeInTicks`, a tick per whole block.
         delay = static_cast<std::int32_t>(std::floor(current->distance));
+        // parity: `Data.setCurrentVibration` arms the reload until the particle reaches a player.
+        world.setVibrationParticlePending(packed, !particle(world, x, y, z, *current, delay, 0.0));
         selector.remove("event");
         selector.putLong("tick", -1);
         listener.set("selector", wire::nbt::NbtTag::ofCompound(std::move(selector)));
+    } else if (world.vibrationParticlePending(packed)) {
+        // parity: `tryReloadVibrationParticle` resends from the lerped origin until someone sees it.
+        const std::int32_t initial = static_cast<std::int32_t>(std::floor(current->distance));
+        if (particle(world, x, y, z, *current, delay,
+                     initial > 0 ? 1.0 - (static_cast<double>(delay) / initial) : 0.0)) {
+            world.setVibrationParticlePending(packed, false);
+        }
     }
     // parity: the countdown spends a turn on the very tick the noise is picked, so one born at zero.
     delay = std::max(0, delay - 1);
@@ -445,6 +483,7 @@ void offer(WorldState& world, std::int32_t sensorX, std::int32_t sensorY, std::i
     listener.remove("event");
     listener.putInt("event_delay", 0);
     data->set(kListenerKey, wire::nbt::NbtTag::ofCompound(std::move(listener)));
+    world.setVibrationParticlePending(packed, false);
     return current;
 }
 

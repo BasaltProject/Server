@@ -64,6 +64,8 @@ struct WardenState {
     std::optional<Heard> candidate;
     std::optional<Heard> travelling;
     std::int32_t travelTicks = 0;
+    /// parity: `VibrationSystem.Data.reloadVibrationParticle`, runtime only like the rest.
+    bool vibrationParticlePending = false;
     std::int64_t heardTime = -1;
     std::size_t heardCount = 0;
     std::int32_t vibrationCooldown = 0;
