@@ -94,8 +94,10 @@ public:
 
     void restore(const storage::StoredInventory& stored);
 
-private:
+    /// parity: `Inventory.getSlotWithRemainingSpace`.
     [[nodiscard]] std::optional<std::int32_t> slotWithRoomFor(const storage::StoredItemStack& stack) const;
+
+private:
 
     item::itemComponentCodecs::EnchantmentId enchantmentIds_;
     std::array<std::optional<storage::StoredItemStack>, storage::StoredInventory::kPlayerSlots> slots_;

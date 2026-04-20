@@ -35,6 +35,14 @@ struct BasaltConfig {
     bool onlineMode = true;
     /// parity: `enforce-secure-profile`, which only matters in online mode.
     bool enforceSecureProfile = true;
+    /// parity: `bug-report-link`; empty sends no server links.
+    std::string bugReportLink;
+    /// parity: `resource-pack`, `resource-pack-sha1`, `resource-pack-id`, `require-resource-pack` and the prompt.
+    std::string resourcePackUrl;
+    std::string resourcePackSha1;
+    std::string resourcePackId;
+    bool requireResourcePack = false;
+    std::string resourcePackPrompt;
     std::string gamemode = "survival";
     bool whitelist = false;
     wire::auth::forwarding::ProxyForwarding forwarding;

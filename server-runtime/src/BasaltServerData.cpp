@@ -169,7 +169,8 @@ void BasaltServer::resyncAfterReload() {
     }
     for (player::PlayerSession* player : playerRegistry_.snapshot()) {
         const std::set<wire::common::Identifier> known = playerProgress_->knownRecipes(player->uuid().toString());
-        world::recipeBook::resend(*player, vanillaData_.recipes, {known.begin(), known.end()});
+        world::recipeBook::resend(*player, vanillaData_.recipes, {known.begin(), known.end()},
+                                  playerProgress_->highlightedRecipes(player->uuid().toString()));
     }
 }
 

@@ -8,6 +8,7 @@
 #include <basalt/wire/common/Uuid.hpp>
 #include <basalt/wire/protocol/play/InventoryPackets.hpp>
 #include <basalt/wire/protocol/play/PlayPackets.hpp>
+#include <basalt/wire/protocol/play/RecipePackets.hpp>
 
 #include <array>
 #include <cstdint>
@@ -149,6 +150,8 @@ public:
     void returnCraftingGrid(player::PlayerSession& session);
 
     void handleContainerClick(const wire::protocol::play::ServerboundContainerClickPacket& packet);
+
+    void placeRecipe(const wire::protocol::play::PlaceRecipePacket& packet);
 
     void handleSetCreativeModeSlot(const wire::protocol::play::ServerboundSetCreativeModeSlotPacket& packet);
 

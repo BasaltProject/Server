@@ -115,11 +115,26 @@ void PlayerProgress::load(std::string_view uuid) {
         }
     }
     recipes_.insert_or_assign(std::string{uuid}, std::move(recipes));
+    std::set<Identifier> highlighted;
+    for (const std::string& recipe : stored.highlighted) {
+        const std::expected<Identifier, wire::common::IdentifierError> parsed = Identifier::parse(recipe);
+        if (parsed.has_value()) {
+            highlighted.insert(*parsed);
+        }
+    }
+    highlighted_.insert_or_assign(std::string{uuid}, std::move(highlighted));
+    bookSettings_.insert_or_assign(std::string{uuid}, stored.bookSettings);
 }
 
 void PlayerProgress::unload(std::string_view uuid) {
     if (const auto found = advancements_.find(uuid); found != advancements_.end()) {
         advancements_.erase(found);
+    }
+    if (const auto found = highlighted_.find(uuid); found != highlighted_.end()) {
+        highlighted_.erase(found);
+    }
+    if (const auto found = bookSettings_.find(uuid); found != bookSettings_.end()) {
+        bookSettings_.erase(found);
     }
     if (const auto found = recipes_.find(uuid); found != recipes_.end()) {
         recipes_.erase(found);
@@ -233,8 +248,11 @@ bool PlayerProgress::learn(std::string_view uuid, const Identifier& recipe) {
         player = recipes_.emplace(std::string{uuid}, std::set<Identifier>{}).first;
     }
     const bool added = player->second.insert(recipe).second;
-    if (added && repository_ != nullptr) {
-        repository_->learnRecipe(uuid, recipe.toString());
+    if (added) {
+        highlighted_[std::string{uuid}].insert(recipe);
+        if (repository_ != nullptr) {
+            repository_->learnRecipe(uuid, recipe.toString());
+        }
     }
     return added;
 }
@@ -249,10 +267,40 @@ bool PlayerProgress::forget(std::string_view uuid, const Identifier& recipe) {
         return false;
     }
     player->second.erase(found);
+    if (const auto marked = highlighted_.find(uuid); marked != highlighted_.end()) {
+        marked->second.erase(recipe);
+    }
     if (repository_ != nullptr) {
         repository_->forgetRecipe(uuid, recipe.toString());
     }
     return true;
+}
+
+std::set<Identifier> PlayerProgress::highlightedRecipes(std::string_view uuid) const {
+    const auto found = highlighted_.find(uuid);
+    return found == highlighted_.end() ? std::set<Identifier>{} : found->second;
+}
+
+void PlayerProgress::removeHighlight(std::string_view uuid, const Identifier& recipe) {
+    const auto found = highlighted_.find(uuid);
+    if (found == highlighted_.end() || found->second.erase(recipe) == 0) {
+        return;
+    }
+    if (repository_ != nullptr) {
+        repository_->removeHighlight(uuid, recipe.toString());
+    }
+}
+
+std::map<std::int32_t, std::pair<bool, bool>> PlayerProgress::bookSettings(std::string_view uuid) const {
+    const auto found = bookSettings_.find(uuid);
+    return found == bookSettings_.end() ? std::map<std::int32_t, std::pair<bool, bool>>{} : found->second;
+}
+
+void PlayerProgress::setBookSetting(std::string_view uuid, std::int32_t book, bool open, bool filtering) {
+    bookSettings_[std::string{uuid}][book] = {open, filtering};
+    if (repository_ != nullptr) {
+        repository_->setBookSetting(uuid, book, open, filtering);
+    }
 }
 
 } // namespace basalt::server::runtime::world

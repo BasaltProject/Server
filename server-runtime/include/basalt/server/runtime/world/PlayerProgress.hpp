@@ -78,6 +78,16 @@ public:
 
     bool forget(std::string_view uuid, const wire::common::Identifier& recipe);
 
+    [[nodiscard]] std::set<wire::common::Identifier> highlightedRecipes(std::string_view uuid) const;
+
+    /// parity: `ServerRecipeBook.removeHighlight`.
+    void removeHighlight(std::string_view uuid, const wire::common::Identifier& recipe);
+
+    /// open and filtering per RecipeBookType ordinal; absent means both off.
+    [[nodiscard]] std::map<std::int32_t, std::pair<bool, bool>> bookSettings(std::string_view uuid) const;
+
+    void setBookSetting(std::string_view uuid, std::int32_t book, bool open, bool filtering);
+
 private:
     storage::ProgressRepository* repository_ = nullptr;
     std::map<std::string, std::map<wire::common::Identifier, std::map<std::string, std::int64_t, std::less<>>>,
@@ -85,6 +95,8 @@ private:
         advancements_;
     Changed changed_;
     std::map<std::string, std::set<wire::common::Identifier>, std::less<>> recipes_;
+    std::map<std::string, std::set<wire::common::Identifier>, std::less<>> highlighted_;
+    std::map<std::string, std::map<std::int32_t, std::pair<bool, bool>>, std::less<>> bookSettings_;
 };
 
 } // namespace basalt::server::runtime::world

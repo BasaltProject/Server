@@ -183,6 +183,7 @@ basalt_module(server-runtime-core
         src/ContainerEnchantment.cpp
         src/ContainerSlots.cpp
         src/ContainerRecipeAwards.cpp
+        src/ContainerRecipePlacing.cpp
         src/MobActionSystem.cpp
         src/ItemUseTimers.cpp
         src/PlayerLifecycle.cpp

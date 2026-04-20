@@ -183,6 +183,17 @@ public:
         bool rememberIp = false;
         /// parity: `WorldDataConfiguration.enabledFeatures`.
         std::function<std::vector<std::string>()> enabledFeatures;
+        /// parity: `DedicatedServer.createServerLinks`; empty when unset or not http(s).
+        std::string bugReportLink;
+        struct ResourcePack {
+            wire::common::Uuid id;
+            std::string url;
+            std::string hash;
+            bool required = false;
+            std::optional<wire::text::Component> prompt;
+        };
+        /// parity: `MinecraftServer.getServerResourcePack`.
+        std::optional<ResourcePack> resourcePack;
         std::function<config::UiConfigs()> ui;
         const wire::common::placeholder::PlaceholderRegistry* placeholders = nullptr;
         world::RealLootTables* lootTables = nullptr;
@@ -491,6 +502,11 @@ private:
 
     void sendRegistriesThenFinish();
 
+    void finishConfiguration();
+
+    void handleResourcePackResponse(const wire::protocol::configuration::ResourcePackResponsePacket& response,
+                                    bool configuring);
+
     wire::io::TcpConnection connection_;
     Options options_;
     wire::common::Logger logger_{"Session"};
@@ -542,6 +558,7 @@ private:
     std::int32_t pendingChatVisibility_ = 0;
     /// parity: `ClientInformation.viewDistance`, kept until the chunk view exists to take it.
     std::int32_t pendingViewDistance_ = 2;
+    bool awaitingResourcePack_ = false;
     std::unique_ptr<chat::SecureChat> secureChat_;
     chat::ChatThrottle chatSpam_;
     chat::ChatThrottle commandSpam_;
